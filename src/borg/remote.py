@@ -1283,7 +1283,7 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
     """
     Return a Repository(No)Cache for *repository*.
 
-    If *decrypted_cache* is a key object, then get and get_many will return a tuple
+    If *decrypted_cache* is a repo_objs object, then get and get_many will return a tuple
     (csize, plaintext) instead of the actual data in the repository. The cache will
     store decrypted data, which increases CPU efficiency (by avoiding repeatedly decrypting
     and more importantly MAC and ID checking cached objects).
@@ -1292,7 +1292,7 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
     if decrypted_cache and (pack or unpack or transform):
         raise ValueError("decrypted_cache and pack/unpack/transform are incompatible")
     elif decrypted_cache:
-        key = decrypted_cache
+        repo_objs = decrypted_cache
         # 32 bit csize, 64 bit (8 byte) xxh64
         cache_struct = struct.Struct("=I8s")
         compressor = Compressor("lz4")
@@ -1311,8 +1311,8 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
             return csize, compressor.decompress(compressed)
 
         def transform(id_, data):
-            csize = len(data)
-            decrypted = key.decrypt(id_, data)
+            meta, decrypted = repo_objs.parse(id_, data)
+            csize = meta.get("csize", len(data))
             return csize, decrypted
 
     if isinstance(repository, RemoteRepository) or force_cache:

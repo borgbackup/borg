@@ -39,8 +39,9 @@ logger = create_logger()
 
 class CreateMixIn:
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.WRITE,))
-    def do_create(self, args, repository, manifest=None, key=None):
+    def do_create(self, args, repository, manifest):
         """Create new archive"""
+        key = manifest.key
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
 
@@ -210,7 +211,6 @@ class CreateMixIn:
         if not dry_run:
             with Cache(
                 repository,
-                key,
                 manifest,
                 progress=args.progress,
                 lock_wait=self.lock_wait,
@@ -219,8 +219,6 @@ class CreateMixIn:
                 iec=args.iec,
             ) as cache:
                 archive = Archive(
-                    repository,
-                    key,
                     manifest,
                     args.name,
                     cache=cache,

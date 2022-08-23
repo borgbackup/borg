@@ -15,7 +15,7 @@ logger = create_logger()
 class DiffMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
-    def do_diff(self, args, repository, manifest, key, archive):
+    def do_diff(self, args, repository, manifest, archive):
         """Diff contents of two archives"""
 
         def print_json_output(diff, path):
@@ -27,7 +27,7 @@ class DiffMixIn:
         print_output = print_json_output if args.json_lines else print_text_output
 
         archive1 = archive
-        archive2 = Archive(repository, key, manifest, args.other_name, consider_part_files=args.consider_part_files)
+        archive2 = Archive(manifest, args.other_name, consider_part_files=args.consider_part_files)
 
         can_compare_chunk_ids = (
             archive1.metadata.get("chunker_params", False) == archive2.metadata.get("chunker_params", True)

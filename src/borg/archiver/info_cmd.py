@@ -16,7 +16,7 @@ logger = create_logger()
 
 class InfoMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
-    def do_info(self, args, repository, manifest, key, cache):
+    def do_info(self, args, repository, manifest, cache):
         """Show archive details such as disk space used"""
 
         def format_cmdline(cmdline):
@@ -29,13 +29,7 @@ class InfoMixIn:
 
         for i, archive_name in enumerate(archive_names, 1):
             archive = Archive(
-                repository,
-                key,
-                manifest,
-                archive_name,
-                cache=cache,
-                consider_part_files=args.consider_part_files,
-                iec=args.iec,
+                manifest, archive_name, cache=cache, consider_part_files=args.consider_part_files, iec=args.iec
             )
             info = archive.info()
             if args.json:

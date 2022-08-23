@@ -17,8 +17,9 @@ logger = create_logger(__name__)
 
 class KeysMixIn:
     @with_repository(compatibility=(Manifest.Operation.CHECK,))
-    def do_change_passphrase(self, args, repository, manifest, key):
+    def do_change_passphrase(self, args, repository, manifest):
         """Change repository key file passphrase"""
+        key = manifest.key
         if not hasattr(key, "change_passphrase"):
             print("This repository is not encrypted, cannot change the passphrase.")
             return EXIT_ERROR
@@ -30,8 +31,9 @@ class KeysMixIn:
         return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
-    def do_change_location(self, args, repository, manifest, key, cache):
+    def do_change_location(self, args, repository, manifest, cache):
         """Change repository key location"""
+        key = manifest.key
         if not hasattr(key, "change_passphrase"):
             print("This repository is not encrypted, cannot change the key location.")
             return EXIT_ERROR
@@ -71,6 +73,7 @@ class KeysMixIn:
 
         # rewrite the manifest with the new key, so that the key-type byte of the manifest changes
         manifest.key = key_new
+        manifest.repo_objs.key = key_new
         manifest.write()
         repository.commit(compact=False)
 

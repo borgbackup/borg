@@ -241,12 +241,12 @@ class ItemCache:
 class FuseBackend:
     """Virtual filesystem based on archive(s) to provide information to fuse"""
 
-    def __init__(self, key, manifest, repository, args, decrypted_repository):
-        self.repository_uncached = repository
+    def __init__(self, manifest, args, decrypted_repository):
         self._args = args
         self.numeric_ids = args.numeric_ids
         self._manifest = manifest
-        self.key = key
+        self.repo_objs = manifest.repo_objs
+        self.repository_uncached = manifest.repository
         # Maps inode numbers to Item instances. This is used for synthetic inodes, i.e. file-system objects that are
         # made up and are not contained in the archives. For example archive directories or intermediate directories
         # not contained in archives.
@@ -330,13 +330,7 @@ class FuseBackend:
         """Build FUSE inode hierarchy from archive metadata"""
         self.file_versions = {}  # for versions mode: original path -> version
         t0 = time.perf_counter()
-        archive = Archive(
-            self.repository_uncached,
-            self.key,
-            self._manifest,
-            archive_name,
-            consider_part_files=self._args.consider_part_files,
-        )
+        archive = Archive(self._manifest, archive_name, consider_part_files=self._args.consider_part_files)
         strip_components = self._args.strip_components
         matcher = build_matcher(self._args.patterns, self._args.paths)
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
@@ -447,9 +441,9 @@ class FuseBackend:
 class FuseOperations(llfuse.Operations, FuseBackend):
     """Export archive as a FUSE filesystem"""
 
-    def __init__(self, key, repository, manifest, args, decrypted_repository):
+    def __init__(self, manifest, args, decrypted_repository):
         llfuse.Operations.__init__(self)
-        FuseBackend.__init__(self, key, manifest, repository, args, decrypted_repository)
+        FuseBackend.__init__(self, manifest, args, decrypted_repository)
         self.decrypted_repository = decrypted_repository
         data_cache_capacity = int(os.environ.get("BORG_MOUNT_DATA_CACHE_ENTRIES", os.cpu_count() or 1))
         logger.debug("mount data cache capacity: %d chunks", data_cache_capacity)
@@ -688,7 +682,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                     # evict fully read chunk from cache
                     del self.data_cache[id]
             else:
-                data = self.key.decrypt(id, self.repository_uncached.get(id))
+                _, data = self.repo_objs.parse(id, self.repository_uncached.get(id))
                 if offset + n < len(data):
                     # chunk was only partially read, cache it
                     self.data_cache[id] = data

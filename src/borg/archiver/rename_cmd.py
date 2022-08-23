@@ -13,7 +13,7 @@ logger = create_logger()
 class RenameMixIn:
     @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
     @with_archive
-    def do_rename(self, args, repository, manifest, key, cache, archive):
+    def do_rename(self, args, repository, manifest, cache, archive):
         """Rename an existing archive"""
         archive.rename(args.newname)
         manifest.write()

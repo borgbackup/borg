@@ -53,7 +53,7 @@ def get_tar_filter(fname, decompress):
 class TarMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
-    def do_export_tar(self, args, repository, manifest, key, archive):
+    def do_export_tar(self, args, repository, manifest, archive):
         """Export archive contents as a tarball"""
         self.output_list = args.output_list
 
@@ -239,7 +239,7 @@ class TarMixIn:
         return self.exit_code
 
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.WRITE,))
-    def do_import_tar(self, args, repository, manifest, key, cache):
+    def do_import_tar(self, args, repository, manifest, cache):
         """Create a backup archive from a tarball"""
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -250,7 +250,7 @@ class TarMixIn:
         tarstream_close = args.tarfile != "-"
 
         with create_filter_process(filter, stream=tarstream, stream_close=tarstream_close, inbound=True) as _stream:
-            self._import_tar(args, repository, manifest, key, cache, _stream)
+            self._import_tar(args, repository, manifest, manifest.key, cache, _stream)
 
         return self.exit_code
 
@@ -259,8 +259,6 @@ class TarMixIn:
         t0_monotonic = time.monotonic()
 
         archive = Archive(
-            repository,
-            key,
             manifest,
             args.name,
             cache=cache,

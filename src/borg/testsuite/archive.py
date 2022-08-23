@@ -110,8 +110,8 @@ class ArchiveTimestampTestCase(BaseTestCase):
     def _test_timestamp_parsing(self, isoformat, expected):
         repository = Mock()
         key = PlaintextKey(repository)
-        manifest = Manifest(repository, key)
-        a = Archive(repository, key, manifest, "test", create=True)
+        manifest = Manifest(key, repository)
+        a = Archive(manifest, "test", create=True)
         a.metadata = ArchiveItem(time=isoformat)
         self.assert_equal(a.ts, expected)
 

@@ -9,8 +9,8 @@ import pytest
 from ..remote import SleepingBandwidthLimiter, RepositoryCache, cache_if_remote
 from ..repository import Repository
 from ..crypto.key import PlaintextKey
-from ..compress import CompressionSpec
 from ..helpers import IntegrityError
+from ..repoobj import RepoObj
 from .hashindex import H
 from .key import TestKey
 
@@ -160,35 +160,38 @@ class TestRepositoryCache:
     def key(self, repository, monkeypatch):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
         key = PlaintextKey.create(repository, TestKey.MockArgs())
-        key.compressor = CompressionSpec("none").compressor
         return key
 
-    def _put_encrypted_object(self, key, repository, data):
-        id_ = key.id_hash(data)
-        repository.put(id_, key.encrypt(id_, data))
+    @pytest.fixture
+    def repo_objs(self, key):
+        return RepoObj(key)
+
+    def _put_encrypted_object(self, repo_objs, repository, data):
+        id_ = repo_objs.id_hash(data)
+        repository.put(id_, repo_objs.format(id_, {}, data))
         return id_
 
     @pytest.fixture
-    def H1(self, key, repository):
-        return self._put_encrypted_object(key, repository, b"1234")
+    def H1(self, repo_objs, repository):
+        return self._put_encrypted_object(repo_objs, repository, b"1234")
 
     @pytest.fixture
-    def H2(self, key, repository):
-        return self._put_encrypted_object(key, repository, b"5678")
+    def H2(self, repo_objs, repository):
+        return self._put_encrypted_object(repo_objs, repository, b"5678")
 
     @pytest.fixture
-    def H3(self, key, repository):
-        return self._put_encrypted_object(key, repository, bytes(100))
+    def H3(self, repo_objs, repository):
+        return self._put_encrypted_object(repo_objs, repository, bytes(100))
 
     @pytest.fixture
-    def decrypted_cache(self, key, repository):
-        return cache_if_remote(repository, decrypted_cache=key, force_cache=True)
+    def decrypted_cache(self, repo_objs, repository):
+        return cache_if_remote(repository, decrypted_cache=repo_objs, force_cache=True)
 
     def test_cache_corruption(self, decrypted_cache: RepositoryCache, H1, H2, H3):
         list(decrypted_cache.get_many([H1, H2, H3]))
 
         iterator = decrypted_cache.get_many([H1, H2, H3])
-        assert next(iterator) == (7, b"1234")
+        assert next(iterator) == (6, b"1234")
 
         with open(decrypted_cache.key_filename(H2), "a+b") as fd:
             fd.seek(-1, io.SEEK_END)
@@ -198,4 +201,4 @@ class TestRepositoryCache:
             fd.truncate()
 
         with pytest.raises(IntegrityError):
-            assert next(iterator) == (7, b"5678")
+            assert next(iterator) == (26, b"5678")

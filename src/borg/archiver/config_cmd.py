@@ -109,9 +109,9 @@ class ConfigMixIn:
                 name = args.name
 
         if args.cache:
-            manifest, key = Manifest.load(repository, (Manifest.Operation.WRITE,))
+            manifest = Manifest.load(repository, (Manifest.Operation.WRITE,))
             assert_secure(repository, manifest, self.lock_wait)
-            cache = Cache(repository, key, manifest, lock_wait=self.lock_wait)
+            cache = Cache(repository, manifest, lock_wait=self.lock_wait)
 
         try:
             if args.cache:

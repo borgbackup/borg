@@ -396,7 +396,6 @@ class Cache:
     def __new__(
         cls,
         repository,
-        key,
         manifest,
         path=None,
         sync=True,
@@ -410,8 +409,6 @@ class Cache:
     ):
         def local():
             return LocalCache(
-                repository=repository,
-                key=key,
                 manifest=manifest,
                 path=path,
                 sync=sync,
@@ -424,14 +421,7 @@ class Cache:
             )
 
         def adhoc():
-            return AdHocCache(
-                repository=repository,
-                key=key,
-                manifest=manifest,
-                lock_wait=lock_wait,
-                iec=iec,
-                consider_part_files=consider_part_files,
-            )
+            return AdHocCache(manifest=manifest, lock_wait=lock_wait, iec=iec, consider_part_files=consider_part_files)
 
         if not permit_adhoc_cache:
             return local()
@@ -481,9 +471,7 @@ Total chunks: {0.total_chunks}
         # so we can just sum up all archives to get the "all archives" stats:
         total_size = 0
         for archive_name in self.manifest.archives:
-            archive = Archive(
-                self.repository, self.key, self.manifest, archive_name, consider_part_files=self.consider_part_files
-            )
+            archive = Archive(self.manifest, archive_name, consider_part_files=self.consider_part_files)
             stats = archive.calc_stats(self, want_unique=False)
             total_size += stats.osize
         stats = self.Summary(total_size, unique_size, total_unique_chunks, total_chunks)._asdict()
@@ -503,8 +491,6 @@ class LocalCache(CacheStatsMixin):
 
     def __init__(
         self,
-        repository,
-        key,
         manifest,
         path=None,
         sync=True,
@@ -522,27 +508,29 @@ class LocalCache(CacheStatsMixin):
         :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         """
         CacheStatsMixin.__init__(self, iec=iec)
-        self.repository = repository
-        self.key = key
+        assert isinstance(manifest, Manifest)
         self.manifest = manifest
+        self.repository = manifest.repository
+        self.key = manifest.key
+        self.repo_objs = manifest.repo_objs
         self.progress = progress
         self.cache_mode = cache_mode
         self.consider_part_files = consider_part_files
         self.timestamp = None
         self.txn_active = False
 
-        self.path = cache_dir(repository, path)
-        self.security_manager = SecurityManager(repository)
+        self.path = cache_dir(self.repository, path)
+        self.security_manager = SecurityManager(self.repository)
         self.cache_config = CacheConfig(self.repository, self.path, lock_wait)
 
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
-            self.security_manager.assert_access_unknown(warn_if_unencrypted, manifest, key)
+            self.security_manager.assert_access_unknown(warn_if_unencrypted, manifest, self.key)
             self.create()
 
         self.open()
         try:
-            self.security_manager.assert_secure(manifest, key, cache_config=self.cache_config)
+            self.security_manager.assert_secure(manifest, self.key, cache_config=self.cache_config)
 
             if not self.check_cache_compatibility():
                 self.wipe_cache()
@@ -912,7 +900,7 @@ class LocalCache(CacheStatsMixin):
         self.manifest.check_repository_compatibility((Manifest.Operation.READ,))
 
         self.begin_txn()
-        with cache_if_remote(self.repository, decrypted_cache=self.key) as decrypted_repository:
+        with cache_if_remote(self.repository, decrypted_cache=self.repo_objs) as decrypted_repository:
             # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
             # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
             self.do_cache = os.path.isdir(archive_path)
@@ -965,7 +953,7 @@ class LocalCache(CacheStatsMixin):
             return self.chunk_incref(id, stats)
         if size is None:
             raise ValueError("when giving compressed data for a new chunk, the uncompressed size must be given also")
-        data = self.key.encrypt(id, chunk, compress=compress)
+        data = self.repo_objs.format(id, {}, chunk, compress=compress, size=size)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size)
         stats.update(size, not refcount)
@@ -1094,18 +1082,18 @@ All archives:                unknown              unknown              unknown
                        Unique chunks         Total chunks
 Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
-    def __init__(
-        self, repository, key, manifest, warn_if_unencrypted=True, lock_wait=None, consider_part_files=False, iec=False
-    ):
+    def __init__(self, manifest, warn_if_unencrypted=True, lock_wait=None, consider_part_files=False, iec=False):
         CacheStatsMixin.__init__(self, iec=iec)
-        self.repository = repository
-        self.key = key
+        assert isinstance(manifest, Manifest)
         self.manifest = manifest
+        self.repository = manifest.repository
+        self.key = manifest.key
+        self.repo_objs = manifest.repo_objs
         self.consider_part_files = consider_part_files
         self._txn_active = False
 
-        self.security_manager = SecurityManager(repository)
-        self.security_manager.assert_secure(manifest, key, lock_wait=lock_wait)
+        self.security_manager = SecurityManager(self.repository)
+        self.security_manager.assert_secure(manifest, self.key, lock_wait=lock_wait)
 
         logger.warning("Note: --no-cache-sync is an experimental feature.")
 
@@ -1138,7 +1126,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         refcount = self.seen_chunk(id, size)
         if refcount:
             return self.chunk_incref(id, stats, size=size)
-        data = self.key.encrypt(id, chunk, compress=compress)
+        data = self.repo_objs.format(id, {}, chunk, compress=compress)
         self.repository.put(id, data, wait=wait)
         self.chunks.add(id, 1, size)
         stats.update(size, not refcount)

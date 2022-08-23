@@ -13,8 +13,9 @@ logger = create_logger()
 
 class RInfoMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
-    def do_rinfo(self, args, repository, manifest, key, cache):
+    def do_rinfo(self, args, repository, manifest, cache):
         """Show repository infos"""
+        key = manifest.key
         info = basic_json_data(manifest, cache=cache, extra={"security_dir": cache.security_manager.dir})
 
         if args.json:

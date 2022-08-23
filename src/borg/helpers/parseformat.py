@@ -673,7 +673,7 @@ class ArchiveFormatter(BaseFormatter):
         if self._archive is None or self._archive.id != self.id:
             from ..archive import Archive
 
-            self._archive = Archive(self.repository, self.key, self.manifest, self.name, iec=self.iec)
+            self._archive = Archive(self.manifest, self.name, iec=self.iec)
         return self._archive
 
     def get_meta(self, key, rs):

@@ -9,7 +9,6 @@ from .hashindex import H
 from .key import TestKey
 from ..archive import Statistics
 from ..cache import AdHocCache
-from ..compress import CompressionSpec
 from ..crypto.key import AESOCBRepoKey
 from ..hashindex import ChunkIndex, CacheSynchronizer
 from ..manifest import Manifest
@@ -167,17 +166,16 @@ class TestAdHocCache:
     def key(self, repository, monkeypatch):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
         key = AESOCBRepoKey.create(repository, TestKey.MockArgs())
-        key.compressor = CompressionSpec("none").compressor
         return key
 
     @pytest.fixture
     def manifest(self, repository, key):
         Manifest(key, repository).write()
-        return Manifest.load(repository, key=key, operations=Manifest.NO_OPERATION_CHECK)[0]
+        return Manifest.load(repository, key=key, operations=Manifest.NO_OPERATION_CHECK)
 
     @pytest.fixture
     def cache(self, repository, key, manifest):
-        return AdHocCache(repository, key, manifest)
+        return AdHocCache(manifest)
 
     def test_does_not_contain_manifest(self, cache):
         assert not cache.seen_chunk(Manifest.MANIFEST_ID)

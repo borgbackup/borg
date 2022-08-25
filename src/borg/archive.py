@@ -83,6 +83,9 @@ class Statistics:
         stats.osize_parts = self.osize_parts + other.osize_parts
         stats.usize_parts = self.usize_parts + other.usize_parts
         stats.nfiles_parts = self.nfiles_parts + other.nfiles_parts
+        stats.files_stats = other.files_stats
+        stats.chunking_time = other.chunking_time
+        stats.hashing_time = other.hashing_time
         return stats
 
     def __str__(self):
@@ -90,6 +93,9 @@ class Statistics:
 Number of files: {stats.nfiles}
 Original size: {stats.osize_fmt}
 Deduplicated size: {stats.usize_fmt}
+Files status: {stats.files_stats}
+Time spent in hashing: {stats.hashing_time}
+Time spent in chunking: {stats.chunking_time}
 """.format(
             stats=self
         )

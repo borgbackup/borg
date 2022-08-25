@@ -1413,9 +1413,9 @@ class FilesystemObjectProcessors:
                 else:  # normal case, no "2nd+" hardlink
                     if not is_special_file:
                         hashed_path = safe_encode(os.path.join(self.cwd, path))
-                        started_hashing = time.time()
+                        started_hashing = time.monotonic()
                         path_hash = self.key.id_hash(hashed_path)
-                        self.stats.hashing_time += time.time() - started_hashing
+                        self.stats.hashing_time += time.monotonic() - started_hashing
                         known, ids = cache.file_known_and_unchanged(hashed_path, path_hash, st)
                     else:
                         # in --read-special mode, we may be called for special files.
@@ -1445,7 +1445,7 @@ class FilesystemObjectProcessors:
                         item.chunks = chunks
                     else:
                         with backup_io("read"):
-                            started_chunking = time.time()
+                            started_chunking = time.monotonic()
                             self.process_file_chunks(
                                 item,
                                 cache,
@@ -1453,7 +1453,7 @@ class FilesystemObjectProcessors:
                                 self.show_progress,
                                 backup_io_iter(self.chunker.chunkify(None, fd)),
                             )
-                            self.stats.chunking_time += time.time() - started_chunking
+                            self.stats.chunking_time += time.monotonic() - started_chunking
                         if is_win32:
                             changed_while_backup = False  # TODO
                         else:

@@ -110,6 +110,9 @@ Time spent in chunking: {stats.chunking_time}
             "original_size": FileSize(self.osize, iec=self.iec),
             "deduplicated_size": FileSize(self.usize, iec=self.iec),
             "nfiles": self.nfiles,
+            "hashing_time": self.hashing_time,
+            "chunking_time": self.chunking_time,
+            "files_stats": self.files_stats
         }
 
     def as_raw_dict(self):

@@ -269,8 +269,6 @@ class CreateMixIn:
                     iec=args.iec,
                     file_status_printer=self.print_file_status,
                 )
-                fso.stats.chunking_time = 0
-                fso.stats.hashing_time = 0
                 create_inner(archive, cache, fso)
         else:
             create_inner(None, None, None)

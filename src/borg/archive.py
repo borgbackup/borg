@@ -60,6 +60,8 @@ class Statistics:
         self.osize_parts = self.usize_parts = self.nfiles_parts = 0
         self.last_progress = 0  # timestamp when last progress was shown
         self.files_stats = {"A": 0, "U": 0, "M": 0}
+        self.chunking_time = 0
+        self.hashing_time = 0
 
     def update(self, size, unique, part=False):
         if not part:

@@ -59,6 +59,7 @@ class Statistics:
         self.osize = self.usize = self.nfiles = 0
         self.osize_parts = self.usize_parts = self.nfiles_parts = 0
         self.last_progress = 0  # timestamp when last progress was shown
+        self.files_stats = {"A": 0, "U": 0, "M": 0}
 
     def update(self, size, unique, part=False):
         if not part:
@@ -1289,7 +1290,6 @@ class FilesystemObjectProcessors:
 
         self.hlm = HardLinkManager(id_type=tuple, info_type=(list, type(None)))  # (dev, ino) -> chunks or None
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
-        self.stats.files_stats = {"A": 0, "M": 0, "U": 0}
         self.cwd = os.getcwd()
         self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=sparse)
 

@@ -5,8 +5,10 @@ import os
 import stat
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import TextIOWrapper
+
+from borg.helpers.time import format_timedelta
 
 from ._common import with_repository, Highlander
 from .. import helpers
@@ -192,6 +194,8 @@ class CreateMixIn:
                     archive.save(comment=args.comment, timestamp=args.timestamp, stats=archive.stats)
                     args.stats |= args.json
                     if args.stats:
+                        archive.stats.chunking_time = format_timedelta(timedelta(seconds=archive.stats.chunking_time))
+                        archive.stats.hashing_time = format_timedelta(timedelta(seconds=archive.stats.hashing_time))
                         if args.json:
                             json_print(basic_json_data(manifest, cache=cache, extra={"archive": archive}))
                         else:

@@ -112,7 +112,7 @@ Time spent in chunking: {stats.chunking_time}
             "nfiles": self.nfiles,
             "hashing_time": self.hashing_time,
             "chunking_time": self.chunking_time,
-            "files_stats": self.files_stats
+            "files_stats": self.files_stats,
         }
 
     def as_raw_dict(self):

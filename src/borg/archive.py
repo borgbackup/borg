@@ -83,9 +83,12 @@ class Statistics:
         stats.osize_parts = self.osize_parts + other.osize_parts
         stats.usize_parts = self.usize_parts + other.usize_parts
         stats.nfiles_parts = self.nfiles_parts + other.nfiles_parts
-        stats.files_stats = other.files_stats
-        stats.chunking_time = other.chunking_time
-        stats.hashing_time = other.hashing_time
+        stats.chunking_time = self.chunking_time + other.chunking_time
+        stats.hashing_time = self.hashing_time + other.hashing_time
+        stats.files_stats["A"] = self.files_stats["A"] + other.files_stats["A"]
+        stats.files_stats["U"] = self.files_stats["U"] + other.files_stats["U"]
+        stats.files_stats["M"] = self.files_stats["M"] + other.files_stats["M"]
+
         return stats
 
     def __str__(self):

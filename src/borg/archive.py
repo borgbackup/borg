@@ -109,7 +109,7 @@ Modified_files: {modified_files}
             chunking_time=chunking_time,
             added_files=self.files_stats["A"],
             unchanged_files=self.files_stats["U"],
-            modified_files=self.files_stats["M"]
+            modified_files=self.files_stats["M"],
         )
 
     def __repr__(self):

@@ -194,8 +194,6 @@ class CreateMixIn:
                     archive.save(comment=args.comment, timestamp=args.timestamp, stats=archive.stats)
                     args.stats |= args.json
                     if args.stats:
-                        archive.stats.chunking_time = format_timedelta(timedelta(seconds=archive.stats.chunking_time))
-                        archive.stats.hashing_time = format_timedelta(timedelta(seconds=archive.stats.hashing_time))
                         if args.json:
                             json_print(basic_json_data(manifest, cache=cache, extra={"archive": archive}))
                         else:

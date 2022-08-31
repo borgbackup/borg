@@ -89,15 +89,24 @@ class Statistics:
         return stats
 
     def __str__(self):
+        hashing_time = format_timedelta(timedelta(seconds=self.hashing_time))
+        chunking_time = format_timedelta(timedelta(seconds=self.chunking_time))
         return """\
 Number of files: {stats.nfiles}
 Original size: {stats.osize_fmt}
 Deduplicated size: {stats.usize_fmt}
-Files status: {stats.files_stats}
-Time spent in hashing: {stats.hashing_time}
-Time spent in chunking: {stats.chunking_time}
+Time spent in hashing: {hashing_time}
+Time spent in chunking: {chunking_time}
+Added files: {added_files}
+Unchanged files: {unchanged_files}
+Modified_files: {modified_files}
 """.format(
-            stats=self
+            stats=self,
+            hashing_time=hashing_time,
+            chunking_time=chunking_time,
+            added_files=self.files_stats["A"],
+            unchanged_files=self.files_stats["U"],
+            modified_files=self.files_stats["M"]
         )
 
     def __repr__(self):

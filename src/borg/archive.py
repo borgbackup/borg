@@ -102,7 +102,7 @@ Time spent in hashing: {hashing_time}
 Time spent in chunking: {chunking_time}
 Added files: {added_files}
 Unchanged files: {unchanged_files}
-Modified_files: {modified_files}
+Modified files: {modified_files}
 """.format(
             stats=self,
             hashing_time=hashing_time,

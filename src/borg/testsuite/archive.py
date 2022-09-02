@@ -60,6 +60,11 @@ def test_stats_format(stats):
 Number of files: 1
 Original size: 20 B
 Deduplicated size: 20 B
+Time spent in hashing: 0.00 seconds
+Time spent in chunking: 0.00 seconds
+Added files: 0
+Unchanged files: 0
+Modified_files: 0
 """
     )
     s = f"{stats.osize_fmt}"

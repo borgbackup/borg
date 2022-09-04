@@ -44,11 +44,12 @@ class RepoObj:
             data_compressed = self.compressor.compress(data)  # TODO: compressor also adds compressor type/level bytes
             ctype = data_compressed[0]
             clevel = data_compressed[1]
+            data_compressed = data_compressed[2:]  # strip the type/level bytes
         else:
             assert isinstance(size, int)
             assert isinstance(ctype, int)
             assert isinstance(clevel, int)
-            data_compressed = data  # is already compressed
+            data_compressed = data  # is already compressed, is NOT prefixed by type/level bytes
         meta["size"] = size
         meta["csize"] = len(data_compressed)
         meta["ctype"] = ctype
@@ -94,10 +95,10 @@ class RepoObj:
             compr_hdr = bytes((ctype, clevel))
             compressor_cls, compression_level = Compressor.detect(compr_hdr)
             compressor = compressor_cls(level=compression_level)
-            data = compressor.decompress(data_compressed)  # TODO: decompressor still needs type/level bytes
+            data = compressor.decompress(compr_hdr + data_compressed)  # TODO: decompressor still needs type/level bytes
             self.key.assert_id(id, data)
         else:
-            data = data_compressed
+            data = data_compressed  # does not include the type/level bytes
         return meta, data
 
 
@@ -125,7 +126,7 @@ class RepoObj1:  # legacy
             data_compressed = self.compressor.compress(data)  # TODO: compressor also adds compressor type/level bytes
         else:
             assert isinstance(size, int)
-            data_compressed = data  # is already compressed
+            data_compressed = data  # is already compressed, must include type/level bytes
         data_encrypted = self.key.encrypt(id, data_compressed)
         return data_encrypted
 

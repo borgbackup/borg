@@ -943,18 +943,18 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.ignored_features.update(repo_features - my_features)
         self.cache_config.mandatory_features.update(repo_features & my_features)
 
-    def add_chunk(self, id, chunk, stats, *, overwrite=False, wait=True, compress=True, size=None):
+    def add_chunk(self, id, meta, data, *, stats, overwrite=False, wait=True, compress=True, size=None):
         if not self.txn_active:
             self.begin_txn()
         if size is None and compress:
-            size = len(chunk)  # chunk is still uncompressed
+            size = len(data)  # data is still uncompressed
         refcount = self.seen_chunk(id, size)
         if refcount and not overwrite:
             return self.chunk_incref(id, stats)
         if size is None:
             raise ValueError("when giving compressed data for a new chunk, the uncompressed size must be given also")
-        data = self.repo_objs.format(id, {}, chunk, compress=compress, size=size)
-        self.repository.put(id, data, wait=wait)
+        cdata = self.repo_objs.format(id, meta, data, compress=compress, size=size)
+        self.repository.put(id, cdata, wait=wait)
         self.chunks.add(id, 1, size)
         stats.update(size, not refcount)
         return ChunkListEntry(id, size)
@@ -1115,19 +1115,19 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     def memorize_file(self, hashed_path, path_hash, st, ids):
         pass
 
-    def add_chunk(self, id, chunk, stats, *, overwrite=False, wait=True, compress=True, size=None):
+    def add_chunk(self, id, meta, data, *, stats, overwrite=False, wait=True, compress=True, size=None):
         assert not overwrite, "AdHocCache does not permit overwrites — trying to use it for recreate?"
         if not self._txn_active:
             self.begin_txn()
         if size is None and compress:
-            size = len(chunk)  # chunk is still uncompressed
+            size = len(data)  # data is still uncompressed
         if size is None:
             raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
         refcount = self.seen_chunk(id, size)
         if refcount:
             return self.chunk_incref(id, stats, size=size)
-        data = self.repo_objs.format(id, {}, chunk, compress=compress)
-        self.repository.put(id, data, wait=wait)
+        cdata = self.repo_objs.format(id, meta, data, compress=compress)
+        self.repository.put(id, cdata, wait=wait)
         self.chunks.add(id, 1, size)
         stats.update(size, not refcount)
         return ChunkListEntry(id, size)

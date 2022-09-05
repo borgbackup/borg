@@ -370,7 +370,7 @@ class CacheChunkBuffer(ChunkBuffer):
         self.stats = stats
 
     def write_chunk(self, chunk):
-        id_, _ = self.cache.add_chunk(self.key.id_hash(chunk), chunk, self.stats, wait=False)
+        id_, _ = self.cache.add_chunk(self.key.id_hash(chunk), {}, chunk, stats=self.stats, wait=False)
         self.cache.repository.async_response(wait=False)
         return id_
 
@@ -415,7 +415,7 @@ def archive_put_items(chunk_ids, *, repo_objs, cache=None, stats=None, add_refer
         data = msgpack.packb(chunk_ids[i : i + IDS_PER_CHUNK])
         id = repo_objs.id_hash(data)
         if cache is not None and stats is not None:
-            cache.add_chunk(id, data, stats)
+            cache.add_chunk(id, {}, data, stats=stats)
         elif add_reference is not None:
             cdata = repo_objs.format(id, {}, data)
             add_reference(id, len(data), cdata)
@@ -667,7 +667,7 @@ Duration: {0.duration}
         data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b"archive")
         self.id = self.repo_objs.id_hash(data)
         try:
-            self.cache.add_chunk(self.id, data, self.stats)
+            self.cache.add_chunk(self.id, {}, data, stats=self.stats)
         except IntegrityError as err:
             err_msg = str(err)
             # hack to avoid changing the RPC protocol by introducing new (more specific) exception class
@@ -967,7 +967,7 @@ Duration: {0.duration}
             del metadata.items
         data = msgpack.packb(metadata.as_dict())
         new_id = self.key.id_hash(data)
-        self.cache.add_chunk(new_id, data, self.stats)
+        self.cache.add_chunk(new_id, {}, data, stats=self.stats)
         self.manifest.archives[self.name] = (new_id, metadata.time)
         self.cache.chunk_decref(self.id, self.stats)
         self.id = new_id
@@ -1233,7 +1233,7 @@ class ChunksProcessor:
 
             def chunk_processor(chunk):
                 chunk_id, data = cached_hash(chunk, self.key.id_hash)
-                chunk_entry = cache.add_chunk(chunk_id, data, stats, wait=False)
+                chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, wait=False)
                 self.cache.repository.async_response(wait=False)
                 return chunk_entry
 
@@ -2269,8 +2269,7 @@ class ArchiveRecreater:
         overwrite = self.recompress
         if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
             # Check if this chunk is already compressed the way we want it
-            old_meta, old_data = self.repo_objs.parse(chunk_id, self.repository.get(chunk_id), decompress=False)
-            # TODO simplify code below
+            old_meta = self.repo_objs.parse_meta(chunk_id, self.repository.get(chunk_id))
             compr_hdr = bytes((old_meta["ctype"], old_meta["clevel"]))
             compressor_cls, level = Compressor.detect(compr_hdr)
             if (
@@ -2279,7 +2278,7 @@ class ArchiveRecreater:
             ):
                 # Stored chunk has the same compression method and level as we wanted
                 overwrite = False
-        chunk_entry = self.cache.add_chunk(chunk_id, data, target.stats, overwrite=overwrite, wait=False)
+        chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, overwrite=overwrite, wait=False)
         self.cache.repository.async_response(wait=False)
         self.seen_chunks.add(chunk_entry.id)
         return chunk_entry

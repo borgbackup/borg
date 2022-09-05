@@ -187,14 +187,14 @@ class TestAdHocCache:
 
     def test_does_not_overwrite(self, cache):
         with pytest.raises(AssertionError):
-            cache.add_chunk(H(1), b"5678", Statistics(), overwrite=True)
+            cache.add_chunk(H(1), {}, b"5678", stats=Statistics(), overwrite=True)
 
     def test_seen_chunk_add_chunk_size(self, cache):
-        assert cache.add_chunk(H(1), b"5678", Statistics()) == (H(1), 4)
+        assert cache.add_chunk(H(1), {}, b"5678", stats=Statistics()) == (H(1), 4)
 
     def test_deletes_chunks_during_lifetime(self, cache, repository):
         """E.g. checkpoint archives"""
-        cache.add_chunk(H(5), b"1010", Statistics())
+        cache.add_chunk(H(5), {}, b"1010", stats=Statistics())
         assert cache.seen_chunk(H(5)) == 1
         cache.chunk_decref(H(5), Statistics())
         assert not cache.seen_chunk(H(5))
@@ -216,10 +216,10 @@ class TestAdHocCache:
         assert not hasattr(cache, "chunks")
 
     def test_incref_after_add_chunk(self, cache):
-        assert cache.add_chunk(H(3), b"5678", Statistics()) == (H(3), 4)
+        assert cache.add_chunk(H(3), {}, b"5678", stats=Statistics()) == (H(3), 4)
         assert cache.chunk_incref(H(3), Statistics()) == (H(3), 4)
 
     def test_existing_incref_after_add_chunk(self, cache):
         """This case occurs with part files, see Archive.chunk_file."""
-        assert cache.add_chunk(H(1), b"5678", Statistics()) == (H(1), 4)
+        assert cache.add_chunk(H(1), {}, b"5678", stats=Statistics()) == (H(1), 4)
         assert cache.chunk_incref(H(1), Statistics()) == (H(1), 4)

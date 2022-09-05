@@ -92,10 +92,13 @@ class RepoObj:
         if decompress:
             ctype = meta["ctype"]
             clevel = meta["clevel"]
+            csize = meta["csize"]  # for obfuscation purposes, data_compressed may be longer than csize
             compr_hdr = bytes((ctype, clevel))
             compressor_cls, compression_level = Compressor.detect(compr_hdr)
             compressor = compressor_cls(level=compression_level)
-            data = compressor.decompress(compr_hdr + data_compressed)  # TODO: decompressor still needs type/level bytes
+            data = compressor.decompress(
+                compr_hdr + data_compressed[:csize]
+            )  # TODO: decompressor still needs type/level bytes
             self.key.assert_id(id, data)
         else:
             data = data_compressed  # does not include the type/level bytes

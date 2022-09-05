@@ -4014,7 +4014,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             for item in archive.iter_items():
                 if item.path.endswith("testsuite/archiver.py"):
                     chunk = item.chunks[-1]
-                    data = repository.get(chunk.id) + b"1234"
+                    data = repository.get(chunk.id)
+                    data = data[0:100] + b"x" + data[101:]
                     repository.put(chunk.id, data)
                     break
             repository.commit(compact=False)

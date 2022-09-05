@@ -1560,7 +1560,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert xattr.getxattr(b"input/file", b"security.capability") == capabilities
 
     @pytest.mark.skipif(
-        not xattr.XATTR_FAKEROOT, reason="xattr not supported on this system or on this version of" "fakeroot"
+        not xattr.XATTR_FAKEROOT, reason="xattr not supported on this system or on this version of " "fakeroot"
     )
     def test_extract_xattrs_errors(self):
         def patched_setxattr_E2BIG(*args, **kwargs):
@@ -3692,7 +3692,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
     # derived from test_extract_xattrs_errors()
     @pytest.mark.skipif(
-        not xattr.XATTR_FAKEROOT, reason="xattr not supported on this system or on this version of" "fakeroot"
+        not xattr.XATTR_FAKEROOT, reason="xattr not supported on this system or on this version of " "fakeroot"
     )
     def test_do_not_fail_when_percent_is_in_xattr_name(self):
         """https://github.com/borgbackup/borg/issues/6063"""
@@ -3710,7 +3710,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
     # derived from test_extract_xattrs_errors()
     @pytest.mark.skipif(
-        not xattr.XATTR_FAKEROOT, reason="xattr not supported on this system or on this version of" "fakeroot"
+        not xattr.XATTR_FAKEROOT, reason="xattr not supported on this system or on this version of " "fakeroot"
     )
     def test_do_not_fail_when_percent_is_in_file_name(self):
         """https://github.com/borgbackup/borg/issues/6063"""

@@ -56,7 +56,7 @@ def test_format_parse_roundtrip_borg1(key):  # legacy
     edata = repo_objs.extract_crypted_data(cdata)
     compressor = repo_objs.compressor
     key = repo_objs.key
-    assert edata.startswith(bytes((key.TYPE, compressor.ID[0], compressor.level)))
+    assert edata.startswith(bytes((key.TYPE, compressor.ID, compressor.level)))
 
 
 def test_borg1_borg2_transition(key):
@@ -70,7 +70,7 @@ def test_borg1_borg2_transition(key):
     borg1_cdata = repo_objs1.format(id, meta, data)
     meta1, compr_data1 = repo_objs1.parse(id, borg1_cdata, decompress=False)  # borg transfer avoids (de)compression
     # in borg 1, we can only get this metadata after decrypting the whole chunk (and we do not have "size" here):
-    assert meta1["ctype"] == LZ4.ID[0]  # default compression
+    assert meta1["ctype"] == LZ4.ID  # default compression
     assert meta1["clevel"] == 0xFF  # lz4 does not know levels (yet?)
     assert meta1["csize"] < len_data  # lz4 should make it smaller
 
@@ -82,14 +82,14 @@ def test_borg1_borg2_transition(key):
     )
     meta2, data2 = repo_objs2.parse(id, borg2_cdata)
     assert data2 == data
-    assert meta2["ctype"] == LZ4.ID[0]
+    assert meta2["ctype"] == LZ4.ID
     assert meta2["clevel"] == 0xFF
     assert meta2["csize"] == meta1["csize"] - 2  # borg2 does not store the type/level bytes there
     assert meta2["size"] == len_data
 
     meta2 = repo_objs2.parse_meta(id, borg2_cdata)
     # now, in borg 2, we have nice and separately decrypted metadata (no need to decrypt the whole chunk):
-    assert meta2["ctype"] == LZ4.ID[0]
+    assert meta2["ctype"] == LZ4.ID
     assert meta2["clevel"] == 0xFF
     assert meta2["csize"] == meta1["csize"] - 2  # borg2 does not store the type/level bytes there
     assert meta2["size"] == len_data

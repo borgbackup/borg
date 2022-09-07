@@ -1293,22 +1293,24 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
         raise ValueError("decrypted_cache and pack/unpack/transform are incompatible")
     elif decrypted_cache:
         repo_objs = decrypted_cache
-        # 32 bit csize, 64 bit (8 byte) xxh64
-        cache_struct = struct.Struct("=I8s")
+        # 32 bit csize, 64 bit (8 byte) xxh64, 1 byte ctype, 1 byte clevel
+        cache_struct = struct.Struct("=I8sBB")
         compressor = Compressor("lz4")
 
         def pack(data):
             csize, decrypted = data
-            compressed = compressor.compress(decrypted)
-            return cache_struct.pack(csize, xxh64(compressed)) + compressed
+            meta, compressed = compressor.compress({}, decrypted)
+            return cache_struct.pack(csize, xxh64(compressed), meta["ctype"], meta["clevel"]) + compressed
 
         def unpack(data):
             data = memoryview(data)
-            csize, checksum = cache_struct.unpack(data[: cache_struct.size])
+            csize, checksum, ctype, clevel = cache_struct.unpack(data[: cache_struct.size])
             compressed = data[cache_struct.size :]
             if checksum != xxh64(compressed):
                 raise IntegrityError("detected corrupted data in metadata cache")
-            return csize, compressor.decompress(compressed)
+            meta = dict(ctype=ctype, clevel=clevel, csize=len(compressed))
+            _, decrypted = compressor.decompress(meta, compressed)
+            return csize, decrypted
 
         def transform(id_, data):
             meta, decrypted = repo_objs.parse(id_, data)

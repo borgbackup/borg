@@ -2273,7 +2273,7 @@ class ArchiveRecreater:
             compr_hdr = bytes((old_meta["ctype"], old_meta["clevel"]))
             compressor_cls, level = Compressor.detect(compr_hdr)
             if (
-                compressor_cls.name == self.repo_objs.compressor.decide(data).name
+                compressor_cls.name == self.repo_objs.compressor.decide({}, data).name
                 and level == self.repo_objs.compressor.level
             ):
                 # Stored chunk has the same compression method and level as we wanted

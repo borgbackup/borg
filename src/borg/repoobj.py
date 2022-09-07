@@ -1,7 +1,7 @@
 from struct import Struct
 
 from .helpers import msgpack
-from .compress import Compressor, LZ4_COMPRESSOR
+from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
 
 
 class RepoObj:
@@ -40,20 +40,16 @@ class RepoObj:
         assert compress or size is not None and ctype is not None and clevel is not None
         if compress:
             assert size is None or size == len(data)
-            size = len(data) if size is None else size
-            data_compressed = self.compressor.compress(data)  # TODO: compressor also adds compressor type/level bytes
-            ctype = data_compressed[0]
-            clevel = data_compressed[1]
-            data_compressed = data_compressed[2:]  # strip the type/level bytes
+            meta, data_compressed = self.compressor.compress(meta, data)
         else:
             assert isinstance(size, int)
+            meta["size"] = size
             assert isinstance(ctype, int)
+            meta["ctype"] = ctype
             assert isinstance(clevel, int)
+            meta["clevel"] = clevel
             data_compressed = data  # is already compressed, is NOT prefixed by type/level bytes
-        meta["size"] = size
-        meta["csize"] = len(data_compressed)
-        meta["ctype"] = ctype
-        meta["clevel"] = clevel
+            meta["csize"] = len(data_compressed)
         data_encrypted = self.key.encrypt(id, data_compressed)
         meta_packed = msgpack.packb(meta)
         meta_encrypted = self.key.encrypt(id, meta_packed)
@@ -92,13 +88,14 @@ class RepoObj:
         if decompress:
             ctype = meta["ctype"]
             clevel = meta["clevel"]
-            csize = meta["csize"]  # for obfuscation purposes, data_compressed may be longer than csize
+            csize = meta["csize"]  # always the overall size
+            assert csize == len(data_compressed)
+            psize = meta.get("psize", csize)  # obfuscation: psize (payload size) is potentially less than csize.
+            assert psize <= csize
             compr_hdr = bytes((ctype, clevel))
             compressor_cls, compression_level = Compressor.detect(compr_hdr)
             compressor = compressor_cls(level=compression_level)
-            data = compressor.decompress(
-                compr_hdr + data_compressed[:csize]
-            )  # TODO: decompressor still needs type/level bytes
+            meta, data = compressor.decompress(meta, data_compressed[:psize])
             self.key.assert_id(id, data)
         else:
             data = data_compressed  # does not include the type/level bytes
@@ -113,7 +110,7 @@ class RepoObj1:  # legacy
 
     def __init__(self, key):
         self.key = key
-        self.compressor = LZ4_COMPRESSOR
+        self.compressor = get_compressor("lz4", legacy_mode=True)
 
     def id_hash(self, data: bytes) -> bytes:
         return self.key.id_hash(data)
@@ -126,7 +123,7 @@ class RepoObj1:  # legacy
         assert compress or size is not None
         if compress:
             assert size is None
-            data_compressed = self.compressor.compress(data)  # TODO: compressor also adds compressor type/level bytes
+            meta, data_compressed = self.compressor.compress(meta, data)
         else:
             assert isinstance(size, int)
             data_compressed = data  # is already compressed, must include type/level bytes
@@ -136,17 +133,16 @@ class RepoObj1:  # legacy
     def parse(self, id: bytes, cdata: bytes, decompress: bool = True) -> tuple[dict, bytes]:
         assert isinstance(id, bytes)
         assert isinstance(cdata, bytes)
-        meta = {}
         data_compressed = self.key.decrypt(id, cdata)
-        meta["csize"] = len(data_compressed)
         compressor_cls, compression_level = Compressor.detect(data_compressed[:2])
-        compressor = compressor_cls(level=compression_level)
-        meta["ctype"] = compressor.ID[0]
-        meta["clevel"] = compressor.level
+        compressor = compressor_cls(level=compression_level, legacy_mode=True)
         if decompress:
-            data = compressor.decompress(data_compressed)  # TODO: decompressor still needs type/level bytes
+            meta, data = compressor.decompress(None, data_compressed)
             self.key.assert_id(id, data)
-            meta["size"] = len(data)
         else:
+            meta = {}
+            meta["ctype"] = compressor.ID
+            meta["clevel"] = compressor.level
             data = data_compressed
+        meta["csize"] = len(data_compressed)
         return meta, data

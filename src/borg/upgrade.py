@@ -102,7 +102,7 @@ class UpgraderFrom12To20:
         # meta/data was parsed via RepoObj1.parse, which returns data **including** the ctype/clevel bytes prefixed
         def upgrade_zlib_and_level(meta, data):
             if ZLIB_legacy.detect(data):
-                ctype = ZLIB.ID[0]
+                ctype = ZLIB.ID
                 data = bytes(data)  # ZLIB_legacy has no ctype/clevel prefix
             else:
                 ctype = data[0]

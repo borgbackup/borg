@@ -943,7 +943,9 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.ignored_features.update(repo_features - my_features)
         self.cache_config.mandatory_features.update(repo_features & my_features)
 
-    def add_chunk(self, id, meta, data, *, stats, overwrite=False, wait=True, compress=True, size=None):
+    def add_chunk(
+        self, id, meta, data, *, stats, overwrite=False, wait=True, compress=True, size=None, ctype=None, clevel=None
+    ):
         if not self.txn_active:
             self.begin_txn()
         if size is None and compress:
@@ -953,7 +955,7 @@ class LocalCache(CacheStatsMixin):
             return self.chunk_incref(id, stats)
         if size is None:
             raise ValueError("when giving compressed data for a new chunk, the uncompressed size must be given also")
-        cdata = self.repo_objs.format(id, meta, data, compress=compress, size=size)
+        cdata = self.repo_objs.format(id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel)
         self.repository.put(id, cdata, wait=wait)
         self.chunks.add(id, 1, size)
         stats.update(size, not refcount)

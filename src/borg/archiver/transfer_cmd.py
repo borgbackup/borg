@@ -71,9 +71,16 @@ class TransferMixIn:
                                     # keep compressed payload same, avoid decompression / recompression
                                     meta, data = other_manifest.repo_objs.parse(chunk_id, cdata, decompress=False)
                                     meta, data = upgrader.upgrade_compressed_chunk(meta, data)
-
                                     chunk_entry = cache.add_chunk(
-                                        chunk_id, meta, data, stats=archive.stats, wait=False, compress=False, size=size
+                                        chunk_id,
+                                        meta,
+                                        data,
+                                        stats=archive.stats,
+                                        wait=False,
+                                        compress=False,
+                                        size=size,
+                                        ctype=meta["ctype"],
+                                        clevel=meta["clevel"],
                                     )
                                     cache.repository.async_response(wait=False)
                                     chunks.append(chunk_entry)

@@ -19,7 +19,7 @@ class UpgraderNoOp:
     def upgrade_item(self, *, item):
         return item
 
-    def upgrade_compressed_chunk(self, *, meta, data):
+    def upgrade_compressed_chunk(self, meta, data):
         return meta, data
 
     def upgrade_archive_metadata(self, *, metadata):
@@ -98,7 +98,7 @@ class UpgraderFrom12To20:
         assert all(key in new_item for key in REQUIRED_ITEM_KEYS)
         return new_item
 
-    def upgrade_compressed_chunk(self, *, meta, data):
+    def upgrade_compressed_chunk(self, meta, data):
         # meta/data was parsed via RepoObj1.parse, which returns data **including** the ctype/clevel bytes prefixed
         def upgrade_zlib_and_level(meta, data):
             if ZLIB_legacy.detect(data):

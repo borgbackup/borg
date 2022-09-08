@@ -123,8 +123,10 @@ class UpgraderFrom12To20:
             csize = borg1_header_fmt.unpack(csize_bytes)
             compressed = data[2 + hlen : 2 + hlen + csize]
             meta, compressed = upgrade_zlib_and_level(meta, compressed)
+            meta["psize"] = csize
             osize = len(data) - 2 - hlen - csize  # amount of 0x00 bytes appended for obfuscation
             data = compressed + bytes(osize)
+            meta["csize"] = len(data)
         else:
             meta, data = upgrade_zlib_and_level(meta, data)
         return meta, data

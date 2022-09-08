@@ -2269,7 +2269,7 @@ class ArchiveRecreater:
         overwrite = self.recompress
         if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
             # Check if this chunk is already compressed the way we want it
-            old_meta = self.repo_objs.parse_meta(chunk_id, self.repository.get(chunk_id))
+            old_meta = self.repo_objs.parse_meta(chunk_id, self.repository.get(chunk_id, read_data=False))
             compr_hdr = bytes((old_meta["ctype"], old_meta["clevel"]))
             compressor_cls, level = Compressor.detect(compr_hdr)
             if (

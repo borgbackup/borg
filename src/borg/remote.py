@@ -1258,7 +1258,6 @@ class RepositoryCache(RepositoryNoCache):
         shutil.rmtree(self.basedir)
 
     def get_many(self, keys, read_data=True, cache=True):
-        # TODO: this currently always requests the full chunk from self.repository (read_data=True).
         # It could use different cache keys depending on read_data and cache full vs. meta-only chunks.
         unknown_keys = [key for key in keys if self.prefixed_key(key, complete=read_data) not in self.cache]
         repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys, read_data=read_data))

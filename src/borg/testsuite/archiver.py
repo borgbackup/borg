@@ -3802,6 +3802,27 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert result["Unchanged files"] == 1
         assert result["Modified files"] == 0
 
+    def test_hashing_time(self):
+        """Tests hashing_time is positive or zero"""
+
+        def extract_hashing_time(borg_create_output: str) -> float:
+            borg_create_output = borg_create_output.split("\n")
+            borg_create_output.pop()  # The last line needs to be removed because its an empty string
+            borg_create_output = [line.split(":", 1) for line in borg_create_output]
+            hashing_time = [line for line in borg_create_output if line[0] == "Time spent in hashing"].pop()
+            hashing_time = hashing_time[1]
+            hashing_time = float(hashing_time[1][0 : len(hashing_time) - 7])
+            return hashing_time
+
+        # Test case set up: create a repository and a file
+        self.cmd(f"--repo={self.repository_location}", "rcreate", KF_ENCRYPTION)
+        self.create_regular_file("testfile1", contents=b"test1")
+        # Archive
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
+        hashing_time = extract_hashing_time(result)
+
+        assert hashing_time >= 0.0
+
 
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
 class ArchiverTestCaseBinary(ArchiverTestCase):

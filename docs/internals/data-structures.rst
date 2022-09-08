@@ -77,7 +77,7 @@ don't have a particular meaning (except for the Manifest_).
 
 Normally the keys are computed like this::
 
-  key = id = id_hash(unencrypted_data)
+  key = id = id_hash(plaintext_data)  # plain = not encrypted, not compressed, not obfuscated
 
 The id_hash function depends on the :ref:`encryption mode <borg_rcreate>`.
 
@@ -98,15 +98,15 @@ followed by a number of log entries. Each log entry consists of (in this order):
 
 * crc32 checksum (uint32):
   - for PUT2: CRC32(size + tag + key + digest)
-  - for PUT: CRC32(size + tag + key + data)
+  - for PUT: CRC32(size + tag + key + payload)
   - for DELETE: CRC32(size + tag + key)
   - for COMMIT: CRC32(size + tag)
 * size (uint32) of the entry (including the whole header)
 * tag (uint8): PUT(0), DELETE(1), COMMIT(2) or PUT2(3)
 * key (256 bit) - only for PUT/PUT2/DELETE
-* data (size - 41 bytes) - only for PUT
-* xxh64 digest (64 bit) = XXH64(size + tag + key + data) - only for PUT2
-* data (size - 41 - 8 bytes) - only for PUT2
+* payload (size - 41 bytes) - only for PUT
+* xxh64 digest (64 bit) = XXH64(size + tag + key + payload) - only for PUT2
+* payload (size - 41 - 8 bytes) - only for PUT2
 
 PUT2 is new since repository version 2. For new log entries PUT2 is used.
 PUT is still supported to read version 1 repositories, but not generated any more.
@@ -116,7 +116,7 @@ version 2+.
 Those files are strictly append-only and modified only once.
 
 When an object is written to the repository a ``PUT`` entry is written
-to the file containing the object id and data. If an object is deleted
+to the file containing the object id and payload. If an object is deleted
 a ``DELETE`` entry is appended with the object id.
 
 A ``COMMIT`` tag is written when a repository transaction is
@@ -130,13 +130,42 @@ partial/uncommitted transaction.
 The size of individual segments is limited to 4 GiB, since the offset of entries
 within segments is stored in a 32-bit unsigned integer in the repository index.
 
-Objects
-~~~~~~~
+Objects / Payload structure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-All objects (the manifest, archives, archive item streams chunks and file data
-chunks) are encrypted and/or compressed. See :ref:`data-encryption` for a
-graphic outlining the anatomy of an object in Borg. The `type` for compression
-is explained in :ref:`data-compression`.
+All data (the manifest, archives, archive item stream chunks and file data
+chunks) is compressed, optionally obfuscated and encrypted. This produces some
+additional metadata (size and compression information), which is separately
+serialized and also encrypted.
+
+See :ref:`data-encryption` for a graphic outlining the anatomy of the encryption in Borg.
+What you see at the bottom there is done twice: once for the data and once for the metadata.
+
+An object (the payload part of a segment file log entry) must be like:
+
+- length of encrypted metadata (16bit unsigned int)
+- encrypted metadata (incl. encryption header), when decrypted:
+
+  - msgpacked dict with:
+
+    - ctype (compression type 0..255)
+    - clevel (compression level 0..255)
+    - csize (overall compressed (and maybe obfuscated) data size)
+    - psize (only when obfuscated: payload size without the obfuscation trailer)
+    - size (uncompressed size of the data)
+- encrypted data (incl. encryption header), when decrypted:
+
+  - compressed data (with an optional all-zero-bytes obfuscation trailer)
+
+This new, more complex repo v2 object format was implemented to be able to efficiently
+query the metadata without having to read, transfer and decrypt the (usually much bigger)
+data part.
+
+The metadata is encrypted to not disclose potentially sensitive information that could be
+used for e.g. fingerprinting attacks.
+
+The compression `ctype` and `clevel` is explained in :ref:`data-compression`.
+
 
 Index, hints and integrity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -855,7 +884,7 @@ For each borg invocation, a new sessionkey is derived from the borg key material
 and the 48bit IV starts from 0 again (both ciphers internally add a 32bit counter
 to our IV, so we'll just count up by 1 per chunk).
 
-The chunk layout is best seen at the bottom of this diagram:
+The encryption layout is best seen at the bottom of this diagram:
 
 .. figure:: encryption-aead.png
     :figwidth: 100%
@@ -954,14 +983,14 @@ representation of the repository id.
 Compression
 -----------
 
-Borg supports the following compression methods, each identified by a type
-byte:
+Borg supports the following compression methods, each identified by a ctype value
+in the range between 0 and 255 (and augmented by a clevel 0..255 value for the
+compression level):
 
 - none (no compression, pass through data 1:1), identified by 0x00
 - lz4 (low compression, but super fast), identified by 0x01
 - zstd (level 1-22 offering a wide range: level 1 is lower compression and high
-  speed, level 22 is higher compression and lower speed) - since borg 1.1.4,
-  identified by 0x03
+  speed, level 22 is higher compression and lower speed) - identified by 0x03
 - zlib (level 0-9, level 0 is no compression [but still adding zlib overhead],
   level 1 is low, level 9 is high compression), identified by 0x05
 - lzma (level 0-9, level 0 is low, level 9 is high compression), identified

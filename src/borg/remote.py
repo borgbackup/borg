@@ -1191,6 +1191,12 @@ class RepositoryCache(RepositoryNoCache):
         available_space = shutil.disk_usage(self.basedir).free
         self.size_limit = int(min(available_space * 0.25, 2**31))
 
+    def prefixed_key(self, key, complete):
+        # just prefix another byte telling whether this key refers to a complete chunk
+        # or a without-data-metadata-only chunk (see also read_data param).
+        prefix = b"\x01" if complete else b"\x00"
+        return prefix + key
+
     def key_filename(self, key):
         return os.path.join(self.basedir, bin_to_hex(key))
 
@@ -1204,12 +1210,13 @@ class RepositoryCache(RepositoryNoCache):
             os.unlink(file)
             self.evictions += 1
 
-    def add_entry(self, key, data, cache):
+    def add_entry(self, key, data, cache, complete):
         transformed = self.transform(key, data)
         if not cache:
             return transformed
         packed = self.pack(transformed)
-        file = self.key_filename(key)
+        pkey = self.prefixed_key(key, complete=complete)
+        file = self.key_filename(pkey)
         try:
             with open(file, "wb") as fd:
                 fd.write(packed)
@@ -1225,7 +1232,7 @@ class RepositoryCache(RepositoryNoCache):
                 raise
         else:
             self.size += len(packed)
-            self.cache.add(key)
+            self.cache.add(pkey)
             if self.size > self.size_limit:
                 self.backoff()
         return transformed
@@ -1253,27 +1260,28 @@ class RepositoryCache(RepositoryNoCache):
     def get_many(self, keys, read_data=True, cache=True):
         # TODO: this currently always requests the full chunk from self.repository (read_data=True).
         # It could use different cache keys depending on read_data and cache full vs. meta-only chunks.
-        unknown_keys = [key for key in keys if key not in self.cache]
-        repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys, read_data=True))
+        unknown_keys = [key for key in keys if self.prefixed_key(key, complete=read_data) not in self.cache]
+        repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys, read_data=read_data))
         for key in keys:
-            if key in self.cache:
-                file = self.key_filename(key)
+            pkey = self.prefixed_key(key, complete=read_data)
+            if pkey in self.cache:
+                file = self.key_filename(pkey)
                 with open(file, "rb") as fd:
                     self.hits += 1
                     yield self.unpack(fd.read())
             else:
                 for key_, data in repository_iterator:
                     if key_ == key:
-                        transformed = self.add_entry(key, data, cache)
+                        transformed = self.add_entry(key, data, cache, complete=read_data)
                         self.misses += 1
                         yield transformed
                         break
                 else:
                     # slow path: eviction during this get_many removed this key from the cache
                     t0 = time.perf_counter()
-                    data = self.repository.get(key, read_data=True)
+                    data = self.repository.get(key, read_data=read_data)
                     self.slow_lat += time.perf_counter() - t0
-                    transformed = self.add_entry(key, data, cache)
+                    transformed = self.add_entry(key, data, cache, complete=read_data)
                     self.slow_misses += 1
                     yield transformed
         # Consume any pending requests

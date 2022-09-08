@@ -3767,18 +3767,39 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 
     def test_file_status_counters(self):
         """Test file status counters in the stats of `borg create --stats`"""
+
+        def to_dict(borg_create_output: str) -> dict:
+            borg_create_output = borg_create_output.split("\n")
+            borg_create_output.pop()  # The last line needs to be removed because its an empty string
+            borg_create_output = [line.split(":", 1) for line in borg_create_output]
+            borg_create_output = {
+                key: int(value) for key, value in borg_create_output if key in ("Added files", "Unchanged files", "Modified files")
+            }
+            return borg_create_output
+
         # Test case set up: create a repository
         self.cmd(f"--repo={self.repository_location}", "rcreate", KF_ENCRYPTION)
-        # Create an archive
-        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", "./")
-        result = result.split("\n")
-        result.pop()  # The last line needs to be removed because its an empty string
-        result = [line.split(":", 1) for line in result]
-        result = {
-            key: int(value) for key, value in result if key in ("Added files", "Unchanged files", "Modified files")
-        }
-        assert result["Added files"] == 3
+        # Archive an empty dir
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
+        result = to_dict(result)
+        assert result["Added files"] == 0
         assert result["Unchanged files"] == 0
+        assert result["Modified files"] == 0
+        # Archive a dir with two added files
+        self.create_regular_file("testfile1", contents=b"test1")
+        self.create_regular_file("testfile2", contents=b"test2")
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive2", self.input_path)
+        result = to_dict(result)
+        assert result["Added files"] == 2
+        assert result["Unchanged files"] == 0
+        assert result["Modified files"] == 0
+        # Archive a dir with 1 unmodified file and 1 modified
+        with open(self.input_path + "/testfile2", "a") as file:
+            file.write("data")
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive3", self.input_path)
+        result = to_dict(result)
+        assert result["Added files"] == 1
+        assert result["Unchanged files"] == 1
         assert result["Modified files"] == 0
 
 

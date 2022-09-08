@@ -3765,6 +3765,23 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
             assert key["algorithm"] == "argon2 chacha20-poly1305"
 
+    def test_file_status_counters(self):
+        """Test file status counters in the stats of `borg create --stats`"""
+        # Test case set up: create a repository
+        self.cmd(f"--repo={self.repository_location}", "rcreate", KF_ENCRYPTION)
+        # Create an archive
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", "./")
+        result = result.split("\n")
+        result = [l.split(":") for l in result]
+        result = [l for l in result if l[0] in ("Added files", "Unchanged files", "Modified files")]
+        # The line above left the value to the right of the `:` with a leading space.
+        # The line below removes the space and converts the value to int.
+        result = [[l[0], int(l[1][1:])] for l in result]
+        result = {l[0]:l[1] for l in result}
+        assert result["Added files"] == 3
+        assert result["Unchanged files"] == 0
+        assert result["Modified files"] == 0
+
 
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
 class ArchiverTestCaseBinary(ArchiverTestCase):

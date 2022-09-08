@@ -60,7 +60,7 @@ class RepositoryTestCaseBase(BaseTestCase):
         H_trans[None] = -1  # key == None appears in commits
         tag_trans = {TAG_PUT2: "put2", TAG_PUT: "put", TAG_DELETE: "del", TAG_COMMIT: "comm"}
         for segment, fn in self.repository.io.segment_iterator():
-            for tag, key, offset, size in self.repository.io.iter_objects(segment):
+            for tag, key, offset, size, _ in self.repository.io.iter_objects(segment):
                 print("%s%s H(%d) -> %s[%d..+%d]" % (label, tag_trans[tag], H_trans[key], fn, offset, size))
         print()
 
@@ -372,7 +372,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         self.repo_dump("d1 cc")
         last_segment = self.repository.io.get_latest_segment() - 1
         num_deletes = 0
-        for tag, key, offset, size in self.repository.io.iter_objects(last_segment):
+        for tag, key, offset, size, _ in self.repository.io.iter_objects(last_segment):
             if tag == TAG_DELETE:
                 assert key == H(1)
                 num_deletes += 1
@@ -384,7 +384,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         assert last_segment not in self.repository.compact
         assert not self.repository.io.segment_exists(last_segment)
         for segment, _ in self.repository.io.segment_iterator():
-            for tag, key, offset, size in self.repository.io.iter_objects(segment):
+            for tag, key, offset, size, _ in self.repository.io.iter_objects(segment):
                 assert tag != TAG_DELETE
                 assert key != H(1)
         # after compaction, there should be no empty shadowed_segments lists left over.

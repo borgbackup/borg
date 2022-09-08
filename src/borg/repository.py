@@ -830,7 +830,7 @@ class Repository:
                 freeable_ratio * 100.0,
                 freeable_space,
             )
-            for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
+            for tag, key, offset, _, data in self.io.iter_objects(segment):
                 if tag == TAG_COMMIT:
                     continue
                 in_index = self.index.get(key)
@@ -961,7 +961,7 @@ class Repository:
     def _update_index(self, segment, objects, report=None):
         """some code shared between replay_segments and check"""
         self.segments[segment] = 0
-        for tag, key, offset, size in objects:
+        for tag, key, offset, size, _ in objects:
             if tag in (TAG_PUT2, TAG_PUT):
                 try:
                     # If this PUT supersedes an older PUT, mark the old segment for compaction and count the free space
@@ -1011,7 +1011,7 @@ class Repository:
             return
 
         self.compact[segment] = 0
-        for tag, key, offset, size in self.io.iter_objects(segment, read_data=False):
+        for tag, key, offset, size, _ in self.io.iter_objects(segment, read_data=False):
             if tag in (TAG_PUT2, TAG_PUT):
                 in_index = self.index.get(key)
                 if not in_index or (in_index.segment, in_index.offset) != (segment, offset):
@@ -1165,8 +1165,8 @@ class Repository:
             if segment is not None and current_segment > segment:
                 break
             try:
-                for tag, key, current_offset, data in self.io.iter_objects(
-                    segment=current_segment, offset=offset or 0, include_data=True
+                for tag, key, current_offset, _, data in self.io.iter_objects(
+                    segment=current_segment, offset=offset or 0
                 ):
                     if offset is not None and current_offset > offset:
                         break
@@ -1229,10 +1229,10 @@ class Repository:
         start_segment, start_offset, _ = (0, 0, 0) if at_start else self.index[marker]
         result = []
         for segment, filename in self.io.segment_iterator(start_segment):
-            obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False, include_data=False)
+            obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False)
             while True:
                 try:
-                    tag, id, offset, size = next(obj_iterator)
+                    tag, id, offset, size, _ = next(obj_iterator)
                 except (StopIteration, IntegrityError):
                     # either end-of-segment or an error - we can not seek to objects at
                     # higher offsets than one that has an error in the header fields.
@@ -1458,7 +1458,7 @@ class LoggedIO:
         seen_commit = False
         while True:
             try:
-                tag, key, offset, _ = next(iterator)
+                tag, key, offset, _, _ = next(iterator)
             except IntegrityError:
                 return False
             except StopIteration:
@@ -1560,15 +1560,13 @@ class LoggedIO:
         fd.seek(0)
         return fd.read(MAGIC_LEN)
 
-    def iter_objects(self, segment, offset=0, include_data=False, read_data=True):
+    def iter_objects(self, segment, offset=0, read_data=True):
         """
         Return object iterator for *segment*.
 
-        If read_data is False then include_data must be False as well.
-
         See the _read() docstring about confidence in the returned data.
 
-        The iterator returns four-tuples of (tag, key, offset, data|size).
+        The iterator returns five-tuples of (tag, key, offset, size, data).
         """
         fd = self.get_fd(segment)
         fd.seek(offset)
@@ -1584,10 +1582,9 @@ class LoggedIO:
             size, tag, key, data = self._read(
                 fd, header, segment, offset, (TAG_PUT2, TAG_DELETE, TAG_COMMIT, TAG_PUT), read_data=read_data
             )
-            if include_data:
-                yield tag, key, offset, data
-            else:
-                yield tag, key, offset, size - header_size(tag)  # corresponds to len(data)
+            # tuple[3]: corresponds to len(data) == length of the full chunk payload (meta_len+enc_meta+enc_data)
+            # tuple[4]: data will be None if read_data is False.
+            yield tag, key, offset, size - header_size(tag), data
             assert size >= 0
             offset += size
             # we must get the fd via get_fd() here again as we yielded to our caller and it might

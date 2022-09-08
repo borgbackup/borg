@@ -96,6 +96,11 @@ def test_stats_progress_json(stats):
     assert "original_size" not in result
     assert "nfiles" not in result
 
+def test_hashing_time(stats):
+    assert stats.hashing_time >= 0.0
+
+def test_chunking_time(stats):
+    assert stats.chunking_time >= 0.0
 
 class MockCache:
     class MockRepo:

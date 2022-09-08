@@ -3772,12 +3772,11 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         # Create an archive
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", "./")
         result = result.split("\n")
-        result = [l.split(":") for l in result]
-        result = [l for l in result if l[0] in ("Added files", "Unchanged files", "Modified files")]
-        # The line above left the value to the right of the `:` with a leading space.
-        # The line below removes the space and converts the value to int.
-        result = [[l[0], int(l[1][1:])] for l in result]
-        result = {l[0]:l[1] for l in result}
+        result.pop()  # The last line needs to be removed because its an empty string
+        result = [line.split(":", 1) for line in result]
+        result = {
+            key: int(value) for key, value in result if key in ("Added files", "Unchanged files", "Modified files")
+        }
         assert result["Added files"] == 3
         assert result["Unchanged files"] == 0
         assert result["Modified files"] == 0

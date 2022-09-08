@@ -25,6 +25,7 @@ from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .manifest import Manifest
 from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
+from .repoobj import RepoObj
 from .checksums import crc32, StreamingXXH64
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 
@@ -1268,18 +1269,18 @@ class Repository:
     def flags_many(self, ids, mask=0xFFFFFFFF, value=None):
         return [self.flags(id_, mask, value) for id_ in ids]
 
-    def get(self, id):
+    def get(self, id, read_data=True):
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
         try:
             in_index = NSIndexEntry(*((self.index[id] + (None,))[:3]))  # legacy: index entries have no size element
-            return self.io.read(in_index.segment, in_index.offset, id, expected_size=in_index.size)
+            return self.io.read(in_index.segment, in_index.offset, id, expected_size=in_index.size, read_data=read_data)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
 
-    def get_many(self, ids, is_preloaded=False):
+    def get_many(self, ids, read_data=True, is_preloaded=False):
         for id_ in ids:
-            yield self.get(id_)
+            yield self.get(id_, read_data=read_data)
 
     def put(self, id, data, wait=True):
         """put a repo object
@@ -1659,13 +1660,12 @@ class LoggedIO:
 
         See the _read() docstring about confidence in the returned data.
         """
-        assert read_data is True  # False is not used (yet)
         if segment == self.segment and self._write_fd:
             self._write_fd.sync()
         fd = self.get_fd(segment)
         fd.seek(offset)
         header = fd.read(self.header_fmt.size)
-        size, tag, key, data = self._read(fd, header, segment, offset, (TAG_PUT2, TAG_PUT), read_data)
+        size, tag, key, data = self._read(fd, header, segment, offset, (TAG_PUT2, TAG_PUT), read_data=read_data)
         if id != key:
             raise IntegrityError(
                 "Invalid segment entry header, is not for wanted id [segment {}, offset {}]".format(segment, offset)
@@ -1686,6 +1686,11 @@ class LoggedIO:
         PUT2 tags, read_data == False: crc32 check (header)
         PUT tags, read_data == True: crc32 check (header+data)
         PUT tags, read_data == False: crc32 check can not be done, all data obtained must be considered informational
+
+        read_data == False behaviour:
+        PUT2 tags: return enough of the chunk so that the client is able to decrypt the metadata,
+                   do not read, but just seek over the data.
+        PUT tags:  return None and just seek over the data.
         """
 
         def check_crc32(wanted, header, *data):
@@ -1746,7 +1751,31 @@ class LoggedIO:
                             f"expected {self.ENTRY_HASH_SIZE}, got {len(entry_hash)} bytes"
                         )
                     check_crc32(crc, header, key, entry_hash)
-                if not read_data:  # seek over data
+                if not read_data:
+                    if tag == TAG_PUT2:
+                        # PUT2 is only used in new repos and they also have different RepoObj layout,
+                        # supporting separately encrypted metadata and data.
+                        # In this case, we return enough bytes so the client can decrypt the metadata
+                        # and seek over the rest (over the encrypted data).
+                        meta_len_size = RepoObj.meta_len_hdr.size
+                        meta_len = fd.read(meta_len_size)
+                        length -= meta_len_size
+                        if len(meta_len) != meta_len_size:
+                            raise IntegrityError(
+                                f"Segment entry meta length short read [segment {segment}, offset {offset}]: "
+                                f"expected {meta_len_size}, got {len(meta_len)} bytes"
+                            )
+                        ml = RepoObj.meta_len_hdr.unpack(meta_len)[0]
+                        meta = fd.read(ml)
+                        length -= ml
+                        if len(meta) != ml:
+                            raise IntegrityError(
+                                f"Segment entry meta short read [segment {segment}, offset {offset}]: "
+                                f"expected {ml}, got {len(meta)} bytes"
+                            )
+                        data = meta_len + meta  # shortened chunk - enough so the client can decrypt the metadata
+                        # we do not have a checksum for this data, but the client's AEAD crypto will check it.
+                    # in any case, we see over the remainder of the chunk
                     oldpos = fd.tell()
                     seeked = fd.seek(length, os.SEEK_CUR) - oldpos
                     if seeked != length:

@@ -1653,13 +1653,13 @@ class LoggedIO:
             h.update(d)
         return h.digest()
 
-    def read(self, segment, offset, id, read_data=True, *, expected_size=None):
+    def read(self, segment, offset, id, *, read_data=True, expected_size=None):
         """
         Read entry from *segment* at *offset* with *id*.
-        If read_data is False the size of the entry is returned instead.
 
         See the _read() docstring about confidence in the returned data.
         """
+        assert read_data is True  # False is not used (yet)
         if segment == self.segment and self._write_fd:
             self._write_fd.sync()
         fd = self.get_fd(segment)
@@ -1675,7 +1675,7 @@ class LoggedIO:
             raise IntegrityError(
                 f"size from repository index: {expected_size} != " f"size from entry header: {data_size_from_header}"
             )
-        return data if read_data else data_size_from_header
+        return data
 
     def _read(self, fd, header, segment, offset, acceptable_tags, read_data=True):
         """

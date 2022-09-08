@@ -5,7 +5,7 @@ from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
 
 
 class RepoObj:
-    meta_len_hdr = Struct("<I")
+    meta_len_hdr = Struct("<H")  # 16bit unsigned int
 
     @classmethod
     def extract_crypted_data(cls, data: bytes) -> bytes:

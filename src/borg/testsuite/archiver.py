@@ -3820,7 +3820,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
         hashing_time = extract_hashing_time(result)
 
-        assert hashing_time >= 0.0
+        assert hashing_time > 0.0
 
 
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")

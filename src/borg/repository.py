@@ -736,10 +736,10 @@ class Repository:
                     except FileNotFoundError:
                         # looks like self.compact is referring to a non-existent segment file, ignore it.
                         pass
-                logger.debug("check_free_space: few segments, not requiring a full free segment")
+                logger.debug("check_free_space: Few segments, not requiring a full free segment")
                 compact_working_space = min(compact_working_space, full_segment_size)
                 logger.debug(
-                    "check_free_space: calculated working space for compact as %d bytes", compact_working_space
+                    "check_free_space: Calculated working space for compact as %d bytes", compact_working_space
                 )
                 required_free_space += compact_working_space
             else:
@@ -751,7 +751,7 @@ class Repository:
         except OSError as os_error:
             logger.warning("Failed to check free space before committing: " + str(os_error))
             return
-        logger.debug(f"check_free_space: required bytes {required_free_space}, free bytes {free_space}")
+        logger.debug(f"check_free_space: Required bytes {required_free_space}, free bytes {free_space}")
         if free_space < required_free_space:
             if self.created:
                 logger.error("Not enough free space to initialize repository at this location.")
@@ -773,7 +773,7 @@ class Repository:
     def compact_segments(self, threshold):
         """Compact sparse segments by copying data into new segments"""
         if not self.compact:
-            logger.debug("nothing to do: compact empty")
+            logger.debug("Nothing to do: compact empty")
             return
         quota_use_before = self.storage_quota_use
         index_transaction_id = self.get_index_transaction_id()
@@ -788,11 +788,11 @@ class Repository:
             self.segments.setdefault(segment, 0)
             self.compact[segment] += LoggedIO.header_fmt.size
             logger.debug(
-                "complete_xfer: wrote %scommit at segment %d", "intermediate " if intermediate else "", segment
+                "complete_xfer: Wrote %scommit at segment %d", "intermediate " if intermediate else "", segment
             )
             # get rid of the old, sparse, unused segments. free space.
             for segment in unused:
-                logger.debug("complete_xfer: deleting unused segment %d", segment)
+                logger.debug("complete_xfer: Deleting unused segment %d", segment)
                 count = self.segments.pop(segment)
                 assert count == 0, "Corrupted segment reference count - corrupted index or hints"
                 self.io.delete_segment(segment)
@@ -805,7 +805,7 @@ class Repository:
         )
         for segment, freeable_space in sorted(self.compact.items()):
             if not self.io.segment_exists(segment):
-                logger.warning("segment %d not found, but listed in compaction data", segment)
+                logger.warning("Segment %d not found, but listed in compaction data", segment)
                 del self.compact[segment]
                 pi.show()
                 continue
@@ -815,7 +815,7 @@ class Repository:
             # - we can free a considerable relative amount of space (freeable_ratio over some threshold)
             if not (freeable_ratio > threshold):
                 logger.debug(
-                    "not compacting segment %d (maybe freeable: %2.2f%% [%d bytes])",
+                    "Not compacting segment %d (maybe freeable: %2.2f%% [%d bytes])",
                     segment,
                     freeable_ratio * 100.0,
                     freeable_space,
@@ -824,7 +824,7 @@ class Repository:
                 continue
             segments.setdefault(segment, 0)
             logger.debug(
-                "compacting segment %d with usage count %d (maybe freeable: %2.2f%% [%d bytes])",
+                "Compacting segment %d with usage count %d (maybe freeable: %2.2f%% [%d bytes])",
                 segment,
                 segments[segment],
                 freeable_ratio * 100.0,
@@ -912,7 +912,7 @@ class Repository:
                         segments.setdefault(new_segment, 0)
                     else:
                         logger.debug(
-                            "dropping DEL for id %s - seg %d, iti %r, knisi %r, spe %r, dins %r, si %r",
+                            "Dropping DEL for id %s - seg %d, iti %r, knisi %r, spe %r, dins %r, si %r",
                             bin_to_hex(key),
                             segment,
                             index_transaction_id,
@@ -931,8 +931,8 @@ class Repository:
         pi.finish()
         complete_xfer(intermediate=False)
         quota_use_after = self.storage_quota_use
-        logger.info("compaction freed about %s repository space.", format_file_size(quota_use_before - quota_use_after))
-        logger.debug("compaction completed.")
+        logger.info("Compaction freed about %s repository space.", format_file_size(quota_use_before - quota_use_after))
+        logger.debug("Compaction completed.")
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):
         # fake an old client, so that in case we do not have an exclusive lock yet, prepare_txn will upgrade the lock:
@@ -1070,7 +1070,7 @@ class Repository:
         if partial:
             # continue a past partial check (if any) or start one from beginning
             last_segment_checked = self.config.getint("repository", "last_segment_checked", fallback=-1)
-            logger.info("skipping to segments >= %d", last_segment_checked + 1)
+            logger.info("Skipping to segments >= %d", last_segment_checked + 1)
         else:
             # start from the beginning and also forget about any potential past partial checks
             last_segment_checked = -1
@@ -1086,7 +1086,7 @@ class Repository:
                 continue
             if segment > transaction_id:
                 continue
-            logger.debug("checking segment file %s...", filename)
+            logger.debug("Checking segment file %s...", filename)
             try:
                 objects = list(self.io.iter_objects(segment))
             except IntegrityError as err:
@@ -1098,12 +1098,12 @@ class Repository:
             if not partial:
                 self._update_index(segment, objects, report_error)
             if partial and time.monotonic() > t_start + max_duration:
-                logger.info("finished partial segment check, last segment checked is %d", segment)
+                logger.info("Finished partial segment check, last segment checked is %d", segment)
                 self.config.set("repository", "last_segment_checked", str(segment))
                 self.save_config(self.path, self.config)
                 break
         else:
-            logger.info("finished segment check at segment %d", segment)
+            logger.info("Finished segment check at segment %d", segment)
             self.config.remove_option("repository", "last_segment_checked")
             self.save_config(self.path, self.config)
 
@@ -1121,8 +1121,8 @@ class Repository:
                 # self.index = "as rebuilt in-memory from segments"
                 if len(current_index) != len(self.index):
                     report_error("Index object count mismatch.")
-                    logger.error("committed index: %d objects", len(current_index))
-                    logger.error("rebuilt index:   %d objects", len(self.index))
+                    logger.error("Committed index: %d objects", len(current_index))
+                    logger.error("Rebuilt index:   %d objects", len(self.index))
                 else:
                     logger.info("Index object count match.")
                 line_format = "ID: %-64s rebuilt index: %-16s committed index: %-16s"
@@ -1600,7 +1600,7 @@ class LoggedIO:
             header = fd.read(self.header_fmt.size)
 
     def recover_segment(self, segment, filename):
-        logger.info("attempting to recover " + filename)
+        logger.info("Attempting to recover " + filename)
         if segment in self.fds:
             del self.fds[segment]
         if os.path.getsize(filename) < MAGIC_LEN + self.header_fmt.size:

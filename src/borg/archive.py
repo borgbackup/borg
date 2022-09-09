@@ -1141,15 +1141,19 @@ class MetadataCollector:
 
     def stat_ext_attrs(self, st, path, fd=None):
         attrs = {}
-        with backup_io("extended stat"):
-            flags = 0 if self.noflags else get_flags(path, st, fd=fd)
-            xattrs = {} if self.noxattrs else xattr.get_all(fd or path, follow_symlinks=False)
-            if not self.noacls:
+        if not self.noflags:
+            with backup_io("extended stat (flags)"):
+                flags = get_flags(path, st, fd=fd)
+            if flags:
+                attrs["bsdflags"] = flags
+        if not self.noxattrs:
+            with backup_io("extended stat (xattrs)"):
+                xattrs = xattr.get_all(fd or path, follow_symlinks=False)
+            if xattrs:
+                attrs["xattrs"] = StableDict(xattrs)
+        if not self.noacls:
+            with backup_io("extended stat (ACLs)"):
                 acl_get(path, attrs, st, self.numeric_ids, fd=fd)
-        if xattrs:
-            attrs["xattrs"] = StableDict(xattrs)
-        if flags:
-            attrs["bsdflags"] = flags
         return attrs
 
     def stat_attrs(self, st, path, fd=None):

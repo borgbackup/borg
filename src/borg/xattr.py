@@ -77,22 +77,14 @@ def get_all(path, follow_symlinks=False):
                 # xattr name is a bytes object, we directly use it.
                 result[name] = getxattr(path, name, follow_symlinks=follow_symlinks)
             except OSError as e:
-                name_str = name.decode()
-                if isinstance(path, int):
-                    path_str = "<FD %d>" % path
-                else:
-                    path_str = os.fsdecode(path)
-                if e.errno == ENOATTR:
-                    # if we get ENOATTR, a race has happened: xattr names were deleted after list.
-                    # we just ignore the now missing ones. if you want consistency, do snapshots.
+                # note: platform.xattr._check has already made a nice exception e with errno, msg, path/fd
+                if e.errno in (ENOATTR,):  # errors we just ignore silently
+                    # ENOATTR: a race has happened: xattr names were deleted after list.
                     pass
-                elif e.errno == errno.EPERM:
-                    # we were not permitted to read this attribute, still can continue trying to read others
-                    logger.warning(
-                        "{}: Operation not permitted when reading extended attribute {}".format(path_str, name_str)
-                    )
-                else:
-                    raise
+                else:  # all others: warn, skip this single xattr name, continue processing other xattrs
+                    # EPERM: we were not permitted to read this attribute
+                    # EINVAL: maybe xattr name is invalid or other issue, #6988
+                    logger.warning("when getting extended attribute %s: %s", name.decode(errors="replace"), str(e))
     except OSError as e:
         if e.errno in (errno.ENOTSUP, errno.EPERM):
             # if xattrs are not supported on the filesystem, we give up.
@@ -122,24 +114,18 @@ def set_all(path, xattrs, follow_symlinks=False):
         try:
             setxattr(path, k, v, follow_symlinks=follow_symlinks)
         except OSError as e:
+            # note: platform.xattr._check has already made a nice exception e with errno, msg, path/fd
             warning = True
-            k_str = k.decode()
-            if isinstance(path, int):
-                path_str = "<FD %d>" % path
-            else:
-                path_str = os.fsdecode(path)
             if e.errno == errno.E2BIG:
-                err_str = "too big for this filesystem"
-            elif e.errno == errno.ENOTSUP:
-                err_str = "xattrs not supported on this filesystem"
+                err_str = "too big for this filesystem (%s)" % str(e)
             elif e.errno == errno.ENOSPC:
                 # ext4 reports ENOSPC when trying to set an xattr with >4kiB while ext4 can only support 4kiB xattrs
                 # (in this case, this is NOT a "disk full" error, just a ext4 limitation).
-                err_str = "no space left on device [xattr len = %d]" % (len(v),)
+                err_str = "fs full or xattr too big? [xattr len = %d] (%s)" % (len(v), str(e))
             else:
                 # generic handler
                 # EACCES: permission denied to set this specific xattr (this may happen related to security.* keys)
                 # EPERM: operation not permitted
-                err_str = os.strerror(e.errno)
-            logger.warning("%s: when setting extended attribute %s: %s", path_str, k_str, err_str)
+                err_str = str(e)
+            logger.warning("when setting extended attribute %s: %s", k.decode(errors="replace"), err_str)
     return warning

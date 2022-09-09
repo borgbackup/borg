@@ -81,6 +81,11 @@ Compatibility notes:
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
 
+Bug fixes:
+
+- xattrs / extended stat: improve exception handling
+- fix and refactor replace_placeholders, #6966
+
 New features:
 
 - support archive timestamps with utc offsets, adapt them when using
@@ -90,8 +95,13 @@ New features:
 
 Other changes:
 
+- chunks: have separate encrypted metadata (ctype, clevel, csize, size)
+  chunk = enc_meta_len16 + encrypted(msgpacked(meta)) + encrypted(compressed(data)).
+  this breaks repo format compatibility, you need to create fresh repos!
+- repository api: flags support, #6982
 - restructured source code
 - update diagrams to odg format, #6928
+- re-add stretch64 vm (to build binary working on rhel7&co), #7010
 
 Version 2.0.0b1 (2022-08-08)
 ----------------------------

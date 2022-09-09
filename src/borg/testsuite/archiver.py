@@ -1393,6 +1393,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rinfo")
         self.cmd(f"--repo={self.repository_location}", "check")
 
+    def test_create_archivename_with_placeholder(self):
+        self.create_test_files()
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        ts = "1999-12-31T23:59:59"
+        name_given = "test-{now}"  # placeholder in archive name gets replaced by borg
+        name_expected = f"test-{ts}"  # placeholder in f-string gets replaced by python
+        self.cmd(f"--repo={self.repository_location}", "create", f"--timestamp={ts}", name_given, "input")
+        list_output = self.cmd(f"--repo={self.repository_location}", "rlist", "--short")
+        assert name_expected in list_output
+
     def test_extract_pattern_opt(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         self.create_regular_file("file1", size=1024 * 80)

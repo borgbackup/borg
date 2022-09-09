@@ -185,7 +185,7 @@ def format_line(format, data):
         raise PlaceholderError(format, data, e.__class__.__name__, str(e))
 
 
-def replace_placeholders(text, overrides={}):
+def _replace_placeholders(text, overrides={}):
     """Replace placeholders in text with their values."""
     from ..platform import fqdn, hostname, getosusername
 
@@ -208,13 +208,26 @@ def replace_placeholders(text, overrides={}):
     return format_line(text, data)
 
 
-PrefixSpec = replace_placeholders
+class PlaceholderReplacer:
+    def __init__(self):
+        self.reset()
 
-GlobSpec = replace_placeholders
+    def override(self, key, value):
+        self.overrides[key] = value
 
-NameSpec = replace_placeholders
+    def reset(self):
+        self.overrides = {}
 
-CommentSpec = replace_placeholders
+    def __call__(self, text, overrides=None):
+        ovr = {}
+        ovr.update(self.overrides)
+        ovr.update(overrides or {})
+        return _replace_placeholders(text, overrides=ovr)
+
+
+replace_placeholders = PlaceholderReplacer()
+
+NameSpec = str
 
 
 def SortBySpec(text):

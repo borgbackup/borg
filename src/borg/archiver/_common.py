@@ -8,7 +8,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
-from ..helpers import GlobSpec, SortBySpec, positive_int_validator, location_validator, Location
+from ..helpers import SortBySpec, positive_int_validator, location_validator, Location
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
@@ -363,7 +363,6 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
         "--glob-archives",
         metavar="GLOB",
         dest="glob_archives",
-        type=GlobSpec,
         action=Highlander,
         help="only consider archive names matching the glob. " 'sh: rules apply, see "borg help patterns".',
     )

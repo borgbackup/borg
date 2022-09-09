@@ -17,7 +17,7 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
 from ..helpers import ChunkerParams
-from ..helpers import NameSpec, CommentSpec, FilesCacheMode
+from ..helpers import NameSpec, FilesCacheMode
 from ..helpers import eval_escapes
 from ..helpers import timestamp
 from ..helpers import get_cache_dir, os_stat
@@ -806,12 +806,7 @@ class CreateMixIn:
 
         archive_group = subparser.add_argument_group("Archive options")
         archive_group.add_argument(
-            "--comment",
-            dest="comment",
-            metavar="COMMENT",
-            type=CommentSpec,
-            default="",
-            help="add a comment text to the archive",
+            "--comment", dest="comment", metavar="COMMENT", default="", help="add a comment text to the archive"
         )
         archive_group.add_argument(
             "--timestamp",

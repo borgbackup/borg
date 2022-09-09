@@ -24,7 +24,7 @@ from .parseformat import ChunkerParams, FilesCacheMode, partial_format, Datetime
 from .parseformat import format_file_size, parse_file_size, FileSize, parse_storage_quota
 from .parseformat import sizeof_fmt, sizeof_fmt_iec, sizeof_fmt_decimal
 from .parseformat import format_line, replace_placeholders, PlaceholderError
-from .parseformat import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, NameSpec
+from .parseformat import SortBySpec, NameSpec
 from .parseformat import format_archive, parse_stringified_list, clean_lines
 from .parseformat import Location, location_validator, archivename_validator
 from .parseformat import BaseFormatter, ArchiveFormatter, ItemFormatter, file_status

@@ -920,6 +920,7 @@ def test_format_line_erroneous():
 
 
 def test_replace_placeholders():
+    replace_placeholders.reset()  # avoid overrides are spoiled by previous tests
     now = datetime.now()
     assert " " not in replace_placeholders("{now}")
     assert int(replace_placeholders("{now:%Y}")) == now.year

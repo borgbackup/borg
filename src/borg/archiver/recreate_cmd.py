@@ -6,7 +6,6 @@ from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
 from ..helpers import archivename_validator, ChunkerParams
-from ..helpers import CommentSpec
 from ..helpers import timestamp
 from ..manifest import Manifest
 
@@ -162,12 +161,7 @@ class RecreateMixIn:
             help="write checkpoint every SECONDS seconds (Default: 1800)",
         )
         archive_group.add_argument(
-            "--comment",
-            dest="comment",
-            metavar="COMMENT",
-            type=CommentSpec,
-            default=None,
-            help="add a comment text to the archive",
+            "--comment", dest="comment", metavar="COMMENT", default=None, help="add a comment text to the archive"
         )
         archive_group.add_argument(
             "--timestamp",

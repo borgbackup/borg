@@ -19,7 +19,7 @@ class DeleteMixIn:
         """Delete archives"""
         self.output_list = args.output_list
         dry_run = args.dry_run
-        manifest, key = Manifest.load(repository, (Manifest.Operation.DELETE,))
+        manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
         archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
         if not archive_names:
             return self.exit_code
@@ -56,7 +56,7 @@ class DeleteMixIn:
             return self.exit_code
 
         stats = Statistics(iec=args.iec)
-        with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait, iec=args.iec) as cache:
+        with Cache(repository, manifest, progress=args.progress, lock_wait=self.lock_wait, iec=args.iec) as cache:
 
             def checkpoint_func():
                 manifest.write()
@@ -80,12 +80,7 @@ class DeleteMixIn:
 
                     if not dry_run:
                         archive = Archive(
-                            repository,
-                            key,
-                            manifest,
-                            archive_name,
-                            cache=cache,
-                            consider_part_files=args.consider_part_files,
+                            manifest, archive_name, cache=cache, consider_part_files=args.consider_part_files
                         )
                         archive.delete(stats, progress=args.progress, forced=args.forced)
                         checkpointed = self.maybe_checkpoint(

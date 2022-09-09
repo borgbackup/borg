@@ -19,8 +19,8 @@ class UpgraderNoOp:
     def upgrade_item(self, *, item):
         return item
 
-    def upgrade_compressed_chunk(self, *, chunk):
-        return chunk
+    def upgrade_compressed_chunk(self, meta, data):
+        return meta, data
 
     def upgrade_archive_metadata(self, *, metadata):
         new_metadata = {}
@@ -98,33 +98,36 @@ class UpgraderFrom12To20:
         assert all(key in new_item for key in REQUIRED_ITEM_KEYS)
         return new_item
 
-    def upgrade_compressed_chunk(self, *, chunk):
-        def upgrade_zlib_and_level(chunk):
-            if ZLIB_legacy.detect(chunk):
+    def upgrade_compressed_chunk(self, meta, data):
+        # meta/data was parsed via RepoObj1.parse, which returns data **including** the ctype/clevel bytes prefixed
+        def upgrade_zlib_and_level(meta, data):
+            if ZLIB_legacy.detect(data):
                 ctype = ZLIB.ID
-                chunk = ctype + level + bytes(chunk)  # get rid of the legacy: prepend separate type/level bytes
+                data = bytes(data)  # ZLIB_legacy has no ctype/clevel prefix
             else:
-                ctype = bytes(chunk[0:1])
-                chunk = ctype + level + bytes(chunk[2:])  # keep type same, but set level
-            return chunk
+                ctype = data[0]
+                data = bytes(data[2:])  # strip ctype/clevel bytes
+            meta["ctype"] = ctype
+            meta["clevel"] = level
+            meta["csize"] = len(data)  # we may have stripped some prefixed ctype/clevel bytes
+            return meta, data
 
-        ctype = chunk[0:1]
-        level = b"\xFF"  # FF means unknown compression level
+        ctype = data[0]
+        level = 0xFF  # means unknown compression level
 
         if ctype == ObfuscateSize.ID:
             # in older borg, we used unusual byte order
-            old_header_fmt = Struct(">I")
-            new_header_fmt = ObfuscateSize.header_fmt
-            length = ObfuscateSize.header_len
-            size_bytes = chunk[2 : 2 + length]
-            size = old_header_fmt.unpack(size_bytes)
-            size_bytes = new_header_fmt.pack(size)
-            compressed = chunk[2 + length :]
-            compressed = upgrade_zlib_and_level(compressed)
-            chunk = ctype + level + size_bytes + compressed
+            borg1_header_fmt = Struct(">I")
+            hlen = borg1_header_fmt.size
+            csize_bytes = data[2 : 2 + hlen]
+            csize = borg1_header_fmt.unpack(csize_bytes)
+            compressed = data[2 + hlen : 2 + hlen + csize]
+            meta, compressed = upgrade_zlib_and_level(meta, compressed)
+            osize = len(data) - 2 - hlen - csize  # amount of 0x00 bytes appended for obfuscation
+            data = compressed + bytes(osize)
         else:
-            chunk = upgrade_zlib_and_level(chunk)
-        return chunk
+            meta, data = upgrade_zlib_and_level(meta, data)
+        return meta, data
 
     def upgrade_archive_metadata(self, *, metadata):
         new_metadata = {}

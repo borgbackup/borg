@@ -14,7 +14,7 @@ logger = create_logger()
 
 class RListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
-    def do_rlist(self, args, repository, manifest, key):
+    def do_rlist(self, args, repository, manifest):
         """List the archives contained in a repository"""
         if args.format is not None:
             format = args.format
@@ -22,7 +22,7 @@ class RListMixIn:
             format = "{archive}{NL}"
         else:
             format = "{archive:<36} {time} [{id}]{NL}"
-        formatter = ArchiveFormatter(format, repository, manifest, key, json=args.json, iec=args.iec)
+        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, json=args.json, iec=args.iec)
 
         output_data = []
 

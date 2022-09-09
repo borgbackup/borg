@@ -16,9 +16,10 @@ logger = create_logger()
 
 class RCreateMixIn:
     @with_repository(create=True, exclusive=True, manifest=False)
-    @with_other_repository(key=True, compatibility=(Manifest.Operation.READ,))
-    def do_rcreate(self, args, repository, *, other_repository=None, other_key=None):
+    @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
+    def do_rcreate(self, args, repository, *, other_repository=None, other_manifest=None):
         """Create a new, empty repository"""
+        other_key = other_manifest.key if other_manifest is not None else None
         path = args.location.canonical_path()
         logger.info('Initializing repository at "%s"' % path)
         if other_key is not None:
@@ -32,7 +33,7 @@ class RCreateMixIn:
         manifest.key = key
         manifest.write()
         repository.commit(compact=False)
-        with Cache(repository, key, manifest, warn_if_unencrypted=False):
+        with Cache(repository, manifest, warn_if_unencrypted=False):
             pass
         if key.tam_required:
             tam_file = tam_required_file(repository)

@@ -16,6 +16,7 @@ from ..helpers import positive_int_validator, NameSpec
 from ..manifest import Manifest
 from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
+from ..repoobj import RepoObj
 
 from ._common import with_repository
 from ._common import process_epilog
@@ -29,11 +30,12 @@ class DebugMixIn:
         return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
-    def do_debug_dump_archive_items(self, args, repository, manifest, key):
+    def do_debug_dump_archive_items(self, args, repository, manifest):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
-        archive = Archive(repository, key, manifest, args.name, consider_part_files=args.consider_part_files)
+        repo_objs = manifest.repo_objs
+        archive = Archive(manifest, args.name, consider_part_files=args.consider_part_files)
         for i, item_id in enumerate(archive.metadata.items):
-            data = key.decrypt(item_id, repository.get(item_id))
+            _, data = repo_objs.parse(item_id, repository.get(item_id))
             filename = "%06d_%s.items" % (i, bin_to_hex(item_id))
             print("Dumping", filename)
             with open(filename, "wb") as fd:
@@ -42,8 +44,9 @@ class DebugMixIn:
         return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
-    def do_debug_dump_archive(self, args, repository, manifest, key):
+    def do_debug_dump_archive(self, args, repository, manifest):
         """dump decoded archive metadata (not: data)"""
+        repo_objs = manifest.repo_objs
         try:
             archive_meta_orig = manifest.archives.get_raw_dict()[args.name]
         except KeyError:
@@ -62,7 +65,7 @@ class DebugMixIn:
             fd.write(do_indent(prepare_dump_dict(archive_meta_orig)))
             fd.write(",\n")
 
-            data = key.decrypt(archive_meta_orig["id"], repository.get(archive_meta_orig["id"]))
+            _, data = repo_objs.parse(archive_meta_orig["id"], repository.get(archive_meta_orig["id"]))
             archive_org_dict = msgpack.unpackb(data, object_hook=StableDict)
 
             fd.write('    "_meta":\n')
@@ -74,10 +77,10 @@ class DebugMixIn:
             first = True
             items = []
             for chunk_id in archive_org_dict["item_ptrs"]:
-                data = key.decrypt(chunk_id, repository.get(chunk_id))
+                _, data = repo_objs.parse(chunk_id, repository.get(chunk_id))
                 items.extend(msgpack.unpackb(data))
             for item_id in items:
-                data = key.decrypt(item_id, repository.get(item_id))
+                _, data = repo_objs.parse(item_id, repository.get(item_id))
                 unpacker.feed(data)
                 for item in unpacker:
                     item = prepare_dump_dict(item)
@@ -95,10 +98,10 @@ class DebugMixIn:
         return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
-    def do_debug_dump_manifest(self, args, repository, manifest, key):
+    def do_debug_dump_manifest(self, args, repository, manifest):
         """dump decoded repository manifest"""
-
-        data = key.decrypt(manifest.MANIFEST_ID, repository.get(manifest.MANIFEST_ID))
+        repo_objs = manifest.repo_objs
+        _, data = repo_objs.parse(manifest.MANIFEST_ID, repository.get(manifest.MANIFEST_ID))
 
         meta = prepare_dump_dict(msgpack.unpackb(data, object_hook=StableDict))
 
@@ -113,9 +116,9 @@ class DebugMixIn:
 
         def decrypt_dump(i, id, cdata, tag=None, segment=None, offset=None):
             if cdata is not None:
-                data = key.decrypt(id, cdata)
+                _, data = repo_objs.parse(id, cdata)
             else:
-                data = b""
+                _, data = {}, b""
             tag_str = "" if tag is None else "_" + tag
             segment_str = "_" + str(segment) if segment is not None else ""
             offset_str = "_" + str(offset) if offset is not None else ""
@@ -132,6 +135,7 @@ class DebugMixIn:
             for id, cdata, tag, segment, offset in repository.scan_low_level():
                 if tag == TAG_PUT:
                     key = key_factory(repository, cdata)
+                    repo_objs = RepoObj(key)
                     break
             i = 0
             for id, cdata, tag, segment, offset in repository.scan_low_level(segment=args.segment, offset=args.offset):
@@ -147,6 +151,7 @@ class DebugMixIn:
             ids = repository.list(limit=1, marker=None)
             cdata = repository.get(ids[0])
             key = key_factory(repository, cdata)
+            repo_objs = RepoObj(key)
             marker = None
             i = 0
             while True:
@@ -195,6 +200,7 @@ class DebugMixIn:
         ids = repository.list(limit=1, marker=None)
         cdata = repository.get(ids[0])
         key = key_factory(repository, cdata)
+        repo_objs = RepoObj(key)
 
         marker = None
         last_data = b""
@@ -207,7 +213,7 @@ class DebugMixIn:
             marker = result[-1]
             for id in result:
                 cdata = repository.get(id)
-                data = key.decrypt(id, cdata)
+                _, data = repo_objs.parse(id, cdata)
 
                 # try to locate wanted sequence crossing the border of last_data and data
                 boundary_data = last_data[-(len(wanted) - 1) :] + data[: len(wanted) - 1]
@@ -284,7 +290,7 @@ class DebugMixIn:
         return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True, cache=True, compatibility=Manifest.NO_OPERATION_CHECK)
-    def do_debug_refcount_obj(self, args, repository, manifest, key, cache):
+    def do_debug_refcount_obj(self, args, repository, manifest, cache):
         """display refcounts for the objects with the given IDs"""
         for hex_id in args.ids:
             try:

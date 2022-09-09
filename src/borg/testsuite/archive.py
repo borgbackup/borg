@@ -101,17 +101,17 @@ class MockCache:
         self.objects = {}
         self.repository = self.MockRepo()
 
-    def add_chunk(self, id, chunk, stats=None, wait=True):
-        self.objects[id] = chunk
-        return id, len(chunk)
+    def add_chunk(self, id, meta, data, stats=None, wait=True):
+        self.objects[id] = data
+        return id, len(data)
 
 
 class ArchiveTimestampTestCase(BaseTestCase):
     def _test_timestamp_parsing(self, isoformat, expected):
         repository = Mock()
         key = PlaintextKey(repository)
-        manifest = Manifest(repository, key)
-        a = Archive(repository, key, manifest, "test", create=True)
+        manifest = Manifest(key, repository)
+        a = Archive(manifest, "test", create=True)
         a.metadata = ArchiveItem(time=isoformat)
         self.assert_equal(a.ts, expected)
 

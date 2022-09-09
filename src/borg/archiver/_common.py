@@ -14,6 +14,7 @@ from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
 from ..remote import RemoteRepository
 from ..repository import Repository
+from ..repoobj import RepoObj, RepoObj1
 from ..patterns import (
     ArgparsePatternAction,
     ArgparseExcludeFileAction,
@@ -80,7 +81,7 @@ def with_repository(
     :param create: create repository
     :param lock: lock repository
     :param exclusive: (bool) lock repository exclusively (for writing)
-    :param manifest: load manifest and key, pass them as keyword arguments
+    :param manifest: load manifest and repo_objs (key), pass them as keyword arguments
     :param cache: open cache, pass it as keyword argument (implies manifest)
     :param secure: do assert_secure after loading manifest
     :param compatibility: mandatory if not create and (manifest or cache), specifies mandatory feature categories to check
@@ -135,16 +136,16 @@ def with_repository(
                         "You can use 'borg transfer' to copy archives from old to new repos."
                     )
                 if manifest or cache:
-                    kwargs["manifest"], kwargs["key"] = Manifest.load(repository, compatibility)
+                    manifest_ = Manifest.load(repository, compatibility)
+                    kwargs["manifest"] = manifest_
                     if "compression" in args:
-                        kwargs["key"].compressor = args.compression.compressor
+                        manifest_.repo_objs.compressor = args.compression.compressor
                     if secure:
-                        assert_secure(repository, kwargs["manifest"], self.lock_wait)
+                        assert_secure(repository, manifest_, self.lock_wait)
                 if cache:
                     with Cache(
                         repository,
-                        kwargs["key"],
-                        kwargs["manifest"],
+                        manifest_,
                         progress=getattr(args, "progress", False),
                         lock_wait=self.lock_wait,
                         cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
@@ -160,7 +161,7 @@ def with_repository(
     return decorator
 
 
-def with_other_repository(manifest=False, key=False, cache=False, compatibility=None):
+def with_other_repository(manifest=False, cache=False, compatibility=None):
     """
     this is a simplified version of "with_repository", just for the "other location".
 
@@ -170,7 +171,7 @@ def with_other_repository(manifest=False, key=False, cache=False, compatibility=
     compatibility = compat_check(
         create=False,
         manifest=manifest,
-        key=key,
+        key=manifest,
         cache=cache,
         compatibility=compatibility,
         decorator_name="with_other_repository",
@@ -199,17 +200,16 @@ def with_other_repository(manifest=False, key=False, cache=False, compatibility=
                 if repository.version not in (1, 2):
                     raise Error("This borg version only accepts version 1 or 2 repos for --other-repo.")
                 kwargs["other_repository"] = repository
-                if manifest or key or cache:
-                    manifest_, key_ = Manifest.load(repository, compatibility)
+                if manifest or cache:
+                    manifest_ = Manifest.load(
+                        repository, compatibility, ro_cls=RepoObj if repository.version > 1 else RepoObj1
+                    )
                     assert_secure(repository, manifest_, self.lock_wait)
                     if manifest:
                         kwargs["other_manifest"] = manifest_
-                    if key:
-                        kwargs["other_key"] = key_
                 if cache:
                     with Cache(
                         repository,
-                        key_,
                         manifest_,
                         progress=False,
                         lock_wait=self.lock_wait,
@@ -229,12 +229,10 @@ def with_other_repository(manifest=False, key=False, cache=False, compatibility=
 
 def with_archive(method):
     @functools.wraps(method)
-    def wrapper(self, args, repository, key, manifest, **kwargs):
+    def wrapper(self, args, repository, manifest, **kwargs):
         archive_name = getattr(args, "name", None)
         assert archive_name is not None
         archive = Archive(
-            repository,
-            key,
             manifest,
             archive_name,
             numeric_ids=getattr(args, "numeric_ids", False),
@@ -246,7 +244,7 @@ def with_archive(method):
             log_json=args.log_json,
             iec=args.iec,
         )
-        return method(self, args, repository=repository, manifest=manifest, key=key, archive=archive, **kwargs)
+        return method(self, args, repository=repository, manifest=manifest, archive=archive, **kwargs)
 
     return wrapper
 

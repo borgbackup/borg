@@ -16,7 +16,7 @@ logger = create_logger()
 
 class ListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
-    def do_list(self, args, repository, manifest, key):
+    def do_list(self, args, repository, manifest):
         """List archive contents"""
         matcher = build_matcher(args.patterns, args.paths)
         if args.format is not None:
@@ -27,9 +27,7 @@ class ListMixIn:
             format = "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"
 
         def _list_inner(cache):
-            archive = Archive(
-                repository, key, manifest, args.name, cache=cache, consider_part_files=args.consider_part_files
-            )
+            archive = Archive(manifest, args.name, cache=cache, consider_part_files=args.consider_part_files)
 
             formatter = ItemFormatter(archive, format, json_lines=args.json_lines)
             for item in archive.iter_items(lambda item: matcher.match(item.path)):
@@ -37,7 +35,7 @@ class ListMixIn:
 
         # Only load the cache if it will be used
         if ItemFormatter.format_needs_cache(format):
-            with Cache(repository, key, manifest, lock_wait=self.lock_wait) as cache:
+            with Cache(repository, manifest, lock_wait=self.lock_wait) as cache:
                 _list_inner(cache)
         else:
             _list_inner(cache=None)

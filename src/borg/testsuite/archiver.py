@@ -314,8 +314,8 @@ class ArchiverTestCaseBase(BaseTestCase):
     def open_archive(self, name):
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            archive = Archive(repository, key, manifest, name)
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            archive = Archive(manifest, name)
         return archive, repository
 
     def open_repository(self):
@@ -1660,7 +1660,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "extract", "test.4", "--dry-run")
         # Make sure both archives have been renamed
         with Repository(self.repository_path) as repository:
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         self.assert_equal(len(manifest.archives), 2)
         self.assert_in("test.3", manifest.archives)
         self.assert_in("test.4", manifest.archives)
@@ -1784,8 +1784,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
         self.create_src_archive("test")
         with Repository(self.repository_path, exclusive=True) as repository:
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            archive = Archive(repository, key, manifest, "test")
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            archive = Archive(manifest, "test")
             for item in archive.iter_items():
                 if item.path.endswith("testsuite/archiver.py"):
                     repository.delete(item.chunks[-1].id)
@@ -1803,8 +1803,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
         self.create_src_archive("test")
         with Repository(self.repository_path, exclusive=True) as repository:
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            archive = Archive(repository, key, manifest, "test")
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            archive = Archive(manifest, "test")
             id = archive.metadata.items[0]
             repository.put(id, b"corrupted items metadata stream chunk")
             repository.commit(compact=False)
@@ -1952,12 +1952,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "create", "--dry-run", "test", "input")
         # Make sure no archive has been created
         with Repository(self.repository_path) as repository:
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         self.assert_equal(len(manifest.archives), 0)
 
     def add_unknown_feature(self, operation):
         with Repository(self.repository_path, exclusive=True) as repository:
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             manifest.config["feature_flags"] = {operation.value: {"mandatory": ["unknown-feature"]}}
             manifest.write()
             repository.commit(compact=False)
@@ -2034,8 +2034,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with Repository(self.repository_path, exclusive=True) as repository:
             if path_prefix:
                 repository._location = Location(self.repository_location)
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            with Cache(repository, key, manifest) as cache:
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, manifest) as cache:
                 cache.begin_txn()
                 cache.cache_config.mandatory_features = {"unknown-feature"}
                 cache.commit()
@@ -2059,8 +2059,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with Repository(self.repository_path, exclusive=True) as repository:
             if path_prefix:
                 repository._location = Location(self.repository_location)
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            with Cache(repository, key, manifest) as cache:
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, manifest) as cache:
                 assert cache.cache_config.mandatory_features == set()
 
     def test_progress_on(self):
@@ -3060,11 +3060,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "check")
         # Then check that the cache on disk matches exactly what's in the repo.
         with self.open_repository() as repository:
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            with Cache(repository, key, manifest, sync=False) as cache:
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, manifest, sync=False) as cache:
                 original_chunks = cache.chunks
             Cache.destroy(repository)
-            with Cache(repository, key, manifest) as cache:
+            with Cache(repository, manifest) as cache:
                 correct_chunks = cache.chunks
         assert original_chunks is not correct_chunks
         seen = set()
@@ -3080,8 +3080,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
         with self.open_repository() as repository:
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            with Cache(repository, key, manifest, sync=False) as cache:
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, manifest, sync=False) as cache:
                 cache.begin_txn()
                 cache.chunks.incref(list(cache.chunks.iteritems())[0][0])
                 cache.commit()
@@ -3765,6 +3765,32 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
             assert key["algorithm"] == "argon2 chacha20-poly1305"
 
+    def test_transfer(self):
+        def check_repo(repo_option):
+            listing = self.cmd(repo_option, "rlist", "--short")
+            assert "arch1" in listing
+            assert "arch2" in listing
+            listing = self.cmd(repo_option, "list", "--short", "arch1")
+            assert "file1" in listing
+            assert "dir2/file2" in listing
+            self.cmd(repo_option, "check")
+
+        self.create_test_files()
+        repo1 = f"--repo={self.repository_location}1"
+        repo2 = f"--repo={self.repository_location}2"
+        other_repo1 = f"--other-repo={self.repository_location}1"
+
+        self.cmd(repo1, "rcreate", RK_ENCRYPTION)
+        self.cmd(repo1, "create", "arch1", "input")
+        self.cmd(repo1, "create", "arch2", "input")
+        check_repo(repo1)
+
+        self.cmd(repo2, "rcreate", RK_ENCRYPTION, other_repo1)
+        self.cmd(repo2, "transfer", other_repo1, "--dry-run")
+        self.cmd(repo2, "transfer", other_repo1)
+        self.cmd(repo2, "transfer", other_repo1, "--dry-run")
+        check_repo(repo2)
+
 
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
 class ArchiverTestCaseBinary(ArchiverTestCase):
@@ -3966,7 +3992,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 
     def test_manifest_rebuild_duplicate_archive(self):
         archive, repository = self.open_archive("archive1")
-        key = archive.key
+        repo_objs = archive.repo_objs
+
         with repository:
             manifest = repository.get(Manifest.MANIFEST_ID)
             corrupted_manifest = manifest + b"corrupted!"
@@ -3983,8 +4010,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                     "version": 2,
                 }
             )
-            archive_id = key.id_hash(archive)
-            repository.put(archive_id, key.encrypt(archive_id, archive))
+            archive_id = repo_objs.id_hash(archive)
+            repository.put(archive_id, repo_objs.format(archive_id, {}, archive))
             repository.commit(compact=False)
         self.cmd(f"--repo={self.repository_location}", "check", exit_code=1)
         self.cmd(f"--repo={self.repository_location}", "check", "--repair", exit_code=0)
@@ -4013,7 +4040,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             for item in archive.iter_items():
                 if item.path.endswith("testsuite/archiver.py"):
                     chunk = item.chunks[-1]
-                    data = repository.get(chunk.id) + b"1234"
+                    data = repository.get(chunk.id)
+                    data = data[0:100] + b"x" + data[101:]
                     repository.put(chunk.id, data)
                     break
             repository.commit(compact=False)
@@ -4042,45 +4070,43 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
 class ManifestAuthenticationTest(ArchiverTestCaseBase):
     def spoof_manifest(self, repository):
         with repository:
-            _, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            repository.put(
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            cdata = manifest.repo_objs.format(
                 Manifest.MANIFEST_ID,
-                key.encrypt(
-                    Manifest.MANIFEST_ID,
-                    msgpack.packb(
-                        {
-                            "version": 1,
-                            "archives": {},
-                            "config": {},
-                            "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(
-                                timespec="microseconds"
-                            ),
-                        }
-                    ),
+                {},
+                msgpack.packb(
+                    {
+                        "version": 1,
+                        "archives": {},
+                        "config": {},
+                        "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(
+                            timespec="microseconds"
+                        ),
+                    }
                 ),
             )
+            repository.put(Manifest.MANIFEST_ID, cdata)
             repository.commit(compact=False)
 
     def test_fresh_init_tam_required(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         repository = Repository(self.repository_path, exclusive=True)
         with repository:
-            manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-            repository.put(
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            cdata = manifest.repo_objs.format(
                 Manifest.MANIFEST_ID,
-                key.encrypt(
-                    Manifest.MANIFEST_ID,
-                    msgpack.packb(
-                        {
-                            "version": 1,
-                            "archives": {},
-                            "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(
-                                timespec="microseconds"
-                            ),
-                        }
-                    ),
+                {},
+                msgpack.packb(
+                    {
+                        "version": 1,
+                        "archives": {},
+                        "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(
+                            timespec="microseconds"
+                        ),
+                    }
                 ),
             )
+            repository.put(Manifest.MANIFEST_ID, cdata)
             repository.commit(compact=False)
 
         with pytest.raises(TAMRequiredError):

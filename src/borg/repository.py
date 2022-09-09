@@ -25,6 +25,7 @@ from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .manifest import Manifest
 from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
+from .repoobj import RepoObj
 from .checksums import crc32, StreamingXXH64
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 
@@ -830,7 +831,7 @@ class Repository:
                 freeable_ratio * 100.0,
                 freeable_space,
             )
-            for tag, key, offset, data in self.io.iter_objects(segment, include_data=True):
+            for tag, key, offset, _, data in self.io.iter_objects(segment):
                 if tag == TAG_COMMIT:
                     continue
                 in_index = self.index.get(key)
@@ -961,7 +962,7 @@ class Repository:
     def _update_index(self, segment, objects, report=None):
         """some code shared between replay_segments and check"""
         self.segments[segment] = 0
-        for tag, key, offset, size in objects:
+        for tag, key, offset, size, _ in objects:
             if tag in (TAG_PUT2, TAG_PUT):
                 try:
                     # If this PUT supersedes an older PUT, mark the old segment for compaction and count the free space
@@ -1011,7 +1012,7 @@ class Repository:
             return
 
         self.compact[segment] = 0
-        for tag, key, offset, size in self.io.iter_objects(segment, read_data=False):
+        for tag, key, offset, size, _ in self.io.iter_objects(segment, read_data=False):
             if tag in (TAG_PUT2, TAG_PUT):
                 in_index = self.index.get(key)
                 if not in_index or (in_index.segment, in_index.offset) != (segment, offset):
@@ -1165,8 +1166,8 @@ class Repository:
             if segment is not None and current_segment > segment:
                 break
             try:
-                for tag, key, current_offset, data in self.io.iter_objects(
-                    segment=current_segment, offset=offset or 0, include_data=True
+                for tag, key, current_offset, _, data in self.io.iter_objects(
+                    segment=current_segment, offset=offset or 0
                 ):
                     if offset is not None and current_offset > offset:
                         break
@@ -1229,10 +1230,10 @@ class Repository:
         start_segment, start_offset, _ = (0, 0, 0) if at_start else self.index[marker]
         result = []
         for segment, filename in self.io.segment_iterator(start_segment):
-            obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False, include_data=False)
+            obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False)
             while True:
                 try:
-                    tag, id, offset, size = next(obj_iterator)
+                    tag, id, offset, size, _ = next(obj_iterator)
                 except (StopIteration, IntegrityError):
                     # either end-of-segment or an error - we can not seek to objects at
                     # higher offsets than one that has an error in the header fields.
@@ -1268,18 +1269,18 @@ class Repository:
     def flags_many(self, ids, mask=0xFFFFFFFF, value=None):
         return [self.flags(id_, mask, value) for id_ in ids]
 
-    def get(self, id):
+    def get(self, id, read_data=True):
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
         try:
             in_index = NSIndexEntry(*((self.index[id] + (None,))[:3]))  # legacy: index entries have no size element
-            return self.io.read(in_index.segment, in_index.offset, id, expected_size=in_index.size)
+            return self.io.read(in_index.segment, in_index.offset, id, expected_size=in_index.size, read_data=read_data)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
 
-    def get_many(self, ids, is_preloaded=False):
+    def get_many(self, ids, read_data=True, is_preloaded=False):
         for id_ in ids:
-            yield self.get(id_)
+            yield self.get(id_, read_data=read_data)
 
     def put(self, id, data, wait=True):
         """put a repo object
@@ -1458,7 +1459,7 @@ class LoggedIO:
         seen_commit = False
         while True:
             try:
-                tag, key, offset, _ = next(iterator)
+                tag, key, offset, _, _ = next(iterator)
             except IntegrityError:
                 return False
             except StopIteration:
@@ -1560,15 +1561,13 @@ class LoggedIO:
         fd.seek(0)
         return fd.read(MAGIC_LEN)
 
-    def iter_objects(self, segment, offset=0, include_data=False, read_data=True):
+    def iter_objects(self, segment, offset=0, read_data=True):
         """
         Return object iterator for *segment*.
 
-        If read_data is False then include_data must be False as well.
-
         See the _read() docstring about confidence in the returned data.
 
-        The iterator returns four-tuples of (tag, key, offset, data|size).
+        The iterator returns five-tuples of (tag, key, offset, size, data).
         """
         fd = self.get_fd(segment)
         fd.seek(offset)
@@ -1584,10 +1583,9 @@ class LoggedIO:
             size, tag, key, data = self._read(
                 fd, header, segment, offset, (TAG_PUT2, TAG_DELETE, TAG_COMMIT, TAG_PUT), read_data=read_data
             )
-            if include_data:
-                yield tag, key, offset, data
-            else:
-                yield tag, key, offset, size - header_size(tag)  # corresponds to len(data)
+            # tuple[3]: corresponds to len(data) == length of the full chunk payload (meta_len+enc_meta+enc_data)
+            # tuple[4]: data will be None if read_data is False.
+            yield tag, key, offset, size - header_size(tag), data
             assert size >= 0
             offset += size
             # we must get the fd via get_fd() here again as we yielded to our caller and it might
@@ -1656,10 +1654,9 @@ class LoggedIO:
             h.update(d)
         return h.digest()
 
-    def read(self, segment, offset, id, read_data=True, *, expected_size=None):
+    def read(self, segment, offset, id, *, read_data=True, expected_size=None):
         """
         Read entry from *segment* at *offset* with *id*.
-        If read_data is False the size of the entry is returned instead.
 
         See the _read() docstring about confidence in the returned data.
         """
@@ -1668,7 +1665,7 @@ class LoggedIO:
         fd = self.get_fd(segment)
         fd.seek(offset)
         header = fd.read(self.header_fmt.size)
-        size, tag, key, data = self._read(fd, header, segment, offset, (TAG_PUT2, TAG_PUT), read_data)
+        size, tag, key, data = self._read(fd, header, segment, offset, (TAG_PUT2, TAG_PUT), read_data=read_data)
         if id != key:
             raise IntegrityError(
                 "Invalid segment entry header, is not for wanted id [segment {}, offset {}]".format(segment, offset)
@@ -1678,7 +1675,7 @@ class LoggedIO:
             raise IntegrityError(
                 f"size from repository index: {expected_size} != " f"size from entry header: {data_size_from_header}"
             )
-        return data if read_data else data_size_from_header
+        return data
 
     def _read(self, fd, header, segment, offset, acceptable_tags, read_data=True):
         """
@@ -1689,6 +1686,11 @@ class LoggedIO:
         PUT2 tags, read_data == False: crc32 check (header)
         PUT tags, read_data == True: crc32 check (header+data)
         PUT tags, read_data == False: crc32 check can not be done, all data obtained must be considered informational
+
+        read_data == False behaviour:
+        PUT2 tags: return enough of the chunk so that the client is able to decrypt the metadata,
+                   do not read, but just seek over the data.
+        PUT tags:  return None and just seek over the data.
         """
 
         def check_crc32(wanted, header, *data):
@@ -1749,7 +1751,31 @@ class LoggedIO:
                             f"expected {self.ENTRY_HASH_SIZE}, got {len(entry_hash)} bytes"
                         )
                     check_crc32(crc, header, key, entry_hash)
-                if not read_data:  # seek over data
+                if not read_data:
+                    if tag == TAG_PUT2:
+                        # PUT2 is only used in new repos and they also have different RepoObj layout,
+                        # supporting separately encrypted metadata and data.
+                        # In this case, we return enough bytes so the client can decrypt the metadata
+                        # and seek over the rest (over the encrypted data).
+                        meta_len_size = RepoObj.meta_len_hdr.size
+                        meta_len = fd.read(meta_len_size)
+                        length -= meta_len_size
+                        if len(meta_len) != meta_len_size:
+                            raise IntegrityError(
+                                f"Segment entry meta length short read [segment {segment}, offset {offset}]: "
+                                f"expected {meta_len_size}, got {len(meta_len)} bytes"
+                            )
+                        ml = RepoObj.meta_len_hdr.unpack(meta_len)[0]
+                        meta = fd.read(ml)
+                        length -= ml
+                        if len(meta) != ml:
+                            raise IntegrityError(
+                                f"Segment entry meta short read [segment {segment}, offset {offset}]: "
+                                f"expected {ml}, got {len(meta)} bytes"
+                            )
+                        data = meta_len + meta  # shortened chunk - enough so the client can decrypt the metadata
+                        # we do not have a checksum for this data, but the client's AEAD crypto will check it.
+                    # in any case, we see over the remainder of the chunk
                     oldpos = fd.tell()
                     seeked = fd.seek(length, os.SEEK_CUR) - oldpos
                     if seeked != length:

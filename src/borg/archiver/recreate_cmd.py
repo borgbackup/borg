@@ -17,7 +17,7 @@ logger = create_logger()
 
 class RecreateMixIn:
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
-    def do_recreate(self, args, repository, manifest, key, cache):
+    def do_recreate(self, args, repository, manifest, cache):
         """Re-create archives"""
         matcher = build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
@@ -26,9 +26,7 @@ class RecreateMixIn:
         always_recompress = args.recompress == "always"
 
         recreater = ArchiveRecreater(
-            repository,
             manifest,
-            key,
             cache,
             matcher,
             exclude_caches=args.exclude_caches,

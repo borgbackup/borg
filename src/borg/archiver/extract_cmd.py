@@ -22,7 +22,7 @@ logger = create_logger()
 class ExtractMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
-    def do_extract(self, args, repository, manifest, key, archive):
+    def do_extract(self, args, repository, manifest, archive):
         """Extract archive contents"""
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == "ascii":

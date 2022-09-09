@@ -31,11 +31,11 @@ class MountMixIn:
         return self._do_mount(args)
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
-    def _do_mount(self, args, repository, manifest, key):
+    def _do_mount(self, args, repository, manifest):
         from ..fuse import FuseOperations
 
-        with cache_if_remote(repository, decrypted_cache=key) as cached_repo:
-            operations = FuseOperations(key, repository, manifest, args, cached_repo)
+        with cache_if_remote(repository, decrypted_cache=manifest.repo_objs) as cached_repo:
+            operations = FuseOperations(manifest, args, cached_repo)
             logger.info("Mounting filesystem")
             try:
                 operations.mount(args.mountpoint, args.options, args.foreground)

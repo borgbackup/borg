@@ -15,12 +15,12 @@ logger = create_logger()
 
 
 class TransferMixIn:
-    @with_other_repository(manifest=True, key=True, compatibility=(Manifest.Operation.READ,))
+    @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
     @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
-    def do_transfer(
-        self, args, *, repository, manifest, key, cache, other_repository=None, other_manifest=None, other_key=None
-    ):
+    def do_transfer(self, args, *, repository, manifest, cache, other_repository=None, other_manifest=None):
         """archives transfer from other repository, optionally upgrade data format"""
+        key = manifest.key
+        other_key = other_manifest.key
         if not uses_same_id_hash(other_key, key):
             self.print_error(
                 "You must keep the same ID hash ([HMAC-]SHA256 or BLAKE2b) or deduplication will break. "
@@ -57,8 +57,8 @@ class TransferMixIn:
             else:
                 if not dry_run:
                     print(f"{name}: copying archive to destination repo...")
-                other_archive = Archive(other_repository, other_key, other_manifest, name)
-                archive = Archive(repository, key, manifest, name, cache=cache, create=True) if not dry_run else None
+                other_archive = Archive(other_manifest, name)
+                archive = Archive(manifest, name, cache=cache, create=True) if not dry_run else None
                 upgrader.new_archive(archive=archive)
                 for item in other_archive.iter_items():
                     if "chunks" in item:
@@ -69,10 +69,18 @@ class TransferMixIn:
                                 if not dry_run:
                                     cdata = other_repository.get(chunk_id)
                                     # keep compressed payload same, avoid decompression / recompression
-                                    data = other_key.decrypt(chunk_id, cdata, decompress=False)
-                                    data = upgrader.upgrade_compressed_chunk(chunk=data)
+                                    meta, data = other_manifest.repo_objs.parse(chunk_id, cdata, decompress=False)
+                                    meta, data = upgrader.upgrade_compressed_chunk(meta, data)
                                     chunk_entry = cache.add_chunk(
-                                        chunk_id, data, archive.stats, wait=False, compress=False, size=size
+                                        chunk_id,
+                                        meta,
+                                        data,
+                                        stats=archive.stats,
+                                        wait=False,
+                                        compress=False,
+                                        size=size,
+                                        ctype=meta["ctype"],
+                                        clevel=meta["clevel"],
                                     )
                                     cache.repository.async_response(wait=False)
                                     chunks.append(chunk_entry)

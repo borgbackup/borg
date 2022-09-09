@@ -4,7 +4,7 @@ from ._common import with_repository, with_other_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
-from ..helpers import EXIT_SUCCESS, EXIT_ERROR
+from ..helpers import EXIT_SUCCESS, EXIT_ERROR, Error
 from ..helpers import location_validator, Location
 from ..helpers import format_file_size
 from ..manifest import Manifest
@@ -46,6 +46,9 @@ class TransferMixIn:
         except AttributeError:
             self.print_error(f"No such upgrader: {args.upgrader}")
             return EXIT_ERROR
+
+        if UpgraderCls is not upgrade_mod.UpgraderFrom12To20 and other_manifest.repository.version == 1:
+            raise Error("To transfer from a borg 1.x repo, you need to use: --upgrader=From12To20")
 
         upgrader = UpgraderCls(cache=cache)
 

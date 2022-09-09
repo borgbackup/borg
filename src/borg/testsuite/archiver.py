@@ -3773,7 +3773,9 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             borg_create_output.pop()  # The last line needs to be removed because its an empty string
             borg_create_output = [line.split(":", 1) for line in borg_create_output]
             borg_create_output = {
-                key: int(value) for key, value in borg_create_output if key in ("Added files", "Unchanged files", "Modified files")
+                key: int(value)
+                for key, value in borg_create_output
+                if key in ("Added files", "Unchanged files", "Modified files")
             }
             return borg_create_output
 

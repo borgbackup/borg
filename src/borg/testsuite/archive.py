@@ -96,6 +96,7 @@ def test_stats_progress_json(stats):
     assert "original_size" not in result
     assert "nfiles" not in result
 
+
 class MockCache:
     class MockRepo:
         def async_response(self, wait=True):

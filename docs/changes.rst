@@ -12,7 +12,7 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0b2 (2022-xx-xx)
+Version 2.0.0b2 (2022-09-10)
 ----------------------------
 Please note:
 
@@ -40,7 +40,8 @@ Compatibility notes:
   - ssh:// URLs: removed support for /~otheruser/, #6855.
     If you used this, just replace it by: ssh://user@host:port/home/otheruser/
   - -P / --prefix option was removed, please use the similar -a / --glob-archives.
-  - differently than with borg 1.x you ONLY give the repo there, never a ::archive.
+  - the archive name is always given separately from the repository
+    (differently than with borg 1.x you must not give repo::archive).
   - the archive name is either given as a positional parameter, like:
 
     - borg create myarchive2 /some/path
@@ -83,7 +84,7 @@ Compatibility notes:
 
 Bug fixes:
 
-- xattrs / extended stat: improve exception handling
+- xattrs / extended stat: improve exception handling, #6988
 - fix and refactor replace_placeholders, #6966
 
 New features:
@@ -96,12 +97,15 @@ New features:
 Other changes:
 
 - chunks: have separate encrypted metadata (ctype, clevel, csize, size)
+
   chunk = enc_meta_len16 + encrypted(msgpacked(meta)) + encrypted(compressed(data)).
+
   this breaks repo format compatibility, you need to create fresh repos!
 - repository api: flags support, #6982
+- OpenBSD only - statically link OpenSSL, #6474.
+  Avoid conflicting with shared libcrypto from the base OS pulled in via dependencies.
 - restructured source code
 - update diagrams to odg format, #6928
-- re-add stretch64 vm (to build binary working on rhel7&co), #7010
 
 Version 2.0.0b1 (2022-08-08)
 ----------------------------

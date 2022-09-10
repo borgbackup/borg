@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-PRUNE" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -50,21 +50,22 @@ behind by interrupted backup runs) except if the checkpoint is the latest
 archive (and thus still needed). Checkpoint archives are not considered when
 comparing archive counts against the retention limits (\fB\-\-keep\-X\fP).
 .sp
-If a prefix is set with \-P, then only archives that start with the prefix are
+If you use \-\-glob\-archives (\-a), then only archives that match the GLOB are
 considered for deletion and only those archives count towards the totals
 specified by the rules.
 Otherwise, \fIall\fP archives in the repository are candidates for deletion!
 There is no automatic distinction between archives representing different
-contents. These need to be distinguished by specifying matching prefixes.
+contents. These need to be distinguished by specifying matching globs.
 .sp
 If you have multiple sequences of archives with different data sets (e.g.
 from different machines) in one shared repository, use one prune call per
-data set that matches only the respective archives using the \-P option.
+data set that matches only the respective archives using the \-\-glob\-archives
+(\-a) option.
 .sp
-The \fB\-\-keep\-within\fP option takes an argument of the form "<int><char>",
-where char is "H", "d", "w", "m", "y". For example, \fB\-\-keep\-within 2d\fP means
+The \fB\-\-keep\-within\fP option takes an argument of the form \(dq<int><char>\(dq,
+where char is \(dqH\(dq, \(dqd\(dq, \(dqw\(dq, \(dqm\(dq, \(dqy\(dq. For example, \fB\-\-keep\-within 2d\fP means
 to keep all archives that were created within the past 48 hours.
-"1m" is taken to mean "31d". The archives kept with this option do not
+\(dq1m\(dq is taken to mean \(dq31d\(dq. The archives kept with this option do not
 count towards the totals specified by any other options.
 .sp
 A good procedure is to thin out more and more the older your backups get.
@@ -85,9 +86,9 @@ keep the last N archives under the assumption that you do not create more than o
 backup archive in the same second).
 .sp
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
-deleted \- the "Deleted data" deduplicated size there is most interesting as
+deleted \- the \(dqDeleted data\(dq deduplicated size there is most interesting as
 that is how much your repository will shrink.
-Please note that the "All archives" stats refer to the state after pruning.
+Please note that the \(dqAll archives\(dq stats refer to the state after pruning.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -140,7 +141,7 @@ write checkpoint every SECONDS seconds (Default: 1800)
 .INDENT 0.0
 .TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
+only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq.
 .UNINDENT
 .SH EXAMPLES
 .sp
@@ -150,7 +151,7 @@ archives.
 The default of prune is to apply to \fBall archives in the repository\fP unless
 you restrict its operation to a subset of the archives using \fB\-a\fP / \fB\-\-glob\-archives\fP\&.
 When using \fB\-a\fP, be careful to choose a good pattern \- e.g. do not use a
-prefix "foo" if you do not also want to match "foobar".
+prefix \(dqfoo\(dq if you do not also want to match \(dqfoobar\(dq.
 .sp
 It is strongly recommended to always run \fBprune \-v \-\-list \-\-dry\-run ...\fP
 first so you will see what it would do without it actually doing anything.
@@ -164,7 +165,7 @@ first so you will see what it would do without it actually doing anything.
 $ borg prune \-v \-\-list \-\-dry\-run \-\-keep\-daily=7 \-\-keep\-weekly=4
 
 # Same as above but only apply to archive names starting with the hostname
-# of the machine followed by a "\-" character:
+# of the machine followed by a \(dq\-\(dq character:
 $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-a \(aq{hostname}\-*\(aq
 # actually free disk space:
 $ borg compact

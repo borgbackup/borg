@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-TRANSFER" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-TRANSFER" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
@@ -94,7 +94,7 @@ use the upgrader to convert transferred data (default: no conversion)
 .INDENT 0.0
 .TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
+only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
@@ -113,7 +113,7 @@ consider last N archives after other filters were applied
 .ft C
 # 0. Have borg 2.0 installed on client AND server, have a b12 repo copy for testing.
 
-# 1. Create a new "related" repository:
+# 1. Create a new \(dqrelated\(dq repository:
 # here, the existing borg 1.2 repo used repokey\-blake2 (and aes\-ctr mode),
 # thus we use repokey\-blake2\-aes\-ocb for the new borg 2.0 repo.
 # staying with the same chunk id algorithm (blake2) and with the same
@@ -121,7 +121,7 @@ consider last N archives after other filters were applied
 # between old archives (copied with borg transfer) and future ones.
 # the AEAD cipher does not matter (everything must be re\-encrypted and
 # re\-authenticated anyway), you could also choose repokey\-blake2\-chacha20\-poly1305.
-# in case your old borg repo did not use blake2, just remove the "\-blake2".
+# in case your old borg repo did not use blake2, just remove the \(dq\-blake2\(dq.
 $ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 rcreate \e
        \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-e repokey\-blake2\-aes\-ocb
 

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-MOUNT" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-MOUNT" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-mount \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
@@ -79,9 +79,9 @@ allow_damaged_files: by default damaged files (where missing chunks were
 replaced with runs of zeros by borg check \fB\-\-repair\fP) are not readable and
 return EIO (I/O error). Set this option to read such files.
 .IP \(bu 2
-ignore_permissions: for security reasons the "default_permissions" mount
-option is internally enforced by borg. "ignore_permissions" can be given to
-not enforce "default_permissions".
+ignore_permissions: for security reasons the \(dqdefault_permissions\(dq mount
+option is internally enforced by borg. \(dqignore_permissions\(dq can be given to
+not enforce \(dqdefault_permissions\(dq.
 .UNINDENT
 .sp
 The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
@@ -126,7 +126,7 @@ use numeric user and group identifiers from archive(s)
 .INDENT 0.0
 .TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
+only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

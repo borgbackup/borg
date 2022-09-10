@@ -104,7 +104,6 @@ def packages_netbsd
     ln -s /usr/pkg/bin/pip3.9 /usr/pkg/bin/pip3
     ln -s /usr/pkg/bin/virtualenv-3.9 /usr/pkg/bin/virtualenv
     ln -s /usr/pkg/bin/virtualenv-3.9 /usr/pkg/bin/virtualenv3
-    ln -s /usr/pkg/lib/python3.9/_sysconfigdata_netbsd9.py /usr/pkg/lib/python3.9/_sysconfigdata__netbsd9_.py  # bug in netbsd 9.2, expected filename not there.
   EOF
 end
 

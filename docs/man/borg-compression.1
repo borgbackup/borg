@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-COMPRESSION" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-COMPRESSION" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-compression \- Details regarding compression
 .SH DESCRIPTION
@@ -53,20 +53,20 @@ Do not compress.
 Use lz4 compression. Very high speed, very low compression. (default)
 .TP
 .B zstd[,L]
-Use zstd ("zstandard") compression, a modern wide\-range algorithm.
+Use zstd (\(dqzstandard\(dq) compression, a modern wide\-range algorithm.
 If you do not explicitly give the compression level L (ranging from 1
 to 22), it will use level 3.
 Archives compressed with zstd are not compatible with borg < 1.1.4.
 .TP
 .B zlib[,L]
-Use zlib ("gz") compression. Medium speed, medium compression.
+Use zlib (\(dqgz\(dq) compression. Medium speed, medium compression.
 If you do not explicitly give the compression level L (ranging from 0
 to 9), it will use level 6.
-Giving level 0 (means "no compression", but still has zlib protocol
-overhead) is usually pointless, you better use "none" compression.
+Giving level 0 (means \(dqno compression\(dq, but still has zlib protocol
+overhead) is usually pointless, you better use \(dqnone\(dq compression.
 .TP
 .B lzma[,L]
-Use lzma ("xz") compression. Low speed, high compression.
+Use lzma (\(dqxz\(dq) compression. Low speed, high compression.
 If you do not explicitly give the compression level L (ranging from 0
 to 9), it will use level 6.
 Giving levels above 6 is pointless and counterproductive because it does
@@ -76,7 +76,7 @@ lots of CPU cycles and RAM.
 .B auto,C[,L]
 Use a built\-in heuristic to decide per chunk whether to compress or not.
 The heuristic tries with lz4 whether the data is compressible.
-For incompressible data, it will not use compression (uses "none").
+For incompressible data, it will not use compression (uses \(dqnone\(dq).
 For compressible data, it uses the given C[,L] compression \- with C[,L]
 being any valid compression specifier.
 .TP

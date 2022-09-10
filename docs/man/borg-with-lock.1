@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-WITH-LOCK" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-WITH-LOCK" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-with-lock \- run a user specified command with the repository lock held
 .SH SYNOPSIS
@@ -47,7 +47,7 @@ code as borg\(aqs return code.
 .INDENT 3.5
 If you copy a repository with the lock held, the lock will be present in
 the copy. Thus, before using borg on the copy from a different host,
-you need to use "borg break\-lock" on the copied repository, because
+you need to use \(dqborg break\-lock\(dq on the copied repository, because
 Borg is cautious and does not automatically remove stale locks made by a different host.
 .UNINDENT
 .UNINDENT

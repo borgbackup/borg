@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-IMPORT-TAR" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-IMPORT-TAR" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -90,7 +90,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 specify the archive name
 .TP
 .B TARFILE
-input tar file. "\-" to read from stdin instead.
+input tar file. \(dq\-\(dq to read from stdin instead.
 .UNINDENT
 .SS optional arguments
 .INDENT 0.0
@@ -117,7 +117,7 @@ output stats as JSON (implies \-\-stats)
 add a comment text to the archive
 .TP
 .BI \-\-timestamp \ TIMESTAMP
-manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). alternatively, give a reference file/directory.
+manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
 .TP
 .BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
 write checkpoint every SECONDS seconds (Default: 1800)
@@ -126,7 +126,7 @@ write checkpoint every SECONDS seconds (Default: 1800)
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the "borg help compression" command for details.
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -144,7 +144,7 @@ $ borg import\-tar Monday Monday.tar
 $ borg export\-tar Monday Monday.tar.gz \-\-exclude \(aq*.so\(aq
 
 # use higher compression level with gzip
-$ borg export\-tar \-\-tar\-filter="gzip \-9" Monday Monday.tar.gz
+$ borg export\-tar \-\-tar\-filter=\(dqgzip \-9\(dq Monday Monday.tar.gz
 
 # copy an archive from repoA to repoB
 $ borg \-r repoA export\-tar \-\-tar\-format=BORG archive \- | borg \-r repoB import\-tar archive \-
@@ -152,8 +152,8 @@ $ borg \-r repoA export\-tar \-\-tar\-format=BORG archive \- | borg \-r repoB im
 # export a tar, but instead of storing it on disk, upload it to remote site using curl
 $ borg export\-tar Monday \- | curl \-\-data\-binary @\- https://somewhere/to/POST
 
-# remote extraction via "tarpipe"
-$ borg export\-tar Monday \- | ssh somewhere "cd extracted; tar x"
+# remote extraction via \(dqtarpipe\(dq
+$ borg export\-tar Monday \- | ssh somewhere \(dqcd extracted; tar x\(dq
 .ft P
 .fi
 .UNINDENT
@@ -168,7 +168,7 @@ Outputs a script that copies all archives from repo1 to repo2:
 .ft C
 for A T in \(gaborg list \-\-format=\(aq{archive} {time:%Y\-%m\-%dT%H:%M:%S}{LF}\(aq\(ga
 do
-  echo "borg \-r repo1 export\-tar \-\-tar\-format=BORG $A \- | borg \-r repo2 import\-tar \-\-timestamp=$T $A \-"
+  echo \(dqborg \-r repo1 export\-tar \-\-tar\-format=BORG $A \- | borg \-r repo2 import\-tar \-\-timestamp=$T $A \-\(dq
 done
 .ft P
 .fi

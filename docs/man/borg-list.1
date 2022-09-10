@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-LIST" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-LIST" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive contents
 .SH SYNOPSIS
@@ -57,10 +57,10 @@ paths to list; patterns are supported
 only print file/directory names, nothing else
 .TP
 .BI \-\-format \ FORMAT
-specify format for file listing (default: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")
+specify format for file listing (default: \(dq{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}\(dq)
 .TP
 .B  \-\-json\-lines
-Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "bpath" key is therefore not available.
+Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A \(dqbpath\(dq key is therefore not available.
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0
@@ -91,14 +91,14 @@ lrwxrwxrwx root   root          0 Fri, 2015\-03\-27 20:24:26 bin/bzcmp \-> bzdif
 \-rwxr\-xr\-x root   root       2140 Fri, 2015\-03\-27 20:24:22 bin/bzdiff
 \&...
 
-$ borg list root\-2016\-02\-15 \-\-pattern "\- bin/ba*"
+$ borg list root\-2016\-02\-15 \-\-pattern \(dq\- bin/ba*\(dq
 drwxr\-xr\-x root   root          0 Mon, 2016\-02\-15 17:44:27 .
 drwxrwxr\-x root   root          0 Mon, 2016\-02\-15 19:04:49 bin
 lrwxrwxrwx root   root          0 Fri, 2015\-03\-27 20:24:26 bin/bzcmp \-> bzdiff
 \-rwxr\-xr\-x root   root       2140 Fri, 2015\-03\-27 20:24:22 bin/bzdiff
 \&...
 
-$ borg list archiveA \-\-format="{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}"
+$ borg list archiveA \-\-format=\(dq{mode} {user:6} {group:6} {size:8d} {isomtime} {path}{extra}{NEWLINE}\(dq
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 .
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code
 drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
@@ -238,9 +238,9 @@ archiveid
 .IP \(bu 2
 archivename
 .IP \(bu 2
-extra: prepends {source} with " \-> " for soft links and " link to " for hard links
+extra: prepends {source} with \(dq \-> \(dq for soft links and \(dq link to \(dq for hard links
 .IP \(bu 2
-health: either "healthy" (file ok) or "broken" (if file has all\-zero replacement chunks)
+health: either \(dqhealthy\(dq (file ok) or \(dqbroken\(dq (if file has all\-zero replacement chunks)
 .UNINDENT
 .SH SEE ALSO
 .sp

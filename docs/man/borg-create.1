@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -112,8 +112,8 @@ The \fB\-\-progress\fP option shows (from left to right) Original, Compressed an
 the currently processed path.
 .sp
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
-added \- the "This Archive" deduplicated size there is most interesting as that is
-how much your repository will grow. Please note that the "All archives" stats refer to
+added \- the \(dqThis Archive\(dq deduplicated size there is most interesting as that is
+how much your repository will grow. Please note that the \(dqAll archives\(dq stats refer to
 the state after creation. Also, the \fB\-\-stats\fP and \fB\-\-dry\-run\fP options are mutually
 exclusive because the data is not actually compressed and deduplicated during a dry run.
 .sp
@@ -160,7 +160,7 @@ use NAME in archive for stdin data (default: \(aqstdin\(aq)
 set user USER in archive for stdin data (default: \(aqroot\(aq)
 .TP
 .BI \-\-stdin\-group \ GROUP
-set group GROUP in archive for stdin data (default: \(aqwheel\(aq)
+set group GROUP in archive for stdin data (default: \(aqroot\(aq)
 .TP
 .BI \-\-stdin\-mode \ M
 set mode to M in archive for stdin data (default: 0660)
@@ -247,7 +247,7 @@ open and read block and char device files as well as FIFOs as if they were regul
 add a comment text to the archive
 .TP
 .BI \-\-timestamp \ TIMESTAMP
-manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). Alternatively, give a reference file/directory.
+manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
 .TP
 .BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
 write checkpoint every SECONDS seconds (Default: 1800)
@@ -256,7 +256,7 @@ write checkpoint every SECONDS seconds (Default: 1800)
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the "borg help compression" command for details.
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -264,7 +264,7 @@ select compression algorithm, see the output of the "borg help compression" comm
 .sp
 .nf
 .ft C
-# Backup ~/Documents into an archive named "my\-documents"
+# Backup ~/Documents into an archive named \(dqmy\-documents\(dq
 $ borg create my\-documents ~/Documents
 
 # same, but list all files as we process them
@@ -280,14 +280,14 @@ $ borg create my\-files                \e
 # /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
 $ borg create my\-files /home \-\-exclude \(aqsh:home/*/.thumbnails\(aq
 
-# Backup the root filesystem into an archive named "root\-YYYY\-MM\-DD"
+# Backup the root filesystem into an archive named \(dqroot\-YYYY\-MM\-DD\(dq
 # use zlib compression (good, but slow) \- default is lz4 (fast, low compression ratio)
 $ borg create \-C zlib,6 \-\-one\-file\-system root\-{now:%Y\-%m\-%d} /
 
 # Backup into an archive name like FQDN\-root\-TIMESTAMP
 $ borg create \(aq{fqdn}\-root\-{now}\(aq /
 
-# Backup a remote host locally ("pull" style) using sshfs
+# Backup a remote host locally (\(dqpull\(dq style) using sshfs
 $ mkdir sshfs\-mount
 $ sshfs root@example.com:/ sshfs\-mount
 $ cd sshfs\-mount
@@ -330,7 +330,7 @@ $ borg create \(aq{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S.%f}\(aq ~
 
 # Backing up relative paths by moving into the correct directory first
 $ cd /home/user/Documents
-# The root directory of the archive will be "projectA"
+# The root directory of the archive will be \(dqprojectA\(dq
 $ borg create \(aqdaily\-projectA\-{now:%Y\-%m\-%d}\(aq projectA
 
 # Use external command to determine files to archive
@@ -341,7 +341,7 @@ $ borg create \-\-paths\-from\-command joes\-files \-\- find /srv/samba/shared \
 # Use \-\-paths\-from\-stdin with \-\-paths\-delimiter (for example, for filenames with newlines in them)
 $ find ~ \-size \-1000k \-print0 | borg create \e
     \-\-paths\-from\-stdin \e
-    \-\-paths\-delimiter "\e0" \e
+    \-\-paths\-delimiter \(dq\e0\(dq \e
     smallfiles\-handle\-newline
 .ft P
 .fi
@@ -384,7 +384,7 @@ If you are interested only in a subset of that output, you can give e.g.
 below).
 .sp
 A uppercase character represents the status of a regular file relative to the
-"files" cache (not relative to the repo \-\- this is an issue if the files cache
+\(dqfiles\(dq cache (not relative to the repo \-\- this is an issue if the files cache
 is not used). Metadata is stored in any case and for \(aqA\(aq and \(aqM\(aq also new data
 chunks are stored. For \(aqU\(aq all data chunks refer to already existing chunks.
 .INDENT 0.0

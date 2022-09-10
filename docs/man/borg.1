@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -407,7 +407,7 @@ be checked.
 Main usecase for this is to fully automate \fBborg change\-passphrase\fP\&.
 .TP
 .B BORG_DISPLAY_PASSPHRASE
-When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
+When set, use the value to answer the \(dqdisplay the passphrase for verification\(dq question when defining a new passphrase for encrypted repositories.
 .TP
 .B BORG_HOST_ID
 Borg usually computes a host id from the FQDN plus the results of \fBuuid.getnode()\fP (which usually returns
@@ -427,7 +427,7 @@ a custom identity file \fBssh \-i /path/to/private/key\fP\&. See \fBman ssh\fP f
 the \fB\-\-rsh CMD\fP commandline option overrides the environment variable.
 .TP
 .B BORG_REMOTE_PATH
-When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
+When set, use the given path as borg executable on the remote (defaults to \(dqborg\(dq if unset).
 Using \fB\-\-remote\-path PATH\fP commandline option overrides the environment variable.
 .TP
 .B BORG_FILES_CACHE_SUFFIX
@@ -436,7 +436,7 @@ When set to a value at least one character long, instructs borg to use a specifi
 cache entries for backup sources other than the current sources.
 .TP
 .B BORG_FILES_CACHE_TTL
-When set to a numeric value, this determines the maximum "time to live" for the files cache
+When set to a numeric value, this determines the maximum \(dqtime to live\(dq for the files cache
 entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
 The FAQ explains this more detailed in: \fIalways_chunking\fP
 .TP
@@ -492,20 +492,20 @@ in WSL1 (Windows Subsystem for Linux 1).
 .UNINDENT
 .UNINDENT
 .TP
-.B Some automatic "answerers" (if set, they automatically answer confirmation questions):
+.B Some automatic \(dqanswerers\(dq (if set, they automatically answer confirmation questions):
 .INDENT 7.0
 .TP
 .B BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)
-For "Warning: Attempting to access a previously unknown unencrypted repository"
+For \(dqWarning: Attempting to access a previously unknown unencrypted repository\(dq
 .TP
 .B BORG_RELOCATED_REPO_ACCESS_IS_OK=no (or =yes)
-For "Warning: The repository at location ... was previously located at ..."
+For \(dqWarning: The repository at location ... was previously located at ...\(dq
 .TP
 .B BORG_CHECK_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
-For "This is a potentially dangerous function..." (check \-\-repair)
+For \(dqThis is a potentially dangerous function...\(dq (check \-\-repair)
 .TP
 .B BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
-For "You requested to completely DELETE the repository \fIincluding\fP all archives it contains:"
+For \(dqYou requested to completely DELETE the repository \fIincluding\fP all archives it contains:\(dq
 .UNINDENT
 .sp
 Note: answers are case sensitive. setting an invalid answer value might either give the default
@@ -538,8 +538,8 @@ for a security advisory about the data in this directory: \fIhome_config_borg\fP
 .TP
 .B BORG_SECURITY_DIR
 Defaults to \fB$BORG_CONFIG_DIR/security\fP\&.
-This directory contains information borg uses to track its usage of NONCES ("numbers used
-once" \- usually in encryption context) and other security relevant data.
+This directory contains information borg uses to track its usage of NONCES (\(dqnumbers used
+once\(dq \- usually in encryption context) and other security relevant data.
 .TP
 .B BORG_KEYS_DIR
 Defaults to \fB$BORG_CONFIG_DIR/keys\fP\&.
@@ -576,7 +576,7 @@ will be linked against the system libzstd instead of a bundled implementation. (
 Please note:
 .INDENT 0.0
 .IP \(bu 2
-Be very careful when using the "yes" sayers, the warnings with prompt exist for your / your data\(aqs security/safety.
+Be very careful when using the \(dqyes\(dq sayers, the warnings with prompt exist for your / your data\(aqs security/safety.
 .IP \(bu 2
 Also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions (e.g.
 mode 600, root:root).
@@ -720,7 +720,7 @@ process.
 For some OSes, this can be done just by setting the correct value in the
 \&.bashrc (or equivalent login config file for other shells), however in
 other cases it may be necessary to first enable \fBPermitUserEnvironment yes\fP
-in your \fBsshd_config\fP file, then add \fBenvironment="TMPDIR=/my/big/tmpdir"\fP
+in your \fBsshd_config\fP file, then add \fBenvironment=\(dqTMPDIR=/my/big/tmpdir\(dq\fP
 at the start of the public key to be used in the \fBauthorized_hosts\fP file.
 .TP
 .B Cache files (client only):
@@ -748,7 +748,7 @@ special files:
 .IP \(bu 2
 character and block device files (restored via mknod)
 .IP \(bu 2
-FIFOs ("named pipes")
+FIFOs (\(dqnamed pipes\(dq)
 .IP \(bu 2
 special file \fIcontents\fP can be backed up in \fB\-\-read\-special\fP mode.
 By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
@@ -868,7 +868,7 @@ Other Unix\-like operating systems may work as well, but have not been tested at
 Note that most of the platform\-dependent features also depend on the file system.
 For example, ntfs\-3g on Linux isn\(aqt able to convey NTFS ACLs.
 .IP [1] 5
-Only "nodump", "immutable", "compressed" and "append" are supported.
+Only \(dqnodump\(dq, \(dqimmutable\(dq, \(dqcompressed\(dq and \(dqappend\(dq are supported.
 Feature request #618 for more flags.
 .IP [2] 5
 Feature request #1332

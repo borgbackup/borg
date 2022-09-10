@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-SERVE" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-SERVE" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -83,11 +83,11 @@ locations like \fB/etc/environment\fP or in the forced command itself (example b
 # Use key options to disable unneeded and potentially dangerous SSH functionality.
 # This will help to secure an automated remote backup system.
 $ cat ~/.ssh/authorized_keys
-command="borg serve \-\-restrict\-to\-path /path/to/repo",restrict ssh\-rsa AAAAB3[...]
+command=\(dqborg serve \-\-restrict\-to\-path /path/to/repo\(dq,restrict ssh\-rsa AAAAB3[...]
 
-# Set a BORG_XXX environment variable on the "borg serve" side
+# Set a BORG_XXX environment variable on the \(dqborg serve\(dq side
 $ cat ~/.ssh/authorized_keys
-command="export BORG_XXX=value; borg serve [...]",restrict ssh\-rsa [...]
+command=\(dqexport BORG_XXX=value; borg serve [...]\(dq,restrict ssh\-rsa [...]
 .ft P
 .fi
 .UNINDENT

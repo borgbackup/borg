@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-KEY-CHANGE-PASSPHRASE" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-KEY-CHANGE-PASSPHRASE" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-key-change-passphrase \- Change repository key file passphrase
 .SH SYNOPSIS
@@ -53,11 +53,11 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .ft C
 # Create a key file protected repository
 $ borg rcreate \-\-encryption=keyfile\-aes\-ocb \-v
-Initializing repository at "/path/to/repo"
+Initializing repository at \(dq/path/to/repo\(dq
 Enter new passphrase:
 Enter same passphrase again:
 Remember your passphrase. Your data will be inaccessible without it.
-Key in "/root/.config/borg/keys/mnt_backup" created.
+Key in \(dq/root/.config/borg/keys/mnt_backup\(dq created.
 Keep this key safe. Your data will be inaccessible without it.
 Synchronizing chunks cache...
 Archives: 0, w/ cached Idx: 0, w/ outdated Idx: 0, w/o cached Idx: 0.
@@ -87,9 +87,9 @@ Fully automated using environment variables:
 .nf
 .ft C
 $ BORG_NEW_PASSPHRASE=old borg rcreate \-e=repokey
-# now "old" is the current passphrase.
+# now \(dqold\(dq is the current passphrase.
 $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change\-passphrase
-# now "new" is the current passphrase.
+# now \(dqnew\(dq is the current passphrase.
 .ft P
 .fi
 .UNINDENT

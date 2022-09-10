@@ -3,10 +3,10 @@ setuptools-scm==6.4.2
 pip==22.1.2
 virtualenv==20.14.1
 pkgconfig==1.5.5
-tox==3.25.0
+tox==3.25.1
 pytest==7.0.1
 pytest-xdist==2.5.0
 pytest-cov==3.0.0
 pytest-benchmark==3.4.1
-Cython==0.29.30
+Cython==0.29.32
 twine==3.8.0

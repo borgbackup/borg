@@ -4,7 +4,6 @@ import io
 import json
 import logging
 import os
-import pstats
 import random
 import re
 import shutil
@@ -18,7 +17,6 @@ import unittest
 from binascii import unhexlify, b2a_base64, a2b_base64
 from configparser import ConfigParser
 from datetime import datetime, timezone, timedelta
-from hashlib import sha256
 from io import BytesIO, StringIO
 from unittest.mock import patch
 
@@ -46,7 +44,6 @@ from ...helpers.nanorst import RstToTextLazy, rst_to_terminal
 from ...manifest import Manifest, MandatoryFeatureUnsupported
 from ...patterns import IECommand, PatternMatcher, parse_pattern
 from ...item import Item, chunks_contents_equal
-from ...locking import LockFailed
 from ...logger import setup_logging
 from ...remote import RemoteRepository, PathNotAllowed
 from ...repository import Repository

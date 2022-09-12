@@ -1604,55 +1604,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir("output"):
             self.cmd(f"--repo={self.repository_location}", "extract", "test", exit_code=1)
 
-    def test_info(self):
-        self.create_regular_file("file1", size=1024 * 80)
-        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
-        info_repo = self.cmd(f"--repo={self.repository_location}", "rinfo")
-        assert "Original size:" in info_repo
-        info_archive = self.cmd(f"--repo={self.repository_location}", "info", "-a", "test")
-        assert "Archive name: test\n" in info_archive
-        info_archive = self.cmd(f"--repo={self.repository_location}", "info", "--first", "1")
-        assert "Archive name: test\n" in info_archive
-
-    def test_info_json(self):
-        self.create_regular_file("file1", size=1024 * 80)
-        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
-        info_repo = json.loads(self.cmd(f"--repo={self.repository_location}", "rinfo", "--json"))
-        repository = info_repo["repository"]
-        assert len(repository["id"]) == 64
-        assert "last_modified" in repository
-        checkts(repository["last_modified"])
-        assert info_repo["encryption"]["mode"] == RK_ENCRYPTION[13:]
-        assert "keyfile" not in info_repo["encryption"]
-        cache = info_repo["cache"]
-        stats = cache["stats"]
-        assert all(isinstance(o, int) for o in stats.values())
-        assert all(key in stats for key in ("total_chunks", "total_size", "total_unique_chunks", "unique_size"))
-
-        info_archive = json.loads(self.cmd(f"--repo={self.repository_location}", "info", "-a", "test", "--json"))
-        assert info_repo["repository"] == info_archive["repository"]
-        assert info_repo["cache"] == info_archive["cache"]
-        archives = info_archive["archives"]
-        assert len(archives) == 1
-        archive = archives[0]
-        assert archive["name"] == "test"
-        assert isinstance(archive["command_line"], list)
-        assert isinstance(archive["duration"], float)
-        assert len(archive["id"]) == 64
-        assert "stats" in archive
-        checkts(archive["start"])
-        checkts(archive["end"])
-
-    def test_info_json_of_empty_archive(self):
-        """See https://github.com/borgbackup/borg/issues/6120"""
-        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        info_repo = json.loads(self.cmd(f"--repo={self.repository_location}", "info", "--json", "--first=1"))
-        assert info_repo["archives"] == []
-        info_repo = json.loads(self.cmd(f"--repo={self.repository_location}", "info", "--json", "--last=1"))
-        assert info_repo["archives"] == []
-
     def test_comment(self):
         self.create_regular_file("file1", size=1024 * 80)
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)

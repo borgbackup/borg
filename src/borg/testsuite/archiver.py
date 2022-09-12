@@ -3788,6 +3788,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert result["Modified files"] == 0
         # Archive a dir with two added files
         self.create_regular_file("testfile1", contents=b"test1")
+        time.sleep(1)
         self.create_regular_file("testfile2", contents=b"test2")
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive2", self.input_path)
         result = to_dict(result)
@@ -3795,13 +3796,13 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert result["Unchanged files"] == 0
         assert result["Modified files"] == 0
         # Archive a dir with 1 unmodified file and 1 modified
-        with open(self.input_path + "/testfile2", "a") as file:
-            file.write("data")
+        self.create_regular_file("testfile1", contents=b"new data")
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive3", self.input_path)
         result = to_dict(result)
+        # Should process testfile2 as added because https://borgbackup.readthedocs.io/en/stable/faq.html#i-am-seeing-a-added-status-for-an-unchanged-file
         assert result["Added files"] == 1
-        assert result["Unchanged files"] == 1
-        assert result["Modified files"] == 0
+        assert result["Unchanged files"] == 0
+        assert result["Modified files"] == 1
 
     def test_hashing_time(self):
         def extract_hashing_time(borg_create_output: str) -> float:

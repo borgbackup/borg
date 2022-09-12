@@ -3805,8 +3805,6 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         assert result["Modified files"] == 0
 
     def test_hashing_time(self):
-        """Tests hashing_time is positive or zero"""
-
         def extract_hashing_time(borg_create_output: str) -> float:
             borg_create_output = borg_create_output.strip().splitlines()
             borg_create_output = [line.split(":", 1) for line in borg_create_output]

@@ -2133,9 +2133,9 @@ class ArchiverTestCaseBinaryBase:
     EXE = "borg.exe"
     FORK_DEFAULT = True
 
+
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
 class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
-
     @unittest.skip("does not raise Exception, but sets rc==2")
     def test_init_parent_dirs(self):
         pass

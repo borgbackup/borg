@@ -1990,11 +1990,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
         self.cmd(f"--repo={self.repository_location}", "delete", "--first", "1", "--last", "1", fork=True, exit_code=2)
 
-    def test_benchmark_crud(self):
-        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        with environment_variable(_BORG_BENCHMARK_CRUD_TEST="YES"):
-            self.cmd(f"--repo={self.repository_location}", "benchmark", "crud", self.input_path)
-
     def test_config(self):
         self.create_test_files()
         os.unlink("input/flagfile")

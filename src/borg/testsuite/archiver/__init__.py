@@ -35,7 +35,7 @@ from ...helpers import msgpack
 from ...helpers import flags_noatime, flags_normal
 from ...manifest import Manifest, MandatoryFeatureUnsupported
 from ...patterns import IECommand, PatternMatcher, parse_pattern
-from ...item import Item, chunks_contents_equal
+from ...item import Item
 from ...logger import setup_logging
 from ...remote import RemoteRepository, PathNotAllowed
 from ...repository import Repository
@@ -2185,24 +2185,6 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
 
         out = self.cmd(f"--repo={self.repository_location}", "rinfo")
         assert "Cache integrity data not available: old Borg version modified the cache." in out
-
-
-def test_chunk_content_equal():
-    def ccc(a, b):
-        chunks_a = [data for data in a]
-        chunks_b = [data for data in b]
-        compare1 = chunks_contents_equal(iter(chunks_a), iter(chunks_b))
-        compare2 = chunks_contents_equal(iter(chunks_b), iter(chunks_a))
-        assert compare1 == compare2
-        return compare1
-
-    assert ccc([b"1234", b"567A", b"bC"], [b"1", b"23", b"4567A", b"b", b"C"])
-    # one iterator exhausted before the other
-    assert not ccc([b"12345"], [b"1234", b"56"])
-    # content mismatch
-    assert not ccc([b"1234", b"65"], [b"1234", b"56"])
-    # first is the prefix of second
-    assert not ccc([b"1234", b"56"], [b"1234", b"565"])
 
 
 class TestBuildFilter:

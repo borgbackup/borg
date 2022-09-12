@@ -4,7 +4,6 @@ import io
 import json
 import os
 import random
-import re
 import shutil
 import socket
 import stat
@@ -45,7 +44,7 @@ from ...logger import setup_logging
 from ...remote import RemoteRepository, PathNotAllowed
 from ...repository import Repository
 from .. import has_lchflags, llfuse
-from .. import BaseTestCase, changedir, environment_variable, no_selinux
+from .. import BaseTestCase, changedir, environment_variable
 from .. import (
     are_symlinks_supported,
     are_hardlinks_supported,
@@ -53,7 +52,7 @@ from .. import (
     is_utime_fully_supported,
     is_birthtime_fully_supported,
 )
-from ..platform import fakeroot_detected, is_darwin
+from ..platform import is_darwin
 
 RK_ENCRYPTION = "--encryption=repokey-aes-ocb"
 KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"

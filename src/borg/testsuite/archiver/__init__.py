@@ -33,7 +33,6 @@ from ...helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ...helpers import bin_to_hex
 from ...helpers import msgpack
 from ...helpers import flags_noatime, flags_normal
-from ...helpers.nanorst import RstToTextLazy, rst_to_terminal
 from ...manifest import Manifest, MandatoryFeatureUnsupported
 from ...patterns import IECommand, PatternMatcher, parse_pattern
 from ...item import Item, chunks_contents_equal
@@ -2227,41 +2226,3 @@ class TestBuildFilter:
         assert not filter(Item(path="shallow/"))  # can this even happen? paths are normalized...
         assert filter(Item(path="deep enough/file"))
         assert filter(Item(path="something/dir/file"))
-
-
-def get_all_parsers():
-    """
-    Return dict mapping command to parser.
-    """
-    parser = Archiver(prog="borg").build_parser()
-    borgfs_parser = Archiver(prog="borgfs").build_parser()
-    parsers = {}
-
-    def discover_level(prefix, parser, Archiver, extra_choices=None):
-        choices = {}
-        for action in parser._actions:
-            if action.choices is not None and "SubParsersAction" in str(action.__class__):
-                for cmd, parser in action.choices.items():
-                    choices[prefix + cmd] = parser
-        if extra_choices is not None:
-            choices.update(extra_choices)
-        if prefix and not choices:
-            return
-
-        for command, parser in sorted(choices.items()):
-            discover_level(command + " ", parser, Archiver)
-            parsers[command] = parser
-
-    discover_level("", parser, Archiver, {"borgfs": borgfs_parser})
-    return parsers
-
-
-@pytest.mark.parametrize("command, parser", list(get_all_parsers().items()))
-def test_help_formatting(command, parser):
-    if isinstance(parser.epilog, RstToTextLazy):
-        assert parser.epilog.rst
-
-
-@pytest.mark.parametrize("topic, helptext", list(Archiver.helptext.items()))
-def test_help_formatting_helptexts(topic, helptext):
-    assert str(rst_to_terminal(helptext))

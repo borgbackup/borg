@@ -357,29 +357,9 @@ class ArchiverTestCaseBase(BaseTestCase):
             assert id in seen
 
 
-class ArchiverTestCase(ArchiverTestCaseBase):
-    def test_do_not_mention_archive_if_you_can_not_find_repo(self):
-        """https://github.com/borgbackup/borg/issues/6014"""
-        output = self.cmd(
-            f"--repo={self.repository_location}-this-repository-does-not-exist",
-            "info",
-            "-a",
-            "test",
-            exit_code=2,
-            fork=True,
-        )
-        self.assert_in("this-repository-does-not-exist", output)
-        self.assert_not_in("this-repository-does-not-exist::test", output)
-
-
 class ArchiverTestCaseBinaryBase:
     EXE = "borg.exe"
     FORK_DEFAULT = True
-
-
-@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
-class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
-    pass
 
 
 class RemoteArchiverTestCaseBase:

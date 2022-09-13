@@ -1,6 +1,15 @@
 import json
+import unittest
+
 from ...constants import *  # NOQA
-from . import ArchiverTestCaseBase, RK_ENCRYPTION, checkts
+from . import (
+    ArchiverTestCaseBase,
+    RemoteArchiverTestCaseBase,
+    ArchiverTestCaseBinaryBase,
+    RK_ENCRYPTION,
+    checkts,
+    BORG_EXES,
+)
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -37,3 +46,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert info_repo["archives"] == []
         info_repo = json.loads(self.cmd(f"--repo={self.repository_location}", "info", "--json", "--last=1"))
         assert info_repo["archives"] == []
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

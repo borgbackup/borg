@@ -1,7 +1,8 @@
 import os
+import unittest
 
 from ...constants import *  # NOQA
-from . import ArchiverTestCaseBase, RK_ENCRYPTION
+from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -18,3 +19,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rdelete")
         # Make sure the repo is gone
         self.assertFalse(os.path.exists(self.repository_path))
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

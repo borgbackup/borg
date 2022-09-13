@@ -1,4 +1,5 @@
 import os
+import unittest
 from binascii import unhexlify, b2a_base64, a2b_base64
 
 import pytest
@@ -12,7 +13,14 @@ from ...helpers import msgpack
 from ...repository import Repository
 from .. import environment_variable
 from .. import key
-from . import ArchiverTestCaseBase, RK_ENCRYPTION, KF_ENCRYPTION
+from . import (
+    ArchiverTestCaseBase,
+    ArchiverTestCaseBinaryBase,
+    RemoteArchiverTestCaseBase,
+    RK_ENCRYPTION,
+    KF_ENCRYPTION,
+    BORG_EXES,
+)
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -277,3 +285,12 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with Repository(self.repository_path) as repository:
             key = msgpack.unpackb(a2b_base64(repository.load_key()))
             assert key["algorithm"] == "argon2 chacha20-poly1305"
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

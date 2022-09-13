@@ -1,8 +1,16 @@
 import re
+import unittest
 from datetime import datetime
 
 from ...constants import *  # NOQA
-from . import ArchiverTestCaseBase, RK_ENCRYPTION, src_dir
+from . import (
+    ArchiverTestCaseBase,
+    RemoteArchiverTestCaseBase,
+    ArchiverTestCaseBinaryBase,
+    RK_ENCRYPTION,
+    src_dir,
+    BORG_EXES,
+)
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -223,3 +231,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in("2015-08-12-20:00-foo", output)
         self.assert_in("2015-08-12-10:00-bar", output)
         self.assert_in("2015-08-12-20:00-bar", output)
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

@@ -15,7 +15,14 @@ from .. import has_lchflags, llfuse
 from .. import changedir, no_selinux
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform import fakeroot_detected
-from . import ArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, requires_hardlinks, BORG_EXES
+from . import (
+    ArchiverTestCaseBase,
+    ArchiverTestCaseBinaryBase,
+    RemoteArchiverTestCaseBase,
+    RK_ENCRYPTION,
+    requires_hardlinks,
+    BORG_EXES,
+)
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -341,6 +348,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         finally:
             # Undecorate
             borg.locking.Lock.migrate_lock = borg.locking.Lock.migrate_lock.__wrapped__
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+    @unittest.skip("only works locally")
+    def test_migrate_lock_alive(self):
+        pass
 
 
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")

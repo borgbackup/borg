@@ -1,7 +1,16 @@
 import json
+import unittest
 
 from ...constants import *  # NOQA
-from . import ArchiverTestCaseBase, src_dir, RK_ENCRYPTION, checkts
+from . import (
+    ArchiverTestCaseBase,
+    RemoteArchiverTestCaseBase,
+    ArchiverTestCaseBinaryBase,
+    src_dir,
+    RK_ENCRYPTION,
+    checkts,
+    BORG_EXES,
+)
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -60,3 +69,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "keyfile" not in list_repo["encryption"]
         archive0 = list_repo["archives"][0]
         checkts(archive0["time"])
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

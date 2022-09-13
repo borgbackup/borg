@@ -1,8 +1,10 @@
+import unittest
+
 from ...archive import Archive
 from ...constants import *  # NOQA
 from ...manifest import Manifest
 from ...repository import Repository
-from . import ArchiverTestCaseBase, RK_ENCRYPTION
+from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -71,3 +73,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "check", "--repair")
         output = self.cmd(f"--repo={self.repository_location}", "rlist")
         self.assert_not_in("test", output)
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

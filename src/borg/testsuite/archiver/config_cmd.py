@@ -1,7 +1,8 @@
 import os
+import unittest
 
 from ...constants import *  # NOQA
-from . import ArchiverTestCaseBase, RK_ENCRYPTION
+from . import ArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -40,3 +41,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "config", "--list", "--delete", exit_code=2)
         self.cmd(f"--repo={self.repository_location}", "config", exit_code=2)
         self.cmd(f"--repo={self.repository_location}", "config", "invalid-option", exit_code=1)
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

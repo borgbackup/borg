@@ -14,7 +14,14 @@ from ...helpers import flags_noatime, flags_normal
 from .. import changedir
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from ..platform import is_darwin
-from . import ArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, requires_hardlinks, BORG_EXES
+from . import (
+    ArchiverTestCaseBase,
+    ArchiverTestCaseBinaryBase,
+    RemoteArchiverTestCaseBase,
+    RK_ENCRYPTION,
+    requires_hardlinks,
+    BORG_EXES,
+)
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -536,6 +543,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir("output"):
             with patch.object(xattr, "setxattr", patched_setxattr_EACCES):
                 self.cmd(f"--repo={self.repository_location}", "extract", "test", exit_code=EXIT_WARNING)
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
 
 
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")

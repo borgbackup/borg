@@ -22,7 +22,14 @@ from .. import (
     is_utime_fully_supported,
     is_birthtime_fully_supported,
 )
-from . import ArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES, requires_hardlinks
+from . import (
+    ArchiverTestCaseBase,
+    ArchiverTestCaseBinaryBase,
+    RemoteArchiverTestCaseBase,
+    RK_ENCRYPTION,
+    BORG_EXES,
+    requires_hardlinks,
+)
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -725,8 +732,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "security: read previous location" in log
 
 
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
 class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""
+
     @unittest.skip("test_basic_functionality seems incompatible with fakeroot and/or the binary.")
     def test_basic_functionality(self):
         pass

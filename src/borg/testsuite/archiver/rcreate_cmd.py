@@ -9,7 +9,14 @@ from ...constants import *  # NOQA
 from ...crypto.key import FlexiKey
 from ...repository import Repository
 from .. import environment_variable
-from . import ArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, KF_ENCRYPTION, BORG_EXES
+from . import (
+    ArchiverTestCaseBase,
+    ArchiverTestCaseBinaryBase,
+    RemoteArchiverTestCaseBase,
+    RK_ENCRYPTION,
+    KF_ENCRYPTION,
+    BORG_EXES,
+)
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -63,8 +70,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert before == after
 
 
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
 class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""
+
     @unittest.skip("does not raise Exception, but sets rc==2")
     def test_rcreate_parent_dirs(self):
         pass

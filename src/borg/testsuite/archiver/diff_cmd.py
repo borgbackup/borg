@@ -1,13 +1,14 @@
 import json
 import os
 import stat
+import unittest
 
 from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported
-from . import ArchiverTestCaseBase, RK_ENCRYPTION
+from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
 
 
-class DiffArchiverTestCase(ArchiverTestCaseBase):
+class ArchiverTestCase(ArchiverTestCaseBase):
     def test_basic_functionality(self):
         # Setup files for the first snapshot
         self.create_regular_file("empty", size=0)
@@ -251,3 +252,12 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         ]
 
         assert all(x in line for x, line in zip(expected, output.splitlines()))
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

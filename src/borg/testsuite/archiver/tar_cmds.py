@@ -1,12 +1,20 @@
 import os
 import shutil
 import subprocess
+import unittest
 
 import pytest
 
 from ...constants import *  # NOQA
 from .. import changedir
-from . import ArchiverTestCaseBase, RK_ENCRYPTION, requires_hardlinks
+from . import (
+    ArchiverTestCaseBase,
+    RemoteArchiverTestCaseBase,
+    ArchiverTestCaseBinaryBase,
+    RK_ENCRYPTION,
+    requires_hardlinks,
+    BORG_EXES,
+)
 
 
 def have_gnutar():
@@ -145,3 +153,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir(self.output_path):
             self.cmd(f"--repo={self.repository_location}", "extract", "dst")
         self.assert_dirs_equal("input", "output/input")
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

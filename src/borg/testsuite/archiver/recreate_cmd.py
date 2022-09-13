@@ -1,12 +1,13 @@
 import os
 import re
+import unittest
 from datetime import datetime
 
 import pytest
 
 from ...constants import *  # NOQA
 from .. import changedir, are_hardlinks_supported
-from . import ArchiverTestCaseBase, RK_ENCRYPTION
+from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -258,3 +259,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "Comment: modified comment" in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test2")
         assert "Comment: \n" in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test3")
         assert "Comment: preserved comment" in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test4")
+
+
+class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
+    """run the same tests, but with a remote repository"""
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

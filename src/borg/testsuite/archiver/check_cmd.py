@@ -1,5 +1,6 @@
 import logging
 import shutil
+import unittest
 from unittest.mock import patch
 
 from ...archive import ChunkBuffer
@@ -8,7 +9,7 @@ from ...helpers import bin_to_hex
 from ...helpers import msgpack
 from ...manifest import Manifest
 from ...repository import Repository
-from . import ArchiverTestCaseBase, RK_ENCRYPTION
+from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
 
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):
@@ -240,3 +241,20 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 repository.delete(id_)
             repository.commit(compact=False)
         self.cmd(f"--repo={self.repository_location}", "check", exit_code=1)
+
+
+class RemoteArchiverCheckTestCase(RemoteArchiverTestCaseBase, ArchiverCheckTestCase):
+    """run the same tests, but with a remote repository"""
+
+    @unittest.skip("only works locally")
+    def test_empty_repository(self):
+        pass
+
+    @unittest.skip("only works locally")
+    def test_extra_chunks(self):
+        pass
+
+
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverCheckTestCase):
+    """runs the same tests, but via the borg binary"""

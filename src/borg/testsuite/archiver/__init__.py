@@ -16,15 +16,13 @@ from unittest.mock import patch
 
 import pytest
 
-import borg
-import borg.helpers.errors
 from ... import xattr, helpers, platform
 from ...archive import Archive
 from ...archiver import Archiver, PURE_PYTHON_MSGPACK_WARNING
 from ...archiver._common import build_filter
 from ...cache import Cache, LocalCache
 from ...constants import *  # NOQA
-from ...crypto.key import FlexiKey, TAMRequiredError
+from ...crypto.key import TAMRequiredError
 from ...crypto.file_integrity import FileIntegrityError
 from ...helpers import Location, get_security_dir
 from ...helpers import EXIT_SUCCESS, EXIT_ERROR
@@ -369,17 +367,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
         return get_security_dir(repository_id)
 
-    def test_init_parent_dirs(self):
-        parent_path = os.path.join(self.tmpdir, "parent1", "parent2")
-        repository_path = os.path.join(parent_path, "repository")
-        repository_location = self.prefix + repository_path
-        with pytest.raises(Repository.ParentPathDoesNotExist):
-            # normal borg init does NOT create missing parent dirs
-            self.cmd(f"--repo={repository_location}", "rcreate", "--encryption=none")
-        # but if told so, it does:
-        self.cmd(f"--repo={repository_location}", "rcreate", "--encryption=none", "--make-parent-dirs")
-        assert os.path.exists(parent_path)
-
     def test_repository_swap_detection(self):
         self.create_test_files()
         os.environ["BORG_PASSPHRASE"] = "passphrase"
@@ -635,44 +622,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with Cache(repository, manifest) as cache:
                 assert cache.cache_config.mandatory_features == set()
 
-    def test_init_interrupt(self):
-        def raise_eof(*args, **kwargs):
-            raise EOFError
-
-        with patch.object(FlexiKey, "create", raise_eof):
-            self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION, exit_code=1)
-        assert not os.path.exists(self.repository_location)
-
-    def test_init_requires_encryption_option(self):
-        self.cmd(f"--repo={self.repository_location}", "rcreate", exit_code=2)
-
-    def test_init_nested_repositories(self):
-        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        if self.FORK_DEFAULT:
-            self.cmd(f"--repo={self.repository_location}/nested", "rcreate", RK_ENCRYPTION, exit_code=2)
-        else:
-            with pytest.raises(Repository.AlreadyExists):
-                self.cmd(f"--repo={self.repository_location}/nested", "rcreate", RK_ENCRYPTION)
-
-    def test_init_refuse_to_overwrite_keyfile(self):
-        """BORG_KEY_FILE=something borg init should quit if "something" already exists.
-
-        See https://github.com/borgbackup/borg/pull/6046"""
-        keyfile = os.path.join(self.tmpdir, "keyfile")
-        with environment_variable(BORG_KEY_FILE=keyfile):
-            self.cmd(f"--repo={self.repository_location}0", "rcreate", KF_ENCRYPTION)
-            with open(keyfile) as file:
-                before = file.read()
-            arg = (f"--repo={self.repository_location}1", "rcreate", KF_ENCRYPTION)
-            if self.FORK_DEFAULT:
-                self.cmd(*arg, exit_code=2)
-            else:
-                with pytest.raises(borg.helpers.errors.Error):
-                    self.cmd(*arg)
-            with open(keyfile) as file:
-                after = file.read()
-            assert before == after
-
     def test_check_cache(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
@@ -711,37 +660,7 @@ class ArchiverTestCaseBinaryBase:
 
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
 class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
-    @unittest.skip("does not raise Exception, but sets rc==2")
-    def test_init_parent_dirs(self):
-        pass
-
-    @unittest.skip("patches objects")
-    def test_init_interrupt(self):
-        pass
-
-    @unittest.skip("patches objects")
-    def test_extract_capabilities(self):
-        pass
-
-    @unittest.skip("patches objects")
-    def test_extract_xattrs_errors(self):
-        pass
-
-    @unittest.skip("test_basic_functionality seems incompatible with fakeroot and/or the binary.")
-    def test_basic_functionality(self):
-        pass
-
-    @unittest.skip("test_overwrite seems incompatible with fakeroot and/or the binary.")
-    def test_overwrite(self):
-        pass
-
-    @unittest.skip("patches objects")
-    def test_do_not_fail_when_percent_is_in_xattr_name(self):
-        pass
-
-    @unittest.skip("patches objects")
-    def test_do_not_fail_when_percent_is_in_file_name(self):
-        pass
+    pass
 
 
 class ManifestAuthenticationTest(ArchiverTestCaseBase):

@@ -858,10 +858,13 @@ Duration: {0.duration}
             st = os.stat(path, follow_symlinks=False)
             if continue_extraction and same_item(item, st):
                 return  # done! we already have fully extracted this file in a previous run.
-            elif stat.S_ISDIR(st.st_mode):
-                os.rmdir(path)
-            else:
+            # remove anything that is not a directory
+            if not stat.S_ISDIR(st.st_mode):
                 os.unlink(path)
+            # only remove a directory if it is conflicting
+            # preserve existing directories because they might be subvolumes
+            elif not stat.S_ISDIR(item.mode):
+                os.rmdir(path)
         except UnicodeEncodeError:
             raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:

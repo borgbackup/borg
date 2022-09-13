@@ -2,7 +2,14 @@ import argparse
 import pytest
 
 from ...helpers import parse_storage_quota
-from . import Archiver, RK_ENCRYPTION
+from . import ArchiverTestCaseBase, Archiver, RK_ENCRYPTION
+
+
+class ArchiverTestCase(ArchiverTestCaseBase):
+    def test_bad_filters(self):
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
+        self.cmd(f"--repo={self.repository_location}", "delete", "--first", "1", "--last", "1", fork=True, exit_code=2)
 
 
 def test_get_args():

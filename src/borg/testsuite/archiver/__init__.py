@@ -358,11 +358,6 @@ class ArchiverTestCaseBase(BaseTestCase):
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
-    def test_bad_filters(self):
-        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
-        self.cmd(f"--repo={self.repository_location}", "delete", "--first", "1", "--last", "1", fork=True, exit_code=2)
-
     def test_do_not_mention_archive_if_you_can_not_find_repo(self):
         """https://github.com/borgbackup/borg/issues/6014"""
         output = self.cmd(

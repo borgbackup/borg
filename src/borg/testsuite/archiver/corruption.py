@@ -12,20 +12,18 @@ from . import ArchiverTestCaseBase, RK_ENCRYPTION
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
-    def test_corrupted_repository(self):
+    def test_check_corrupted_repository(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         self.create_src_archive("test")
         self.cmd(f"--repo={self.repository_location}", "extract", "test", "--dry-run")
-        output = self.cmd(f"--repo={self.repository_location}", "check", "--show-version")
-        self.assert_in("borgbackup version", output)  # implied output even without --info given
-        self.assert_not_in("Starting repository check", output)  # --info not given for root logger
+        self.cmd(f"--repo={self.repository_location}", "check")
 
         name = sorted(os.listdir(os.path.join(self.tmpdir, "repository", "data", "0")), reverse=True)[1]
         with open(os.path.join(self.tmpdir, "repository", "data", "0", name), "r+b") as fd:
             fd.seek(100)
             fd.write(b"XXXX")
-        output = self.cmd(f"--repo={self.repository_location}", "check", "--info", exit_code=1)
-        self.assert_in("Starting repository check", output)  # --info given for root logger
+
+        self.cmd(f"--repo={self.repository_location}", "check", exit_code=1)
 
 
 class ArchiverCorruptionTestCase(ArchiverTestCaseBase):

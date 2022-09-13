@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DIFF" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-DIFF" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-diff \- Diff contents of two archives
 .SH SYNOPSIS
@@ -109,10 +109,10 @@ added           0 B file4
 removed         0 B file3
 
 $ borg diff archive1 archive2
-{"path": "file1", "changes": [{"type": "modified", "added": 17, "removed": 5}, {"type": "mode", "old_mode": "\-rw\-r\-\-r\-\-", "new_mode": "\-rwxr\-xr\-x"}]}
-{"path": "file2", "changes": [{"type": "modified", "added": 135, "removed": 252}]}
-{"path": "file4", "changes": [{"type": "added", "size": 0}]}
-{"path": "file3", "changes": [{"type": "removed", "size": 0}]}
+{\(dqpath\(dq: \(dqfile1\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqmodified\(dq, \(dqadded\(dq: 17, \(dqremoved\(dq: 5}, {\(dqtype\(dq: \(dqmode\(dq, \(dqold_mode\(dq: \(dq\-rw\-r\-\-r\-\-\(dq, \(dqnew_mode\(dq: \(dq\-rwxr\-xr\-x\(dq}]}
+{\(dqpath\(dq: \(dqfile2\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqmodified\(dq, \(dqadded\(dq: 135, \(dqremoved\(dq: 252}]}
+{\(dqpath\(dq: \(dqfile4\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqadded\(dq, \(dqsize\(dq: 0}]}
+{\(dqpath\(dq: \(dqfile3\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqremoved\(dq, \(dqsize\(dq: 0}]}
 .ft P
 .fi
 .UNINDENT

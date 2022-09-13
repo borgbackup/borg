@@ -1001,12 +1001,12 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def flags_many(self, ids, mask=0xFFFFFFFF, value=None):
         """actual remoting is done via self.call in the @api decorator"""
 
-    def get(self, id):
-        for resp in self.get_many([id]):
+    def get(self, id, read_data=True):
+        for resp in self.get_many([id], read_data=read_data):
             return resp
 
-    def get_many(self, ids, is_preloaded=False):
-        yield from self.call_many("get", [{"id": id} for id in ids], is_preloaded=is_preloaded)
+    def get_many(self, ids, read_data=True, is_preloaded=False):
+        yield from self.call_many("get", [{"id": id, "read_data": read_data} for id in ids], is_preloaded=is_preloaded)
 
     @api(since=parse_version("1.0.0"))
     def put(self, id, data, wait=True):
@@ -1148,11 +1148,11 @@ class RepositoryNoCache:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def get(self, key):
-        return next(self.get_many([key], cache=False))
+    def get(self, key, read_data=True):
+        return next(self.get_many([key], read_data=read_data, cache=False))
 
-    def get_many(self, keys, cache=True):
-        for key, data in zip(keys, self.repository.get_many(keys)):
+    def get_many(self, keys, read_data=True, cache=True):
+        for key, data in zip(keys, self.repository.get_many(keys, read_data=read_data)):
             yield self.transform(key, data)
 
     def log_instrumentation(self):
@@ -1191,6 +1191,12 @@ class RepositoryCache(RepositoryNoCache):
         available_space = shutil.disk_usage(self.basedir).free
         self.size_limit = int(min(available_space * 0.25, 2**31))
 
+    def prefixed_key(self, key, complete):
+        # just prefix another byte telling whether this key refers to a complete chunk
+        # or a without-data-metadata-only chunk (see also read_data param).
+        prefix = b"\x01" if complete else b"\x00"
+        return prefix + key
+
     def key_filename(self, key):
         return os.path.join(self.basedir, bin_to_hex(key))
 
@@ -1204,12 +1210,13 @@ class RepositoryCache(RepositoryNoCache):
             os.unlink(file)
             self.evictions += 1
 
-    def add_entry(self, key, data, cache):
+    def add_entry(self, key, data, cache, complete):
         transformed = self.transform(key, data)
         if not cache:
             return transformed
         packed = self.pack(transformed)
-        file = self.key_filename(key)
+        pkey = self.prefixed_key(key, complete=complete)
+        file = self.key_filename(pkey)
         try:
             with open(file, "wb") as fd:
                 fd.write(packed)
@@ -1225,7 +1232,7 @@ class RepositoryCache(RepositoryNoCache):
                 raise
         else:
             self.size += len(packed)
-            self.cache.add(key)
+            self.cache.add(pkey)
             if self.size > self.size_limit:
                 self.backoff()
         return transformed
@@ -1250,28 +1257,30 @@ class RepositoryCache(RepositoryNoCache):
         self.cache.clear()
         shutil.rmtree(self.basedir)
 
-    def get_many(self, keys, cache=True):
-        unknown_keys = [key for key in keys if key not in self.cache]
-        repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys))
+    def get_many(self, keys, read_data=True, cache=True):
+        # It could use different cache keys depending on read_data and cache full vs. meta-only chunks.
+        unknown_keys = [key for key in keys if self.prefixed_key(key, complete=read_data) not in self.cache]
+        repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys, read_data=read_data))
         for key in keys:
-            if key in self.cache:
-                file = self.key_filename(key)
+            pkey = self.prefixed_key(key, complete=read_data)
+            if pkey in self.cache:
+                file = self.key_filename(pkey)
                 with open(file, "rb") as fd:
                     self.hits += 1
                     yield self.unpack(fd.read())
             else:
                 for key_, data in repository_iterator:
                     if key_ == key:
-                        transformed = self.add_entry(key, data, cache)
+                        transformed = self.add_entry(key, data, cache, complete=read_data)
                         self.misses += 1
                         yield transformed
                         break
                 else:
                     # slow path: eviction during this get_many removed this key from the cache
                     t0 = time.perf_counter()
-                    data = self.repository.get(key)
+                    data = self.repository.get(key, read_data=read_data)
                     self.slow_lat += time.perf_counter() - t0
-                    transformed = self.add_entry(key, data, cache)
+                    transformed = self.add_entry(key, data, cache, complete=read_data)
                     self.slow_misses += 1
                     yield transformed
         # Consume any pending requests
@@ -1283,7 +1292,7 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
     """
     Return a Repository(No)Cache for *repository*.
 
-    If *decrypted_cache* is a key object, then get and get_many will return a tuple
+    If *decrypted_cache* is a repo_objs object, then get and get_many will return a tuple
     (csize, plaintext) instead of the actual data in the repository. The cache will
     store decrypted data, which increases CPU efficiency (by avoiding repeatedly decrypting
     and more importantly MAC and ID checking cached objects).
@@ -1292,27 +1301,29 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
     if decrypted_cache and (pack or unpack or transform):
         raise ValueError("decrypted_cache and pack/unpack/transform are incompatible")
     elif decrypted_cache:
-        key = decrypted_cache
-        # 32 bit csize, 64 bit (8 byte) xxh64
-        cache_struct = struct.Struct("=I8s")
+        repo_objs = decrypted_cache
+        # 32 bit csize, 64 bit (8 byte) xxh64, 1 byte ctype, 1 byte clevel
+        cache_struct = struct.Struct("=I8sBB")
         compressor = Compressor("lz4")
 
         def pack(data):
             csize, decrypted = data
-            compressed = compressor.compress(decrypted)
-            return cache_struct.pack(csize, xxh64(compressed)) + compressed
+            meta, compressed = compressor.compress({}, decrypted)
+            return cache_struct.pack(csize, xxh64(compressed), meta["ctype"], meta["clevel"]) + compressed
 
         def unpack(data):
             data = memoryview(data)
-            csize, checksum = cache_struct.unpack(data[: cache_struct.size])
+            csize, checksum, ctype, clevel = cache_struct.unpack(data[: cache_struct.size])
             compressed = data[cache_struct.size :]
             if checksum != xxh64(compressed):
                 raise IntegrityError("detected corrupted data in metadata cache")
-            return csize, compressor.decompress(compressed)
+            meta = dict(ctype=ctype, clevel=clevel, csize=len(compressed))
+            _, decrypted = compressor.decompress(meta, compressed)
+            return csize, decrypted
 
         def transform(id_, data):
-            csize = len(data)
-            decrypted = key.decrypt(id_, data)
+            meta, decrypted = repo_objs.parse(id_, data)
+            csize = meta.get("csize", len(data))
             return csize, decrypted
 
     if isinstance(repository, RemoteRepository) or force_cache:

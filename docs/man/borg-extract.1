@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-EXTRACT" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-EXTRACT" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-extract \- Extract archive contents
 .SH SYNOPSIS
@@ -52,7 +52,7 @@ pass over the archive metadata.
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
-Currently, extract always writes into the current working directory ("."),
+Currently, extract always writes into the current working directory (\(dq.\(dq),
 so make sure you \fBcd\fP to the right place before calling \fBborg extract\fP\&.
 .sp
 When parent directories are not extracted (because of using file/directory selection
@@ -132,10 +132,10 @@ $ borg extract \-\-list my\-files
 # Verify whether an archive could be successfully extracted, but do not write files to disk
 $ borg extract \-\-dry\-run my\-files
 
-# Extract the "src" directory
+# Extract the \(dqsrc\(dq directory
 $ borg extract my\-files home/USERNAME/src
 
-# Extract the "src" directory but exclude object files
+# Extract the \(dqsrc\(dq directory but exclude object files
 $ borg extract my\-files home/USERNAME/src \-\-exclude \(aq*.o\(aq
 
 # Restore a raw device (must not be active/in use/mounted at that time)

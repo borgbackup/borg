@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RECREATE" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-RECREATE" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .SH SYNOPSIS
@@ -43,7 +43,7 @@ recreate is a potentially dangerous function and might lead to data loss
 Important: Repository disk space is \fBnot\fP freed until you run \fBborg compact\fP\&.
 .sp
 \fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, \fB\-\-exclude\-if\-present\fP, \fB\-\-keep\-exclude\-tags\fP
-and PATH have the exact same semantics as in "borg create", but they only check
+and PATH have the exact same semantics as in \(dqborg create\(dq, but they only check
 for files in the archives and not in the local file system. If PATHs are specified,
 the resulting archives will only contain files from these PATHs.
 .sp
@@ -66,7 +66,7 @@ interpreted. See \fIlist_item_flags\fP in \fBborg create\fP for details.
 .sp
 The archive being recreated is only removed after the operation completes. The
 archive that is built during the operation exists at the same time at
-"<ARCHIVE>.recreate". The new archive will have a different archive ID.
+\(dq<ARCHIVE>.recreate\(dq. The new archive will have a different archive ID.
 .sp
 With \fB\-\-target\fP the original archive is not replaced, instead a new archive is created.
 .sp
@@ -136,7 +136,7 @@ if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit 
 .INDENT 0.0
 .TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
+only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
@@ -157,13 +157,13 @@ write checkpoint every SECONDS seconds (Default: 1800)
 add a comment text to the archive
 .TP
 .BI \-\-timestamp \ TIMESTAMP
-manually specify the archive creation date/time (UTC, yyyy\-mm\-ddThh:mm:ss format). alternatively, give a reference file/directory.
+manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the "borg help compression" command for details.
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
 .TP
 .BI \-\-recompress \ MODE
-recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIif\-different\fP: recompress if current compression is with a different compression algorithm or different level; \fIalways\fP: recompress unconditionally; and \fInever\fP: do not recompress (use this option to explicitly prevent recompression). If no MODE is given, \fIif\-different\fP will be used. Not passing \-\-recompress is equivalent to "\-\-recompress never".
+recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIif\-different\fP: recompress if current compression is with a different compression algorithm or different level; \fIalways\fP: recompress unconditionally; and \fInever\fP: do not recompress (use this option to explicitly prevent recompression). If no MODE is given, \fIif\-different\fP will be used. Not passing \-\-recompress is equivalent to \(dq\-\-recompress never\(dq.
 .TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the current defaults. default: buzhash,19,23,21,4095
@@ -185,13 +185,13 @@ $ borg recreate \-a archive \-\-recompress \-\-compression zlib,9
 $ borg recreate \-\-exclude home/icke/Pictures/drunk_photos
 
 # Change archive comment
-$ borg create \-\-comment "This is a comment" archivename ~
+$ borg create \-\-comment \(dqThis is a comment\(dq archivename ~
 $ borg info \-a archivename
 Name: archivename
 Fingerprint: ...
 Comment: This is a comment
 \&...
-$ borg recreate \-\-comment "This is a better comment" \-a archivename
+$ borg recreate \-\-comment \(dqThis is a better comment\(dq \-a archivename
 $ borg info \-a archivename
 Name: archivename
 Fingerprint: ...

@@ -15,7 +15,7 @@ try:
     import shlex
     import signal
     import time
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     from ..logger import create_logger, setup_logging
 
@@ -27,6 +27,7 @@ try:
     from ..helpers import Error, set_ec
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates
+    from ..helpers import DatetimeWrapper, replace_placeholders
     from ..helpers import check_python, check_extension_modules
     from ..helpers import is_slow_msgpack, is_supported_msgpack, sysinfo
     from ..helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
@@ -402,8 +403,18 @@ class Archiver(
             }
             if func not in bypass_allowed:
                 raise Error("Not allowed to bypass locking mechanism for chosen command")
+        # we can only have a complete knowledge of placeholder replacements we should do **after** arg parsing,
+        # e.g. due to options like --timestamp that override the current time.
+        # thus we have to initialize replace_placeholders here and process all args that need placeholder replacement.
         if getattr(args, "timestamp", None):
+            replace_placeholders.override("now", DatetimeWrapper(args.timestamp))
+            replace_placeholders.override("utcnow", DatetimeWrapper(args.timestamp.astimezone(timezone.utc)))
             args.location = args.location.with_timestamp(args.timestamp)
+        for name in "name", "other_name", "newname", "glob_archives", "comment":
+            value = getattr(args, name, None)
+            if value is not None:
+                setattr(args, name, replace_placeholders(value))
+
         return args
 
     def prerun_checks(self, logger, is_serve):

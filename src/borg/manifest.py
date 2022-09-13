@@ -17,6 +17,7 @@ from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex
 from .helpers.time import parse_timestamp
 from .helpers.errors import Error
+from .repoobj import RepoObj
 
 
 class NoManifestError(Error):
@@ -164,10 +165,11 @@ class Manifest:
 
     MANIFEST_ID = b"\0" * 32
 
-    def __init__(self, key, repository, item_keys=None):
+    def __init__(self, key, repository, item_keys=None, ro_cls=RepoObj):
         self.archives = Archives()
         self.config = {}
         self.key = key
+        self.repo_objs = ro_cls(key)
         self.repository = repository
         self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
         self.tam_verified = False
@@ -182,7 +184,7 @@ class Manifest:
         return parse_timestamp(self.timestamp)
 
     @classmethod
-    def load(cls, repository, operations, key=None, force_tam_not_required=False):
+    def load(cls, repository, operations, key=None, force_tam_not_required=False, *, ro_cls=RepoObj):
         from .item import ManifestItem
         from .crypto.key import key_factory, tam_required_file, tam_required
         from .repository import Repository
@@ -192,14 +194,14 @@ class Manifest:
         except Repository.ObjectNotFound:
             raise NoManifestError
         if not key:
-            key = key_factory(repository, cdata)
-        manifest = cls(key, repository)
-        data = key.decrypt(cls.MANIFEST_ID, cdata)
+            key = key_factory(repository, cdata, ro_cls=ro_cls)
+        manifest = cls(key, repository, ro_cls=ro_cls)
+        _, data = manifest.repo_objs.parse(cls.MANIFEST_ID, cdata)
         manifest_dict, manifest.tam_verified = key.unpack_and_verify_manifest(
             data, force_tam_not_required=force_tam_not_required
         )
         m = ManifestItem(internal_dict=manifest_dict)
-        manifest.id = key.id_hash(data)
+        manifest.id = manifest.repo_objs.id_hash(data)
         if m.get("version") not in (1, 2):
             raise ValueError("Invalid manifest version")
         manifest.archives.set_raw_dict(m.archives)
@@ -219,7 +221,7 @@ class Manifest:
                 logger.debug("Manifest is TAM verified and says TAM is *not* required, updating security database...")
                 os.unlink(tam_required_file(repository))
         manifest.check_repository_compatibility(operations)
-        return manifest, key
+        return manifest
 
     def check_repository_compatibility(self, operations):
         for operation in operations:
@@ -272,5 +274,5 @@ class Manifest:
         )
         self.tam_verified = True
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
-        self.id = self.key.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.key.encrypt(self.MANIFEST_ID, data))
+        self.id = self.repo_objs.id_hash(data)
+        self.repository.put(self.MANIFEST_ID, self.repo_objs.format(self.MANIFEST_ID, {}, data))

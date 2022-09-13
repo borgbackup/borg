@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RCREATE" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-RCREATE" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-rcreate \- Create a new, empty repository
 .SH SYNOPSIS
@@ -61,7 +61,7 @@ Ask you to come up with a passphrase.
 .IP 2. 3
 Create a borg key (which contains some random secrets. See \fIkey_files\fP).
 .IP 3. 3
-Derive a "key encryption key" from your passphrase
+Derive a \(dqkey encryption key\(dq from your passphrase
 .IP 4. 3
 Encrypt and sign the key with the key encryption key
 .IP 5. 3
@@ -71,7 +71,7 @@ This is why it is essential to use a secure passphrase.
 Encrypt and sign your backups to prevent anyone from reading or forging them unless they
 have the key and know the passphrase. Make sure to keep a backup of
 your key \fBoutside\fP the repository \- do not lock yourself out by
-"leaving your keys inside your car" (see \fIborg_key_export\fP).
+\(dqleaving your keys inside your car\(dq (see \fIborg_key_export\fP).
 The encryption is done locally \- if you use a remote repository, the remote machine
 never sees your passphrase, your unencrypted key or your unencrypted files.
 Chunking and id generation are also based on your key to improve
@@ -107,10 +107,10 @@ the encryption/decryption key or other secrets.
 Depending on your hardware, hashing and crypto performance may vary widely.
 The easiest way to find out about what\(aqs fastest is to run \fBborg benchmark cpu\fP\&.
 .sp
-\fIrepokey\fP modes: if you want ease\-of\-use and "passphrase" security is good enough \-
+\fIrepokey\fP modes: if you want ease\-of\-use and \(dqpassphrase\(dq security is good enough \-
 the key will be stored in the repository (in \fBrepo_dir/config\fP).
 .sp
-\fIkeyfile\fP modes: if you rather want "passphrase and having\-the\-key" security \-
+\fIkeyfile\fP modes: if you rather want \(dqpassphrase and having\-the\-key\(dq security \-
 the key will be stored in your home directory (in \fB~/.config/borg/keys\fP).
 .sp
 The following table is roughly sorted in order of preference, the better ones are

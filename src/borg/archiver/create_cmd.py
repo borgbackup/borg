@@ -19,7 +19,7 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
 from ..helpers import ChunkerParams
-from ..helpers import NameSpec, CommentSpec, FilesCacheMode
+from ..helpers import NameSpec, FilesCacheMode
 from ..helpers import eval_escapes
 from ..helpers import timestamp
 from ..helpers import get_cache_dir, os_stat
@@ -41,8 +41,9 @@ logger = create_logger()
 
 class CreateMixIn:
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.WRITE,))
-    def do_create(self, args, repository, manifest=None, key=None):
+    def do_create(self, args, repository, manifest):
         """Create new archive"""
+        key = manifest.key
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
 
@@ -212,7 +213,6 @@ class CreateMixIn:
         if not dry_run:
             with Cache(
                 repository,
-                key,
                 manifest,
                 progress=args.progress,
                 lock_wait=self.lock_wait,
@@ -221,8 +221,6 @@ class CreateMixIn:
                 iec=args.iec,
             ) as cache:
                 archive = Archive(
-                    repository,
-                    key,
                     manifest,
                     args.name,
                     cache=cache,
@@ -810,12 +808,7 @@ class CreateMixIn:
 
         archive_group = subparser.add_argument_group("Archive options")
         archive_group.add_argument(
-            "--comment",
-            dest="comment",
-            metavar="COMMENT",
-            type=CommentSpec,
-            default="",
-            help="add a comment text to the archive",
+            "--comment", dest="comment", metavar="COMMENT", default="", help="add a comment text to the archive"
         )
         archive_group.add_argument(
             "--timestamp",

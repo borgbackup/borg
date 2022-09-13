@@ -8,6 +8,7 @@ import pytest
 from ..crypto.key import bin_to_hex
 from ..crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey
 from ..crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey
+from ..crypto.key import AEADKeyBase
 from ..crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey
 from ..crypto.key import Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey
 from ..crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
@@ -42,15 +43,8 @@ class TestKey:
         F84MsMMiqpbz4KVICeBZhfAaTPs4W7BC63qml0ZXJhdGlvbnPOAAGGoKRzYWx02gAgLENQ
         2uVCoR7EnAoiRzn8J+orbojKtJlNCnQ31SSC8rendmVyc2lvbgE=""".strip()
 
-    keyfile2_cdata = unhexlify(
-        re.sub(
-            r"\W",
-            "",
-            """
-        0055f161493fcfc16276e8c31493c4641e1eb19a79d0326fad0291e5a9c98e5933
-        00000000000003e8d21eaf9b86c297a8cd56432e1915bb
-        """,
-        )
+    keyfile2_cdata = bytes.fromhex(
+        "003be7d57280d1a42add9f3f36ea363bbc5e9349ad01ddec0634a54dd02959e70500000000000003ec063d2cbcacba6b"
     )
     keyfile2_id = unhexlify("c3fbf14bc001ebcc3cd86e696c13482ed071740927cd7cbe1b01b4bfcee49314")
 
@@ -69,7 +63,7 @@ class TestKey:
         qkPqtDDxs2j/T7+ndmVyc2lvbgE=""".strip()
 
     keyfile_blake2_cdata = bytes.fromhex(
-        "04fdf9475cf2323c0ba7a99ddc011064f2e7d039f539f2e448" "0e6f5fc6ff9993d604040404040404098c8cee1c6db8c28947"
+        "04d6040f5ef80e0a8ac92badcbe3dee83b7a6b53d5c9a58c4eed14964cb10ef591040404040404040d1e65cc1f435027"
     )
     # Verified against b2sum. Entire string passed to BLAKE2, including the padded 64 byte key contained in
     # keyfile_blake2_key_file above is
@@ -224,7 +218,8 @@ class TestKey:
             data = bytearray(self.keyfile2_cdata)
             id = bytearray(key.id_hash(data))  # corrupt chunk id
             id[12] = 0
-            key.decrypt(id, data)
+            plaintext = key.decrypt(id, data)
+            key.assert_id(id, plaintext)
 
     def test_roundtrip(self, key):
         repository = key.repository
@@ -237,45 +232,18 @@ class TestKey:
         decrypted = loaded_key.decrypt(id, encrypted)
         assert decrypted == plaintext
 
-    def test_decrypt_decompress(self, key):
-        plaintext = b"123456789"
-        id = key.id_hash(plaintext)
-        encrypted = key.encrypt(id, plaintext)
-        assert key.decrypt(id, encrypted, decompress=False) != plaintext
-        assert key.decrypt(id, encrypted) == plaintext
-
     def test_assert_id(self, key):
         plaintext = b"123456789"
         id = key.id_hash(plaintext)
         key.assert_id(id, plaintext)
         id_changed = bytearray(id)
         id_changed[0] ^= 1
-        with pytest.raises(IntegrityError):
-            key.assert_id(id_changed, plaintext)
-        plaintext_changed = plaintext + b"1"
-        with pytest.raises(IntegrityError):
-            key.assert_id(id, plaintext_changed)
-
-    def test_getting_wrong_chunk_fails(self, key):
-        # for the new AEAD crypto, we provide the chunk id as AAD when encrypting/authenticating,
-        # we provide the id **we want** as AAD when authenticating/decrypting the data we got from the repo.
-        # only if the id used for encrypting matches the id we want, the AEAD crypto authentication will succeed.
-        # thus, there is no need any more for calling self._assert_id() for the new crypto.
-        # the old crypto as well as plaintext and authenticated modes still need to call self._assert_id().
-        plaintext_wanted = b"123456789"
-        id_wanted = key.id_hash(plaintext_wanted)
-        ciphertext_wanted = key.encrypt(id_wanted, plaintext_wanted)
-        plaintext_other = b"xxxxxxxxx"
-        id_other = key.id_hash(plaintext_other)
-        ciphertext_other = key.encrypt(id_other, plaintext_other)
-        # both ciphertexts are authentic and decrypting them should succeed:
-        key.decrypt(id_wanted, ciphertext_wanted)
-        key.decrypt(id_other, ciphertext_other)
-        # but if we wanted the one and got the other, it must fail.
-        # the new crypto will fail due to AEAD auth failure,
-        # the old crypto and plaintext, authenticated modes will fail due to ._assert_id() check failing:
-        with pytest.raises(IntegrityErrorBase):
-            key.decrypt(id_wanted, ciphertext_other)
+        if not isinstance(key, AEADKeyBase):
+            with pytest.raises(IntegrityError):
+                key.assert_id(id_changed, plaintext)
+            plaintext_changed = plaintext + b"1"
+            with pytest.raises(IntegrityError):
+                key.assert_id(id, plaintext_changed)
 
     def test_authenticated_encrypt(self, monkeypatch):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
@@ -285,8 +253,8 @@ class TestKey:
         plaintext = b"123456789"
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
-        # 0x07 is the key TYPE, \x00ff identifies no compression / unknown level.
-        assert authenticated == b"\x07\x00\xff" + plaintext
+        # 0x07 is the key TYPE.
+        assert authenticated == b"\x07" + plaintext
 
     def test_blake2_authenticated_encrypt(self, monkeypatch):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
@@ -296,8 +264,8 @@ class TestKey:
         plaintext = b"123456789"
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
-        # 0x06 is the key TYPE, 0x00ff identifies no compression / unknown level.
-        assert authenticated == b"\x06\x00\xff" + plaintext
+        # 0x06 is the key TYPE.
+        assert authenticated == b"\x06" + plaintext
 
 
 class TestTAM:

@@ -154,13 +154,15 @@ if not on_rtd:
             f"or ensure {lib_pkg_name}.pc is in PKG_CONFIG_PATH."
         )
 
-    crypto_ldflags = []
+    crypto_extra_objects = []
     if is_win32:
         crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "libcrypto", "libcrypto", ">=1.1.1", lib_subdir="")
     elif is_openbsd:
-        # use openssl (not libressl) because we need AES-OCB and CHACHA20-POLY1305 via EVP api
-        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "crypto", "libecrypto11", ">=1.1.1")
-        crypto_ldflags += ["-Wl,-rpath=/usr/local/lib/eopenssl11"]
+        # Use openssl (not libressl) because we need AES-OCB via EVP api. Link
+        # it statically to avoid conflicting with shared libcrypto from the base
+        # OS pulled in via dependencies.
+        crypto_ext_lib = {"include_dirs": ["/usr/local/include/eopenssl11"]}
+        crypto_extra_objects += ["/usr/local/lib/eopenssl11/libcrypto.a"]
     else:
         crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "crypto", "libcrypto", ">=1.1.1")
 
@@ -168,7 +170,7 @@ if not on_rtd:
         dict(sources=[crypto_ll_source]),
         crypto_ext_lib,
         dict(extra_compile_args=cflags),
-        dict(extra_link_args=crypto_ldflags),
+        dict(extra_objects=crypto_extra_objects),
     )
 
     compress_ext_kwargs = members_appended(

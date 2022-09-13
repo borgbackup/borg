@@ -7,6 +7,8 @@ from hashlib import sha256
 from ..helpers import Error, yes, bin_to_hex, dash_open
 from ..manifest import Manifest, NoManifestError
 from ..repository import Repository
+from ..repoobj import RepoObj
+
 
 from .key import CHPOKeyfileKey, RepoKeyNotFoundError, KeyBlobStorage, identify_key
 
@@ -40,10 +42,11 @@ class KeyManager:
         self.keyblob_storage = None
 
         try:
-            manifest_data = self.repository.get(Manifest.MANIFEST_ID)
+            manifest_chunk = self.repository.get(Manifest.MANIFEST_ID)
         except Repository.ObjectNotFound:
             raise NoManifestError
 
+        manifest_data = RepoObj.extract_crypted_data(manifest_chunk)
         key = identify_key(manifest_data)
         self.keyblob_storage = key.STORAGE
         if self.keyblob_storage == KeyBlobStorage.NO_STORAGE:

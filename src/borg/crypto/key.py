@@ -12,7 +12,6 @@ logger = create_logger()
 import argon2.low_level
 
 from ..constants import *  # NOQA
-from ..compress import Compressor
 from ..helpers import StableDict
 from ..helpers import Error, IntegrityError
 from ..helpers import get_keys_dir, get_security_dir
@@ -23,6 +22,8 @@ from ..helpers import msgpack
 from ..item import Key, EncryptedKey, want_bytes
 from ..manifest import Manifest
 from ..platform import SaveFile
+from ..repoobj import RepoObj
+
 
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
@@ -107,7 +108,8 @@ def identify_key(manifest_data):
         raise UnsupportedPayloadError(key_type)
 
 
-def key_factory(repository, manifest_data):
+def key_factory(repository, manifest_chunk, *, ro_cls=RepoObj):
+    manifest_data = ro_cls.extract_crypted_data(manifest_chunk)
     return identify_key(manifest_data).detect(repository, manifest_data)
 
 
@@ -186,10 +188,6 @@ class KeyBase:
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
         self.target = None  # key location file path / repo obj
-        # Some commands write new chunks (e.g. rename) but don't take a --compression argument. This duplicates
-        # the default used by those commands who do take a --compression argument.
-        self.compressor = Compressor("lz4")
-        self.decompress = self.compressor.decompress
         self.tam_required = True
         self.copy_crypt_key = False
 
@@ -197,10 +195,10 @@ class KeyBase:
         """Return HMAC hash using the "id" HMAC key"""
         raise NotImplementedError
 
-    def encrypt(self, id, data, compress=True):
+    def encrypt(self, id, data):
         pass
 
-    def decrypt(self, id, data, decompress=True):
+    def decrypt(self, id, data):
         pass
 
     def assert_id(self, id, data):
@@ -301,19 +299,12 @@ class PlaintextKey(KeyBase):
     def id_hash(self, data):
         return sha256(data).digest()
 
-    def encrypt(self, id, data, compress=True):
-        if compress:
-            data = self.compressor.compress(data)
+    def encrypt(self, id, data):
         return b"".join([self.TYPE_STR, data])
 
-    def decrypt(self, id, data, decompress=True):
+    def decrypt(self, id, data):
         self.assert_type(data[0], id)
-        payload = memoryview(data)[1:]
-        if not decompress:
-            return payload
-        data = self.decompress(payload)
-        self.assert_id(id, data)
-        return data
+        return memoryview(data)[1:]
 
     def _tam_key(self, salt, context):
         return salt + context
@@ -380,23 +371,16 @@ class AESKeyBase(KeyBase):
 
     logically_encrypted = True
 
-    def encrypt(self, id, data, compress=True):
-        if compress:
-            data = self.compressor.compress(data)
+    def encrypt(self, id, data):
         next_iv = self.nonce_manager.ensure_reservation(self.cipher.next_iv(), self.cipher.block_count(len(data)))
         return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
 
-    def decrypt(self, id, data, decompress=True):
+    def decrypt(self, id, data):
         self.assert_type(data[0], id)
         try:
-            payload = self.cipher.decrypt(data)
+            return self.cipher.decrypt(data)
         except IntegrityError as e:
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
-        if not decompress:
-            return payload
-        data = self.decompress(memoryview(payload))
-        self.assert_id(id, data)
-        return data
 
     def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):
         assert len(crypt_key) in (32 + 32, 32 + 128)
@@ -804,19 +788,12 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
         if manifest_data is not None:
             self.assert_type(manifest_data[0])
 
-    def encrypt(self, id, data, compress=True):
-        if compress:
-            data = self.compressor.compress(data)
+    def encrypt(self, id, data):
         return b"".join([self.TYPE_STR, data])
 
-    def decrypt(self, id, data, decompress=True):
+    def decrypt(self, id, data):
         self.assert_type(data[0], id)
-        payload = memoryview(data)[1:]
-        if not decompress:
-            return payload
-        data = self.decompress(payload)
-        self.assert_id(id, data)
-        return data
+        return memoryview(data)[1:]
 
 
 class AuthenticatedKey(ID_HMAC_SHA_256, AuthenticatedKeyBase):
@@ -861,10 +838,15 @@ class AEADKeyBase(KeyBase):
 
     MAX_IV = 2**48 - 1
 
-    def encrypt(self, id, data, compress=True):
+    def assert_id(self, id, data):
+        # note: assert_id(id, data) is not needed any more for the new AEAD crypto.
+        # we put the id into AAD when storing the chunk, so it gets into the authentication tag computation.
+        # when decrypting, we provide the id we **want** as AAD for the auth tag verification, so
+        # decrypting only succeeds if we got the ciphertext we wrote **for that chunk id**.
+        pass
+
+    def encrypt(self, id, data):
         # to encrypt new data in this session we use always self.cipher and self.sessionid
-        if compress:
-            data = self.compressor.compress(data)
         reserved = b"\0"
         iv = self.cipher.next_iv()
         if iv > self.MAX_IV:  # see the data-structures docs about why the IV range is enough
@@ -873,7 +855,7 @@ class AEADKeyBase(KeyBase):
         header = self.TYPE_STR + reserved + iv_48bit + self.sessionid
         return self.cipher.encrypt(data, header=header, iv=iv, aad=id)
 
-    def decrypt(self, id, data, decompress=True):
+    def decrypt(self, id, data):
         # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header
         self.assert_type(data[0], id)
         iv_48bit = data[2:8]
@@ -881,17 +863,9 @@ class AEADKeyBase(KeyBase):
         iv = int.from_bytes(iv_48bit, "big")
         cipher = self._get_cipher(sessionid, iv)
         try:
-            payload = cipher.decrypt(data, aad=id)
+            return cipher.decrypt(data, aad=id)
         except IntegrityError as e:
             raise IntegrityError(f"Chunk {bin_to_hex(id)}: Could not decrypt [{str(e)}]")
-        if not decompress:
-            return payload
-        data = self.decompress(memoryview(payload))
-        # note: calling self.assert_id(id, data) is not needed any more for the new AEAD crypto.
-        # we put the id into AAD when storing the chunk, so it gets into the authentication tag computation.
-        # when decrypting, we provide the id we **want** as AAD for the auth tag verification, so
-        # decrypting only succeeds if we got the ciphertext we wrote **for that chunk id**.
-        return data
 
     def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):
         assert len(crypt_key) in (32 + 32, 32 + 128)

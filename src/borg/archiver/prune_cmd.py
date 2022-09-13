@@ -71,7 +71,7 @@ def prune_split(archives, rule, n, kept_because=None):
 
 class PruneMixIn:
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
-    def do_prune(self, args, repository, manifest, key):
+    def do_prune(self, args, repository, manifest):
         """Prune repository archives according to specified rules"""
         if not any(
             (args.secondly, args.minutely, args.hourly, args.daily, args.weekly, args.monthly, args.yearly, args.within)
@@ -119,7 +119,7 @@ class PruneMixIn:
 
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         stats = Statistics(iec=args.iec)
-        with Cache(repository, key, manifest, lock_wait=self.lock_wait, iec=args.iec) as cache:
+        with Cache(repository, manifest, lock_wait=self.lock_wait, iec=args.iec) as cache:
 
             def checkpoint_func():
                 manifest.write()
@@ -142,9 +142,7 @@ class PruneMixIn:
                     else:
                         archives_deleted += 1
                         log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
-                        archive = Archive(
-                            repository, key, manifest, archive.name, cache, consider_part_files=args.consider_part_files
-                        )
+                        archive = Archive(manifest, archive.name, cache, consider_part_files=args.consider_part_files)
                         archive.delete(stats, forced=args.forced)
                         checkpointed = self.maybe_checkpoint(
                             checkpoint_func=checkpoint_func, checkpoint_interval=args.checkpoint_interval

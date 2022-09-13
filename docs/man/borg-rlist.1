@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RLIST" 1 "2022-08-07" "" "borg backup tool"
+.TH "BORG-RLIST" 1 "2022-09-10" "" "borg backup tool"
 .SH NAME
 borg-rlist \- List the archives contained in a repository
 .SH SYNOPSIS
@@ -49,16 +49,16 @@ Show checkpoint archives in the repository contents list (default: hidden).
 only print the archive names, nothing else
 .TP
 .BI \-\-format \ FORMAT
-specify format for archive listing (default: "{archive:<36} {time} [{id}]{NL}")
+specify format for archive listing (default: \(dq{archive:<36} {time} [{id}]{NL}\(dq)
 .TP
 .B  \-\-json
-Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A "barchive" key is therefore not available.
+Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A \(dqbarchive\(dq key is therefore not available.
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
+only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
@@ -135,7 +135,7 @@ Keys available only when listing archives in a repository:
 .IP \(bu 2
 archive: archive name interpreted as text (might be missing non\-text characters, see barchive)
 .IP \(bu 2
-name: alias of "archive"
+name: alias of \(dqarchive\(dq
 .IP \(bu 2
 barchive: verbatim archive name, can contain any character except NUL
 .IP \(bu 2
@@ -147,7 +147,7 @@ id: internal ID of the archive
 .IP \(bu 2
 start: time (start) of creation of the archive
 .IP \(bu 2
-time: alias of "start"
+time: alias of \(dqstart\(dq
 .IP \(bu 2
 end: time (end) of creation of the archive
 .IP \(bu 2

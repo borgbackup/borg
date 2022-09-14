@@ -808,6 +808,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         assert chunking_time > 0.0
 
+
 class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
     """run the same tests, but with a remote repository"""
 

@@ -1,7 +1,7 @@
 import pytest
 
 from ..cache import ChunkListEntry
-from ..item import Item
+from ..item import Item, chunks_contents_equal
 from ..helpers import StableDict
 from ..helpers.msgpack import Timestamp
 
@@ -156,3 +156,21 @@ def test_item_file_size_no_chunks():
 def test_item_optr():
     item = Item()
     assert Item.from_optr(item.to_optr()) is item
+
+
+def test_chunk_content_equal():
+    def ccc(a, b):
+        chunks_a = [data for data in a]
+        chunks_b = [data for data in b]
+        compare1 = chunks_contents_equal(iter(chunks_a), iter(chunks_b))
+        compare2 = chunks_contents_equal(iter(chunks_b), iter(chunks_a))
+        assert compare1 == compare2
+        return compare1
+
+    assert ccc([b"1234", b"567A", b"bC"], [b"1", b"23", b"4567A", b"b", b"C"])
+    # one iterator exhausted before the other
+    assert not ccc([b"12345"], [b"1234", b"56"])
+    # content mismatch
+    assert not ccc([b"1234", b"65"], [b"1234", b"56"])
+    # first is the prefix of second
+    assert not ccc([b"1234", b"56"], [b"1234", b"565"])

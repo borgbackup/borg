@@ -3832,6 +3832,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         hashing_time = extract_hashing_time(result)
 
         assert hashing_time > 0.0
+
     def test_transfer(self):
         def check_repo(repo_option):
             listing = self.cmd(repo_option, "rlist", "--short")

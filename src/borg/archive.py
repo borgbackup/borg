@@ -1115,7 +1115,8 @@ class MetadataCollector:
         self.nobirthtime = nobirthtime
 
     def stat_simple_attrs(self, st):
-        attrs = dict(mode=st.st_mode, uid=st.st_uid, gid=st.st_gid)
+        attrs = {}
+        attrs["mode"] = st.st_mode
         # borg can work with archives only having mtime (very old borg archives do not have
         # atime/ctime). it can be useful to omit atime/ctime, if they change without the
         # file content changing - e.g. to get better metadata deduplication.
@@ -1127,6 +1128,8 @@ class MetadataCollector:
         if not self.nobirthtime and hasattr(st, "st_birthtime"):
             # sadly, there's no stat_result.st_birthtime_ns
             attrs["birthtime"] = safe_ns(int(st.st_birthtime * 10**9))
+        attrs["uid"] = st.st_uid
+        attrs["gid"] = st.st_gid
         if not self.numeric_ids:
             user = uid2user(st.st_uid)
             if user is not None:

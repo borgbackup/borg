@@ -834,7 +834,7 @@ class ItemFormatter(BaseFormatter):
         item_data["source"] = source
         item_data["linktarget"] = source
         item_data["hlid"] = hlid
-        item_data["flags"] = item.get("bsdflags", 0)
+        item_data["flags"] = item.get("bsdflags")  # int if flags known, else (if flags unknown) None
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data

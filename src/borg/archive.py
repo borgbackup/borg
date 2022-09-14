@@ -1144,8 +1144,7 @@ class MetadataCollector:
         if not self.noflags:
             with backup_io("extended stat (flags)"):
                 flags = get_flags(path, st, fd=fd)
-            if flags:
-                attrs["bsdflags"] = flags
+            attrs["bsdflags"] = flags
         if not self.noxattrs:
             with backup_io("extended stat (xattrs)"):
                 xattrs = xattr.get_all(fd or path, follow_symlinks=False)

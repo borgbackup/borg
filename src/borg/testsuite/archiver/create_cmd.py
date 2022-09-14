@@ -789,6 +789,25 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         assert hashing_time > 0.0
 
+    def test_chunking_time(self):
+        def extract_chunking_time(borg_create_output: str) -> float:
+            borg_create_output = borg_create_output.strip().splitlines()
+            borg_create_output = [line.split(":", 1) for line in borg_create_output]
+            chunking_time = [line for line in borg_create_output if line[0] == "Time spent in chunking"].pop()
+            chunking_time = chunking_time[1]
+            chunking_time = float(chunking_time.rstrip(" seconds"))
+            return chunking_time
+
+        # Test case set up: create a repository and a 500 files
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        for i in range(0, 500):
+            self.create_regular_file(f"testfile{i}")
+        # Archive
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
+        chunking_time = extract_chunking_time(result)
+
+        assert chunking_time > 0.0
+
 class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
     """run the same tests, but with a remote repository"""
 

@@ -106,17 +106,19 @@ def setxattr(path, name, value, *, follow_symlinks=False):
 
 
 cdef _get_acl(p, type, item, attribute, flags, fd=None):
-    cdef acl_t acl
-    cdef char *text
-    if fd is not None:
-        acl = acl_get_fd_np(fd, type)
-    else:
-        acl = acl_get_link_np(p, type)
-    if acl:
-        text = acl_to_text_np(acl, NULL, flags)
-        if text:
-            item[attribute] = text
-            acl_free(text)
+    cdef acl_t acl = NULL
+    cdef char *text = NULL
+    try:
+        if fd is not None:
+            acl = acl_get_fd_np(fd, type)
+        else:
+            acl = acl_get_link_np(p, type)
+        if acl is not NULL:
+            text = acl_to_text_np(acl, NULL, flags)
+            if text is not NULL:
+                item[attribute] = text
+    finally:
+        acl_free(text)
         acl_free(acl)
 
 
@@ -139,26 +141,29 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
         _get_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', flags, fd=fd)
 
 
-cdef _set_acl(p, type, item, attribute, numeric_ids=False, fd=None):
-    cdef acl_t acl
+cdef _set_acl(path, type, item, attribute, numeric_ids=False, fd=None):
+    cdef acl_t acl = NULL
     text = item.get(attribute)
-    if text:
+    if text is not None:
         if numeric_ids and type == ACL_TYPE_NFS4:
             text = _nfs4_use_stored_uid_gid(text)
-        elif numeric_ids and type in(ACL_TYPE_ACCESS, ACL_TYPE_DEFAULT):
+        elif numeric_ids and type in (ACL_TYPE_ACCESS, ACL_TYPE_DEFAULT):
             text = posix_acl_use_stored_uid_gid(text)
-        acl = acl_from_text(<bytes>text)
-        if acl:
-            if fd is not None:
-                acl_set_fd_np(fd, acl, type)
-            else:
-                acl_set_link_np(p, type, acl)
+        try:
+            acl = acl_from_text(<bytes> text)
+            if acl is not NULL:
+                if fd is not None:
+                    acl_set_fd_np(fd, acl, type)
+                else:
+                    acl_set_link_np(path, type, acl)
+        finally:
             acl_free(acl)
 
 
 cdef _nfs4_use_stored_uid_gid(acl):
     """Replace the user/group field with the stored uid/gid
     """
+    assert isinstance(acl, bytes)
     entries = []
     for entry in safe_decode(acl).split('\n'):
         if entry:

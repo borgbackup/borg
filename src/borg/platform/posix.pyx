@@ -112,6 +112,7 @@ def group2gid(group, default=None):
 def posix_acl_use_stored_uid_gid(acl):
     """Replace the user/group field with the stored uid/gid
     """
+    assert isinstance(acl, bytes)
     from ..helpers import safe_decode, safe_encode
     entries = []
     for entry in safe_decode(acl).split('\n'):

@@ -947,10 +947,10 @@ Duration: {0.duration}
                 pass
             if not self.noacls:
                 acl_set(path, item, self.numeric_ids, fd=fd)
-            if not self.noxattrs:
+            if not self.noxattrs and "xattrs" in item:
                 # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
                 # the Linux capabilities in the "security.capability" attribute.
-                warning = xattr.set_all(fd or path, item.get("xattrs", {}), follow_symlinks=False)
+                warning = xattr.set_all(fd or path, item.xattrs, follow_symlinks=False)
                 if warning:
                     set_ec(EXIT_WARNING)
             # bsdflags include the immutable flag and need to be set last:
@@ -1148,8 +1148,7 @@ class MetadataCollector:
         if not self.noxattrs:
             with backup_io("extended stat (xattrs)"):
                 xattrs = xattr.get_all(fd or path, follow_symlinks=False)
-            if xattrs:
-                attrs["xattrs"] = StableDict(xattrs)
+            attrs["xattrs"] = StableDict(xattrs)
         if not self.noacls:
             with backup_io("extended stat (ACLs)"):
                 acl_get(path, attrs, st, self.numeric_ids, fd=fd)

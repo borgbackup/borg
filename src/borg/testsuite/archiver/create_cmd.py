@@ -660,7 +660,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file("testfile1", contents=b"new data")
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive3", self.input_path)
         result = to_dict(result)
-        # Should process testfile2 as added because https://borgbackup.readthedocs.io/en/stable/faq.html#i-am-seeing-a-added-status-for-an-unchanged-file
+        # Should process testfile2 as added because of
+        # https://borgbackup.readthedocs.io/en/stable/faq.html#i-am-seeing-a-added-status-for-an-unchanged-file
         assert result["Added files"] == 1
         assert result["Unchanged files"] == 0
         assert result["Modified files"] == 1

@@ -19,7 +19,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "create", "test-1", src_dir)
         self.cmd(f"--repo={self.repository_location}", "create", "something-else-than-test-1", src_dir)
         self.cmd(f"--repo={self.repository_location}", "create", "test-2", src_dir)
-        output = self.cmd(f"--repo={self.repository_location}", "rlist", "--glob-archives=test-*")
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "--match-archives=sh:test-*")
         self.assert_in("test-1", output)
         self.assert_in("test-2", output)
         self.assert_not_in("something-else", output)

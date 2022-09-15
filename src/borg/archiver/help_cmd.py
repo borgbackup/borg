@@ -244,9 +244,38 @@ class HelpMixIn:
         This allows you to share the same patterns between multiple repositories
         without needing to specify them on the command line.\n\n"""
     )
+    helptext["match-archives"] = textwrap.dedent(
+        """
+        The ``--match-archives`` option matches a given pattern against the list of all archive
+        names in the repository.
+
+        It uses pattern styles similar to the ones described by ``borg help patterns``:
+
+        Identical match pattern, selector ``id:`` (default)
+            Simple string match, must fully match exactly as given.
+
+        Shell-style patterns, selector ``sh:``
+            Match like on the shell, wildcards like `*` and `?` work.
+
+        `Regular expressions <https://docs.python.org/3/library/re.html>`_, selector ``re:``
+            Full regular expression support.
+            This is very powerful, but can also get rather complicated.
+
+        Examples::
+            # id: style
+            borg delete --match-archives 'id:archive-with-crap'
+            borg delete -a 'id:archive-with-crap'  # same, using short option
+            borg delete -a 'archive-with-crap'  # same, because 'id:' is the default
+
+            # sh: style
+            borg delete -a 'sh:home-kenny-*'
+
+            # re: style
+            borg delete -a 're:pc[123]-home-(user1|user2)-2022-09-.*'\n\n"""
+    )
     helptext["placeholders"] = textwrap.dedent(
         """
-        Repository URLs, ``--name``, ``-a`` / ``--glob-archives``, ``--comment``
+        Repository URLs, ``--name``, ``-a`` / ``--match-archives``, ``--comment``
         and ``--remote-path`` values support these placeholders:
 
         {hostname}
@@ -292,7 +321,7 @@ class HelpMixIn:
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
             borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S%z} ...
-            borg prune -a '{hostname}-*' ...
+            borg prune -a 'sh:{hostname}-*' ...
 
         .. note::
             systemd uses a difficult, non-standard syntax for command lines in unit files (refer to

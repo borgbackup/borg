@@ -84,7 +84,7 @@ class PruneMixIn:
             return self.exit_code
         checkpoint_re = r"\.checkpoint(\.\d+)?"
         archives_checkpoints = manifest.archives.list(
-            glob=args.glob_archives,
+            match=args.match_archives,
             consider_checkpoints=True,
             match_end=r"(%s)?\Z" % checkpoint_re,
             sort_by=["ts"],
@@ -191,7 +191,7 @@ class PruneMixIn:
         archive (and thus still needed). Checkpoint archives are not considered when
         comparing archive counts against the retention limits (``--keep-X``).
 
-        If you use --glob-archives (-a), then only archives that match the GLOB are
+        If you use --match-archives (-a), then only archives that match the pattern are
         considered for deletion and only those archives count towards the totals
         specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
@@ -200,7 +200,7 @@ class PruneMixIn:
 
         If you have multiple sequences of archives with different data sets (e.g.
         from different machines) in one shared repository, use one prune call per
-        data set that matches only the respective archives using the --glob-archives
+        data set that matches only the respective archives using the --match-archives
         (-a) option.
 
         The ``--keep-within`` option takes an argument of the form "<int><char>",

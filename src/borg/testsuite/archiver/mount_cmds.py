@@ -236,13 +236,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch11", "arch12"]
         with self.fuse_mount(self.repository_location, mountpoint, "--last=2", "--sort=name"):
             assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch21", "arch22"]
-        with self.fuse_mount(self.repository_location, mountpoint, "--glob-archives=arch1*"):
+        with self.fuse_mount(self.repository_location, mountpoint, "--match-archives=sh:arch1*"):
             assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch11", "arch12"]
-        with self.fuse_mount(self.repository_location, mountpoint, "--glob-archives=arch2*"):
+        with self.fuse_mount(self.repository_location, mountpoint, "--match-archives=sh:arch2*"):
             assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch21", "arch22"]
-        with self.fuse_mount(self.repository_location, mountpoint, "--glob-archives=arch*"):
+        with self.fuse_mount(self.repository_location, mountpoint, "--match-archives=sh:arch*"):
             assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch11", "arch12", "arch21", "arch22"]
-        with self.fuse_mount(self.repository_location, mountpoint, "--glob-archives=nope"):
+        with self.fuse_mount(self.repository_location, mountpoint, "--match-archives=nope"):
             assert sorted(os.listdir(os.path.join(mountpoint))) == []
 
     @unittest.skipUnless(llfuse, "llfuse not installed")

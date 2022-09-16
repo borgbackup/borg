@@ -6,10 +6,9 @@ import unittest
 
 import pytest
 
-import borg
-import borg.helpers.errors
 from ... import xattr, platform
 from ...constants import *  # NOQA
+from ...locking import Lock
 from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, llfuse
 from .. import changedir, no_selinux
@@ -301,7 +300,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             return wrapper
 
         # Decorate
-        borg.locking.Lock.migrate_lock = write_assert_data(borg.locking.Lock.migrate_lock)
+        Lock.migrate_lock = write_assert_data(Lock.migrate_lock)
         try:
             self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
             self.create_src_archive("arch")
@@ -347,7 +346,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             ], "new_id must be alive (=must not be stale) when Lock.migrate_lock() has returned."
         finally:
             # Undecorate
-            borg.locking.Lock.migrate_lock = borg.locking.Lock.migrate_lock.__wrapped__
+            Lock.migrate_lock = Lock.migrate_lock.__wrapped__
 
 
 class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):

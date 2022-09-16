@@ -11,6 +11,6 @@ if sys.platform.startswith("win32"):
     os.environ["PATH"] = os.pathsep.join(dll_path) + os.pathsep + os.environ["PATH"]
 
 
-from borg.archiver import main
+from .archiver import main
 
 main()

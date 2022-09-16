@@ -179,6 +179,7 @@ def get_flags(path, st, fd=None):
 def acl_use_local_uid_gid(acl):
     """Replace the user/group field with the local uid/gid if possible
     """
+    assert isinstance(acl, bytes)
     entries = []
     for entry in safe_decode(acl).split('\n'):
         if entry:
@@ -194,6 +195,7 @@ def acl_use_local_uid_gid(acl):
 cdef acl_append_numeric_ids(acl):
     """Extend the "POSIX 1003.1e draft standard 17" format with an additional uid/gid field
     """
+    assert isinstance(acl, bytes)
     entries = []
     for entry in _comment_re.sub('', safe_decode(acl)).split('\n'):
         if entry:
@@ -210,6 +212,7 @@ cdef acl_append_numeric_ids(acl):
 cdef acl_numeric_ids(acl):
     """Replace the "POSIX 1003.1e draft standard 17" user/group field with uid/gid
     """
+    assert isinstance(acl, bytes)
     entries = []
     for entry in _comment_re.sub('', safe_decode(acl)).split('\n'):
         if entry:
@@ -249,22 +252,25 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
             access_acl = acl_get_fd(fd)
         else:
             access_acl = acl_get_file(path, ACL_TYPE_ACCESS)
+        if access_acl is not NULL:
+            access_text = acl_to_text(access_acl, NULL)
+            if access_text is not NULL:
+                item['acl_access'] = converter(access_text)
+    finally:
+        acl_free(access_text)
+        acl_free(access_acl)
+
+    try:
         if stat.S_ISDIR(st.st_mode):
             # only directories can have a default ACL. there is no fd-based api to get it.
             default_acl = acl_get_file(path, ACL_TYPE_DEFAULT)
-        if access_acl:
-            access_text = acl_to_text(access_acl, NULL)
-            if access_text:
-                item['acl_access'] = converter(access_text)
-        if default_acl:
-            default_text = acl_to_text(default_acl, NULL)
-            if default_text:
-                item['acl_default'] = converter(default_text)
+            if default_acl is not NULL:
+                default_text = acl_to_text(default_acl, NULL)
+                if default_text is not NULL:
+                    item['acl_default'] = converter(default_text)
     finally:
         acl_free(default_text)
         acl_free(default_acl)
-        acl_free(access_text)
-        acl_free(access_acl)
 
 
 def acl_set(path, item, numeric_ids=False, fd=None):
@@ -282,10 +288,10 @@ def acl_set(path, item, numeric_ids=False, fd=None):
     else:
         converter = acl_use_local_uid_gid
     access_text = item.get('acl_access')
-    if access_text:
+    if access_text is not None:
         try:
-            access_acl = acl_from_text(<bytes>converter(access_text))
-            if access_acl:
+            access_acl = acl_from_text(<bytes> converter(access_text))
+            if access_acl is not NULL:
                 if fd is not None:
                     acl_set_fd(fd, access_acl)
                 else:
@@ -293,10 +299,10 @@ def acl_set(path, item, numeric_ids=False, fd=None):
         finally:
             acl_free(access_acl)
     default_text = item.get('acl_default')
-    if default_text:
+    if default_text is not None:
         try:
-            default_acl = acl_from_text(<bytes>converter(default_text))
-            if default_acl:
+            default_acl = acl_from_text(<bytes> converter(default_text))
+            if default_acl is not NULL:
                 # only directories can get a default ACL. there is no fd-based api to set it.
                 acl_set_file(path, ACL_TYPE_DEFAULT, default_acl)
         finally:

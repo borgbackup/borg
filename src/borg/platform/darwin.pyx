@@ -81,6 +81,7 @@ def setxattr(path, name, value, *, follow_symlinks=False):
 def _remove_numeric_id_if_possible(acl):
     """Replace the user/group field with the local uid/gid if possible
     """
+    assert isinstance(acl, bytes)
     entries = []
     for entry in safe_decode(acl).split('\n'):
         if entry:
@@ -98,6 +99,7 @@ def _remove_numeric_id_if_possible(acl):
 def _remove_non_numeric_identifier(acl):
     """Remove user and group names from the acl
     """
+    assert isinstance(acl, bytes)
     entries = []
     for entry in safe_decode(acl).split('\n'):
         if entry:
@@ -113,22 +115,20 @@ def _remove_non_numeric_identifier(acl):
 def acl_get(path, item, st, numeric_ids=False, fd=None):
     cdef acl_t acl = NULL
     cdef char *text = NULL
-    if isinstance(path, str):
-        path = os.fsencode(path)
     try:
         if fd is not None:
             acl = acl_get_fd_np(fd, ACL_TYPE_EXTENDED)
         else:
+            if isinstance(path, str):
+                path = os.fsencode(path)
             acl = acl_get_link_np(path, ACL_TYPE_EXTENDED)
-        if acl == NULL:
-            return
-        text = acl_to_text(acl, NULL)
-        if text == NULL:
-            return
-        if numeric_ids:
-            item['acl_extended'] = _remove_non_numeric_identifier(text)
-        else:
-            item['acl_extended'] = text
+        if acl is not NULL:
+            text = acl_to_text(acl, NULL)
+            if text is not NULL:
+                if numeric_ids:
+                    item['acl_extended'] = _remove_non_numeric_identifier(text)
+                else:
+                    item['acl_extended'] = text
     finally:
         acl_free(text)
         acl_free(acl)
@@ -143,13 +143,12 @@ def acl_set(path, item, numeric_ids=False, fd=None):
                 acl = acl_from_text(acl_text)
             else:
                 acl = acl_from_text(<bytes>_remove_numeric_id_if_possible(acl_text))
-            if acl == NULL:
-                return
-            if isinstance(path, str):
-                path = os.fsencode(path)
-            if fd is not None:
-                acl_set_fd_np(fd, acl, ACL_TYPE_EXTENDED)
-            else:
-                acl_set_link_np(path, ACL_TYPE_EXTENDED, acl)
+            if acl is not NULL:
+                if fd is not None:
+                    acl_set_fd_np(fd, acl, ACL_TYPE_EXTENDED)
+                else:
+                    if isinstance(path, str):
+                        path = os.fsencode(path)
+                    acl_set_link_np(path, ACL_TYPE_EXTENDED, acl)
         finally:
             acl_free(acl)

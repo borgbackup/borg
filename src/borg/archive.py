@@ -920,11 +920,7 @@ Duration: {0.duration}
                     if not symlink:
                         os.chmod(path, item.mode)
             mtime = item.mtime
-            if "atime" in item:
-                atime = item.atime
-            else:
-                # old archives only had mtime in item metadata
-                atime = mtime
+            atime = item.atime if "atime" in item else mtime
             if "birthtime" in item:
                 birthtime = item.birthtime
                 try:
@@ -947,10 +943,10 @@ Duration: {0.duration}
                 pass
             if not self.noacls:
                 acl_set(path, item, self.numeric_ids, fd=fd)
-            if not self.noxattrs:
+            if not self.noxattrs and "xattrs" in item:
                 # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
                 # the Linux capabilities in the "security.capability" attribute.
-                warning = xattr.set_all(fd or path, item.get("xattrs", {}), follow_symlinks=False)
+                warning = xattr.set_all(fd or path, item.xattrs, follow_symlinks=False)
                 if warning:
                     set_ec(EXIT_WARNING)
             # bsdflags include the immutable flag and need to be set last:
@@ -1119,10 +1115,12 @@ class MetadataCollector:
         self.nobirthtime = nobirthtime
 
     def stat_simple_attrs(self, st):
-        attrs = dict(mode=st.st_mode, uid=st.st_uid, gid=st.st_gid, mtime=safe_ns(st.st_mtime_ns))
+        attrs = {}
+        attrs["mode"] = st.st_mode
         # borg can work with archives only having mtime (very old borg archives do not have
         # atime/ctime). it can be useful to omit atime/ctime, if they change without the
         # file content changing - e.g. to get better metadata deduplication.
+        attrs["mtime"] = safe_ns(st.st_mtime_ns)
         if not self.noatime:
             attrs["atime"] = safe_ns(st.st_atime_ns)
         if not self.noctime:
@@ -1130,6 +1128,8 @@ class MetadataCollector:
         if not self.nobirthtime and hasattr(st, "st_birthtime"):
             # sadly, there's no stat_result.st_birthtime_ns
             attrs["birthtime"] = safe_ns(int(st.st_birthtime * 10**9))
+        attrs["uid"] = st.st_uid
+        attrs["gid"] = st.st_gid
         if not self.numeric_ids:
             user = uid2user(st.st_uid)
             if user is not None:
@@ -1144,13 +1144,11 @@ class MetadataCollector:
         if not self.noflags:
             with backup_io("extended stat (flags)"):
                 flags = get_flags(path, st, fd=fd)
-            if flags:
-                attrs["bsdflags"] = flags
+            attrs["bsdflags"] = flags
         if not self.noxattrs:
             with backup_io("extended stat (xattrs)"):
                 xattrs = xattr.get_all(fd or path, follow_symlinks=False)
-            if xattrs:
-                attrs["xattrs"] = StableDict(xattrs)
+            attrs["xattrs"] = StableDict(xattrs)
         if not self.noacls:
             with backup_io("extended stat (ACLs)"):
                 acl_get(path, attrs, st, self.numeric_ids, fd=fd)

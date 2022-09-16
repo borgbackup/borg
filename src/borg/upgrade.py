@@ -93,6 +93,11 @@ class UpgraderFrom12To20:
         # - 'acl' remnants of bug in attic <= 0.13
         # - 'hardlink_master' (superseded by hlid)
         new_item_dict = {key: value for key, value in item.as_dict().items() if key in ITEM_KEY_WHITELIST}
+        # remove some pointless entries older borg put in there:
+        for key in "user", "group":
+            if key in new_item_dict and new_item_dict[key] is None:
+                del new_item_dict[key]
+        assert not any(value is None for value in new_item_dict.values()), f"found None value in {new_item_dict}"
         new_item = Item(internal_dict=new_item_dict)
         new_item.get_size(memorize=True)  # if not already present: compute+remember size for items with chunks
         assert all(key in new_item for key in REQUIRED_ITEM_KEYS)

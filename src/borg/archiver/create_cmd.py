@@ -116,6 +116,7 @@ class CreateMixIn:
                     except (BackupOSError, BackupError) as e:
                         self.print_warning("%s: %s", path, e)
                         status = "E"
+                        self.fso.stats.file_stats["E"] += 1
                     if status == "C":
                         self.print_warning("%s: file changed while we backed it up", path)
                     self.print_file_status(status, path)
@@ -138,6 +139,7 @@ class CreateMixIn:
                                 )
                             except BackupOSError as e:
                                 status = "E"
+                                self.fso.stats.file_stats["E"] += 1
                                 self.print_warning("%s: %s", path, e)
                         else:
                             status = "-"
@@ -465,6 +467,7 @@ class CreateMixIn:
         except (BackupOSError, BackupError) as e:
             self.print_warning("%s: %s", path, e)
             status = "E"
+            self.fso.stats.file_stats["E"] += 1
         if status == "C":
             self.print_warning("%s: file changed while we backed it up", path)
         if not recurse_excluded_dir:

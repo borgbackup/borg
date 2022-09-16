@@ -60,7 +60,7 @@ class Statistics:
         self.osize = self.usize = self.nfiles = 0
         self.osize_parts = self.usize_parts = self.nfiles_parts = 0
         self.last_progress = 0  # timestamp when last progress was shown
-        self.files_stats = {"A": 0, "U": 0, "M": 0}
+        self.files_stats = {"A": 0, "U": 0, "M": 0, "E": 0}
         self.chunking_time = 0.0
         self.hashing_time = 0.0
 
@@ -89,6 +89,7 @@ class Statistics:
         stats.files_stats["A"] = self.files_stats["A"] + other.files_stats["A"]
         stats.files_stats["U"] = self.files_stats["U"] + other.files_stats["U"]
         stats.files_stats["M"] = self.files_stats["M"] + other.files_stats["M"]
+        stats.files_stats["E"] = self.files_stats["E"] + other.files_stats["E"]
 
         return stats
 
@@ -104,6 +105,7 @@ Time spent in chunking: {chunking_time}
 Added files: {added_files}
 Unchanged files: {unchanged_files}
 Modified files: {modified_files}
+Error files: {error_files}
 """.format(
             stats=self,
             hashing_time=hashing_time,
@@ -111,6 +113,7 @@ Modified files: {modified_files}
             added_files=self.files_stats["A"],
             unchanged_files=self.files_stats["U"],
             modified_files=self.files_stats["M"],
+            error_files=self.files_stats["E"],
         )
 
     def __repr__(self):

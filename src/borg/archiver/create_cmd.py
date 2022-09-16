@@ -5,10 +5,8 @@ import os
 import stat
 import subprocess
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from io import TextIOWrapper
-
-from borg.helpers.time import format_timedelta
 
 from ._common import with_repository, Highlander
 from .. import helpers

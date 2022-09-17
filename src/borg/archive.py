@@ -63,6 +63,8 @@ class Statistics:
         self.files_stats = defaultdict(int)
         self.chunking_time = 0.0
         self.hashing_time = 0.0
+        self.rx_bytes = 0
+        self.tx_bytes = 0
 
     def update(self, size, unique, part=False):
         if not part:
@@ -106,6 +108,8 @@ Added files: {added_files}
 Unchanged files: {unchanged_files}
 Modified files: {modified_files}
 Error files: {error_files}
+Bytes read from remote: {stats.rx_bytes}
+Bytes sent to remote: {stats.tx_bytes}
 """.format(
             stats=self,
             hashing_time=hashing_time,

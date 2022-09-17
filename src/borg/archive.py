@@ -4,7 +4,7 @@ import os
 import stat
 import sys
 import time
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from functools import partial
@@ -60,7 +60,7 @@ class Statistics:
         self.osize = self.usize = self.nfiles = 0
         self.osize_parts = self.usize_parts = self.nfiles_parts = 0
         self.last_progress = 0  # timestamp when last progress was shown
-        self.files_stats = {"A": 0, "U": 0, "M": 0, "E": 0}
+        self.files_stats = defaultdict(int)
         self.chunking_time = 0.0
         self.hashing_time = 0.0
 

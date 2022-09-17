@@ -116,10 +116,10 @@ class CreateMixIn:
                     except (BackupOSError, BackupError) as e:
                         self.print_warning("%s: %s", path, e)
                         status = "E"
-                        self.fso.stats.file_stats["E"] += 1
                     if status == "C":
                         self.print_warning("%s: file changed while we backed it up", path)
                     self.print_file_status(status, path)
+                    fso.stats.files_stats[status] += 1
                 if args.paths_from_command:
                     rc = proc.wait()
                     if rc != 0:
@@ -139,11 +139,11 @@ class CreateMixIn:
                                 )
                             except BackupOSError as e:
                                 status = "E"
-                                self.fso.stats.file_stats["E"] += 1
                                 self.print_warning("%s: %s", path, e)
                         else:
                             status = "-"
                         self.print_file_status(status, path)
+                        fso.stats.files_stats[status] += 1
                         continue
                     path = os.path.normpath(path)
                     parent_dir = os.path.dirname(path) or "."
@@ -467,11 +467,11 @@ class CreateMixIn:
         except (BackupOSError, BackupError) as e:
             self.print_warning("%s: %s", path, e)
             status = "E"
-            self.fso.stats.file_stats["E"] += 1
         if status == "C":
             self.print_warning("%s: file changed while we backed it up", path)
         if not recurse_excluded_dir:
             self.print_file_status(status, path)
+        fso.stats.files_stats[status] += 1
 
     def build_parser_create(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

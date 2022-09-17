@@ -264,7 +264,7 @@ setup(
     name='borgbackup',
     use_scm_version={
         'write_to': 'src/borg/_version.py',
-        'write_to_template': '__version__ = version = {version!r}\n__version_tuple__ = version_tuple = {version_tuple!r}\n',
+        'write_to_template': '__version__ = version = {version!r}\n',
     },
     author='The Borg Collective (see AUTHORS file)',
     author_email='borgbackup@python.org',

@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1015052
 # https://github.com/borgbackup/borg/issues/6875
 write_to = "src/borg/_version.py"
-write_to_template = "__version__ = version = {version!r}\n__version_tuple__ = version_tuple = {version_tuple!r}\n"
+write_to_template = "__version__ = version = {version!r}\n"
 
 [tool.black]
 line-length = 120

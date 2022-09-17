@@ -206,19 +206,18 @@ def test_obfuscate():
 
 def test_obfuscate_meta():
     compressor = CompressionSpec("obfuscate,3,lz4").compressor
-    meta_in = {}
+    meta = {}
     data = bytes(10000)
-    meta_out, compressed = compressor.compress(meta_in, data)
-    assert "ctype" not in meta_in  # do not modify dict of caller
-    assert "ctype" in meta_out
-    assert meta_out["ctype"] == LZ4.ID
-    assert "clevel" in meta_out
-    assert meta_out["clevel"] == 0xFF
-    assert "csize" in meta_out
-    csize = meta_out["csize"]
+    meta, compressed = compressor.compress(meta, data)
+    assert "ctype" in meta
+    assert meta["ctype"] == LZ4.ID
+    assert "clevel" in meta
+    assert meta["clevel"] == 0xFF
+    assert "csize" in meta
+    csize = meta["csize"]
     assert csize == len(compressed)  # this is the overall size
-    assert "psize" in meta_out
-    psize = meta_out["psize"]
+    assert "psize" in meta
+    psize = meta["psize"]
     assert 0 < psize < 100
     assert csize - psize >= 0  # there is a obfuscation trailer
     trailer = compressed[psize:]

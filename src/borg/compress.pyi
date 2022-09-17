@@ -61,3 +61,5 @@ class ZSTD(DecidingCompressor):
 
 LZ4_COMPRESSOR: Type[LZ4]
 NONE_COMPRESSOR: Type[CNONE]
+
+COMPRESSOR_TABLE: dict

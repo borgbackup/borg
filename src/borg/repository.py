@@ -1081,6 +1081,7 @@ class Repository:
         pi = ProgressIndicatorPercent(
             total=segment_count, msg="Checking segments %3.1f%%", step=0.1, msgid="repository.check"
         )
+        segment = -1  # avoid uninitialized variable if there are no segment files at all
         for i, (segment, filename) in enumerate(self.io.segment_iterator()):
             pi.show(i)
             if segment <= last_segment_checked:

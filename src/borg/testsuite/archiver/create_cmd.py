@@ -629,7 +629,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_file_status_counters(self):
         """Test file status counters in the stats of `borg create --stats`"""
 
-        def to_dict(borg_create_output: str) -> dict:
+        def to_dict(borg_create_output):
             borg_create_output = borg_create_output.strip().splitlines()
             borg_create_output = [line.split(":", 1) for line in borg_create_output]
             borg_create_output = {
@@ -772,7 +772,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "security: read previous location" in log
 
     def test_hashing_time(self):
-        def extract_hashing_time(borg_create_output: str) -> float:
+        def extract_hashing_time(borg_create_output):
             borg_create_output = borg_create_output.strip().splitlines()
             borg_create_output = [line.split(":", 1) for line in borg_create_output]
             hashing_time = [line for line in borg_create_output if line[0] == "Time spent in hashing"].pop()
@@ -791,7 +791,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert hashing_time > 0.0
 
     def test_chunking_time(self):
-        def extract_chunking_time(borg_create_output: str) -> float:
+        def extract_chunking_time(borg_create_output):
             borg_create_output = borg_create_output.strip().splitlines()
             borg_create_output = [line.split(":", 1) for line in borg_create_output]
             chunking_time = [line for line in borg_create_output if line[0] == "Time spent in chunking"].pop()

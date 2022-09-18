@@ -187,11 +187,8 @@ class CreateMixIn:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 archive.stats += fso.stats
-                try:
-                    archive.stats.rx_bytes = repository.rx_bytes
-                    archive.stats.tx_bytes = repository.tx_bytes
-                except AttributeError:
-                    pass  # We are working with a local repo
+                archive.stats.rx_bytes = getattr(repository, "rx_bytes", 0)
+                archive.stats.tx_bytes = getattr(repository, "tx_bytes", 0)
                 if sig_int:
                     # do not save the archive if the user ctrl-c-ed - it is valid, but incomplete.
                     # we already have a checkpoint archive in this case.

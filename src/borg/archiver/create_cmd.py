@@ -473,8 +473,7 @@ class CreateMixIn:
             self.print_warning("%s: file changed while we backed it up", path)
         if not recurse_excluded_dir:
             self.print_file_status(status, path)
-        if not dry_run:
-            fso.stats.files_stats[status] += 1
+        fso.stats.files_stats[status] += 1
 
     def build_parser_create(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

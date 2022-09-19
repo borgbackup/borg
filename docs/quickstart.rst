@@ -202,13 +202,13 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
     # limit prune's operation to this machine's archives and not apply to
     # other machines' archives also:
 
-    borg prune                          
-        --list 
-        --glob-archives 'yourprefix' (-a)       
-        --show-rc                       
-        --keep-daily    7               
-        --keep-weekly   4               
-        --keep-monthly  6               
+    borg prune                      \
+    --list                          \
+    --glob-archives '{hostname}-'   \
+    --show-rc                       \
+    --keep-daily    7               \
+    --keep-weekly   4               \
+    --keep-monthly  6                        
 
     prune_exit=$?
 

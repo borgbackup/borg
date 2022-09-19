@@ -197,10 +197,37 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         second_half = self.repository.scan(marker=first_half[-1])
         assert len(second_half) == 50
         assert second_half == all[50:]
-        assert len(self.repository.scan(limit=50)) == 50
         # check result order == on-disk order (which is hash order)
         for x in range(100):
             assert all[x] == H(x)
+
+    def test_scan_modify(self):
+        for x in range(100):
+            self.repository.put(H(x), fchunk(b"ORIGINAL"))
+        self.repository.commit(compact=False)
+        # now we scan, read and modify chunks at the same time
+        count = 0
+        for id in self.repository.scan():
+            # scan results are in same order as we put the chunks into the repo (into the segment file)
+            assert id == H(count)
+            chunk = self.repository.get(id)
+            # check that we **only** get data that was committed when we started scanning
+            # and that we do not run into the new data we put into the repo.
+            assert pdchunk(chunk) == b"ORIGINAL"
+            count += 1
+            self.repository.put(id, fchunk(b"MODIFIED"))
+        assert count == 100
+        self.repository.commit()
+
+        # now we have committed all the modified chunks, and **only** must get the modified ones.
+        count = 0
+        for id in self.repository.scan():
+            # scan results are in same order as we put the chunks into the repo (into the segment file)
+            assert id == H(count)
+            chunk = self.repository.get(id)
+            assert pdchunk(chunk) == b"MODIFIED"
+            count += 1
+        assert count == 100
 
     def test_max_data_size(self):
         max_data = b"x" * (MAX_DATA_SIZE - RepoObj.meta_len_hdr.size)

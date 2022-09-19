@@ -1163,9 +1163,7 @@ class Repository:
 
         When segment or segment+offset is given, limit processing to this location only.
         """
-        for current_segment, filename in self.io.segment_iterator(segment=segment):
-            if segment is not None and current_segment > segment:
-                break
+        for current_segment, filename in self.io.segment_iterator(start_segment=segment, end_segment=segment):
             try:
                 for tag, key, current_offset, _, data in self.io.iter_objects(
                     segment=current_segment, offset=offset or 0
@@ -1223,14 +1221,14 @@ class Repository:
         """
         if limit is not None and limit < 1:
             raise ValueError("please use limit > 0 or limit = None")
+        transaction_id = self.get_transaction_id()
         if not self.index:
-            transaction_id = self.get_transaction_id()
             self.index = self.open_index(transaction_id)
         at_start = marker is None
         # smallest valid seg is <uint32> 0, smallest valid offs is <uint32> 8
         start_segment, start_offset, _ = (0, 0, 0) if at_start else self.index[marker]
         result = []
-        for segment, filename in self.io.segment_iterator(start_segment):
+        for segment, filename in self.io.segment_iterator(start_segment, transaction_id):
             obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False)
             while True:
                 try:
@@ -1392,23 +1390,26 @@ class LoggedIO:
         safe_fadvise(fd.fileno(), 0, 0, "DONTNEED")
         fd.close()
 
-    def segment_iterator(self, segment=None, reverse=False):
-        if segment is None:
-            segment = 0 if not reverse else 2**32 - 1
+    def segment_iterator(self, start_segment=None, end_segment=None, reverse=False):
+        if start_segment is None:
+            start_segment = 0 if not reverse else 2**32 - 1
+        if end_segment is None:
+            end_segment = 2**32 - 1 if not reverse else 0
         data_path = os.path.join(self.path, "data")
-        start_segment_dir = segment // self.segments_per_dir
+        start_segment_dir = start_segment // self.segments_per_dir
+        end_segment_dir = end_segment // self.segments_per_dir
         dirs = os.listdir(data_path)
         if not reverse:
-            dirs = [dir for dir in dirs if dir.isdigit() and int(dir) >= start_segment_dir]
+            dirs = [dir for dir in dirs if dir.isdigit() and start_segment_dir <= int(dir) <= end_segment_dir]
         else:
-            dirs = [dir for dir in dirs if dir.isdigit() and int(dir) <= start_segment_dir]
+            dirs = [dir for dir in dirs if dir.isdigit() and start_segment_dir >= int(dir) >= end_segment_dir]
         dirs = sorted(dirs, key=int, reverse=reverse)
         for dir in dirs:
             filenames = os.listdir(os.path.join(data_path, dir))
             if not reverse:
-                filenames = [filename for filename in filenames if filename.isdigit() and int(filename) >= segment]
+                filenames = [filename for filename in filenames if filename.isdigit() and start_segment <= int(filename) <= end_segment]
             else:
-                filenames = [filename for filename in filenames if filename.isdigit() and int(filename) <= segment]
+                filenames = [filename for filename in filenames if filename.isdigit() and start_segment >= int(filename) >= end_segment]
             filenames = sorted(filenames, key=int, reverse=reverse)
             for filename in filenames:
                 # Note: Do not filter out logically deleted segments  (see "File system interaction" above),

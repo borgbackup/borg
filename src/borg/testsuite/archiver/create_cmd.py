@@ -777,7 +777,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             borg_create_output = [line.split(":", 1) for line in borg_create_output]
             hashing_time = [line for line in borg_create_output if line[0] == "Time spent in hashing"].pop()
             hashing_time = hashing_time[1]
-            hashing_time = float(hashing_time.rstrip(" seconds"))
+            hashing_time = float(hashing_time.removesuffix(" seconds"))
             return hashing_time
 
         # Test case set up: create a repository and a 500 files
@@ -796,7 +796,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             borg_create_output = [line.split(":", 1) for line in borg_create_output]
             chunking_time = [line for line in borg_create_output if line[0] == "Time spent in chunking"].pop()
             chunking_time = chunking_time[1]
-            chunking_time = float(chunking_time.rstrip(" seconds"))
+            chunking_time = float(chunking_time.removesuffix(" seconds"))
             return chunking_time
 
         # Test case set up: create a repository and a 500 files

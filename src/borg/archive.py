@@ -1749,11 +1749,10 @@ class ArchiveChecker:
         )
         marker = None
         while True:
-            chunk_ids = self.repository.scan(limit=100, marker=marker)
+            chunk_ids, marker = self.repository.scan(limit=100, marker=marker)
             if not chunk_ids:
                 break
             chunks_count_segments += len(chunk_ids)
-            marker = chunk_ids[-1]
             chunk_data_iter = self.repository.get_many(chunk_ids)
             chunk_ids_revd = list(reversed(chunk_ids))
             while chunk_ids_revd:

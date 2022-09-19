@@ -1163,9 +1163,7 @@ class Repository:
 
         When segment or segment+offset is given, limit processing to this location only.
         """
-        for current_segment, filename in self.io.segment_iterator(segment=segment):
-            if segment is not None and current_segment > segment:
-                break
+        for current_segment, filename in self.io.segment_iterator(start_segment=segment, end_segment=segment):
             try:
                 for tag, key, current_offset, _, data in self.io.iter_objects(
                     segment=current_segment, offset=offset or 0
@@ -1211,8 +1209,13 @@ class Repository:
 
     def scan(self, limit=None, marker=None):
         """
-        list <limit> IDs starting from after id <marker> - in on-disk order, so that a client
+        list <limit> IDs starting from after <marker> - in on-disk order, so that a client
         fetching data in this order does linear reads and reuses stuff from disk cache.
+
+        marker can either be None (default, meaning "start from the beginning") or the object
+        returned from a previous scan call (meaning "continue scanning where we stopped previously").
+
+        returns: list of chunk ids, marker
 
         We rely on repository.check() has run already (either now or some time before) and that:
 
@@ -1223,14 +1226,15 @@ class Repository:
         """
         if limit is not None and limit < 1:
             raise ValueError("please use limit > 0 or limit = None")
+        transaction_id = self.get_transaction_id()
         if not self.index:
-            transaction_id = self.get_transaction_id()
             self.index = self.open_index(transaction_id)
-        at_start = marker is None
         # smallest valid seg is <uint32> 0, smallest valid offs is <uint32> 8
-        start_segment, start_offset, _ = (0, 0, 0) if at_start else self.index[marker]
-        result = []
-        for segment, filename in self.io.segment_iterator(start_segment):
+        start_segment, start_offset = marker if marker is not None else (0, 0)
+        ids, segment, offset = [], 0, 0
+        # we only scan up to end_segment == transaction_id to only scan **committed** chunks,
+        # avoiding scanning into newly written chunks.
+        for segment, filename in self.io.segment_iterator(start_segment, transaction_id):
             obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False)
             while True:
                 try:
@@ -1249,10 +1253,10 @@ class Repository:
                     in_index = self.index.get(id)
                     if in_index and (in_index.segment, in_index.offset) == (segment, offset):
                         # we have found an existing and current object
-                        result.append(id)
-                        if len(result) == limit:
-                            return result
-        return result
+                        ids.append(id)
+                        if len(ids) == limit:
+                            return ids, (segment, offset)
+        return ids, (segment, offset)
 
     def flags(self, id, mask=0xFFFFFFFF, value=None):
         """
@@ -1392,23 +1396,34 @@ class LoggedIO:
         safe_fadvise(fd.fileno(), 0, 0, "DONTNEED")
         fd.close()
 
-    def segment_iterator(self, segment=None, reverse=False):
-        if segment is None:
-            segment = 0 if not reverse else 2**32 - 1
+    def segment_iterator(self, start_segment=None, end_segment=None, reverse=False):
+        if start_segment is None:
+            start_segment = 0 if not reverse else 2**32 - 1
+        if end_segment is None:
+            end_segment = 2**32 - 1 if not reverse else 0
         data_path = os.path.join(self.path, "data")
-        start_segment_dir = segment // self.segments_per_dir
+        start_segment_dir = start_segment // self.segments_per_dir
+        end_segment_dir = end_segment // self.segments_per_dir
         dirs = os.listdir(data_path)
         if not reverse:
-            dirs = [dir for dir in dirs if dir.isdigit() and int(dir) >= start_segment_dir]
+            dirs = [dir for dir in dirs if dir.isdigit() and start_segment_dir <= int(dir) <= end_segment_dir]
         else:
-            dirs = [dir for dir in dirs if dir.isdigit() and int(dir) <= start_segment_dir]
+            dirs = [dir for dir in dirs if dir.isdigit() and start_segment_dir >= int(dir) >= end_segment_dir]
         dirs = sorted(dirs, key=int, reverse=reverse)
         for dir in dirs:
             filenames = os.listdir(os.path.join(data_path, dir))
             if not reverse:
-                filenames = [filename for filename in filenames if filename.isdigit() and int(filename) >= segment]
+                filenames = [
+                    filename
+                    for filename in filenames
+                    if filename.isdigit() and start_segment <= int(filename) <= end_segment
+                ]
             else:
-                filenames = [filename for filename in filenames if filename.isdigit() and int(filename) <= segment]
+                filenames = [
+                    filename
+                    for filename in filenames
+                    if filename.isdigit() and start_segment >= int(filename) >= end_segment
+                ]
             filenames = sorted(filenames, key=int, reverse=reverse)
             for filename in filenames:
                 # Note: Do not filter out logically deleted segments  (see "File system interaction" above),

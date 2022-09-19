@@ -191,10 +191,10 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.repository.commit(compact=False)
         all, _ = self.repository.scan()
         assert len(all) == 100
-        first_half, marker = self.repository.scan(limit=50)
+        first_half, state = self.repository.scan(limit=50)
         assert len(first_half) == 50
         assert first_half == all[:50]
-        second_half, _ = self.repository.scan(marker=marker)
+        second_half, _ = self.repository.scan(state=state)
         assert len(second_half) == 50
         assert second_half == all[50:]
         # check result order == on-disk order (which is hash order)

@@ -1207,15 +1207,15 @@ class Repository:
             self.index = self.open_index(self.get_transaction_id())
         return [id_ for id_, _ in islice(self.index.iteritems(marker=marker, mask=mask, value=value), limit)]
 
-    def scan(self, limit=None, marker=None):
+    def scan(self, limit=None, state=None):
         """
-        list <limit> IDs starting from after <marker> - in on-disk order, so that a client
+        list (the next) <limit> chunk IDs from the repository - in on-disk order, so that a client
         fetching data in this order does linear reads and reuses stuff from disk cache.
 
-        marker can either be None (default, meaning "start from the beginning") or the object
-        returned from a previous scan call (meaning "continue scanning where we stopped previously").
+        state can either be None (initially, when starting to scan) or the object
+        returned from a previous scan call (meaning "continue scanning").
 
-        returns: list of chunk ids, marker
+        returns: list of chunk ids, state
 
         We rely on repository.check() has run already (either now or some time before) and that:
 
@@ -1230,11 +1230,11 @@ class Repository:
         if not self.index:
             self.index = self.open_index(transaction_id)
         # smallest valid seg is <uint32> 0, smallest valid offs is <uint32> 8
-        start_segment, start_offset = marker if marker is not None else (0, 0)
+        start_segment, start_offset, end_segment = state if state is not None else (0, 0, transaction_id)
         ids, segment, offset = [], 0, 0
         # we only scan up to end_segment == transaction_id to only scan **committed** chunks,
         # avoiding scanning into newly written chunks.
-        for segment, filename in self.io.segment_iterator(start_segment, transaction_id):
+        for segment, filename in self.io.segment_iterator(start_segment, end_segment):
             obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False)
             while True:
                 try:
@@ -1255,8 +1255,8 @@ class Repository:
                         # we have found an existing and current object
                         ids.append(id)
                         if len(ids) == limit:
-                            return ids, (segment, offset)
-        return ids, (segment, offset)
+                            return ids, (segment, offset, end_segment)
+        return ids, (segment, offset, end_segment)
 
     def flags(self, id, mask=0xFFFFFFFF, value=None):
         """

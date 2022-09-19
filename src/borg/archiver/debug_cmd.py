@@ -152,12 +152,10 @@ class DebugMixIn:
             cdata = repository.get(ids[0])
             key = key_factory(repository, cdata)
             repo_objs = RepoObj(key)
-            marker = None
+            state = None
             i = 0
             while True:
-                ids, marker = repository.scan(
-                    limit=LIST_SCAN_LIMIT, marker=marker
-                )  # must use on-disk order scanning here
+                ids, state = repository.scan(limit=LIST_SCAN_LIMIT, state=state)  # must use on-disk order scanning here
                 if not ids:
                     break
                 for id in ids:
@@ -203,12 +201,12 @@ class DebugMixIn:
         key = key_factory(repository, cdata)
         repo_objs = RepoObj(key)
 
-        marker = None
+        state = None
         last_data = b""
         last_id = None
         i = 0
         while True:
-            ids, marker = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
+            ids, state = repository.scan(limit=LIST_SCAN_LIMIT, state=state)  # must use on-disk order scanning here
             if not ids:
                 break
             for id in ids:

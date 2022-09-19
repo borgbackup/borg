@@ -1747,9 +1747,9 @@ class ArchiveChecker:
         pi = ProgressIndicatorPercent(
             total=chunks_count_index, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
         )
-        marker = None
+        state = None
         while True:
-            chunk_ids, marker = self.repository.scan(limit=100, marker=marker)
+            chunk_ids, state = self.repository.scan(limit=100, state=state)
             if not chunk_ids:
                 break
             chunks_count_segments += len(chunk_ids)

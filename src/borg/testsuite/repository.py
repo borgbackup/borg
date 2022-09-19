@@ -189,12 +189,12 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         for x in range(100):
             self.repository.put(H(x), fchunk(b"SOMEDATA"))
         self.repository.commit(compact=False)
-        all = self.repository.scan()
+        all, _ = self.repository.scan()
         assert len(all) == 100
-        first_half = self.repository.scan(limit=50)
+        first_half, marker = self.repository.scan(limit=50)
         assert len(first_half) == 50
         assert first_half == all[:50]
-        second_half = self.repository.scan(marker=first_half[-1])
+        second_half, _ = self.repository.scan(marker=marker)
         assert len(second_half) == 50
         assert second_half == all[50:]
         # check result order == on-disk order (which is hash order)
@@ -207,7 +207,8 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.repository.commit(compact=False)
         # now we scan, read and modify chunks at the same time
         count = 0
-        for id in self.repository.scan():
+        ids, _ = self.repository.scan()
+        for id in ids:
             # scan results are in same order as we put the chunks into the repo (into the segment file)
             assert id == H(count)
             chunk = self.repository.get(id)
@@ -221,7 +222,8 @@ class RepositoryTestCase(RepositoryTestCaseBase):
 
         # now we have committed all the modified chunks, and **only** must get the modified ones.
         count = 0
-        for id in self.repository.scan():
+        ids, _ = self.repository.scan()
+        for id in ids:
             # scan results are in same order as we put the chunks into the repo (into the segment file)
             assert id == H(count)
             chunk = self.repository.get(id)

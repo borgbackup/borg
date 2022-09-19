@@ -1209,8 +1209,13 @@ class Repository:
 
     def scan(self, limit=None, marker=None):
         """
-        list <limit> IDs starting from after id <marker> - in on-disk order, so that a client
+        list <limit> IDs starting from after <marker> - in on-disk order, so that a client
         fetching data in this order does linear reads and reuses stuff from disk cache.
+
+        marker can either be None (default, meaning "start from the beginning") or the object
+        returned from a previous scan call (meaning "continue scanning where we stopped previously").
+
+        returns: list of chunk ids, marker
 
         We rely on repository.check() has run already (either now or some time before) and that:
 
@@ -1224,10 +1229,11 @@ class Repository:
         transaction_id = self.get_transaction_id()
         if not self.index:
             self.index = self.open_index(transaction_id)
-        at_start = marker is None
         # smallest valid seg is <uint32> 0, smallest valid offs is <uint32> 8
-        start_segment, start_offset, _ = (0, 0, 0) if at_start else self.index[marker]
-        result = []
+        start_segment, start_offset = marker if marker is not None else (0, 0)
+        ids, segment, offset = [], 0, 0
+        # we only scan up to end_segment == transaction_id to only scan **committed** chunks,
+        # avoiding scanning into newly written chunks.
         for segment, filename in self.io.segment_iterator(start_segment, transaction_id):
             obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False)
             while True:
@@ -1247,10 +1253,10 @@ class Repository:
                     in_index = self.index.get(id)
                     if in_index and (in_index.segment, in_index.offset) == (segment, offset):
                         # we have found an existing and current object
-                        result.append(id)
-                        if len(result) == limit:
-                            return result
-        return result
+                        ids.append(id)
+                        if len(ids) == limit:
+                            return ids, (segment, offset)
+        return ids, (segment, offset)
 
     def flags(self, id, mask=0xFFFFFFFF, value=None):
         """
@@ -1407,9 +1413,17 @@ class LoggedIO:
         for dir in dirs:
             filenames = os.listdir(os.path.join(data_path, dir))
             if not reverse:
-                filenames = [filename for filename in filenames if filename.isdigit() and start_segment <= int(filename) <= end_segment]
+                filenames = [
+                    filename
+                    for filename in filenames
+                    if filename.isdigit() and start_segment <= int(filename) <= end_segment
+                ]
             else:
-                filenames = [filename for filename in filenames if filename.isdigit() and start_segment >= int(filename) >= end_segment]
+                filenames = [
+                    filename
+                    for filename in filenames
+                    if filename.isdigit() and start_segment >= int(filename) >= end_segment
+                ]
             filenames = sorted(filenames, key=int, reverse=reverse)
             for filename in filenames:
                 # Note: Do not filter out logically deleted segments  (see "File system interaction" above),

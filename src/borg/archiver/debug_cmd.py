@@ -152,14 +152,13 @@ class DebugMixIn:
             cdata = repository.get(ids[0])
             key = key_factory(repository, cdata)
             repo_objs = RepoObj(key)
-            marker = None
+            state = None
             i = 0
             while True:
-                result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
-                if not result:
+                ids, state = repository.scan(limit=LIST_SCAN_LIMIT, state=state)  # must use on-disk order scanning here
+                if not ids:
                     break
-                marker = result[-1]
-                for id in result:
+                for id in ids:
                     cdata = repository.get(id)
                     decrypt_dump(i, id, cdata)
                     i += 1
@@ -202,16 +201,15 @@ class DebugMixIn:
         key = key_factory(repository, cdata)
         repo_objs = RepoObj(key)
 
-        marker = None
+        state = None
         last_data = b""
         last_id = None
         i = 0
         while True:
-            result = repository.scan(limit=LIST_SCAN_LIMIT, marker=marker)  # must use on-disk order scanning here
-            if not result:
+            ids, state = repository.scan(limit=LIST_SCAN_LIMIT, state=state)  # must use on-disk order scanning here
+            if not ids:
                 break
-            marker = result[-1]
-            for id in result:
+            for id in ids:
                 cdata = repository.get(id)
                 _, data = repo_objs.parse(id, cdata)
 

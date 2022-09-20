@@ -1235,6 +1235,10 @@ class Repository:
         # we only scan up to end_segment == transaction_id to only scan **committed** chunks,
         # avoiding scanning into newly written chunks.
         for segment, filename in self.io.segment_iterator(start_segment, end_segment):
+            # the start_offset we potentially got from state is only valid for the start_segment we also got
+            # from there. in case the segment file vanished meanwhile, the segment_iterator might never
+            # return a segment/filename corresponding to the start_segment and we must start from offset 0 then.
+            start_offset = start_offset if segment == start_segment else 0
             obj_iterator = self.io.iter_objects(segment, start_offset, read_data=False)
             while True:
                 try:
@@ -1244,7 +1248,7 @@ class Repository:
                     # higher offsets than one that has an error in the header fields.
                     break
                 if start_offset > 0:
-                    # we are using a marker and the marker points to the last object we have already
+                    # we are using a state != None and it points to the last object we have already
                     # returned in the previous scan() call - thus, we need to skip this one object.
                     # also, for the next segment, we need to start at offset 0.
                     start_offset = 0

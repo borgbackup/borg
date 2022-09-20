@@ -191,7 +191,7 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
         /etc                            \
         /home                           \
         /root                           \
-        /var                            \
+        /var
 
     backup_exit=$?
 
@@ -204,11 +204,11 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
 
     borg prune                          \
         --list                          \
-        --prefix '{hostname}-'          \
+        --glob-archives '{hostname}-*'  \
         --show-rc                       \
         --keep-daily    7               \
         --keep-weekly   4               \
-        --keep-monthly  6               \
+        --keep-monthly  6    
 
     prune_exit=$?
 

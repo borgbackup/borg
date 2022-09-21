@@ -114,20 +114,31 @@ class RepoObj1:  # legacy
     def id_hash(self, data: bytes) -> bytes:
         return self.key.id_hash(data)
 
-    def format(self, id: bytes, meta: dict, data: bytes, compress: bool = True, size: int = None) -> bytes:
+    def format(
+        self,
+        id: bytes,
+        meta: dict,
+        data: bytes,
+        compress: bool = True,
+        size: int = None,
+        ctype: int = None,
+        clevel: int = None,
+    ) -> bytes:
         assert isinstance(id, bytes)
         assert meta == {}
         assert isinstance(data, (bytes, memoryview))
-        assert compress or size is not None
-        assert compress or size is not None
+        assert compress or size is not None and ctype is not None and clevel is not None
         if compress:
-            assert size is None
+            assert size is None or size == len(data)
             meta, data_compressed = self.compressor.compress(meta, data)
         else:
             assert isinstance(size, int)
             data_compressed = data  # is already compressed, must include type/level bytes
         data_encrypted = self.key.encrypt(id, data_compressed)
         return data_encrypted
+
+    def parse_meta(self, id: bytes, cdata: bytes) -> dict:
+        raise NotImplementedError("parse_meta is not available for RepoObj1")
 
     def parse(self, id: bytes, cdata: bytes, decompress: bool = True) -> tuple[dict, bytes]:
         assert isinstance(id, bytes)

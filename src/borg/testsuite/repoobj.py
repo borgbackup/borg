@@ -78,7 +78,7 @@ def test_borg1_borg2_transition(key):
     # note: as we did not decompress, we do not have "size" and we need to get it from somewhere else.
     # here, we just use len_data. for borg transfer, we also know the size from another metadata source.
     borg2_cdata = repo_objs2.format(
-        id, meta1, compr_data1[2:], compress=False, size=len_data, ctype=meta1["ctype"], clevel=meta1["clevel"]
+        id, dict(meta1), compr_data1[2:], compress=False, size=len_data, ctype=meta1["ctype"], clevel=meta1["clevel"]
     )
     meta2, data2 = repo_objs2.parse(id, borg2_cdata)
     assert data2 == data

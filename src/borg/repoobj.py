@@ -35,7 +35,6 @@ class RepoObj:
     ) -> bytes:
         assert isinstance(id, bytes)
         assert isinstance(meta, dict)
-        meta = dict(meta)  # make a copy, so call arg is not modified
         assert isinstance(data, (bytes, memoryview))
         assert compress or size is not None and ctype is not None and clevel is not None
         if compress:

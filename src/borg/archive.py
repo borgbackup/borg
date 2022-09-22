@@ -1263,7 +1263,9 @@ class ChunksProcessor:
         if not chunk_processor:
 
             def chunk_processor(chunk):
+                started_hashing = time.monotonic()
                 chunk_id, data = cached_hash(chunk, self.key.id_hash)
+                stats.hashing_time += time.monotonic() - started_hashing
                 chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, wait=False)
                 self.cache.repository.async_response(wait=False)
                 return chunk_entry

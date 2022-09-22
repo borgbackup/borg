@@ -798,10 +798,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             chunking_time = float(chunking_time.removesuffix(" seconds"))
             return chunking_time
 
-        # Test case set up: create a repository and a 500 files
+        # Test case set up: create a repository and a file
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        for i in range(0, 500):
-            self.create_regular_file(f"testfile{i}")
+        self.create_regular_file("testfile", size=5000000)
         # Archive
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
         chunking_time = extract_chunking_time(result)

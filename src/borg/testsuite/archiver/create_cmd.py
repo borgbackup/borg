@@ -780,10 +780,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             hashing_time = float(hashing_time.removesuffix(" seconds"))
             return hashing_time
 
-        # Test case set up: create a repository and a 500 files
-        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        for i in range(0, 500):
-            self.create_regular_file(f"testfile{i}")
+        # Test case set up: create a repository and a file
+        self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
+        self.create_regular_file("testfile", size=6000000)
         # Archive
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
         hashing_time = extract_hashing_time(result)

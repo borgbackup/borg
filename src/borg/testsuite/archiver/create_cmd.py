@@ -1,6 +1,7 @@
 import errno
 import json
 import os
+from random import randbytes
 import shutil
 import socket
 import stat
@@ -780,9 +781,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             hashing_time = float(hashing_time.removesuffix(" seconds"))
             return hashing_time
 
+        def create_test_file():
+            # create_regular_file is not used because the test
+            # needs random data in the file to avoid deduplication
+            data = randbytes(50000)
+            filename = os.path.join(self.input_path, "test_file")
+            with open(filename, "wb") as file:
+                for byte in data:
+                    file.write(bytes(byte))
+
         # Test case set up: create a repository and a file
         self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
-        self.create_regular_file("testfile", size=6000000)
+        create_test_file()
+        # self.create_regular_file("testfile", size=3000000, contents=create_random_bytes())
         # Archive
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
         hashing_time = extract_hashing_time(result)

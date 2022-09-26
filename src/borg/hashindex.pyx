@@ -344,8 +344,9 @@ cdef class NSIndex1(IndexBase):  # legacy borg 1.x
             assert segment <= _MAX_VALUE, "maximum number of segments reached"
         return data != NULL
 
-    def iteritems(self, marker=None):
+    def iteritems(self, marker=None, mask=0, value=0):
         cdef const unsigned char *key
+        assert mask == 0 and value == 0, "using mask/value is not supported for old index"
         iter = NSKeyIterator1(self.key_size)
         iter.idx = self
         iter.index = self.index
@@ -355,6 +356,9 @@ cdef class NSIndex1(IndexBase):  # legacy borg 1.x
                 raise IndexError
             iter.key = key - self.key_size
         return iter
+
+    def flags(self, key, mask=0xFFFFFFFF, value=None):
+        raise NotImplemented("calling .flags() is not supported for old index")
 
 
 cdef class NSKeyIterator1:  # legacy borg 1.x

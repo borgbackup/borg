@@ -110,6 +110,7 @@ def identify_key(manifest_data):
 
 def key_factory(repository, manifest_chunk, *, ro_cls=RepoObj):
     manifest_data = ro_cls.extract_crypted_data(manifest_chunk)
+    assert manifest_data, "manifest data must not be zero bytes long"
     return identify_key(manifest_data).detect(repository, manifest_data)
 
 

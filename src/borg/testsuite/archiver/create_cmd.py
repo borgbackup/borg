@@ -783,7 +783,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         # Test case set up: create a repository and a file
         self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
-        self.create_regular_file("testfile", size=6000000, contents=randbytes(6000000))
+        self.create_regular_file("testfile", contents=randbytes(6000000))
         # Archive
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
         hashing_time = extract_hashing_time(result)

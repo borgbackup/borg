@@ -88,7 +88,7 @@ class Statistics:
         stats.nfiles_parts = self.nfiles_parts + other.nfiles_parts
         stats.chunking_time = self.chunking_time + other.chunking_time
         stats.hashing_time = self.hashing_time + other.hashing_time
-        for key in other.files_stats.keys():
+        for key in other.files_stats:
             stats.files_stats[key] = self.files_stats[key] + other.files_stats[key]
 
         return stats

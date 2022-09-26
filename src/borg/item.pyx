@@ -365,6 +365,10 @@ class Item(PropDict):
         # also need to fix old timestamp data types.
         for k, v in list(d.items()):
             k = fix_key(d, k)
+            if k in ('user', 'group') and d[k] is None:
+                # borg 1 stored some "not known" values with a None value.
+                # borg 2 policy for such cases is to just not have the key/value pair.
+                continue
             if k in ('path', 'source', 'user', 'group'):
                 v = fix_str_value(d, k)
             if k in ('chunks', 'chunks_healthy'):

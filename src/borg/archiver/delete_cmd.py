@@ -23,9 +23,9 @@ class DeleteMixIn:
         archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
         if not archive_names:
             return self.exit_code
-        if args.glob_archives is None and args.first == 0 and args.last == 0:
+        if args.match_archives is None and args.first == 0 and args.last == 0:
             self.print_error(
-                "Aborting: if you really want to delete all archives, please use -a '*' "
+                "Aborting: if you really want to delete all archives, please use -a 'sh:*' "
                 "or just delete the whole repository (might be much faster)."
             )
             return EXIT_ERROR
@@ -114,8 +114,8 @@ class DeleteMixIn:
         that is how much your repository will shrink.
         Please note that the "All archives" stats refer to the state after deletion.
 
-        You can delete multiple archives by specifying a matching shell pattern,
-        using the ``--glob-archives GLOB`` option (for more info on these patterns,
+        You can delete multiple archives by specifying a matching pattern,
+        using the ``--match-archives PATTERN`` option (for more info on these patterns,
         see :ref:`borg_patterns`).
 
         Always first use ``--dry-run --list`` to see what would be deleted.

@@ -8,6 +8,7 @@ import pytest
 from ..patterns import PathFullPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, RegexPattern
 from ..patterns import load_exclude_file, load_pattern_file
 from ..patterns import parse_pattern, PatternMatcher
+from ..patterns import get_regex_from_pattern
 
 
 def check_patterns(files, pattern, expected):
@@ -617,3 +618,18 @@ def test_pattern_matcher():
     assert pm.match("z") == "B"
 
     assert PatternMatcher(fallback="hey!").fallback == "hey!"
+
+
+@pytest.mark.parametrize(
+    "pattern, regex",
+    [
+        ("foo.bar", r"foo\.bar"),  # default is id:
+        ("id:foo.bar", r"foo\.bar"),
+        ("id:foo?", r"foo\?"),
+        ("re:foo.bar", r"foo.bar"),
+        ("re:.*(fooo?|bar|baz).*", r".*(fooo?|bar|baz).*"),
+        ("sh:foo.*", r"foo\.[^\/]*"),
+    ],
+)
+def test_regex_from_pattern(pattern, regex):
+    assert get_regex_from_pattern(pattern) == regex

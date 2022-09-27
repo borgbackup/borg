@@ -11,12 +11,12 @@ from .logger import create_logger
 
 logger = create_logger()
 
-from .helpers import shellpattern
 from .constants import *  # NOQA
 from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex
 from .helpers.time import parse_timestamp
 from .helpers.errors import Error
+from .patterns import get_regex_from_pattern
 from .repoobj import RepoObj
 
 
@@ -74,12 +74,20 @@ class Archives(abc.MutableMapping):
         del self._archives[name]
 
     def list(
-        self, *, glob=None, match_end=r"\Z", sort_by=(), consider_checkpoints=True, first=None, last=None, reverse=False
+        self,
+        *,
+        match=None,
+        match_end=r"\Z",
+        sort_by=(),
+        consider_checkpoints=True,
+        first=None,
+        last=None,
+        reverse=False
     ):
         """
         Return list of ArchiveInfo instances according to the parameters.
 
-        First match *glob* (considering *match_end*), then *sort_by*.
+        First match *match* (considering *match_end*), then *sort_by*.
         Apply *first* and *last* filters, and then possibly *reverse* the list.
 
         *sort_by* is a list of sort keys applied in reverse order.
@@ -90,7 +98,8 @@ class Archives(abc.MutableMapping):
         """
         if isinstance(sort_by, (str, bytes)):
             raise TypeError("sort_by must be a sequence of str")
-        regex = re.compile(shellpattern.translate(glob or "*", match_end=match_end))
+        regex = get_regex_from_pattern(match or "re:.*")
+        regex = re.compile(regex + match_end)
         archives = [x for x in self.values() if regex.match(x.name) is not None]
         if not consider_checkpoints:
             archives = [x for x in archives if ".checkpoint" not in x.name]
@@ -106,18 +115,18 @@ class Archives(abc.MutableMapping):
 
     def list_considering(self, args):
         """
-        get a list of archives, considering --first/last/prefix/glob-archives/sort/consider-checkpoints cmdline args
+        get a list of archives, considering --first/last/prefix/match-archives/sort/consider-checkpoints cmdline args
         """
         name = getattr(args, "name", None)
         consider_checkpoints = getattr(args, "consider_checkpoints", None)
         if name is not None:
             raise Error(
-                "Giving a specific name is incompatible with options --first, --last, -a / --glob-archives, and --consider-checkpoints."
+                "Giving a specific name is incompatible with options --first, --last, -a / --match-archives, and --consider-checkpoints."
             )
         return self.list(
             sort_by=args.sort_by.split(","),
             consider_checkpoints=consider_checkpoints,
-            glob=args.glob_archives,
+            match=args.match_archives,
             first=args.first,
             last=args.last,
         )

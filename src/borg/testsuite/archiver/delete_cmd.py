@@ -19,7 +19,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "create", "another_test.2", "input")
         self.cmd(f"--repo={self.repository_location}", "extract", "test", "--dry-run")
         self.cmd(f"--repo={self.repository_location}", "extract", "test.2", "--dry-run")
-        self.cmd(f"--repo={self.repository_location}", "delete", "--glob-archives", "another_*")
+        self.cmd(f"--repo={self.repository_location}", "delete", "--match-archives", "sh:another_*")
         self.cmd(f"--repo={self.repository_location}", "delete", "--last", "1")
         self.cmd(f"--repo={self.repository_location}", "delete", "-a", "test")
         self.cmd(f"--repo={self.repository_location}", "extract", "test.2", "--dry-run")

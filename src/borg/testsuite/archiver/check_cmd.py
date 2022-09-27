@@ -39,7 +39,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             "check",
             "-v",
             "--archives-only",
-            "--glob-archives=archive2",
+            "--match-archives=archive2",
             exit_code=0,
         )
         self.assert_not_in("archive1", output)

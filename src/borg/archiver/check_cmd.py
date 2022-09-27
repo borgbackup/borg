@@ -31,9 +31,9 @@ class CheckMixIn:
                 env_var_override="BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
             ):
                 return EXIT_ERROR
-        if args.repo_only and any((args.verify_data, args.first, args.last, args.glob_archives)):
+        if args.repo_only and any((args.verify_data, args.first, args.last, args.match_archives)):
             self.print_error(
-                "--repository-only contradicts --first, --last, -a / --glob-archives " " and --verify-data arguments."
+                "--repository-only contradicts --first, --last, -a / --match-archives and --verify-data arguments."
             )
             return EXIT_ERROR
         if args.repair and args.max_duration:
@@ -55,7 +55,7 @@ class CheckMixIn:
             first=args.first,
             last=args.last,
             sort_by=args.sort_by or "ts",
-            glob=args.glob_archives,
+            match=args.match_archives,
             verify_data=args.verify_data,
             save_space=args.save_space,
         ):

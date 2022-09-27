@@ -410,7 +410,7 @@ class Archiver(
             replace_placeholders.override("now", DatetimeWrapper(args.timestamp))
             replace_placeholders.override("utcnow", DatetimeWrapper(args.timestamp.astimezone(timezone.utc)))
             args.location = args.location.with_timestamp(args.timestamp)
-        for name in "name", "other_name", "newname", "glob_archives", "comment":
+        for name in "name", "other_name", "newname", "match_archives", "comment":
             value = getattr(args, name, None)
             if value is not None:
                 setattr(args, name, replace_placeholders(value))

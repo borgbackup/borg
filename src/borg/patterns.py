@@ -388,3 +388,26 @@ def parse_inclexcl_command(cmd_line_str, fallback=ShellPattern):
         val = parse_pattern(remainder_str, fallback, recurse_dir)
 
     return CmdTuple(val, cmd)
+
+
+def get_regex_from_pattern(pattern: str) -> str:
+    """
+    return a regular expression string corresponding to the given pattern string.
+
+    the allowed pattern types are similar to the ones implemented by PatternBase subclasses,
+    but here we rather do generic string matching, not specialised filesystem paths matching.
+    """
+    if len(pattern) > 2 and pattern[2] == ":" and pattern[:2] in {"sh", "re", "id"}:
+        (style, pattern) = (pattern[:2], pattern[3:])
+    else:
+        (style, pattern) = ("id", pattern)  # "identical" match is the default
+    if style == "sh":
+        # (?ms) (meaning re.MULTILINE and re.DOTALL) are not desired here.
+        regex = shellpattern.translate(pattern, match_end="").removeprefix("(?ms)")
+    elif style == "re":
+        regex = pattern
+    elif style == "id":
+        regex = re.escape(pattern)
+    else:
+        raise NotImplementedError
+    return regex

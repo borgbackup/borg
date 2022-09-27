@@ -86,6 +86,8 @@ cdef class CompressorBase:
         """
         Compress *data* (bytes) and return compression metadata and compressed bytes.
         """
+        if not isinstance(data, bytes):
+            data = bytes(data)  # code below does not work with memoryview
         if self.legacy_mode:
             return None, bytes((self.ID, self.level)) + data
         else:

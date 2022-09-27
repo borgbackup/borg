@@ -468,7 +468,7 @@ def define_common_options(add_common_option):
         metavar="SECONDS",
         dest="lock_wait",
         type=int,
-        default=1,
+        default=int(os.environ.get("BORG_LOCK_WAIT", 1)),
         help="wait at most SECONDS for acquiring a repository/cache lock (default: %(default)d).",
     )
     add_common_option(

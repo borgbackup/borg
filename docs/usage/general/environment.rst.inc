@@ -43,6 +43,9 @@ General:
         So, if you have a all-zero MAC address or other reasons to better externally control the host id, just set this
         environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
         use fqdn@uniqueid.
+    BORG_LOCK_WAIT
+        You can set the default value for the ``--lock-wait`` option with this, so
+        you do not need to give it as a commandline option.
     BORG_LOGGING_CONF
         When set, use the given filename as INI_-style logging configuration.
         A basic example conf can be found at ``docs/misc/logging.conf``.

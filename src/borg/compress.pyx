@@ -491,21 +491,29 @@ class Auto(CompressorBase):
         return self._decide(meta, data)[0]
 
     def compress(self, meta, data):
+        def get_meta(from_meta, to_meta):
+            for key in "ctype", "clevel", "csize":
+                if key in from_meta:
+                    to_meta[key] = from_meta[key]
+
         compressor, (cheap_meta, cheap_compressed_data) = self._decide(dict(meta), data)
         if compressor in (LZ4_COMPRESSOR, NONE_COMPRESSOR):
             # we know that trying to compress with expensive compressor is likely pointless,
             # so we fallback to return the cheap compressed data.
-            return cheap_meta, cheap_compressed_data
+            get_meta(cheap_meta, meta)
+            return meta, cheap_compressed_data
         # if we get here, the decider decided to try the expensive compressor.
         # we also know that the compressed data returned by the decider is lz4 compressed.
         expensive_meta, expensive_compressed_data = compressor.compress(dict(meta), data)
         ratio = len(expensive_compressed_data) / len(cheap_compressed_data)
         if ratio < 0.99:
             # the expensive compressor managed to squeeze the data significantly better than lz4.
-            return expensive_meta, expensive_compressed_data
+            get_meta(expensive_meta, meta)
+            return meta, expensive_compressed_data
         else:
             # otherwise let's just store the lz4 data, which decompresses extremely fast.
-            return cheap_meta, cheap_compressed_data
+            get_meta(cheap_meta, meta)
+            return meta, cheap_compressed_data
 
     def decompress(self, data):
         raise NotImplementedError
@@ -527,6 +535,7 @@ class ObfuscateSize(CompressorBase):
     def __init__(self, level=None, compressor=None, legacy_mode=False):
         super().__init__(level=level, legacy_mode=legacy_mode)  # data will be encrypted, so we can tell the level
         self.compressor = compressor
+        self.level = level
         if level is None:
             pass  # decompression
         elif 1 <= level <= 6:
@@ -557,7 +566,6 @@ class ObfuscateSize(CompressorBase):
 
     def compress(self, meta, data):
         assert not self.legacy_mode  # we never call this in legacy mode
-        meta = dict(meta)  # make a copy, do not modify caller's dict
         meta, compressed_data = self.compressor.compress(meta, data)  # compress data
         compr_size = len(compressed_data)
         assert "csize" in meta, repr(meta)
@@ -568,6 +576,7 @@ class ObfuscateSize(CompressorBase):
         trailer = bytes(addtl_size)
         obfuscated_data = compressed_data + trailer
         meta["csize"] = len(obfuscated_data)  # csize is the overall output size of this "obfuscation compressor"
+        meta["olevel"] = self.level  # remember the obfuscation level, useful for rcompress
         return meta, obfuscated_data  # for borg2 it is enough that we have the payload size in meta["psize"]
 
     def decompress(self, meta, data):

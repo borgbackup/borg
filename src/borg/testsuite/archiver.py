@@ -2992,6 +2992,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert not int(self.cmd('list', self.repository_location + '::test1', 'input/large_file',
                                 '--format', '{unique_chunks}'))
 
+    def test_recreate_fixed_rechunkify(self):
+        with open(os.path.join(self.input_path, 'file'), 'wb') as fd:
+            fd.write(b'a' * 8192)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', '--chunker-params', '7,9,8,128', self.repository_location + '::test', 'input')
+        output = self.cmd('list', self.repository_location + '::test', 'input/file',
+                          '--format', '{num_chunks}')
+        num_chunks = int(output)
+        assert num_chunks > 2
+        self.cmd('recreate', self.repository_location, '--chunker-params', 'fixed,4096')
+        output = self.cmd('list', self.repository_location + '::test', 'input/file',
+                          '--format', '{num_chunks}')
+        num_chunks = int(output)
+        assert num_chunks == 2
+
     def test_recreate_recompress(self):
         self.create_regular_file('compressible', size=10000)
         self.cmd('init', '--encryption=repokey', self.repository_location)

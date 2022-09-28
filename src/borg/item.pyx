@@ -1,6 +1,9 @@
 import stat
 from collections import namedtuple
 
+from libc.string cimport memcmp
+from cpython.bytes cimport PyBytes_AsStringAndSize
+
 from .constants import ITEM_KEYS, ARCHIVE_KEYS
 from .helpers import StableDict
 from .helpers import format_file_size
@@ -719,33 +722,35 @@ class ItemDiff:
         return chunks_contents_equal(chunk_iterator1, chunk_iterator2)
 
 
-def chunks_contents_equal(chunks1, chunks2):
+def chunks_contents_equal(chunks_a, chunks_b):
     """
     Compare chunk content and return True if they are identical.
 
     The chunks must be given as chunk iterators (like returned by :meth:`.DownloadPipeline.fetch_many`).
     """
+    cdef:
+        bytes a, b
+        char * ap
+        char * bp
+        Py_ssize_t slicelen = 0
+        Py_ssize_t alen = 0
+        Py_ssize_t blen = 0
 
-    end = object()
-    alen = ai = 0
-    blen = bi = 0
     while True:
-        if not alen - ai:
-            a = next(chunks1, end)
-            if a is end:
-                return not blen - bi and next(chunks2, end) is end
-            a = memoryview(a)
-            alen = len(a)
-            ai = 0
-        if not blen - bi:
-            b = next(chunks2, end)
-            if b is end:
-                return not alen - ai and next(chunks1, end) is end
-            b = memoryview(b)
-            blen = len(b)
-            bi = 0
-        slicelen = min(alen - ai, blen - bi)
-        if a[ai:ai + slicelen] != b[bi:bi + slicelen]:
+        if not alen:
+            a = next(chunks_a, None)
+            if a is None:
+                return not blen and next(chunks_b, None) is None
+            PyBytes_AsStringAndSize(a, &ap, &alen)
+        if not blen:
+            b = next(chunks_b, None)
+            if b is None:
+                return not alen and next(chunks_a, None) is None
+            PyBytes_AsStringAndSize(b, &bp, &blen)
+        slicelen = min(alen, blen)
+        if memcmp(ap, bp, slicelen) != 0:
             return False
-        ai += slicelen
-        bi += slicelen
+        ap += slicelen
+        bp += slicelen
+        alen -= slicelen
+        blen -= slicelen

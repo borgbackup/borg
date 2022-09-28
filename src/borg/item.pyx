@@ -114,7 +114,7 @@ def want_str(v, *, errors='surrogateescape'):
     return v
 
 
-class PropDict:
+cdef class PropDict:
     """
     Manage a dictionary via properties.
 
@@ -134,11 +134,11 @@ class PropDict:
     then use eg. Item(internal_dict={...}). This does not validate the keys, therefore unknown keys
     are ignored instead of causing an error.
     """
-    VALID_KEYS = None  # override with <set of str> in child class
+    VALID_KEYS = frozenset()  # override with <set of str> in child class
 
-    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
+    cdef object _dict
 
-    def __init__(self, data_dict=None, internal_dict=None, **kw):
+    def __cinit__(self, data_dict=None, internal_dict=None, **kw):
         self._dict = {}
         if internal_dict is None:
             pass  # nothing to do
@@ -193,46 +193,59 @@ class PropDict:
         """get value for key, return default if key does not exist"""
         return getattr(self, self._check_key(key), default)
 
-    @staticmethod
-    def _make_property(key, value_type, value_type_name=None, encode=None, decode=None):
-        """return a property that deals with self._dict[key]"""
-        assert isinstance(key, str)
-        if value_type_name is None:
-            value_type_name = value_type.__name__
-        doc = "%s (%s)" % (key, value_type_name)
-        type_error_msg = "%s value must be %s" % (key, value_type_name)
-        attr_error_msg = "attribute %s not found" % key
 
-        def _get(self):
-            try:
-                value = self._dict[key]
-            except KeyError:
-                raise AttributeError(attr_error_msg) from None
-            if decode is not None:
-                value = decode(value)
-            if not isinstance(value, value_type):
-                raise TypeError(type_error_msg)
-            return value
+cdef class PropDictProperty:
+    """return a property that deals with self._dict[key] of  PropDict"""
+    cpdef readonly str key
+    cpdef readonly object value_type
+    cdef str value_type_name
+    cpdef readonly str __doc__
+    cdef object encode
+    cdef object decode
+    cdef str type_error_msg
+    cdef str attr_error_msg
 
-        def _set(self, value):
-            if not isinstance(value, value_type):
-                raise TypeError(type_error_msg)
-            if encode is not None:
-                value = encode(value)
-            self._dict[key] = value
+    def __cinit__(self, value_type, value_type_name=None, encode=None, decode=None):
+       self.key = None
+       self.value_type = value_type
+       self.value_type_name = value_type_name if value_type_name is not None else value_type.__name__
+       self.encode = encode
+       self.decode = decode
 
-        def _del(self):
-            try:
-                del self._dict[key]
-            except KeyError:
-                raise AttributeError(attr_error_msg) from None
+    def __get__(self, PropDict instance, owner):
+        try:
+            value = instance._dict[self.key]
+        except KeyError:
+            raise AttributeError(self.attr_error_msg) from None
+        if self.decode is not None:
+            value = self.decode(value)
+        if not isinstance(value, self.value_type):
+            raise TypeError(self.type_error_msg)
+        return value
 
-        return property(_get, _set, _del, doc=doc)
+    def __set__(self, PropDict instance, value):
+        if not isinstance(value, self.value_type):
+            raise TypeError(self.type_error_msg)
+        if self.encode is not None:
+            value = self.encode(value)
+        instance._dict[self.key] = value
+
+    def __delete__(self, PropDict instance):
+        try:
+            del instance._dict[self.key]
+        except KeyError:
+            raise AttributeError(self.attr_error_msg) from None
+
+    cpdef __set_name__(self, name):
+       self.key = name
+       self.__doc__ = "%s (%s)" % (name, self.value_type_name)
+       self.type_error_msg = "%s value must be %s" % (name, self.value_type_name)
+       self.attr_error_msg = "attribute %s not found" % name
 
 
 ChunkListEntry = namedtuple('ChunkListEntry', 'id size')
 
-class Item(PropDict):
+cdef class Item(PropDict):
     """
     Item abstraction that deals with validation and the low-level details internally:
 
@@ -244,48 +257,46 @@ class Item(PropDict):
     If an Item shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', }  # str-typed keys
-
-    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
+    VALID_KEYS = ITEM_KEYS | {'deleted', 'nlink', }
 
     # properties statically defined, so that IDEs can know their names:
 
-    path = PropDict._make_property('path', str, 'surrogate-escaped str')
-    source = PropDict._make_property('source', str, 'surrogate-escaped str')
-    user = PropDict._make_property('user', str, 'surrogate-escaped str')
-    group = PropDict._make_property('group', str, 'surrogate-escaped str')
+    path = PropDictProperty(str, 'surrogate-escaped str')
+    source = PropDictProperty(str, 'surrogate-escaped str')
+    user = PropDictProperty(str, 'surrogate-escaped str')
+    group = PropDictProperty(str, 'surrogate-escaped str')
 
-    acl_access = PropDict._make_property('acl_access', bytes)
-    acl_default = PropDict._make_property('acl_default', bytes)
-    acl_extended = PropDict._make_property('acl_extended', bytes)
-    acl_nfs4 = PropDict._make_property('acl_nfs4', bytes)
+    acl_access = PropDictProperty(bytes)
+    acl_default = PropDictProperty(bytes)
+    acl_extended = PropDictProperty(bytes)
+    acl_nfs4 = PropDictProperty(bytes)
 
-    mode = PropDict._make_property('mode', int)
-    uid = PropDict._make_property('uid', int)
-    gid = PropDict._make_property('gid', int)
-    rdev = PropDict._make_property('rdev', int)
-    bsdflags = PropDict._make_property('bsdflags', int)
+    mode = PropDictProperty(int)
+    uid = PropDictProperty(int)
+    gid = PropDictProperty(int)
+    rdev = PropDictProperty(int)
+    bsdflags = PropDictProperty(int)
 
-    atime = PropDict._make_property('atime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
-    ctime = PropDict._make_property('ctime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
-    mtime = PropDict._make_property('mtime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
-    birthtime = PropDict._make_property('birthtime', int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
+    atime = PropDictProperty(int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
+    ctime = PropDictProperty(int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
+    mtime = PropDictProperty(int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
+    birthtime = PropDictProperty(int, 'int (ns)', encode=int_to_timestamp, decode=timestamp_to_int)
 
     # size is only present for items with a chunk list and then it is sum(chunk_sizes)
-    size = PropDict._make_property('size', int)
+    size = PropDictProperty(int)
 
-    hlid = PropDict._make_property('hlid', bytes)  # hard link id: same value means same hard link.
-    hardlink_master = PropDict._make_property('hardlink_master', bool)  # legacy
+    hlid = PropDictProperty(bytes)  # hard link id: same value means same hard link.
+    hardlink_master = PropDictProperty(bool)  # legacy
 
-    chunks = PropDict._make_property('chunks', list, 'list')
-    chunks_healthy = PropDict._make_property('chunks_healthy', list, 'list')
+    chunks = PropDictProperty(list, 'list')
+    chunks_healthy = PropDictProperty(list, 'list')
 
-    xattrs = PropDict._make_property('xattrs', StableDict)
+    xattrs = PropDictProperty(StableDict)
 
-    deleted = PropDict._make_property('deleted', bool)
-    nlink = PropDict._make_property('nlink', int)
+    deleted = PropDictProperty(bool)
+    nlink = PropDictProperty(int)
 
-    part = PropDict._make_property('part', int)
+    part = PropDictProperty(int)
 
     def get_size(self, *, memorize=False, from_chunks=False, consider_ids=None):
         """
@@ -393,7 +404,7 @@ class Item(PropDict):
             self._dict[k] = v
 
 
-class EncryptedKey(PropDict):
+cdef class EncryptedKey(PropDict):
     """
     EncryptedKey abstraction that deals with validation and the low-level details internally:
 
@@ -408,18 +419,16 @@ class EncryptedKey(PropDict):
     VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data',
                   'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism', 'argon2_type'}
 
-    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
-
-    version = PropDict._make_property('version', int)
-    algorithm = PropDict._make_property('algorithm', str)
-    iterations = PropDict._make_property('iterations', int)
-    salt = PropDict._make_property('salt', bytes)
-    hash = PropDict._make_property('hash', bytes)
-    data = PropDict._make_property('data', bytes)
-    argon2_time_cost = PropDict._make_property('argon2_time_cost', int)
-    argon2_memory_cost = PropDict._make_property('argon2_memory_cost', int)
-    argon2_parallelism = PropDict._make_property('argon2_parallelism', int)
-    argon2_type = PropDict._make_property('argon2_type', str)
+    version = PropDictProperty(int)
+    algorithm = PropDictProperty(str)
+    iterations = PropDictProperty(int)
+    salt = PropDictProperty(bytes)
+    hash = PropDictProperty(bytes)
+    data = PropDictProperty(bytes)
+    argon2_time_cost = PropDictProperty(int)
+    argon2_memory_cost = PropDictProperty(int)
+    argon2_parallelism = PropDictProperty(int)
+    argon2_type = PropDictProperty(str)
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
@@ -434,7 +443,7 @@ class EncryptedKey(PropDict):
             self._dict[k] = v
 
 
-class Key(PropDict):
+cdef class Key(PropDict):
     """
     Key abstraction that deals with validation and the low-level details internally:
 
@@ -446,16 +455,14 @@ class Key(PropDict):
     If a Key shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = {'version', 'repository_id', 'crypt_key', 'id_key', 'chunk_seed', 'tam_required'}  # str-typed keys
+    VALID_KEYS = {'version', 'repository_id', 'crypt_key', 'id_key', 'chunk_seed', 'tam_required'}
 
-    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
-
-    version = PropDict._make_property('version', int)
-    repository_id = PropDict._make_property('repository_id', bytes)
-    crypt_key = PropDict._make_property('crypt_key', bytes)
-    id_key = PropDict._make_property('id_key', bytes)
-    chunk_seed = PropDict._make_property('chunk_seed', int)
-    tam_required = PropDict._make_property('tam_required', bool)
+    version = PropDictProperty(int)
+    repository_id = PropDictProperty(bytes)
+    crypt_key = PropDictProperty(bytes)
+    id_key = PropDictProperty(bytes)
+    chunk_seed = PropDictProperty(int)
+    tam_required = PropDictProperty(bool)
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
@@ -472,7 +479,7 @@ class Key(PropDict):
             assert len(k) in (32 + 32, 32 + 128)  # 256+256 or 256+1024 bits
             self._dict['crypt_key'] = k
 
-class ArchiveItem(PropDict):
+cdef class ArchiveItem(PropDict):
     """
     ArchiveItem abstraction that deals with validation and the low-level details internally:
 
@@ -484,30 +491,28 @@ class ArchiveItem(PropDict):
     If a ArchiveItem shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = ARCHIVE_KEYS  # str-typed keys
+    VALID_KEYS = ARCHIVE_KEYS
 
-    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
-
-    version = PropDict._make_property('version', int)
-    name = PropDict._make_property('name', str, 'surrogate-escaped str')
-    items = PropDict._make_property('items', list)  # list of chunk ids of item metadata stream (only in memory)
-    item_ptrs = PropDict._make_property('item_ptrs', list)  # list of blocks with list of chunk ids of ims, arch v2
-    cmdline = PropDict._make_property('cmdline', list)  # list of s-e-str
-    hostname = PropDict._make_property('hostname', str, 'surrogate-escaped str')
-    username = PropDict._make_property('username', str, 'surrogate-escaped str')
-    time = PropDict._make_property('time', str)
-    time_end = PropDict._make_property('time_end', str)
-    comment = PropDict._make_property('comment', str, 'surrogate-escaped str')
-    chunker_params = PropDict._make_property('chunker_params', tuple)
-    recreate_cmdline = PropDict._make_property('recreate_cmdline', list)  # list of s-e-str
+    version = PropDictProperty(int)
+    name = PropDictProperty(str, 'surrogate-escaped str')
+    items = PropDictProperty(list)  # list of chunk ids of item metadata stream (only in memory)
+    item_ptrs = PropDictProperty(list)  # list of blocks with list of chunk ids of ims, arch v2
+    cmdline = PropDictProperty(list)  # list of s-e-str
+    hostname = PropDictProperty(str, 'surrogate-escaped str')
+    username = PropDictProperty(str, 'surrogate-escaped str')
+    time = PropDictProperty(str)
+    time_end = PropDictProperty(str)
+    comment = PropDictProperty(str, 'surrogate-escaped str')
+    chunker_params = PropDictProperty(tuple)
+    recreate_cmdline = PropDictProperty(list)  # list of s-e-str
     # recreate_source_id, recreate_args, recreate_partial_chunks were used in 1.1.0b1 .. b2
-    recreate_source_id = PropDict._make_property('recreate_source_id', bytes)
-    recreate_args = PropDict._make_property('recreate_args', list)  # list of s-e-str
-    recreate_partial_chunks = PropDict._make_property('recreate_partial_chunks', list)  # list of tuples
-    size = PropDict._make_property('size', int)
-    nfiles = PropDict._make_property('nfiles', int)
-    size_parts = PropDict._make_property('size_parts', int)
-    nfiles_parts = PropDict._make_property('nfiles_parts', int)
+    recreate_source_id = PropDictProperty(bytes)
+    recreate_args = PropDictProperty(list)  # list of s-e-str
+    recreate_partial_chunks = PropDictProperty(list)  # list of tuples
+    size = PropDictProperty(int)
+    nfiles = PropDictProperty(int)
+    size_parts = PropDictProperty(int)
+    nfiles_parts = PropDictProperty(int)
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
@@ -530,7 +535,7 @@ class ArchiveItem(PropDict):
             self._dict[k] = v
 
 
-class ManifestItem(PropDict):
+cdef class ManifestItem(PropDict):
     """
     ManifestItem abstraction that deals with validation and the low-level details internally:
 
@@ -542,15 +547,13 @@ class ManifestItem(PropDict):
     If a ManifestItem shall be serialized, give as_dict() method output to msgpack packer.
     """
 
-    VALID_KEYS = {'version', 'archives', 'timestamp', 'config', 'item_keys', }  # str-typed keys
+    VALID_KEYS = {'version', 'archives', 'timestamp', 'config', 'item_keys', }
 
-    __slots__ = ("_dict", )  # avoid setting attributes not supported by properties
-
-    version = PropDict._make_property('version', int)
-    archives = PropDict._make_property('archives', dict, 'dict of str -> dict')  # name -> dict
-    timestamp = PropDict._make_property('timestamp', str)
-    config = PropDict._make_property('config', dict)
-    item_keys = PropDict._make_property('item_keys', tuple, 'tuple of str')
+    version = PropDictProperty(int)
+    archives = PropDictProperty(dict, 'dict of str -> dict')  # name -> dict
+    timestamp = PropDictProperty(str)
+    config = PropDictProperty(dict)
+    item_keys = PropDictProperty(tuple, 'tuple of str')
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
@@ -594,6 +597,18 @@ class ManifestItem(PropDict):
             if k == 'item_keys':
                 v = fix_tuple_of_str(v)
             self._dict[k] = v
+
+
+cpdef _init_names():
+    """
+    re-implements python __set_name__
+    """
+    for cls in PropDict.__subclasses__():
+        for name, value in vars(cls).items():
+            if isinstance(value, PropDictProperty):
+                value.__set_name__(name)
+
+_init_names()
 
 
 class ItemDiff:

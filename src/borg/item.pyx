@@ -196,10 +196,10 @@ cdef class PropDict:
 
 cdef class PropDictProperty:
     """return a property that deals with self._dict[key] of  PropDict"""
-    cpdef readonly str key
-    cpdef readonly object value_type
+    cdef readonly str key
+    cdef readonly object value_type
     cdef str value_type_name
-    cpdef readonly str __doc__
+    cdef readonly str __doc__
     cdef object encode
     cdef object decode
     cdef str type_error_msg

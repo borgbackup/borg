@@ -12,8 +12,9 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0b2 (2022-09-10)
-----------------------------
+Version 2.0.0b3 (not released yet)
+----------------------------------
+
 Please note:
 
 This is a beta release, only for testing - do not use for production repos.
@@ -81,6 +82,43 @@ Compatibility notes:
   - removed --numeric-owner (use --numeric-ids)
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
+- the --glob-archives option was renamed to --match-archives (the short option
+  name -a is unchanged) and extended to support different pattern styles:
+
+  - id: for identical string match (this is the new default!)
+  - sh: for shell pattern / globbing match (this was used by --glob-archives)
+  - re: for regular expression match
+
+  So you might need to edit your scripts like e.g.::
+
+      borg 1.x: --glob-archives 'myserver-*'
+      borg 2.0: --match-archives 'sh:myserver-*'
+
+
+Fixes:
+
+- transfer: fix user/group == None crash with borg1 archives
+- compressors: avoid memoryview related TypeError
+- check: fix uninitialised variable if repo is completely empty, #7034
+- do not use version_tuple placeholder in setuptools_scm template, #7024.
+
+New features:
+
+- rcompress: do a repo-wide (re)compression
+- implement pattern support for --match-archives, #6504
+- BORG_LOCK_WAIT=n env var to set default for --lock-wait option, #5279
+
+Other:
+
+- repository.scan: misc. fixes / improvements
+- metadata: differentiate between empty/zero and unknown, #6908
+- CI: test pyfuse3 with python 3.11
+- use more relative imports
+- make borg.testsuite.archiver a package, split archiver tests into many modules
+
+
+Version 2.0.0b2 (2022-09-10)
+----------------------------
 
 Bug fixes:
 

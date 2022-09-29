@@ -79,7 +79,7 @@ def fix_tuple_of_str(v):
 
 
 def fix_tuple_of_str_and_int(v):
-    """make sure we have a tuple of str"""
+    """make sure we have a tuple of str or int"""
     assert isinstance(v, (tuple, list))
     t = tuple(e.decode() if isinstance(e, bytes) else e for e in v)
     assert all(isinstance(e, (str, int)) for e in t), repr(t)
@@ -127,11 +127,11 @@ cdef class PropDict:
     - be safe against typos in key names: check against VALID_KEYS
     - when setting a value: check type of value
 
-    When "packing" a dict, ie. you have a dict with some data and want to convert it into an instance,
-    then use eg. Item({'a': 1, ...}). This way all keys in your dictionary are validated.
+    When "packing" a dict, i.e. you have a dict with some data and want to convert it into an instance,
+    then use e.g. Item({'a': 1, ...}). This way all keys in your dictionary are validated.
 
-    When "unpacking", that is you've read a dictionary with some data from somewhere (eg. msgpack),
-    then use eg. Item(internal_dict={...}). This does not validate the keys, therefore unknown keys
+    When "unpacking", that is you've read a dictionary with some data from somewhere (e.g. msgpack),
+    then use e.g. Item(internal_dict={...}). This does not validate the keys, therefore unknown keys
     are ignored instead of causing an error.
     """
     VALID_KEYS = frozenset()  # override with <set of str> in child class
@@ -195,7 +195,7 @@ cdef class PropDict:
 
 
 cdef class PropDictProperty:
-    """return a property that deals with self._dict[key] of  PropDict"""
+    """return a property that deals with self._dict[key] of PropDict"""
     cdef readonly str key
     cdef readonly object value_type
     cdef str value_type_name
@@ -658,7 +658,7 @@ class ItemDiff:
     def __repr__(self):
         if self.equal:
             return 'equal'
-        return ' '.join(str for d,str in self._changes)
+        return ' '.join(str for d, str in self._changes)
 
     def _equal(self, chunk_iterator1, chunk_iterator2):
         # if both are deleted, there is nothing at path regardless of what was deleted

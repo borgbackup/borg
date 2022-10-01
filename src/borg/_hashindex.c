@@ -638,6 +638,8 @@ write_hashheader(HashIndex *index, PyObject *file_py)
     PyObject *length_object, *tmp;
     Py_ssize_t length;
 
+    _Static_assert(sizeof(HashHeader) == 1024, "HashHeader struct should be exactly 1024 bytes in size");
+
     HashHeader header = {
         .magic = MAGIC,
         .version = _htole32(2),
@@ -645,7 +647,8 @@ write_hashheader(HashIndex *index, PyObject *file_py)
         .num_buckets = _htole32(index->num_buckets),
         .num_empty = _htole32(index->num_empty),
         .key_size = _htole32(index->key_size),
-        .value_size = _htole32(index->value_size)
+        .value_size = _htole32(index->value_size),
+        .reserved = {0}
     };
 
     length_object = PyObject_CallMethod(file_py, "write", "y#", &header, (Py_ssize_t)sizeof(header));

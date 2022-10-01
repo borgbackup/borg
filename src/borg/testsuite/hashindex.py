@@ -618,7 +618,7 @@ class IndexCorruptionTestCase(BaseTestCase):
         for y in range(700):  # stay below max load to not trigger resize
             idx[HH(0, y, 0)] = (0, y, 0)
 
-        assert idx.size() == 1031 * 48 + 1024  # 1031 buckets + header
+        assert idx.size() == 1024 + 1031 * 48  # header + 1031 buckets
 
         # delete lots of the collisions, creating lots of tombstones
         for y in range(400):  # stay above min load to not trigger resize

@@ -689,11 +689,10 @@ hashindex_write(HashIndex *index, PyObject *file_py, int legacy)
     Py_ssize_t length;
     Py_ssize_t buckets_length = (Py_ssize_t)index->num_buckets * index->bucket_size;
 
-    if (legacy)
-        1 / 0;  // guess we do not write old hashindexes
-    else
-        if(!write_hashheader(index, file_py))
-            return;
+    assert(!legacy);  // we do not ever write legacy hashindexes
+
+    if(!write_hashheader(index, file_py))
+        return;
 
     /* Note: explicitly construct view; BuildValue can convert (pointer, length) to Python objects, but copies them for doing so */
     buckets_view = PyMemoryView_FromMemory((char*)index->buckets, buckets_length, PyBUF_READ);

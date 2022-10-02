@@ -322,7 +322,7 @@ class ChunkBuffer:
         self.packer = msgpack.Packer()
         self.chunks = []
         self.key = key
-        self.chunker = get_chunker(*chunker_params, seed=self.key.chunk_seed)
+        self.chunker = get_chunker(*chunker_params, seed=self.key.chunk_seed, sparse=False)
 
     def add(self, item):
         self.buffer.write(self.packer.pack(item.as_dict()))
@@ -2380,7 +2380,7 @@ class ArchiveRecreater:
             checkpoint_interval=self.checkpoint_interval,
             rechunkify=target.recreate_rechunkify,
         ).process_file_chunks
-        target.chunker = get_chunker(*target.chunker_params, seed=self.key.chunk_seed)
+        target.chunker = get_chunker(*target.chunker_params, seed=self.key.chunk_seed, sparse=False)
         return target
 
     def create_target_archive(self, name):

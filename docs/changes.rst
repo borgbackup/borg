@@ -100,11 +100,12 @@ Fixes:
 - transfer: fix user/group == None crash with borg1 archives
 - compressors: avoid memoryview related TypeError
 - check: fix uninitialised variable if repo is completely empty, #7034
-- do not use version_tuple placeholder in setuptools_scm template, #7024.
+- do not use version_tuple placeholder in setuptools_scm template, #7024
+- get_chunker: fix missing sparse=False argument, #7056
 
 New features:
 
-- rcompress: do a repo-wide (re)compression
+- rcompress: do a repo-wide (re)compression, #7037
 - implement pattern support for --match-archives, #6504
 - BORG_LOCK_WAIT=n env var to set default for --lock-wait option, #5279
 
@@ -115,6 +116,10 @@ Other:
 - CI: test pyfuse3 with python 3.11
 - use more relative imports
 - make borg.testsuite.archiver a package, split archiver tests into many modules
+- support reading new, improved hashindex header format, #6960.
+  added version number and num_empty to the HashHeader, fixed alignment.
+- vagrant: upgrade pyinstaller 4.10 -> 5.4.1, use python 3.9.14 for binary build
+- item.pyx: use more Cython (faster, uses less memory), #5763
 
 
 Version 2.0.0b2 (2022-09-10)

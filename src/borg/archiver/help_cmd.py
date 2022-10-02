@@ -262,6 +262,7 @@ class HelpMixIn:
             This is very powerful, but can also get rather complicated.
 
         Examples::
+
             # id: style
             borg delete --match-archives 'id:archive-with-crap'
             borg delete -a 'id:archive-with-crap'  # same, using short option

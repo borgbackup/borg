@@ -49,7 +49,7 @@ borg prune
     +-----------------------------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------+
     | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                       |
     +-----------------------------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a GLOB``, ``--glob-archives GLOB``             | only consider archive names matching the glob. sh: rules apply, see "borg help patterns".       |
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN``      | only consider archive names matching the pattern. see "borg help match-archives".               |
     +-----------------------------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------+
 
     .. raw:: html
@@ -85,7 +85,7 @@ borg prune
         |
 
     Archive filters
-        -a GLOB, --glob-archives GLOB     only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
+        -a PATTERN, --match-archives PATTERN     only consider archive names matching the pattern. see "borg help match-archives".
 
 
 Description
@@ -106,7 +106,7 @@ behind by interrupted backup runs) except if the checkpoint is the latest
 archive (and thus still needed). Checkpoint archives are not considered when
 comparing archive counts against the retention limits (``--keep-X``).
 
-If you use --glob-archives (-a), then only archives that match the GLOB are
+If you use --match-archives (-a), then only archives that match the pattern are
 considered for deletion and only those archives count towards the totals
 specified by the rules.
 Otherwise, *all* archives in the repository are candidates for deletion!
@@ -115,7 +115,7 @@ contents. These need to be distinguished by specifying matching globs.
 
 If you have multiple sequences of archives with different data sets (e.g.
 from different machines) in one shared repository, use one prune call per
-data set that matches only the respective archives using the --glob-archives
+data set that matches only the respective archives using the --match-archives
 (-a) option.
 
 The ``--keep-within`` option takes an argument of the form "<int><char>",

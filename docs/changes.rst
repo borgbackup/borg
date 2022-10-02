@@ -12,8 +12,8 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0b3 (not released yet)
-----------------------------------
+Version 2.0.0b3 (2022-10-02)
+----------------------------
 
 Please note:
 

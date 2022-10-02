@@ -154,6 +154,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             )
         )
 
+    def test_recreate_fixed_rechunkify(self):
+        with open(os.path.join(self.input_path, "file"), "wb") as fd:
+            fd.write(b"a" * 8192)
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        self.cmd(f"--repo={self.repository_location}", "create", "test", "input", "--chunker-params", "7,9,8,128")
+        output = self.cmd(
+            f"--repo={self.repository_location}", "list", "test", "input/file", "--format", "{num_chunks}"
+        )
+        num_chunks = int(output)
+        assert num_chunks > 2
+        self.cmd(f"--repo={self.repository_location}", "recreate", "--chunker-params", "fixed,4096")
+        output = self.cmd(
+            f"--repo={self.repository_location}", "list", "test", "input/file", "--format", "{num_chunks}"
+        )
+        num_chunks = int(output)
+        assert num_chunks == 2
+
     def test_recreate_recompress(self):
         self.create_regular_file("compressible", size=10000)
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)

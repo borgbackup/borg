@@ -11,6 +11,7 @@ if sys.platform.startswith("win32"):
     os.environ["PATH"] = os.pathsep.join(dll_path) + os.pathsep + os.environ["PATH"]
 
 
-from .archiver import main
+# note: absolute import from "borg", it seems pyinstaller binaries do not work without this.
+from borg.archiver import main
 
 main()

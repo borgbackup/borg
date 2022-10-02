@@ -37,7 +37,7 @@ borg delete
     +-----------------------------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
     | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                        |
     +-----------------------------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a GLOB``, ``--glob-archives GLOB``             | only consider archive names matching the glob. sh: rules apply, see "borg help patterns".        |
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN``      | only consider archive names matching the pattern. see "borg help match-archives".                |
     +-----------------------------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
     |                                                                             | ``--sort-by KEYS``                                | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp |
     +-----------------------------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
@@ -73,10 +73,10 @@ borg delete
         |
 
     Archive filters
-        -a GLOB, --glob-archives GLOB     only consider archive names matching the glob. sh: rules apply, see "borg help patterns".
-        --sort-by KEYS                    Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
-        --first N                         consider first N archives after other filters were applied
-        --last N                          consider last N archives after other filters were applied
+        -a PATTERN, --match-archives PATTERN     only consider archive names matching the pattern. see "borg help match-archives".
+        --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+        --first N                                consider first N archives after other filters were applied
+        --last N                                 consider last N archives after other filters were applied
 
 
 Description
@@ -94,8 +94,8 @@ deleted - the "Deleted data" deduplicated size there is most interesting as
 that is how much your repository will shrink.
 Please note that the "All archives" stats refer to the state after deletion.
 
-You can delete multiple archives by specifying a matching shell pattern,
-using the ``--glob-archives GLOB`` option (for more info on these patterns,
+You can delete multiple archives by specifying a matching pattern,
+using the ``--match-archives PATTERN`` option (for more info on these patterns,
 see :ref:`borg_patterns`).
 
 Always first use ``--dry-run --list`` to see what would be deleted.

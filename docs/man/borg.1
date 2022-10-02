@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2022-09-10" "" "borg backup tool"
+.TH "BORG" 1 "2022-10-02" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -416,6 +416,10 @@ that case it returns a random value, which is not what we want (because it kills
 So, if you have a all\-zero MAC address or other reasons to better externally control the host id, just set this
 environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
 use \fI\%fqdn@uniqueid\fP\&.
+.TP
+.B BORG_LOCK_WAIT
+You can set the default value for the \fB\-\-lock\-wait\fP option with this, so
+you do not need to give it as a commandline option.
 .TP
 .B BORG_LOGGING_CONF
 When set, use the given filename as \fI\%INI\fP\-style logging configuration.

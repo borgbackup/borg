@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RECREATE" 1 "2022-09-10" "" "borg backup tool"
+.TH "BORG-RECREATE" 1 "2022-10-02" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .SH SYNOPSIS
@@ -135,8 +135,8 @@ if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit 
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq.
+.BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
+only consider archive names matching the pattern. see \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

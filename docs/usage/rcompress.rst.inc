@@ -69,7 +69,7 @@ slower progress due to higher overhead (and vice versa).
 Please note that this command can not work in low (or zero) free disk space
 conditions.
 
-If the ``borg rcompress``process receives a SIGINT signal (Ctrl-C), the repo
+If the ``borg rcompress`` process receives a SIGINT signal (Ctrl-C), the repo
 will be committed and compacted and borg will terminate cleanly afterwards.
 
 Both ``--progress`` and ``--stats`` are recommended when ``borg rcompress``

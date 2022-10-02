@@ -108,15 +108,21 @@ class TestCacheSynchronizer:
 
     def make_index_with_refcount(self, refcount):
         index_data = io.BytesIO()
-        index_data.write(b"BORG_IDX")
+        index_data.write(b"BORG2IDX")
+        # version
+        index_data.write((2).to_bytes(4, "little"))
         # num_entries
         index_data.write((1).to_bytes(4, "little"))
         # num_buckets
         index_data.write((1).to_bytes(4, "little"))
+        # num_empty
+        index_data.write((0).to_bytes(4, "little"))
         # key_size
-        index_data.write((32).to_bytes(1, "little"))
+        index_data.write((32).to_bytes(4, "little"))
         # value_size
-        index_data.write((3 * 4).to_bytes(1, "little"))
+        index_data.write((3 * 4).to_bytes(4, "little"))
+        # reserved
+        index_data.write(bytes(1024 - 32))
 
         index_data.write(H(0))
         index_data.write(refcount.to_bytes(4, "little"))

@@ -543,9 +543,9 @@ class Repository:
         integrity_data = self._read_integrity(transaction_id, "index")
         try:
             with IntegrityCheckedFile(index_path, write=False, integrity_data=integrity_data) as fd:
-                if variant == "k32_v16":
+                if variant == 2:
                     return NSIndex.read(fd)
-                if variant == "k32_v8":  # legacy
+                if variant == 1:  # legacy
                     return NSIndex1.read(fd)
         except (ValueError, OSError, FileIntegrityError) as exc:
             logger.warning("Repository index missing or corrupted, trying to recover from: %s", exc)

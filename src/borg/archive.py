@@ -1471,7 +1471,6 @@ class FilesystemObjectProcessors:
                         item.chunks = chunks
                     else:
                         with backup_io("read"):
-                            started_chunking = time.monotonic()
                             self.process_file_chunks(
                                 item,
                                 cache,
@@ -1479,7 +1478,7 @@ class FilesystemObjectProcessors:
                                 self.show_progress,
                                 backup_io_iter(self.chunker.chunkify(None, fd)),
                             )
-                            self.stats.chunking_time += time.monotonic() - started_chunking
+                            self.stats.chunking_time = self.chunker.chunking_time
                         if is_win32:
                             changed_while_backup = False  # TODO
                         else:

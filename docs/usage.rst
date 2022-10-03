@@ -39,6 +39,7 @@ Usage
    usage/rcreate
    usage/rlist
    usage/rinfo
+   usage/rcompress
    usage/rdelete
    usage/serve
    usage/compact

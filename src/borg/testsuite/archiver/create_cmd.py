@@ -801,7 +801,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         # Test case set up: create a repository and a file
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        self.create_regular_file("testfile", contents=randbytes(700000))
+        self.create_regular_file("testfile", contents=randbytes(2400000))
         # Archive
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
         chunking_time = extract_chunking_time(result)

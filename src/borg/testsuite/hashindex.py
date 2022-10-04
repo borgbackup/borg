@@ -86,12 +86,12 @@ class HashIndexTestCase(BaseTestCase):
 
     def test_nsindex(self):
         self._generic_test(
-            NSIndex, lambda x: (x, x, x), "7d70671d0b7e9d2f51b2691ecf35184b9f8ecc1202cceb2748c905c8fc04c256"
+            NSIndex, lambda x: (x, x, x), "0d7880dbe02b64f03c471e60e193a1333879b4f23105768b10c9222accfeac5e"
         )
 
     def test_chunkindex(self):
         self._generic_test(
-            ChunkIndex, lambda x: (x, x), "85f72b036c692c8266e4f51ccf0cff2147204282b5e316ae508d30a448d88fef"
+            ChunkIndex, lambda x: (x, x), "5915fcf986da12e5f3ac68e05242b9c729e6101b0460b1d4e4a9e9f7cdf1b7da"
         )
 
     def test_resize(self):
@@ -252,7 +252,7 @@ class HashIndexExtraTestCase(BaseTestCase):
 class HashIndexSizeTestCase(BaseTestCase):
     def test_size_on_disk(self):
         idx = ChunkIndex()
-        assert idx.size() == 18 + 1031 * (32 + 2 * 4)
+        assert idx.size() == 1024 + 1031 * (32 + 2 * 4)
 
     def test_size_on_disk_accurate(self):
         idx = ChunkIndex()
@@ -368,12 +368,12 @@ class HashIndexRefcountingTestCase(BaseTestCase):
 
 
 class HashIndexDataTestCase(BaseTestCase):
-    # This bytestring was created with borg2-pre 2022-06-10
+    # This bytestring was created with borg2-pre 2022-09-30
     HASHINDEX = (
-        b"eJzt0LEJg1AYhdE/JqBjOEJMNhBBrAQrO9ewc+HsoG+CPMsEz1cfbnHbceqXoZvvEVE+IuoqMu2pnOE4"
-        b"juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4juM4"
-        b"juM4juM4juM4jruie36vuSVT5N0rzW0n9t7r5z9+4TiO4ziO4ziO4ziO4ziO4ziO4ziO4ziO4ziO4ziO"
-        b"4ziO4ziO4ziO4ziO4ziO437LHbSVHGw="
+        b"eJzt0DEKgwAMQNFoBXsMj9DqDUQoToKTR3Hzwr2DZi+0HS19HwIZHhnST/OjHYeljIhLTl1FVDlN7te"
+        b"Q9M/tGcdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHMdxHM"
+        b"dxHMdxHMdxHMdxHMdxHMdxHPfqbu+7F2nKz67Nc9sX97r1+Rt/4TiO4ziO4ziO4ziO4ziO4ziO4ziO4"
+        b"ziO4ziO4ziO4ziO4ziO4ziO4ziO4ziO487lDoRvHEk="
     )
 
     def _serialize_hashindex(self, idx):
@@ -439,17 +439,23 @@ class HashIndexIntegrityTestCase(HashIndexDataTestCase):
 
 
 class HashIndexCompactTestCase(HashIndexDataTestCase):
-    def index(self, num_entries, num_buckets):
+    def index(self, num_entries, num_buckets, num_empty):
         index_data = io.BytesIO()
-        index_data.write(b"BORG_IDX")
+        index_data.write(b"BORG2IDX")
+        # version
+        index_data.write((2).to_bytes(4, "little"))
         # num_entries
         index_data.write(num_entries.to_bytes(4, "little"))
         # num_buckets
         index_data.write(num_buckets.to_bytes(4, "little"))
+        # num_empty
+        index_data.write(num_empty.to_bytes(4, "little"))
         # key_size
-        index_data.write((32).to_bytes(1, "little"))
+        index_data.write((32).to_bytes(4, "little"))
         # value_size
-        index_data.write((3 * 4).to_bytes(1, "little"))
+        index_data.write((3 * 4).to_bytes(4, "little"))
+        # reserved
+        index_data.write(bytes(1024 - 32))
 
         self.index_data = index_data
 
@@ -481,7 +487,7 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         self.write_entry(key, 0xFFFFFFFE, 0, 0)
 
     def test_simple(self):
-        self.index(num_entries=3, num_buckets=6)
+        self.index(num_entries=3, num_buckets=6, num_empty=2)
         self.write_entry(H2(0), 1, 2, 3)
         self.write_deleted(H2(1))
         self.write_empty(H2(2))
@@ -491,14 +497,14 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
 
         compact_index = self.index_from_data_compact_to_data()
 
-        self.index(num_entries=3, num_buckets=3)
+        self.index(num_entries=3, num_buckets=3, num_empty=0)
         self.write_entry(H2(0), 1, 2, 3)
         self.write_entry(H2(3), 5, 6, 7)
         self.write_entry(H2(4), 8, 9, 10)
         assert compact_index == self.index_data.getvalue()
 
     def test_first_empty(self):
-        self.index(num_entries=3, num_buckets=6)
+        self.index(num_entries=3, num_buckets=6, num_empty=2)
         self.write_deleted(H2(1))
         self.write_entry(H2(0), 1, 2, 3)
         self.write_empty(H2(2))
@@ -508,14 +514,14 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
 
         compact_index = self.index_from_data_compact_to_data()
 
-        self.index(num_entries=3, num_buckets=3)
+        self.index(num_entries=3, num_buckets=3, num_empty=0)
         self.write_entry(H2(0), 1, 2, 3)
         self.write_entry(H2(3), 5, 6, 7)
         self.write_entry(H2(4), 8, 9, 10)
         assert compact_index == self.index_data.getvalue()
 
     def test_last_used(self):
-        self.index(num_entries=3, num_buckets=6)
+        self.index(num_entries=3, num_buckets=6, num_empty=2)
         self.write_deleted(H2(1))
         self.write_entry(H2(0), 1, 2, 3)
         self.write_empty(H2(2))
@@ -525,14 +531,14 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
 
         compact_index = self.index_from_data_compact_to_data()
 
-        self.index(num_entries=3, num_buckets=3)
+        self.index(num_entries=3, num_buckets=3, num_empty=0)
         self.write_entry(H2(0), 1, 2, 3)
         self.write_entry(H2(3), 5, 6, 7)
         self.write_entry(H2(4), 8, 9, 10)
         assert compact_index == self.index_data.getvalue()
 
     def test_too_few_empty_slots(self):
-        self.index(num_entries=3, num_buckets=6)
+        self.index(num_entries=3, num_buckets=6, num_empty=2)
         self.write_deleted(H2(1))
         self.write_entry(H2(0), 1, 2, 3)
         self.write_entry(H2(3), 5, 6, 7)
@@ -542,14 +548,14 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
 
         compact_index = self.index_from_data_compact_to_data()
 
-        self.index(num_entries=3, num_buckets=3)
+        self.index(num_entries=3, num_buckets=3, num_empty=0)
         self.write_entry(H2(0), 1, 2, 3)
         self.write_entry(H2(3), 5, 6, 7)
         self.write_entry(H2(4), 8, 9, 10)
         assert compact_index == self.index_data.getvalue()
 
     def test_empty(self):
-        self.index(num_entries=0, num_buckets=6)
+        self.index(num_entries=0, num_buckets=6, num_empty=3)
         self.write_deleted(H2(1))
         self.write_empty(H2(0))
         self.write_deleted(H2(3))
@@ -559,7 +565,7 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
 
         compact_index = self.index_from_data_compact_to_data()
 
-        self.index(num_entries=0, num_buckets=0)
+        self.index(num_entries=0, num_buckets=0, num_empty=0)
         assert compact_index == self.index_data.getvalue()
 
     def test_merge(self):
@@ -569,7 +575,7 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         idx1[H(2)] = 2, 200
         idx1[H(3)] = 3, 300
         idx1.compact()
-        assert idx1.size() == 18 + 3 * (32 + 2 * 4)
+        assert idx1.size() == 1024 + 3 * (32 + 2 * 4)
 
         master.merge(idx1)
         assert master[H(1)] == (1, 100)
@@ -612,7 +618,7 @@ class IndexCorruptionTestCase(BaseTestCase):
         for y in range(700):  # stay below max load to not trigger resize
             idx[HH(0, y, 0)] = (0, y, 0)
 
-        assert idx.size() == 1031 * 48 + 18  # 1031 buckets + header
+        assert idx.size() == 1024 + 1031 * 48  # header + 1031 buckets
 
         # delete lots of the collisions, creating lots of tombstones
         for y in range(400):  # stay above min load to not trigger resize

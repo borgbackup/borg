@@ -360,11 +360,11 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
     group = filters_group.add_mutually_exclusive_group()
     group.add_argument(
         "-a",
-        "--glob-archives",
-        metavar="GLOB",
-        dest="glob_archives",
+        "--match-archives",
+        metavar="PATTERN",
+        dest="match_archives",
         action=Highlander,
-        help="only consider archive names matching the glob. " 'sh: rules apply, see "borg help patterns".',
+        help='only consider archive names matching the pattern. see "borg help match-archives".',
     )
 
     if sort_by:
@@ -468,7 +468,7 @@ def define_common_options(add_common_option):
         metavar="SECONDS",
         dest="lock_wait",
         type=int,
-        default=1,
+        default=int(os.environ.get("BORG_LOCK_WAIT", 1)),
         help="wait at most SECONDS for acquiring a repository/cache lock (default: %(default)d).",
     )
     add_common_option(

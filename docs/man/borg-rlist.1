@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RLIST" 1 "2022-09-10" "" "borg backup tool"
+.TH "BORG-RLIST" 1 "2022-10-02" "" "borg backup tool"
 .SH NAME
 borg-rlist \- List the archives contained in a repository
 .SH SYNOPSIS
@@ -57,8 +57,8 @@ Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq.
+.BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
+only consider archive names matching the pattern. see \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

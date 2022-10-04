@@ -17,12 +17,12 @@ cdef extern from "_hashindex.c":
         uint32_t version
         char hash[16]
 
-    HashIndex *hashindex_read(object file_py, int permit_compact) except *
+    HashIndex *hashindex_read(object file_py, int permit_compact, int legacy) except *
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
     int hashindex_len(HashIndex *index)
     int hashindex_size(HashIndex *index)
-    void hashindex_write(HashIndex *index, object file_py) except *
+    void hashindex_write(HashIndex *index, object file_py, int legacy) except *
     unsigned char *hashindex_get(HashIndex *index, unsigned char *key)
     unsigned char *hashindex_next_key(HashIndex *index, unsigned char *key)
     int hashindex_delete(HashIndex *index, unsigned char *key)
@@ -75,21 +75,21 @@ assert _MAX_VALUE % 2 == 1
 def hashindex_variant(fn):
     """peek into an index file and find out what it is"""
     with open(fn, 'rb') as f:
-        hh = f.read(18)  # len(HashHeader)
-    magic = hh[0:8]
+        magic = f.read(8)  # MAGIC_LEN
     if magic == b'BORG_IDX':
-        key_size = hh[16]
-        value_size = hh[17]
-        return f'k{key_size}_v{value_size}'
+        return 1  # legacy
+    if magic == b'BORG2IDX':
+        return 2
     if magic == b'12345678':  # used by unit tests
-        return 'k32_v16'  # just return the current variant
-    raise ValueError(f'unknown hashindex format, magic: {magic!r}')
+        return 2  # just return the current variant
+    raise ValueError(f'unknown hashindex magic: {magic!r}')
 
 
 @cython.internal
 cdef class IndexBase:
     cdef HashIndex *index
     cdef int key_size
+    legacy = 0
 
     _key_size = 32
 
@@ -101,9 +101,9 @@ cdef class IndexBase:
         if path:
             if isinstance(path, (str, bytes)):
                 with open(path, 'rb') as fd:
-                    self.index = hashindex_read(fd, permit_compact)
+                    self.index = hashindex_read(fd, permit_compact, self.legacy)
             else:
-                self.index = hashindex_read(path, permit_compact)
+                self.index = hashindex_read(path, permit_compact, self.legacy)
             assert self.index, 'hashindex_read() returned NULL with no exception set'
         else:
             if usable is not None:
@@ -123,9 +123,9 @@ cdef class IndexBase:
     def write(self, path):
         if isinstance(path, (str, bytes)):
             with open(path, 'wb') as fd:
-                hashindex_write(self.index, fd)
+                hashindex_write(self.index, fd, self.legacy)
         else:
-            hashindex_write(self.index, path)
+            hashindex_write(self.index, path, self.legacy)
 
     def clear(self):
         hashindex_free(self.index)
@@ -314,6 +314,7 @@ cdef class NSKeyIterator:
 
 cdef class NSIndex1(IndexBase):  # legacy borg 1.x
 
+    legacy = 1
     value_size = 8
 
     def __getitem__(self, key):

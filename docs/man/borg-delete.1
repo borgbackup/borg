@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2022-09-10" "" "borg backup tool"
+.TH "BORG-DELETE" 1 "2022-10-02" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete archives
 .SH SYNOPSIS
@@ -47,8 +47,8 @@ deleted \- the \(dqDeleted data\(dq deduplicated size there is most interesting 
 that is how much your repository will shrink.
 Please note that the \(dqAll archives\(dq stats refer to the state after deletion.
 .sp
-You can delete multiple archives by specifying a matching shell pattern,
-using the \fB\-\-glob\-archives GLOB\fP option (for more info on these patterns,
+You can delete multiple archives by specifying a matching pattern,
+using the \fB\-\-match\-archives PATTERN\fP option (for more info on these patterns,
 see \fIborg_patterns\fP).
 .sp
 Always first use \fB\-\-dry\-run \-\-list\fP to see what would be deleted.
@@ -85,8 +85,8 @@ write checkpoint every SECONDS seconds (Default: 1800)
 .SS Archive filters
 .INDENT 0.0
 .TP
-.BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq.
+.BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
+only consider archive names matching the pattern. see \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp

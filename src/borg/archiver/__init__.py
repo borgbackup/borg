@@ -79,6 +79,7 @@ from .list_cmd import ListMixIn
 from .lock_cmds import LocksMixIn
 from .mount_cmds import MountMixIn
 from .prune_cmd import PruneMixIn
+from .rcompress_cmd import RCompressMixIn
 from .recreate_cmd import RecreateMixIn
 from .rename_cmd import RenameMixIn
 from .rcreate_cmd import RCreateMixIn
@@ -109,6 +110,7 @@ class Archiver(
     PruneMixIn,
     RecreateMixIn,
     RenameMixIn,
+    RCompressMixIn,
     RCreateMixIn,
     RDeleteMixIn,
     RInfoMixIn,
@@ -327,6 +329,7 @@ class Archiver(
         self.build_parser_locks(subparsers, common_parser, mid_common_parser)
         self.build_parser_mount_umount(subparsers, common_parser, mid_common_parser)
         self.build_parser_prune(subparsers, common_parser, mid_common_parser)
+        self.build_parser_rcompress(subparsers, common_parser, mid_common_parser)
         self.build_parser_rcreate(subparsers, common_parser, mid_common_parser)
         self.build_parser_rdelete(subparsers, common_parser, mid_common_parser)
         self.build_parser_rinfo(subparsers, common_parser, mid_common_parser)
@@ -410,7 +413,7 @@ class Archiver(
             replace_placeholders.override("now", DatetimeWrapper(args.timestamp))
             replace_placeholders.override("utcnow", DatetimeWrapper(args.timestamp.astimezone(timezone.utc)))
             args.location = args.location.with_timestamp(args.timestamp)
-        for name in "name", "other_name", "newname", "glob_archives", "comment":
+        for name in "name", "other_name", "newname", "match_archives", "comment":
             value = getattr(args, name, None)
             if value is not None:
                 setattr(args, name, replace_placeholders(value))

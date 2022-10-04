@@ -989,7 +989,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def list(self, limit=None, marker=None, mask=0, value=0):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version("2.0.0b2"))
+    @api(since=parse_version("2.0.0b3"))
     def scan(self, limit=None, state=None):
         """actual remoting is done via self.call in the @api decorator"""
 

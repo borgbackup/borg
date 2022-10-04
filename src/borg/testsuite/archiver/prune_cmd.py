@@ -188,7 +188,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "--list",
             "--dry-run",
             "--keep-daily=1",
-            "--glob-archives=foo-*",
+            "--match-archives=sh:foo-*",
         )
         assert re.search(r"Keeping archive \(rule: daily #1\):\s+foo-2015-08-12-20:00", output)
         assert re.search(r"Would prune:\s+foo-2015-08-12-10:00", output)
@@ -197,7 +197,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in("foo-2015-08-12-20:00", output)
         self.assert_in("bar-2015-08-12-10:00", output)
         self.assert_in("bar-2015-08-12-20:00", output)
-        self.cmd(f"--repo={self.repository_location}", "prune", "--keep-daily=1", "--glob-archives=foo-*")
+        self.cmd(f"--repo={self.repository_location}", "prune", "--keep-daily=1", "--match-archives=sh:foo-*")
         output = self.cmd(f"--repo={self.repository_location}", "rlist")
         self.assert_not_in("foo-2015-08-12-10:00", output)
         self.assert_in("foo-2015-08-12-20:00", output)
@@ -216,7 +216,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "--list",
             "--dry-run",
             "--keep-daily=1",
-            "--glob-archives=2015-*-foo",
+            "--match-archives=sh:2015-*-foo",
         )
         assert re.search(r"Keeping archive \(rule: daily #1\):\s+2015-08-12-20:00-foo", output)
         assert re.search(r"Would prune:\s+2015-08-12-10:00-foo", output)
@@ -225,7 +225,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in("2015-08-12-20:00-foo", output)
         self.assert_in("2015-08-12-10:00-bar", output)
         self.assert_in("2015-08-12-20:00-bar", output)
-        self.cmd(f"--repo={self.repository_location}", "prune", "--keep-daily=1", "--glob-archives=2015-*-foo")
+        self.cmd(f"--repo={self.repository_location}", "prune", "--keep-daily=1", "--match-archives=sh:2015-*-foo")
         output = self.cmd(f"--repo={self.repository_location}", "rlist")
         self.assert_not_in("2015-08-12-10:00-foo", output)
         self.assert_in("2015-08-12-20:00-foo", output)

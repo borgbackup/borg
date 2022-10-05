@@ -205,7 +205,7 @@ class BenchmarkMixIn:
         ]:
             compressor = CompressionSpec(spec).compressor
             size = "0.1GB"
-            print(f"{spec:<12} {size:<10} {timeit(lambda: compressor.compress(random_10M), number=10):.3f}s")
+            print(f"{spec:<12} {size:<10} {timeit(lambda: compressor.compress({}, random_10M), number=10):.3f}s")
 
         print("msgpack ========================================================")
         item = Item(path="/foo/bar/baz", mode=660, mtime=1234567)

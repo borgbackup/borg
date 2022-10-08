@@ -653,15 +653,18 @@ Duration: {0.duration}
             "time_end": end.isoformat(timespec="microseconds"),
             "chunker_params": self.chunker_params,
         }
-        if stats is not None:
-            metadata.update(
-                {
-                    "size": stats.osize,
-                    "nfiles": stats.nfiles,
-                    "size_parts": stats.osize_parts,
-                    "nfiles_parts": stats.nfiles_parts,
-                }
-            )
+        # we always want to create archives with the addtl. metadata (nfiles, etc.),
+        # because borg info relies on them. so, either use the given stats (from args)
+        # or fall back to self.stats if it was not given.
+        stats = stats or self.stats
+        metadata.update(
+            {
+                "size": stats.osize,
+                "nfiles": stats.nfiles,
+                "size_parts": stats.osize_parts,
+                "nfiles_parts": stats.nfiles_parts,
+            }
+        )
         metadata.update(additional_metadata or {})
         metadata = ArchiveItem(metadata)
         data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b"archive")
@@ -2320,9 +2323,7 @@ class ArchiveRecreater:
                 "recreate_cmdline": sys.argv,
             }
 
-        target.save(
-            comment=comment, timestamp=self.timestamp, stats=target.stats, additional_metadata=additional_metadata
-        )
+        target.save(comment=comment, timestamp=self.timestamp, additional_metadata=additional_metadata)
         if replace_original:
             archive.delete(Statistics(), progress=self.progress)
             target.rename(archive.name)

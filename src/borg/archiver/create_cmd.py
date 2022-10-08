@@ -190,7 +190,7 @@ class CreateMixIn:
                     # we already have a checkpoint archive in this case.
                     self.print_error("Got Ctrl-C / SIGINT.")
                 else:
-                    archive.save(comment=args.comment, timestamp=args.timestamp, stats=archive.stats)
+                    archive.save(comment=args.comment, timestamp=args.timestamp)
                     args.stats |= args.json
                     if args.stats:
                         if args.json:

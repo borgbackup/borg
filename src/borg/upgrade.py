@@ -1,6 +1,6 @@
 from struct import Struct
 
-from .constants import REQUIRED_ITEM_KEYS
+from .constants import REQUIRED_ITEM_KEYS, CH_BUZHASH
 from .compress import ZLIB, ZLIB_legacy, ObfuscateSize
 from .helpers import HardLinkManager
 from .item import Item
@@ -143,6 +143,10 @@ class UpgraderFrom12To20:
         for attr in ("cmdline", "hostname", "username", "comment", "chunker_params", "recreate_cmdline"):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
+        if chunker_params := new_metadata.get("chunker_params"):
+            if len(chunker_params) == 4 and isinstance(chunker_params[0], int):
+                # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
+                new_metadata["chunker_params"] = (CH_BUZHASH,) + chunker_params
         # old borg used UTC timestamps, but did not have the explicit tz offset in them.
         for attr in ("time", "time_end"):
             if hasattr(metadata, attr):

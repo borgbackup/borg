@@ -67,7 +67,7 @@ try:
     from .helpers import ProgressIndicatorPercent
     from .helpers import basic_json_data, json_print
     from .helpers import replace_placeholders
-    from .helpers import ChunkIteratorFileWrapper
+    from .helpers import ChunkIteratorFileWrapper, normalize_chunker_params
     from .helpers import popen_with_error_handling, prepare_subprocess_env, create_filter_process
     from .helpers import dash_open
     from .helpers import umount
@@ -1125,8 +1125,10 @@ class Archiver:
         archive2 = Archive(repository, key, manifest, args.archive2,
                            consider_part_files=args.consider_part_files)
 
-        can_compare_chunk_ids = archive1.metadata.get('chunker_params', False) == archive2.metadata.get(
-            'chunker_params', True) or args.same_chunker_params
+        cp1 = archive1.metadata.get('chunker_params')
+        cp2 = archive2.metadata.get('chunker_params')
+        can_compare_chunk_ids = (args.same_chunker_params or
+            cp1 is not None and cp2 is not None and normalize_chunker_params(cp1) == normalize_chunker_params(cp2))
         if not can_compare_chunk_ids:
             self.print_warning('--chunker-params might be different between archives, diff will be slow.\n'
                                'If you know for certain that they are the same, pass --same-chunker-params '

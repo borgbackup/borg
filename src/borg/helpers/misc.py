@@ -16,6 +16,7 @@ from .time import to_localtime
 from . import msgpack
 from .. import __version__ as borg_version
 from .. import chunker
+from ..constants import CH_BUZHASH, CH_FIXED
 
 
 def prune_within(archives, hours, kept_because):
@@ -117,6 +118,17 @@ def log_multi(*msgs, level=logging.INFO, logger=logger):
         lines.extend(msg.splitlines())
     for line in lines:
         logger.log(level, line)
+
+
+def normalize_chunker_params(cp):
+    assert isinstance(cp, (list, tuple))
+    if isinstance(cp, list):
+        cp = tuple(cp)
+    if len(cp) == 4 and isinstance(cp[0], int):
+        # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
+        cp = (CH_BUZHASH, ) + cp
+    assert cp[0] in (CH_BUZHASH, CH_FIXED)
+    return cp
 
 
 class ChunkIteratorFileWrapper:

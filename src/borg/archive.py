@@ -28,7 +28,7 @@ from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Manifest
 from .helpers import hardlinkable
-from .helpers import ChunkIteratorFileWrapper, open_item
+from .helpers import ChunkIteratorFileWrapper, normalize_chunker_params, open_item
 from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, to_localtime
@@ -547,12 +547,14 @@ class Archive:
         if self.create:
             info['command_line'] = sys.argv
         else:
+            cp = self.metadata.get('chunker_params')
+            cp = normalize_chunker_params(cp) if cp is not None else ''
             info.update({
                 'command_line': self.metadata.cmdline,
                 'hostname': self.metadata.hostname,
                 'username': self.metadata.username,
                 'comment': self.metadata.get('comment', ''),
-                'chunker_params': self.metadata.get('chunker_params', ''),
+                'chunker_params': cp,
             })
         return info
 
@@ -2302,13 +2304,12 @@ class ArchiveRecreater:
         target_name = target_name or archive.name + '.recreate'
         target = self.create_target_archive(target_name)
         # If the archives use the same chunker params, then don't rechunkify
-        source_chunker_params = tuple(archive.metadata.get('chunker_params', []))
-        if len(source_chunker_params) == 4 and isinstance(source_chunker_params[0], int):
-            # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
-            source_chunker_params = (CH_BUZHASH, ) + source_chunker_params
-        target.recreate_rechunkify = self.rechunkify and source_chunker_params != target.chunker_params
+        src_cp = archive.metadata.get('chunker_params')
+        src_cp = normalize_chunker_params(src_cp) if src_cp is not None else None
+        dst_cp = target.chunker_params
+        target.recreate_rechunkify = self.rechunkify and src_cp != dst_cp
         if target.recreate_rechunkify:
-            logger.debug('Rechunking archive from %s to %s', source_chunker_params or '(unknown)', target.chunker_params)
+            logger.debug('Rechunking archive from %s to %s', src_cp or '(unknown)', dst_cp)
         target.process_file_chunks = ChunksProcessor(
             cache=self.cache, key=self.key,
             add_item=target.add_item, write_checkpoint=target.write_checkpoint,

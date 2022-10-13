@@ -715,25 +715,23 @@ which might be unwanted.
 A temporary (but maybe long lived) hack to avoid using lots of disk memory
 for ``chunks.archive.d`` (see :issue:`235` for details) is to replace this
 directory with an empty dummy file of this name.  Note, below,
-``$(borg config id)`` is used as place holder for the alphanumeric string
-specific to your backup repository (REPO_ID) you have to enter instead.
-You identify this string of 64 characters either in your file browsers, or
-by
+``$(borg config id)`` resolves into alphanumeric string specific to your
+backup repository (REPO_ID) you may identify in your file manager, or by
 
 ::
 
   borg config id
 
-With this information, and assuming you work with the same user as in the
-backup, adjust your setup
+With this information, and assuming you work with the same user as for
+the backup, adjust your setup
 
 ::
 
   cd ~/.cache/borg/$(borg config id)
   rm -rf chunks.archive.d ; touch chunks.archive.d
 
-The deletion of the cached archive chunk and presence of the dummy file
-prevents borg to store anything "in" there in future.
+The presence of the dummy file prevents borg to store anything "in" there
+in future.
 
 This has some pros and cons, though:
 

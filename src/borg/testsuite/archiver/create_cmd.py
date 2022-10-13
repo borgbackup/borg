@@ -650,7 +650,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert result["Modified files"] == 0
         # Archive a dir with two added files
         self.create_regular_file("testfile1", contents=b"test1")
-        time.sleep(1)
+        time.sleep(1)  # testfile2 must have newer timestamps than testfile1
         self.create_regular_file("testfile2", contents=b"test2")
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive2", self.input_path)
         result = to_dict(result)

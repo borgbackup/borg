@@ -2,7 +2,7 @@ API_VERSION = '1.2_01'
 
 import errno
 import os
-from time import monotonic
+import time
 from collections import namedtuple
 
 from .constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
@@ -146,7 +146,7 @@ class ChunkerFixed:
     def __init__(self, block_size, header_size=0, sparse=False):
         self.block_size = block_size
         self.header_size = header_size
-        self.chunking_time = 0
+        self.chunking_time = 0.0
         # should borg try to do sparse input processing?
         # whether it actually can be done depends on the input file being seekable.
         self.try_sparse = sparse and has_seek_hole
@@ -200,7 +200,7 @@ class ChunkerFixed:
                 offset = range_start
                 dseek(offset, os.SEEK_SET, fd, fh)
             while range_size:
-                started_chunking = monotonic()
+                started_chunking = time.monotonic()
                 wanted = min(range_size, self.block_size)
                 if is_data:
                     # read block from the range
@@ -220,7 +220,7 @@ class ChunkerFixed:
                 if got > 0:
                     offset += got
                     range_size -= got
-                    self.chunking_time += monotonic() - started_chunking
+                    self.chunking_time += time.monotonic() - started_chunking
                     yield Chunk(data, size=got, allocation=allocation)
                 if got < wanted:
                     # we did not get enough data, looks like EOF.
@@ -250,7 +250,7 @@ cdef class Chunker:
         assert hash_window_size + min_size + 1 <= max_size, "too small max_size"
         hash_mask = (1 << hash_mask_bits) - 1
         self.chunker = chunker_init(hash_window_size, hash_mask, min_size, max_size, seed & 0xffffffff)
-        self.chunking_time = 0
+        self.chunking_time = 0.0
 
 
     def chunkify(self, fd, fh=-1):
@@ -272,7 +272,7 @@ cdef class Chunker:
         return self
 
     def __next__(self):
-        started_chunking = monotonic()
+        started_chunking = time.monotonic()
         data = chunker_process(self.chunker)
         got = len(data)
         # we do not have SEEK_DATA/SEEK_HOLE support in chunker_process C code,
@@ -283,8 +283,9 @@ cdef class Chunker:
             allocation = CH_ALLOC
         else:
             allocation = CH_DATA
-        self.chunking_time += monotonic() - started_chunking
+        self.chunking_time += time.monotonic() - started_chunking
         return Chunk(data, size=got, allocation=allocation)
+
 
 def get_chunker(algo, *params, **kw):
     if algo == 'buzhash':

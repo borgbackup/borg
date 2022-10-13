@@ -730,7 +730,7 @@ the backup, adjust your setup
   cd ~/.cache/borg/$(borg config id)
   rm -rf chunks.archive.d ; touch chunks.archive.d
 
-The presence of the dummy file prevents borg to store anything "in" there
+The presence of the dummy file prevents borg from storing anything "in" there
 in future.
 
 This has some pros and cons, though:

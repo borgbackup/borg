@@ -100,7 +100,7 @@ class TransferMixIn:
                         archive.add_item(upgrader.upgrade_item(item=item))
                 if not dry_run:
                     additional_metadata = upgrader.upgrade_archive_metadata(metadata=other_archive.metadata)
-                    archive.save(stats=archive.stats, additional_metadata=additional_metadata)
+                    archive.save(additional_metadata=additional_metadata)
                     print(
                         f"{name}: finished. "
                         f"transfer_size: {format_file_size(transfer_size)} "

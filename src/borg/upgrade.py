@@ -1,6 +1,6 @@
 from struct import Struct
 
-from .constants import REQUIRED_ITEM_KEYS
+from .constants import REQUIRED_ITEM_KEYS, CH_BUZHASH
 from .compress import ZLIB, ZLIB_legacy, ObfuscateSize
 from .helpers import HardLinkManager
 from .item import Item
@@ -77,18 +77,18 @@ class UpgraderFrom12To20:
         }
 
         if self.hlm.borg1_hardlink_master(item):
-            item._dict["hlid"] = hlid = self.hlm.hardlink_id_from_path(item._dict["path"])
-            self.hlm.remember(id=hlid, info=(item._dict.get("chunks"), item._dict.get("chunks_healthy")))
+            item.hlid = hlid = self.hlm.hardlink_id_from_path(item.path)
+            self.hlm.remember(id=hlid, info=(item.get("chunks"), item.get("chunks_healthy")))
         elif self.hlm.borg1_hardlink_slave(item):
-            item._dict["hlid"] = hlid = self.hlm.hardlink_id_from_path(item._dict["source"])
+            item.hlid = hlid = self.hlm.hardlink_id_from_path(item.source)
             chunks, chunks_healthy = self.hlm.retrieve(id=hlid, default=(None, None))
             if chunks is not None:
-                item._dict["chunks"] = chunks
+                item.chunks = chunks
                 for chunk_id, _ in chunks:
                     self.cache.chunk_incref(chunk_id, self.archive.stats)
             if chunks_healthy is not None:
-                item._dict["chunks_healthy"] = chunks
-            item._dict.pop("source")  # not used for hardlinks any more, replaced by hlid
+                item.chunks_healthy = chunks
+            del item.source  # not used for hardlinks any more, replaced by hlid
         # make sure we only have desired stuff in the new item. specifically, make sure to get rid of:
         # - 'acl' remnants of bug in attic <= 0.13
         # - 'hardlink_master' (superseded by hlid)
@@ -143,6 +143,10 @@ class UpgraderFrom12To20:
         for attr in ("cmdline", "hostname", "username", "comment", "chunker_params", "recreate_cmdline"):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
+        if chunker_params := new_metadata.get("chunker_params"):
+            if len(chunker_params) == 4 and isinstance(chunker_params[0], int):
+                # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
+                new_metadata["chunker_params"] = (CH_BUZHASH,) + chunker_params
         # old borg used UTC timestamps, but did not have the explicit tz offset in them.
         for attr in ("time", "time_end"):
             if hasattr(metadata, attr):

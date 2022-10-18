@@ -12,8 +12,8 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0b3 (2022-10-02)
-----------------------------
+Version 2.0.0b4 (not released yet)
+----------------------------------
 
 Please note:
 
@@ -94,6 +94,22 @@ Compatibility notes:
       borg 1.x: --glob-archives 'myserver-*'
       borg 2.0: --match-archives 'sh:myserver-*'
 
+
+Fixes:
+
+- transfer/upgrade: fix borg < 1.2 chunker_params, #7079
+- transfer/upgrade: do not access Item._dict, #7077
+- archive.save(): always use metadata from stats, #7072
+- benchmark: fixed TypeError in compression benchmarks, #7075
+- fix repository.scan api minimum requirement
+
+Other changes:
+
+- vagrant: use 3.10.7 for binary building
+- docs: add rcompress to usage index
+
+Version 2.0.0b3 (2022-10-02)
+----------------------------
 
 Fixes:
 

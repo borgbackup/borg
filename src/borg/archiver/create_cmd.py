@@ -119,6 +119,7 @@ class CreateMixIn:
                     if status == "C":
                         self.print_warning("%s: file changed while we backed it up", path)
                     self.print_file_status(status, path)
+                    fso.stats.files_stats[status] += 1
                 if args.paths_from_command:
                     rc = proc.wait()
                     if rc != 0:
@@ -142,6 +143,7 @@ class CreateMixIn:
                         else:
                             status = "-"
                         self.print_file_status(status, path)
+                        fso.stats.files_stats[status] += 1
                         continue
                     path = os.path.normpath(path)
                     parent_dir = os.path.dirname(path) or "."
@@ -185,6 +187,8 @@ class CreateMixIn:
                 if args.progress:
                     archive.stats.show_progress(final=True)
                 archive.stats += fso.stats
+                archive.stats.rx_bytes = getattr(repository, "rx_bytes", 0)
+                archive.stats.tx_bytes = getattr(repository, "tx_bytes", 0)
                 if sig_int:
                     # do not save the archive if the user ctrl-c-ed - it is valid, but incomplete.
                     # we already have a checkpoint archive in this case.
@@ -469,6 +473,8 @@ class CreateMixIn:
             self.print_warning("%s: file changed while we backed it up", path)
         if not recurse_excluded_dir:
             self.print_file_status(status, path)
+            if status is not None:
+                fso.stats.files_stats[status] += 1
 
     def build_parser_create(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

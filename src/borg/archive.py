@@ -4,7 +4,7 @@ import os
 import stat
 import sys
 import time
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from functools import partial
@@ -60,6 +60,11 @@ class Statistics:
         self.osize = self.usize = self.nfiles = 0
         self.osize_parts = self.usize_parts = self.nfiles_parts = 0
         self.last_progress = 0  # timestamp when last progress was shown
+        self.files_stats = defaultdict(int)
+        self.chunking_time = 0.0
+        self.hashing_time = 0.0
+        self.rx_bytes = 0
+        self.tx_bytes = 0
 
     def update(self, size, unique, part=False):
         if not part:
@@ -81,15 +86,36 @@ class Statistics:
         stats.osize_parts = self.osize_parts + other.osize_parts
         stats.usize_parts = self.usize_parts + other.usize_parts
         stats.nfiles_parts = self.nfiles_parts + other.nfiles_parts
+        stats.chunking_time = self.chunking_time + other.chunking_time
+        stats.hashing_time = self.hashing_time + other.hashing_time
+        for key in other.files_stats:
+            stats.files_stats[key] = self.files_stats[key] + other.files_stats[key]
+
         return stats
 
     def __str__(self):
+        hashing_time = format_timedelta(timedelta(seconds=self.hashing_time))
+        chunking_time = format_timedelta(timedelta(seconds=self.chunking_time))
         return """\
 Number of files: {stats.nfiles}
 Original size: {stats.osize_fmt}
 Deduplicated size: {stats.usize_fmt}
+Time spent in hashing: {hashing_time}
+Time spent in chunking: {chunking_time}
+Added files: {added_files}
+Unchanged files: {unchanged_files}
+Modified files: {modified_files}
+Error files: {error_files}
+Bytes read from remote: {stats.rx_bytes}
+Bytes sent to remote: {stats.tx_bytes}
 """.format(
-            stats=self
+            stats=self,
+            hashing_time=hashing_time,
+            chunking_time=chunking_time,
+            added_files=self.files_stats["A"],
+            unchanged_files=self.files_stats["U"],
+            modified_files=self.files_stats["M"],
+            error_files=self.files_stats["E"],
         )
 
     def __repr__(self):
@@ -102,6 +128,9 @@ Deduplicated size: {stats.usize_fmt}
             "original_size": FileSize(self.osize, iec=self.iec),
             "deduplicated_size": FileSize(self.usize, iec=self.iec),
             "nfiles": self.nfiles,
+            "hashing_time": self.hashing_time,
+            "chunking_time": self.chunking_time,
+            "files_stats": self.files_stats,
         }
 
     def as_raw_dict(self):
@@ -1237,7 +1266,9 @@ class ChunksProcessor:
         if not chunk_processor:
 
             def chunk_processor(chunk):
+                started_hashing = time.monotonic()
                 chunk_id, data = cached_hash(chunk, self.key.id_hash)
+                stats.hashing_time += time.monotonic() - started_hashing
                 chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, wait=False)
                 self.cache.repository.async_response(wait=False)
                 return chunk_entry
@@ -1411,7 +1442,9 @@ class FilesystemObjectProcessors:
                 else:  # normal case, no "2nd+" hardlink
                     if not is_special_file:
                         hashed_path = safe_encode(os.path.join(self.cwd, path))
+                        started_hashing = time.monotonic()
                         path_hash = self.key.id_hash(hashed_path)
+                        self.stats.hashing_time += time.monotonic() - started_hashing
                         known, ids = cache.file_known_and_unchanged(hashed_path, path_hash, st)
                     else:
                         # in --read-special mode, we may be called for special files.
@@ -1434,6 +1467,7 @@ class FilesystemObjectProcessors:
                     else:
                         status = "M" if known else "A"  # regular file, modified or added
                     self.print_file_status(status, path)
+                    self.stats.files_stats[status] += 1
                     status = None  # we already printed the status
                     # Only chunkify the file if needed
                     if chunks is not None:
@@ -1447,6 +1481,7 @@ class FilesystemObjectProcessors:
                                 self.show_progress,
                                 backup_io_iter(self.chunker.chunkify(None, fd)),
                             )
+                            self.stats.chunking_time = self.chunker.chunking_time
                         if is_win32:
                             changed_while_backup = False  # TODO
                         else:

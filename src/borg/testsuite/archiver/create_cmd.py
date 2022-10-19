@@ -1,6 +1,7 @@
 import errno
 import json
 import os
+from random import randbytes
 import shutil
 import socket
 import stat
@@ -626,6 +627,46 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if has_lchflags:
             self.assert_in("x input/file3", output)
 
+    def test_file_status_counters(self):
+        """Test file status counters in the stats of `borg create --stats`"""
+
+        def to_dict(borg_create_output):
+            borg_create_output = borg_create_output.strip().splitlines()
+            borg_create_output = [line.split(":", 1) for line in borg_create_output]
+            borg_create_output = {
+                key: int(value)
+                for key, value in borg_create_output
+                if key in ("Added files", "Unchanged files", "Modified files")
+            }
+            return borg_create_output
+
+        # Test case set up: create a repository
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        # Archive an empty dir
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
+        result = to_dict(result)
+        assert result["Added files"] == 0
+        assert result["Unchanged files"] == 0
+        assert result["Modified files"] == 0
+        # Archive a dir with two added files
+        self.create_regular_file("testfile1", contents=b"test1")
+        time.sleep(0.01)  # testfile2 must have newer timestamps than testfile1
+        self.create_regular_file("testfile2", contents=b"test2")
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive2", self.input_path)
+        result = to_dict(result)
+        assert result["Added files"] == 2
+        assert result["Unchanged files"] == 0
+        assert result["Modified files"] == 0
+        # Archive a dir with 1 unmodified file and 1 modified
+        self.create_regular_file("testfile1", contents=b"new data")
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive3", self.input_path)
+        result = to_dict(result)
+        # Should process testfile2 as added because of
+        # https://borgbackup.readthedocs.io/en/stable/faq.html#i-am-seeing-a-added-status-for-an-unchanged-file
+        assert result["Added files"] == 1
+        assert result["Unchanged files"] == 0
+        assert result["Modified files"] == 1
+
     def test_create_json(self):
         self.create_regular_file("file1", size=1024 * 80)
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
@@ -730,6 +771,42 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         log = self.cmd(f"--repo={self.repository_location}", "--debug", "create", "test", "input")
         assert "security: read previous location" in log
+
+    def test_hashing_time(self):
+        def extract_hashing_time(borg_create_output):
+            borg_create_output = borg_create_output.strip().splitlines()
+            borg_create_output = [line.split(":", 1) for line in borg_create_output]
+            hashing_time = [line for line in borg_create_output if line[0] == "Time spent in hashing"].pop()
+            hashing_time = hashing_time[1]
+            hashing_time = float(hashing_time.removesuffix(" seconds"))
+            return hashing_time
+
+        # Test case set up: create a repository and a file
+        self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
+        self.create_regular_file("testfile", contents=randbytes(6000000))
+        # Archive
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
+        hashing_time = extract_hashing_time(result)
+
+        assert hashing_time > 0.0
+
+    def test_chunking_time(self):
+        def extract_chunking_time(borg_create_output):
+            borg_create_output = borg_create_output.strip().splitlines()
+            borg_create_output = [line.split(":", 1) for line in borg_create_output]
+            chunking_time = [line for line in borg_create_output if line[0] == "Time spent in chunking"].pop()
+            chunking_time = chunking_time[1]
+            chunking_time = float(chunking_time.removesuffix(" seconds"))
+            return chunking_time
+
+        # Test case set up: create a repository and a file
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        self.create_regular_file("testfile", contents=randbytes(5000000))
+        # Archive
+        result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive", self.input_path)
+        chunking_time = extract_chunking_time(result)
+
+        assert chunking_time > 0.0
 
 
 class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):

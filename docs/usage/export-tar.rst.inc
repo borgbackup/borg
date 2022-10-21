@@ -92,7 +92,7 @@ before writing it to FILE:
 - .tar.gz or .tgz: gzip
 - .tar.bz2 or .tbz: bzip2
 - .tar.xz or .txz: xz
-- .tar.zstd: zstd
+- .tar.zstd or .tar.zst: zstd
 - .tar.lz4: lz4
 
 Alternatively, a ``--tar-filter`` program may be explicitly specified. It should

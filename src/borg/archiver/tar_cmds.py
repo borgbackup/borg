@@ -42,7 +42,7 @@ def get_tar_filter(fname, decompress):
         filter = "xz -d" if decompress else "xz"
     elif fname.endswith((".tar.lz4",)):
         filter = "lz4 -d" if decompress else "lz4"
-    elif fname.endswith((".tar.zstd",)):
+    elif fname.endswith((".tar.zstd", ".tar.zst")):
         filter = "zstd -d" if decompress else "zstd"
     else:
         filter = None

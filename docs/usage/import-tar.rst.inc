@@ -96,7 +96,7 @@ based on its file extension and pipe the file through an appropriate filter:
 - .tar.gz or .tgz: gzip -d
 - .tar.bz2 or .tbz: bzip2 -d
 - .tar.xz or .txz: xz -d
-- .tar.zstd or .tar.zst: zstd -d
+- .tar.zstd: zstd -d
 - .tar.lz4: lz4 -d
 
 Alternatively, a --tar-filter program may be explicitly specified. It should

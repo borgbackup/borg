@@ -9,10 +9,6 @@ if(!(Test-Path $opensslPath)) {
 }
 
 $env:BORG_OPENSSL_PREFIX = $opensslPath
-$env:BORG_USE_BUNDLED_B2 = "YES"
-$env:BORG_USE_BUNDLED_LZ4 = "YES"
-$env:BORG_USE_BUNDLED_ZSTD = "YES"
-$env:BORG_USE_BUNDLED_XXHASH = "YES"
 
 Write-Host "Environment configured for borg. The following variables where set:"
 Write-Host ( Get-ChildItem Env: | Where-Object { $_.Name.StartsWith("BORG_") } | Out-String )

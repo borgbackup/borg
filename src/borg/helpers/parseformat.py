@@ -19,7 +19,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 from .errors import Error
-from .fs import get_keys_dir
+from .fs import get_keys_dir, make_path_safe
 from .msgpack import Timestamp
 from .time import OutputTimestamp, format_time, safe_timestamp
 from .. import __version__ as borg_version
@@ -840,7 +840,7 @@ class ItemFormatter(BaseFormatter):
 
         from ..item import Item
 
-        fake_item = Item(mode=0, path="", user="", group="", mtime=0, uid=0, gid=0)
+        fake_item = Item(mode=0, path="foo", user="", group="", mtime=0, uid=0, gid=0)
         formatter = cls(FakeArchive, "")
         keys = []
         keys.extend(formatter.call_keys.keys())
@@ -1147,3 +1147,14 @@ def prepare_dump_dict(d):
         return res
 
     return decode(d)
+
+
+class MakePathSafeAction(argparse.Action):
+    def __call__(self, parser, namespace, path, option_string=None):
+        try:
+            sanitized_path = make_path_safe(path)
+        except ValueError as e:
+            raise argparse.ArgumentError(self, e)
+        if sanitized_path == ".":
+            raise argparse.ArgumentError(self, f"{path!r} is not a valid file name")
+        setattr(namespace, self.dest, sanitized_path)

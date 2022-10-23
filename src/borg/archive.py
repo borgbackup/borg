@@ -32,7 +32,7 @@ from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, archive_ts_now
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
-from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd
+from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd, remove_dotdot_prefixes
 from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
@@ -853,8 +853,6 @@ Duration: {0.duration}
             return
 
         dest = self.cwd
-        if item.path.startswith(("/", "../")):
-            raise Exception("Path should be relative and local")
         path = os.path.join(dest, item.path)
         # Attempt to remove existing files, ignore errors on failure
         try:
@@ -1376,8 +1374,8 @@ class FilesystemObjectProcessors:
 
     @contextmanager
     def create_helper(self, path, st, status=None, hardlinkable=True):
-        safe_path = make_path_safe(path)
-        item = Item(path=safe_path)
+        sanitized_path = remove_dotdot_prefixes(path)
+        item = Item(path=sanitized_path)
         hardlinked = hardlinkable and st.st_nlink > 1
         hl_chunks = None
         update_map = False

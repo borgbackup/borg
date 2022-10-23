@@ -23,6 +23,7 @@ from ..helpers import umount
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .. import platform
 
+
 # Note: this is used by borg.selftest, do not use or import py.test functionality here.
 
 from ..fuse_impl import llfuse, has_pyfuse3, has_llfuse
@@ -59,6 +60,24 @@ def same_ts_ns(ts_ns1, ts_ns2):
     diff_ts = int(abs(ts_ns1 - ts_ns2))
     diff_max = 10 ** (-st_mtime_ns_round)
     return diff_ts <= diff_max
+
+
+rejected_dotdot_paths = (
+    "..",
+    "../",
+    "../etc/shadow",
+    "/..",
+    "/../",
+    "/../etc",
+    "/../etc/",
+    "etc/..",
+    "/etc/..",
+    "/etc/../etc/shadow",
+    "//etc/..",
+    "etc//..",
+    "etc/..//",
+    "foo/../bar",
+)
 
 
 @contextmanager

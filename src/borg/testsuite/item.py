@@ -38,8 +38,8 @@ def test_item_empty():
 @pytest.mark.parametrize(
     "item_dict, path, mode",
     [  # does not matter whether we get str or bytes keys
-        ({b"path": "/a/b/c", b"mode": 0o666}, "/a/b/c", 0o666),
-        ({"path": "/a/b/c", "mode": 0o666}, "/a/b/c", 0o666),
+        ({b"path": "a/b/c", b"mode": 0o666}, "a/b/c", 0o666),
+        ({"path": "a/b/c", "mode": 0o666}, "a/b/c", 0o666),
     ],
 )
 def test_item_from_dict(item_dict, path, mode):
@@ -64,8 +64,8 @@ def test_item_invalid(invalid_item, error):
 
 
 def test_item_from_kw():
-    item = Item(path="/a/b/c", mode=0o666)
-    assert item.path == "/a/b/c"
+    item = Item(path="a/b/c", mode=0o666)
+    assert item.path == "a/b/c"
     assert item.mode == 0o666
 
 
@@ -91,22 +91,22 @@ def test_item_mptimestamp_property(atime):
 def test_item_se_str_property():
     # start simple
     item = Item()
-    item.path = "/a/b/c"
-    assert item.path == "/a/b/c"
-    assert item.as_dict() == {"path": "/a/b/c"}
+    item.path = "a/b/c"
+    assert item.path == "a/b/c"
+    assert item.as_dict() == {"path": "a/b/c"}
     del item.path
     assert item.as_dict() == {}
     with pytest.raises(TypeError):
         item.path = 42
 
     # non-utf-8 path, needing surrogate-escaping for latin-1 u-umlaut
-    item = Item(internal_dict={"path": b"/a/\xfc/c"})
-    assert item.path == "/a/\udcfc/c"  # getting a surrogate-escaped representation
-    assert item.as_dict() == {"path": "/a/\udcfc/c"}
+    item = Item(internal_dict={"path": b"a/\xfc/c"})
+    assert item.path == "a/\udcfc/c"  # getting a surrogate-escaped representation
+    assert item.as_dict() == {"path": "a/\udcfc/c"}
     del item.path
     assert "path" not in item
-    item.path = "/a/\udcfc/c"  # setting using a surrogate-escaped representation
-    assert item.as_dict() == {"path": "/a/\udcfc/c"}
+    item.path = "a/\udcfc/c"  # setting using a surrogate-escaped representation
+    assert item.as_dict() == {"path": "a/\udcfc/c"}
 
 
 def test_item_list_property():

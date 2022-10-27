@@ -1,0 +1,4 @@
+#!/bin/bash
+
+pacman -S --needed --noconfirm git mingw-w64-ucrt-x86_64-{toolchain,pkgconf,zstd,lz4,xxhash,openssl,python,cython,python-setuptools,python-wheel,python-pkgconfig,python-packaging,python-msgpack,python-argon2_cffi,python-pip}
+pip install pyinstaller

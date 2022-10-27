@@ -1,0 +1,27 @@
+name: Windows CI
+on: [push, pull_request]
+
+jobs:
+  msys2-ucrt64:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+      - name: Install dependencies
+        run: ./scripts/msys2-install-deps
+      - name: Build
+        run: ./scripts/msys2-build
+      - name: Test
+        run: ./dist/borg.exe -V
+      - uses: actions/upload-artifact@v3
+        with:
+          name: borg-windows
+          path: dist/borg.exe

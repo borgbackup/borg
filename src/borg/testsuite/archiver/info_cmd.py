@@ -19,8 +19,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
         info_archive = self.cmd(f"--repo={self.repository_location}", "info", "-a", "test")
         assert "Archive name: test\n" in info_archive
+        assert "Storage quota" not in info_archive
         info_archive = self.cmd(f"--repo={self.repository_location}", "info", "--first", "1")
         assert "Archive name: test\n" in info_archive
+        assert "Storage quota" not in info_archive
 
     def test_info_json(self):
         self.create_regular_file("file1", size=1024 * 80)

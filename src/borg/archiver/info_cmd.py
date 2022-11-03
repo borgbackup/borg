@@ -19,16 +19,17 @@ class InfoMixIn:
     def do_info(self, args, repository, manifest, cache):
         """Show archive details such as disk space used"""
 
-        print(
-            """\
+        if repository.storage_quota:
+            print(
+                """\
 Storage quota: \
 {used} used out of \
 {quota}
         """.format(
-                used=format_file_size(repository.get_storage_quota_use()),
-                quota=format_file_size(repository.storage_quota),
+                    used=format_file_size(repository.get_storage_quota_use()),
+                    quota=format_file_size(repository.storage_quota),
+                )
             )
-        )
 
         def format_cmdline(cmdline):
             return remove_surrogates(" ".join(shlex.quote(x) for x in cmdline))

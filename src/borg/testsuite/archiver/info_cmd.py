@@ -49,6 +49,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         info_repo = json.loads(self.cmd(f"--repo={self.repository_location}", "info", "--json", "--last=1"))
         assert info_repo["archives"] == []
 
+    def test_info_on_repository_with_storage_quota(self):
+        self.create_regular_file("file1", size=1024 * 80)
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION, "--storage-quota=1G")
+        self.cmd(f"--repo={self.repository_location}", "create", "test", self.input_path)
+        info_archive = self.cmd(f"--repo={self.repository_location}", "info")
+        assert f"Storage quota" in info_archive
+
 
 class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
     """run the same tests, but with a remote repository"""

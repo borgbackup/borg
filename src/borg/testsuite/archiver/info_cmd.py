@@ -54,7 +54,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION, "--storage-quota=1G")
         self.cmd(f"--repo={self.repository_location}", "create", "test", self.input_path)
         info_archive = self.cmd(f"--repo={self.repository_location}", "info")
-        assert f"Storage quota" in info_archive
+        assert "Storage quota" in info_archive
 
 
 class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):

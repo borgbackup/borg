@@ -61,7 +61,7 @@ jobs:
               python-version: '3.10'
               toxenv: py310-fuse3
             - os: ubuntu-20.04
-              python-version: '3.11-dev'
+              python-version: '3.11'
               toxenv: py311-fuse3
             - os: macos-12
               python-version: '3.9'

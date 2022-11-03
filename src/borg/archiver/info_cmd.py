@@ -6,7 +6,7 @@ from datetime import timedelta
 from ._common import with_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import remove_surrogates, format_timedelta, json_print, basic_json_data
+from ..helpers import remove_surrogates, format_timedelta, json_print, basic_json_data, format_file_size
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -18,6 +18,17 @@ class InfoMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
     def do_info(self, args, repository, manifest, cache):
         """Show archive details such as disk space used"""
+
+        print(
+            """\
+Storage quota: \
+{used} used out of \
+{quota}
+        """.format(
+                used=format_file_size(repository.get_storage_quota_use()),
+                quota=format_file_size(repository.storage_quota),
+            )
+        )
 
         def format_cmdline(cmdline):
             return remove_surrogates(" ".join(shlex.quote(x) for x in cmdline))

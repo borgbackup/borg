@@ -960,12 +960,11 @@ class Repository:
             self.rollback()
 
     def get_storage_quota_use(self):
-        storage_quota_use = 0
-        for i, (segment, filename) in enumerate(self.io.segment_iterator()):
-            objects = list(self.io.iter_objects(segment))
-            for tag, key, offset, size, _ in objects:
-                storage_quota_use += header_size(tag) + size
-        return storage_quota_use
+        hints_path = os.path.join(self.path, "hints.%d" % self.get_transaction_id())
+        integrity_data = self._read_integrity(self.get_transaction_id(), "hints")
+        with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
+            hints = msgpack.unpack(fd)
+            return hints["storage_quota_use"]
 
     def _update_index(self, segment, objects, report=None):
         """some code shared between replay_segments and check"""

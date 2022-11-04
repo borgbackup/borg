@@ -260,7 +260,7 @@ class HashIndexSizeTestCase(BaseTestCase):
             idx[H(i)] = i, i**2
         with tempfile.NamedTemporaryFile() as file:
             idx.write(file)
-            size = os.path.getsize(file.name)
+            size = os.path.getsize(file.fileno())
         assert idx.size() == size
 
 

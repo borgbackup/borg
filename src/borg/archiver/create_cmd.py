@@ -853,4 +853,4 @@ class CreateMixIn:
         )
 
         subparser.add_argument("name", metavar="NAME", type=NameSpec, help="specify the archive name")
-        subparser.add_argument("paths", metavar="PATH", nargs="*", type=str, help="paths to archive")
+        subparser.add_argument("paths", metavar="PATH", nargs="*", type=str, action="extend", help="paths to archive")

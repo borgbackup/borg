@@ -19,6 +19,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
         info_repo = self.cmd(f"--repo={self.repository_location}", "rinfo")
         assert "Original size:" in info_repo
+        assert "Storage quota:" not in info_repo
 
     def test_info_json(self):
         self.create_regular_file("file1", size=1024 * 80)
@@ -35,6 +36,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         stats = cache["stats"]
         assert all(isinstance(o, int) for o in stats.values())
         assert all(key in stats for key in ("total_chunks", "total_size", "total_unique_chunks", "unique_size"))
+
+    def test_info_on_repository_with_storage_quota(self):
+        self.create_regular_file("file1", size=1024 * 80)
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION, "--storage-quota=1G")
+        self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
+        info_repo = self.cmd(f"--repo={self.repository_location}", "rinfo")
+        assert "Storage quota" in info_repo
 
 
 class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):

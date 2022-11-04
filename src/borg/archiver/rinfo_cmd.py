@@ -3,7 +3,7 @@ import textwrap
 
 from ._common import with_repository
 from ..constants import *  # NOQA
-from ..helpers import bin_to_hex, json_print, basic_json_data
+from ..helpers import bin_to_hex, json_print, basic_json_data, format_file_size
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -40,6 +40,7 @@ class RInfoMixIn:
             {encryption}
             Cache: {cache.path}
             Security dir: {security_dir}
+            Storage quota: {used} used out of {storage_quota}
             """
                 )
                 .strip()
@@ -48,6 +49,8 @@ class RInfoMixIn:
                     location=repository._location.canonical_path(),
                     version=repository.version,
                     append_only=repository.append_only,
+                    used=format_file_size(repository.get_storage_quota_use()),
+                    storage_quota=format_file_size(repository.storage_quota),
                     **info,
                 )
             )

@@ -3614,7 +3614,7 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='name of archive to create (must be also a valid directory name)')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str, action='extend',
                                help='paths to archive')
 
         # borg debug

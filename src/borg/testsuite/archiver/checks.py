@@ -227,15 +227,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     @pytest.mark.allow_cache_wipe
     def test_unknown_mandatory_feature_in_cache(self):
-        if self.prefix:
-            path_prefix = "ssh://__testsuite__"
-        else:
-            path_prefix = ""
-
+        remote_repo = bool(self.prefix)
         print(self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION))
 
         with Repository(self.repository_path, exclusive=True) as repository:
-            if path_prefix:
+            if remote_repo:
                 repository._location = Location(self.repository_location)
             manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, manifest) as cache:
@@ -260,7 +256,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert called
 
         with Repository(self.repository_path, exclusive=True) as repository:
-            if path_prefix:
+            if remote_repo:
                 repository._location = Location(self.repository_location)
             manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             with Cache(repository, manifest) as cache:

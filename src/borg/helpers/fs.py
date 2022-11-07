@@ -20,9 +20,6 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-py_37_plus = sys.version_info >= (3, 7)
-
-
 def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_deadly=True):
     """
     Ensures that the dir exists with the right permissions.
@@ -259,8 +256,7 @@ def scandir_keyfunc(dirent):
 
 
 def scandir_inorder(*, path, fd=None):
-    # py37+ supports giving an fd instead of a path (no full entry.path in DirEntry in that case!)
-    arg = fd if fd is not None and py_37_plus else path
+    arg = fd if fd is not None else path
     return sorted(os.scandir(arg), key=scandir_keyfunc)
 
 

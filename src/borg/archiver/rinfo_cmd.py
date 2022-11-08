@@ -30,7 +30,7 @@ class RInfoMixIn:
                 encryption += "\nKey file: %s" % key.find_key()
             info["encryption"] = encryption
 
-            print(
+            output = (
                 textwrap.dedent(
                     """
             Repository ID: {id}
@@ -38,9 +38,6 @@ class RInfoMixIn:
             Repository version: {version}
             Append only: {append_only}
             {encryption}
-            Cache: {cache.path}
-            Security dir: {security_dir}
-            Storage quota: {used} used out of {storage_quota}
             """
                 )
                 .strip()
@@ -49,11 +46,27 @@ class RInfoMixIn:
                     location=repository._location.canonical_path(),
                     version=repository.version,
                     append_only=repository.append_only,
-                    used=format_file_size(repository.get_storage_quota_use()),
-                    storage_quota=format_file_size(repository.storage_quota),
-                    **info,
+                    encryption=info["encryption"],
                 )
             )
+
+            if repository.storage_quota:
+                used = format_file_size(repository.info().get("storage_quota_use"))
+                quota = format_file_size(repository.storage_quota)
+                output += f"\nStorage quota: {used} used out of {quota}\n"
+
+            output += (
+                textwrap.dedent(
+                    """
+                    Cache: {cache.path}
+                    Security dir: {security_dir}
+                    """
+                )
+                .strip()
+                .format(**info)
+            )
+
+            print(output)
             print(str(cache))
         return self.exit_code
 

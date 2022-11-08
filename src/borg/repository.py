@@ -493,9 +493,22 @@ class Repository:
         self.id = unhexlify(self.config.get("repository", "id").strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
+    def _load_hints(self):
+        transaction_id = self.get_transaction_id()
+        hints_path = os.path.join(self.path, "hints.%d" % transaction_id)
+        integrity_data = self._read_integrity(transaction_id, "hints")
+        with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
+            hints = msgpack.unpack(fd)
+        self.version = hints["version"]
+        self.storage_quota_use = hints["storage_quota_use"]
+        self.shadow_index = hints["shadow_index"]
+
     def info(self):
         """return some infos about the repo (must be opened first)"""
-        return dict(id=self.id, version=self.version, append_only=self.append_only)
+        self._load_hints()
+        return dict(
+            id=self.id, version=self.version, append_only=self.append_only, storage_quota_use=self.storage_quota_use
+        )
 
     def close(self):
         if self.lock:

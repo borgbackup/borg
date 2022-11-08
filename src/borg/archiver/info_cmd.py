@@ -6,7 +6,7 @@ from datetime import timedelta
 from ._common import with_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import remove_surrogates, format_timedelta, json_print, basic_json_data, format_file_size
+from ..helpers import remove_surrogates, format_timedelta, json_print, basic_json_data
 from ..manifest import Manifest
 
 from ..logger import create_logger

@@ -505,10 +505,13 @@ class Repository:
 
     def info(self):
         """return some infos about the repo (must be opened first)"""
-        self._load_hints()
-        return dict(
-            id=self.id, version=self.version, append_only=self.append_only, storage_quota_use=self.storage_quota_use
-        )
+        info = dict(id=self.id, version=self.version, append_only=self.append_only)
+        try:
+            self._load_hints()
+        except TypeError:
+            pass
+        info["storage_quota_use"] = self.storage_quota_use
+        return info
 
     def close(self):
         if self.lock:

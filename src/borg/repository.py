@@ -507,6 +507,7 @@ class Repository:
         except TypeError:
             pass
         info["storage_quota_use"] = self.storage_quota_use
+        info["storage_quota"] = self.storage_quota
         return info
 
     def close(self):

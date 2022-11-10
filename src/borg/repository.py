@@ -494,11 +494,7 @@ class Repository:
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
     def _load_hints(self):
-        transaction_id = self.get_transaction_id()
-        hints_path = os.path.join(self.path, "hints.%d" % transaction_id)
-        integrity_data = self._read_integrity(transaction_id, "hints")
-        with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
-            hints = msgpack.unpack(fd)
+        hints = self._unpack_hints(self.get_transaction_id())
         self.version = hints["version"]
         self.storage_quota_use = hints["storage_quota_use"]
         self.shadow_index = hints["shadow_index"]
@@ -573,6 +569,12 @@ class Repository:
             self.commit(compact=False)
             return self.open_index(self.get_transaction_id())
 
+    def _unpack_hints(self, transaction_id):
+        hints_path = os.path.join(self.path, "hints.%d" % transaction_id)
+        integrity_data = self._read_integrity(transaction_id, "hints")
+        with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
+            return msgpack.unpack(fd)
+
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
         if self.do_lock and not self.lock.got_exclusive_lock():
@@ -609,10 +611,8 @@ class Repository:
                 self.io.cleanup(transaction_id)
             hints_path = os.path.join(self.path, "hints.%d" % transaction_id)
             index_path = os.path.join(self.path, "index.%d" % transaction_id)
-            integrity_data = self._read_integrity(transaction_id, "hints")
             try:
-                with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
-                    hints = msgpack.unpack(fd)
+                hints = self._unpack_hints(transaction_id)
             except (msgpack.UnpackException, FileNotFoundError, FileIntegrityError) as e:
                 logger.warning("Repository hints file missing or corrupted, trying to recover: %s", e)
                 if not isinstance(e, FileNotFoundError):

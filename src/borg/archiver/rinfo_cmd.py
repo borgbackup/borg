@@ -50,12 +50,9 @@ class RInfoMixIn:
                 )
             )
 
-            try:
-                storage_quota = repository.storage_quota
-                used = repository.info().get("storage_quota_use")
-            except AttributeError:
-                # rpc call
-                pass
+            response = repository.info()
+            storage_quota = response["storage_quota"] or None
+            used = response["storage_quota_use"]
 
             if storage_quota:
                 storage_quota = format_file_size(storage_quota)

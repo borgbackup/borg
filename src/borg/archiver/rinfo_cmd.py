@@ -50,10 +50,17 @@ class RInfoMixIn:
                 )
             )
 
-            if repository.storage_quota:
-                used = format_file_size(repository.info().get("storage_quota_use"))
-                quota = format_file_size(repository.storage_quota)
-                output += f"\nStorage quota: {used} used out of {quota}\n"
+            try:
+                storage_quota = repository.storage_quota
+                used = repository.info().get("storage_quota_use")
+            except AttributeError:
+                # rpc call
+                pass
+
+            if storage_quota:
+                storage_quota = format_file_size(storage_quota)
+                used = format_file_size(used)
+                output += f"\nStorage quota: {used} used out of {storage_quota}\n"
 
             output += (
                 textwrap.dedent(

@@ -525,7 +525,6 @@ class Repository:
             self.rollback()
             raise exception
         self.check_free_space()
-        self.log_storage_quota()
         segment = self.io.write_commit()
         self.segments.setdefault(segment, 0)
         self.compact[segment] += LoggedIO.header_fmt.size
@@ -639,7 +638,6 @@ class Repository:
                 self.compact = FreeSpace(hints["compact"])
                 self.storage_quota_use = hints.get("storage_quota_use", 0)
                 self.shadow_index = hints.get("shadow_index", {})
-            self.log_storage_quota()
             # Drop uncommitted segments in the shadow index
             for key, shadowed_segments in self.shadow_index.items():
                 for segment in list(shadowed_segments):
@@ -778,14 +776,6 @@ class Repository:
             formatted_required = format_file_size(required_free_space)
             formatted_free = format_file_size(free_space)
             raise self.InsufficientFreeSpaceError(formatted_required, formatted_free)
-
-    def log_storage_quota(self):
-        if self.storage_quota:
-            logger.info(
-                "Storage quota: %s out of %s used.",
-                format_file_size(self.storage_quota_use),
-                format_file_size(self.storage_quota),
-            )
 
     def compact_segments(self, threshold):
         """Compact sparse segments by copying data into new segments"""

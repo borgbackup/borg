@@ -636,7 +636,7 @@ class Repository:
             os.fsync(fd.fileno())
 
         def rename_tmp(file):
-            os.rename(file + ".tmp", file)
+            os.replace(file + ".tmp", file)
 
         hints = {
             "version": 2,

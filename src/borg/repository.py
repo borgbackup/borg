@@ -966,13 +966,6 @@ class Repository:
             self.exclusive = remember_exclusive
             self.rollback()
 
-    def get_storage_quota_use(self):
-        hints_path = os.path.join(self.path, "hints.%d" % self.get_transaction_id())
-        integrity_data = self._read_integrity(self.get_transaction_id(), "hints")
-        with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
-            hints = msgpack.unpack(fd)
-            return hints["storage_quota_use"]
-
     def _update_index(self, segment, objects, report=None):
         """some code shared between replay_segments and check"""
         self.segments[segment] = 0

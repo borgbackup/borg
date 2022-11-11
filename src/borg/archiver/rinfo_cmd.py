@@ -51,7 +51,7 @@ class RInfoMixIn:
             )
 
             response = repository.info()
-            storage_quota = response["storage_quota"] or None
+            storage_quota = response["storage_quota"]
             used = response["storage_quota_use"]
 
             if storage_quota:

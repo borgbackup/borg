@@ -1138,6 +1138,14 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
         # skip this test, we can't mock-patch a Repository class in another process!
         pass
 
+    def test_repair_missing_commit_segment(self):
+        # skip this test, files in RemoteRepository cannot be deleted
+        pass
+
+    def test_repair_missing_segment(self):
+        # skip this test, files in RemoteRepository cannot be deleted
+        pass
+
 
 class RemoteLoggerTestCase(BaseTestCase):
     def setUp(self):

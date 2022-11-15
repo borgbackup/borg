@@ -844,7 +844,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
             fd.write(b"BOOM")
 
     def delete_segment(self, segment):
-        os.unlink(os.path.join(self.tmppath, "repository", "data", "0", str(segment)))
+        self.repository.io.delete_segment(segment)
 
     def delete_index(self):
         os.unlink(os.path.join(self.tmppath, "repository", f"index.{self.get_head()}"))

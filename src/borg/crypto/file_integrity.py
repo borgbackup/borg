@@ -128,6 +128,7 @@ class IntegrityCheckedFile(FileLikeWrapper):
         self.writing = write
         mode = "wb" if write else "rb"
         self.file_fd = override_fd or open(path, mode)
+        self.file_opened = override_fd is None
         self.digests = {}
 
         hash_cls = XXH64FileHashingWrapper
@@ -190,9 +191,14 @@ class IntegrityCheckedFile(FileLikeWrapper):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         exception = exc_type is not None
-        if not exception:
-            self.hash_part("final", is_final=True)
-        self.hasher.__exit__(exc_type, exc_val, exc_tb)
+
+        try:
+            if not exception:
+                self.hash_part("final", is_final=True)
+            self.hasher.__exit__(exc_type, exc_val, exc_tb)
+        finally:
+            if self.file_opened:
+                self.file_fd.close()
         if exception:
             return
         if self.writing:

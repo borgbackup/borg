@@ -844,7 +844,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
             fd.write(b"BOOM")
 
     def delete_segment(self, segment):
-        os.unlink(os.path.join(self.tmppath, "repository", "data", "0", str(segment)))
+        self.repository.io.delete_segment(segment)
 
     def delete_index(self):
         os.unlink(os.path.join(self.tmppath, "repository", f"index.{self.get_head()}"))
@@ -1136,6 +1136,14 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
 
     def test_crash_before_compact(self):
         # skip this test, we can't mock-patch a Repository class in another process!
+        pass
+
+    def test_repair_missing_commit_segment(self):
+        # skip this test, files in RemoteRepository cannot be deleted
+        pass
+
+    def test_repair_missing_segment(self):
+        # skip this test, files in RemoteRepository cannot be deleted
         pass
 
 

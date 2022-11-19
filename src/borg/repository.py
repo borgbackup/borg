@@ -613,7 +613,7 @@ class Repository:
             os.fsync(fd.fileno())
 
         def rename_tmp(file):
-            os.rename(file + '.tmp', file)
+            os.replace(file + ".tmp", file)
 
         hints = {
             b'version': 2,
@@ -1358,13 +1358,12 @@ class LoggedIO:
     def cleanup(self, transaction_id):
         """Delete segment files left by aborted transactions
         """
+        self.close_segment()
         self.segment = transaction_id + 1
         count = 0
         for segment, filename in self.segment_iterator(reverse=True):
             if segment > transaction_id:
-                if segment in self.fds:
-                    del self.fds[segment]
-                safe_unlink(filename)
+                self.delete_segment(segment)
                 count += 1
             else:
                 break

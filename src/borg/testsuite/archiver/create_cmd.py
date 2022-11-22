@@ -13,6 +13,7 @@ import pytest
 from ... import platform
 from ...constants import *  # NOQA
 from ...manifest import Manifest
+from ...platform import is_cygwin
 from ...repository import Repository
 from .. import has_lchflags
 from .. import changedir
@@ -707,7 +708,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd(f"--repo={self.repository_location}", "create", "test3", "input", "--list", "--filter=AM")
         self.assert_in("file1", output)
 
-    @pytest.mark.skipif(not are_fifos_supported(), reason="FIFOs not supported")
+    @pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason="FIFOs not supported, hangs on cygwin")
     def test_create_read_special_symlink(self):
         from threading import Thread
 

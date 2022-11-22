@@ -235,10 +235,10 @@ class ArchiverTestCaseBase(BaseTestCase):
             os.mknod("input/bdev", 0o600 | stat.S_IFBLK, os.makedev(10, 20))
             # Char device
             os.mknod("input/cdev", 0o600 | stat.S_IFCHR, os.makedev(30, 40))
-            # File mode
-            os.chmod("input/dir2", 0o555)  # if we take away write perms, we need root to remove contents
             # File owner
             os.chown("input/file1", 100, 200)  # raises OSError invalid argument on cygwin
+            # File mode
+            os.chmod("input/dir2", 0o555)  # if we take away write perms, we need root to remove contents
             have_root = True  # we have (fake)root
         except PermissionError:
             have_root = False

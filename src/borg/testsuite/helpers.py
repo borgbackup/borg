@@ -42,6 +42,7 @@ from ..helpers import iter_separated
 from ..helpers import eval_escapes
 from ..helpers import safe_unlink
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
+from ..platform import is_cygwin
 
 from . import BaseTestCase, FakeInputs
 
@@ -596,6 +597,7 @@ def test_parse_file_size_invalid(string):
         parse_file_size(string)
 
 
+@pytest.mark.skipif(is_cygwin, reason="ignore slow msgpack on cygwin")
 def test_is_slow_msgpack():
     # we need to import upstream msgpack package here, not helpers.msgpack:
     import msgpack

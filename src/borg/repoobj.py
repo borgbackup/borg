@@ -153,6 +153,6 @@ class RepoObj1:  # legacy
             meta = {}
             meta["ctype"] = compressor.ID
             meta["clevel"] = compressor.level
+            meta["csize"] = len(data_compressed)
             data = data_compressed
-        meta["csize"] = len(data_compressed)
         return meta, data

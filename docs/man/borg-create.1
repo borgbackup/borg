@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2022-10-02" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2022-11-26" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -132,7 +132,7 @@ specify the archive name
 .B PATH
 paths to archive
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -160,7 +160,7 @@ use NAME in archive for stdin data (default: \(aqstdin\(aq)
 set user USER in archive for stdin data (default: \(aqroot\(aq)
 .TP
 .BI \-\-stdin\-group \ GROUP
-set group GROUP in archive for stdin data (default: \(aqroot\(aq)
+set group GROUP in archive for stdin data (default: \(aqwheel\(aq)
 .TP
 .BI \-\-stdin\-mode \ M
 set mode to M in archive for stdin data (default: 0660)

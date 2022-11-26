@@ -99,14 +99,26 @@ Fixes:
 
 - transfer/upgrade: fix borg < 1.2 chunker_params, #7079
 - transfer/upgrade: do not access Item._dict, #7077
+- transfer/upgrade: fix crash in borg transfer, #7156
 - archive.save(): always use metadata from stats, #7072
 - benchmark: fixed TypeError in compression benchmarks, #7075
 - fix repository.scan api minimum requirement
+- fix args.paths related argparsing, #6994
 
 Other changes:
 
-- vagrant: use 3.10.7 for binary building
+- tar_filter: recognize .tar.zst as zstd, #7093
+- adding performance statistics to borg create, #6991
 - docs: add rcompress to usage index
+- tests:
+
+  - use github and MSYS2 for Windows CI, #7097
+  - win32 and cygwin: test fixes / skip hanging test
+  - vagrant / github CI: use python 3.11.0 / 3.10.8
+- vagrant:
+
+  - upgrade pyinstaller to 5.6.2 (supports python 3.11)
+  - use python 3.11 to build the borg binary
 
 Version 2.0.0b3 (2022-10-02)
 ----------------------------

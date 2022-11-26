@@ -21,7 +21,7 @@ borg export-tar
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``PATH``                              | paths to extract; patterns are supported                                                                  |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                    |
+    | **options**                                                                                                                                                                                               |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--tar-filter``                      | filter program to pipe data through                                                                       |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
@@ -64,7 +64,7 @@ borg export-tar
         paths to extract; patterns are supported
 
 
-    optional arguments
+    options
         --tar-filter         filter program to pipe data through
         --list               output verbose list of items (files, dirs, ...)
         --tar-format FMT     select tar format: BORG, PAX or GNU
@@ -95,7 +95,7 @@ before writing it to FILE:
 - .tar.gz or .tgz: gzip
 - .tar.bz2 or .tbz: bzip2
 - .tar.xz or .txz: xz
-- .tar.zstd: zstd
+- .tar.zstd or .tar.zst: zstd
 - .tar.lz4: lz4
 
 Alternatively, a ``--tar-filter`` program may be explicitly specified. It should

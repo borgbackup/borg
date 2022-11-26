@@ -21,7 +21,7 @@ borg diff
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     |                                                       | ``PATH``                              | paths of items inside the archives to compare; patterns are supported |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                |
+    | **options**                                                                                                                                                           |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     |                                                       | ``--numeric-ids``                     | only consider numeric user and group identifiers                      |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
@@ -64,7 +64,7 @@ borg diff
         paths of items inside the archives to compare; patterns are supported
 
 
-    optional arguments
+    options
         --numeric-ids    only consider numeric user and group identifiers
         --same-chunker-params    Override check of chunker parameters.
         --sort     Sort the output lines by file path.

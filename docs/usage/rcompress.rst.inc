@@ -13,7 +13,7 @@ borg rcompress
     .. class:: borg-options-table
 
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                       |
+    | **options**                                                                                                                                                                                                  |
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
     |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details. |
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
@@ -38,7 +38,7 @@ borg rcompress
 
 
 
-    optional arguments
+    options
         -C COMPRESSION, --compression COMPRESSION    select compression algorithm, see the output of the "borg help compression" command for details.
         -s, --stats     print statistics
         -c SECONDS, --checkpoint-interval SECONDS    write checkpoint every SECONDS seconds (Default: 1800)

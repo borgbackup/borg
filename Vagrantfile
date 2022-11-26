@@ -3,8 +3,8 @@
 
 # Automated creation of testing environments / binaries on misc. platforms
 
-$cpus = Integer(ENV.fetch('VMCPUS', '16'))  # create VMs with that many cpus
-$xdistn = Integer(ENV.fetch('XDISTN', '16'))  # dispatch tests to that many pytest workers
+$cpus = Integer(ENV.fetch('VMCPUS', '8'))  # create VMs with that many cpus
+$xdistn = Integer(ENV.fetch('XDISTN', '8'))  # dispatch tests to that many pytest workers
 $wmem = $xdistn * 256  # give the VM additional memory for workers [MB]
 
 def packages_debianoid(user)

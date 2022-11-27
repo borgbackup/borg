@@ -501,6 +501,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "create", "test", "input", "input")
 
     @pytest.mark.skipif("BORG_TESTS_IGNORE_MODES" in os.environ, reason="modes unreliable")
+    @pytest.mark.skipif(is_win32, reason="modes unavailable on Windows")
     def test_umask(self):
         self.create_regular_file("file1", size=1024 * 80)
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)

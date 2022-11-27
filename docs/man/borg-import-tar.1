@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-IMPORT-TAR" 1 "2022-10-02" "" "borg backup tool"
+.TH "BORG-IMPORT-TAR" 1 "2022-11-26" "" "borg backup tool"
 .SH NAME
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -49,7 +49,7 @@ based on its file extension and pipe the file through an appropriate filter:
 .IP \(bu 2
 \&.tar.xz or .txz: xz \-d
 .IP \(bu 2
-\&.tar.zstd: zstd \-d
+\&.tar.zstd or .tar.zst: zstd \-d
 .IP \(bu 2
 \&.tar.lz4: lz4 \-d
 .UNINDENT
@@ -92,7 +92,7 @@ specify the archive name
 .B TARFILE
 input tar file. \(dq\-\(dq to read from stdin instead.
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-tar\-filter

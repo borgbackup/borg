@@ -13,7 +13,7 @@ import pytest
 from ... import platform
 from ...constants import *  # NOQA
 from ...manifest import Manifest
-from ...platform import is_cygwin
+from ...platform import is_cygwin, is_win32
 from ...repository import Repository
 from .. import has_lchflags
 from .. import changedir
@@ -119,6 +119,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # we have all fs items exactly once!
         assert sorted(paths) == ["input", "input/a", "input/a/hardlink", "input/b", "input/b/hardlink"]
 
+    @pytest.mark.skipif(is_win32, reason="unix sockets not available on windows")
     def test_unix_socket(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         try:

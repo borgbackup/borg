@@ -265,7 +265,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "create", "test2", "input", "--comment", "this is the comment")
         self.cmd(f"--repo={self.repository_location}", "create", "test3", "input", "--comment", '"deleted" comment')
         self.cmd(f"--repo={self.repository_location}", "create", "test4", "input", "--comment", "preserved comment")
-        assert "Comment: \n" in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test1")
+        assert "Comment: " + os.linesep in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test1")
         assert "Comment: this is the comment" in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test2")
 
         self.cmd(f"--repo={self.repository_location}", "recreate", "-a", "test1", "--comment", "added comment")
@@ -274,7 +274,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "recreate", "-a", "test4", "12345")
         assert "Comment: added comment" in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test1")
         assert "Comment: modified comment" in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test2")
-        assert "Comment: \n" in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test3")
+        assert "Comment: " + os.linesep in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test3")
         assert "Comment: preserved comment" in self.cmd(f"--repo={self.repository_location}", "info", "-a", "test4")
 
 

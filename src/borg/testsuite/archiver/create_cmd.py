@@ -204,14 +204,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "exit 73;",
             exit_code=2,
         )
-        assert output.endswith("Command 'sh' exited with status 73\n")
+        assert output.endswith("Command 'sh' exited with status 73" + os.linesep)
         archive_list = json.loads(self.cmd(f"--repo={self.repository_location}", "rlist", "--json"))
         assert archive_list["archives"] == []
 
     def test_create_content_from_command_missing_command(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         output = self.cmd(f"--repo={self.repository_location}", "create", "test", "--content-from-command", exit_code=2)
-        assert output.endswith("No command given.\n")
+        assert output.endswith("No command given." + os.linesep)
 
     def test_create_paths_from_stdin(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
@@ -262,14 +262,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "exit 73;",
             exit_code=2,
         )
-        assert output.endswith("Command 'sh' exited with status 73\n")
+        assert output.endswith("Command 'sh' exited with status 73" + os.linesep)
         archive_list = json.loads(self.cmd(f"--repo={self.repository_location}", "rlist", "--json"))
         assert archive_list["archives"] == []
 
     def test_create_paths_from_command_missing_command(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         output = self.cmd(f"--repo={self.repository_location}", "create", "test", "--paths-from-command", exit_code=2)
-        assert output.endswith("No command given.\n")
+        assert output.endswith("No command given." + os.linesep)
 
     def test_create_without_root(self):
         """test create without a root"""

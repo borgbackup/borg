@@ -24,17 +24,17 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in("No option ", output)
         self.cmd(f"--repo={self.repository_location}", "config", "last_segment_checked", "123")
         output = self.cmd(f"--repo={self.repository_location}", "config", "last_segment_checked")
-        assert output == "123" + "\n"
+        assert output == "123" + os.linesep
         output = self.cmd(f"--repo={self.repository_location}", "config", "--list")
         self.assert_in("last_segment_checked", output)
         self.cmd(f"--repo={self.repository_location}", "config", "--delete", "last_segment_checked")
 
         for cfg_key, cfg_value in [("additional_free_space", "2G"), ("repository.append_only", "1")]:
             output = self.cmd(f"--repo={self.repository_location}", "config", cfg_key)
-            assert output == "0" + "\n"
+            assert output == "0" + os.linesep
             self.cmd(f"--repo={self.repository_location}", "config", cfg_key, cfg_value)
             output = self.cmd(f"--repo={self.repository_location}", "config", cfg_key)
-            assert output == cfg_value + "\n"
+            assert output == cfg_value + os.linesep
             self.cmd(f"--repo={self.repository_location}", "config", "--delete", cfg_key)
             self.cmd(f"--repo={self.repository_location}", "config", cfg_key, exit_code=1)
 

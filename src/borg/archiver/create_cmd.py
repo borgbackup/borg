@@ -28,6 +28,7 @@ from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
+from ..platform import is_win32
 from ..platform import get_flags
 from ..platform import uid2user, gid2group
 
@@ -68,7 +69,9 @@ class CreateMixIn:
                 if not dry_run:
                     try:
                         try:
-                            proc = subprocess.Popen(args.paths, stdout=subprocess.PIPE, preexec_fn=ignore_sigint)
+                            proc = subprocess.Popen(
+                                args.paths, stdout=subprocess.PIPE, preexec_fn=None if is_win32 else ignore_sigint
+                            )
                         except (FileNotFoundError, PermissionError) as e:
                             self.print_error("Failed to execute command: %s", e)
                             return self.exit_code
@@ -89,7 +92,9 @@ class CreateMixIn:
                 paths_sep = eval_escapes(args.paths_delimiter) if args.paths_delimiter is not None else "\n"
                 if args.paths_from_command:
                     try:
-                        proc = subprocess.Popen(args.paths, stdout=subprocess.PIPE, preexec_fn=ignore_sigint)
+                        proc = subprocess.Popen(
+                            args.paths, stdout=subprocess.PIPE, preexec_fn=None if is_win32 else ignore_sigint
+                        )
                     except (FileNotFoundError, PermissionError) as e:
                         self.print_error("Failed to execute command: %s", e)
                         return self.exit_code

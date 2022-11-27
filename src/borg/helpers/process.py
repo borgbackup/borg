@@ -341,7 +341,7 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
                 stdin=filter_stream,
                 log_prefix="filter-process: ",
                 env=env,
-                preexec_fn=ignore_sigint,
+                preexec_fn=None if is_win32 else ignore_sigint,
             )
         else:
             proc = popen_with_error_handling(
@@ -350,7 +350,7 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
                 stdout=filter_stream,
                 log_prefix="filter-process: ",
                 env=env,
-                preexec_fn=ignore_sigint,
+                preexec_fn=None if is_win32 else ignore_sigint,
             )
         if not proc:
             raise Error(f"filter {cmd}: process creation failed")

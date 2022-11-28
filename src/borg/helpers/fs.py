@@ -202,7 +202,7 @@ class HardLinkManager:
         return stat.S_ISREG(mode) or stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
 
     def borg1_hardlink_master(self, item):  # legacy
-        return item.get("hardlink_master", True) and "source" not in item and self.borg1_hardlinkable(item.mode)
+        return item.get("hardlink_master", False) and "source" not in item and self.borg1_hardlinkable(item.mode)
 
     def borg1_hardlink_slave(self, item):  # legacy
         return "source" in item and self.borg1_hardlinkable(item.mode)

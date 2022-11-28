@@ -5,6 +5,7 @@ import unittest
 
 from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported
+from ..platform import is_win32
 from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
 
 
@@ -79,7 +80,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert "input/file_unchanged" not in output
 
             # Directory replaced with a regular file
-            if "BORG_TESTS_IGNORE_MODES" not in os.environ:
+            if "BORG_TESTS_IGNORE_MODES" not in os.environ and not is_win32:
                 assert "[drwxr-xr-x -> -rwxr-xr-x] input/dir_replaced_with_file" in output
 
             # Basic directory cases
@@ -153,7 +154,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert not any(get_changes("input/file_unchanged", joutput))
 
             # Directory replaced with a regular file
-            if "BORG_TESTS_IGNORE_MODES" not in os.environ:
+            if "BORG_TESTS_IGNORE_MODES" not in os.environ and not is_win32:
                 assert {"type": "mode", "old_mode": "drwxr-xr-x", "new_mode": "-rwxr-xr-x"} in get_changes(
                     "input/dir_replaced_with_file", joutput
                 )

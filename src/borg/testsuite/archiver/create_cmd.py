@@ -547,6 +547,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # https://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
         self.assert_in("A input/file2", output)
 
+    @pytest.mark.skipif(
+        is_win32, reason="ctime attribute is file creation time on Windows"
+    )  # see https://docs.python.org/3/library/os.html#os.stat_result.st_ctime
     def test_file_status_cs_cache_mode(self):
         """test that a changed file with faked "previous" mtime still gets backed up in ctime,size cache_mode"""
         self.create_regular_file("file1", contents=b"123")

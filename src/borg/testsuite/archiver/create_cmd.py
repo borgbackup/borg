@@ -243,9 +243,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file("file4", size=1024 * 80)
 
         input_data = "input/file1\ninput/file2\ninput/file3"
+        if is_win32:
+            with open("filenames.cmd", "w") as script:
+                for filename in input_data.splitlines():
+                    script.write(f"@echo {filename}\n")
         self.cmd(
-            f"--repo={self.repository_location}", "create", "--paths-from-command", "test", "--", "echo", input_data
+            f"--repo={self.repository_location}",
+            "create",
+            "--paths-from-command",
+            "test",
+            "--",
+            "filenames.cmd" if is_win32 else "echo",
+            input_data,
         )
+
         archive_list = self.cmd(f"--repo={self.repository_location}", "list", "test", "--json-lines")
         paths = [json.loads(line)["path"] for line in archive_list.split("\n") if line]
         assert paths == ["input/file1", "input/file2", "input/file3"]

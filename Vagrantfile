@@ -3,8 +3,8 @@
 
 # Automated creation of testing environments / binaries on misc. platforms
 
-$cpus = Integer(ENV.fetch('VMCPUS', '16'))  # create VMs with that many cpus
-$xdistn = Integer(ENV.fetch('XDISTN', '16'))  # dispatch tests to that many pytest workers
+$cpus = Integer(ENV.fetch('VMCPUS', '8'))  # create VMs with that many cpus
+$xdistn = Integer(ENV.fetch('XDISTN', '8'))  # dispatch tests to that many pytest workers
 $wmem = $xdistn * 256  # give the VM additional memory for workers [MB]
 
 def packages_debianoid(user)
@@ -160,8 +160,8 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.11.0  # tests
-    pyenv install 3.10.8  # tests, binary build
+    pyenv install 3.11.0  # tests, binary build
+    pyenv install 3.10.1  # tests
     pyenv install 3.9.1   # tests
     pyenv rehash
   EOF
@@ -179,9 +179,9 @@ def build_pyenv_venv(boxname)
   return <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
-    # use the latest 3.10 release
-    pyenv global 3.10.8
-    pyenv virtualenv 3.10.8 borg-env
+    # use the latest 3.11 release
+    pyenv global 3.11.0
+    pyenv virtualenv 3.11.0 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -205,7 +205,7 @@ def install_pyinstaller()
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    pip install 'pyinstaller==5.4.1'
+    pip install 'pyinstaller==5.6.2'
   EOF
 end
 
@@ -228,8 +228,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.1 3.10.8 3.11.0
-      pyenv local 3.9.1 3.10.8 3.11.0
+      pyenv global 3.9.1 3.10.1 3.11.0
+      pyenv local 3.9.1 3.10.1 3.11.0
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:

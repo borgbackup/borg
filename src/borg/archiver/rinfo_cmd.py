@@ -52,12 +52,12 @@ class RInfoMixIn:
 
             response = repository.info()
             storage_quota = response["storage_quota"]
-            used = response["storage_quota_use"]
+            used = format_file_size(response["storage_quota_use"])
 
+            output = f"Storage quota: {used} used"
             if storage_quota:
-                storage_quota = format_file_size(storage_quota)
-                used = format_file_size(used)
-                output += f"\nStorage quota: {used} used out of {storage_quota}\n"
+                output += f" out of {format_file_size(storage_quota)}"
+            output += "\n"
 
             output += (
                 textwrap.dedent(

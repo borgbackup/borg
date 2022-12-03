@@ -83,7 +83,7 @@ def safe_ns(ts):
 
 def safe_timestamp(item_timestamp_ns):
     t_ns = safe_ns(item_timestamp_ns)
-    return datetime.fromtimestamp(t_ns / 1e9)
+    return datetime.fromtimestamp(t_ns / 1e9, timezone.utc)  # return tz-aware utc datetime obj
 
 
 def format_time(ts: datetime, format_spec=""):

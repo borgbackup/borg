@@ -61,14 +61,14 @@ typedef unsigned int _msgpack_atomic_counter_t;
 #endif
 #endif
 
-#else
-#include <arpa/inet.h>  /* __BYTE_ORDER */
+#else /* _WIN32 */
+#include <arpa/inet.h> /* ntohs, ntohl */
 #endif
 
 #if !defined(__LITTLE_ENDIAN__) && !defined(__BIG_ENDIAN__)
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #define __LITTLE_ENDIAN__
-#elif __BYTE_ORDER == __BIG_ENDIAN
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #define __BIG_ENDIAN__
 #elif _WIN32
 #define __LITTLE_ENDIAN__
@@ -95,7 +95,7 @@ typedef unsigned int _msgpack_atomic_counter_t;
 #ifdef _WIN32
 #  if defined(ntohl)
 #    define _msgpack_be32(x) ntohl(x)
-#  elif defined(_byteswap_ulong) || (defined(_MSC_VER) && _MSC_VER >= 1400)
+#  elif defined(_byteswap_ulong) || defined(_MSC_VER)
 #    define _msgpack_be32(x) ((uint32_t)_byteswap_ulong((unsigned long)x))
 #  else
 #    define _msgpack_be32(x) \
@@ -108,7 +108,7 @@ typedef unsigned int _msgpack_atomic_counter_t;
 #  define _msgpack_be32(x) ntohl(x)
 #endif
 
-#if defined(_byteswap_uint64) || (defined(_MSC_VER) && _MSC_VER >= 1400)
+#if defined(_byteswap_uint64) || defined(_MSC_VER)
 #  define _msgpack_be64(x) (_byteswap_uint64(x))
 #elif defined(bswap_64)
 #  define _msgpack_be64(x) bswap_64(x)

@@ -123,3 +123,8 @@ class OutputTimestamp:
         return self.ts.isoformat(timespec="microseconds")
 
     to_json = isoformat
+
+
+def archive_ts_now():
+    """return tz-aware datetime obj for current time for usage as archive timestamp"""
+    return datetime.now().astimezone()  # local time / local timezone

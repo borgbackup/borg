@@ -756,6 +756,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 extracted_data = f.read()
         assert extracted_data == data
 
+    @pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
     def test_create_read_special_broken_symlink(self):
         os.symlink("somewhere does not exist", os.path.join(self.input_path, "link"))
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)

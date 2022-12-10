@@ -32,6 +32,7 @@ from ..helpers import msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
+from ..helpers import archivename_validator
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import swidth_slice
 from ..helpers import chunkit
@@ -244,6 +245,49 @@ class TestLocationWithoutEnv:
         with pytest.raises(ValueError):
             # this is invalid due to the 2nd colon, correct: 'ssh://user@host/path'
             Location("ssh://user@host:/path")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "foobar",
+        # placeholders
+        "foobar-{now}",
+    ],
+)
+def test_archivename_ok(name):
+    av = archivename_validator()
+    av(name)  # must not raise an exception
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "",  # too short
+        "x" * 201,  # too long
+        # invalid chars:
+        "foo/bar",
+        "foo\\bar",
+        ">foo",
+        "<foo",
+        "|foo",
+        'foo"bar',
+        "foo?",
+        "*bar",
+        "foo\nbar",
+        "foo\0bar",
+        # leading/trailing blanks
+        " foo",
+        "bar  ",
+        # contains surrogate-escapes
+        "foo\udc80bar",
+        "foo\udcffbar",
+    ],
+)
+def test_archivename_invalid(name):
+    av = archivename_validator()
+    with pytest.raises(ArgumentTypeError):
+        av(name)
 
 
 class FormatTimedeltaTestCase(BaseTestCase):

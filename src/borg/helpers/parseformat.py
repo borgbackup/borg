@@ -540,9 +540,34 @@ def location_validator(proto=None, other=False):
 
 def archivename_validator():
     def validator(text):
+        assert isinstance(text, str)
+        # we make sure that the archive name can be used as directory name (for borg mount)
         text = replace_placeholders(text)
-        if "/" in text or "::" in text or not text:
-            raise argparse.ArgumentTypeError('Invalid archive name: "%s"' % text)
+        MAX_PATH = 260  # Windows default. Since Win10, there is a registry setting LongPathsEnabled to get more.
+        MAX_DIRNAME = MAX_PATH - len("12345678.123")
+        SAFETY_MARGIN = 48  # borgfs path: mountpoint / archivename / dir / dir / ... / file
+        MAX_ARCHIVENAME = MAX_DIRNAME - SAFETY_MARGIN
+        if not (0 < len(text) <= MAX_ARCHIVENAME):
+            raise argparse.ArgumentTypeError(f'Invalid archive name: "{text}" [0 < length <= {MAX_ARCHIVENAME}]')
+        # note: ":" is also a invalid path char on windows, but we can not blacklist it,
+        # because e.g. our {now} placeholder creates ISO-8601 like output like 2022-12-10T20:47:42 .
+        invalid_chars = r"/" + r"\"<|>?*"  # posix + windows
+        if re.search(f"[{re.escape(invalid_chars)}]", text):
+            raise argparse.ArgumentTypeError(
+                f'Invalid archive name: "{text}" [invalid chars detected matching "{invalid_chars}"]'
+            )
+        invalid_ctrl_chars = "".join(chr(i) for i in range(32))
+        if re.search(f"[{re.escape(invalid_ctrl_chars)}]", text):
+            raise argparse.ArgumentTypeError(
+                f'Invalid archive name: "{text}" [invalid control chars detected, ASCII < 32]'
+            )
+        if text.startswith(" ") or text.endswith(" "):
+            raise argparse.ArgumentTypeError(f'Invalid archive name: "{text}" [leading or trailing blanks]')
+        try:
+            text.encode("utf-8", errors="strict")
+        except UnicodeEncodeError:
+            # looks like text contains surrogate-escapes
+            raise argparse.ArgumentTypeError(f'Invalid archive name: "{text}" [contains non-unicode characters]')
         return text
 
     return validator

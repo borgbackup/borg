@@ -30,7 +30,7 @@ from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid
-from .helpers import parse_timestamp
+from .helpers import parse_timestamp, archive_ts_now
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import safe_encode, make_path_safe, remove_surrogates
 from .helpers import StableDict
@@ -510,13 +510,13 @@ class Archive:
             start_monotonic is None
         ), "Logic error: if start is given, start_monotonic must be given as well and vice versa."
         if start is None:
-            start = datetime.now().astimezone()  # local time with local timezone
+            start = archive_ts_now()
             start_monotonic = time.monotonic()
         self.chunker_params = chunker_params
         self.start = start
         self.start_monotonic = start_monotonic
         if end is None:
-            end = datetime.now().astimezone()  # local time with local timezone
+            end = archive_ts_now()
         self.end = end
         self.consider_part_files = consider_part_files
         self.pipeline = DownloadPipeline(self.repository, self.repo_objs)
@@ -663,7 +663,7 @@ Duration: {0.duration}
         )
         duration = timedelta(seconds=time.monotonic() - self.start_monotonic)
         if timestamp is None:
-            end = datetime.now().astimezone()  # local time with local timezone
+            end = archive_ts_now()
             start = end - duration
         else:
             start = timestamp
@@ -2364,7 +2364,7 @@ class ArchiveRecreater:
             target.rename(archive.name)
         if self.stats:
             target.start = _start
-            target.end = datetime.now().astimezone()  # local time with local timezone
+            target.end = archive_ts_now()
             log_multi(str(target), str(target.stats))
 
     def matcher_add_tagged_dirs(self, archive):

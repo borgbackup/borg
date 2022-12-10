@@ -5,7 +5,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
 from ..helpers import EXIT_SUCCESS, EXIT_ERROR, Error
-from ..helpers import location_validator, Location
+from ..helpers import location_validator, Location, archivename_validator
 from ..helpers import format_file_size
 from ..manifest import Manifest
 
@@ -38,6 +38,19 @@ class TransferMixIn:
         archive_names = tuple(x.name for x in other_manifest.archives.list_considering(args))
         if not archive_names:
             return EXIT_SUCCESS
+
+        an_errors = []
+        av = archivename_validator()
+        for archive_name in archive_names:
+            try:
+                av(archive_name)
+            except argparse.ArgumentTypeError as err:
+                an_errors.append(str(err))
+        if an_errors:
+            self.print_error("Invalid archive names detected, please rename them before transfer:")
+            for err_msg in an_errors:
+                self.print_error(err_msg)
+            return EXIT_ERROR
 
         from .. import upgrade as upgrade_mod
 

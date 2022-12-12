@@ -616,7 +616,7 @@ class BaseFormatter:
         return (
             "- NEWLINE: OS dependent line separator\n"
             "- NL: alias of NEWLINE\n"
-            "- NUL: NUL character for creating print0 / xargs -0 like output, see bpath key below\n"
+            "- NUL: NUL character for creating print0 / xargs -0 like output\n"
             "- SPACE\n"
             "- TAB\n"
             "- CR\n"
@@ -753,8 +753,7 @@ class ItemFormatter(BaseFormatter):
     # shake_* is not provided because it uses an incompatible .digest() method to support variable length.
     hash_algorithms = set(hashlib.algorithms_guaranteed).union({"xxh64"}).difference({"shake_128", "shake_256"})
     KEY_DESCRIPTIONS = {
-        "bpath": "verbatim POSIX path, can contain any character except NUL",
-        "path": "path interpreted as text (might be missing non-text characters, see bpath)",
+        "path": "file path",
         "source": "link target for symlinks (identical to linktarget)",
         "hlid": "hard link identity (same if hardlinking same fs object)",
         "extra": 'prepends {source} with " -> " for soft links and " link to " for hard links',
@@ -765,7 +764,7 @@ class ItemFormatter(BaseFormatter):
         "health": 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
     }
     KEY_GROUPS = (
-        ("type", "mode", "uid", "gid", "user", "group", "path", "bpath", "source", "linktarget", "hlid", "flags"),
+        ("type", "mode", "uid", "gid", "user", "group", "path", "source", "linktarget", "hlid", "flags"),
         ("size", "dsize", "num_chunks", "unique_chunks"),
         ("mtime", "ctime", "atime", "isomtime", "isoctime", "isoatime"),
         tuple(sorted(hash_algorithms)),
@@ -869,7 +868,6 @@ class ItemFormatter(BaseFormatter):
         if self.json_lines:
             item_data["healthy"] = "chunks_healthy" not in item
         else:
-            item_data["bpath"] = item.path
             item_data["extra"] = extra
             item_data["health"] = "broken" if "chunks_healthy" in item else "healthy"
         item_data["source"] = source

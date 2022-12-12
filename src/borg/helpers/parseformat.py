@@ -629,8 +629,7 @@ class ArchiveFormatter(BaseFormatter):
         "archive": "archive name interpreted as text (might be missing non-text characters, see barchive)",
         "name": 'alias of "archive"',
         "barchive": "verbatim archive name, can contain any character except NUL",
-        "comment": "archive comment interpreted as text (might be missing non-text characters, see bcomment)",
-        "bcomment": "verbatim archive comment, can contain any character except NUL",
+        "comment": "archive comment",
         # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
         "start": "time (start) of creation of the archive",
         "time": 'alias of "start"',
@@ -641,7 +640,7 @@ class ArchiveFormatter(BaseFormatter):
         "username": "username of user who created this archive",
     }
     KEY_GROUPS = (
-        ("archive", "name", "barchive", "comment", "bcomment", "id"),
+        ("archive", "name", "barchive", "comment", "id"),
         ("start", "time", "end", "command_line"),
         ("hostname", "username"),
     )
@@ -692,7 +691,6 @@ class ArchiveFormatter(BaseFormatter):
             "hostname": partial(self.get_meta, "hostname", rs=True),
             "username": partial(self.get_meta, "username", rs=True),
             "comment": partial(self.get_meta, "comment", rs=True),
-            "bcomment": partial(self.get_meta, "comment", rs=False),
             "end": self.get_ts_end,
             "command_line": self.get_cmdline,
         }

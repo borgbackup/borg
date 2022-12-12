@@ -32,7 +32,7 @@ from ..helpers import msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
-from ..helpers import archivename_validator
+from ..helpers import archivename_validator, text_validator
 from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
 from ..helpers import swidth_slice
 from ..helpers import chunkit
@@ -288,6 +288,29 @@ def test_archivename_invalid(name):
     av = archivename_validator()
     with pytest.raises(ArgumentTypeError):
         av(name)
+
+
+@pytest.mark.parametrize("text", ["", "single line", "multi\nline\ncomment"])
+def test_text_ok(text):
+    tv = text_validator(max_length=100, name="name")
+    tv(text)  # must not raise an exception
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "x" * 101,  # too long
+        # invalid chars:
+        "foo\0bar",
+        # contains surrogate-escapes
+        "foo\udc80bar",
+        "foo\udcffbar",
+    ],
+)
+def test_text_invalid(text):
+    tv = text_validator(max_length=100, name="name")
+    with pytest.raises(ArgumentTypeError):
+        tv(text)
 
 
 class FormatTimedeltaTestCase(BaseTestCase):

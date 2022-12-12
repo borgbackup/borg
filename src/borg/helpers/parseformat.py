@@ -573,6 +573,26 @@ def archivename_validator():
     return validator
 
 
+def text_validator(*, name, max_length, invalid_ctrl_chars="\0"):
+    def validator(text):
+        assert isinstance(text, str)
+        if not (len(text) <= max_length):
+            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [length <= {max_length}]')
+        if re.search(f"[{re.escape(invalid_ctrl_chars)}]", text):
+            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [invalid control chars detected]')
+        try:
+            text.encode("utf-8", errors="strict")
+        except UnicodeEncodeError:
+            # looks like text contains surrogate-escapes
+            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [contains non-unicode characters]')
+        return text
+
+    return validator
+
+
+comment_validator = text_validator(name="comment", max_length=10000)
+
+
 class BaseFormatter:
     FIXED_KEYS = {
         # Formatting aids

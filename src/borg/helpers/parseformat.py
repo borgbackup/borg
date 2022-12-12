@@ -616,7 +616,7 @@ class BaseFormatter:
         return (
             "- NEWLINE: OS dependent line separator\n"
             "- NL: alias of NEWLINE\n"
-            "- NUL: NUL character for creating print0 / xargs -0 like output, see barchive and bpath keys below\n"
+            "- NUL: NUL character for creating print0 / xargs -0 like output, see bpath key below\n"
             "- SPACE\n"
             "- TAB\n"
             "- CR\n"
@@ -626,9 +626,8 @@ class BaseFormatter:
 
 class ArchiveFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
-        "archive": "archive name interpreted as text (might be missing non-text characters, see barchive)",
+        "archive": "archive name",
         "name": 'alias of "archive"',
-        "barchive": "verbatim archive name, can contain any character except NUL",
         "comment": "archive comment",
         # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
         "start": "time (start) of creation of the archive",
@@ -640,7 +639,7 @@ class ArchiveFormatter(BaseFormatter):
         "username": "username of user who created this archive",
     }
     KEY_GROUPS = (
-        ("archive", "name", "barchive", "comment", "id"),
+        ("archive", "name", "comment", "id"),
         ("start", "time", "end", "command_line"),
         ("hostname", "username"),
     )
@@ -713,7 +712,6 @@ class ArchiveFormatter(BaseFormatter):
             {
                 "name": remove_surrogates(archive_info.name),
                 "archive": remove_surrogates(archive_info.name),
-                "barchive": archive_info.name,
                 "id": bin_to_hex(archive_info.id),
                 "time": self.format_time(archive_info.ts),
                 "start": self.format_time(archive_info.ts),

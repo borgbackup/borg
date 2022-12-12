@@ -114,7 +114,6 @@ class RListMixIn:
             help="Format output as JSON. "
             "The form of ``--format`` is ignored, "
             "but keys used in it are added to the JSON output. "
-            "Some keys are always present. Note: JSON can only represent text. "
-            'A "barchive" key is therefore not available.',
+            "Some keys are always present. Note: JSON can only represent text.",
         )
         define_archive_filters_group(subparser)

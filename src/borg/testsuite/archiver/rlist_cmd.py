@@ -35,8 +35,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assertEqual(output_1, output_2)
         output_1 = self.cmd(f"--repo={self.repository_location}", "rlist", "--short")
         self.assertEqual(output_1, "test-1\ntest-2\n")
-        output_1 = self.cmd(f"--repo={self.repository_location}", "rlist", "--format", "{barchive}/")
-        self.assertEqual(output_1, "test-1/test-2/")
         output_3 = self.cmd(f"--repo={self.repository_location}", "rlist", "--format", "{name} {comment}{NL}")
         self.assert_in("test-1 comment 1\n", output_3)
         self.assert_in("test-2 comment 2\n", output_3)

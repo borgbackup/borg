@@ -593,8 +593,8 @@ class BaseFormatter:
         "TAB": "\t",
         "CR": "\r",
         "NUL": "\0",
-        "NEWLINE": os.linesep,
-        "NL": os.linesep,
+        "NEWLINE": "\n",
+        "NL": "\n",  # \n is automatically converted to os.linesep on write
     }
 
     def get_item_data(self, item):

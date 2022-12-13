@@ -60,7 +60,7 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
     def test_chunks_archive(self):
         self.cmd(f"--repo={self.repository_location}", "create", "test1", "input")
         # Find ID of test1 so we can corrupt it later :)
-        target_id = self.cmd(f"--repo={self.repository_location}", "rlist", "--format={id}{LF}").strip()
+        target_id = self.cmd(f"--repo={self.repository_location}", "rlist", "--format={id}{NL}").strip()
         self.cmd(f"--repo={self.repository_location}", "create", "test2", "input")
 
         # Force cache sync, creating archive chunks of test1 and test2 in chunks.archive.d

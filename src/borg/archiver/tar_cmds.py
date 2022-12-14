@@ -1,6 +1,5 @@
 import argparse
 import base64
-from datetime import datetime
 import logging
 import os
 import stat
@@ -19,7 +18,7 @@ from ..helpers import ChunkIteratorFileWrapper
 from ..helpers import ChunkerParams
 from ..helpers import NameSpec
 from ..helpers import remove_surrogates
-from ..helpers import timestamp
+from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
 from ..manifest import Manifest
@@ -255,7 +254,7 @@ class TarMixIn:
         return self.exit_code
 
     def _import_tar(self, args, repository, manifest, key, cache, tarstream):
-        t0 = datetime.now().astimezone()  # local time with local timezone
+        t0 = archive_ts_now()
         t0_monotonic = time.monotonic()
 
         archive = Archive(

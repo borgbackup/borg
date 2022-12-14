@@ -5,7 +5,6 @@ import os
 import stat
 import subprocess
 import time
-from datetime import datetime
 from io import TextIOWrapper
 
 from ._common import with_repository, Highlander
@@ -19,7 +18,7 @@ from ..compress import CompressionSpec
 from ..helpers import ChunkerParams
 from ..helpers import NameSpec, FilesCacheMode
 from ..helpers import eval_escapes
-from ..helpers import timestamp
+from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat
 from ..helpers import dir_is_tagged
 from ..helpers import log_multi
@@ -209,7 +208,7 @@ class CreateMixIn:
         self.noxattrs = args.noxattrs
         self.exclude_nodump = args.exclude_nodump
         dry_run = args.dry_run
-        t0 = datetime.now().astimezone()  # local time with local timezone
+        t0 = archive_ts_now()
         t0_monotonic = time.monotonic()
         logger.info('Creating archive at "%s"' % args.location.processed)
         if not dry_run:

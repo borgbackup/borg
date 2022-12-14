@@ -35,7 +35,7 @@ from .process import signal_handler, raising_signal_handler, sig_int, ignore_sig
 from .process import popen_with_error_handling, is_terminal, prepare_subprocess_env, create_filter_process
 from .progress import ProgressIndicatorPercent, ProgressIndicatorEndless, ProgressIndicatorMessage
 from .time import parse_timestamp, timestamp, safe_timestamp, safe_s, safe_ns, MAX_S, SUPPORT_32BIT_PLATFORMS
-from .time import format_time, format_timedelta, OutputTimestamp
+from .time import format_time, format_timedelta, OutputTimestamp, archive_ts_now
 from .yes_no import yes, TRUISH, FALSISH, DEFAULTISH
 
 from .msgpack import is_slow_msgpack, is_supported_msgpack, get_limited_unpacker

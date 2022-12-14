@@ -54,7 +54,7 @@ class RInfoMixIn:
             storage_quota = response["storage_quota"]
             used = format_file_size(response["storage_quota_use"])
 
-            output = f"Storage quota: {used} used"
+            output += f"Storage quota: {used} used"
             if storage_quota:
                 output += f" out of {format_file_size(storage_quota)}"
             output += "\n"

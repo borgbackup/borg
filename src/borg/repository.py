@@ -502,8 +502,12 @@ class Repository:
     def info(self):
         """return some infos about the repo (must be opened first)"""
         info = dict(id=self.id, version=self.version, append_only=self.append_only)
-        self._load_hints()
-        info["storage_quota_use"] = self.storage_quota_use
+        try:
+            self._load_hints()
+            info["storage_quota_use"] = self.storage_quota_use
+        except TypeError:
+            # self is a fresh repo, so transaction_id is None and there is no hints file
+            info["storage_quota_use"] = 0
         info["storage_quota"] = self.storage_quota
         return info
 

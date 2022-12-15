@@ -494,7 +494,11 @@ class Repository:
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
     def _load_hints(self):
-        hints = self._unpack_hints(self.get_transaction_id())
+        if not (transaction_id := self.get_transaction_id()):
+            # self is a fresh repo, so transaction_id is None and there is no hints file
+            self.storage_quota_use = 0
+            return
+        hints = self._unpack_hints(transaction_id)
         self.version = hints["version"]
         self.storage_quota_use = hints["storage_quota_use"]
         self.shadow_index = hints["shadow_index"]
@@ -502,13 +506,9 @@ class Repository:
     def info(self):
         """return some infos about the repo (must be opened first)"""
         info = dict(id=self.id, version=self.version, append_only=self.append_only)
-        try:
-            self._load_hints()
-            info["storage_quota_use"] = self.storage_quota_use
-        except TypeError:
-            # self is a fresh repo, so transaction_id is None and there is no hints file
-            info["storage_quota_use"] = 0
+        self._load_hints()
         info["storage_quota"] = self.storage_quota
+        info["storage_quota_use"] = self.storage_quota_use
         return info
 
     def close(self):

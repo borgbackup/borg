@@ -40,10 +40,9 @@ class TransferMixIn:
             return EXIT_SUCCESS
 
         an_errors = []
-        av = archivename_validator()
         for archive_name in archive_names:
             try:
-                av(archive_name)
+                archivename_validator(archive_name)
             except argparse.ArgumentTypeError as err:
                 an_errors.append(str(err))
         if an_errors:

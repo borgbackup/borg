@@ -16,7 +16,7 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
 from ..helpers import comment_validator, ChunkerParams
-from ..helpers import NameSpec, FilesCacheMode
+from ..helpers import archivename_validator, FilesCacheMode
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat
@@ -861,5 +861,5 @@ class CreateMixIn:
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
 
-        subparser.add_argument("name", metavar="NAME", type=NameSpec, help="specify the archive name")
+        subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument("paths", metavar="PATH", nargs="*", type=str, action="extend", help="paths to archive")

@@ -106,8 +106,8 @@ class DiffMixIn:
         )
         subparser.add_argument("--sort", dest="sort", action="store_true", help="Sort the output lines by file path.")
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")
-        subparser.add_argument("name", metavar="ARCHIVE1", type=archivename_validator(), help="ARCHIVE1 name")
-        subparser.add_argument("other_name", metavar="ARCHIVE2", type=archivename_validator(), help="ARCHIVE2 name")
+        subparser.add_argument("name", metavar="ARCHIVE1", type=archivename_validator, help="ARCHIVE1 name")
+        subparser.add_argument("other_name", metavar="ARCHIVE2", type=archivename_validator, help="ARCHIVE2 name")
         subparser.add_argument(
             "paths",
             metavar="PATH",

@@ -20,11 +20,10 @@ from .misc import sysinfo, log_multi, consume
 from .misc import ChunkIteratorFileWrapper, open_item, chunkit, iter_separated, ErrorIgnoringTextIOWrapper
 from .parseformat import bin_to_hex, safe_encode, safe_decode
 from .parseformat import remove_surrogates, eval_escapes, decode_dict, positive_int_validator, interval
-from .parseformat import ChunkerParams, FilesCacheMode, partial_format, DatetimeWrapper
+from .parseformat import SortBySpec, ChunkerParams, FilesCacheMode, partial_format, DatetimeWrapper
 from .parseformat import format_file_size, parse_file_size, FileSize, parse_storage_quota
 from .parseformat import sizeof_fmt, sizeof_fmt_iec, sizeof_fmt_decimal
 from .parseformat import format_line, replace_placeholders, PlaceholderError
-from .parseformat import SortBySpec, NameSpec
 from .parseformat import format_archive, parse_stringified_list, clean_lines
 from .parseformat import Location, location_validator, archivename_validator, comment_validator, text_validator
 from .parseformat import BaseFormatter, ArchiveFormatter, ItemFormatter, file_status

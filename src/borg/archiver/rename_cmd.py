@@ -41,7 +41,7 @@ class RenameMixIn:
             help="rename archive",
         )
         subparser.set_defaults(func=self.do_rename)
-        subparser.add_argument("name", metavar="OLDNAME", type=archivename_validator(), help="specify the archive name")
+        subparser.add_argument("name", metavar="OLDNAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(
-            "newname", metavar="NEWNAME", type=archivename_validator(), help="specify the new archive name"
+            "newname", metavar="NEWNAME", type=archivename_validator, help="specify the new archive name"
         )

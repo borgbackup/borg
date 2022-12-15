@@ -118,7 +118,8 @@ class CreateMixIn:
                     if status == "C":
                         self.print_warning("%s: file changed while we backed it up", path)
                     self.print_file_status(status, path)
-                    fso.stats.files_stats[status] += 1
+                    if not dry_run and status is not None:
+                        fso.stats.files_stats[status] += 1
                 if args.paths_from_command:
                     rc = proc.wait()
                     if rc != 0:
@@ -142,7 +143,8 @@ class CreateMixIn:
                         else:
                             status = "-"
                         self.print_file_status(status, path)
-                        fso.stats.files_stats[status] += 1
+                        if not dry_run and status is not None:
+                            fso.stats.files_stats[status] += 1
                         continue
                     path = os.path.normpath(path)
                     parent_dir = os.path.dirname(path) or "."
@@ -475,7 +477,7 @@ class CreateMixIn:
             self.print_warning("%s: file changed while we backed it up", path)
         if not recurse_excluded_dir:
             self.print_file_status(status, path)
-            if status is not None:
+            if not dry_run and status is not None:
                 fso.stats.files_stats[status] += 1
 
     def build_parser_create(self, subparsers, common_parser, mid_common_parser):

@@ -81,6 +81,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         for got_archive, expected_archive in zip(got["archives"], expected["archives"]):
             del got_archive["id"]
             del expected_archive["id"]
+            del expected_archive["barchive"]
             # timestamps:
             # borg 1.2 transformed to local time and had microseconds = 0, no tzoffset
             # borg 2 uses an utc timestamp, with microseconds and with tzoffset

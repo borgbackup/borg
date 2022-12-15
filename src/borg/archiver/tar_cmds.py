@@ -15,7 +15,7 @@ from ..helpers import dash_open
 from ..helpers import msgpack
 from ..helpers import create_filter_process
 from ..helpers import ChunkIteratorFileWrapper
-from ..helpers import ChunkerParams
+from ..helpers import comment_validator, ChunkerParams
 from ..helpers import NameSpec
 from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
@@ -491,7 +491,12 @@ class TarMixIn:
 
         archive_group = subparser.add_argument_group("Archive options")
         archive_group.add_argument(
-            "--comment", dest="comment", metavar="COMMENT", default="", help="add a comment text to the archive"
+            "--comment",
+            metavar="COMMENT",
+            dest="comment",
+            type=comment_validator,
+            default="",
+            help="add a comment text to the archive",
         )
         archive_group.add_argument(
             "--timestamp",

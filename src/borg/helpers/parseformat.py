@@ -540,12 +540,57 @@ def location_validator(proto=None, other=False):
 
 def archivename_validator():
     def validator(text):
+        assert isinstance(text, str)
+        # we make sure that the archive name can be used as directory name (for borg mount)
         text = replace_placeholders(text)
-        if "/" in text or "::" in text or not text:
-            raise argparse.ArgumentTypeError('Invalid archive name: "%s"' % text)
+        MAX_PATH = 260  # Windows default. Since Win10, there is a registry setting LongPathsEnabled to get more.
+        MAX_DIRNAME = MAX_PATH - len("12345678.123")
+        SAFETY_MARGIN = 48  # borgfs path: mountpoint / archivename / dir / dir / ... / file
+        MAX_ARCHIVENAME = MAX_DIRNAME - SAFETY_MARGIN
+        if not (0 < len(text) <= MAX_ARCHIVENAME):
+            raise argparse.ArgumentTypeError(f'Invalid archive name: "{text}" [0 < length <= {MAX_ARCHIVENAME}]')
+        # note: ":" is also a invalid path char on windows, but we can not blacklist it,
+        # because e.g. our {now} placeholder creates ISO-8601 like output like 2022-12-10T20:47:42 .
+        invalid_chars = r"/" + r"\"<|>?*"  # posix + windows
+        if re.search(f"[{re.escape(invalid_chars)}]", text):
+            raise argparse.ArgumentTypeError(
+                f'Invalid archive name: "{text}" [invalid chars detected matching "{invalid_chars}"]'
+            )
+        invalid_ctrl_chars = "".join(chr(i) for i in range(32))
+        if re.search(f"[{re.escape(invalid_ctrl_chars)}]", text):
+            raise argparse.ArgumentTypeError(
+                f'Invalid archive name: "{text}" [invalid control chars detected, ASCII < 32]'
+            )
+        if text.startswith(" ") or text.endswith(" "):
+            raise argparse.ArgumentTypeError(f'Invalid archive name: "{text}" [leading or trailing blanks]')
+        try:
+            text.encode("utf-8", errors="strict")
+        except UnicodeEncodeError:
+            # looks like text contains surrogate-escapes
+            raise argparse.ArgumentTypeError(f'Invalid archive name: "{text}" [contains non-unicode characters]')
         return text
 
     return validator
+
+
+def text_validator(*, name, max_length, invalid_ctrl_chars="\0"):
+    def validator(text):
+        assert isinstance(text, str)
+        if not (len(text) <= max_length):
+            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [length <= {max_length}]')
+        if re.search(f"[{re.escape(invalid_ctrl_chars)}]", text):
+            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [invalid control chars detected]')
+        try:
+            text.encode("utf-8", errors="strict")
+        except UnicodeEncodeError:
+            # looks like text contains surrogate-escapes
+            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [contains non-unicode characters]')
+        return text
+
+    return validator
+
+
+comment_validator = text_validator(name="comment", max_length=10000)
 
 
 class BaseFormatter:
@@ -571,7 +616,7 @@ class BaseFormatter:
         return (
             "- NEWLINE: OS dependent line separator\n"
             "- NL: alias of NEWLINE\n"
-            "- NUL: NUL character for creating print0 / xargs -0 like output, see barchive and bpath keys below\n"
+            "- NUL: NUL character for creating print0 / xargs -0 like output\n"
             "- SPACE\n"
             "- TAB\n"
             "- CR\n"
@@ -581,11 +626,9 @@ class BaseFormatter:
 
 class ArchiveFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
-        "archive": "archive name interpreted as text (might be missing non-text characters, see barchive)",
+        "archive": "archive name",
         "name": 'alias of "archive"',
-        "barchive": "verbatim archive name, can contain any character except NUL",
-        "comment": "archive comment interpreted as text (might be missing non-text characters, see bcomment)",
-        "bcomment": "verbatim archive comment, can contain any character except NUL",
+        "comment": "archive comment",
         # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
         "start": "time (start) of creation of the archive",
         "time": 'alias of "start"',
@@ -596,7 +639,7 @@ class ArchiveFormatter(BaseFormatter):
         "username": "username of user who created this archive",
     }
     KEY_GROUPS = (
-        ("archive", "name", "barchive", "comment", "bcomment", "id"),
+        ("archive", "name", "comment", "id"),
         ("start", "time", "end", "command_line"),
         ("hostname", "username"),
     )
@@ -647,7 +690,6 @@ class ArchiveFormatter(BaseFormatter):
             "hostname": partial(self.get_meta, "hostname", rs=True),
             "username": partial(self.get_meta, "username", rs=True),
             "comment": partial(self.get_meta, "comment", rs=True),
-            "bcomment": partial(self.get_meta, "comment", rs=False),
             "end": self.get_ts_end,
             "command_line": self.get_cmdline,
         }
@@ -670,7 +712,6 @@ class ArchiveFormatter(BaseFormatter):
             {
                 "name": remove_surrogates(archive_info.name),
                 "archive": remove_surrogates(archive_info.name),
-                "barchive": archive_info.name,
                 "id": bin_to_hex(archive_info.id),
                 "time": self.format_time(archive_info.ts),
                 "start": self.format_time(archive_info.ts),
@@ -712,8 +753,7 @@ class ItemFormatter(BaseFormatter):
     # shake_* is not provided because it uses an incompatible .digest() method to support variable length.
     hash_algorithms = set(hashlib.algorithms_guaranteed).union({"xxh64"}).difference({"shake_128", "shake_256"})
     KEY_DESCRIPTIONS = {
-        "bpath": "verbatim POSIX path, can contain any character except NUL",
-        "path": "path interpreted as text (might be missing non-text characters, see bpath)",
+        "path": "file path",
         "source": "link target for symlinks (identical to linktarget)",
         "hlid": "hard link identity (same if hardlinking same fs object)",
         "extra": 'prepends {source} with " -> " for soft links and " link to " for hard links',
@@ -724,7 +764,7 @@ class ItemFormatter(BaseFormatter):
         "health": 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
     }
     KEY_GROUPS = (
-        ("type", "mode", "uid", "gid", "user", "group", "path", "bpath", "source", "linktarget", "hlid", "flags"),
+        ("type", "mode", "uid", "gid", "user", "group", "path", "source", "linktarget", "hlid", "flags"),
         ("size", "dsize", "num_chunks", "unique_chunks"),
         ("mtime", "ctime", "atime", "isomtime", "isoctime", "isoatime"),
         tuple(sorted(hash_algorithms)),
@@ -828,7 +868,6 @@ class ItemFormatter(BaseFormatter):
         if self.json_lines:
             item_data["healthy"] = "chunks_healthy" not in item
         else:
-            item_data["bpath"] = item.path
             item_data["extra"] = extra
             item_data["health"] = "broken" if "chunks_healthy" in item else "healthy"
         item_data["source"] = source

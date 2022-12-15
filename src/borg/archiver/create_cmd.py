@@ -15,7 +15,7 @@ from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProce
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
-from ..helpers import ChunkerParams
+from ..helpers import comment_validator, ChunkerParams
 from ..helpers import NameSpec, FilesCacheMode
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
@@ -816,7 +816,12 @@ class CreateMixIn:
 
         archive_group = subparser.add_argument_group("Archive options")
         archive_group.add_argument(
-            "--comment", dest="comment", metavar="COMMENT", default="", help="add a comment text to the archive"
+            "--comment",
+            metavar="COMMENT",
+            dest="comment",
+            type=comment_validator,
+            default="",
+            help="add a comment text to the archive",
         )
         archive_group.add_argument(
             "--timestamp",

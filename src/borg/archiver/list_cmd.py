@@ -114,8 +114,7 @@ class ListMixIn:
             help="Format output as JSON Lines. "
             "The form of ``--format`` is ignored, "
             "but keys used in it are added to the JSON output. "
-            "Some keys are always present. Note: JSON can only represent text. "
-            'A "bpath" key is therefore not available.',
+            "Some keys are always present. Note: JSON can only represent text.",
         )
         subparser.add_argument("name", metavar="NAME", type=NameSpec, help="specify the archive name")
         subparser.add_argument(

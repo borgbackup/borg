@@ -6,7 +6,7 @@ from ._common import with_repository, build_matcher
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import ItemFormatter, BaseFormatter, NameSpec
+from ..helpers import ItemFormatter, BaseFormatter, archivename_validator
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -116,7 +116,7 @@ class ListMixIn:
             "but keys used in it are added to the JSON output. "
             "Some keys are always present. Note: JSON can only represent text.",
         )
-        subparser.add_argument("name", metavar="NAME", type=NameSpec, help="specify the archive name")
+        subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(
             "paths", metavar="PATH", nargs="*", type=str, help="paths to list; patterns are supported"
         )

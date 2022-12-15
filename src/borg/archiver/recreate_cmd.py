@@ -147,7 +147,7 @@ class RecreateMixIn:
             dest="target",
             metavar="TARGET",
             default=None,
-            type=archivename_validator(),
+            type=archivename_validator,
             help="create a new archive with the name ARCHIVE, do not replace existing archive "
             "(only applies for a single archive)",
         )

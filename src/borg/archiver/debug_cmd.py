@@ -12,7 +12,7 @@ from ..helpers import sysinfo
 from ..helpers import bin_to_hex, prepare_dump_dict
 from ..helpers import dash_open
 from ..helpers import StableDict
-from ..helpers import positive_int_validator, NameSpec
+from ..helpers import positive_int_validator, archivename_validator
 from ..manifest import Manifest
 from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
@@ -387,7 +387,7 @@ class DebugMixIn:
             help="dump archive items (metadata) (debug)",
         )
         subparser.set_defaults(func=self.do_debug_dump_archive_items)
-        subparser.add_argument("name", metavar="NAME", type=NameSpec, help="specify the archive name")
+        subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
 
         debug_dump_archive_epilog = process_epilog(
             """
@@ -404,7 +404,7 @@ class DebugMixIn:
             help="dump decoded archive metadata (debug)",
         )
         subparser.set_defaults(func=self.do_debug_dump_archive)
-        subparser.add_argument("name", metavar="NAME", type=NameSpec, help="specify the archive name")
+        subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument("path", metavar="PATH", type=str, help="file to dump data into")
 
         debug_dump_manifest_epilog = process_epilog(

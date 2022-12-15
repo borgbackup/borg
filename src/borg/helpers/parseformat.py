@@ -227,8 +227,6 @@ class PlaceholderReplacer:
 
 replace_placeholders = PlaceholderReplacer()
 
-NameSpec = str
-
 
 def SortBySpec(text):
     from ..manifest import AI_HUMAN_SORT_KEYS
@@ -538,48 +536,21 @@ def location_validator(proto=None, other=False):
     return validator
 
 
-def archivename_validator():
+def text_validator(*, name, max_length, min_length=0, invalid_ctrl_chars="\0", invalid_chars="", no_blanks=False):
     def validator(text):
         assert isinstance(text, str)
-        # we make sure that the archive name can be used as directory name (for borg mount)
-        text = replace_placeholders(text)
-        MAX_PATH = 260  # Windows default. Since Win10, there is a registry setting LongPathsEnabled to get more.
-        MAX_DIRNAME = MAX_PATH - len("12345678.123")
-        SAFETY_MARGIN = 48  # borgfs path: mountpoint / archivename / dir / dir / ... / file
-        MAX_ARCHIVENAME = MAX_DIRNAME - SAFETY_MARGIN
-        if not (0 < len(text) <= MAX_ARCHIVENAME):
-            raise argparse.ArgumentTypeError(f'Invalid archive name: "{text}" [0 < length <= {MAX_ARCHIVENAME}]')
-        # note: ":" is also a invalid path char on windows, but we can not blacklist it,
-        # because e.g. our {now} placeholder creates ISO-8601 like output like 2022-12-10T20:47:42 .
-        invalid_chars = r"/" + r"\"<|>?*"  # posix + windows
-        if re.search(f"[{re.escape(invalid_chars)}]", text):
-            raise argparse.ArgumentTypeError(
-                f'Invalid archive name: "{text}" [invalid chars detected matching "{invalid_chars}"]'
-            )
-        invalid_ctrl_chars = "".join(chr(i) for i in range(32))
-        if re.search(f"[{re.escape(invalid_ctrl_chars)}]", text):
-            raise argparse.ArgumentTypeError(
-                f'Invalid archive name: "{text}" [invalid control chars detected, ASCII < 32]'
-            )
-        if text.startswith(" ") or text.endswith(" "):
-            raise argparse.ArgumentTypeError(f'Invalid archive name: "{text}" [leading or trailing blanks]')
-        try:
-            text.encode("utf-8", errors="strict")
-        except UnicodeEncodeError:
-            # looks like text contains surrogate-escapes
-            raise argparse.ArgumentTypeError(f'Invalid archive name: "{text}" [contains non-unicode characters]')
-        return text
-
-    return validator
-
-
-def text_validator(*, name, max_length, invalid_ctrl_chars="\0"):
-    def validator(text):
-        assert isinstance(text, str)
-        if not (len(text) <= max_length):
-            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [length <= {max_length}]')
-        if re.search(f"[{re.escape(invalid_ctrl_chars)}]", text):
+        if len(text) < min_length:
+            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [length < {min_length}]')
+        if len(text) > max_length:
+            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [length > {max_length}]')
+        if invalid_ctrl_chars and re.search(f"[{re.escape(invalid_ctrl_chars)}]", text):
             raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [invalid control chars detected]')
+        if invalid_chars and re.search(f"[{re.escape(invalid_chars)}]", text):
+            raise argparse.ArgumentTypeError(
+                f'Invalid {name}: "{text}" [invalid chars detected matching "{invalid_chars}"]'
+            )
+        if no_blanks and (text.startswith(" ") or text.endswith(" ")):
+            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [leading or trailing blanks detected]')
         try:
             text.encode("utf-8", errors="strict")
         except UnicodeEncodeError:
@@ -591,6 +562,27 @@ def text_validator(*, name, max_length, invalid_ctrl_chars="\0"):
 
 
 comment_validator = text_validator(name="comment", max_length=10000)
+
+
+def archivename_validator(text):
+    # we make sure that the archive name can be used as directory name (for borg mount)
+    MAX_PATH = 260  # Windows default. Since Win10, there is a registry setting LongPathsEnabled to get more.
+    MAX_DIRNAME = MAX_PATH - len("12345678.123")
+    SAFETY_MARGIN = 48  # borgfs path: mountpoint / archivename / dir / dir / ... / file
+    MAX_ARCHIVENAME = MAX_DIRNAME - SAFETY_MARGIN
+    invalid_ctrl_chars = "".join(chr(i) for i in range(32))
+    # note: ":" is also an invalid path char on windows, but we can not blacklist it,
+    # because e.g. our {now} placeholder creates ISO-8601 like output like 2022-12-10T20:47:42 .
+    invalid_chars = r"/" + r"\"<|>?*"  # posix + windows
+    validate_text = text_validator(
+        name="archive name",
+        min_length=1,
+        max_length=MAX_ARCHIVENAME,
+        invalid_ctrl_chars=invalid_ctrl_chars,
+        invalid_chars=invalid_chars,
+        no_blanks=True,
+    )
+    return validate_text(text)
 
 
 class BaseFormatter:

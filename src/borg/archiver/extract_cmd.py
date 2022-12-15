@@ -8,7 +8,7 @@ from ._common import with_repository, with_archive
 from ._common import build_filter, build_matcher
 from ..archive import BackupError, BackupOSError
 from ..constants import *  # NOQA
-from ..helpers import NameSpec
+from ..helpers import archivename_validator
 from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
@@ -175,7 +175,7 @@ class ExtractMixIn:
             action="store_true",
             help="create holes in output sparse file from all-zero chunks",
         )
-        subparser.add_argument("name", metavar="NAME", type=NameSpec, help="specify the archive name")
+        subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(
             "paths", metavar="PATH", nargs="*", type=str, help="paths to extract; patterns are supported"
         )

@@ -256,8 +256,7 @@ class TestLocationWithoutEnv:
     ],
 )
 def test_archivename_ok(name):
-    av = archivename_validator()
-    av(name)  # must not raise an exception
+    archivename_validator(name)  # must not raise an exception
 
 
 @pytest.mark.parametrize(
@@ -285,9 +284,8 @@ def test_archivename_ok(name):
     ],
 )
 def test_archivename_invalid(name):
-    av = archivename_validator()
     with pytest.raises(ArgumentTypeError):
-        av(name)
+        archivename_validator(name)
 
 
 @pytest.mark.parametrize("text", ["", "single line", "multi\nline\ncomment"])

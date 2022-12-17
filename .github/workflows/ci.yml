@@ -49,7 +49,7 @@ jobs:
 
     needs: lint
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
             - os: ubuntu-20.04

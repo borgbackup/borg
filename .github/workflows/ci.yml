@@ -31,13 +31,13 @@ on:
 jobs:
   lint:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 10
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: 3.9
     - name: Lint with flake8
@@ -70,23 +70,23 @@ jobs:
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
-      PKG_CONFIG_PATH: /usr/local/opt/openssl@1.1/lib/pkgconfig
+      PKG_CONFIG_PATH: "/usr/local/opt/openssl@1.1/lib/pkgconfig:$PKG_CONFIG_PATH"
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         # just fetching 1 commit is not enough for setuptools-scm, so we fetch all
         fetch-depth: 0
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Cache pip
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
@@ -117,10 +117,18 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.d/development.txt
     - name: Install borgbackup
+      env:
+        # we already have that in the global env, but something is broken and overwrites that.
+        # so, set it here, again.
+        PKG_CONFIG_PATH: "/usr/local/opt/openssl@1.1/lib/pkgconfig:$PKG_CONFIG_PATH"
       run: |
         # pip install -e .
         python setup.py -v develop
     - name: run tox env
+      env:
+        # we already have that in the global env, but something is broken and overwrites that.
+        # so, set it here, again.
+        PKG_CONFIG_PATH: "/usr/local/opt/openssl@1.1/lib/pkgconfig:$PKG_CONFIG_PATH"
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"

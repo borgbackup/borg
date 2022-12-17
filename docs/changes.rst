@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.2 (2022-08-20)
---------------------------
+Version 1.2.3 (not released yet)
+--------------------------------
 
 Upgrade notes:
 
@@ -296,6 +296,33 @@ Compatibility notes:
 - exit with 128 + signal number, #5161.
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
+
+Fixes:
+
+- create: fix --list --dry-run output for directories, #7209
+- diff/recreate: normalize chunker params before comparing them, #7079
+- check: fix uninitialised variable if repo is completely empty, #7034
+- xattrs: improve error handling, #6988
+- fix args.paths related argparsing, #6994
+- archive.save(): always use metadata from stats (e.g. nfiles, size, ...), #7072
+- tar_filter: recognize .tar.zst as zstd, #7093
+- get_chunker: fix missing sparse=False argument, #7056
+- file_integrity.py: make sure file_fd is always closed on exit
+- repository: cleanup(): close segment before unlinking
+- repository: use os.replace instead of os.rename
+
+Other changes:
+
+- remove python < 3.7 compatibility code
+- do not use version_tuple placeholder in setuptools_scm template
+- CI: fix tox4 passenv issue, #7199
+- vagrant: update python 3.9 and 3.11
+- misc. test suite and docs fixes / improvements
+- Windows: use MSYS2 for Github CI, remove Appveyor CI
+
+
+Version 1.2.2 (2022-08-20)
+--------------------------
 
 New features:
 

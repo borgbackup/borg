@@ -1691,16 +1691,13 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(
-        self, repository, repair=False, first=0, last=0, sort_by="", match=None, verify_data=False, save_space=False
-    ):
+    def check(self, repository, repair=False, first=0, last=0, sort_by="", match=None, verify_data=False):
         """Perform a set of checks on 'repository'
 
         :param repair: enable repair mode, write updated or corrected data into repository
         :param first/last/sort_by: only check this number of first/last archives ordered by sort_by
         :param match: only check archives matching this pattern
         :param verify_data: integrity verification of data referenced by archives
-        :param save_space: Repository.commit(save_space)
         """
         logger.info("Starting archive consistency check...")
         self.check_all = not any((first, last, match))
@@ -1728,7 +1725,7 @@ class ArchiveChecker:
                 self.manifest = self.rebuild_manifest()
         self.rebuild_refcounts(match=match, first=first, last=last, sort_by=sort_by)
         self.orphan_chunks_check()
-        self.finish(save_space=save_space)
+        self.finish()
         if self.error_found:
             logger.error("Archive consistency check complete, problems found.")
         else:
@@ -2192,12 +2189,12 @@ class ArchiveChecker:
         else:
             logger.info("Orphaned objects check skipped (needs all archives checked).")
 
-    def finish(self, save_space=False):
+    def finish(self):
         if self.repair:
             logger.info("Writing Manifest.")
             self.manifest.write()
             logger.info("Committing repo.")
-            self.repository.commit(compact=False, save_space=save_space)
+            self.repository.commit(compact=False)
 
 
 class ArchiveRecreater:

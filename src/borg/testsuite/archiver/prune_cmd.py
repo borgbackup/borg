@@ -161,21 +161,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert re.search(r"Keeping archive \(rule: monthly #1\):\s+september30", output)
         self.assert_not_in("original_archive", output)
 
-    def test_prune_repository_save_space(self):
-        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        self.cmd(f"--repo={self.repository_location}", "create", "test1", src_dir)
-        self.cmd(f"--repo={self.repository_location}", "create", "test2", src_dir)
-        output = self.cmd(f"--repo={self.repository_location}", "prune", "--list", "--dry-run", "--keep-daily=1")
-        assert re.search(r"Keeping archive \(rule: daily #1\):\s+test2", output)
-        assert re.search(r"Would prune:\s+test1", output)
-        output = self.cmd(f"--repo={self.repository_location}", "rlist")
-        self.assert_in("test1", output)
-        self.assert_in("test2", output)
-        self.cmd(f"--repo={self.repository_location}", "prune", "--save-space", "--keep-daily=1")
-        output = self.cmd(f"--repo={self.repository_location}", "rlist")
-        self.assert_not_in("test1", output)
-        self.assert_in("test2", output)
-
     def test_prune_repository_prefix(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         self.cmd(f"--repo={self.repository_location}", "create", "foo-2015-08-12-10:00", src_dir)

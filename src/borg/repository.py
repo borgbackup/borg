@@ -505,9 +505,8 @@ class Repository:
             self.lock.release()
             self.lock = None
 
-    def commit(self, save_space=False, compact=True, threshold=0.1):
+    def commit(self, compact=True, threshold=0.1):
         """Commit transaction"""
-        # save_space is not used anymore, but stays for RPC/API compatibility.
         if self.transaction_doomed:
             exception = self.transaction_doomed
             self.rollback()
@@ -1022,7 +1021,7 @@ class Repository:
                 # The outcome of the DELETE has been recorded in the PUT branch already.
                 self.compact[segment] += header_size(tag) + size
 
-    def check(self, repair=False, save_space=False, max_duration=0):
+    def check(self, repair=False, max_duration=0):
         """Check repository consistency
 
         This method verifies all segment checksums and makes sure

@@ -60,7 +60,7 @@ class DeleteMixIn:
 
             def checkpoint_func():
                 manifest.write()
-                repository.commit(compact=False, save_space=args.save_space)
+                repository.commit(compact=False)
                 cache.commit()
 
             msg_delete = "Would delete archive: {} ({}/{})" if dry_run else "Deleting archive: {} ({}/{})"
@@ -156,9 +156,6 @@ class DeleteMixIn:
             action="count",
             default=0,
             help="force deletion of corrupted archives, " "use ``--force --force`` in case ``--force`` does not work.",
-        )
-        subparser.add_argument(
-            "--save-space", dest="save_space", action="store_true", help="work slower, but using less space"
         )
         subparser.add_argument(
             "-c",

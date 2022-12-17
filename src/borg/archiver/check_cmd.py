@@ -47,7 +47,7 @@ class CheckMixIn:
             self.print_error("--repository-only is required for --max-duration support.")
             return EXIT_ERROR
         if not args.archives_only:
-            if not repository.check(repair=args.repair, save_space=args.save_space, max_duration=args.max_duration):
+            if not repository.check(repair=args.repair, max_duration=args.max_duration):
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
             repository,
@@ -57,7 +57,6 @@ class CheckMixIn:
             sort_by=args.sort_by or "ts",
             match=args.match_archives,
             verify_data=args.verify_data,
-            save_space=args.save_space,
         ):
             return EXIT_WARNING
         return EXIT_SUCCESS
@@ -167,9 +166,6 @@ class CheckMixIn:
         )
         subparser.add_argument(
             "--repair", dest="repair", action="store_true", help="attempt to repair any inconsistencies found"
-        )
-        subparser.add_argument(
-            "--save-space", dest="save_space", action="store_true", help="work slower, but using less space"
         )
         subparser.add_argument(
             "--max-duration",

@@ -123,7 +123,7 @@ class PruneMixIn:
 
             def checkpoint_func():
                 manifest.write()
-                repository.commit(compact=False, save_space=args.save_space)
+                repository.commit(compact=False)
                 cache.commit()
 
             list_logger = logging.getLogger("borg.output.list")
@@ -289,9 +289,6 @@ class PruneMixIn:
             "-y", "--keep-yearly", dest="yearly", type=int, default=0, help="number of yearly archives to keep"
         )
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
-        subparser.add_argument(
-            "--save-space", dest="save_space", action="store_true", help="work slower, but using less space"
-        )
         subparser.add_argument(
             "-c",
             "--checkpoint-interval",

@@ -119,8 +119,8 @@ class UnexpectedRPCDataFormatFromServer(Error):
 
 
 compatMap = {
-    "check": ("repair", "save_space"),
-    "commit": ("save_space",),
+    "check": ("repair",),
+    "commit": (),
     "rollback": (),
     "destroy": (),
     "__len__": (),
@@ -958,7 +958,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("1.0.0"), max_duration={"since": parse_version("1.2.0a4"), "previously": 0})
-    def check(self, repair=False, save_space=False, max_duration=0):
+    def check(self, repair=False, max_duration=0):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(
@@ -966,7 +966,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
         compact={"since": parse_version("1.2.0a0"), "previously": True, "dontcare": True},
         threshold={"since": parse_version("1.2.0a8"), "previously": 0.1, "dontcare": True},
     )
-    def commit(self, save_space=False, compact=True, threshold=0.1):
+    def commit(self, compact=True, threshold=0.1):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("1.0.0"))

@@ -107,7 +107,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         # Invalid IDs do not abort or return an error
         output = self.cmd(f"--repo={self.repository_location}", "debug", "refcount-obj", "124", "xyza").strip()
-        assert output == "object id 124 is invalid.\nobject id xyza is invalid."
+        assert output == "object id 124 is invalid." + os.linesep + "object id xyza is invalid."
 
     def test_debug_info(self):
         output = self.cmd("debug", "info")

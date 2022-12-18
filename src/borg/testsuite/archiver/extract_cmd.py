@@ -309,19 +309,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file("file3", size=1024 * 80)
         self.create_regular_file("file4", size=1024 * 80)
         self.create_regular_file("file333", size=1024 * 80)
-        self.create_regular_file("aa:something", size=1024 * 80)
 
         # Create while excluding using mixed pattern styles
         with open(self.exclude_file_path, "wb") as fd:
             fd.write(b"re:input/file4$\n")
-            fd.write(b"fm:*aa:*thing\n")
+            fd.write(b"fm:*file3*\n")
 
         self.cmd(
             f"--repo={self.repository_location}", "create", "--exclude-from=" + self.exclude_file_path, "test", "input"
         )
         with changedir("output"):
             self.cmd(f"--repo={self.repository_location}", "extract", "test")
-        self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2", "file3", "file333"])
+        self.assert_equal(sorted(os.listdir("output/input")), ["file1", "file2"])
         shutil.rmtree("output/input")
 
         # Exclude using regular expression
@@ -346,7 +345,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd(
                 f"--repo={self.repository_location}", "extract", "test", "--exclude-from=" + self.exclude_file_path
             )
-        self.assert_equal(sorted(os.listdir("output/input")), ["file3"])
+        self.assert_equal(sorted(os.listdir("output/input")), [])
 
     def test_extract_with_pattern(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)

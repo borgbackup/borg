@@ -28,6 +28,7 @@ from ...repository import Repository
 from .. import has_lchflags
 from .. import BaseTestCase, changedir, environment_variable
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
+from ..platform import is_win32
 
 RK_ENCRYPTION = "--encryption=repokey-aes-ocb"
 KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"
@@ -230,23 +231,27 @@ class ArchiverTestCaseBase(BaseTestCase):
             os.mkfifo(os.path.join(self.input_path, "fifo1"))
         if has_lchflags:
             platform.set_flags(os.path.join(self.input_path, "flagfile"), stat.UF_NODUMP)
-        try:
-            # Block device
-            os.mknod("input/bdev", 0o600 | stat.S_IFBLK, os.makedev(10, 20))
-            # Char device
-            os.mknod("input/cdev", 0o600 | stat.S_IFCHR, os.makedev(30, 40))
-            # File owner
-            os.chown("input/file1", 100, 200)  # raises OSError invalid argument on cygwin
-            # File mode
-            os.chmod("input/dir2", 0o555)  # if we take away write perms, we need root to remove contents
-            have_root = True  # we have (fake)root
-        except PermissionError:
+
+        if is_win32:
             have_root = False
-        except OSError as e:
-            # Note: ENOSYS "Function not implemented" happens as non-root on Win 10 Linux Subsystem.
-            if e.errno not in (errno.EINVAL, errno.ENOSYS):
-                raise
-            have_root = False
+        else:
+            try:
+                # Block device
+                os.mknod("input/bdev", 0o600 | stat.S_IFBLK, os.makedev(10, 20))
+                # Char device
+                os.mknod("input/cdev", 0o600 | stat.S_IFCHR, os.makedev(30, 40))
+                # File owner
+                os.chown("input/file1", 100, 200)  # raises OSError invalid argument on cygwin
+                # File mode
+                os.chmod("input/dir2", 0o555)  # if we take away write perms, we need root to remove contents
+                have_root = True  # we have (fake)root
+            except PermissionError:
+                have_root = False
+            except OSError as e:
+                # Note: ENOSYS "Function not implemented" happens as non-root on Win 10 Linux Subsystem.
+                if e.errno not in (errno.EINVAL, errno.ENOSYS):
+                    raise
+                have_root = False
         time.sleep(1)  # "empty" must have newer timestamp than other files
         self.create_regular_file("empty", size=0)
         return have_root

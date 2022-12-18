@@ -34,7 +34,7 @@ Outputs a script that copies all archives from repo1 to repo2:
 
 ::
 
-    for A T in `borg list --format='{archive} {time:%Y-%m-%dT%H:%M:%S}{LF}'`
+    for A T in `borg list --format='{archive} {time:%Y-%m-%dT%H:%M:%S}{NL}'`
     do
       echo "borg -r repo1 export-tar --tar-format=BORG $A - | borg -r repo2 import-tar --timestamp=$T $A -"
     done

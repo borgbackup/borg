@@ -163,6 +163,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.cmd(f"--repo={self.repository_location}", "key", "export", export_directory, exit_code=EXIT_ERROR)
 
+    def test_key_export_qr_directory(self):
+        export_directory = self.output_path + "/exported"
+        os.mkdir(export_directory)
+
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+
+        self.cmd(
+            f"--repo={self.repository_location}", "key", "export", "--qr-html", export_directory, exit_code=EXIT_ERROR
+        )
+
     def test_key_import_errors(self):
         export_file = self.output_path + "/exported"
         self.cmd(f"--repo={self.repository_location}", "rcreate", KF_ENCRYPTION)

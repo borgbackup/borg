@@ -101,6 +101,8 @@ class KeysMixIn:
             manager.export_paperkey(args.path)
         else:
             try:
+                if os.path.isdir(args.path):
+                    raise IsADirectoryError
                 if args.qr:
                     manager.export_qr(args.path)
                 else:

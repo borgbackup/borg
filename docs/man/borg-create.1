@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2022-08-20" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2022-12-24" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -112,8 +112,8 @@ The \fB\-\-progress\fP option shows (from left to right) Original, Compressed an
 the currently processed path.
 .sp
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
-added \- the "This Archive" deduplicated size there is most interesting as that is
-how much your repository will grow. Please note that the "All archives" stats refer to
+added \- the \(dqThis Archive\(dq deduplicated size there is most interesting as that is
+how much your repository will grow. Please note that the \(dqAll archives\(dq stats refer to
 the state after creation. Also, the \fB\-\-stats\fP and \fB\-\-dry\-run\fP options are mutually
 exclusive because the data is not actually compressed and deduplicated during a dry run.
 .sp
@@ -132,7 +132,7 @@ name of archive to create (must be also a valid directory name)
 .B PATH
 paths to archive
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -265,7 +265,7 @@ write checkpoint every SECONDS seconds (Default: 1800)
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the "borg help compression" command for details.
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
@@ -273,7 +273,7 @@ select compression algorithm, see the output of the "borg help compression" comm
 .sp
 .nf
 .ft C
-# Backup ~/Documents into an archive named "my\-documents"
+# Backup ~/Documents into an archive named \(dqmy\-documents\(dq
 $ borg create /path/to/repo::my\-documents ~/Documents
 
 # same, but list all files as we process them
@@ -290,15 +290,15 @@ $ borg create /path/to/repo::my\-files \e
 $ borg create /path/to/repo::my\-files /home \e
     \-\-exclude \(aqsh:home/*/.thumbnails\(aq
 
-# Backup the root filesystem into an archive named "root\-YYYY\-MM\-DD"
+# Backup the root filesystem into an archive named \(dqroot\-YYYY\-MM\-DD\(dq
 # use zlib compression (good, but slow) \- default is lz4 (fast, low compression ratio)
 $ borg create \-C zlib,6 \-\-one\-file\-system /path/to/repo::root\-{now:%Y\-%m\-%d} /
 
-# Backup onto a remote host ("push" style) via ssh to port 2222,
-# logging in as user "borg" and storing into /path/to/repo
+# Backup onto a remote host (\(dqpush\(dq style) via ssh to port 2222,
+# logging in as user \(dqborg\(dq and storing into /path/to/repo
 $ borg create ssh://borg@backup.example.org:2222/path/to/repo::{fqdn}\-root\-{now} /
 
-# Backup a remote host locally ("pull" style) using sshfs
+# Backup a remote host locally (\(dqpull\(dq style) using sshfs
 $ mkdir sshfs\-mount
 $ sshfs root@example.com:/ sshfs\-mount
 $ cd sshfs\-mount
@@ -341,7 +341,7 @@ $ borg create /path/to/repo::{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S.%f} ~
 
 # Backing up relative paths by moving into the correct directory first
 $ cd /home/user/Documents
-# The root directory of the archive will be "projectA"
+# The root directory of the archive will be \(dqprojectA\(dq
 $ borg create /path/to/repo::daily\-projectA\-{now:%Y\-%m\-%d} projectA
 
 # Use external command to determine files to archive
@@ -352,7 +352,7 @@ $ borg create \-\-paths\-from\-command /path/to/repo::joes\-files \-\- find /srv
 # Use \-\-paths\-from\-stdin with \-\-paths\-delimiter (for example, for filenames with newlines in them)
 $ find ~ \-size \-1000k \-print0 | borg create \e
     \-\-paths\-from\-stdin \e
-    \-\-paths\-delimiter "\e0" \e
+    \-\-paths\-delimiter \(dq\e0\(dq \e
     /path/to/repo::smallfiles\-handle\-newline
 .ft P
 .fi
@@ -395,7 +395,7 @@ If you are interested only in a subset of that output, you can give e.g.
 below).
 .sp
 A uppercase character represents the status of a regular file relative to the
-"files" cache (not relative to the repo \-\- this is an issue if the files cache
+\(dqfiles\(dq cache (not relative to the repo \-\- this is an issue if the files cache
 is not used). Metadata is stored in any case and for \(aqA\(aq and \(aqM\(aq also new data
 chunks are stored. For \(aqU\(aq all data chunks refer to already existing chunks.
 .INDENT 0.0

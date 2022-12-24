@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.3 (not released yet)
---------------------------------
+Version 1.2.3 (2022-12-24)
+--------------------------
 
 Upgrade notes:
 
@@ -316,8 +316,9 @@ Other changes:
 - remove python < 3.7 compatibility code
 - do not use version_tuple placeholder in setuptools_scm template
 - CI: fix tox4 passenv issue, #7199
-- vagrant: update python 3.9 and 3.11
+- vagrant: update to python 3.9.16, use the openbsd 7.1 box
 - misc. test suite and docs fixes / improvements
+- remove deprecated --prefix from docs, #7109
 - Windows: use MSYS2 for Github CI, remove Appveyor CI
 
 

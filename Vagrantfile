@@ -68,9 +68,11 @@ def packages_openbsd
   return <<-EOF
     pkg_add bash
     chsh -s bash vagrant
+    pkg_add xxhash
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
+    pkg_add openssl%1.1
     pkg_add py3-pip
     pkg_add py3-virtualenv
   EOF
@@ -156,7 +158,7 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     pyenv install 3.10.0  # tests, version supporting openssl 1.1
-    pyenv install 3.9.15  # tests, version supporting openssl 1.1, binary build
+    pyenv install 3.9.16  # tests, version supporting openssl 1.1, binary build
     pyenv install 3.8.0  # tests, version supporting openssl 1.1
     pyenv rehash
   EOF
@@ -175,8 +177,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.9 release
-    pyenv global 3.9.15
-    pyenv virtualenv 3.9.15 borg-env
+    pyenv global 3.9.16
+    pyenv virtualenv 3.9.16 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -223,8 +225,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.8.0 3.9.15 3.10.0
-      pyenv local 3.8.0 3.9.15 3.10.0
+      pyenv global 3.8.0 3.9.16 3.10.0
+      pyenv local 3.8.0 3.9.16 3.10.0
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -355,7 +357,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "generic/openbsd6"
+    b.vm.box = "openbsd71-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

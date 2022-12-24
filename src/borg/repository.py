@@ -494,9 +494,8 @@ class Repository:
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
     def _load_hints(self):
-        if not (transaction_id := self.get_transaction_id()):
+        if (transaction_id := self.get_transaction_id()) is None:
             # self is a fresh repo, so transaction_id is None and there is no hints file
-            self.storage_quota_use = 0
             return
         hints = self._unpack_hints(transaction_id)
         self.version = hints["version"]

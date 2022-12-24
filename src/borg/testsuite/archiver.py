@@ -1575,7 +1575,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::another_test.2', 'input')
         self.cmd('extract', '--dry-run', self.repository_location + '::test')
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
-        self.cmd('delete', '--prefix', 'another_', self.repository_location)
+        self.cmd('delete', '--glob-archives', 'another_*', self.repository_location)
         self.cmd('delete', '--last', '1', self.repository_location)
         self.cmd('delete', self.repository_location + '::test')
         self.cmd('extract', '--dry-run', self.repository_location + '::test.2')
@@ -2259,12 +2259,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in('2015-08-12-10:00-bar', output)
         self.assert_in('2015-08-12-20:00-bar', output)
 
-    def test_list_prefix(self):
+    def test_list_glob(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.cmd('create', self.repository_location + '::test-1', src_dir)
         self.cmd('create', self.repository_location + '::something-else-than-test-1', src_dir)
         self.cmd('create', self.repository_location + '::test-2', src_dir)
-        output = self.cmd('list', '--prefix=test-', self.repository_location)
+        output = self.cmd('list', '--glob-archives=test-*', self.repository_location)
         self.assert_in('test-1', output)
         self.assert_in('test-2', output)
         self.assert_not_in('something-else', output)
@@ -2672,13 +2672,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert sorted(os.listdir(os.path.join(mountpoint))) == ['arch11', 'arch12']
         with self.fuse_mount(self.repository_location, mountpoint, '--last=2', '--sort=name'):
             assert sorted(os.listdir(os.path.join(mountpoint))) == ['arch21', 'arch22']
-        with self.fuse_mount(self.repository_location, mountpoint, '--prefix=arch1'):
+        with self.fuse_mount(self.repository_location, mountpoint, '--glob-archives=arch1*'):
             assert sorted(os.listdir(os.path.join(mountpoint))) == ['arch11', 'arch12']
-        with self.fuse_mount(self.repository_location, mountpoint, '--prefix=arch2'):
+        with self.fuse_mount(self.repository_location, mountpoint, '--glob-archives=arch2*'):
             assert sorted(os.listdir(os.path.join(mountpoint))) == ['arch21', 'arch22']
-        with self.fuse_mount(self.repository_location, mountpoint, '--prefix=arch'):
+        with self.fuse_mount(self.repository_location, mountpoint, '--glob-archives=arch*'):
             assert sorted(os.listdir(os.path.join(mountpoint))) == ['arch11', 'arch12', 'arch21', 'arch22']
-        with self.fuse_mount(self.repository_location, mountpoint, '--prefix=nope'):
+        with self.fuse_mount(self.repository_location, mountpoint, '--glob-archives=nope*'):
             assert sorted(os.listdir(os.path.join(mountpoint))) == []
 
     @unittest.skipUnless(llfuse, 'llfuse not installed')
@@ -3650,7 +3650,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         output = self.cmd('check', '-v', '--archives-only', self.repository_location, exit_code=0)
         self.assert_not_in('Starting repository check', output)
         self.assert_in('Starting archive consistency check', output)
-        output = self.cmd('check', '-v', '--archives-only', '--prefix=archive2', self.repository_location, exit_code=0)
+        output = self.cmd('check', '-v', '--archives-only', '--glob-archives=archive2', self.repository_location, exit_code=0)
         self.assert_not_in('archive1', output)
         output = self.cmd('check', '-v', '--archives-only', '--first=1', self.repository_location, exit_code=0)
         self.assert_in('archive1', output)

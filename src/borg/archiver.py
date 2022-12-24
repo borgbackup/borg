@@ -327,7 +327,7 @@ class Archiver:
                 return EXIT_ERROR
         if args.repo_only and any(
            (args.verify_data, args.first, args.last, args.prefix is not None, args.glob_archives)):
-            self.print_error("--repository-only contradicts --first, --last, --prefix and --verify-data arguments.")
+            self.print_error("--repository-only contradicts --first, --last, --glob-archives, --prefix and --verify-data arguments.")
             return EXIT_ERROR
         if args.repair and args.max_duration:
             self.print_error("--repair does not allow --max-duration argument.")
@@ -2556,7 +2556,7 @@ class Archiver:
 
             borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
             borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S} ...
-            borg prune --prefix '{hostname}-' ...
+            borg prune --glob-archives '{hostname}-*' ...
 
         .. note::
             systemd uses a difficult, non-standard syntax for command lines in unit files (refer to
@@ -2948,12 +2948,11 @@ class Archiver:
                                                          'Archive filters can be applied to repository targets.')
             group = filters_group.add_mutually_exclusive_group()
             group.add_argument('-P', '--prefix', metavar='PREFIX', dest='prefix', type=PrefixSpec, action=Highlander,
-                               help='only consider archive names starting with this prefix.')
+                               help='only consider archive names starting with this prefix. (deprecated)')
             group.add_argument('-a', '--glob-archives', metavar='GLOB', dest='glob_archives',
                                type=GlobSpec, action=Highlander,
                                help='only consider archive names matching the glob. '
-                                    'sh: rules apply, see "borg help patterns". '
-                                    '``--prefix`` and ``--glob-archives`` are mutually exclusive.')
+                                    'sh: rules apply, see "borg help patterns".')
 
             if sort_by:
                 sort_by_default = 'timestamp'
@@ -3837,11 +3836,9 @@ class Archiver:
         that is how much your repository will shrink.
         Please note that the "All archives" stats refer to the state after deletion.
 
-        You can delete multiple archives by specifying their common prefix, if they
-        have one, using the ``--prefix PREFIX`` option. You can also specify a shell
-        pattern to match multiple archives using the ``--glob-archives GLOB`` option
-        (for more info on these patterns, see :ref:`borg_patterns`). Note that these
-        two options are mutually exclusive.
+        You can delete multiple archives by specifying a shell pattern to match
+        multiple archives using the ``--glob-archives GLOB`` option (for more info on
+        these patterns, see :ref:`borg_patterns`).
 
         To avoid accidentally deleting archives, especially when using glob patterns,
         it might be helpful to use the ``--dry-run`` to test out the command without

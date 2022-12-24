@@ -229,6 +229,8 @@ def run_tests(boxname, skip_env)
       pyenv local 3.8.0 3.9.16 3.10.0
     fi
     # otherwise: just use the system python
+    # avoid that git complains about dubious ownership if we use fakeroot:
+    git config --global --add safe.directory /vagrant/borg/borg
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
     export TOX_SKIP_ENV='#{skip_env}'
     if which fakeroot 2> /dev/null; then

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PLACEHOLDERS" 1 "2022-08-20" "" "borg backup tool"
+.TH "BORG-PLACEHOLDERS" 1 "2022-12-24" "" "borg backup tool"
 .SH NAME
 borg-placeholders \- Details regarding placeholders
 .SH DESCRIPTION
@@ -92,7 +92,7 @@ Examples:
 .ft C
 borg create /path/to/repo::{hostname}\-{user}\-{utcnow} ...
 borg create /path/to/repo::{hostname}\-{now:%Y\-%m\-%d_%H:%M:%S} ...
-borg prune \-\-prefix \(aq{hostname}\-\(aq ...
+borg prune \-\-glob\-archives \(aq{hostname}\-*\(aq ...
 .ft P
 .fi
 .UNINDENT

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UPGRADE" 1 "2022-08-20" "" "borg backup tool"
+.TH "BORG-UPGRADE" 1 "2022-12-24" "" "borg backup tool"
 .SH NAME
 borg-upgrade \- upgrade a repository from a previous version
 .SH SYNOPSIS
@@ -131,7 +131,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B REPOSITORY
 path to the repository to be upgraded
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -170,11 +170,11 @@ no key file found for repository
 .UNINDENT
 .SS Upgrading a passphrase encrypted attic repo
 .sp
-attic offered a "passphrase" encryption mode, but this was removed in borg 1.0
-and replaced by the "repokey" mode (which stores the passphrase\-protected
+attic offered a \(dqpassphrase\(dq encryption mode, but this was removed in borg 1.0
+and replaced by the \(dqrepokey\(dq mode (which stores the passphrase\-protected
 encryption key into the repository config).
 .sp
-Thus, to upgrade a "passphrase" attic repo to a "repokey" borg repo, 2 steps
+Thus, to upgrade a \(dqpassphrase\(dq attic repo to a \(dqrepokey\(dq borg repo, 2 steps
 are needed, in this order:
 .INDENT 0.0
 .IP \(bu 2

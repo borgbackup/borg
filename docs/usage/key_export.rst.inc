@@ -19,7 +19,7 @@ borg key export
     +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
     |                                                       | ``PATH``       | where to store the backup                                              |
     +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                          |
+    | **options**                                                                                                                                     |
     +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
     |                                                       | ``--paper``    | Create an export suitable for printing and later type-in               |
     +-------------------------------------------------------+----------------+------------------------------------------------------------------------+
@@ -46,7 +46,7 @@ borg key export
         where to store the backup
 
 
-    optional arguments
+    options
         --paper       Create an export suitable for printing and later type-in
         --qr-html     Create an html file suitable for printing and later type-in or qr scan
 

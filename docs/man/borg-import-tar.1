@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-IMPORT-TAR" 1 "2022-08-20" "" "borg backup tool"
+.TH "BORG-IMPORT-TAR" 1 "2022-12-24" "" "borg backup tool"
 .SH NAME
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -49,7 +49,7 @@ based on its file extension and pipe the file through an appropriate filter:
 .IP \(bu 2
 \&.tar.xz or .txz: xz \-d
 .IP \(bu 2
-\&.tar.zstd: zstd \-d
+\&.tar.zstd or .tar.zst: zstd \-d
 .IP \(bu 2
 \&.tar.lz4: lz4 \-d
 .UNINDENT
@@ -80,9 +80,9 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 name of archive to create (must be also a valid directory name)
 .TP
 .B TARFILE
-input tar file. "\-" to read from stdin instead.
+input tar file. \(dq\-\(dq to read from stdin instead.
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-tar\-filter
@@ -116,7 +116,7 @@ write checkpoint every SECONDS seconds (Default: 1800)
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
-select compression algorithm, see the output of the "borg help compression" command for details.
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
 .UNINDENT
 .SH SEE ALSO
 .sp

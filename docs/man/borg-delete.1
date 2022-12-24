@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2022-08-20" "" "borg backup tool"
+.TH "BORG-DELETE" 1 "2022-12-24" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete an existing repository or archives
 .SH SYNOPSIS
@@ -48,15 +48,13 @@ with the \fB\-\-cache\-only\fP option, or keep the security info with the
 When in doubt, use \fB\-\-dry\-run \-\-list\fP to see what would be deleted.
 .sp
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
-deleted \- the "Deleted data" deduplicated size there is most interesting as
+deleted \- the \(dqDeleted data\(dq deduplicated size there is most interesting as
 that is how much your repository will shrink.
-Please note that the "All archives" stats refer to the state after deletion.
+Please note that the \(dqAll archives\(dq stats refer to the state after deletion.
 .sp
-You can delete multiple archives by specifying their common prefix, if they
-have one, using the \fB\-\-prefix PREFIX\fP option. You can also specify a shell
-pattern to match multiple archives using the \fB\-\-glob\-archives GLOB\fP option
-(for more info on these patterns, see \fIborg_patterns\fP). Note that these
-two options are mutually exclusive.
+You can delete multiple archives by specifying a shell pattern to match
+multiple archives using the \fB\-\-glob\-archives GLOB\fP option (for more info on
+these patterns, see \fIborg_patterns\fP).
 .sp
 To avoid accidentally deleting archives, especially when using glob patterns,
 it might be helpful to use the \fB\-\-dry\-run\fP to test out the command without
@@ -73,7 +71,7 @@ repository or archive to delete
 .B ARCHIVE
 archives to delete
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -104,10 +102,10 @@ write checkpoint every SECONDS seconds (Default: 1800)
 .INDENT 0.0
 .TP
 .BI \-P \ PREFIX\fR,\fB \ \-\-prefix \ PREFIX
-only consider archive names starting with this prefix.
+only consider archive names starting with this prefix. (deprecated)
 .TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see "borg help patterns". \fB\-\-prefix\fP and \fB\-\-glob\-archives\fP are mutually exclusive.
+only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
@@ -129,10 +127,10 @@ $ borg delete /path/to/repo::Monday
 # actually free disk space:
 $ borg compact /path/to/repo
 
-# delete all archives whose names begin with the machine\(aqs hostname followed by "\-"
-$ borg delete \-\-prefix \(aq{hostname}\-\(aq /path/to/repo
+# delete all archives whose names begin with the machine\(aqs hostname followed by \(dq\-\(dq
+$ borg delete \-\-glob\-archives \(aq{hostname}\-*\(aq /path/to/repo
 
-# delete all archives whose names contain "\-2012\-"
+# delete all archives whose names contain \(dq\-2012\-\(dq
 $ borg delete \-\-glob\-archives \(aq*\-2012\-*\(aq /path/to/repo
 
 # see what would be deleted if delete was run without \-\-dry\-run

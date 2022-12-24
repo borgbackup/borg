@@ -1399,8 +1399,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         def patched_setxattr_E2BIG(*args, **kwargs):
             raise OSError(errno.E2BIG, 'E2BIG')
 
-        def patched_setxattr_ENOTSUP(*args, **kwargs):
-            raise OSError(errno.ENOTSUP, 'ENOTSUP')
+        def patched_setxattr_ENOSPC(*args, **kwargs):
+            raise OSError(errno.ENOSPC, 'ENOSPC')
 
         def patched_setxattr_EACCES(*args, **kwargs):
             raise OSError(errno.EACCES, 'EACCES')
@@ -1413,15 +1413,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             input_abspath = os.path.abspath('input/file')
             with patch.object(xattr, 'setxattr', patched_setxattr_E2BIG):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert ': when setting extended attribute user.attribute: too big for this filesystem\n' in out
+                assert 'when setting extended attribute user.attribute: too big for this filesystem' in out
             os.remove(input_abspath)
-            with patch.object(xattr, 'setxattr', patched_setxattr_ENOTSUP):
+            with patch.object(xattr, 'setxattr', patched_setxattr_ENOSPC):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert ': when setting extended attribute user.attribute: xattrs not supported on this filesystem\n' in out
+                assert 'when setting extended attribute user.attribute: fs full or xattr too big?' in out
             os.remove(input_abspath)
             with patch.object(xattr, 'setxattr', patched_setxattr_EACCES):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
-                assert ': when setting extended attribute user.attribute: Permission denied\n' in out
+                assert 'when setting extended attribute user.attribute:' in out
             assert os.path.isfile(input_abspath)
 
     def test_path_normalization(self):

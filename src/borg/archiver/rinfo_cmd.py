@@ -3,7 +3,7 @@ import textwrap
 
 from ._common import with_repository
 from ..constants import *  # NOQA
-from ..helpers import bin_to_hex, json_print, basic_json_data
+from ..helpers import bin_to_hex, json_print, basic_json_data, format_file_size
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -30,7 +30,7 @@ class RInfoMixIn:
                 encryption += "\nKey file: %s" % key.find_key()
             info["encryption"] = encryption
 
-            print(
+            output = (
                 textwrap.dedent(
                     """
             Repository ID: {id}
@@ -38,8 +38,6 @@ class RInfoMixIn:
             Repository version: {version}
             Append only: {append_only}
             {encryption}
-            Cache: {cache.path}
-            Security dir: {security_dir}
             """
                 )
                 .strip()
@@ -48,9 +46,31 @@ class RInfoMixIn:
                     location=repository._location.canonical_path(),
                     version=repository.version,
                     append_only=repository.append_only,
-                    **info,
+                    encryption=info["encryption"],
                 )
             )
+
+            response = repository.info()
+            storage_quota = response["storage_quota"]
+            used = format_file_size(response["storage_quota_use"])
+
+            output += f"Storage quota: {used} used"
+            if storage_quota:
+                output += f" out of {format_file_size(storage_quota)}"
+            output += "\n"
+
+            output += (
+                textwrap.dedent(
+                    """
+                    Cache: {cache.path}
+                    Security dir: {security_dir}
+                    """
+                )
+                .strip()
+                .format(**info)
+            )
+
+            print(output)
             print(str(cache))
         return self.exit_code
 

@@ -493,9 +493,22 @@ class Repository:
         self.id = unhexlify(self.config.get("repository", "id").strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
+    def _load_hints(self):
+        if (transaction_id := self.get_transaction_id()) is None:
+            # self is a fresh repo, so transaction_id is None and there is no hints file
+            return
+        hints = self._unpack_hints(transaction_id)
+        self.version = hints["version"]
+        self.storage_quota_use = hints["storage_quota_use"]
+        self.shadow_index = hints["shadow_index"]
+
     def info(self):
         """return some infos about the repo (must be opened first)"""
-        return dict(id=self.id, version=self.version, append_only=self.append_only)
+        info = dict(id=self.id, version=self.version, append_only=self.append_only)
+        self._load_hints()
+        info["storage_quota"] = self.storage_quota
+        info["storage_quota_use"] = self.storage_quota_use
+        return info
 
     def close(self):
         if self.lock:
@@ -512,7 +525,6 @@ class Repository:
             self.rollback()
             raise exception
         self.check_free_space()
-        self.log_storage_quota()
         segment = self.io.write_commit()
         self.segments.setdefault(segment, 0)
         self.compact[segment] += LoggedIO.header_fmt.size
@@ -556,6 +568,12 @@ class Repository:
             self.commit(compact=False)
             return self.open_index(self.get_transaction_id())
 
+    def _unpack_hints(self, transaction_id):
+        hints_path = os.path.join(self.path, "hints.%d" % transaction_id)
+        integrity_data = self._read_integrity(transaction_id, "hints")
+        with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
+            return msgpack.unpack(fd)
+
     def prepare_txn(self, transaction_id, do_cleanup=True):
         self._active_txn = True
         if self.do_lock and not self.lock.got_exclusive_lock():
@@ -592,10 +610,8 @@ class Repository:
                 self.io.cleanup(transaction_id)
             hints_path = os.path.join(self.path, "hints.%d" % transaction_id)
             index_path = os.path.join(self.path, "index.%d" % transaction_id)
-            integrity_data = self._read_integrity(transaction_id, "hints")
             try:
-                with IntegrityCheckedFile(hints_path, write=False, integrity_data=integrity_data) as fd:
-                    hints = msgpack.unpack(fd)
+                hints = self._unpack_hints(transaction_id)
             except (msgpack.UnpackException, FileNotFoundError, FileIntegrityError) as e:
                 logger.warning("Repository hints file missing or corrupted, trying to recover: %s", e)
                 if not isinstance(e, FileNotFoundError):
@@ -622,7 +638,6 @@ class Repository:
                 self.compact = FreeSpace(hints["compact"])
                 self.storage_quota_use = hints.get("storage_quota_use", 0)
                 self.shadow_index = hints.get("shadow_index", {})
-            self.log_storage_quota()
             # Drop uncommitted segments in the shadow index
             for key, shadowed_segments in self.shadow_index.items():
                 for segment in list(shadowed_segments):
@@ -761,14 +776,6 @@ class Repository:
             formatted_required = format_file_size(required_free_space)
             formatted_free = format_file_size(free_space)
             raise self.InsufficientFreeSpaceError(formatted_required, formatted_free)
-
-    def log_storage_quota(self):
-        if self.storage_quota:
-            logger.info(
-                "Storage quota: %s out of %s used.",
-                format_file_size(self.storage_quota_use),
-                format_file_size(self.storage_quota),
-            )
 
     def compact_segments(self, threshold):
         """Compact sparse segments by copying data into new segments"""

@@ -68,9 +68,11 @@ def packages_openbsd
   return <<-EOF
     pkg_add bash
     chsh -s bash vagrant
+    pkg_add xxhash
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
+    pkg_add openssl%1.1
     pkg_add py3-pip
     pkg_add py3-virtualenv
   EOF
@@ -355,7 +357,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "generic/openbsd6"
+    b.vm.box = "openbsd71-64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

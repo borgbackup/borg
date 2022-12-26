@@ -712,17 +712,25 @@ will make the subsequent rebuilds faster (because it needs to transfer less data
 from the repository). While being faster, the cache needs quite some disk space,
 which might be unwanted.
 
-There is a temporary (but maybe long lived) hack to avoid using lots of disk
-space for chunks.archive.d (see :issue:`235` for details):
+A temporary (but maybe long lived) hack to avoid using lots of disk memory
+for ``chunks.archive.d`` (see :issue:`235` for details) is to replace this
+directory with an empty dummy file of this name.  Note, below,
+``$(borg config id)`` resolves into alphanumeric string specific to your
+backup repository (REPO_ID) you may identify in your file manager, or by
 
 ::
 
-    # this assumes you are working with the same user as the backup.
-    cd ~/.cache/borg/$(borg config id)
-    rm -rf chunks.archive.d ; touch chunks.archive.d
+  borg config id
 
-This deletes all the cached archive chunk indexes and replaces the directory
-that kept them with a file, so borg won't be able to store anything "in" there
+With this information, and assuming you work with the same user as for
+the backup, adjust your setup
+
+::
+
+  cd ~/.cache/borg/$(borg config id)
+  rm -rf chunks.archive.d ; touch chunks.archive.d
+
+The presence of the dummy file prevents borg from storing anything "in" there
 in future.
 
 This has some pros and cons, though:

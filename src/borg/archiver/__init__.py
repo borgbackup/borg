@@ -383,7 +383,7 @@ class Archiver(
         parser.common_options.resolve(args)
         func = get_func(args)
         if func == self.do_create and args.paths and args.paths_from_stdin:
-            parser.error("Must not pass PATH with ``--paths-from-stdin``.")
+            parser.error("Must not pass PATH with --paths-from-stdin.")
         if args.progress and getattr(args, "output_list", False):
             parser.error("Options --progress and --list do not play nicely together.")
         if func == self.do_create and not args.paths:

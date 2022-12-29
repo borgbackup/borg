@@ -488,6 +488,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 assert "when setting extended attribute user.attribute" in out
             assert os.path.isfile(input_abspath)
 
+    @pytest.mark.skipif(not is_darwin, reason="only for macOS")
+    def test_extract_xattrs_resourcefork(self):
+        self.create_regular_file("file")
+        self.cmd(f"--repo={self.repository_location}", "rcreate", "-e" "none")
+        input_path = os.path.abspath("input/file")
+        xa_key, xa_value = b"com.apple.ResourceFork", b"whatshouldbehere"  # issue #7234
+        xattr.setxattr(input_path.encode(), xa_key, xa_value)
+        birthtime_expected = os.stat(input_path).st_birthtime
+        mtime_expected = os.stat(input_path).st_mtime_ns
+        # atime_expected = os.stat(input_path).st_atime_ns
+        self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
+        with changedir("output"):
+            self.cmd(f"--repo={self.repository_location}", "extract", "test")
+            extracted_path = os.path.abspath("input/file")
+            birthtime_extracted = os.stat(extracted_path).st_birthtime
+            mtime_extracted = os.stat(extracted_path).st_mtime_ns
+            # atime_extracted = os.stat(extracted_path).st_atime_ns
+            xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
+        assert xa_value_extracted == xa_value
+        assert birthtime_extracted == birthtime_expected
+        assert mtime_extracted == mtime_expected
+        # assert atime_extracted == atime_expected  # still broken, but not really important.
+
     def test_overwrite(self):
         self.create_regular_file("file1", size=1024 * 80)
         self.create_regular_file("dir2/file2", size=1024 * 80)

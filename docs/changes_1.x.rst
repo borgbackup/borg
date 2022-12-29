@@ -776,7 +776,7 @@ Other changes:
 - docs:
 
   - improve description of path variables
-  - document how to completely delete data, #2929
+  - document how to delete data completely, #2929
   - add FAQ about Borg config dir, #4941
   - add docs about errors not printed as JSON, #4073
   - update usage_general.rst.inc
@@ -2149,7 +2149,7 @@ New features:
 - mount: added exclusion group options and paths, #2138
 
   Reused some code to support similar options/paths as borg extract offers -
-  making good use of these to only mount a smaller subset of dirs/files can
+  making good use of these to mount only a smaller subset of dirs/files can
   speed up mounting a lot and also will consume way less memory.
 
   borg mount [options] repo_or_archive mountpoint path [paths...]
@@ -3078,7 +3078,7 @@ New features:
     which includes the SHA1 and SHA2 family as well as MD5
 - borg prune:
 
-  - to better visualize the "thinning out", we now list all archives in
+  - to visualize the "thinning out" better, we now list all archives in
     reverse time order. rephrase and reorder help text.
   - implement --keep-last N via --keep-secondly N, also --keep-minutely.
     assuming that there is not more than 1 backup archive made in 1s,
@@ -3505,8 +3505,18 @@ Security fixes:
 
   CVE-2016-10099 was assigned to this vulnerability.
 - borg check: When rebuilding the manifest (which should only be needed very rarely)
-  duplicate archive names would be handled on a "first come first serve" basis, allowing
-  an attacker to apparently replace archives.
+  duplicate archive names would be handled on a "first come first serve" basis,
+  potentially opening an attack vector to replace archives.
+
+  Example: were there 2 archives named "foo" in a repo (which can not happen
+  under normal circumstances, because borg checks if the name is already used)
+  and a "borg check" recreated a (previously lost) manifest, the first of the
+  archives it encountered would be in the manifest. The second archive is also
+  still in the repo, but not referenced in the manifest, in this case. If the
+  second archive is the "correct" one (and was previously referenced from the
+  manifest), it looks like it got replaced by the first one. In the manifest,
+  it actually got replaced. Both remain in the repo but the "correct" one is no
+  longer accessible via normal means - the manifest.
 
   CVE-2016-10100 was assigned to this vulnerability.
 
@@ -4234,20 +4244,20 @@ Compatibility notes:
   changed file and in the worst case (e.g. if your files cache was lost / is
   not used) by the size of every file (minus any compression you might use).
 
-  in case you want to immediately see a much lower resource usage (RAM / disk)
+  in case you want to see a much lower resource usage immediately (RAM / disk)
   for chunks management, it might be better to start with a new repo than
-  continuing in the existing repo (with an existing repo, you'ld have to wait
-  until all archives with small chunks got pruned to see a lower resource
+  to continue in the existing repo (with an existing repo, you have to wait
+  until all archives with small chunks get pruned to see a lower resource
   usage).
 
   if you used the old --chunker-params default value (or if you did not use
-  --chunker-params option at all) and you'ld like to continue using small
+  --chunker-params option at all) and you'd like to continue using small
   chunks (and you accept the huge resource usage that comes with that), just
-  explicitly use borg create --chunker-params=10,23,16,4095.
+  use explicitly borg create --chunker-params=10,23,16,4095.
 - archive timestamps: the 'time' timestamp now refers to archive creation
   start time (was: end time), the new 'time_end' timestamp refers to archive
-  creation end time. This might affect prune if your backups take rather long.
-  if you give a timestamp via cli this is stored into 'time', therefore it now
+  creation end time. This might affect prune if your backups take a long time.
+  if you give a timestamp via cli, this is stored into 'time'. therefore it now
   needs to mean archive creation start time.
 
 New features:
@@ -4289,8 +4299,8 @@ Bug fixes:
 
 Other changes:
 
-- it is now possible to use "pip install borgbackup[fuse]" to automatically
-  install the llfuse dependency using the correct version requirement
+- it is now possible to use "pip install borgbackup[fuse]" to
+  install the llfuse dependency automatically, using the correct version requirement
   for it. you still need to care about having installed the FUSE / build
   related OS package first, though, so that building llfuse can succeed.
 - Vagrant: drop Ubuntu Precise (12.04) - does not have Python >= 3.4

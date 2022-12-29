@@ -75,7 +75,7 @@ To avoid permissions issues (in your borg repository or borg cache), **always
 access the repository using the same user account**.
 
 If you want to back up files of other users or the operating system, running
-borg as root likely will be required (otherwise you'ld get `Permission denied`
+borg as root likely will be required (otherwise you get `Permission denied`
 errors).
 If you only back up your own files, you neither need nor want to run borg as
 root, just run it as your normal user.
@@ -256,7 +256,7 @@ For more information, refer to the sudo(8) man page and ``env_keep`` in
 the sudoers(5) man page.
 
 .. Tip::
-    To debug what your borg process is actually seeing, find its PID
+    To debug what your borg process sees, find its PID
     (``ps aux|grep borg``) and then look into ``/proc/<PID>/environ``.
 
 .. passphrase_notes:
@@ -278,7 +278,7 @@ Borg is technically able to process all unicode text, but you might get into
 trouble reproducing the same encoded utf-8 bytes or with keyboard layouts,
 so better just avoid non-ASCII stuff.
 
-If you want to automate, you can alternatively supply the passphrase
+Alternatively, if you want to automate, you can supply the passphrase
 directly or indirectly using some environment variables.
 
 You can directly give a passphrase::

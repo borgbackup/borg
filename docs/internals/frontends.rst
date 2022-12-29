@@ -546,7 +546,7 @@ Errors
     Buffer.MemoryLimitExceeded
         Requested buffer size {} is above the limit of {}.
     ExtensionModuleError
-        The Borg binary extension modules do not seem to be properly installed
+        The Borg binary extension modules do not seem to be installed properly
     IntegrityError
         Data integrity error: {}
     NoManifestError
@@ -638,4 +638,4 @@ Prompts
     BORG_CHECK_I_KNOW_WHAT_I_AM_DOING
         For "This is a potentially dangerous function..." (check --repair)
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING
-        For "You requested to completely DELETE the repository *including* all archives it contains:"
+        For "You requested to DELETE the repository completely *including* all archives it contains:"

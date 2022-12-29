@@ -8,8 +8,8 @@ Version 0.30.0 (2016-01-23)
 
 Compatibility notes:
 
-- you may need to use -v (or --info) more often to actually see output emitted
-  at INFO log level (because it is suppressed at the default WARNING log level).
+- The new default logging level is WARNING. Previously, it was INFO, which was
+  more verbose. Use -v (or --info) to show once again log level INFO messages.
   See the "general" section in the usage docs.
 - for borg create, you need --list (additionally to -v) to see the long file
   list (was needed so you can have e.g. --stats alone without the long list)

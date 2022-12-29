@@ -65,7 +65,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             sys.stdin = StringIO(input.decode())
             sys.stdin.buffer = BytesIO(input)
             output = BytesIO()
-            # Always use utf-8 here, to simply .decode() below
+            # Always use utf-8 here, to .decode() below
             output_text = sys.stdout = sys.stderr = io.TextIOWrapper(output, encoding="utf-8")
             if archiver is None:
                 archiver = Archiver()

@@ -33,14 +33,14 @@ General:
         When set, use the value to answer the passphrase question when a **new** passphrase is asked for.
         This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
         be checked.
-        Main usecase for this is to fully automate ``borg change-passphrase``.
+        Main usecase for this is to automate fully ``borg change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
     BORG_HOST_ID
         Borg usually computes a host id from the FQDN plus the results of ``uuid.getnode()`` (which usually returns
         a unique id based on the MAC address of the network interface. Except if that MAC happens to be all-zero - in
         that case it returns a random value, which is not what we want (because it kills automatic stale lock removal).
-        So, if you have a all-zero MAC address or other reasons to better externally control the host id, just set this
+        So, if you have a all-zero MAC address or other reasons to control better externally the host id, just set this
         environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
         use fqdn@uniqueid.
     BORG_LOCK_WAIT
@@ -62,7 +62,7 @@ General:
         cache entries for backup sources other than the current sources.
     BORG_FILES_CACHE_TTL
         When set to a numeric value, this determines the maximum "time to live" for the files cache
-        entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
+        entries (default: 20). The files cache is used to determine quickly whether a file is unchanged.
         The FAQ explains this more detailed in: :ref:`always_chunking`
     BORG_SHOW_SYSINFO
         When set to no (default: yes), system information (like OS, Python version, ...) in
@@ -112,7 +112,7 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
     BORG_CHECK_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
         For "This is a potentially dangerous function..." (check --repair)
     BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
-        For "You requested to completely DELETE the repository *including* all archives it contains:"
+        For "You requested to DELETE the repository completely *including* all archives it contains:"
 
     Note: answers are case sensitive. setting an invalid answer value might either give the default
     answer or ask you interactively, depending on whether retries are allowed (they by default are

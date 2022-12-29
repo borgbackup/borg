@@ -77,7 +77,7 @@ Because the partitions were zeroed in place, restoration is only one command::
     borg extract --stdout repo::hostname-disk | dd of=$DISK
 
 .. note:: The "traditional" way to zero out space on a partition, especially one already
-          mounted, is to simply ``dd`` from ``/dev/zero`` to a temporary file and delete
+          mounted, is simply to ``dd`` from ``/dev/zero`` to a temporary file and delete
           it. This is ill-advised for the reasons mentioned in the ``zerofree`` man page:
 
           - it is slow

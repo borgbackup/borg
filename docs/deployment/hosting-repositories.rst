@@ -5,7 +5,7 @@
 Hosting repositories
 ====================
 
-This sections shows how to securely provide repository storage for users.
+This sections shows how to provide repository storage securely for users.
 Optionally, each user can have a storage quota.
 
 Repositories are accessed through SSH. Each user of the service should

@@ -36,7 +36,7 @@ def swidth(s):
 
 def process_alive(host, pid, thread):
     """
-    Check if the (host, pid, thread_id) combination corresponds to a potentially alive process.
+    Check whether the (host, pid, thread_id) combination corresponds to a process potentially alive.
 
     If the process is local, then this will be accurate. If the process is not local, then this
     returns always True, since there is no real way to check.

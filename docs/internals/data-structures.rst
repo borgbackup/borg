@@ -157,8 +157,8 @@ An object (the payload part of a segment file log entry) must be like:
 
   - compressed data (with an optional all-zero-bytes obfuscation trailer)
 
-This new, more complex repo v2 object format was implemented to be able to efficiently
-query the metadata without having to read, transfer and decrypt the (usually much bigger)
+This new, more complex repo v2 object format was implemented to be able to query the
+metadata efficiently without having to read, transfer and decrypt the (usually much bigger)
 data part.
 
 The metadata is encrypted not to disclose potentially sensitive information that could be

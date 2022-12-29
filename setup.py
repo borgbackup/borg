@@ -40,7 +40,7 @@ cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing
 # Are we building on ReadTheDocs?
 on_rtd = os.environ.get("READTHEDOCS")
 
-# Extra cflags for all extensions, usually just warnings we want to explicitly enable
+# Extra cflags for all extensions, usually just warnings we want to enable explicitly
 cflags = ["-Wall", "-Wextra", "-Wpointer-arith"]
 
 compress_source = "src/borg/compress.pyx"

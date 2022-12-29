@@ -404,7 +404,7 @@ If BORG_PASSPHRASE or BORG_PASSCOMMAND are also set, they take precedence.
 When set, use the value to answer the passphrase question when a \fBnew\fP passphrase is asked for.
 This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
 be checked.
-Main usecase for this is to fully automate \fBborg change\-passphrase\fP\&.
+Main usecase for this is to automate fully \fBborg change\-passphrase\fP\&.
 .TP
 .B BORG_DISPLAY_PASSPHRASE
 When set, use the value to answer the \(dqdisplay the passphrase for verification\(dq question when defining a new passphrase for encrypted repositories.
@@ -413,7 +413,7 @@ When set, use the value to answer the \(dqdisplay the passphrase for verificatio
 Borg usually computes a host id from the FQDN plus the results of \fBuuid.getnode()\fP (which usually returns
 a unique id based on the MAC address of the network interface. Except if that MAC happens to be all\-zero \- in
 that case it returns a random value, which is not what we want (because it kills automatic stale lock removal).
-So, if you have a all\-zero MAC address or other reasons to better externally control the host id, just set this
+So, if you have a all\-zero MAC address or other reasons to control better externally the host id just set this
 environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
 use \fI\%fqdn@uniqueid\fP\&.
 .TP
@@ -441,7 +441,7 @@ cache entries for backup sources other than the current sources.
 .TP
 .B BORG_FILES_CACHE_TTL
 When set to a numeric value, this determines the maximum \(dqtime to live\(dq for the files cache
-entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
+entries (default: 20). The files cache is used to determine quickly whether a file is unchanged.
 The FAQ explains this more detailed in: \fIalways_chunking\fP
 .TP
 .B BORG_SHOW_SYSINFO
@@ -509,7 +509,7 @@ For \(dqWarning: The repository at location ... was previously located at ...\(d
 For \(dqThis is a potentially dangerous function...\(dq (check \-\-repair)
 .TP
 .B BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
-For \(dqYou requested to completely DELETE the repository \fIincluding\fP all archives it contains:\(dq
+For \(dqYou requested to DELETE the repository completely \fIincluding\fP all archives it contains:\(dq
 .UNINDENT
 .sp
 Note: answers are case sensitive. setting an invalid answer value might either give the default

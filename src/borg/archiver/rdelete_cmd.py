@@ -31,13 +31,13 @@ class RDeleteMixIn:
                     manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
                     n_archives = len(manifest.archives)
                     msg.append(
-                        f"You requested to completely DELETE the following repository "
+                        f"You requested to DELETE the following repository completely "
                         f"*including* {n_archives} archives it contains:"
                     )
                 except NoManifestError:
                     n_archives = None
                     msg.append(
-                        "You requested to completely DELETE the following repository "
+                        "You requested to DELETE the following repository completely "
                         "*including* all archives it may contain:"
                     )
 

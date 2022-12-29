@@ -152,7 +152,7 @@ class Manifest:
         # behaviours are known when introducing new features sometimes this might not match the general descriptions
         # below.
 
-        # The READ operation describes which features are needed to safely list and extract the archives in the
+        # The READ operation describes which features are needed to list and extract the archives safely in the
         # repository.
         READ = "read"
         # The CHECK operation is for all operations that need either to understand every detail

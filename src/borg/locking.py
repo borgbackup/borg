@@ -328,8 +328,8 @@ class LockRoster:
     def migrate_lock(self, key, old_id, new_id):
         """migrate the lock ownership from old_id to new_id"""
         assert self.id == old_id
-        # need to temporarily switch off stale lock killing as we want to
-        # rather migrate than kill them (at least the one made by old_id).
+        # need to switch off stale lock killing temporarily as we want to
+        # migrate rather than kill them (at least the one made by old_id).
         killing, self.kill_stale_locks = self.kill_stale_locks, False
         try:
             try:

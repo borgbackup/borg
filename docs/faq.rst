@@ -86,7 +86,7 @@ run into this by yourself by restoring an older copy of your repository.
 "attack": maybe an attacker has replaced your repo by an older copy, trying to
 trick you into AES counter reuse, trying to break your repo encryption.
 
-If you'ld decide to ignore this and accept unsafe operation for this repository,
+If you decide to ignore this and accept unsafe operation for this repository,
 you could delete the manifest-timestamp and the local cache:
 
 ::
@@ -159,7 +159,7 @@ so that checkpoints even work while a big file is being processed.
 They are named ``<filename>.borg_part_<N>`` and all operations usually ignore
 these files, but you can make them considered by giving the option
 ``--consider-part-files``. You usually only need that option if you are
-really desperate (e.g. if you have no completed backup of that file and you'ld
+really desperate (e.g. if you have no completed backup of that file and you'd
 rather get a partial file extracted than nothing). You do **not** want to give
 that option under any normal circumstances.
 
@@ -342,7 +342,7 @@ That's **45** orders of magnitude more probable than the SHA-256 collision. Brie
 if you find SHA-256 collisions scary then your priorities are wrong. This example was grabbed from
 `this SO answer <https://stackoverflow.com/a/4014407/13359375>`_, it's great honestly.
 
-Still, the real question is if Borg tries not to make this happen?
+Still, the real question is whether Borg tries not to make this happen?
 
 Well... previously it did not check anything until there was a feature added which saves the size
 of the chunks too, so the size of the chunks is compared to the size that you got with the
@@ -467,7 +467,7 @@ Setting ``BORG_PASSPHRASE``
           user
           <https://security.stackexchange.com/questions/14000/environment-variable-accessibility-in-linux/14009#14009>`_.
 
-Using ``BORG_PASSCOMMAND`` with a properly permissioned file
+Using ``BORG_PASSCOMMAND`` with a file of proper permissions
   Another option is to create a file with a password in it in your home
   directory and use permissions to keep anyone else from reading it. For
   example, first create a key::
@@ -524,7 +524,7 @@ Using ``BORG_PASSCOMMAND`` with GNOME Keyring
 
     export BORG_PASSCOMMAND="secret-tool lookup borg-repository repo-name"
 
-  .. note:: For this to automatically unlock the keychain it must be run
+  .. note:: For this to unlock the keychain automatically it must be run
     in the ``dbus`` session of an unlocked terminal; for example, running a backup
     script as a ``cron`` job might not work unless you also ``export DISPLAY=:0``
     so ``secret-tool`` can pick up your open session. `It gets even more complicated`__
@@ -573,7 +573,7 @@ C to delete all backups residing on S.
 
 These are your options to protect against that:
 
-- Do not allow to permanently delete data from the repo, see :ref:`append_only_mode`.
+- Do not allow to delete data permanently from the repo, see :ref:`append_only_mode`.
 - Use a pull-mode setup using ``ssh -R``, see :ref:`pull_backup` for more information.
 - Mount C's filesystem on another machine and then create a backup of it.
 - Do not give C filesystem-level access to S.
@@ -853,7 +853,7 @@ Then you do the backup and look at the log output:
   The metadata values used in this comparison are determined by the ``--files-cache`` option
   and could be e.g. size, ctime and inode number (see the ``borg create`` docs for more
   details and potential issues).
-  You can use the ``stat`` command on files to manually look at fs metadata to debug if
+  You can use the ``stat`` command on files to look at fs metadata manually to debug if
   there is any unexpected change triggering the ``M`` status.
   Also, the ``--debug-topic=files_cache`` option of ``borg create`` provides a lot of debug
   output helping to analyse why the files cache does not give its expected high performance.

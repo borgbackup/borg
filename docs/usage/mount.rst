@@ -49,5 +49,5 @@ borgfs
 
     ``borgfs`` will be automatically provided if you used a distribution
     package, ``pip`` or ``setup.py`` to install Borg. Users of the
-    standalone binary will have to manually create a symlink (see
+    standalone binary will have to create a symlink manually (see
     :ref:`pyinstaller-binary`).

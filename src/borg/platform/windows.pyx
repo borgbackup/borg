@@ -41,7 +41,7 @@ def getosusername():
 
 def process_alive(host, pid, thread):
     """
-    Check if the (host, pid, thread_id) combination corresponds to a potentially alive process.
+    Check whether the (host, pid, thread_id) combination corresponds to a process potentially alive.
     """
     if host.split('@')[0].lower() != platform.node().lower():
         # Not running on the same node, assume running.

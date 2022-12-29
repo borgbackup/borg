@@ -134,7 +134,7 @@ fail if /tmp has not enough free space or is mounted with the ``noexec``
 option. You can change the temporary directory by setting the ``TEMP``
 environment variable before running Borg.
 
-If a new version is released, you will have to manually download it and replace
+If a new version is released, you will have to download it manually and replace
 the old version using the same steps as shown above.
 
 .. _pyinstaller: http://www.pyinstaller.org
@@ -331,7 +331,7 @@ optional, but recommended except for the most simple use cases.
     If you install into a virtual environment, you need to **activate** it
     first (``source borg-env/bin/activate``), before running ``borg``.
     Alternatively, symlink ``borg-env/bin/borg`` into some directory that is in
-    your ``PATH`` so you can just run ``borg``.
+    your ``PATH`` so you can run ``borg``.
 
 This will use ``pip`` to install the latest release from PyPi::
 

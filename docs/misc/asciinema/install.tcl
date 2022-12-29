@@ -24,7 +24,7 @@ sudo chmod 755 /usr/local/bin/borg
 # Now check it: (possibly needs a terminal restart)
 borg -V
 
-# That's it! Check out the other screencasts to see how to actually use borgbackup.
+# That's it! Now check out the other screencasts to see how to use borgbackup.
 }]
 
 # wget may be slow

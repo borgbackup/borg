@@ -161,7 +161,7 @@ Now we can run
 
     borg extract /borgrepo::archive PATH
 
-to partially restore whatever we like. Finally, do the clean-up:
+to restore whatever we like partially. Finally, do the clean-up:
 
 ::
 
@@ -209,8 +209,8 @@ socat
 =====
 
 In this setup a SSH connection from the backup server to the client is
-established that uses SSH reverse port forwarding to transparently
-tunnel data between UNIX domain sockets on the client and server and the socat
+established that uses SSH reverse port forwarding to tunnel data
+transparently between UNIX domain sockets on the client and server and the socat
 tool to connect these with the borg client and server processes, respectively.
 
 The program socat has to be available on the backup server and on the client
@@ -277,7 +277,7 @@ forwarding can do this for us::
 
       Warning: remote port forwarding failed for listen path /run/borg/reponame.sock
 
-   When you are done, you have to manually remove the socket file, otherwise
+   When you are done, you have to remove the socket file manually, otherwise
    you may see an error like this when trying to execute borg commands::
 
       Remote: YYYY/MM/DD HH:MM:SS socat[XXX] E connect(5, AF=1 "/run/borg/reponame.sock", 13): Connection refused
@@ -417,7 +417,7 @@ Parentheses are not needed when using a dedicated bash process.
 
   *ssh://borgs@borg-server/~/repo* refers to the repository *repo* within borgs's home directory on *borg-server*.
 
-  *StrictHostKeyChecking=no* is used to automatically add host keys to *~/.ssh/known_hosts* without user intervention.
+  *StrictHostKeyChecking=no* is used to add host keys automatically to *~/.ssh/known_hosts* without user intervention.
 
 ``kill "${SSH_AGENT_PID}"``
 

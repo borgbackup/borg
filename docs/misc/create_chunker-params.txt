@@ -45,7 +45,7 @@ to the ratio of the different target chunk sizes.
 
 Note: RAM needs were not a problem in this specific case (37GB data size).
       But just imagine, you have 37TB of such data and much less than 42GB RAM,
-      then you'ld definitely want the "lg" chunker params so you only need
+      then you should use the "lg" chunker params so you only need
       2.6GB RAM. Or even bigger chunks than shown for "lg" (see "xl").
 
 You also see compression works better for larger chunks, as expected.

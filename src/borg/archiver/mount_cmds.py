@@ -105,7 +105,7 @@ class MountMixIn:
 
         When the daemonized process receives a signal or crashes, it does not unmount.
         Unmounting in these cases could cause an active rsync or similar process
-        to unintentionally delete data.
+        to delete data unintentionally.
 
         When running in the foreground ^C/SIGINT unmounts cleanly, but other
         signals or crashes do not.

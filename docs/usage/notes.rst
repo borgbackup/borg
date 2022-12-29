@@ -309,8 +309,8 @@ operation on an append-only repository to catch accidental or malicious corrupti
     # run without append-only mode
     borg check --verify-data && borg compact
 
-Aside from checking repository & archive integrity you may want to also manually check
-backups to ensure their content seems correct.
+Aside from checking repository & archive integrity you may also want to check
+backups manually to ensure their content seems correct.
 
 Further considerations
 ++++++++++++++++++++++

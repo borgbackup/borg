@@ -436,7 +436,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_extract_capabilities(self):
         fchown = os.fchown
 
-        # We need to manually patch chown to get the behaviour Linux has, since fakeroot does not
+        # We need to patch chown manually to get the behaviour Linux has, since fakeroot does not
         # accurately model the interaction of chown(2) and Linux capabilities, i.e. it does not remove them.
         def patched_fchown(fd, uid, gid):
             xattr.setxattr(fd, b"security.capability", b"", follow_symlinks=False)

@@ -54,7 +54,7 @@ class RDeleteMixIn:
                             for archive_info in manifest.archives.list(sort_by=["ts"]):
                                 msg.append(format_archive(archive_info))
                         else:
-                            msg.append("This repository seems to not have any archives.")
+                            msg.append("This repository seems not to have any archives.")
                     else:
                         msg.append(
                             "This repository seems to have no manifest, so we can't "

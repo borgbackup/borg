@@ -615,17 +615,17 @@ class IndexCorruptionTestCase(BaseTestCase):
         idx = NSIndex()
 
         # create lots of colliding entries
-        for y in range(700):  # stay below max load to not trigger resize
+        for y in range(700):  # stay below max load not to trigger resize
             idx[HH(0, y, 0)] = (0, y, 0)
 
         assert idx.size() == 1024 + 1031 * 48  # header + 1031 buckets
 
         # delete lots of the collisions, creating lots of tombstones
-        for y in range(400):  # stay above min load to not trigger resize
+        for y in range(400):  # stay above min load not to trigger resize
             del idx[HH(0, y, 0)]
 
         # create lots of colliding entries, within the not yet used part of the hashtable
-        for y in range(330):  # stay below max load to not trigger resize
+        for y in range(330):  # stay below max load not to trigger resize
             # at y == 259 a resize will happen due to going beyond max EFFECTIVE load
             # if the bug is present, that element will be inserted at the wrong place.
             # and because it will be at the wrong place, it can not be found again.

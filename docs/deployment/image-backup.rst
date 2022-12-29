@@ -33,7 +33,7 @@ deduplicating. For backup, save the disk header and the contents of each partiti
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
         ntfsclone -so - $x | borg create repo::hostname-part$PARTNUM -
     done
-    # to backup non-NTFS partitions as well:
+    # to back up non-NTFS partitions as well:
     echo "$PARTITIONS" | grep -v NTFS | cut -d' ' -f1 | while read x; do
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
         borg create --read-special repo::hostname-part$PARTNUM $x

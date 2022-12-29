@@ -24,7 +24,7 @@ is assigned a home directory and repositories of the user reside in her
 home directory.
 
 The following ``~user/.ssh/authorized_keys`` file is the most important
-piece for a correct deployment. It allows the user to login via
+piece for a correct deployment. It allows the user to log in via
 their public key (which must be provided by the user), and restricts
 SSH access to safe operations only.
 

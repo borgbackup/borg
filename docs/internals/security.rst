@@ -60,7 +60,7 @@ In other words, the object ID itself only authenticates the plaintext of the
 object and not its context or meaning. The latter is established by a different
 object referring to an object ID, thereby assigning a particular meaning to
 an object. For example, an archive item contains a list of object IDs that
-represent packed file metadata. On their own it's not clear that these objects
+represent packed file metadata. On their own, it's not clear that these objects
 would represent what they do, but by the archive item referring to them
 in a particular part of its own data structure assigns this meaning.
 

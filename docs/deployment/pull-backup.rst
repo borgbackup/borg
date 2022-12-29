@@ -13,7 +13,7 @@ If you however require the backup server to initiate the connection or prefer
 it to initiate the backup run, one of the following workarounds is required to
 allow such a pull mode setup.
 
-A common use case for pull mode is to backup a remote server to a local personal
+A common use case for pull mode is to back up a remote server to a local personal
 computer.
 
 SSHFS

@@ -864,7 +864,7 @@ New features:
 - ability to use a system-provided version of "xxhash"
 - create:
 
-  - changed the default behaviour to not store the atime of fs items. atime is
+  - changed the default behaviour not to store the atime of fs items. atime is
     often rather not interesting and fragile - it easily changes even if nothing
     else has changed and, if stored into the archive, spoils deduplication of
     the archive metadata stream.
@@ -1781,7 +1781,7 @@ Fixes:
 - security fix: configure FUSE with "default_permissions", #3903
   "default_permissions" is now enforced by borg by default to let the
   kernel check uid/gid/mode based permissions.
-  "ignore_permissions" can be given to not enforce "default_permissions".
+  "ignore_permissions" can be given not to enforce "default_permissions".
 - make "hostname" short, even on misconfigured systems, #4262
 - fix free space calculation on macOS (and others?), #4289
 - config: quit with error message when no key is provided, #4223
@@ -2235,10 +2235,10 @@ Compatibility notes:
 - The deprecated --no-files-cache is not a global/common option any more,
   but only available for borg create (it is not needed for anything else).
   Use --files-cache=disabled instead of --no-files-cache.
-- The nodump flag ("do not backup this file") is not honoured any more by
+- The nodump flag ("do not back up this file") is not honoured any more by
   default because this functionality (esp. if it happened by error or
   unexpected) was rather confusing and unexplainable at first to users.
-  If you want that "do not backup NODUMP-flagged files" behaviour, use:
+  If you want that "do not back up NODUMP-flagged files" behaviour, use:
   borg create --exclude-nodump ...
 - If you are on Linux and do not need bsdflags archived, consider using
   ``--nobsdflags`` with ``borg create`` to avoid additional syscalls and
@@ -3175,7 +3175,7 @@ Bug fixes:
 - security fix: configure FUSE with "default_permissions", #3903.
   "default_permissions" is now enforced by borg by default to let the
   kernel check uid/gid/mode based permissions.
-  "ignore_permissions" can be given to not enforce "default_permissions".
+  "ignore_permissions" can be given not to enforce "default_permissions".
 - xattrs: fix borg exception handling on ENOSPC error, #3808.
 
 New features:
@@ -3478,7 +3478,7 @@ Other changes:
 - docs:
 
   - language clarification - VM backup FAQ
-  - borg create: document how to backup stdin, #2013
+  - borg create: document how to back up stdin, #2013
   - borg upgrade: fix incorrect title levels
   - add CVE numbers for issues fixed in 1.0.9, #2106
 - fix typos (taken from Debian package patch)
@@ -3674,7 +3674,7 @@ Bug fixes:
 New features:
 
 - add "borg key export" / "borg key import" commands, #1555, so users are able
-  to backup / restore their encryption keys more easily.
+  to back up / restore their encryption keys more easily.
 
   Supported formats are the keyfile format used by borg internally and a
   special "paper" format with by line checksums for printed backups. For the
@@ -4161,7 +4161,7 @@ Bug fixes:
 - do not sleep for >60s while waiting for lock, #773
 - unpack file stats before passing to FUSE
 - fix build on illumos
-- don't try to backup doors or event ports (Solaris and derivatives)
+- don't try to back up doors or event ports (Solaris and derivatives)
 - remove useless/misleading libc version display, #738
 - test suite: reset exit code of persistent archiver, #844
 - RemoteRepository: clean up pipe if remote open() fails

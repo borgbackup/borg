@@ -2,7 +2,7 @@
 
     $ borg -r /path/to/repo rcreate --encryption=repokey-aes-ocb
 
-2. Backup the ``~/src`` and ``~/Documents`` directories into an archive called
+2. Back up the ``~/src`` and ``~/Documents`` directories into an archive called
    *Monday*::
 
     $ borg -r /path/to/repo create Monday ~/src ~/Documents

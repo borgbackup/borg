@@ -151,7 +151,7 @@ in the upper part of the table, in the lower part is the old and/or unsafe(r) st
 
 .. nanorst: inline-replace
 
-`none` mode uses no encryption and no authentication. You're advised to NOT use this mode
+`none` mode uses no encryption and no authentication. You're advised NOT to use this mode
 as it would expose you to all sorts of issues (DoS, confidentiality, tampering, ...) in
 case of malicious activity in the repository.
 

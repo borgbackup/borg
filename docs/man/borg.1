@@ -40,11 +40,11 @@ borg [common options] <command> [options] [arguments]
 BorgBackup (short: Borg) is a deduplicating backup program.
 Optionally, it supports compression and authenticated encryption.
 .sp
-The main goal of Borg is to provide an efficient and secure way to backup data.
+The main goal of Borg is to provide an efficient and secure way to back up data.
 The data deduplication technique used makes Borg suitable for daily backups
 since only changes are stored.
-The authenticated encryption technique makes it suitable for backups to not
-fully trusted targets.
+The authenticated encryption technique makes it suitable for backups to targets not
+fully trusted.
 .sp
 Borg stores a set of files in an \fIarchive\fP\&. A \fIrepository\fP is a collection
 of \fIarchives\fP\&. The format of repositories is Borg\-specific. Borg does not
@@ -737,7 +737,7 @@ If your repository is remote, all deduplicated (and optionally compressed/
 encrypted) data of course has to go over the connection (\fBssh://\fP repo url).
 If you use a locally mounted network filesystem, additionally some copy
 operations used for transaction support also go over the connection. If
-you backup multiple sources to one target repository, additional traffic
+you back up multiple sources to one target repository, additional traffic
 happens for cache resynchronization.
 .UNINDENT
 .SS Support for file metadata

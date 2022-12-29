@@ -74,7 +74,7 @@ Important note about permissions
 To avoid permissions issues (in your borg repository or borg cache), **always
 access the repository using the same user account**.
 
-If you want to backup files of other users or the operating system, running
+If you want to back up files of other users or the operating system, running
 borg as root likely will be required (otherwise you'ld get `Permission denied`
 errors).
 If you only back up your own files, you neither need nor want to run borg as
@@ -123,7 +123,7 @@ works well enough without further care for consistency.  Log files and
 caches might not be in a perfect state, but this is rarely a problem.
 
 For databases, virtual machines, and containers, there are specific
-techniques for backing them up that do not simply use Borg to backup
+techniques for backing them up that do not simply use Borg to back up
 the underlying filesystem.  For databases, check your database
 documentation for techniques that will save the database state between
 transactions.  For virtual machines, consider running the backup on
@@ -171,7 +171,7 @@ backed up and that the ``prune`` command is keeping and deleting the correct bac
 
     info "Starting backup"
 
-    # Backup the most important directories into an archive named after
+    # Back up the most important directories into an archive named after
     # the machine this script is currently running on:
 
     borg create                         \

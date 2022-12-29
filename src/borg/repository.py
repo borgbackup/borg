@@ -129,7 +129,7 @@ class Repository:
     this is of course way more complex).
 
     LoggedIO gracefully handles truncate/unlink splits as long as the truncate resulted in
-    a zero length file. Zero length segments are considered to not exist, while LoggedIO.cleanup()
+    a zero length file. Zero length segments are considered not to exist, while LoggedIO.cleanup()
     will still get rid of them.
     """
 

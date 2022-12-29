@@ -30,7 +30,7 @@ for block devices (like disks, partitions, LVM LVs) or raw disk image files.
 
 ``--chunker-params=fixed,4096,512`` results in fixed 4kiB sized blocks,
 but the first header block will only be 512B long. This might be useful to
-dedup files with 1 header + N fixed size data blocks. Be careful to not
+dedup files with 1 header + N fixed size data blocks. Be careful not to
 produce a too big amount of chunks (like using small block size for huge
 files).
 
@@ -63,7 +63,7 @@ For more details, see :ref:`chunker_details`.
 ``--noatime / --noctime``
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can use these ``borg create`` options to not store the respective timestamp
+You can use these ``borg create`` options not to store the respective timestamp
 into the archive, in case you do not really need it.
 
 Besides saving a little space for the not archived timestamp, it might also
@@ -74,7 +74,7 @@ won't deduplicate just because of that.
 ``--nobsdflags / --noflags``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can use this to not query and store (or not extract and set) flags - in case
+You can use this not to query and store (or not extract and set) flags - in case
 you don't need them or if they are broken somehow for your fs.
 
 On Linux, dealing with the flags needs some additional syscalls. Especially when
@@ -132,7 +132,7 @@ scale and perform better if you do not work via the FUSE mount.
 Example
 +++++++
 
-Imagine you have made some snapshots of logical volumes (LVs) you want to backup.
+Imagine you have made some snapshots of logical volumes (LVs) you want to back up.
 
 .. note::
 

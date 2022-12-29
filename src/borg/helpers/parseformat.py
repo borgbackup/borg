@@ -876,31 +876,32 @@ class ItemFormatter(BaseFormatter):
     def get_item_data(self, item):
         item_data = {}
         item_data.update(self.item_data)
-        mode = stat.filemode(item.mode)
-        item_type = mode[0]
 
+        item_data.update(text_to_json("path", item.path))
         source = item.get("source", "")
-        extra = ""
-        if source:
-            source = remove_surrogates(source)
-            extra = " -> %s" % source
+        item_data.update(text_to_json("source", source))
+        item_data.update(text_to_json("linktarget", source))
+        if not self.json_lines:
+            item_data["extra"] = "" if not source else f" -> {item_data['source']}"
+
         hlid = item.get("hlid")
         hlid = bin_to_hex(hlid) if hlid else ""
+        item_data["hlid"] = hlid
+
+        mode = stat.filemode(item.mode)
+        item_type = mode[0]
         item_data["type"] = item_type
         item_data["mode"] = mode
-        item_data["user"] = item.get("user", str(item.uid))
-        item_data["group"] = item.get("group", str(item.gid))
+
+        item_data.update(text_to_json("user", item.get("user", str(item.uid))))
+        item_data.update(text_to_json("group", item.get("group", str(item.gid))))
         item_data["uid"] = item.uid
         item_data["gid"] = item.gid
-        item_data["path"] = remove_surrogates(item.path)
+
         if self.json_lines:
             item_data["healthy"] = "chunks_healthy" not in item
         else:
-            item_data["extra"] = extra
             item_data["health"] = "broken" if "chunks_healthy" in item else "healthy"
-        item_data["source"] = source
-        item_data["linktarget"] = source
-        item_data["hlid"] = hlid
         item_data["flags"] = item.get("bsdflags")  # int if flags known, else (if flags unknown) None
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)

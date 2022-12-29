@@ -422,7 +422,7 @@ Deprecations:
   We keep the --compression 0..9 for now not to break scripts, but it is
   deprecated and will be removed later, so better fix your scripts now:
   --compression 0 (as in 0.24) is the same as --compression zlib,0 (now).
-  BUT: if you do not want compression, you rather want --compression none
+  BUT: if you do not want compression, use --compression none
   (which is the default).
   --compression 1 (in 0.24) is the same as --compression zlib,1 (now)
   --compression 9 (in 0.24) is the same as --compression zlib,9 (now)

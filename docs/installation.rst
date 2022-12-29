@@ -414,4 +414,4 @@ If you need to use a different version of Python you can install this using ``py
     source borg-env/bin/activate   # always before using!
     ...
 
-.. note:: As a developer or power user, you always want to use a virtual environment.
+.. note:: As a developer or power user, you should always use a virtual environment.

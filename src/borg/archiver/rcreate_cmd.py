@@ -118,7 +118,7 @@ class RCreateMixIn:
         `repokey` modes: if you want ease-of-use and "passphrase" security is good enough -
         the key will be stored in the repository (in ``repo_dir/config``).
 
-        `keyfile` modes: if you rather want "passphrase and having-the-key" security -
+        `keyfile` modes: if you want "passphrase and having-the-key" security -
         the key will be stored in your home directory (in ``~/.config/borg/keys``).
 
         The following table is roughly sorted in order of preference, the better ones are

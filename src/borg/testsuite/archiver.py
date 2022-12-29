@@ -56,7 +56,7 @@ from ..repository import Repository
 from . import has_lchflags, llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from .platform import fakeroot_detected
+from .platform import fakeroot_detected, is_darwin
 from .upgrader import make_attic_repo
 from . import key
 
@@ -1423,6 +1423,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 out = self.cmd('extract', self.repository_location + '::test', exit_code=EXIT_WARNING)
                 assert 'when setting extended attribute user.attribute:' in out
             assert os.path.isfile(input_abspath)
+
+    @pytest.mark.skipif(not is_darwin, reason='only for macOS')
+    def test_extract_xattrs_resourcefork(self):
+        self.create_regular_file('file')
+        self.cmd('init', self.repository_location, '-e' 'none')
+        input_path = os.path.abspath('input/file')
+        xa_key, xa_value = b'com.apple.ResourceFork', b'whatshouldbehere'  # issue #7234
+        xattr.setxattr(input_path.encode(), xa_key, xa_value)
+        birthtime_expected = os.stat(input_path).st_birthtime
+        mtime_expected = os.stat(input_path).st_mtime_ns
+        # atime_expected = os.stat(input_path).st_atime_ns
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+            extracted_path = os.path.abspath('input/file')
+            birthtime_extracted = os.stat(extracted_path).st_birthtime
+            mtime_extracted = os.stat(extracted_path).st_mtime_ns
+            # atime_extracted = os.stat(extracted_path).st_atime_ns
+            xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
+        assert xa_value_extracted == xa_value
+        assert birthtime_extracted == birthtime_expected
+        assert mtime_extracted == mtime_expected
+        # assert atime_extracted == atime_expected  # still broken, but not really important.
 
     def test_path_normalization(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

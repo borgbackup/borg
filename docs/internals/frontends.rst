@@ -29,6 +29,42 @@ On POSIX systems, you can usually set environment vars to choose a UTF-8 locale:
     export LC_CTYPE=en_US.UTF-8
 
 
+Dealing with non-unicode byte sequences and JSON limitations
+------------------------------------------------------------
+
+Paths on POSIX systems can have arbitrary bytes in them (except 0x00 which is used as string terminator in C).
+
+Nowadays, UTF-8 encoded paths (which decode to valid unicode) are the usual thing, but a lot of systems
+still have paths from the past, when other, non-unicode codings were used. Especially old Samba shares often
+have wild mixtures of misc. encodings, sometimes even very broken stuff.
+
+borg deals with such non-unicode paths ("with funny/broken characters") by decoding such byte sequences using
+UTF-8 coding and "surrogateescape" error handling mode, which maps invalid bytes to special unicode code points
+(surrogate escapes). When encoding such a unicode string back to a byte sequence, the original byte sequence
+will be reproduced exactly.
+
+JSON should only contain valid unicode text without any surrogate escapes, so we can't just directly have a
+surrogate-escaped path in JSON ("path" is only one example, this also affects other text-like content).
+
+Borg deals with this situation like this (since borg 2.0):
+
+For a valid unicode path (no surrogate escapes), the JSON will only have "path": path.
+
+For a non-unicode path (with surrogate escapes), the JSON will have 2 entries:
+
+- "path": path_approximation (pure valid unicode, all invalid bytes will show up as "?")
+- "path_b64": path_bytes_base64_encoded (if you decode the base64, you get the original path byte string)
+
+JSON users need to pick whatever suits their needs best. The suggested procedure (shown for "path") is:
+
+- check if there is a "path_b64" key.
+- if it is there, you will know that the original bytes path did not cleanly UTF-8-decode into unicode (has
+  some invalid bytes) and that the string given by the "path" key is only an approximation, but not the precise
+  path. if you need precision, you must base64-decode the value of "path_b64" and deal with the arbitrary byte
+  string you'll get. if an approximation is fine, use the value of the "path" key.
+- if it is not there, the value of the "path" key is all you need (the original bytes path is its UTF-8 encoding).
+
+
 Logging
 -------
 
@@ -39,8 +75,6 @@ where each line is a JSON object. The *type* key of the object determines its ot
 .. warning:: JSON logging requires successful argument parsing. Even with ``--log-json`` specified, a
     parsing error will be printed in plain text, because logging set-up happens after all arguments are
     parsed.
-
-Since JSON can only encode text, any string representing a file system path may miss non-text parts.
 
 The following types are in use. Progress information is governed by the usual rules for progress information,
 it is not produced unless ``--progress`` is specified.

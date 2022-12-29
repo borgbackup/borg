@@ -21,22 +21,22 @@ mount an archive to restore from a backup.
 
 *Repositories* are filesystem directories acting as self-contained stores of archives.
 Repositories can be accessed locally via path or remotely via ssh. Under the hood,
-repositories contain data blocks and a manifest tracking which blocks are in each
-archive. If some data hasn't changed from one backup to another, Borg can simply
-reference an already uploaded data chunk (deduplication).
+repositories contain data blocks and a manifest that tracks which blocks are in each
+archive. If some data hasn't changed between backups, Borg simply
+references an already uploaded data chunk (deduplication).
 
 .. _about_free_space:
 
 Important note about free space
 -------------------------------
 
-Before you start creating backups, please make sure that there is *always*
-a good amount of free space on the filesystem that has your backup repository
+Before you start creating backups, ensure that there is *always* plenty
+of free space on the destination filesystem that has your backup repository
 (and also on ~/.cache). A few GB should suffice for most hard-drive sized
 repositories. See also :ref:`cache-memory-usage`.
 
-Borg doesn't use space reserved for root on repository disks (even when run as root),
-on file systems which do not support this mechanism (e.g. XFS) we recommend to reserve
+Borg doesn't use space reserved for root on repository disks (even when run as root).
+On file systems which do not support this mechanism (e.g. XFS) we recommend to reserve
 some space in Borg itself just to be safe by adjusting the ``additional_free_space``
 setting (a good starting point is ``2G``)::
 
@@ -47,7 +47,7 @@ can while aborting the current operation safely, which allows the user to free m
 by deleting/pruning archives. This mechanism is not bullet-proof in some
 circumstances [1]_.
 
-If you *really* run out of disk space, it can be hard or impossible to free space,
+If you do run out of disk space, it can be hard or impossible to free space,
 because Borg needs free space to operate - even to delete backup archives.
 
 You can use some monitoring process or just include the free space information
@@ -71,16 +71,15 @@ Also helpful:
 Important note about permissions
 --------------------------------
 
-To avoid permissions issues (in your borg repository or borg cache), **always
+To avoid permission issues (in your borg repository or borg cache), **always
 access the repository using the same user account**.
 
 If you want to back up files of other users or the operating system, running
 borg as root likely will be required (otherwise you get `Permission denied`
 errors).
-If you only back up your own files, you neither need nor want to run borg as
-root, just run it as your normal user.
+If you only back up your own files, run it as your normal user (no root).
 
-For a local repository just always use the same user to invoke borg.
+For a local repository always use the same user to invoke borg.
 
 For a remote repository: always use e.g. ssh://borg@remote_host. You can use this
 from different local users, the remote user running borg and accessing the
@@ -116,7 +115,7 @@ common techniques to achieve this.
 
 - Shut down containers before backing up their storage volumes.
 
-For some systems Borg might work well enough without these
+For some systems, Borg might work well enough without these
 precautions.  If you are simply backing up the files on a system that
 isn't very active (e.g. in a typical home directory), Borg usually
 works well enough without further care for consistency.  Log files and
@@ -139,8 +138,8 @@ complete operating system) to a repository ``~/backup/main``  on a remote server
 Some files which aren't necessarily needed in this backup are excluded. See
 :ref:`borg_patterns` on how to add more exclude options.
 
-After the backup this script also uses the :ref:`borg_prune` subcommand to keep
-only a certain number of old archives and deletes the others.
+After the backup, this script also uses the :ref:`borg_prune` subcommand to keep
+a certain number of old archives and deletes the others.
 
 Finally, it uses the :ref:`borg_compact` subcommand to remove deleted objects
 from the segment files in the repository to free disk space.
@@ -152,8 +151,8 @@ by the root user, but not executable or readable by anyone else, i.e. root:root 
 You can use this script as a starting point and modify it where it's necessary to fit
 your setup.
 
-Do not forget to test your created backups to make sure everything you need is being
-backed up and that the ``prune`` command is keeping and deleting the correct backups.
+Do not forget to test your created backups to make sure everything you need is
+backed up and that the ``prune`` command keeps and deletes the correct backups.
 
 ::
 
@@ -236,7 +235,7 @@ Pitfalls with shell variables and environment variables
 -------------------------------------------------------
 
 This applies to all environment variables you want Borg to see, not just
-``BORG_PASSPHRASE``. The short explanation is: always ``export`` your variable,
+``BORG_PASSPHRASE``. TL;DR: always ``export`` your variable,
 and use single quotes if you're unsure of the details of your shell's expansion
 behavior. E.g.::
 
@@ -267,26 +266,27 @@ Passphrase notes
 If you use encryption (or authentication), Borg will interactively ask you
 for a passphrase to encrypt/decrypt the keyfile / repokey.
 
-A passphrase should be a single line of text, a trailing linefeed will be
+A passphrase should be a single line of text. Any trailing linefeed will be
 stripped.
 
-For your own safety, you maybe want to avoid empty passphrases as well
-extremely long passphrase (much more than 256 bits of entropy).
+Do not use empty passphrases, as these can be trivially guessed, which does not
+leave any encrypted data secure. 
 
-Also avoid passphrases containing non-ASCII characters.
-Borg is technically able to process all unicode text, but you might get into
-trouble reproducing the same encoded utf-8 bytes or with keyboard layouts,
-so better just avoid non-ASCII stuff.
+Avoid passphrases containing non-ASCII characters.
+Borg can process any unicode text, but problems may arise at input due to text
+encoding or differing keyboard layouts, so best just avoid non-ASCII stuff.
 
-Alternatively, if you want to automate, you can supply the passphrase
-directly or indirectly using some environment variables.
+See: https://xkcd.com/936/
 
-You can directly give a passphrase::
+If you want to automate, you can supply the passphrase
+directly or indirectly with the use of environment variables.
+
+Supply a passphrase directly::
 
     # use this passphrase (use safe permissions on the script!):
     export BORG_PASSPHRASE='my super secret passphrase'
 
-Or ask an external program to supply the passphrase::
+Or delegate to an external program to supply the passphrase::
 
     # use the "pass" password manager to get the passphrase:
     export BORG_PASSCOMMAND='pass show backup'
@@ -424,22 +424,23 @@ be acceptable for backup usage.
 Restoring a backup
 ------------------
 
-Please note that we are only describing the most basic commands and options
-here - please refer to the command reference to see more.
+Please note that we describe only the most basic commands and options
+here. Refer to the command reference to see more.
 
-For restoring, you usually want to work **on the same machine as the same user**
-that was also used to create the backups of the wanted files. Doing it like
-that avoids quite some issues:
+To restore, work **on the same machine as the same user**
+that was used to create the backups of the wanted files. Doing so
+avoids issues such as:
 
-- no confusion relating to paths
-- same mapping of user/group names to user/group IDs
-- no permission issues
-- you likely already have a working borg setup there,
+- confusion relating to paths
+- mapping of user/group names to user/group IDs
+- permissions
 
-  - maybe including a environment variable for the key passphrase (for encrypted repos),
-  - maybe including a keyfile for the repo (not needed for repokey mode),
-  - maybe including a ssh key for the repo server (not needed for locally mounted repos),
-  - maybe including a valid borg cache for that repo (quicker than cache rebuild).
+You likely already have a working borg setup there, including perhaps:
+
+  - an environment variable for the key passphrase (for encrypted repos),
+  - a keyfile for the repo (not needed for repokey mode),
+  - a ssh key for the repo server (not needed for locally mounted repos),
+  - a valid borg cache for that repo (quicker than cache rebuild).
 
 The **user** might be:
 
@@ -461,12 +462,12 @@ The **key** can be located:
 - in the repository (**repokey** mode).
 
   Easy, this will usually "just work".
-- in the home directory of the user who did the backup (**keyfile** mode).
+- in the home directory of the user who made the backup (**keyfile** mode).
 
   This may cause a bit more effort:
 
   - if you have just lost that home directory and you first need to restore the
-    borg key (e.g. from the separate backup you have made of it or from another
+    borg key (e.g. from the separate backup you made of it or from another
     user or machine accessing the same repository).
   - if you first must find out the correct machine / user / home directory
     (where the borg client was run to make the backups).
@@ -483,19 +484,19 @@ There are **2 ways to restore** files from a borg backup repository:
 
 - **borg mount** - use this if:
 
-  - you don't precisely know what files you want to restore
+  - you don't know exactly which files you want to restore
   - you don't know which archive contains the files (in the state) you want
   - you need to look into files / directories before deciding what you want
   - you need a relatively low volume of data restored
-  - you don't care for restoring stuff that the FUSE mount is not implementing yet
+  - you don't care for restoring stuff that FUSE mount does not implement yet
     (like special fs flags, ACLs)
-  - you have a client with good resources (RAM, CPU, temp. disk space)
-  - you want to rather use some filemanager to restore (copy) files than borg
+  - you have a client with good resources (RAM, CPU, temporary disk space)
+  - you would rather use some filemanager to restore (copy) files than borg
     extract shell commands
 
 - **borg extract** - use this if:
 
-  - you precisely know what you want (repo, archive, path)
+  - you know precisely what you want (repo, archive, path)
   - you need a high volume of files restored (best speed)
   - you want a as-complete-as-it-gets reproduction of file metadata
     (like special fs flags, ACLs)

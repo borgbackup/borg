@@ -77,7 +77,7 @@ access the repository using the same user account**.
 If you want to back up files of other users or the operating system, running
 borg as root likely will be required (otherwise you get `Permission denied`
 errors).
-If you only back up your own files, run it as your normal user (no root).
+If you only back up your own files, run it as your normal user (i.e. not root).
 
 For a local repository always use the same user to invoke borg.
 
@@ -263,7 +263,7 @@ the sudoers(5) man page.
 Passphrase notes
 ----------------
 
-If you use encryption (or authentication), Borg will interactively ask you
+If you use encryption (or authentication), Borg will ask you interactively
 for a passphrase to encrypt/decrypt the keyfile / repokey.
 
 A passphrase should be a single line of text. Any trailing linefeed will be

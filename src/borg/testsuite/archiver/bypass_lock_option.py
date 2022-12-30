@@ -113,7 +113,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     pass
             else:
                 with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
-                    # self.fuse_mount always assumes fork=True, so for this test we have to manually set fork=False
+                    # self.fuse_mount always assumes fork=True, so for this test we have to set fork=False manually
                     with self.fuse_mount(self.repository_location, fork=False):
                         pass
                 if isinstance(excinfo.value, RemoteRepository.RPCError):

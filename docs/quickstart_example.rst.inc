@@ -1,8 +1,8 @@
-1. Before a backup can be made a repository has to be initialized::
+1. Before a backup can be made, a repository has to be initialized::
 
     $ borg -r /path/to/repo rcreate --encryption=repokey-aes-ocb
 
-2. Backup the ``~/src`` and ``~/Documents`` directories into an archive called
+2. Back up the ``~/src`` and ``~/Documents`` directories into an archive called
    *Monday*::
 
     $ borg -r /path/to/repo create Monday ~/src ~/Documents
@@ -11,7 +11,7 @@
 
     $ borg -r /path/to/repo create --stats Tuesday ~/src ~/Documents
 
-   This backup will be a lot quicker and a lot smaller since only new never
+   This backup will be a lot quicker and a lot smaller since only new, never
    before seen data is stored. The ``--stats`` option causes Borg to
    output statistics about the newly created archive such as the deduplicated
    size (the amount of unique data not shared with other archives)::
@@ -58,7 +58,7 @@
     $ borg -r /path/to/repo compact
 
 .. Note::
-    Borg is quiet by default (it works on WARNING log level).
+    Borg is quiet by default (it defaults to WARNING log level).
     You can use options like ``--progress`` or ``--list`` to get specific
     reports during command execution.  You can also add the ``-v`` (or
     ``--verbose`` or ``--info``) option to adjust the log level to INFO to

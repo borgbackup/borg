@@ -43,7 +43,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--content-from-command``                        | interpret PATH as command and store its stdout. See also section Reading from stdin below.                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--paths-from-stdin``                            | read DELIM-separated list of paths to backup from stdin. Will not recurse into directories.                                                                                                       |
+    |                                                       | ``--paths-from-stdin``                            | read DELIM-separated list of paths to back up from stdin. Will not recurse into directories.                                                                                                       |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--paths-from-command``                          | interpret PATH as command and treat its output as ``--paths-from-stdin``                                                                                                                          |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -136,7 +136,7 @@ borg create
         --stdin-group GROUP    set group GROUP in archive for stdin data (default: 'wheel')
         --stdin-mode M    set mode to M in archive for stdin data (default: 0660)
         --content-from-command    interpret PATH as command and store its stdout. See also section Reading from stdin below.
-        --paths-from-stdin    read DELIM-separated list of paths to backup from stdin. Will not recurse into directories.
+        --paths-from-stdin    read DELIM-separated list of paths to back up from stdin. Will not recurse into directories.
         --paths-from-command    interpret PATH as command and treat its output as ``--paths-from-stdin``
         --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \n) 
 

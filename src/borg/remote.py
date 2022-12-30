@@ -669,7 +669,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 self.shutdown_time = time.monotonic() + 30
                 self.rollback()
         finally:
-            # in any case, we want to cleanly close the repo, even if the
+            # in any case, we want to close the repo cleanly, even if the
             # rollback can not succeed (e.g. because the connection was
             # already closed) and raised another exception:
             logger.debug(

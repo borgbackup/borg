@@ -151,7 +151,7 @@ class KeysMixIn:
         key_export_epilog = process_epilog(
             """
         If repository encryption is used, the repository is inaccessible
-        without the key. This command allows one to backup this essential key.
+        without the key. This command allows one to back up this essential key.
         Note that the backup produced does not include the passphrase itself
         (i.e. the exported key stays encrypted). In order to regain access to a
         repository, one needs both the exported key and the original passphrase.

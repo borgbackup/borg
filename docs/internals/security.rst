@@ -60,7 +60,7 @@ In other words, the object ID itself only authenticates the plaintext of the
 object and not its context or meaning. The latter is established by a different
 object referring to an object ID, thereby assigning a particular meaning to
 an object. For example, an archive item contains a list of object IDs that
-represent packed file metadata. On their own it's not clear that these objects
+represent packed file metadata. On their own, it's not clear that these objects
 would represent what they do, but by the archive item referring to them
 in a particular part of its own data structure assigns this meaning.
 
@@ -277,7 +277,7 @@ SSH server -- Borg RPC does not contain *any* networking
 code. Networking is done by the SSH client running in a separate
 process, Borg only communicates over the standard pipes (stdout,
 stderr and stdin) with this process. This also means that Borg doesn't
-have to directly use a SSH client (or SSH at all). For example,
+have to use a SSH client directly (or SSH at all). For example,
 ``sudo`` or ``qrexec`` could be used as an intermediary.
 
 By using the system's SSH client and not implementing a

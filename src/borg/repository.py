@@ -129,7 +129,7 @@ class Repository:
     this is of course way more complex).
 
     LoggedIO gracefully handles truncate/unlink splits as long as the truncate resulted in
-    a zero length file. Zero length segments are considered to not exist, while LoggedIO.cleanup()
+    a zero length file. Zero length segments are considered not to exist, while LoggedIO.cleanup()
     will still get rid of them.
     """
 
@@ -328,7 +328,7 @@ class Repository:
 
         if os.path.isfile(config_path):
             link_error_msg = (
-                "Failed to securely erase old repository config file (hardlinks not supported). "
+                "Failed to erase old repository config file securely (hardlinks not supported). "
                 "Old repokey data, if any, might persist on physical storage."
             )
             try:
@@ -429,7 +429,7 @@ class Repository:
             # valid (committed) state of the repo which we could use.
             msg = '%s" - although likely this is "beyond repair' % self.path  # dirty hack
             raise self.CheckNeeded(msg)
-        # Attempt to automatically rebuild index if we crashed between commit
+        # Attempt to rebuild index automatically if we crashed between commit
         # tag write and index save.
         if index_transaction_id != segments_transaction_id:
             if index_transaction_id is not None and index_transaction_id > segments_transaction_id:
@@ -719,7 +719,7 @@ class Repository:
         self.index = None
 
     def check_free_space(self):
-        """Pre-commit check for sufficient free space to actually perform the commit."""
+        """Pre-commit check for sufficient free space necessary to perform the commit."""
         # As a baseline we take four times the current (on-disk) index size.
         # At this point the index may only be updated by compaction, which won't resize it.
         # We still apply a factor of four so that a later, separate invocation can free space
@@ -734,7 +734,7 @@ class Repository:
         # 10 bytes for each segment-refcount pair, 10 bytes for each segment-space pair
         # Assume maximum of 5 bytes per integer. Segment numbers will usually be packed more densely (1-3 bytes),
         # as will refcounts and free space integers. For 5 MiB segments this estimate is good to ~20 PB repo size.
-        # Add 4K to generously account for constant format overhead.
+        # Add a generous 4K to account for constant format overhead.
         hints_size = len(self.segments) * 10 + len(self.compact) * 10 + 4096
         required_free_space += hints_size
 
@@ -1238,7 +1238,7 @@ class Repository:
         # smallest valid seg is <uint32> 0, smallest valid offs is <uint32> 8
         start_segment, start_offset, end_segment = state if state is not None else (0, 0, transaction_id)
         ids, segment, offset = [], 0, 0
-        # we only scan up to end_segment == transaction_id to only scan **committed** chunks,
+        # we only scan up to end_segment == transaction_id to scan only **committed** chunks,
         # avoiding scanning into newly written chunks.
         for segment, filename in self.io.segment_iterator(start_segment, end_segment):
             # the start_offset we potentially got from state is only valid for the start_segment we also got

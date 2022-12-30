@@ -22,7 +22,7 @@ metadata, using :ref:`chunks` created by the chunker using the
 Buzhash_ algorithm ("buzhash" chunker) or a simpler fixed blocksize
 algorithm ("fixed" chunker).
 
-To actually perform the repository-wide deduplication, a hash of each
+To perform the repository-wide deduplication, a hash of each
 chunk is checked against the :ref:`chunks cache <cache>`, which is a
 hash-table of all chunks that already exist.
 

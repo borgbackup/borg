@@ -91,5 +91,5 @@ Network (only for client/server operation):
     encrypted) data of course has to go over the connection (``ssh://`` repo url).
     If you use a locally mounted network filesystem, additionally some copy
     operations used for transaction support also go over the connection. If
-    you backup multiple sources to one target repository, additional traffic
+    you back up multiple sources to one target repository, additional traffic
     happens for cache resynchronization.

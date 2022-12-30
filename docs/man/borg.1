@@ -40,11 +40,11 @@ borg [common options] <command> [options] [arguments]
 BorgBackup (short: Borg) is a deduplicating backup program.
 Optionally, it supports compression and authenticated encryption.
 .sp
-The main goal of Borg is to provide an efficient and secure way to backup data.
+The main goal of Borg is to provide an efficient and secure way to back up data.
 The data deduplication technique used makes Borg suitable for daily backups
 since only changes are stored.
-The authenticated encryption technique makes it suitable for backups to not
-fully trusted targets.
+The authenticated encryption technique makes it suitable for backups to targets not
+fully trusted.
 .sp
 Borg stores a set of files in an \fIarchive\fP\&. A \fIrepository\fP is a collection
 of \fIarchives\fP\&. The format of repositories is Borg\-specific. Borg does not
@@ -54,7 +54,7 @@ it does not matter when or where archives were created (e.g. different hosts).
 .SS A step\-by\-step example
 .INDENT 0.0
 .IP 1. 3
-Before a backup can be made a repository has to be initialized:
+Before a backup can be made, a repository has to be initialized:
 .INDENT 3.0
 .INDENT 3.5
 .sp
@@ -91,7 +91,7 @@ $ borg \-r /path/to/repo create \-\-stats Tuesday ~/src ~/Documents
 .UNINDENT
 .UNINDENT
 .sp
-This backup will be a lot quicker and a lot smaller since only new never
+This backup will be a lot quicker and a lot smaller since only new, never
 before seen data is stored. The \fB\-\-stats\fP option causes Borg to
 output statistics about the newly created archive such as the deduplicated
 size (the amount of unique data not shared with other archives):
@@ -189,7 +189,7 @@ $ borg \-r /path/to/repo compact
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
-Borg is quiet by default (it works on WARNING log level).
+Borg is quiet by default (it defaults to WARNING log level).
 You can use options like \fB\-\-progress\fP or \fB\-\-list\fP to get specific
 reports during command execution.  You can also add the \fB\-v\fP (or
 \fB\-\-verbose\fP or \fB\-\-info\fP) option to adjust the log level to INFO to
@@ -404,7 +404,7 @@ If BORG_PASSPHRASE or BORG_PASSCOMMAND are also set, they take precedence.
 When set, use the value to answer the passphrase question when a \fBnew\fP passphrase is asked for.
 This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
 be checked.
-Main usecase for this is to fully automate \fBborg change\-passphrase\fP\&.
+Main usecase for this is to automate fully \fBborg change\-passphrase\fP\&.
 .TP
 .B BORG_DISPLAY_PASSPHRASE
 When set, use the value to answer the \(dqdisplay the passphrase for verification\(dq question when defining a new passphrase for encrypted repositories.
@@ -413,7 +413,7 @@ When set, use the value to answer the \(dqdisplay the passphrase for verificatio
 Borg usually computes a host id from the FQDN plus the results of \fBuuid.getnode()\fP (which usually returns
 a unique id based on the MAC address of the network interface. Except if that MAC happens to be all\-zero \- in
 that case it returns a random value, which is not what we want (because it kills automatic stale lock removal).
-So, if you have a all\-zero MAC address or other reasons to better externally control the host id, just set this
+So, if you have a all\-zero MAC address or other reasons to control better externally the host id just set this
 environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
 use \fI\%fqdn@uniqueid\fP\&.
 .TP
@@ -441,7 +441,7 @@ cache entries for backup sources other than the current sources.
 .TP
 .B BORG_FILES_CACHE_TTL
 When set to a numeric value, this determines the maximum \(dqtime to live\(dq for the files cache
-entries (default: 20). The files cache is used to quickly determine whether a file is unchanged.
+entries (default: 20). The files cache is used to determine quickly whether a file is unchanged.
 The FAQ explains this more detailed in: \fIalways_chunking\fP
 .TP
 .B BORG_SHOW_SYSINFO
@@ -509,7 +509,7 @@ For \(dqWarning: The repository at location ... was previously located at ...\(d
 For \(dqThis is a potentially dangerous function...\(dq (check \-\-repair)
 .TP
 .B BORG_DELETE_I_KNOW_WHAT_I_AM_DOING=NO (or =YES)
-For \(dqYou requested to completely DELETE the repository \fIincluding\fP all archives it contains:\(dq
+For \(dqYou requested to DELETE the repository completely \fIincluding\fP all archives it contains:\(dq
 .UNINDENT
 .sp
 Note: answers are case sensitive. setting an invalid answer value might either give the default
@@ -737,7 +737,7 @@ If your repository is remote, all deduplicated (and optionally compressed/
 encrypted) data of course has to go over the connection (\fBssh://\fP repo url).
 If you use a locally mounted network filesystem, additionally some copy
 operations used for transaction support also go over the connection. If
-you backup multiple sources to one target repository, additional traffic
+you back up multiple sources to one target repository, additional traffic
 happens for cache resynchronization.
 .UNINDENT
 .SS Support for file metadata

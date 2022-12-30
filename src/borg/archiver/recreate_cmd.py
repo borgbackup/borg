@@ -89,8 +89,8 @@ class RecreateMixIn:
         used to have upgraded Borg 0.xx archives deduplicate with Borg 1.x archives.
 
         **USE WITH CAUTION.**
-        Depending on the PATHs and patterns given, recreate can be used to permanently
-        delete files from archives.
+        Depending on the PATHs and patterns given, recreate can be used to
+        delete files from archives permanently.
         When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
         interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
 
@@ -199,7 +199,7 @@ class RecreateMixIn:
             "`if-different`: recompress if current compression is with a different "
             "compression algorithm or different level; "
             "`always`: recompress unconditionally; and "
-            "`never`: do not recompress (use this option to explicitly prevent "
+            "`never`: do not recompress (use this option explicitly to prevent "
             "recompression). "
             "If no MODE is given, `if-different` will be used. "
             'Not passing --recompress is equivalent to "--recompress never".',

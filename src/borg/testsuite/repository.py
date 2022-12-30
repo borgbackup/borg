@@ -463,7 +463,7 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         put_segment = get_latest_segment()
         self.repository.commit(compact=False)
 
-        # We now delete H(1), and force this segment to not be compacted, which can happen
+        # We now delete H(1), and force this segment not to be compacted, which can happen
         # if it's not sparse enough (symbolized by H(2) here).
         self.repository.delete(H(1))
         self.repository.put(H(2), fchunk(b"1"))

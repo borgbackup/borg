@@ -556,7 +556,7 @@ _borg-recreate() {
   local -a mods=(
     'if-different:recompress if current compression is with a different compression algorithm (the level is not considered)'
     'always:recompress even if current compression is with the same compression algorithm (use this to change the compression level)'
-    'never:do not recompress (use this option to explicitly prevent recompression)'
+    'never:do not recompress (use this option explicitly to prevent recompression)'
   )
   mods=( ${(q)mods//\\/\\\\} )
   mods=( ${mods//:/\\:} )

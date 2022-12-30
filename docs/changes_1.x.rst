@@ -776,7 +776,7 @@ Other changes:
 - docs:
 
   - improve description of path variables
-  - document how to completely delete data, #2929
+  - document how to delete data completely, #2929
   - add FAQ about Borg config dir, #4941
   - add docs about errors not printed as JSON, #4073
   - update usage_general.rst.inc
@@ -864,7 +864,7 @@ New features:
 - ability to use a system-provided version of "xxhash"
 - create:
 
-  - changed the default behaviour to not store the atime of fs items. atime is
+  - changed the default behaviour not to store the atime of fs items. atime is
     often rather not interesting and fragile - it easily changes even if nothing
     else has changed and, if stored into the archive, spoils deduplication of
     the archive metadata stream.
@@ -1781,7 +1781,7 @@ Fixes:
 - security fix: configure FUSE with "default_permissions", #3903
   "default_permissions" is now enforced by borg by default to let the
   kernel check uid/gid/mode based permissions.
-  "ignore_permissions" can be given to not enforce "default_permissions".
+  "ignore_permissions" can be given not to enforce "default_permissions".
 - make "hostname" short, even on misconfigured systems, #4262
 - fix free space calculation on macOS (and others?), #4289
 - config: quit with error message when no key is provided, #4223
@@ -2149,7 +2149,7 @@ New features:
 - mount: added exclusion group options and paths, #2138
 
   Reused some code to support similar options/paths as borg extract offers -
-  making good use of these to only mount a smaller subset of dirs/files can
+  making good use of these to mount only a smaller subset of dirs/files can
   speed up mounting a lot and also will consume way less memory.
 
   borg mount [options] repo_or_archive mountpoint path [paths...]
@@ -2235,10 +2235,10 @@ Compatibility notes:
 - The deprecated --no-files-cache is not a global/common option any more,
   but only available for borg create (it is not needed for anything else).
   Use --files-cache=disabled instead of --no-files-cache.
-- The nodump flag ("do not backup this file") is not honoured any more by
+- The nodump flag ("do not back up this file") is not honoured any more by
   default because this functionality (esp. if it happened by error or
   unexpected) was rather confusing and unexplainable at first to users.
-  If you want that "do not backup NODUMP-flagged files" behaviour, use:
+  If you want that "do not back up NODUMP-flagged files" behaviour, use:
   borg create --exclude-nodump ...
 - If you are on Linux and do not need bsdflags archived, consider using
   ``--nobsdflags`` with ``borg create`` to avoid additional syscalls and
@@ -3078,7 +3078,7 @@ New features:
     which includes the SHA1 and SHA2 family as well as MD5
 - borg prune:
 
-  - to better visualize the "thinning out", we now list all archives in
+  - to visualize the "thinning out" better, we now list all archives in
     reverse time order. rephrase and reorder help text.
   - implement --keep-last N via --keep-secondly N, also --keep-minutely.
     assuming that there is not more than 1 backup archive made in 1s,
@@ -3175,7 +3175,7 @@ Bug fixes:
 - security fix: configure FUSE with "default_permissions", #3903.
   "default_permissions" is now enforced by borg by default to let the
   kernel check uid/gid/mode based permissions.
-  "ignore_permissions" can be given to not enforce "default_permissions".
+  "ignore_permissions" can be given not to enforce "default_permissions".
 - xattrs: fix borg exception handling on ENOSPC error, #3808.
 
 New features:
@@ -3478,7 +3478,7 @@ Other changes:
 - docs:
 
   - language clarification - VM backup FAQ
-  - borg create: document how to backup stdin, #2013
+  - borg create: document how to back up stdin, #2013
   - borg upgrade: fix incorrect title levels
   - add CVE numbers for issues fixed in 1.0.9, #2106
 - fix typos (taken from Debian package patch)
@@ -3505,8 +3505,18 @@ Security fixes:
 
   CVE-2016-10099 was assigned to this vulnerability.
 - borg check: When rebuilding the manifest (which should only be needed very rarely)
-  duplicate archive names would be handled on a "first come first serve" basis, allowing
-  an attacker to apparently replace archives.
+  duplicate archive names would be handled on a "first come first serve" basis,
+  potentially opening an attack vector to replace archives.
+
+  Example: were there 2 archives named "foo" in a repo (which can not happen
+  under normal circumstances, because borg checks if the name is already used)
+  and a "borg check" recreated a (previously lost) manifest, the first of the
+  archives it encountered would be in the manifest. The second archive is also
+  still in the repo, but not referenced in the manifest, in this case. If the
+  second archive is the "correct" one (and was previously referenced from the
+  manifest), it looks like it got replaced by the first one. In the manifest,
+  it actually got replaced. Both remain in the repo but the "correct" one is no
+  longer accessible via normal means - the manifest.
 
   CVE-2016-10100 was assigned to this vulnerability.
 
@@ -3674,7 +3684,7 @@ Bug fixes:
 New features:
 
 - add "borg key export" / "borg key import" commands, #1555, so users are able
-  to backup / restore their encryption keys more easily.
+  to back up / restore their encryption keys more easily.
 
   Supported formats are the keyfile format used by borg internally and a
   special "paper" format with by line checksums for printed backups. For the
@@ -4161,7 +4171,7 @@ Bug fixes:
 - do not sleep for >60s while waiting for lock, #773
 - unpack file stats before passing to FUSE
 - fix build on illumos
-- don't try to backup doors or event ports (Solaris and derivatives)
+- don't try to back up doors or event ports (Solaris and derivatives)
 - remove useless/misleading libc version display, #738
 - test suite: reset exit code of persistent archiver, #844
 - RemoteRepository: clean up pipe if remote open() fails
@@ -4234,20 +4244,20 @@ Compatibility notes:
   changed file and in the worst case (e.g. if your files cache was lost / is
   not used) by the size of every file (minus any compression you might use).
 
-  in case you want to immediately see a much lower resource usage (RAM / disk)
+  in case you want to see a much lower resource usage immediately (RAM / disk)
   for chunks management, it might be better to start with a new repo than
-  continuing in the existing repo (with an existing repo, you'ld have to wait
-  until all archives with small chunks got pruned to see a lower resource
+  to continue in the existing repo (with an existing repo, you have to wait
+  until all archives with small chunks get pruned to see a lower resource
   usage).
 
   if you used the old --chunker-params default value (or if you did not use
-  --chunker-params option at all) and you'ld like to continue using small
+  --chunker-params option at all) and you'd like to continue using small
   chunks (and you accept the huge resource usage that comes with that), just
-  explicitly use borg create --chunker-params=10,23,16,4095.
+  use explicitly borg create --chunker-params=10,23,16,4095.
 - archive timestamps: the 'time' timestamp now refers to archive creation
   start time (was: end time), the new 'time_end' timestamp refers to archive
-  creation end time. This might affect prune if your backups take rather long.
-  if you give a timestamp via cli this is stored into 'time', therefore it now
+  creation end time. This might affect prune if your backups take a long time.
+  if you give a timestamp via cli, this is stored into 'time'. therefore it now
   needs to mean archive creation start time.
 
 New features:
@@ -4289,8 +4299,8 @@ Bug fixes:
 
 Other changes:
 
-- it is now possible to use "pip install borgbackup[fuse]" to automatically
-  install the llfuse dependency using the correct version requirement
+- it is now possible to use "pip install borgbackup[fuse]" to
+  install the llfuse dependency automatically, using the correct version requirement
   for it. you still need to care about having installed the FUSE / build
   related OS package first, though, so that building llfuse can succeed.
 - Vagrant: drop Ubuntu Precise (12.04) - does not have Python >= 3.4

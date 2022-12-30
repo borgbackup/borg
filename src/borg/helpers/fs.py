@@ -261,7 +261,7 @@ def scandir_inorder(*, path, fd=None):
 
 
 def secure_erase(path, *, avoid_collateral_damage):
-    """Attempt to securely erase a file by writing random data over it before deleting it.
+    """Attempt to erase a file securely by writing random data over it before deleting it.
 
     If avoid_collateral_damage is True, we only secure erase if the total link count is 1,
     otherwise we just do a normal "delete" (unlink) without first overwriting it with random.

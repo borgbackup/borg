@@ -211,7 +211,7 @@ class SigIntManager:
 
     def action_completed(self):
         # this must be called when the action triggered is completed,
-        # to avoid that the action is repeatedly triggered.
+        # to avoid repeatedly triggering the action.
         self._action_triggered = False
         self._action_done = True
 
@@ -242,7 +242,7 @@ def ignore_sigint():
 
     Ctrl-C will send a SIGINT to both the main process (borg) and subprocesses
     (e.g. ssh for remote ssh:// repos), but often we do not want the subprocess
-    getting killed (e.g. because it is still needed to cleanly shut down borg).
+    getting killed (e.g. because it is still needed to shut down borg cleanly).
 
     To avoid that: Popen(..., preexec_fn=ignore_sigint)
     """

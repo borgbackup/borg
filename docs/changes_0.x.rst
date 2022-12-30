@@ -8,8 +8,8 @@ Version 0.30.0 (2016-01-23)
 
 Compatibility notes:
 
-- you may need to use -v (or --info) more often to actually see output emitted
-  at INFO log level (because it is suppressed at the default WARNING log level).
+- The new default logging level is WARNING. Previously, it was INFO, which was
+  more verbose. Use -v (or --info) to show once again log level INFO messages.
   See the "general" section in the usage docs.
 - for borg create, you need --list (additionally to -v) to see the long file
   list (was needed so you can have e.g. --stats alone without the long list)
@@ -164,7 +164,7 @@ New features:
 
 - borg create --exclude-if-present TAGFILE - exclude directories that have the
   given file from the backup. You can additionally give --keep-tag-files to
-  preserve just the directory roots and the tag-files (but not backup other
+  preserve just the directory roots and the tag-files (but not back up other
   directory contents), #395, attic #128, attic #142
 
 Other changes:
@@ -419,10 +419,10 @@ Compatibility notes:
 Deprecations:
 
 - --compression N (with N being a number, as in 0.24) is deprecated.
-  We keep the --compression 0..9 for now to not break scripts, but it is
+  We keep the --compression 0..9 for now not to break scripts, but it is
   deprecated and will be removed later, so better fix your scripts now:
   --compression 0 (as in 0.24) is the same as --compression zlib,0 (now).
-  BUT: if you do not want compression, you rather want --compression none
+  BUT: if you do not want compression, use --compression none
   (which is the default).
   --compression 1 (in 0.24) is the same as --compression zlib,1 (now)
   --compression 9 (in 0.24) is the same as --compression zlib,9 (now)
@@ -434,7 +434,7 @@ New features:
 - create --compression lz4 (super-fast, but not very high compression)
 - create --compression zlib,N (slower, higher compression, default for N is 6)
 - create --compression lzma,N (slowest, highest compression, default N is 6)
-- honor the nodump flag (UF_NODUMP) and do not backup such items
+- honor the nodump flag (UF_NODUMP) and do not back up such items
 - list --short just outputs a simple list of the files/directories in an archive
 
 Bug fixes:
@@ -541,7 +541,7 @@ Other changes:
   - update internals doc about chunker params, memory usage and compression
   - added docs about development
   - add some words about resource usage in general
-  - document how to backup a raw disk
+  - document how to back up a raw disk
   - add note about how to run borg from virtual env
   - add solutions for (ll)fuse installation problems
   - document what borg check does, fixes #138
@@ -617,7 +617,7 @@ New features:
 - FUSE: reflect deduplication in allocated blocks
 - only allow whitelisted RPC calls in server mode
 - normalize source/exclude paths before matching
-- use posix_fadvise to not spoil the OS cache, fixes attic #252
+- use posix_fadvise not to spoil the OS cache, fixes attic #252
 - toplevel error handler: show tracebacks for better error analysis
 - sigusr1 / sigint handler to print current file infos - attic PR #286
 - RPCError: include the exception args we get from remote

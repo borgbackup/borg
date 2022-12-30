@@ -199,14 +199,14 @@ class HelpMixIn:
 
         Examples::
 
-            # backup pics, but not the ones from 2018, except the good ones:
+            # back up pics, but not the ones from 2018, except the good ones:
             # note: using = is essential to avoid cmdline argument parsing issues.
             borg create --pattern=+pics/2018/good --pattern=-pics/2018 archive pics
 
-            # backup only JPG/JPEG files (case insensitive) in all home directories:
+            # back up only JPG/JPEG files (case insensitive) in all home directories:
             borg create --pattern '+ re:\\.jpe?g(?i)$' archive /home
 
-            # backup homes, but exclude big downloads (like .ISO files) or hidden files:
+            # back up homes, but exclude big downloads (like .ISO files) or hidden files:
             borg create --exclude 're:\\.iso(?i)$' --exclude 'sh:home/**/.*' archive /home
 
             # use a file with patterns (recursion root '/' via command line):
@@ -221,7 +221,7 @@ class HelpMixIn:
             + home/susan
             # also back up this exact file
             + pf:home/bobby/specialfile.txt
-            # don't backup the other home directories
+            # don't back up the other home directories
             - home/*
             # don't even look in /dev, /proc, /run, /sys, /tmp (note: would exclude files like /device, too)
             ! re:^(dev|proc|run|sys|tmp)

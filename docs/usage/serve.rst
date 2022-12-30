@@ -21,7 +21,7 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
 
 ::
 
-    # Allow an SSH keypair to only run borg, and only have access to /path/to/repo.
+    # Allow an SSH keypair to run only borg, and only have access to /path/to/repo.
     # Use key options to disable unneeded and potentially dangerous SSH functionality.
     # This will help to secure an automated remote backup system.
     $ cat ~/.ssh/authorized_keys
@@ -36,7 +36,7 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
     block potential dangerous ssh features, even when they are added in a future
     update. Thus, this option should be preferred.
     
-    If you're using openssh-server < 7.2, however, you have to explicitly specify
+    If you're using openssh-server < 7.2, however, you have to specify explicitly
     the ssh features to restrict and cannot simply use the restrict option as it
     has been introduced in v7.2. We recommend to use
     ``no-port-forwarding,no-X11-forwarding,no-pty,no-agent-forwarding,no-user-rc``

@@ -135,9 +135,9 @@ class ChunkerFixed:
     It optionally supports:
 
     - a header block of different size
-    - using a sparsemap to only read data ranges and seek over hole ranges
+    - using a sparsemap to read only data ranges and seek over hole ranges
       for sparse files.
-    - using an externally given filemap to only read specific ranges from
+    - using an externally given filemap to read only specific ranges from
       a file.
 
     Note: the last block of a data or hole range may be less than the block size,
@@ -231,7 +231,7 @@ cdef class Chunker:
     """
     Content-Defined Chunker, variable chunk sizes.
 
-    This chunker does quite some effort to mostly cut the same-content chunks, even if
+    This chunker makes quite some effort to cut mostly chunks of the same-content, even if
     the content moves to a different offset inside the file. It uses the buzhash
     rolling-hash algorithm to identify the chunk cutting places by looking at the
     content inside the moving window and computing the rolling hash value over the

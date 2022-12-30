@@ -46,7 +46,7 @@ class ServeMixIn:
             action="append",
             help="restrict repository access to PATH. "
             "Can be specified multiple times to allow the client access to several directories. "
-            "Access to all sub-directories is granted implicitly; PATH doesn't need to directly point to a repository.",
+            "Access to all sub-directories is granted implicitly; PATH doesn't need to point directly to a repository.",
         )
         subparser.add_argument(
             "--restrict-to-repository",
@@ -57,7 +57,7 @@ class ServeMixIn:
             "(no sub-directories are considered) is accessible. "
             "Can be specified multiple times to allow the client access to several repositories. "
             "Unlike ``--restrict-to-path`` sub-directories are not accessible; "
-            "PATH needs to directly point at a repository location. "
+            "PATH needs to point directly at a repository location. "
             "PATH may be an empty directory or the last element of PATH may not exist, in which case "
             "the client may initialize a repository there.",
         )

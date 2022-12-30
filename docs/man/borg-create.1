@@ -169,7 +169,7 @@ set mode to M in archive for stdin data (default: 0660)
 interpret PATH as command and store its stdout. See also section Reading from stdin below.
 .TP
 .B  \-\-paths\-from\-stdin
-read DELIM\-separated list of paths to backup from stdin. Will not recurse into directories.
+read DELIM\-separated list of paths to back up from stdin. Will not recurse into directories.
 .TP
 .B  \-\-paths\-from\-command
 interpret PATH as command and treat its output as \fB\-\-paths\-from\-stdin\fP
@@ -264,30 +264,30 @@ select compression algorithm, see the output of the \(dqborg help compression\(d
 .sp
 .nf
 .ft C
-# Backup ~/Documents into an archive named \(dqmy\-documents\(dq
+# Back up ~/Documents into an archive named \(dqmy\-documents\(dq
 $ borg create my\-documents ~/Documents
 
 # same, but list all files as we process them
 $ borg create \-\-list my\-documents ~/Documents
 
-# Backup ~/Documents and ~/src but exclude pyc files
+# Back up ~/Documents and ~/src but exclude pyc files
 $ borg create my\-files                \e
     ~/Documents                       \e
     ~/src                             \e
     \-\-exclude \(aq*.pyc\(aq
 
-# Backup home directories excluding image thumbnails (i.e. only
+# Back up home directories excluding image thumbnails (i.e. only
 # /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
 $ borg create my\-files /home \-\-exclude \(aqsh:home/*/.thumbnails\(aq
 
-# Backup the root filesystem into an archive named \(dqroot\-YYYY\-MM\-DD\(dq
+# Back up the root filesystem into an archive named \(dqroot\-YYYY\-MM\-DD\(dq
 # use zlib compression (good, but slow) \- default is lz4 (fast, low compression ratio)
 $ borg create \-C zlib,6 \-\-one\-file\-system root\-{now:%Y\-%m\-%d} /
 
-# Backup into an archive name like FQDN\-root\-TIMESTAMP
+# Back up into an archive name like FQDN\-root\-TIMESTAMP
 $ borg create \(aq{fqdn}\-root\-{now}\(aq /
 
-# Backup a remote host locally (\(dqpull\(dq style) using sshfs
+# Back up a remote host locally (\(dqpull\(dq style) using sshfs
 $ mkdir sshfs\-mount
 $ sshfs root@example.com:/ sshfs\-mount
 $ cd sshfs\-mount
@@ -300,10 +300,10 @@ $ fusermount \-u sshfs\-mount
 # docs \- same parameters as borg < 1.0):
 $ borg create \-\-chunker\-params buzhash,10,23,16,4095 small /smallstuff
 
-# Backup a raw device (must not be active/in use/mounted at that time)
+# Back up a raw device (must not be active/in use/mounted at that time)
 $ borg create \-\-read\-special \-\-chunker\-params fixed,4194304 my\-sdx /dev/sdX
 
-# Backup a sparse disk image (must not be active/in use/mounted at that time)
+# Back up a sparse disk image (must not be active/in use/mounted at that time)
 $ borg create \-\-sparse \-\-chunker\-params fixed,4194304 my\-disk my\-disk.raw
 
 # No compression (none)
@@ -334,9 +334,9 @@ $ cd /home/user/Documents
 $ borg create \(aqdaily\-projectA\-{now:%Y\-%m\-%d}\(aq projectA
 
 # Use external command to determine files to archive
-# Use \-\-paths\-from\-stdin with find to only backup files less than 1MB in size
+# Use \-\-paths\-from\-stdin with find to back up only files less than 1MB in size
 $ find ~ \-size \-1000k | borg create \-\-paths\-from\-stdin small\-files\-only
-# Use \-\-paths\-from\-command with find to only backup files from a given user
+# Use \-\-paths\-from\-command with find to back up files from only a given user
 $ borg create \-\-paths\-from\-command joes\-files \-\- find /srv/samba/shared \-user joe
 # Use \-\-paths\-from\-stdin with \-\-paths\-delimiter (for example, for filenames with newlines in them)
 $ find ~ \-size \-1000k \-print0 | borg create \e

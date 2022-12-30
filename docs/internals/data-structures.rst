@@ -157,11 +157,11 @@ An object (the payload part of a segment file log entry) must be like:
 
   - compressed data (with an optional all-zero-bytes obfuscation trailer)
 
-This new, more complex repo v2 object format was implemented to be able to efficiently
-query the metadata without having to read, transfer and decrypt the (usually much bigger)
+This new, more complex repo v2 object format was implemented to be able to query the
+metadata efficiently without having to read, transfer and decrypt the (usually much bigger)
 data part.
 
-The metadata is encrypted to not disclose potentially sensitive information that could be
+The metadata is encrypted not to disclose potentially sensitive information that could be
 used for e.g. fingerprinting attacks.
 
 The compression `ctype` and `clevel` is explained in :ref:`data-compression`.
@@ -688,7 +688,7 @@ To determine whether a file has not changed, cached values are looked up via
 the key in the mapping and compared to the current file attribute values.
 
 If the file's size, timestamp and inode number is still the same, it is
-considered to not have changed. In that case, we check that all file content
+considered not to have changed. In that case, we check that all file content
 chunks are (still) present in the repository (we check that via the chunks
 cache).
 
@@ -818,7 +818,7 @@ bucket is reached.
 This particular mode of operation is open addressing with linear probing.
 
 When the hash table is filled to 75%, its size is grown. When it's
-emptied to 25%, its size is shrinked. Operations on it have a variable
+emptied to 25%, its size is shrunken. Operations on it have a variable
 complexity between constant and linear with low factor, and memory overhead
 varies between 33% and 300%.
 
@@ -1013,7 +1013,7 @@ while doing no compression at all (none) is a operation that takes no time, it
 likely will need to store more data to the storage compared to using lz4.
 The time needed to transfer and store the additional data might be much more
 than if you had used lz4 (which is super fast, but still might compress your
-data about 2:1). This is assuming your data is compressible (if you backup
+data about 2:1). This is assuming your data is compressible (if you back up
 already compressed data, trying to compress them at backup time is usually
 pointless).
 

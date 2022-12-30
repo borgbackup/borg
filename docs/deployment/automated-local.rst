@@ -168,13 +168,13 @@ after creating the backup. Rename the file to something else (e.g. ``/etc/backup
 when you want to do something with the drive after creating backups (e.g running check).
 
 Create the ``/etc/backups/backup-suspend`` file if the machine should suspend after completing
-the backup. Don't forget to physically disconnect the device before resuming,
+the backup. Don't forget to disconnect the device physically before resuming,
 otherwise you'll enter a cycle. You can also add an option to power down instead.
 
 Create an empty ``/etc/backups/backup.disks`` file, you'll register your backup drives
 there.
 
-The last part is to actually enable the udev rules and services:
+The last part is actually to enable the udev rules and services:
 
 .. code-block:: bash
 

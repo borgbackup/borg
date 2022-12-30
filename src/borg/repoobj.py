@@ -56,7 +56,7 @@ class RepoObj:
         return hdr + meta_encrypted + data_encrypted
 
     def parse_meta(self, id: bytes, cdata: bytes) -> dict:
-        # when calling parse_meta, enough cdata needs to be supplied to completely contain the
+        # when calling parse_meta, enough cdata needs to be supplied to contain completely the
         # meta_len_hdr and the encrypted, packed metadata. it is allowed to provide more cdata.
         assert isinstance(id, bytes)
         assert isinstance(cdata, bytes)

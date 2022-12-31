@@ -52,11 +52,11 @@ class RInfoMixIn:
 
             response = repository.info()
             storage_quota = response["storage_quota"]
-            used = format_file_size(response["storage_quota_use"], iec=True if args.iec else False)
+            used = format_file_size(response["storage_quota_use"], iec=args.iec)
 
             output += f"\nStorage quota: {used} used"
             if storage_quota:
-                output += f" out of {format_file_size(storage_quota, iec=True if args.iec else False)}"
+                output += f" out of {format_file_size(storage_quota, iec=args.iec)}"
             output += "\n"
 
             output += (

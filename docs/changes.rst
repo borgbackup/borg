@@ -12,8 +12,8 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0b4 (2022-11-27)
-----------------------------
+Version 2.0.0b5 (not released yet)
+----------------------------------
 
 Please note:
 
@@ -82,6 +82,7 @@ Compatibility notes:
   - removed --numeric-owner (use --numeric-ids)
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
+  - removed --save-space option (does not change behaviour)
 - the --glob-archives option was renamed to --match-archives (the short option
   name -a is unchanged) and extended to support different pattern styles:
 
@@ -94,6 +95,41 @@ Compatibility notes:
       borg 1.x: --glob-archives 'myserver-*'
       borg 2.0: --match-archives 'sh:myserver-*'
 
+
+New features:
+
+- adding used storage quota to borg info, #7121
+
+Fixes:
+
+- disallow --list with --progress, #7219
+- create: fix --list --dry-run output for directories, #7209
+- do no assume hardlink_master=True if not present, #7175
+
+Other changes:
+
+- switch archive and file timestamps to UTC, also output tzoffset
+- update development.lock.txt, including a setuptools security fix, #7227
+- remove --save-space option (does not change behaviour)
+- validation / placeholders / JSON:
+
+  - text attributes (like archive name, comment): validate more strictly, #2290
+  - transfer: validate archive names and comment before transfer
+  - remove bpath, barchive, bcomment placeholders / JSON keys
+- docs:
+
+  - docs and comments consistency and readability improvement
+  - fix --progress display description, #7180
+- tests:
+
+  - fix archiver tests on Windows
+  - fix tox4 passenv issue, #7199
+  - github actions updates (fix deprecation warnings)
+  - add tests for borg transfer/upgrade
+
+
+Version 2.0.0b4 (2022-11-27)
+----------------------------
 
 Fixes:
 

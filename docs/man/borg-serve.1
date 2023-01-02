@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-SERVE" 1 "2022-11-26" "" "borg backup tool"
+.TH "BORG-SERVE" 1 "2023-01-02" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -43,7 +43,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .INDENT 0.0
 .TP
 .BI \-\-restrict\-to\-path \ PATH
-restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all sub\-directories is granted implicitly; PATH doesn\(aqt need to point to a repository directly.
+restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all sub\-directories is granted implicitly; PATH doesn\(aqt need to point directly to a repository.
 .TP
 .BI \-\-restrict\-to\-repository \ PATH
 restrict repository access. Only the repository located at PATH (no sub\-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike \fB\-\-restrict\-to\-path\fP sub\-directories are not accessible; PATH needs to point directly at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.

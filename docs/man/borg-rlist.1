@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RLIST" 1 "2022-11-26" "" "borg backup tool"
+.TH "BORG-RLIST" 1 "2023-01-02" "" "borg backup tool"
 .SH NAME
 borg-rlist \- List the archives contained in a repository
 .SH SYNOPSIS
@@ -52,7 +52,7 @@ only print the archive names, nothing else
 specify format for archive listing (default: \(dq{archive:<36} {time} [{id}]{NL}\(dq)
 .TP
 .B  \-\-json
-Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. A \(dqbarchive\(dq key is therefore not available.
+Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
@@ -119,7 +119,7 @@ NEWLINE: OS dependent line separator
 .IP \(bu 2
 NL: alias of NEWLINE
 .IP \(bu 2
-NUL: NUL character for creating print0 / xargs \-0 like output, see barchive and bpath keys below
+NUL: NUL character for creating print0 / xargs \-0 like output
 .IP \(bu 2
 SPACE
 .IP \(bu 2
@@ -133,15 +133,11 @@ LF
 Keys available only when listing archives in a repository:
 .INDENT 0.0
 .IP \(bu 2
-archive: archive name interpreted as text (might be missing non\-text characters, see barchive)
+archive: archive name
 .IP \(bu 2
 name: alias of \(dqarchive\(dq
 .IP \(bu 2
-barchive: verbatim archive name, can contain any character except NUL
-.IP \(bu 2
-comment: archive comment interpreted as text (might be missing non\-text characters, see bcomment)
-.IP \(bu 2
-bcomment: verbatim archive comment, can contain any character except NUL
+comment: archive comment
 .IP \(bu 2
 id: internal ID of the archive
 .IP \(bu 2

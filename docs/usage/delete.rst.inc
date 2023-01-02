@@ -27,8 +27,6 @@ borg delete
     +-----------------------------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
     |                                                                             | ``--force``                                       | force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work. |
     +-----------------------------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--save-space``                                  | work slower, but using less space                                                                |
-    +-----------------------------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
     |                                                                             | ``-c SECONDS``, ``--checkpoint-interval SECONDS`` | write checkpoint every SECONDS seconds (Default: 1800)                                           |
     +-----------------------------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                     |
@@ -65,7 +63,6 @@ borg delete
         -s, --stats     print statistics for the deleted archive
         --cache-only    delete only the local cache for the given repository
         --force         force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work.
-        --save-space    work slower, but using less space
         -c SECONDS, --checkpoint-interval SECONDS    write checkpoint every SECONDS seconds (Default: 1800)
 
 

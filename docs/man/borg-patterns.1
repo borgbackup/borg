@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PATTERNS" 1 "2022-11-26" "" "borg backup tool"
+.TH "BORG-PATTERNS" 1 "2023-01-02" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
@@ -257,14 +257,14 @@ Examples:
 .sp
 .nf
 .ft C
-# backup pics, but not the ones from 2018, except the good ones:
+# back up pics, but not the ones from 2018, except the good ones:
 # note: using = is essential to avoid cmdline argument parsing issues.
 borg create \-\-pattern=+pics/2018/good \-\-pattern=\-pics/2018 archive pics
 
-# backup only JPG/JPEG files (case insensitive) in all home directories:
+# back up only JPG/JPEG files (case insensitive) in all home directories:
 borg create \-\-pattern \(aq+ re:\e.jpe?g(?i)$\(aq archive /home
 
-# backup homes, but exclude big downloads (like .ISO files) or hidden files:
+# back up homes, but exclude big downloads (like .ISO files) or hidden files:
 borg create \-\-exclude \(aqre:\e.iso(?i)$\(aq \-\-exclude \(aqsh:home/**/.*\(aq archive /home
 
 # use a file with patterns (recursion root \(aq/\(aq via command line):
@@ -287,7 +287,7 @@ The patterns.lst file could look like that:
 + home/susan
 # also back up this exact file
 + pf:home/bobby/specialfile.txt
-# don\(aqt backup the other home directories
+# don\(aqt back up the other home directories
 \- home/*
 # don\(aqt even look in /dev, /proc, /run, /sys, /tmp (note: would exclude files like /device, too)
 ! re:^(dev|proc|run|sys|tmp)

@@ -43,7 +43,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--content-from-command``                        | interpret PATH as command and store its stdout. See also section Reading from stdin below.                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--paths-from-stdin``                            | read DELIM-separated list of paths to back up from stdin. Will not recurse into directories.                                                                                                       |
+    |                                                       | ``--paths-from-stdin``                            | read DELIM-separated list of paths to back up from stdin. Will not recurse into directories.                                                                                                      |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--paths-from-command``                          | interpret PATH as command and treat its output as ``--paths-from-stdin``                                                                                                                          |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -241,9 +241,9 @@ creation of a new archive to ensure fast operation. This is because the file cac
 is used to determine changed files quickly uses absolute filenames.
 If this is not possible, consider creating a bind mount to a stable location.
 
-The ``--progress`` option shows (from left to right) Original, Compressed and Deduplicated
-(O, C and D, respectively), then the Number of files (N) processed so far, followed by
-the currently processed path.
+The ``--progress`` option shows (from left to right) Original and (uncompressed)
+deduplicated size (O and U respectively), then the Number of files (N) processed so far,
+followed by the currently processed path.
 
 When using ``--stats``, you will get some statistics about how much data was
 added - the "This Archive" deduplicated size there is most interesting as that is

@@ -285,17 +285,17 @@ class build_man(Command):
     user_options = []
 
     see_also = {
-        "create": ("delete", "prune", "check", "patterns", "placeholders", "compression"),
+        "create": ("delete", "prune", "check", "patterns", "placeholders", "compression", "rcreate"),
         "recreate": ("patterns", "placeholders", "compression"),
-        "list": ("info", "diff", "prune", "patterns"),
-        "info": ("list", "diff"),
-        "rcreate": ("rdelete", "rlist", "check", "key-import", "key-export", "key-change-passphrase"),
+        "list": ("info", "diff", "prune", "patterns", "rlist"),
+        "info": ("list", "diff", "rinfo"),
+        "rcreate": ("rdelete", "rlist", "check", "benchmark-cpu", "key-import", "key-export", "key-change-passphrase"),
         "key-import": ("key-export",),
         "key-export": ("key-import",),
         "mount": ("umount", "extract"),  # Would be cooler if these two were on the same page
         "umount": ("mount",),
         "extract": ("mount",),
-        "delete": ("compact",),
+        "delete": ("compact", "rdelete"),
         "prune": ("compact",),
     }
 

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2022-11-26" "" "borg backup tool"
+.TH "BORG" 1 "2023-01-02" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -40,7 +40,7 @@ borg [common options] <command> [options] [arguments]
 BorgBackup (short: Borg) is a deduplicating backup program.
 Optionally, it supports compression and authenticated encryption.
 .sp
-The main goal of Borg is to provide an efficient and secure way to back up data.
+The main goal of Borg is to provide an efficient and secure way to back data up.
 The data deduplication technique used makes Borg suitable for daily backups
 since only changes are stored.
 The authenticated encryption technique makes it suitable for backups to targets not
@@ -66,7 +66,7 @@ $ borg \-r /path/to/repo rcreate \-\-encryption=repokey\-aes\-ocb
 .UNINDENT
 .UNINDENT
 .IP 2. 3
-Backup the \fB~/src\fP and \fB~/Documents\fP directories into an archive called
+Back up the \fB~/src\fP and \fB~/Documents\fP directories into an archive called
 \fIMonday\fP:
 .INDENT 3.0
 .INDENT 3.5
@@ -413,7 +413,7 @@ When set, use the value to answer the \(dqdisplay the passphrase for verificatio
 Borg usually computes a host id from the FQDN plus the results of \fBuuid.getnode()\fP (which usually returns
 a unique id based on the MAC address of the network interface. Except if that MAC happens to be all\-zero \- in
 that case it returns a random value, which is not what we want (because it kills automatic stale lock removal).
-So, if you have a all\-zero MAC address or other reasons to control better externally the host id just set this
+So, if you have a all\-zero MAC address or other reasons to control better externally the host id, just set this
 environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
 use \fI\%fqdn@uniqueid\fP\&.
 .TP

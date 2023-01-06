@@ -951,6 +951,15 @@ Duration: {0.duration}
                 except NotImplementedError:
                     if not symlink:
                         os.chmod(path, item.mode)
+            if not self.noacls:
+                acl_set(path, item, self.numeric_ids, fd=fd)
+            if not self.noxattrs and "xattrs" in item:
+                # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
+                # the Linux capabilities in the "security.capability" attribute.
+                warning = xattr.set_all(fd or path, item.xattrs, follow_symlinks=False)
+                if warning:
+                    set_ec(EXIT_WARNING)
+            # set timestamps rather late
             mtime = item.mtime
             atime = item.atime if "atime" in item else mtime
             if "birthtime" in item:
@@ -973,14 +982,6 @@ Duration: {0.duration}
             except OSError:
                 # some systems don't support calling utime on a symlink
                 pass
-            if not self.noacls:
-                acl_set(path, item, self.numeric_ids, fd=fd)
-            if not self.noxattrs and "xattrs" in item:
-                # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
-                # the Linux capabilities in the "security.capability" attribute.
-                warning = xattr.set_all(fd or path, item.xattrs, follow_symlinks=False)
-                if warning:
-                    set_ec(EXIT_WARNING)
             # bsdflags include the immutable flag and need to be set last:
             if not self.noflags and "bsdflags" in item:
                 try:

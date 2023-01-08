@@ -717,7 +717,7 @@ class ArchiveFormatter(BaseFormatter):
         self.call_keys = {
             "hostname": partial(self.get_meta, "hostname", rs=True),
             "username": partial(self.get_meta, "username", rs=True),
-            "comment": partial(self.get_meta, "comment", rs=True),
+            "comment": partial(self.get_meta, "comment", rs=False),
             "end": self.get_ts_end,
             "command_line": self.get_cmdline,
         }
@@ -738,8 +738,8 @@ class ArchiveFormatter(BaseFormatter):
         item_data.update(self.item_data)
         item_data.update(
             {
-                "name": remove_surrogates(archive_info.name),
-                "archive": remove_surrogates(archive_info.name),
+                "name": archive_info.name,
+                "archive": archive_info.name,
                 "id": bin_to_hex(archive_info.id),
                 "time": self.format_time(archive_info.ts),
                 "start": self.format_time(archive_info.ts),

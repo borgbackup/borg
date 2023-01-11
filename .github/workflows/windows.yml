@@ -1,6 +1,10 @@
 name: Windows CI
 on: [push, pull_request]
 
+env:
+  SETUPTOOLS_USE_DISTUTILS: stdlib # Needed for pip to work - https://www.msys2.org/docs/python/#known-issues
+  PY_COLORS: 1
+
 jobs:
   msys2-ucrt64:
     runs-on: windows-latest
@@ -16,12 +20,15 @@ jobs:
           msystem: UCRT64
           update: true
       - name: Install dependencies
-        run: ./scripts/msys2-install-deps
+        run: ./scripts/msys2-install-deps development
       - name: Build
         run: ./scripts/msys2-build
-      - name: Test
-        run: ./dist/borg.exe -V
       - uses: actions/upload-artifact@v3
         with:
           name: borg-windows
           path: dist/borg.exe
+      - name: Run tests
+        run: |
+          ./dist/borg.exe -V
+          pip install -e .
+          pytest --benchmark-skip -k "not remote"

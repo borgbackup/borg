@@ -3371,7 +3371,7 @@ Other changes:
   - kill api page
   - added FAQ section about backing up root partition
   - add bountysource badge, #2558
-  - create empty docs.txt reequirements, #2694
+  - create empty docs.txt requirements, #2694
   - README: how to help the project
   - note -v/--verbose requirement on affected options, #2542
   - document borg init behaviour via append-only borg serve, #2440

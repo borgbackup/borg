@@ -1156,7 +1156,7 @@ full when Borg starts a write command like `borg create`, it will abort
 immediately and the repository will stay as-is.
 
 If you run a backup that stops due to a disk running full, Borg will roll back,
-delete the new new segment file and thus freeing disk space automatically. There
+delete the new segment file and thus freeing disk space automatically. There
 may be a checkpoint archive left that has been saved before the disk got full.
 You can keep it to speed up the next backup or delete it to get back more disk
 space.

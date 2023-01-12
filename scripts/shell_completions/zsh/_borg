@@ -1504,7 +1504,7 @@ _borg_compression() {
     'lz4:very high speed, very low compression'
   )
   local -a havelvl=(
-    'zstd:("zstandart")'
+    'zstd:("zstandard")'
     'zlib:("gz") medium speed, medium compression'
     'lzma:("xz") low speed, high compression'
   )

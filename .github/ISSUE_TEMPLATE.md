@@ -5,14 +5,14 @@ Thank you for reporting an issue.
  - Borgbackup documentation: http://borgbackup.readthedocs.io/en/stable/index.html
  - FAQ: https://borgbackup.readthedocs.io/en/stable/faq.html
  and
- - open issues in Github tracker: https://github.com/borgbackup/borg/issues
+ - open issues in GitHub tracker: https://github.com/borgbackup/borg/issues
   
 If you cannot find a similar problem, then create a new issue.
 
 Please fill in as much of the template as possible.
 -->
 
-## Have you checked borgbackup docs, FAQ, and open Github issues?
+## Have you checked borgbackup docs, FAQ, and open GitHub issues?
 
 No
 
@@ -46,7 +46,7 @@ results and any steps you took to troubleshoot.
 How to run benchmark: http://borgbackup.readthedocs.io/en/stable/usage/benchmark.html
 
 *IMPORTANT* - Please mark logs and text output from terminal commands 
-or else Github will not display them correctly. 
+or else GitHub will not display them correctly. 
 An example is provided below.
 
 Example:

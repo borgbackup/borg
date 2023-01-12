@@ -333,7 +333,7 @@ Changes:
     - compression: use the 2 bytes for type and level, #6698
     - use version 2 for new archives
     - convert timestamps int/bigint -> msgpack.Timestamp, see #2323
-    - all hardlinks have chunks, maybe chunks_healty, hlid
+    - all hardlinks have chunks, maybe chunks_healthy, hlid
     - remove the zlib type bytes hack
     - make sure items with chunks have precomputed size
     - removes the csize element from the tuples in the Item.chunks list

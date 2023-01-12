@@ -749,7 +749,7 @@ class Repository:
                     try:
                         compact_working_space += self.io.segment_size(segment) - free
                     except FileNotFoundError:
-                        # looks like self.compact is referring to a non-existent segment file, ignore it.
+                        # looks like self.compact is referring to a nonexistent segment file, ignore it.
                         pass
                 logger.debug("check_free_space: Few segments, not requiring a full free segment")
                 compact_working_space = min(compact_working_space, full_segment_size)

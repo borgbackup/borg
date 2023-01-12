@@ -15,7 +15,7 @@ Vagrant.configure("2") do |config|
   SHELL
   config.vm.provision "record basic usage", type: "shell", inline: <<-SHELL
     # `rm` below allows quick re-exec via:
-    # vagrant vagrant provision --provision-with "record basic usage"
+    # vagrant provision --provision-with "record basic usage"
     # this is useful when testing changes
     rm -r /media/backup/borgdemo || true
     rm -r ~/.ssh/ || true

@@ -116,7 +116,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert "added       2.05 kB input/hardlink_added" in output
 
-            # check if a diff between non-existent and empty new file is found
+            # check if a diff between nonexistent and empty new file is found
             assert "added           0 B input/file_empty_added" in output
 
             # The inode has two links and both of them are deleted. They should
@@ -198,7 +198,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert {"type": "added", "size": 2048} in get_changes("input/hardlink_added", joutput)
 
-            # check if a diff between non-existent and empty new file is found
+            # check if a diff between nonexistent and empty new file is found
             assert {"type": "added", "size": 0} in get_changes("input/file_empty_added", joutput)
 
             # The inode has two links and both of them are deleted. They should

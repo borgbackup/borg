@@ -148,7 +148,7 @@ class Manifest:
     class Operation(enum.Enum):
         # The comments here only roughly describe the scope of each feature. In the end, additions need to be
         # based on potential problems older clients could produce when accessing newer repositories and the
-        # tradeofs of locking version out or still allowing access. As all older versions and their exact
+        # trade-offs of locking version out or still allowing access. As all older versions and their exact
         # behaviours are known when introducing new features sometimes this might not match the general descriptions
         # below.
 

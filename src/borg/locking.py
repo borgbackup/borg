@@ -141,7 +141,7 @@ class ExclusiveLock:
             timer = TimeoutTimer(timeout, sleep).start()
             while True:
                 try:
-                    os.rename(temp_path, self.path)
+                    os.replace(temp_path, self.path)
                 except OSError:  # already locked
                     if self.by_me():
                         return self

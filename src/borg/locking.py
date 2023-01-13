@@ -191,6 +191,8 @@ class ExclusiveLock:
             names = os.listdir(self.path)
         except FileNotFoundError:  # another process did our job in the meantime.
             pass
+        except PermissionError:  # win32 might throw this.
+            return False
         else:
             for name in names:
                 try:

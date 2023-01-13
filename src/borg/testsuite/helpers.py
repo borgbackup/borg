@@ -45,7 +45,7 @@ from ..helpers import safe_unlink
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 from ..platform import is_cygwin
 
-from . import BaseTestCase, FakeInputs
+from . import BaseTestCase, FakeInputs, are_hardlinks_supported
 
 
 def test_bin_to_hex():
@@ -1100,24 +1100,26 @@ def test_eval_escapes():
     assert eval_escapes("äç\\n") == "äç\n"
 
 
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
 def test_safe_unlink_is_safe(tmpdir):
     contents = b"Hello, world\n"
     victim = tmpdir / "victim"
     victim.write_binary(contents)
     hard_link = tmpdir / "hardlink"
-    hard_link.mklinkto(victim)
+    os.link(str(victim), str(hard_link))  # hard_link.mklinkto is not implemented on win32
 
     safe_unlink(hard_link)
 
     assert victim.read_binary() == contents
 
 
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
 def test_safe_unlink_is_safe_ENOSPC(tmpdir, monkeypatch):
     contents = b"Hello, world\n"
     victim = tmpdir / "victim"
     victim.write_binary(contents)
     hard_link = tmpdir / "hardlink"
-    hard_link.mklinkto(victim)
+    os.link(str(victim), str(hard_link))  # hard_link.mklinkto is not implemented on win32
 
     def os_unlink(_):
         raise OSError(errno.ENOSPC, "Pretend that we ran out of space")

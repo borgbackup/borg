@@ -170,15 +170,22 @@ class ExclusiveLock:
         if not self.by_me():
             raise NotMyLock(self.path)
         os.unlink(self.unique_name)
-        try:
-            os.rmdir(self.path)
-        except OSError as err:
-            if err.errno not in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOENT):
-                # EACCES or EIO or ... = we cannot operate anyway, so re-throw
-                raise err
-            # else:
-            # Directory is not empty or doesn't exist any more.
-            # this means we lost the race to somebody else -- which is ok.
+        retry = 0
+        while retry < 42:
+            retry += 1
+            try:
+                os.rmdir(self.path)
+            except OSError as err:
+                if err.errno in (errno.EACCES,):
+                    # windows behaving strangely? -> just try again.
+                    continue
+                if err.errno not in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOENT):
+                    # EACCES or EIO or ... = we cannot operate anyway, so re-throw
+                    raise err
+                # else:
+                # Directory is not empty or doesn't exist any more.
+                # this means we lost the race to somebody else -- which is ok.
+            return
 
     def is_locked(self):
         return os.path.exists(self.path)

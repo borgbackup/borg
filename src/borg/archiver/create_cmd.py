@@ -30,7 +30,6 @@ from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
 from ..platform import get_flags
-from ..platform import uid2user, gid2group
 
 from ..logger import create_logger
 
@@ -718,15 +717,15 @@ class CreateMixIn:
             "--stdin-user",
             metavar="USER",
             dest="stdin_user",
-            default=uid2user(0),
-            help="set user USER in archive for stdin data (default: %(default)r)",
+            default=None,
+            help="set user USER in archive for stdin data (default: do not store user/uid)",
         )
         subparser.add_argument(
             "--stdin-group",
             metavar="GROUP",
             dest="stdin_group",
-            default=gid2group(0),
-            help="set group GROUP in archive for stdin data (default: %(default)r)",
+            default=None,
+            help="set group GROUP in archive for stdin data (default: do not store group/gid)",
         )
         subparser.add_argument(
             "--stdin-mode",

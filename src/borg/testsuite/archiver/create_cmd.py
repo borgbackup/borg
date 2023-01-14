@@ -160,8 +160,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         input_data = b"\x00foo\n\nbar\n   \n"
         self.cmd(f"--repo={self.repository_location}", "create", "test", "-", input=input_data)
         item = json.loads(self.cmd(f"--repo={self.repository_location}", "list", "test", "--json-lines"))
-        assert item["uid"] == 0
-        assert item["gid"] == 0
         assert item["size"] == len(input_data)
         assert item["path"] == "stdin"
         extracted_data = self.cmd(
@@ -185,8 +183,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             input_data,
         )
         item = json.loads(self.cmd(f"--repo={self.repository_location}", "list", "test", "--json-lines"))
-        assert item["uid"] == 0
-        assert item["gid"] == 0
         assert item["size"] == len(input_data) + 1  # `echo` adds newline
         assert item["path"] == name
         extracted_data = self.cmd(f"--repo={self.repository_location}", "extract", "test", "--stdout")

@@ -356,3 +356,29 @@ def test_get_item_uid_gid():
     # because item uid/gid seems valid, do not use the given uid/gid defaults
     assert uid == 9
     assert gid == 10
+
+    # item metadata only has uid/gid, but no user/group.
+    item = Item(path="filename", uid=13, gid=14)
+
+    uid, gid = get_item_uid_gid(item, numeric=False)
+    # it'll check user/group first, but as there is nothing in the item, falls back to uid/gid.
+    assert uid == 13
+    assert gid == 14
+
+    uid, gid = get_item_uid_gid(item, numeric=True)
+    # does not check user/group, directly returns uid/gid.
+    assert uid == 13
+    assert gid == 14
+
+    # item metadata has no uid/gid/user/group.
+    item = Item(path="filename")
+
+    uid, gid = get_item_uid_gid(item, numeric=False, uid_default=15)
+    # as there is nothing, it'll fall back to uid_default/gid_default.
+    assert uid == 15
+    assert gid == 0
+
+    uid, gid = get_item_uid_gid(item, numeric=True, gid_default=16)
+    # as there is nothing, it'll fall back to uid_default/gid_default.
+    assert uid == 0
+    assert gid == 16

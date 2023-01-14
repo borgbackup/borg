@@ -410,15 +410,15 @@ def get_item_uid_gid(item, *, numeric, uid_forced=None, gid_forced=None, uid_def
         uid = uid_forced
     else:
         uid = None if numeric else user2uid(item.get("user"))
-        uid = item.uid if uid is None else uid
-        if uid < 0:
+        uid = item.get("uid") if uid is None else uid
+        if uid is None or uid < 0:
             uid = uid_default
     if gid_forced is not None:
         gid = gid_forced
     else:
         gid = None if numeric else group2gid(item.get("group"))
-        gid = item.gid if gid is None else gid
-        if gid < 0:
+        gid = item.get("gid") if gid is None else gid
+        if gid is None or gid < 0:
             gid = gid_default
     return uid, gid
 

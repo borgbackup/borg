@@ -928,9 +928,12 @@ Duration: {0.duration}
         Does not access the repository.
         """
         backup_io.op = "attrs"
-        uid, gid = get_item_uid_gid(item, numeric=self.numeric_ids)
-        # This code is a bit of a mess due to os specific differences
+        # This code is a bit of a mess due to OS specific differences.
         if not is_win32:
+            # by using uid_default = -1 and gid_default = -1, they will not be restored if
+            # the archived item has no information about them.
+            uid, gid = get_item_uid_gid(item, numeric=self.numeric_ids, uid_default=-1, gid_default=-1)
+            # if uid and/or gid is -1, chown will keep it as is and not change it.
             try:
                 if fd:
                     os.fchown(fd, uid, gid)

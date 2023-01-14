@@ -2259,7 +2259,14 @@ class ArchiveRecreater:
         target = self.create_target(archive, target_name)
         if self.exclude_if_present or self.exclude_caches:
             self.matcher_add_tagged_dirs(archive)
-        if self.matcher.empty() and not self.recompress and not target.recreate_rechunkify and comment is None:
+        if (
+            self.matcher.empty()
+            and not self.recompress
+            and not target.recreate_rechunkify
+            and comment is None
+            and target_name is None
+        ):
+            # nothing to do
             return False
         self.process_items(archive, target)
         replace_original = target_name is None

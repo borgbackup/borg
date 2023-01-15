@@ -1,4 +1,5 @@
 import json
+import os
 from collections import OrderedDict
 from datetime import datetime, timezone
 from io import StringIO
@@ -295,18 +296,22 @@ def test_backup_io_iter():
 
 def test_get_item_uid_gid():
     # test requires that:
-    # - a name for user 0 and group 0 exists, usually root:root or root:wheel.
+    # - a user/group name for the current process' real uid/gid exists.
     # - a system user/group udoesnotexist:gdoesnotexist does NOT exist.
 
-    user0, group0 = uid2user(0), gid2group(0)
+    try:
+        puid, pgid = os.getuid(), os.getgid()  # UNIX only
+    except AttributeError:
+        puid, pgid = 0, 0
+    puser, pgroup = uid2user(puid), gid2group(pgid)
 
     # this is intentionally a "strange" item, with not matching ids/names.
-    item = Item(path="filename", uid=1, gid=2, user=user0, group=group0)
+    item = Item(path="filename", uid=1, gid=2, user=puser, group=pgroup)
 
     uid, gid = get_item_uid_gid(item, numeric=False)
     # these are found via a name-to-id lookup
-    assert uid == 0
-    assert gid == 0
+    assert uid == puid
+    assert gid == pgid
 
     uid, gid = get_item_uid_gid(item, numeric=True)
     # these are directly taken from the item.uid and .gid
@@ -319,7 +324,7 @@ def test_get_item_uid_gid():
     assert gid == 4
 
     # item metadata broken, has negative ids.
-    item = Item(path="filename", uid=-1, gid=-2, user=user0, group=group0)
+    item = Item(path="filename", uid=-1, gid=-2, user=puser, group=pgroup)
 
     uid, gid = get_item_uid_gid(item, numeric=True)
     # use the uid/gid defaults (which both default to 0).

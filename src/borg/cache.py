@@ -863,7 +863,7 @@ class LocalCache(CacheStatsMixin):
                 )
                 archive_ids_to_names = get_archive_ids_to_names(archive_ids)
                 for archive_id, archive_name in archive_ids_to_names.items():
-                    pi.show(info=[remove_surrogates(archive_name)])
+                    pi.show(info=[remove_surrogates(archive_name)])  # legacy. borg2 always has pure unicode arch names.
                     if self.do_cache:
                         if archive_id in cached_ids:
                             archive_chunk_idx = read_archive_index(archive_id, archive_name)

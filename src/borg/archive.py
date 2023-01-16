@@ -32,7 +32,7 @@ from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, archive_ts_now
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
-from .helpers import safe_encode, make_path_safe, remove_surrogates
+from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json
 from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
@@ -165,7 +165,8 @@ Bytes sent to remote: {stats.tx_bytes}
             if self.output_json:
                 if not final:
                     data = self.as_dict()
-                    data["path"] = remove_surrogates(item.path if item else "")
+                    if item:
+                        data.update(text_to_json("path", item.path))
                 else:
                     data = {}
                 data.update({"time": time.time(), "type": "archive_progress", "finished": final})

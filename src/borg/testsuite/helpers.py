@@ -1,3 +1,4 @@
+import base64
 import errno
 import getpass
 import hashlib
@@ -42,6 +43,7 @@ from ..helpers import dash_open
 from ..helpers import iter_separated
 from ..helpers import eval_escapes
 from ..helpers import safe_unlink
+from ..helpers import text_to_json, binary_to_json
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 from ..platform import is_cygwin
 
@@ -51,6 +53,46 @@ from . import BaseTestCase, FakeInputs, are_hardlinks_supported
 def test_bin_to_hex():
     assert bin_to_hex(b"") == ""
     assert bin_to_hex(b"\x00\x01\xff") == "0001ff"
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [("key", b"\x00\x01\x02\x03"), ("key", b"\x00\x01\x02"), ("key", b"\x00\x01"), ("key", b"\x00"), ("key", b"")],
+)
+def test_binary_to_json(key, value):
+    key_b64 = key + "_b64"
+    d = binary_to_json(key, value)
+    assert key_b64 in d
+    assert base64.b64decode(d[key_b64]) == value
+
+
+@pytest.mark.parametrize(
+    "key,value,strict",
+    [
+        ("key", "abc", True),
+        ("key", "äöü", True),
+        ("key", "", True),
+        ("key", b"\x00\xff".decode("utf-8", errors="surrogateescape"), False),
+        ("key", "äöü".encode("latin1").decode("utf-8", errors="surrogateescape"), False),
+    ],
+)
+def test_text_to_json(key, value, strict):
+    key_b64 = key + "_b64"
+    d = text_to_json(key, value)
+    value_b = value.encode("utf-8", errors="surrogateescape")
+    if strict:
+        # no surrogate-escapes, just unicode text
+        assert key in d
+        assert d[key] == value_b.decode("utf-8", errors="strict")
+        assert d[key].encode("utf-8", errors="strict") == value_b
+        assert key_b64 not in d  # not needed. pure valid unicode.
+    else:
+        # requiring surrogate-escapes. text has replacement chars, base64 representation is present.
+        assert key in d
+        assert d[key] == value.encode("utf-8", errors="replace").decode("utf-8", errors="strict")
+        assert d[key].encode("utf-8", errors="strict") == value.encode("utf-8", errors="replace")
+        assert key_b64 in d
+        assert base64.b64decode(d[key_b64]) == value_b
 
 
 class TestLocationWithoutEnv:

@@ -26,7 +26,7 @@ try:
     from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from ..helpers import Error, set_ec
     from ..helpers import format_file_size
-    from ..helpers import remove_surrogates
+    from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
     from ..helpers import check_python, check_extension_modules
     from ..helpers import is_slow_msgpack, is_supported_msgpack, sysinfo
@@ -139,10 +139,9 @@ class Archiver(
         # if we get called with status == None, the final file status was already printed
         if self.output_list and status is not None and (self.output_filter is None or status in self.output_filter):
             if self.log_json:
-                print(
-                    json.dumps({"type": "file_status", "status": status, "path": remove_surrogates(path)}),
-                    file=sys.stderr,
-                )
+                json_data = {"type": "file_status", "status": status}
+                json_data.update(text_to_json("path", path))
+                print(json.dumps(json_data), file=sys.stderr)
             else:
                 logging.getLogger("borg.output.list").info("%1s %s", status, remove_surrogates(path))
 

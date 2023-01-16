@@ -3,7 +3,7 @@ import os
 import os.path
 import re
 from collections import abc, namedtuple
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, date, timedelta, timezone
 from operator import attrgetter
 from typing import Sequence, FrozenSet
 
@@ -14,7 +14,7 @@ logger = create_logger()
 from .constants import *  # NOQA
 from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex
-from .helpers.time import parse_timestamp
+from .helpers.time import parse_timestamp, calculate_relative_offset, archive_ts_now
 from .helpers.errors import Error
 from .patterns import get_regex_from_pattern
 from .repoobj import RepoObj
@@ -32,6 +32,29 @@ ArchiveInfo = namedtuple("ArchiveInfo", "name id ts")
 
 AI_HUMAN_SORT_KEYS = ["timestamp"] + list(ArchiveInfo._fields)
 AI_HUMAN_SORT_KEYS.remove("ts")
+
+
+def filter_archives_by_date(archives, oldest=None, newest=None, older=None, newer=None):
+    def get_first_and_last_archive_dates(archives_list):
+        dates = [x.ts.date() for x in archives_list]
+        return min(dates), max(dates)
+
+    today = archive_ts_now().date()
+    first_archive_date, last_archive_date = get_first_and_last_archive_dates(archives)
+
+    until_date = calculate_relative_offset(older, from_date=today, earlier=True) if older is not None else last_archive_date
+    from_date = calculate_relative_offset(newer, from_date=today, earlier=True) if newer is not None else first_archive_date
+    archives = [x for x in archives if from_date <= x.ts.date() <= until_date]
+    
+    first_archive_date, last_archive_date = get_first_and_last_archive_dates(archives)
+    if oldest:
+        oldest_date = calculate_relative_offset(oldest, from_date=first_archive_date, earlier=False)
+        archives = [x for x in archives if x.ts.date() <= oldest_date]
+    if newest:
+        newest_date = calculate_relative_offset(newest, from_date=last_archive_date, earlier=True)
+        archives = [x for x in archives if x.ts.date() >= newest_date ]
+
+    return archives
 
 
 class Archives(abc.MutableMapping):
@@ -82,7 +105,11 @@ class Archives(abc.MutableMapping):
         consider_checkpoints=True,
         first=None,
         last=None,
-        reverse=False
+        reverse=False,
+        oldest=None,
+        newest=None,
+        older=None,
+        newer=None
     ):
         """
         Return list of ArchiveInfo instances according to the parameters.
@@ -98,9 +125,14 @@ class Archives(abc.MutableMapping):
         """
         if isinstance(sort_by, (str, bytes)):
             raise TypeError("sort_by must be a sequence of str")
+
+        archives = self.values()
+        if any([oldest, newest, older, newer]) and len(archives) > 0:
+            archives = filter_archives_by_date(archives, oldest=oldest, newest=newest, newer=newer, older=older)
+        
         regex = get_regex_from_pattern(match or "re:.*")
         regex = re.compile(regex + match_end)
-        archives = [x for x in self.values() if regex.match(x.name) is not None]
+        archives = [x for x in archives if regex.match(x.name) is not None]
         if not consider_checkpoints:
             archives = [x for x in archives if ".checkpoint" not in x.name]
         for sortkey in reversed(sort_by):

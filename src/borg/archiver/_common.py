@@ -353,7 +353,7 @@ def define_exclusion_group(subparser, **kwargs):
     return exclude_group
 
 
-def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
+def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, oldest_newest=True, older_newer=True):
     filters_group = subparser.add_argument_group(
         "Archive filters", "Archive filters can be applied to repository targets."
     )
@@ -397,6 +397,36 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
             default=0,
             type=positive_int_validator,
             help="consider last N archives after other filters were applied",
+        )
+
+    if oldest_newest:
+        group = filters_group.add_mutually_exclusive_group()
+        group.add_argument(
+            "--oldest",
+            metavar="Nd",
+            dest="oldest",
+            help="consider archives N-days after the oldest archive's timestamp",
+        )
+        group.add_argument(
+            "--newest",
+            metavar="Nd",
+            dest="newest",
+            help="consider archives N-days before the newest archive's timestamp",
+        )
+
+    if older_newer:
+        group = filters_group.add_mutually_exclusive_group()
+        group.add_argument(
+            "--older",
+            metavar="Nd",
+            dest="older",
+            help="consider archives older than N-days ago",
+        )
+        group.add_argument(
+            "--newer",
+            metavar="Nd",
+            dest="newer",
+            help="consider archives between now and N-days ago",
         )
 
     return filters_group

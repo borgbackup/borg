@@ -1,6 +1,6 @@
 import os
-from datetime import datetime, timezone
-
+import re
+from datetime import datetime, timezone, timedelta
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
     """Parse a ISO 8601 timestamp string.
@@ -107,6 +107,48 @@ def format_timedelta(td):
     if td.days:
         txt = "%d days %s" % (td.days, txt)
     return txt
+
+
+def calculate_relative_offset(format_string, from_date, earlier=False):
+    """ Calculates offset based on a relative marker. 7d (7 days), 8m (8 months)
+        earlier: whether offset should be calculated to an earlier time.
+    """
+    if from_date is None:
+        from_date = archive_ts_now().date()
+
+    if format_string is None:
+        return from_date
+
+    day_offset_regex = re.compile(r'\d+d')
+    month_offset_regex = re.compile(r'\d+m')
+
+    day_offset_str = day_offset_regex.search(format_string)
+    if day_offset_str is not None:
+        day_offset = int(day_offset_str.group()[:-1])
+        day_offset *= -1 if earlier else 1
+        return from_date + timedelta(days=day_offset)
+
+    month_offset_str = month_offset_regex.search(format_string)
+    if month_offset_str is not None:
+        month_offset = int(month_offset_str.group()[:-1])
+        month_offset *= -1 if earlier else 1
+        return offset_n_months(from_date, month_offset)
+
+    return from_date
+
+
+def offset_n_months(from_date, n_months):
+    # Calculate target month and year by getting completed total_months until target_month
+    total_months = (from_date.year * 12) + from_date.month + n_months
+    target_year = (total_months - 1) // 12
+    target_month = (total_months % 12) or 12
+
+    # calculate the max days of the target month by subtracting a day from the next month
+    next_month_month = ((total_months + 1) % 12) or 12
+    next_month_year = (total_months + 1) // 12
+    max_days_in_month = (datetime(next_month_year, next_month_month, 1) - timedelta(1)).day
+
+    return datetime(day=min(from_date.day, max_days_in_month), month=target_month, year=target_year).replace(tzinfo=timezone.utc)
 
 
 class OutputTimestamp:

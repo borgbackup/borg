@@ -93,7 +93,7 @@ _borg()
                 local opts="--list -n --dry-run --numeric-ids --noflags --noacls --noxattrs --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
                 ;;
             *' check '*)
-                local opts="--repository-only --archives-only --verify-data --repair --save-space --max-duration -a --match-archives --sort-by --first --last ${common_opts}"
+                local opts="--repository-only --archives-only --verify-data --repair --max-duration -a --match-archives --sort-by --first --last ${common_opts}"
                 ;;
             # rename
             #   no specific options
@@ -104,10 +104,10 @@ _borg()
                 local opts="--numeric-ids --same-chunker-params --sort --json-lines -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
                 ;;
             *' delete '*)
-                local opts="-n --dry-run --list --consider-checkpoints -s --stats --cache-only --force --save-space -c --checkpoint-interval -a --match-archives --sort-by --first --last ${common_opts}"
+                local opts="-n --dry-run --list --consider-checkpoints -s --stats --cache-only --force -c --checkpoint-interval -a --match-archives --sort-by --first --last ${common_opts}"
                 ;;
             *' prune '*)
-                local opts="-n --dry-run --force -s --stats --list --keep-within --keep-last --keep-secondly --keep-minutely -H --keep-hourly -d --keep-daily -w --keep-weekly -m --keep-monthly -y --keep-yearly --save-space -c --checkpoint-interval -a --match-archives ${common_opts}"
+                local opts="-n --dry-run --force -s --stats --list --keep-within --keep-last --keep-secondly --keep-minutely -H --keep-hourly -d --keep-daily -w --keep-weekly -m --keep-monthly -y --keep-yearly -c --checkpoint-interval -a --match-archives ${common_opts}"
                 ;;
             *' compact '*)
                 local opts="--threshold ${common_opts}"

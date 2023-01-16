@@ -17,7 +17,7 @@ _borg()
 
     # Commands
     if [[ ${COMP_CWORD} == 1 ]] ; then
-        local borg_commands="benchmark break-lock check compact config create delete diff export-tar extract help import-tar info key list mount prune rcreate rdelete recreate rename rlist serve transfer umount with-lock"
+        local borg_commands="benchmark break-lock check compact config create delete diff export-tar extract help import-tar info key list mount prune rcompress rcreate rdelete recreate rename rinfo rlist serve transfer umount with-lock"
         COMPREPLY=( $(compgen -W "${borg_commands}" -- ${cur}) )
         compopt +o default
         return 0
@@ -72,42 +72,51 @@ _borg()
     if [[ ${cur} == -* ]] ; then
         case "${COMP_LINE}" in
             *' rcreate '*)
-                local opts="--other-repo -e --encryption --append-only --storage-quota --make-parent-dirs ${common_opts}"
+                local opts="--other-repo -e --encryption --append-only --storage-quota --make-parent-dirs --copy-crypt-key ${common_opts}"
                 ;;
             *' rlist '*)
-                local opts="--consider-checkpoints --short --format ${common_opts} -a --glob-archives --sort-by --first --last"
+                local opts="--consider-checkpoints --short --format --json ${common_opts} -a --match-archives --sort-by --first --last"
+                ;;
+            *' rinfo '*)
+                local opts="--json ${common_opts}"
+                ;;
+            *' rcompress '*)
+                local opts="-C --compression -s --stats -c --checkpoint-interval ${common_opts}"
+                ;;
+            *' rdelete '*)
+                local opts="-n --dry-run --list --force --cache-only --keep-security-info ${common_opts}"
                 ;;
             *' create '*)
-                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name --stdin-user --stdin-group --stdin-mode --content-from-command --paths-from-stdin --paths-from-command --paths-delimiter -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-owner --noatime --noctime --nobirthtime --noflags --noacls --noxattrs --sparse --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
+                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name --stdin-user --stdin-group --stdin-mode --content-from-command --paths-from-stdin --paths-from-command --paths-delimiter -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-id --atime --noctime --nobirthtime --noflags --noacls --noxattrs --sparse --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
                 ;;
             *' extract '*)
                 local opts="--list -n --dry-run --numeric-ids --noflags --noacls --noxattrs --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
                 ;;
             *' check '*)
-                local opts="--repository-only --archives-only --verify-data --repair --save-space --max-duration -a --glob-archives --sort-by --first --last ${common_opts}"
+                local opts="--repository-only --archives-only --verify-data --repair --save-space --max-duration -a --match-archives --sort-by --first --last ${common_opts}"
                 ;;
             # rename
             #   no specific options
             *" list "*)
-                local opts="--short --format --json-lines -a -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
+                local opts="--short --format --json-lines -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
                 ;;
             *' diff '*)
                 local opts="--numeric-ids --same-chunker-params --sort --json-lines -e --exclude --exclude-from --pattern --patterns-from ${common_opts}"
                 ;;
             *' delete '*)
-                local opts="-n --dry-run --list --consider-checkpoints -s --stats --cache-only --force --keep-security-info --save-space -a --glob-archives --sort-by --first --last ${common_opts}"
+                local opts="-n --dry-run --list --consider-checkpoints -s --stats --cache-only --force --save-space -c --checkpoint-interval -a --match-archives --sort-by --first --last ${common_opts}"
                 ;;
             *' prune '*)
-                local opts="-n --dry-run --force -s --stats --list --keep-within --keep-last --keep-secondly --keep-minutely -H --keep-hourly -d --keep-daily -w --keep-weekly -m --keep-monthly -y --keep-yearly --save-space -a --glob-archives ${common_opts}"
+                local opts="-n --dry-run --force -s --stats --list --keep-within --keep-last --keep-secondly --keep-minutely -H --keep-hourly -d --keep-daily -w --keep-weekly -m --keep-monthly -y --keep-yearly --save-space -c --checkpoint-interval -a --match-archives ${common_opts}"
                 ;;
             *' compact '*)
                 local opts="--threshold ${common_opts}"
                 ;;
             *' info '*)
-                local opts="--json -a --glob-archives --sort-by --first --last ${common_opts}"
+                local opts="--json -a --match-archives --sort-by --first --last ${common_opts}"
                 ;;
             *' mount '*)
-                local opts="--consider-checkpoints -f --foreground -o --numeric-ids -a --glob-archives --sort-by --first --last -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
+                local opts="--consider-checkpoints -f --foreground -o --numeric-ids -a --match-archives --sort-by --first --last -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
                 ;;
             # umount
             #   no specific options
@@ -120,7 +129,7 @@ _borg()
                 local opts="--paper ${common_opts}"
                 ;;
             *' recreate '*)
-                local opts="--list --filter -n dry-run -s stats -e exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags -a --glob-archives --sort-by --first --last --target -c checkpoint-interval --comment --timestamp -C compression --recompress --chunker-params ${common_opts}"
+                local opts="--list --filter -n dry-run -s stats -e exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags -a --match-archives --sort-by --first --last --target -c --checkpoint-interval --comment --timestamp -C --compression --recompress --chunker-params ${common_opts}"
                 ;;
             *' export-tar '*)
                 local opts="--tar-filter --list --tar-format -e exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"
@@ -129,7 +138,7 @@ _borg()
                 local opts="--tar-filter -s --stats --list --filter --json ${common_opts} --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression"
                 ;;
             *' transfer '*)
-                local opts="-n --dry-run --other-repo --upgrader ${common_opts} -a --glob-archives --sort-by --first --last"
+                local opts="-n --dry-run --other-repo --upgrader ${common_opts} -a --match-archives --sort-by --first --last"
                 ;;
             *' serve '*)
                 local opts="--restrict-to-path --restrict-to-repository --append-only --storage-quota ${common_opts}"

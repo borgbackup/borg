@@ -67,6 +67,11 @@ _borg()
             COMPREPLY=( $(compgen -W "${recompress_when}" -- ${cur}) )
             return 0
             ;;
+        '--upgrader')
+            local upgraders="From12To20"
+            COMPREPLY=( $(compgren -W "${upgraders}" -- ${cur}) )
+            return 0
+            ;;
     esac
 
     if [[ ${cur} == -* ]] ; then

@@ -153,6 +153,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     # Note: healthy == True indicates the *absence* of the additional chunks_healthy list
                 del g["hlid"]
 
+                # borg 1 used "linktarget" and "source" for links, borg 2 uses "target" for symlinks.
+                if g["target"] == e["linktarget"]:
+                    e["target"] = e["linktarget"]
+                    del e["linktarget"]
+                    del e["source"]
+
                 if e["type"] == "b" and is_win32:
                     # The S_IFBLK macro is broken on MINGW
                     del e["type"], g["type"]
@@ -197,6 +203,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                         chunks1 = item.chunks
                         size1 = item.size
                         assert "source" not in item
+                        assert "target" not in item
                         assert "hardlink_master" not in item
                     elif item.path.endswith("hardlink2"):
                         assert stat.S_ISREG(item.mode)
@@ -207,15 +214,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                         chunks2 = item.chunks
                         size2 = item.size
                         assert "source" not in item
+                        assert "target" not in item
                         assert "hardlink_master" not in item
                     elif item.path.endswith("broken_symlink"):
                         assert stat.S_ISLNK(item.mode)
-                        assert item.source == "doesnotexist"
+                        assert item.target == "doesnotexist"
                         assert item.uid > 0
                         assert "hlid" not in item
                     elif item.path.endswith("symlink"):
                         assert stat.S_ISLNK(item.mode)
-                        assert item.source == "target"
+                        assert item.target == "target"
                         assert item.uid > 0
                         assert "hlid" not in item
                     elif item.path.endswith("fifo"):

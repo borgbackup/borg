@@ -262,7 +262,8 @@ cdef class Item(PropDict):
     # properties statically defined, so that IDEs can know their names:
 
     path = PropDictProperty(str, 'surrogate-escaped str')
-    source = PropDictProperty(str, 'surrogate-escaped str')
+    source = PropDictProperty(str, 'surrogate-escaped str')  # legacy borg 1.x. borg 2: see .target
+    target = PropDictProperty(str, 'surrogate-escaped str')
     user = PropDictProperty(str, 'surrogate-escaped str')
     group = PropDictProperty(str, 'surrogate-escaped str')
 
@@ -315,7 +316,9 @@ cdef class Item(PropDict):
         except AttributeError:
             if stat.S_ISLNK(self.mode):
                 # get out of here quickly. symlinks have no own chunks, their fs size is the length of the target name.
-                return len(self.source)
+                if 'source' in self:  # legacy borg 1.x archives
+                    return len(self.source)
+                return len(self.target)
             # no precomputed (c)size value available, compute it:
             try:
                 chunks = getattr(self, 'chunks')
@@ -383,7 +386,7 @@ cdef class Item(PropDict):
                 # borg 1 stored some "not known" values with a None value.
                 # borg 2 policy for such cases is to just not have the key/value pair.
                 continue
-            if k in ('path', 'source', 'user', 'group'):
+            if k in ('path', 'source', 'target', 'user', 'group'):
                 v = fix_str_value(d, k)
             if k in ('chunks', 'chunks_healthy'):
                 v = fix_list_of_chunkentries(v)
@@ -665,15 +668,15 @@ class ItemDiff:
         if self._item1.get('deleted') and self._item2.get('deleted'):
             return True
 
-        attr_list = ['deleted', 'mode', 'source']
+        attr_list = ['deleted', 'mode', 'target']
         attr_list += ['uid', 'gid'] if self._numeric_ids else ['user', 'group']
         for attr in attr_list:
             if self._item1.get(attr) != self._item2.get(attr):
                 return False
 
         if 'mode' in self._item1:     # mode of item1 and item2 is equal
-            if (self._item1.is_link() and 'source' in self._item1 and 'source' in self._item2
-                and self._item1.source != self._item2.source):
+            if (self._item1.is_link() and 'target' in self._item1 and 'target' in self._item2
+                and self._item1.target != self._item2.target):
                 return False
 
         if 'chunks' in self._item1 and 'chunks' in self._item2:
@@ -693,7 +696,7 @@ class ItemDiff:
         pd = self._presence_diff('link')
         if pd is not None:
             return pd
-        if 'source' in self._item1 and 'source' in self._item2 and self._item1.source != self._item2.source:
+        if 'target' in self._item1 and 'target' in self._item2 and self._item1.target != self._item2.target:
             return ({"type": 'changed link'}, 'changed link')
 
     def _content_diff(self):

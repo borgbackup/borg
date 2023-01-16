@@ -163,7 +163,7 @@ class TarMixIn:
                 tarinfo.type = tarfile.DIRTYPE
             elif modebits == stat.S_IFLNK:
                 tarinfo.type = tarfile.SYMTYPE
-                tarinfo.linkname = item.source
+                tarinfo.linkname = item.target
             elif modebits == stat.S_IFBLK:
                 tarinfo.type = tarfile.BLKTYPE
                 tarinfo.devmajor = os.major(item.rdev)

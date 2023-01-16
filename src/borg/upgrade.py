@@ -52,7 +52,6 @@ class UpgraderFrom12To20:
         """upgrade item as needed, get rid of legacy crap"""
         ITEM_KEY_WHITELIST = {
             "path",
-            "source",
             "rdev",
             "chunks",
             "chunks_healthy",
@@ -92,7 +91,12 @@ class UpgraderFrom12To20:
         # make sure we only have desired stuff in the new item. specifically, make sure to get rid of:
         # - 'acl' remnants of bug in attic <= 0.13
         # - 'hardlink_master' (superseded by hlid)
-        new_item_dict = {key: value for key, value in item.as_dict().items() if key in ITEM_KEY_WHITELIST}
+        item_dict = item.as_dict()
+        new_item_dict = {key: value for key, value in item_dict.items() if key in ITEM_KEY_WHITELIST}
+        # symlink targets were .source for borg1, but borg2 uses .target:
+        if "source" in item_dict:
+            new_item_dict["target"] = item_dict["source"]
+        assert "source" not in new_item_dict
         # remove some pointless entries older borg put in there:
         for key in "user", "group":
             if key in new_item_dict and new_item_dict[key] is None:

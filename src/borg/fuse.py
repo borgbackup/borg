@@ -720,4 +720,4 @@ class FuseOperations(llfuse.Operations, FuseBackend):
     @async_wrapper
     def readlink(self, inode, ctx=None):
         item = self.get_item(inode)
-        return os.fsencode(item.source)
+        return os.fsencode(item.target)

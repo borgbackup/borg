@@ -122,6 +122,9 @@ _borg()
             #   no specific options
             # key change-passphrase
             #   no specific options
+            *' change-location' *)
+                local opts="${common_opts} keyfile repokey --keep"
+                ;;
             *' export '*)
                 local opts="--paper --qr-html ${common_opts}"
                 ;;

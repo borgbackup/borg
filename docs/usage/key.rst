@@ -37,7 +37,7 @@ Fully automated using environment variables:
 
 ::
 
-    $ BORG_NEW_PASSPHRASE=old borg rcreate -e=repokey
+    $ BORG_NEW_PASSPHRASE=old borg rcreate --encryption=repokey-aes-ocb
     # now "old" is the current passphrase.
     $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change-passphrase
     # now "new" is the current passphrase.

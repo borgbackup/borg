@@ -132,8 +132,8 @@ class TarMixIn:
             tarinfo.name = item.path
             tarinfo.mtime = item.mtime / 1e9
             tarinfo.mode = stat.S_IMODE(item.mode)
-            tarinfo.uid = item.uid
-            tarinfo.gid = item.gid
+            tarinfo.uid = item.get("uid", 0)
+            tarinfo.gid = item.get("gid", 0)
             tarinfo.uname = item.get("user", "")
             tarinfo.gname = item.get("group", "")
             # The linkname in tar has 2 uses:

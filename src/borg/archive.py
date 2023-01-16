@@ -410,15 +410,15 @@ def get_item_uid_gid(item, *, numeric, uid_forced=None, gid_forced=None, uid_def
         uid = uid_forced
     else:
         uid = None if numeric else user2uid(item.get("user"))
-        uid = item.uid if uid is None else uid
-        if uid < 0:
+        uid = item.get("uid") if uid is None else uid
+        if uid is None or uid < 0:
             uid = uid_default
     if gid_forced is not None:
         gid = gid_forced
     else:
         gid = None if numeric else group2gid(item.get("group"))
-        gid = item.gid if gid is None else gid
-        if gid < 0:
+        gid = item.get("gid") if gid is None else gid
+        if gid is None or gid < 0:
             gid = gid_default
     return uid, gid
 
@@ -928,9 +928,12 @@ Duration: {0.duration}
         Does not access the repository.
         """
         backup_io.op = "attrs"
-        uid, gid = get_item_uid_gid(item, numeric=self.numeric_ids)
-        # This code is a bit of a mess due to os specific differences
+        # This code is a bit of a mess due to OS specific differences.
         if not is_win32:
+            # by using uid_default = -1 and gid_default = -1, they will not be restored if
+            # the archived item has no information about them.
+            uid, gid = get_item_uid_gid(item, numeric=self.numeric_ids, uid_default=-1, gid_default=-1)
+            # if uid and/or gid is -1, chown will keep it as is and not change it.
             try:
                 if fd:
                     os.fchown(fd, uid, gid)
@@ -1399,28 +1402,32 @@ class FilesystemObjectProcessors:
             item.update(self.metadata_collector.stat_attrs(st, path))  # can't use FD here?
             return status
 
-    def process_pipe(self, *, path, cache, fd, mode, user, group):
+    def process_pipe(self, *, path, cache, fd, mode, user=None, group=None):
         status = "i"  # stdin (or other pipe)
         self.print_file_status(status, path)
         status = None  # we already printed the status
-        uid = user2uid(user)
-        if uid is None:
-            raise Error("no such user: %s" % user)
-        gid = group2gid(group)
-        if gid is None:
-            raise Error("no such group: %s" % group)
+        if user is not None:
+            uid = user2uid(user)
+            if uid is None:
+                raise Error("no such user: %s" % user)
+        else:
+            uid = None
+        if group is not None:
+            gid = group2gid(group)
+            if gid is None:
+                raise Error("no such group: %s" % group)
+        else:
+            gid = None
         t = int(time.time()) * 1000000000
-        item = Item(
-            path=path,
-            mode=mode & 0o107777 | 0o100000,  # forcing regular file mode
-            uid=uid,
-            user=user,
-            gid=gid,
-            group=group,
-            mtime=t,
-            atime=t,
-            ctime=t,
-        )
+        item = Item(path=path, mode=mode & 0o107777 | 0o100000, mtime=t, atime=t, ctime=t)  # forcing regular file mode
+        if user is not None:
+            item.user = user
+        if group is not None:
+            item.group = group
+        if uid is not None:
+            item.uid = uid
+        if gid is not None:
+            item.gid = gid
         self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd)))
         item.get_size(memorize=True)
         self.stats.nfiles += 1

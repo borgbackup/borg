@@ -893,10 +893,10 @@ class ItemFormatter(BaseFormatter):
         item_data["type"] = item_type
         item_data["mode"] = mode
 
-        item_data.update(text_to_json("user", item.get("user", str(item.uid))))
-        item_data.update(text_to_json("group", item.get("group", str(item.gid))))
-        item_data["uid"] = item.uid
-        item_data["gid"] = item.gid
+        item_data["uid"] = item.get("uid")  # int or None
+        item_data["gid"] = item.get("gid")  # int or None
+        item_data.update(text_to_json("user", item.get("user", str(item_data["uid"]))))
+        item_data.update(text_to_json("group", item.get("group", str(item_data["gid"]))))
 
         if self.json_lines:
             item_data["healthy"] = "chunks_healthy" not in item

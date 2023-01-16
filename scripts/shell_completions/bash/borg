@@ -12,7 +12,7 @@ _borg()
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local prev="${COMP_WORDS[COMP_CWORD-1]}"
     local prevprev="${COMP_WORDS[COMP_CWORD-2]}"
-    local common_opts="-h --help --version --critical --error --warning --info -v --verbose --debug --debug-topic -p --progress --log-json --lock-wait --show-version --show-rc --umask --remote-path --remote-ratelimit --consider-part-files --debug-profile --rsh"
+    local common_opts="-h --help --critical --error --warning --info -v --verbose --debug --debug-topic -p --progress --iec --log-json --lock-wait --bypass-lock --show-version --show-rc --umask --remote-path --upload-ratelimit --upload-buffer --consider-part-files --debug-profile --rsh -r --repo"
     local opts="${common_opts}"
 
     # Commands
@@ -37,7 +37,7 @@ _borg()
             return 0
             ;;
         '--encryption' | '-e')
-            local encryption_modes="authenticated authenticated-blake2 keyfile keyfile-aes-ocb keyfile-blake2 keyfile-blake2-aes-ocb keyfile-blake2-chacha20-poly1305 keyfile-chacha20-poly1305 none repokey repokey-aes-ocb repokey-blake2 repokey-blake2-aes-ocb repokey-blake2-chacha20-poly1305 repokey-chacha20-poly1305"
+            local encryption_modes="authenticated authenticated-blake2 keyfile-aes-ocb keyfile-blake2-aes-ocb keyfile-blake2-chacha20-poly1305 keyfile-chacha20-poly1305 none repokey-aes-ocb repokey-blake2-aes-ocb repokey-blake2-chacha20-poly1305 repokey-chacha20-poly1305"
             COMPREPLY=( $(compgen -W "${encryption_modes}" -- ${cur}) )
             return 0
             ;;

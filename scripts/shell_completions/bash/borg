@@ -127,7 +127,7 @@ _borg()
             #   no specific options
             # key change-passphrase
             #   no specific options
-            *' change-location' *)
+            *' change-location '*)
                 local opts="${common_opts} keyfile repokey --keep"
                 ;;
             *' export '*)

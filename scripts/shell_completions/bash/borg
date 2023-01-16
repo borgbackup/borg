@@ -87,7 +87,7 @@ _borg()
                 local opts="-n --dry-run --list --force --cache-only --keep-security-info ${common_opts}"
                 ;;
             *' create '*)
-                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name --stdin-user --stdin-group --stdin-mode --content-from-command --paths-from-stdin --paths-from-command --paths-delimiter -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-id --atime --noctime --nobirthtime --noflags --noacls --noxattrs --sparse --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
+                local opts="-n --dry-run -s --stats --list --filter --json --no-cache-sync --stdin-name --stdin-user --stdin-group --stdin-mode --content-from-command --paths-from-stdin --paths-from-command --paths-delimiter -e --exclude --exclude-from --pattern --patterns-from --exclude-caches --exclude-if-present --keep-exclude-tags --exclude-nodump -x --one-file-system --numeric-ids --atime --noctime --nobirthtime --noflags --noacls --noxattrs --sparse --files-cache --read-special --comment --timestamp -c --checkpoint-interval --chunker-params -C --compression ${common_opts}"
                 ;;
             *' extract '*)
                 local opts="--list -n --dry-run --numeric-ids --noflags --noacls --noxattrs --stdout --sparse -e --exclude --exclude-from --pattern --patterns-from --strip-components ${common_opts}"

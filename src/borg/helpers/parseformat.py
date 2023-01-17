@@ -536,6 +536,17 @@ def location_validator(proto=None, other=False):
     return validator
 
 
+def relative_time_marker_validator(text: str):
+    day_offset_regex = r"^\d+d$"
+    month_offset_regex = r"^\d+m$"
+    day_match = re.compile(day_offset_regex).search(text)
+    month_match = re.compile(month_offset_regex).search(text)
+    if not day_match and not month_match:
+        raise argparse.ArgumentTypeError(f"Invalid relative time marker used: {text}")
+    else:
+        return text
+
+
 def text_validator(*, name, max_length, min_length=0, invalid_ctrl_chars="\0", invalid_chars="", no_blanks=False):
     def validator(text):
         assert isinstance(text, str)

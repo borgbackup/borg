@@ -3,7 +3,7 @@ import os
 import os.path
 import re
 from collections import abc, namedtuple
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from operator import attrgetter
 from typing import Sequence, FrozenSet
 
@@ -36,23 +36,27 @@ AI_HUMAN_SORT_KEYS.remove("ts")
 
 def filter_archives_by_date(archives, oldest=None, newest=None, older=None, newer=None):
     def get_first_and_last_archive_dates(archives_list):
-        dates = [x.ts.date() for x in archives_list]
+        dates = [x.ts for x in archives_list]
         return min(dates), max(dates)
 
-    today = archive_ts_now().date()
+    today = archive_ts_now()
     first_archive_date, last_archive_date = get_first_and_last_archive_dates(archives)
 
-    until_date = calculate_relative_offset(older, from_date=today, earlier=True) if older is not None else last_archive_date
-    from_date = calculate_relative_offset(newer, from_date=today, earlier=True) if newer is not None else first_archive_date
-    archives = [x for x in archives if from_date <= x.ts.date() <= until_date]
-    
+    until_date = (
+        calculate_relative_offset(older, from_date=today, earlier=True) if older is not None else last_archive_date
+    )
+    from_date = (
+        calculate_relative_offset(newer, from_date=today, earlier=True) if newer is not None else first_archive_date
+    )
+    archives = [x for x in archives if from_date <= x.ts <= until_date]
+
     first_archive_date, last_archive_date = get_first_and_last_archive_dates(archives)
     if oldest:
         oldest_date = calculate_relative_offset(oldest, from_date=first_archive_date, earlier=False)
-        archives = [x for x in archives if x.ts.date() <= oldest_date]
+        archives = [x for x in archives if x.ts <= oldest_date]
     if newest:
         newest_date = calculate_relative_offset(newest, from_date=last_archive_date, earlier=True)
-        archives = [x for x in archives if x.ts.date() >= newest_date ]
+        archives = [x for x in archives if x.ts >= newest_date]
 
     return archives
 
@@ -127,12 +131,12 @@ class Archives(abc.MutableMapping):
             raise TypeError("sort_by must be a sequence of str")
 
         archives = self.values()
-        if any([oldest, newest, older, newer]) and len(archives) > 0:
-            archives = filter_archives_by_date(archives, oldest=oldest, newest=newest, newer=newer, older=older)
-        
         regex = get_regex_from_pattern(match or "re:.*")
         regex = re.compile(regex + match_end)
         archives = [x for x in archives if regex.match(x.name) is not None]
+
+        if any([oldest, newest, older, newer]) and len(archives) > 0:
+            archives = filter_archives_by_date(archives, oldest=oldest, newest=newest, newer=newer, older=older)
         if not consider_checkpoints:
             archives = [x for x in archives if ".checkpoint" not in x.name]
         for sortkey in reversed(sort_by):

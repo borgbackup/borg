@@ -60,7 +60,7 @@ class CheckMixIn:
             oldest=args.oldest,
             newest=args.newest,
             older=args.older,
-            newer=args.newer
+            newer=args.newer,
         ):
             return EXIT_WARNING
         return EXIT_SUCCESS

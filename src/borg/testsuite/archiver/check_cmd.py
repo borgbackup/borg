@@ -64,6 +64,9 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.create_src_archive("archive2", ts=ts_in_between)
         self.create_src_archive("archive3", ts=latest_between)
         output = self.cmd(
+            f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--oldest=23e", exit_code=2
+        )
+        output = self.cmd(
             f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--oldest=1m", exit_code=0
         )
         self.assert_in("archive1", output)

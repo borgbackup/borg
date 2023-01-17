@@ -21,7 +21,6 @@ from ...constants import *  # NOQA
 from ...helpers import Location
 from ...helpers import EXIT_SUCCESS
 from ...helpers import bin_to_hex
-from ...helpers import archive_ts_now 
 from ...manifest import Manifest
 from ...logger import setup_logging
 from ...remote import RemoteRepository
@@ -173,8 +172,9 @@ class ArchiverTestCaseBase(BaseTestCase):
         output = empty.join(line for line in output.splitlines(keepends=True) if pp_msg not in line)
         return output
 
-    def create_src_archive(self, name, ts=archive_ts_now().isoformat()):
-        self.cmd(f"--repo={self.repository_location}", "create", "--compression=lz4", f"--timestamp={ts}", name, src_dir)
+    def create_src_archive(self, name, ts=None):
+        timestamp_arg = f"--timestamp={ts}" if ts else ""
+        self.cmd(f"--repo={self.repository_location}", "create", "--compression=lz4", timestamp_arg, name, src_dir)
 
     def open_archive(self, name):
         repository = Repository(self.repository_path, exclusive=True)

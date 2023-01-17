@@ -8,7 +8,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
-from ..helpers import SortBySpec, positive_int_validator, location_validator, Location
+from ..helpers import SortBySpec, positive_int_validator, location_validator, Location, relative_time_marker_validator
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
@@ -404,12 +404,14 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
         group.add_argument(
             "--oldest",
             metavar="Nd",
+            type=relative_time_marker_validator,
             dest="oldest",
             help="consider archives N-days after the oldest archive's timestamp",
         )
         group.add_argument(
             "--newest",
             metavar="Nd",
+            type=relative_time_marker_validator,
             dest="newest",
             help="consider archives N-days before the newest archive's timestamp",
         )
@@ -419,12 +421,14 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
         group.add_argument(
             "--older",
             metavar="Nd",
+            type=relative_time_marker_validator,
             dest="older",
             help="consider archives older than N-days ago",
         )
         group.add_argument(
             "--newer",
             metavar="Nd",
+            type=relative_time_marker_validator,
             dest="newer",
             help="consider archives between now and N-days ago",
         )

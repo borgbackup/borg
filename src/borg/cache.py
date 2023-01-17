@@ -797,7 +797,7 @@ class LocalCache(CacheStatsMixin):
 
         def read_archive_index(archive_id, archive_name):
             archive_chunk_idx_path = mkpath(archive_id)
-            logger.info("Reading cached archive chunk index for %s ...", archive_name)
+            logger.info("Reading cached archive chunk index for %s", archive_name)
             try:
                 try:
                     # Attempt to load compact index first
@@ -837,13 +837,12 @@ class LocalCache(CacheStatsMixin):
             return archive_names
 
         def create_master_idx(chunk_idx):
-            logger.info("Synchronizing chunks cache...")
+            logger.debug("Synchronizing chunks cache...")
             cached_ids = cached_archives()
             archive_ids = repo_archives()
             logger.info(
-                "Archives: %d, w/ cached Idx: %d, w/ outdated Idx: %d, w/o cached Idx: %d.",
-                len(archive_ids),
-                len(cached_ids),
+                "Cached archive chunk indexes: %d fresh, %d stale, %d need fetching.",
+                len(archive_ids & cached_ids),
                 len(cached_ids - archive_ids),
                 len(archive_ids - cached_ids),
             )
@@ -872,14 +871,14 @@ class LocalCache(CacheStatsMixin):
                         if archive_id not in cached_ids:
                             # Do not make this an else branch; the FileIntegrityError exception handler
                             # above can remove *archive_id* from *cached_ids*.
-                            logger.info("Fetching and building archive index for %s ...", archive_name)
+                            logger.info("Fetching and building archive index for %s", archive_name)
                             archive_chunk_idx = ChunkIndex()
                             fetch_and_build_idx(archive_id, decrypted_repository, archive_chunk_idx)
-                        logger.info("Merging into master chunks index ...")
+                        logger.debug("Merging into master chunks index")
                         chunk_idx.merge(archive_chunk_idx)
                     else:
                         chunk_idx = chunk_idx or ChunkIndex(usable=master_index_capacity)
-                        logger.info("Fetching archive index for %s ...", archive_name)
+                        logger.info("Fetching archive index for %s", archive_name)
                         fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx)
                 pi.finish()
                 logger.debug(
@@ -891,7 +890,7 @@ class LocalCache(CacheStatsMixin):
                     "Cache sync: compact chunks.archive.d storage saved %s bytes",
                     format_file_size(compact_chunks_archive_saved_space),
                 )
-            logger.info("Done.")
+            logger.debug("Cache sync done.")
             return chunk_idx
 
         # The cache can be used by a command that e.g. only checks against Manifest.Operation.WRITE,

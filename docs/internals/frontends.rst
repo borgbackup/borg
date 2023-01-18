@@ -472,8 +472,9 @@ Refer to the *borg list* documentation for the available keys and their meaning.
 
 Example (excerpt) of ``borg list --json-lines``::
 
-    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux", "healthy": true, "source": "", "linktarget": "", "flags": null, "mtime": "2017-02-27T12:27:20.023407", "size": 0}
-    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux/baz", "healthy": true, "source": "", "linktarget": "", "flags": null, "mtime": "2017-02-27T12:27:20.585407", "size": 0}
+    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux", "healthy": true, "target": "", "flags": null, "mtime": "2017-02-27T12:27:20.023407", "size": 0}
+    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux/baz", "healthy": true, "target": "", "flags": null, "mtime": "2017-02-27T12:27:20.585407", "size": 0}
+
 
 Archive Differencing
 ++++++++++++++++++++

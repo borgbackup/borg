@@ -149,7 +149,7 @@ class ChunkBufferTestCase(BaseTestCase):
 
     def test_partial(self):
         big = "0123456789abcdefghijklmnopqrstuvwxyz" * 25000
-        data = [Item(path="full", source=big), Item(path="partial", source=big)]
+        data = [Item(path="full", target=big), Item(path="partial", target=big)]
         cache = MockCache()
         key = PlaintextKey(None)
         chunks = CacheChunkBuffer(cache, key, None)

@@ -782,9 +782,9 @@ class ItemFormatter(BaseFormatter):
     hash_algorithms = set(hashlib.algorithms_guaranteed).union({"xxh64"}).difference({"shake_128", "shake_256"})
     KEY_DESCRIPTIONS = {
         "path": "file path",
-        "source": "link target for symlinks (identical to linktarget)",
+        "target": "link target for symlinks",
         "hlid": "hard link identity (same if hardlinking same fs object)",
-        "extra": 'prepends {source} with " -> " for soft links and " link to " for hard links',
+        "extra": 'prepends {target} with " -> " for soft links and " link to " for hard links',
         "dsize": "deduplicated size",
         "num_chunks": "number of chunks in this file",
         "unique_chunks": "number of unique chunks in this file",
@@ -792,7 +792,7 @@ class ItemFormatter(BaseFormatter):
         "health": 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
     }
     KEY_GROUPS = (
-        ("type", "mode", "uid", "gid", "user", "group", "path", "source", "linktarget", "hlid", "flags"),
+        ("type", "mode", "uid", "gid", "user", "group", "path", "target", "hlid", "flags"),
         ("size", "dsize", "num_chunks", "unique_chunks"),
         ("mtime", "ctime", "atime", "isomtime", "isoctime", "isoatime"),
         tuple(sorted(hash_algorithms)),
@@ -878,11 +878,10 @@ class ItemFormatter(BaseFormatter):
         item_data.update(self.item_data)
 
         item_data.update(text_to_json("path", item.path))
-        source = item.get("source", "")
-        item_data.update(text_to_json("source", source))
-        item_data.update(text_to_json("linktarget", source))
+        target = item.get("target", "")
+        item_data.update(text_to_json("target", target))
         if not self.json_lines:
-            item_data["extra"] = "" if not source else f" -> {item_data['source']}"
+            item_data["extra"] = "" if not target else f" -> {item_data['target']}"
 
         hlid = item.get("hlid")
         hlid = bin_to_hex(hlid) if hlid else ""

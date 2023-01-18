@@ -898,11 +898,11 @@ Duration: {0.duration}
                     if hardlink_set:
                         # unusual, but possible: this is a hardlinked symlink.
                         return
-                    source = item.source
+                    target = item.target
                     try:
-                        os.symlink(source, path)
+                        os.symlink(target, path)
                     except UnicodeEncodeError:
-                        raise self.IncompatibleFilesystemEncodingError(source, sys.getfilesystemencoding()) from None
+                        raise self.IncompatibleFilesystemEncodingError(target, sys.getfilesystemencoding()) from None
                     self.restore_attrs(path, item, symlink=True)
             elif stat.S_ISFIFO(mode):
                 make_parent(path)
@@ -1397,8 +1397,8 @@ class FilesystemObjectProcessors:
         with self.create_helper(path, st, "s", hardlinkable=True) as (item, status, hardlinked):
             fname = name if name is not None and parent_fd is not None else path
             with backup_io("readlink"):
-                source = os.readlink(fname, dir_fd=parent_fd)
-            item.source = source
+                target = os.readlink(fname, dir_fd=parent_fd)
+            item.target = target
             item.update(self.metadata_collector.stat_attrs(st, path))  # can't use FD here?
             return status
 
@@ -1589,7 +1589,7 @@ class TarfileObjectProcessors:
 
     def process_symlink(self, *, tarinfo, status, type):
         with self.create_helper(tarinfo, status, type) as (item, status):
-            item.source = tarinfo.linkname
+            item.target = tarinfo.linkname
             return status
 
     def process_hardlink(self, *, tarinfo, status, type):

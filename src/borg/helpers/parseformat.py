@@ -537,11 +537,9 @@ def location_validator(proto=None, other=False):
 
 
 def relative_time_marker_validator(text: str):
-    day_offset_regex = r"^\d+d$"
-    month_offset_regex = r"^\d+m$"
-    day_match = re.compile(day_offset_regex).search(text)
-    month_match = re.compile(month_offset_regex).search(text)
-    if not day_match and not month_match:
+    time_marker_regex = r"^\d+[md]$"
+    match = re.compile(time_marker_regex).search(text)
+    if not match:
         raise argparse.ArgumentTypeError(f"Invalid relative time marker used: {text}")
     else:
         return text

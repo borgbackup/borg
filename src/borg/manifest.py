@@ -35,28 +35,24 @@ AI_HUMAN_SORT_KEYS.remove("ts")
 
 
 def filter_archives_by_date(archives, oldest=None, newest=None, older=None, newer=None):
-    def get_first_and_last_archive_dates(archives_list):
-        dates = [x.ts for x in archives_list]
-        return min(dates), max(dates)
+    def get_first_and_last_archive_ts(archives_list):
+        timestamps = [x.ts for x in archives_list]
+        return min(timestamps), max(timestamps)
 
-    today = archive_ts_now()
-    first_archive_date, last_archive_date = get_first_and_last_archive_dates(archives)
+    now = archive_ts_now()
+    earliest_ts, latest_ts = get_first_and_last_archive_ts(archives)
 
-    until_date = (
-        calculate_relative_offset(older, from_date=today, earlier=True) if older is not None else last_archive_date
-    )
-    from_date = (
-        calculate_relative_offset(newer, from_date=today, earlier=True) if newer is not None else first_archive_date
-    )
-    archives = [x for x in archives if from_date <= x.ts <= until_date]
+    until_ts = calculate_relative_offset(older, from_date=now, earlier=True) if older is not None else latest_ts
+    from_ts = calculate_relative_offset(newer, from_date=now, earlier=True) if newer is not None else earliest_ts
+    archives = [x for x in archives if from_ts <= x.ts <= until_ts]
 
-    first_archive_date, last_archive_date = get_first_and_last_archive_dates(archives)
+    earliest_ts, latest_ts = get_first_and_last_archive_ts(archives)
     if oldest:
-        oldest_date = calculate_relative_offset(oldest, from_date=first_archive_date, earlier=False)
-        archives = [x for x in archives if x.ts <= oldest_date]
+        until_ts = calculate_relative_offset(oldest, from_date=earliest_ts, earlier=False)
+        archives = [x for x in archives if x.ts <= until_ts]
     if newest:
-        newest_date = calculate_relative_offset(newest, from_date=last_archive_date, earlier=True)
-        archives = [x for x in archives if x.ts >= newest_date]
+        from_ts = calculate_relative_offset(newest, from_date=latest_ts, earlier=True)
+        archives = [x for x in archives if x.ts >= from_ts]
 
     return archives
 

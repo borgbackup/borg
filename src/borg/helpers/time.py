@@ -119,7 +119,7 @@ def calculate_relative_offset(format_string, from_date, earlier=False):
 
     if format_string is not None:
         day_offset_regex = re.compile(r"(?P<offset>\d+)d")
-        month_offset_regex = re.compile(r"(?P<offset>\d+)+m")
+        month_offset_regex = re.compile(r"(?P<offset>\d+)m")
 
         day_offset_match = day_offset_regex.search(format_string)
         if day_offset_match:

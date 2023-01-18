@@ -15,7 +15,8 @@ def translate(pat, match_end=r"\Z"):
 
     This function is derived from the "fnmatch" module distributed with the Python standard library.
 
-    Copyright (C) 2001-2016 Python Software Foundation. All rights reserved.
+    :copyright: 2001-2016 Python Software Foundation. All rights reserved.
+    :license: PSFLv2
 
     TODO: support {alt1,alt2} shell-style alternatives
 

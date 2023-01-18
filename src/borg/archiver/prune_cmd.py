@@ -53,8 +53,10 @@ def prune_split(archives, rule, n, kept_because=None):
 
     a = None
     for a in sorted(archives, key=attrgetter("ts"), reverse=True):
-        # we compute the pruning in local time zone
-        period = a.ts.astimezone().strftime(pattern)
+        # we compute the pruning in UTC time zone
+        # note: we used to compute the pruning in local timezone (tz=None),
+        # but this is causing test failures in some time zones (like e.g. UTC+12).
+        period = a.ts.astimezone(tz=timezone.utc).strftime(pattern)
         if period != last:
             last = period
             if a.id not in kept_because:

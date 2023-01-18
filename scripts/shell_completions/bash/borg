@@ -68,7 +68,7 @@ _borg()
             return 0
             ;;
         '--upgrader')
-            local upgraders="From12To20"
+            local upgraders="From12To20 NoOp"
             COMPREPLY=( $(compgren -W "${upgraders}" -- ${cur}) )
             return 0
             ;;

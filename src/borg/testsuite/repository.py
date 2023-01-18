@@ -850,7 +850,7 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
         os.unlink(os.path.join(self.tmppath, "repository", f"index.{self.get_head()}"))
 
     def rename_index(self, new_name):
-        os.rename(
+        os.replace(
             os.path.join(self.tmppath, "repository", f"index.{self.get_head()}"),
             os.path.join(self.tmppath, "repository", new_name),
         )

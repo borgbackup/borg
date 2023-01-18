@@ -49,7 +49,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}_encrypted", "rcreate", RK_ENCRYPTION)
         self.cmd(f"--repo={self.repository_location}_encrypted", "create", "test", "input")
         shutil.rmtree(self.repository_path + "_encrypted")
-        os.rename(self.repository_path + "_unencrypted", self.repository_path + "_encrypted")
+        os.replace(self.repository_path + "_unencrypted", self.repository_path + "_encrypted")
         if self.FORK_DEFAULT:
             self.cmd(f"--repo={self.repository_location}_encrypted", "create", "test.2", "input", exit_code=EXIT_ERROR)
         else:
@@ -82,7 +82,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}_unencrypted", "rdelete", "--cache-only")
         self.cmd(f"--repo={self.repository_location}_encrypted", "rdelete", "--cache-only")
         shutil.rmtree(self.repository_path + "_encrypted")
-        os.rename(self.repository_path + "_unencrypted", self.repository_path + "_encrypted")
+        os.replace(self.repository_path + "_unencrypted", self.repository_path + "_encrypted")
         if self.FORK_DEFAULT:
             self.cmd(f"--repo={self.repository_location}_encrypted", "create", "test.2", "input", exit_code=EXIT_ERROR)
         else:
@@ -115,7 +115,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_repository_move(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         security_dir = self.get_security_dir()
-        os.rename(self.repository_path, self.repository_path + "_new")
+        os.replace(self.repository_path, self.repository_path + "_new")
         with environment_variable(BORG_RELOCATED_REPO_ACCESS_IS_OK="yes"):
             self.cmd(f"--repo={self.repository_location}_new", "rinfo")
         with open(os.path.join(security_dir, "location")) as fd:

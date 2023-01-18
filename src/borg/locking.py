@@ -170,9 +170,7 @@ class ExclusiveLock:
         if not self.by_me():
             raise NotMyLock(self.path)
         os.unlink(self.unique_name)
-        retry = 0
-        while retry < 42:
-            retry += 1
+        for retry in range(42):
             try:
                 os.rmdir(self.path)
             except OSError as err:

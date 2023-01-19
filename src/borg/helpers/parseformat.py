@@ -75,8 +75,7 @@ def text_to_json(key, value):
         value.encode(coding, errors="strict")  # check if pure unicode
     except UnicodeEncodeError:
         # value has surrogate escape sequences
-        value_replace_encoded = value.encode(coding, errors="replace")
-        data[key] = value_replace_encoded.decode(coding, errors="strict")
+        data[key] = remove_surrogates(value)
         value_bytes = value.encode(coding, errors="surrogateescape")
         data.update(binary_to_json(key, value_bytes))
     else:
@@ -715,9 +714,9 @@ class ArchiveFormatter(BaseFormatter):
         self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
-            "hostname": partial(self.get_meta, "hostname", rs=True),
-            "username": partial(self.get_meta, "username", rs=True),
-            "comment": partial(self.get_meta, "comment", rs=False),
+            "hostname": partial(self.get_meta, "hostname"),
+            "username": partial(self.get_meta, "username"),
+            "comment": partial(self.get_meta, "comment"),
             "end": self.get_ts_end,
             "command_line": self.get_cmdline,
         }
@@ -747,6 +746,12 @@ class ArchiveFormatter(BaseFormatter):
         )
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key]()
+
+        # Note: name and comment are validated, should never contain surrogate escapes.
+        # But unsure whether hostname, username could contain surrogate escapes, play safe:
+        for key in "hostname", "username":
+            if key in item_data:
+                item_data.update(text_to_json(key, item_data[key]))
         return item_data
 
     @property
@@ -758,9 +763,8 @@ class ArchiveFormatter(BaseFormatter):
             self._archive = Archive(self.manifest, self.name, iec=self.iec)
         return self._archive
 
-    def get_meta(self, key, rs):
-        value = self.archive.metadata.get(key, "")
-        return remove_surrogates(value) if rs else value
+    def get_meta(self, key):
+        return self.archive.metadata.get(key, "")
 
     def get_cmdline(self):
         cmdline = map(remove_surrogates, self.archive.metadata.get("cmdline", []))

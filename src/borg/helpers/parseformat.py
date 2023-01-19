@@ -75,8 +75,7 @@ def text_to_json(key, value):
         value.encode(coding, errors="strict")  # check if pure unicode
     except UnicodeEncodeError:
         # value has surrogate escape sequences
-        value_replace_encoded = value.encode(coding, errors="replace")
-        data[key] = value_replace_encoded.decode(coding, errors="strict")
+        data[key] = remove_surrogates(value)
         value_bytes = value.encode(coding, errors="surrogateescape")
         data.update(binary_to_json(key, value_bytes))
     else:

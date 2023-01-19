@@ -636,7 +636,7 @@ class LocalCache(CacheStatsMixin):
         except FileNotFoundError:
             with SaveFile(os.path.join(txn_dir, files_cache_name()), binary=True):
                 pass  # empty file
-        os.rename(os.path.join(self.path, "txn.tmp"), os.path.join(self.path, "txn.active"))
+        os.replace(txn_dir, os.path.join(self.path, "txn.active"))
         self.txn_active = True
         pi.finish()
 
@@ -680,7 +680,7 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.integrity["chunks"] = fd.integrity_data
         pi.output("Saving cache config")
         self.cache_config.save(self.manifest, self.key)
-        os.rename(os.path.join(self.path, "txn.active"), os.path.join(self.path, "txn.tmp"))
+        os.replace(os.path.join(self.path, "txn.active"), os.path.join(self.path, "txn.tmp"))
         shutil.rmtree(os.path.join(self.path, "txn.tmp"))
         self.txn_active = False
         pi.finish()
@@ -696,9 +696,10 @@ class LocalCache(CacheStatsMixin):
             shutil.copy(os.path.join(txn_dir, "config"), self.path)
             shutil.copy(os.path.join(txn_dir, "chunks"), self.path)
             shutil.copy(os.path.join(txn_dir, discover_files_cache_name(txn_dir)), self.path)
-            os.rename(txn_dir, os.path.join(self.path, "txn.tmp"))
-            if os.path.exists(os.path.join(self.path, "txn.tmp")):
-                shutil.rmtree(os.path.join(self.path, "txn.tmp"))
+            txn_tmp = os.path.join(self.path, "txn.tmp")
+            os.replace(txn_dir, txn_tmp)
+            if os.path.exists(txn_tmp):
+                shutil.rmtree(txn_tmp)
         self.txn_active = False
         self._do_open()
 
@@ -793,7 +794,7 @@ class LocalCache(CacheStatsMixin):
             except Exception:
                 safe_unlink(fn_tmp)
             else:
-                os.rename(fn_tmp, fn)
+                os.replace(fn_tmp, fn)
 
         def read_archive_index(archive_id, archive_name):
             archive_chunk_idx_path = mkpath(archive_id)

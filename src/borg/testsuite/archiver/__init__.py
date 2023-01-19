@@ -173,8 +173,10 @@ class ArchiverTestCaseBase(BaseTestCase):
         return output
 
     def create_src_archive(self, name, ts=None):
-        timestamp_arg = f"--timestamp={ts}" if ts else ""
-        self.cmd(f"--repo={self.repository_location}", "create", "--compression=lz4", timestamp_arg, name, src_dir)
+        if ts:
+            self.cmd(f"--repo={self.repository_location}", "create", "--compression=lz4", f"--timestamp={ts}", name, src_dir)
+        else:
+            self.cmd(f"--repo={self.repository_location}", "create", "--compression=lz4", name, src_dir)
 
     def open_archive(self, name):
         repository = Repository(self.repository_path, exclusive=True)

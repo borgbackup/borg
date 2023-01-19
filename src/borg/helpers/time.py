@@ -110,46 +110,45 @@ def format_timedelta(td):
     return txt
 
 
-def calculate_relative_offset(format_string, from_date, earlier=False):
+def calculate_relative_offset(format_string, from_ts, earlier=False):
     """Calculates offset based on a relative marker. 7d (7 days), 8m (8 months)
     earlier: whether offset should be calculated to an earlier time.
     """
-    if from_date is None:
-        from_date = archive_ts_now().date()
+    if from_ts is None:
+        from_ts = archive_ts_now()
 
     if format_string is not None:
-        day_offset_regex = re.compile(r"(?P<offset>\d+)d")
-        month_offset_regex = re.compile(r"(?P<offset>\d+)m")
+        offset_regex = re.compile(r"(?P<offset>\d+)(?P<unit>[md])")
+        match = offset_regex.search(format_string)
 
-        day_offset_match = day_offset_regex.search(format_string)
-        if day_offset_match:
-            day_offset = int(day_offset_match.group("offset"))
-            day_offset *= -1 if earlier else 1
-            return from_date + timedelta(days=day_offset)
+        if match:
+            unit = match.group("unit")
+            offset = int(match.group("offset"))
+            offset *= -1 if earlier else 1
 
-        month_offset_match = month_offset_regex.search(format_string)
-        if month_offset_match:
-            month_offset = int(month_offset_match.group("offset"))
-            month_offset *= -1 if earlier else 1
-            return offset_n_months(from_date, month_offset)
-
-    raise ValueError(f"{format_string} is not a recognized relative time marker")
+            if unit == 'd':
+                return from_ts + timedelta(days=offset)
+            elif unit == 'm':
+                return offset_n_months(from_ts, offset)
+    
+    raise ValueError(f"Invalid relative ts offset format: {format_string}")
 
 
-def offset_n_months(from_date, n_months):
+def offset_n_months(from_ts, n_months):
+    def get_month_and_year_from_total(total_completed_months):
+        month = (total_completed_months % 12) + 1
+        year = total_completed_months // 12
+        return month, year
+
     # Calculate target month and year by getting completed total_months until target_month
-    total_months = (from_date.year * 12) + from_date.month + n_months
-    target_year = (total_months - 1) // 12
-    target_month = (total_months % 12) or 12
+    total_months = (from_ts.year * 12) + from_ts.month + n_months - 1
+    target_month, target_year = get_month_and_year_from_total(total_months)
 
     # calculate the max days of the target month by subtracting a day from the next month
-    next_month_month = ((total_months + 1) % 12) or 12
-    next_month_year = (total_months + 1) // 12
-    max_days_in_month = (datetime(next_month_year, next_month_month, 1) - timedelta(1)).day
+    following_month, year_of_following_month = get_month_and_year_from_total(total_months + 1)
+    max_days_in_month = (datetime(year_of_following_month, following_month, 1) - timedelta(1)).day
 
-    return datetime(day=min(from_date.day, max_days_in_month), month=target_month, year=target_year).replace(
-        tzinfo=from_date.tzinfo
-    )
+    return datetime(day=min(from_ts.day, max_days_in_month), month=target_month, year=target_year).replace(tzinfo=from_ts.tzinfo)
 
 
 class OutputTimestamp:

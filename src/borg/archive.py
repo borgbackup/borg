@@ -32,7 +32,7 @@ from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid
 from .helpers import parse_timestamp, archive_ts_now
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
-from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json
+from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd
 from .helpers import StableDict
 from .helpers import bin_to_hex
 from .helpers import safe_ns
@@ -597,11 +597,11 @@ class Archive:
             "stats": stats.as_dict(),
         }
         if self.create:
-            info["command_line"] = sys.argv
+            info["command_line"] = join_cmd(sys.argv)
         else:
             info.update(
                 {
-                    "command_line": self.metadata.cmdline,
+                    "command_line": self.metadata.command_line,
                     "hostname": self.metadata.hostname,
                     "username": self.metadata.username,
                     "comment": self.metadata.get("comment", ""),
@@ -676,7 +676,7 @@ Duration: {0.duration}
             "name": name,
             "comment": comment or "",
             "item_ptrs": item_ptrs,  # see #1473
-            "cmdline": sys.argv,
+            "command_line": join_cmd(sys.argv),
             "hostname": hostname,
             "username": getuser(),
             "time": start.isoformat(timespec="microseconds"),
@@ -1902,7 +1902,7 @@ class ArchiveChecker:
                 continue
             if not valid_msgpacked_dict(data, archive_keys_serialized):
                 continue
-            if b"cmdline" not in data or b"\xa7version\x02" not in data:
+            if b"command_line" not in data or b"\xa7version\x02" not in data:
                 continue
             try:
                 archive = msgpack.unpackb(data)
@@ -2360,15 +2360,15 @@ class ArchiveRecreater:
             additional_metadata = {
                 "time": archive.metadata.time,
                 "time_end": archive.metadata.get("time_end") or archive.metadata.time,
-                "cmdline": archive.metadata.cmdline,
+                "command_line": archive.metadata.command_line,
                 # but also remember recreate metadata:
-                "recreate_cmdline": sys.argv,
+                "recreate_command_line": join_cmd(sys.argv),
             }
         else:
             additional_metadata = {
-                "cmdline": archive.metadata.cmdline,
+                "command_line": archive.metadata.command_line,
                 # but also remember recreate metadata:
-                "recreate_cmdline": sys.argv,
+                "recreate_command_line": join_cmd(sys.argv),
             }
 
         target.save(comment=comment, timestamp=self.timestamp, additional_metadata=additional_metadata)

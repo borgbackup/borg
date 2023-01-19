@@ -2,7 +2,7 @@ from struct import Struct
 
 from .constants import REQUIRED_ITEM_KEYS, CH_BUZHASH
 from .compress import ZLIB, ZLIB_legacy, ObfuscateSize
-from .helpers import HardLinkManager
+from .helpers import HardLinkManager, join_cmd
 from .item import Item
 from .logger import create_logger
 
@@ -26,14 +26,14 @@ class UpgraderNoOp:
         new_metadata = {}
         # keep all metadata except archive version and stats.
         for attr in (
-            "cmdline",
+            "command_line",
             "hostname",
             "username",
             "time",
             "time_end",
             "comment",
             "chunker_params",
-            "recreate_cmdline",
+            "recreate_command_line",
         ):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
@@ -144,7 +144,7 @@ class UpgraderFrom12To20:
         new_metadata = {}
         # keep all metadata except archive version and stats. also do not keep
         # recreate_source_id, recreate_args, recreate_partial_chunks which were used only in 1.1.0b1 .. b2.
-        for attr in ("cmdline", "hostname", "username", "comment", "chunker_params", "recreate_cmdline"):
+        for attr in ("hostname", "username", "comment", "chunker_params"):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
         if chunker_params := new_metadata.get("chunker_params"):
@@ -155,4 +155,10 @@ class UpgraderFrom12To20:
         for attr in ("time", "time_end"):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr) + "+00:00"
+        # borg 1: cmdline, recreate_cmdline: a copy of sys.argv
+        # borg 2: command_line, recreate_command_line: a single string
+        if hasattr(metadata, "cmdline"):
+            new_metadata["command_line"] = join_cmd(getattr(metadata, "cmdline"))
+        if hasattr(metadata, "recreate_cmdline"):
+            new_metadata["recreate_command_line"] = join_cmd(getattr(metadata, "recreate_cmdline"))
         return new_metadata

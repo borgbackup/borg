@@ -542,7 +542,7 @@ The archive object itself further contains some metadata:
   in the manifest, but leaves the *name* field of the archives as it was.
 * *item_ptrs*, a list of "pointer chunk" IDs.
   Each "pointer chunk" contains a list of chunk IDs of item metadata.
-* *cmdline*, the command line which was used to create the archive
+* *command_line*, the command line which was used to create the archive
 * *hostname*
 * *username*
 * *time* and *time_end* are the start and end timestamps, respectively

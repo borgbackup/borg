@@ -500,14 +500,16 @@ cdef class ArchiveItem(PropDict):
     name = PropDictProperty(str, 'surrogate-escaped str')
     items = PropDictProperty(list)  # list of chunk ids of item metadata stream (only in memory)
     item_ptrs = PropDictProperty(list)  # list of blocks with list of chunk ids of ims, arch v2
-    cmdline = PropDictProperty(list)  # list of s-e-str
+    cmdline = PropDictProperty(list)  # legacy, list of s-e-str
+    command_line = PropDictProperty(str, 'surrogate-escaped str')
     hostname = PropDictProperty(str, 'surrogate-escaped str')
     username = PropDictProperty(str, 'surrogate-escaped str')
     time = PropDictProperty(str)
     time_end = PropDictProperty(str)
     comment = PropDictProperty(str, 'surrogate-escaped str')
     chunker_params = PropDictProperty(tuple)
-    recreate_cmdline = PropDictProperty(list)  # list of s-e-str
+    recreate_cmdline = PropDictProperty(list)  # legacy, list of s-e-str
+    recreate_command_line = PropDictProperty(str, 'surrogate-escaped str')
     # recreate_source_id, recreate_args, recreate_partial_chunks were used in 1.1.0b1 .. b2
     recreate_source_id = PropDictProperty(bytes)
     recreate_args = PropDictProperty(list)  # list of s-e-str
@@ -529,7 +531,9 @@ cdef class ArchiveItem(PropDict):
                 v = fix_str_value(d, k, 'replace')
             if k == 'chunker_params':
                 v = fix_tuple_of_str_and_int(v)
-            if k in ('cmdline', 'recreate_cmdline'):
+            if k in ('command_line', 'recreate_command_line'):
+                v = fix_str_value(d, k)
+            if k in ('cmdline', 'recreate_cmdline'):  # legacy
                 v = fix_list_of_str(v)
             if k == 'items':  # legacy
                 v = fix_list_of_bytes(v)

@@ -1,12 +1,11 @@
 import argparse
-import shlex
 import textwrap
 from datetime import timedelta
 
 from ._common import with_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import remove_surrogates, format_timedelta, json_print, basic_json_data
+from ..helpers import format_timedelta, json_print, basic_json_data
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -18,9 +17,6 @@ class InfoMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
     def do_info(self, args, repository, manifest, cache):
         """Show archive details such as disk space used"""
-
-        def format_cmdline(cmdline):
-            return remove_surrogates(" ".join(shlex.quote(x) for x in cmdline))
 
         args.consider_checkpoints = True
         archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
@@ -36,7 +32,6 @@ class InfoMixIn:
                 output_data.append(info)
             else:
                 info["duration"] = format_timedelta(timedelta(seconds=info["duration"]))
-                info["command_line"] = format_cmdline(info["command_line"])
                 print(
                     textwrap.dedent(
                         """

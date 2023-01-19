@@ -181,11 +181,12 @@ class TestExclusiveLock:
         exception_counter = SynchronizedCounter()
         print_lock = ThreadingLock()
         thread = None
+        host_id, process_id = "differenthost", 1234
         for thread_id in range(RACE_TEST_NUM_THREADS):
             thread = Thread(
                 target=acquire_release_loop,
                 args=(
-                    ("foo", thread_id, 0),
+                    (host_id, process_id, thread_id),
                     RACE_TEST_DURATION,
                     thread_id,
                     lock_owner_counter,

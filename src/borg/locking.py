@@ -141,7 +141,7 @@ class ExclusiveLock:
             timer = TimeoutTimer(timeout, sleep).start()
             while True:
                 try:
-                    os.rename(temp_path, self.path)
+                    os.replace(temp_path, self.path)
                 except OSError:  # already locked
                     if self.by_me():
                         return self
@@ -170,15 +170,20 @@ class ExclusiveLock:
         if not self.by_me():
             raise NotMyLock(self.path)
         os.unlink(self.unique_name)
-        try:
-            os.rmdir(self.path)
-        except OSError as err:
-            if err.errno not in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOENT):
-                # EACCES or EIO or ... = we cannot operate anyway, so re-throw
-                raise err
-            # else:
-            # Directory is not empty or doesn't exist any more.
-            # this means we lost the race to somebody else -- which is ok.
+        for retry in range(42):
+            try:
+                os.rmdir(self.path)
+            except OSError as err:
+                if err.errno in (errno.EACCES,):
+                    # windows behaving strangely? -> just try again.
+                    continue
+                if err.errno not in (errno.ENOTEMPTY, errno.EEXIST, errno.ENOENT):
+                    # EACCES or EIO or ... = we cannot operate anyway, so re-throw
+                    raise err
+                # else:
+                # Directory is not empty or doesn't exist any more.
+                # this means we lost the race to somebody else -- which is ok.
+            return
 
     def is_locked(self):
         return os.path.exists(self.path)
@@ -190,14 +195,16 @@ class ExclusiveLock:
         try:
             names = os.listdir(self.path)
         except FileNotFoundError:  # another process did our job in the meantime.
-            pass
+            return False
+        except PermissionError:  # win32 might throw this.
+            return False
         else:
             for name in names:
                 try:
                     host_pid, thread_str = name.rsplit("-", 1)
                     host, pid_str = host_pid.rsplit(".", 1)
                     pid = int(pid_str)
-                    thread = int(thread_str)
+                    thread = int(thread_str, 16)
                 except ValueError:
                     # Malformed lock name? Or just some new format we don't understand?
                     logger.error("Found malformed lock %s in %s. Please check/fix manually.", name, self.path)

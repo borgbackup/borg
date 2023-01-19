@@ -139,7 +139,7 @@ class ExclusiveLock:
             timer = TimeoutTimer(timeout, sleep).start()
             while True:
                 try:
-                    os.rename(temp_path, self.path)
+                    os.replace(temp_path, self.path)
                 except OSError:  # already locked
                     if self.by_me():
                         return self
@@ -195,7 +195,7 @@ class ExclusiveLock:
                     host_pid, thread_str = name.rsplit('-', 1)
                     host, pid_str = host_pid.rsplit('.', 1)
                     pid = int(pid_str)
-                    thread = int(thread_str)
+                    thread = int(thread_str, 16)
                 except ValueError:
                     # Malformed lock name? Or just some new format we don't understand?
                     logger.error("Found malformed lock %s in %s. Please check/fix manually.", name, self.path)

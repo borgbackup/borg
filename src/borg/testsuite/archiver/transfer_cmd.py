@@ -2,7 +2,6 @@ import json
 import os
 import stat
 import tarfile
-from datetime import timezone
 import unittest
 
 from ...constants import *  # NOQA
@@ -48,9 +47,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         repo12_tar = os.path.join(os.path.dirname(__file__), "repo12.tar.gz")
         repo12_tzoffset = "+01:00"  # timezone used to create the repo/archives/json dumps inside the tar file
 
-        def local_to_utc(local_naive, tzoffset, tzinfo):
+        def convert_tz(local_naive, tzoffset, tzinfo):
             # local_naive was meant to be in tzoffset timezone (e.g. "+01:00"),
-            # but we want it non-naive in tzinfo time zone (e.g. timezone.utc).
+            # but we want it non-naive in tzinfo time zone (e.g. timezone.utc
+            # or None if local timezone is desired).
             ts = parse_timestamp(local_naive + tzoffset)
             return ts.astimezone(tzinfo).isoformat(timespec="microseconds")
 
@@ -85,10 +85,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             del expected_archive["barchive"]
             # timestamps:
             # borg 1.2 transformed to local time and had microseconds = 0, no tzoffset
-            # borg 2 uses an utc timestamp, with microseconds and with tzoffset
+            # borg 2 uses local time, with microseconds and with tzoffset
             for key in "start", "time":
-                # fix expectation: local time meant +01:00, so we convert that to utc +00:00
-                expected_archive[key] = local_to_utc(expected_archive[key], repo12_tzoffset, timezone.utc)
+                # fix expectation: local time meant +01:00, so we convert that to whatever local tz is here.
+                expected_archive[key] = convert_tz(expected_archive[key], repo12_tzoffset, None)
                 # set microseconds to 0, so we can compare got with expected.
                 got_ts = parse_timestamp(got_archive[key])
                 got_archive[key] = got_ts.replace(microsecond=0).isoformat(timespec="microseconds")
@@ -125,7 +125,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
                 for key in "mtime", "ctime", "atime":
                     if key in e:
-                        e[key] = local_to_utc(e[key], repo12_tzoffset, timezone.utc)
+                        e[key] = convert_tz(e[key], repo12_tzoffset, None)
 
                 # borg 1 used hardlink slaves linking back to their hardlink masters.
                 # borg 2 uses symmetric approach: just normal items. if they are hardlinks,

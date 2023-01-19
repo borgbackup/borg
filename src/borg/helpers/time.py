@@ -114,13 +114,15 @@ class OutputTimestamp:
         self.ts = ts
 
     def __format__(self, format_spec):
-        return format_time(self.ts, format_spec=format_spec)
+        # we want to output a timestamp in the user's local timezone
+        return format_time(self.ts.astimezone(), format_spec=format_spec)
 
     def __str__(self):
         return f"{self}"
 
     def isoformat(self):
-        return self.ts.isoformat(timespec="microseconds")
+        # we want to output a timestamp in the user's local timezone
+        return self.ts.astimezone().isoformat(timespec="microseconds")
 
     to_json = isoformat
 

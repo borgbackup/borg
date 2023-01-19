@@ -882,15 +882,15 @@ class LocalCache(CacheStatsMixin):
                         fetch_and_build_idx(archive_id, decrypted_repository, chunk_idx)
                 pi.finish()
                 logger.debug(
-                    "Cache index sync: processed %s (%d chunks) of metadata.",
+                    "Chunks index sync: processed %s (%d chunks) of metadata.",
                     format_file_size(processed_item_metadata_bytes),
                     processed_item_metadata_chunks,
                 )
                 logger.debug(
-                    "Cache index sync: compact chunks.archive.d storage saved %s bytes.",
+                    "Chunks index sync: compact chunks.archive.d storage saved %s bytes.",
                     format_file_size(compact_chunks_archive_saved_space),
                 )
-            logger.debug("Cache index sync done.")
+            logger.debug("Chunks index sync done.")
             return chunk_idx
 
         # The cache can be used by a command that e.g. only checks against Manifest.Operation.WRITE,

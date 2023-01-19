@@ -21,6 +21,9 @@ def uid2user(uid, default=None):
 
 @lru_cache(maxsize=None)
 def user2uid(user, default=None):
+    if not user:
+        # user is either None or the empty string
+        return default
     return 0
 
 
@@ -31,6 +34,9 @@ def gid2group(gid, default=None):
 
 @lru_cache(maxsize=None)
 def group2gid(group, default=None):
+    if not group:
+        # group is either None or the empty string
+        return default
     return 0
 
 

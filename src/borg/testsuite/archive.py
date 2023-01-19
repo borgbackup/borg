@@ -14,7 +14,7 @@ from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
 from ..helpers import msgpack
 from ..item import Item, ArchiveItem
 from ..manifest import Manifest
-from ..platform import uid2user, gid2group
+from ..platform import uid2user, gid2group, is_win32
 
 
 @pytest.fixture()
@@ -349,18 +349,23 @@ def test_get_item_uid_gid():
     assert uid == 7
     assert gid == 8
 
-    # item metadata has valid uid/gid, but non-existing user/group names.
-    item = Item(path="filename", uid=9, gid=10, user="udoesnotexist", group="gdoesnotexist")
+    if not is_win32:
+        # due to the hack in borg.platform.windows user2uid / group2gid, these always return 0
+        # (no matter which username we ask for) and they never raise a KeyError (like e.g. for
+        # a non-existing user/group name). Thus, these tests can currently not succeed on win32.
 
-    uid, gid = get_item_uid_gid(item, numeric=False)
-    # because user/group name does not exist here, use valid numeric ids from item metadata.
-    assert uid == 9
-    assert gid == 10
+        # item metadata has valid uid/gid, but non-existing user/group names.
+        item = Item(path="filename", uid=9, gid=10, user="udoesnotexist", group="gdoesnotexist")
 
-    uid, gid = get_item_uid_gid(item, numeric=False, uid_default=11, gid_default=12)
-    # because item uid/gid seems valid, do not use the given uid/gid defaults
-    assert uid == 9
-    assert gid == 10
+        uid, gid = get_item_uid_gid(item, numeric=False)
+        # because user/group name does not exist here, use valid numeric ids from item metadata.
+        assert uid == 9
+        assert gid == 10
+
+        uid, gid = get_item_uid_gid(item, numeric=False, uid_default=11, gid_default=12)
+        # because item uid/gid seems valid, do not use the given uid/gid defaults
+        assert uid == 9
+        assert gid == 10
 
     # item metadata only has uid/gid, but no user/group.
     item = Item(path="filename", uid=13, gid=14)

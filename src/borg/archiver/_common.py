@@ -406,14 +406,14 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             metavar="Nd",
             type=relative_time_marker_validator,
             dest="oldest",
-            help="consider archives N-days after the oldest archive's timestamp",
+            help="consider archives N [days/months] after the oldest archive's timestamp",
         )
         group.add_argument(
             "--newest",
             metavar="Nd",
             type=relative_time_marker_validator,
             dest="newest",
-            help="consider archives N-days before the newest archive's timestamp",
+            help="consider archives N [days/months] before the newest archive's timestamp",
         )
 
     if older_newer:
@@ -423,14 +423,14 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             metavar="Nd",
             type=relative_time_marker_validator,
             dest="older",
-            help="consider archives older than N-days ago",
+            help="consider archives older than N [days/months] ago",
         )
         group.add_argument(
             "--newer",
             metavar="Nd",
             type=relative_time_marker_validator,
             dest="newer",
-            help="consider archives between now and N-days ago",
+            help="consider archives between now and N [days/months] ago",
         )
 
     return filters_group

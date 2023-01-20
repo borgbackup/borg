@@ -126,11 +126,11 @@ def calculate_relative_offset(format_string, from_ts, earlier=False):
             offset = int(match.group("offset"))
             offset *= -1 if earlier else 1
 
-            if unit == 'd':
+            if unit == "d":
                 return from_ts + timedelta(days=offset)
-            elif unit == 'm':
+            elif unit == "m":
                 return offset_n_months(from_ts, offset)
-    
+
     raise ValueError(f"Invalid relative ts offset format: {format_string}")
 
 
@@ -148,7 +148,9 @@ def offset_n_months(from_ts, n_months):
     following_month, year_of_following_month = get_month_and_year_from_total(total_months + 1)
     max_days_in_month = (datetime(year_of_following_month, following_month, 1) - timedelta(1)).day
 
-    return datetime(day=min(from_ts.day, max_days_in_month), month=target_month, year=target_year).replace(tzinfo=from_ts.tzinfo)
+    return datetime(day=min(from_ts.day, max_days_in_month), month=target_month, year=target_year).replace(
+        tzinfo=from_ts.tzinfo
+    )
 
 
 class OutputTimestamp:

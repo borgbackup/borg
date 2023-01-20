@@ -1701,8 +1701,8 @@ class ArchiveChecker:
         sort_by="",
         match=None,
         older=None,
-        oldest=None,
         newer=None,
+        oldest=None,
         newest=None,
         verify_data=False,
     ):
@@ -1711,10 +1711,12 @@ class ArchiveChecker:
         :param repair: enable repair mode, write updated or corrected data into repository
         :param first/last/sort_by: only check this number of first/last archives ordered by sort_by
         :param match: only check archives matching this pattern
+        :param older/newer: only check archives older/newer than timedelta from now
+        :param oldest/newest: only check archives older/newer than timedelta from oldest/newest archive timestamp
         :param verify_data: integrity verification of data referenced by archives
         """
         logger.info("Starting archive consistency check...")
-        self.check_all = not any((first, last, match))
+        self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
         self.repository = repository
         self.init_chunks()
@@ -1935,7 +1937,7 @@ class ArchiveChecker:
         return manifest
 
     def rebuild_refcounts(
-        self, first=0, last=0, sort_by="", match=None, older=None, oldest=None, newer=None, newest=None
+        self, first=0, last=0, sort_by="", match=None, older=None, newer=None, oldest=None, newest=None
     ):
         """Rebuild object reference counts by walking the metadata
 

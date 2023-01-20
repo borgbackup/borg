@@ -34,7 +34,7 @@ AI_HUMAN_SORT_KEYS = ["timestamp"] + list(ArchiveInfo._fields)
 AI_HUMAN_SORT_KEYS.remove("ts")
 
 
-def filter_archives_by_date(archives, oldest=None, newest=None, older=None, newer=None):
+def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newest=None):
     def get_first_and_last_archive_ts(archives_list):
         timestamps = [x.ts for x in archives_list]
         return min(timestamps), max(timestamps)
@@ -106,18 +106,25 @@ class Archives(abc.MutableMapping):
         first=None,
         last=None,
         reverse=False,
-        oldest=None,
-        newest=None,
         older=None,
-        newer=None
+        newer=None,
+        oldest=None,
+        newest=None
     ):
         """
         Return list of ArchiveInfo instances according to the parameters.
 
-        First match *match* (considering *match_end*), then *sort_by*.
+        First match *match* (considering *match_end*)
+        then filter by timestamp considering *older* and *newer* followed by a second pass to
+        filter the result considering *oldest* and *newest*
+        then *sort_by*.
+
         Apply *first* and *last* filters, and then possibly *reverse* the list.
 
         *sort_by* is a list of sort keys applied in reverse order.
+        *newer* and *older* are relative time markers that indicate offset from now
+        *newest* and *oldest* are relative time markers that indicate offset from newest/oldest archive's timestamp
+
 
         Note: for better robustness, all filtering / limiting parameters must default to
               "not limit / not filter", so a FULL archive list is produced by a simple .list().

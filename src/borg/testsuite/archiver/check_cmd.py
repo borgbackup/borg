@@ -59,10 +59,9 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         earliest_ts = "2022-11-20T23:59:59"
         ts_in_between = "2022-12-18T23:59:59"
-        latest_between = "2023-01-17T23:59:59"
         self.create_src_archive("archive1", ts=earliest_ts)
         self.create_src_archive("archive2", ts=ts_in_between)
-        self.create_src_archive("archive3", ts=latest_between)
+        self.create_src_archive("archive3")
         output = self.cmd(
             f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--oldest=23e", exit_code=2
         )

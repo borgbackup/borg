@@ -11,17 +11,18 @@ REQUIRED_ITEM_KEYS = frozenset(["path", "mtime"])
 
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
 # fmt: off
-ARCHIVE_KEYS = frozenset(['version', 'name', 'cmdline', 'hostname', 'username', 'time', 'time_end',
+ARCHIVE_KEYS = frozenset(['version', 'name', 'hostname', 'username', 'time', 'time_end',
                           'items',  # legacy v1 archives
                           'item_ptrs',  # v2+ archives
                           'comment', 'chunker_params',
-                          'recreate_cmdline',
+                          'command_line', 'recreate_command_line',  # v2+ archives
+                          'cmdline', 'recreate_cmdline',  # legacy
                           'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',  # used in 1.1.0b1 .. b2
                           'size', 'nfiles', 'size_parts', 'nfiles_parts'])
 # fmt: on
 
 # this is the set of keys that are always present in archives:
-REQUIRED_ARCHIVE_KEYS = frozenset(["version", "name", "item_ptrs", "cmdline", "time"])
+REQUIRED_ARCHIVE_KEYS = frozenset(["version", "name", "item_ptrs", "command_line", "time"])
 
 # default umask, overridden by --umask, defaults to read/write only for owner
 UMASK_DEFAULT = 0o077

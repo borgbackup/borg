@@ -19,7 +19,7 @@ from .fs import HardLinkManager
 from .misc import sysinfo, log_multi, consume
 from .misc import ChunkIteratorFileWrapper, open_item, chunkit, iter_separated, ErrorIgnoringTextIOWrapper
 from .parseformat import bin_to_hex, safe_encode, safe_decode
-from .parseformat import text_to_json, binary_to_json, remove_surrogates
+from .parseformat import text_to_json, binary_to_json, remove_surrogates, join_cmd
 from .parseformat import eval_escapes, decode_dict, positive_int_validator, interval
 from .parseformat import SortBySpec, ChunkerParams, FilesCacheMode, partial_format, DatetimeWrapper
 from .parseformat import format_file_size, parse_file_size, FileSize, parse_storage_quota

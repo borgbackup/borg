@@ -692,7 +692,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         archive = create_info["archive"]
         assert archive["name"] == "test"
-        assert isinstance(archive["command_line"], list)
+        assert isinstance(archive["command_line"], str)
         assert isinstance(archive["duration"], float)
         assert len(archive["id"]) == 64
         assert "stats" in archive

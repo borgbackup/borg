@@ -85,6 +85,11 @@ def text_to_json(key, value):
     return data
 
 
+def join_cmd(argv, rs=False):
+    cmd = shlex.join(argv)
+    return remove_surrogates(cmd) if rs else cmd
+
+
 def eval_escapes(s):
     """Evaluate literal escape sequences in a string (eg `\\n` -> `\n`)."""
     return s.encode("ascii", "backslashreplace").decode("unicode-escape")
@@ -717,8 +722,8 @@ class ArchiveFormatter(BaseFormatter):
             "hostname": partial(self.get_meta, "hostname"),
             "username": partial(self.get_meta, "username"),
             "comment": partial(self.get_meta, "comment"),
+            "command_line": partial(self.get_meta, "command_line"),
             "end": self.get_ts_end,
-            "command_line": self.get_cmdline,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
         if self.json:
@@ -748,8 +753,8 @@ class ArchiveFormatter(BaseFormatter):
             item_data[key] = self.call_keys[key]()
 
         # Note: name and comment are validated, should never contain surrogate escapes.
-        # But unsure whether hostname, username could contain surrogate escapes, play safe:
-        for key in "hostname", "username":
+        # But unsure whether hostname, username, command_line could contain surrogate escapes, play safe:
+        for key in "hostname", "username", "command_line":
             if key in item_data:
                 item_data.update(text_to_json(key, item_data[key]))
         return item_data
@@ -765,13 +770,6 @@ class ArchiveFormatter(BaseFormatter):
 
     def get_meta(self, key):
         return self.archive.metadata.get(key, "")
-
-    def get_cmdline(self):
-        cmdline = map(remove_surrogates, self.archive.metadata.get("cmdline", []))
-        if self.json:
-            return list(cmdline)
-        else:
-            return " ".join(map(shlex.quote, cmdline))
 
     def get_ts_end(self):
         return self.format_time(self.archive.ts_end)

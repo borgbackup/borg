@@ -403,34 +403,34 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
         group = filters_group.add_mutually_exclusive_group()
         group.add_argument(
             "--oldest",
-            metavar="Nd",
+            metavar="TIMESTAMP",
             type=relative_time_marker_validator,
             dest="oldest",
-            help="consider archives N [days/months] after the oldest archive's timestamp",
+            help="consider archives between the oldest archive's timestamp and the TIMESTAMP offset. e.g. 3d 7m",
         )
         group.add_argument(
             "--newest",
-            metavar="Nd",
+            metavar="TIMESTAMP",
             type=relative_time_marker_validator,
             dest="newest",
-            help="consider archives N [days/months] before the newest archive's timestamp",
+            help="consider archives between the newest archive's timestamp and the TIMESTAMP offset. e.g. 3d 7m",
         )
 
     if older_newer:
         group = filters_group.add_mutually_exclusive_group()
         group.add_argument(
             "--older",
-            metavar="Nd",
+            metavar="TIMESTAMP",
             type=relative_time_marker_validator,
             dest="older",
-            help="consider archives older than N [days/months] ago",
+            help="consider archives older than (now - TIMESTAMP). e.g. 3d 7m",
         )
         group.add_argument(
             "--newer",
-            metavar="Nd",
+            metavar="TIMESTAMP",
             type=relative_time_marker_validator,
             dest="newer",
-            help="consider archives between now and N [days/months] ago",
+            help="consider archives after (now - TIMESTAMP). e.g. 3d 7m",
         )
 
     return filters_group

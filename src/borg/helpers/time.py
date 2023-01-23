@@ -111,7 +111,8 @@ def format_timedelta(td):
 
 
 def calculate_relative_offset(format_string, from_ts, earlier=False):
-    """Calculates offset based on a relative marker. 7d (7 days), 8m (8 months)
+    """
+    Calculates offset based on a relative marker. 7d (7 days), 8m (8 months)
     earlier: whether offset should be calculated to an earlier time.
     """
     if from_ts is None:

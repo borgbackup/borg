@@ -42,16 +42,16 @@ def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newes
     now = archive_ts_now()
     earliest_ts, latest_ts = get_first_and_last_archive_ts(archives)
 
-    until_ts = calculate_relative_offset(older, from_date=now, earlier=True) if older is not None else latest_ts
-    from_ts = calculate_relative_offset(newer, from_date=now, earlier=True) if newer is not None else earliest_ts
+    until_ts = calculate_relative_offset(older, now, earlier=True) if older is not None else latest_ts
+    from_ts = calculate_relative_offset(newer, now, earlier=True) if newer is not None else earliest_ts
     archives = [x for x in archives if from_ts <= x.ts <= until_ts]
 
     earliest_ts, latest_ts = get_first_and_last_archive_ts(archives)
     if oldest:
-        until_ts = calculate_relative_offset(oldest, from_date=earliest_ts, earlier=False)
+        until_ts = calculate_relative_offset(oldest, earliest_ts, earlier=False)
         archives = [x for x in archives if x.ts <= until_ts]
     if newest:
-        from_ts = calculate_relative_offset(newest, from_date=latest_ts, earlier=True)
+        from_ts = calculate_relative_offset(newest, latest_ts, earlier=True)
         archives = [x for x in archives if x.ts >= from_ts]
 
     return archives
@@ -114,16 +114,14 @@ class Archives(abc.MutableMapping):
         """
         Return list of ArchiveInfo instances according to the parameters.
 
-        First match *match* (considering *match_end*)
-        then filter by timestamp considering *older* and *newer* followed by a second pass to
-        filter the result considering *oldest* and *newest*
-        then *sort_by*.
+        First match *match* (considering *match_end*), then filter by timestamp considering *older* and *newer*.
+        Second, follow with a filter considering *oldest* and *newest*, then sort by the given *sort_by* argument.
 
         Apply *first* and *last* filters, and then possibly *reverse* the list.
 
         *sort_by* is a list of sort keys applied in reverse order.
-        *newer* and *older* are relative time markers that indicate offset from now
-        *newest* and *oldest* are relative time markers that indicate offset from newest/oldest archive's timestamp
+        *newer* and *older* are relative time markers that indicate offset from now.
+        *newest* and *oldest* are relative time markers that indicate offset from newest/oldest archive's timestamp.
 
 
         Note: for better robustness, all filtering / limiting parameters must default to

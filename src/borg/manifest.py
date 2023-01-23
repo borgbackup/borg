@@ -14,7 +14,7 @@ logger = create_logger()
 from .constants import *  # NOQA
 from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex
-from .helpers.time import parse_timestamp
+from .helpers.time import parse_timestamp, calculate_relative_offset, archive_ts_now
 from .helpers.errors import Error
 from .patterns import get_regex_from_pattern
 from .repoobj import RepoObj
@@ -32,6 +32,29 @@ ArchiveInfo = namedtuple("ArchiveInfo", "name id ts")
 
 AI_HUMAN_SORT_KEYS = ["timestamp"] + list(ArchiveInfo._fields)
 AI_HUMAN_SORT_KEYS.remove("ts")
+
+
+def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newest=None):
+    def get_first_and_last_archive_ts(archives_list):
+        timestamps = [x.ts for x in archives_list]
+        return min(timestamps), max(timestamps)
+
+    now = archive_ts_now()
+    earliest_ts, latest_ts = get_first_and_last_archive_ts(archives)
+
+    until_ts = calculate_relative_offset(older, now, earlier=True) if older is not None else latest_ts
+    from_ts = calculate_relative_offset(newer, now, earlier=True) if newer is not None else earliest_ts
+    archives = [x for x in archives if from_ts <= x.ts <= until_ts]
+
+    earliest_ts, latest_ts = get_first_and_last_archive_ts(archives)
+    if oldest:
+        until_ts = calculate_relative_offset(oldest, earliest_ts, earlier=False)
+        archives = [x for x in archives if x.ts <= until_ts]
+    if newest:
+        from_ts = calculate_relative_offset(newest, latest_ts, earlier=True)
+        archives = [x for x in archives if x.ts >= from_ts]
+
+    return archives
 
 
 class Archives(abc.MutableMapping):
@@ -82,15 +105,24 @@ class Archives(abc.MutableMapping):
         consider_checkpoints=True,
         first=None,
         last=None,
-        reverse=False
+        reverse=False,
+        older=None,
+        newer=None,
+        oldest=None,
+        newest=None
     ):
         """
         Return list of ArchiveInfo instances according to the parameters.
 
-        First match *match* (considering *match_end*), then *sort_by*.
+        First match *match* (considering *match_end*), then filter by timestamp considering *older* and *newer*.
+        Second, follow with a filter considering *oldest* and *newest*, then sort by the given *sort_by* argument.
+
         Apply *first* and *last* filters, and then possibly *reverse* the list.
 
         *sort_by* is a list of sort keys applied in reverse order.
+        *newer* and *older* are relative time markers that indicate offset from now.
+        *newest* and *oldest* are relative time markers that indicate offset from newest/oldest archive's timestamp.
+
 
         Note: for better robustness, all filtering / limiting parameters must default to
               "not limit / not filter", so a FULL archive list is produced by a simple .list().
@@ -98,9 +130,14 @@ class Archives(abc.MutableMapping):
         """
         if isinstance(sort_by, (str, bytes)):
             raise TypeError("sort_by must be a sequence of str")
+
+        archives = self.values()
         regex = get_regex_from_pattern(match or "re:.*")
         regex = re.compile(regex + match_end)
-        archives = [x for x in self.values() if regex.match(x.name) is not None]
+        archives = [x for x in archives if regex.match(x.name) is not None]
+
+        if any([oldest, newest, older, newer]) and len(archives) > 0:
+            archives = filter_archives_by_date(archives, oldest=oldest, newest=newest, newer=newer, older=older)
         if not consider_checkpoints:
             archives = [x for x in archives if ".checkpoint" not in x.name]
         for sortkey in reversed(sort_by):

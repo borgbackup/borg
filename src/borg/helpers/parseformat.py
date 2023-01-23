@@ -576,6 +576,15 @@ def location_validator(proto=None, other=False):
     return validator
 
 
+def relative_time_marker_validator(text: str):
+    time_marker_regex = r"^\d+[md]$"
+    match = re.compile(time_marker_regex).search(text)
+    if not match:
+        raise argparse.ArgumentTypeError(f"Invalid relative time marker used: {text}")
+    else:
+        return text
+
+
 def text_validator(*, name, max_length, min_length=0, invalid_ctrl_chars="\0", invalid_chars="", no_blanks=False):
     def validator(text):
         assert isinstance(text, str)

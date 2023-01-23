@@ -172,8 +172,13 @@ class ArchiverTestCaseBase(BaseTestCase):
         output = empty.join(line for line in output.splitlines(keepends=True) if pp_msg not in line)
         return output
 
-    def create_src_archive(self, name):
-        self.cmd(f"--repo={self.repository_location}", "create", "--compression=lz4", name, src_dir)
+    def create_src_archive(self, name, ts=None):
+        if ts:
+            self.cmd(
+                f"--repo={self.repository_location}", "create", "--compression=lz4", f"--timestamp={ts}", name, src_dir
+            )
+        else:
+            self.cmd(f"--repo={self.repository_location}", "create", "--compression=lz4", name, src_dir)
 
     def open_archive(self, name):
         repository = Repository(self.repository_path, exclusive=True)

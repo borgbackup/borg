@@ -57,6 +57,10 @@ class CheckMixIn:
             sort_by=args.sort_by or "ts",
             match=args.match_archives,
             verify_data=args.verify_data,
+            oldest=args.oldest,
+            newest=args.newest,
+            older=args.older,
+            newer=args.newer,
         ):
             return EXIT_WARNING
         return EXIT_SUCCESS

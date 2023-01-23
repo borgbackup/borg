@@ -54,6 +54,43 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.assert_not_in("archive1", output)
         self.assert_in("archive2", output)
 
+    def test_date_matching(self):
+        shutil.rmtree(self.repository_path)
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        earliest_ts = "2022-11-20T23:59:59"
+        ts_in_between = "2022-12-18T23:59:59"
+        self.create_src_archive("archive1", ts=earliest_ts)
+        self.create_src_archive("archive2", ts=ts_in_between)
+        self.create_src_archive("archive3")
+        output = self.cmd(
+            f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--oldest=23e", exit_code=2
+        )
+        output = self.cmd(
+            f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--oldest=1m", exit_code=0
+        )
+        self.assert_in("archive1", output)
+        self.assert_in("archive2", output)
+        self.assert_not_in("archive3", output)
+
+        output = self.cmd(
+            f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--newest=1m", exit_code=0
+        )
+        self.assert_in("archive3", output)
+        self.assert_not_in("archive2", output)
+        self.assert_not_in("archive1", output)
+        output = self.cmd(
+            f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--newer=1d", exit_code=0
+        )
+        self.assert_in("archive3", output)
+        self.assert_not_in("archive1", output)
+        self.assert_not_in("archive2", output)
+        output = self.cmd(
+            f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--older=1d", exit_code=0
+        )
+        self.assert_in("archive1", output)
+        self.assert_in("archive2", output)
+        self.assert_not_in("archive3", output)
+
     def test_missing_file_chunk(self):
         archive, repository = self.open_archive("archive1")
         with repository:

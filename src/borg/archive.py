@@ -1700,16 +1700,31 @@ class ArchiveChecker:
         self.error_found = False
         self.possibly_superseded = set()
 
-    def check(self, repository, repair=False, first=0, last=0, sort_by="", match=None, verify_data=False):
+    def check(
+        self,
+        repository,
+        repair=False,
+        first=0,
+        last=0,
+        sort_by="",
+        match=None,
+        older=None,
+        newer=None,
+        oldest=None,
+        newest=None,
+        verify_data=False,
+    ):
         """Perform a set of checks on 'repository'
 
         :param repair: enable repair mode, write updated or corrected data into repository
         :param first/last/sort_by: only check this number of first/last archives ordered by sort_by
         :param match: only check archives matching this pattern
+        :param older/newer: only check archives older/newer than timedelta from now
+        :param oldest/newest: only check archives older/newer than timedelta from oldest/newest archive timestamp
         :param verify_data: integrity verification of data referenced by archives
         """
         logger.info("Starting archive consistency check...")
-        self.check_all = not any((first, last, match))
+        self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
         self.repository = repository
         self.init_chunks()
@@ -1732,7 +1747,9 @@ class ArchiveChecker:
                 self.error_found = True
                 del self.chunks[Manifest.MANIFEST_ID]
                 self.manifest = self.rebuild_manifest()
-        self.rebuild_refcounts(match=match, first=first, last=last, sort_by=sort_by)
+        self.rebuild_refcounts(
+            match=match, first=first, last=last, sort_by=sort_by, older=older, oldest=oldest, newer=newer, newest=newest
+        )
         self.orphan_chunks_check()
         self.finish()
         if self.error_found:
@@ -1927,7 +1944,9 @@ class ArchiveChecker:
         logger.info("Manifest rebuild complete.")
         return manifest
 
-    def rebuild_refcounts(self, first=0, last=0, sort_by="", match=None):
+    def rebuild_refcounts(
+        self, first=0, last=0, sort_by="", match=None, older=None, newer=None, oldest=None, newest=None
+    ):
         """Rebuild object reference counts by walking the metadata
 
         Missing and/or incorrect data is repaired when detected
@@ -2121,8 +2140,17 @@ class ArchiveChecker:
                     i += 1
 
         sort_by = sort_by.split(",")
-        if any((first, last, match)):
-            archive_infos = self.manifest.archives.list(sort_by=sort_by, match=match, first=first, last=last)
+        if any((first, last, match, older, newer, newest, oldest)):
+            archive_infos = self.manifest.archives.list(
+                sort_by=sort_by,
+                match=match,
+                first=first,
+                last=last,
+                oldest=oldest,
+                newest=newest,
+                older=older,
+                newer=newer,
+            )
             if match and not archive_infos:
                 logger.warning("--match-archives %s does not match any archives", match)
             if first and len(archive_infos) < first:

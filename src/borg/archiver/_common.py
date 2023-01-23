@@ -8,7 +8,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
-from ..helpers import SortBySpec, positive_int_validator, location_validator, Location
+from ..helpers import SortBySpec, positive_int_validator, location_validator, Location, relative_time_marker_validator
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
@@ -353,7 +353,7 @@ def define_exclusion_group(subparser, **kwargs):
     return exclude_group
 
 
-def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
+def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, oldest_newest=True, older_newer=True):
     filters_group = subparser.add_argument_group(
         "Archive filters", "Archive filters can be applied to repository targets."
     )
@@ -397,6 +397,40 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True):
             default=0,
             type=positive_int_validator,
             help="consider last N archives after other filters were applied",
+        )
+
+    if oldest_newest:
+        group = filters_group.add_mutually_exclusive_group()
+        group.add_argument(
+            "--oldest",
+            metavar="TIMESTAMP",
+            type=relative_time_marker_validator,
+            dest="oldest",
+            help="consider archives between the oldest archive's timestamp and the TIMESTAMP offset. e.g. 3d 7m",
+        )
+        group.add_argument(
+            "--newest",
+            metavar="TIMESTAMP",
+            type=relative_time_marker_validator,
+            dest="newest",
+            help="consider archives between the newest archive's timestamp and the TIMESTAMP offset. e.g. 3d 7m",
+        )
+
+    if older_newer:
+        group = filters_group.add_mutually_exclusive_group()
+        group.add_argument(
+            "--older",
+            metavar="TIMESTAMP",
+            type=relative_time_marker_validator,
+            dest="older",
+            help="consider archives older than (now - TIMESTAMP). e.g. 3d 7m",
+        )
+        group.add_argument(
+            "--newer",
+            metavar="TIMESTAMP",
+            type=relative_time_marker_validator,
+            dest="newer",
+            help="consider archives after (now - TIMESTAMP). e.g. 3d 7m",
         )
 
     return filters_group

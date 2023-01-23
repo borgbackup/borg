@@ -1,5 +1,6 @@
 import os
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timezone, timedelta
 
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
@@ -107,6 +108,50 @@ def format_timedelta(td):
     if td.days:
         txt = "%d days %s" % (td.days, txt)
     return txt
+
+
+def calculate_relative_offset(format_string, from_ts, earlier=False):
+    """
+    Calculates offset based on a relative marker. 7d (7 days), 8m (8 months)
+    earlier: whether offset should be calculated to an earlier time.
+    """
+    if from_ts is None:
+        from_ts = archive_ts_now()
+
+    if format_string is not None:
+        offset_regex = re.compile(r"(?P<offset>\d+)(?P<unit>[md])")
+        match = offset_regex.search(format_string)
+
+        if match:
+            unit = match.group("unit")
+            offset = int(match.group("offset"))
+            offset *= -1 if earlier else 1
+
+            if unit == "d":
+                return from_ts + timedelta(days=offset)
+            elif unit == "m":
+                return offset_n_months(from_ts, offset)
+
+    raise ValueError(f"Invalid relative ts offset format: {format_string}")
+
+
+def offset_n_months(from_ts, n_months):
+    def get_month_and_year_from_total(total_completed_months):
+        month = (total_completed_months % 12) + 1
+        year = total_completed_months // 12
+        return month, year
+
+    # Calculate target month and year by getting completed total_months until target_month
+    total_months = (from_ts.year * 12) + from_ts.month + n_months - 1
+    target_month, target_year = get_month_and_year_from_total(total_months)
+
+    # calculate the max days of the target month by subtracting a day from the next month
+    following_month, year_of_following_month = get_month_and_year_from_total(total_months + 1)
+    max_days_in_month = (datetime(year_of_following_month, following_month, 1) - timedelta(1)).day
+
+    return datetime(day=min(from_ts.day, max_days_in_month), month=target_month, year=target_year).replace(
+        tzinfo=from_ts.tzinfo
+    )
 
 
 class OutputTimestamp:

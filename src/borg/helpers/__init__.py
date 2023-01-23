@@ -23,10 +23,10 @@ from .parseformat import text_to_json, binary_to_json, remove_surrogates, join_c
 from .parseformat import eval_escapes, decode_dict, positive_int_validator, interval
 from .parseformat import SortBySpec, ChunkerParams, FilesCacheMode, partial_format, DatetimeWrapper
 from .parseformat import format_file_size, parse_file_size, FileSize, parse_storage_quota
-from .parseformat import sizeof_fmt, sizeof_fmt_iec, sizeof_fmt_decimal
-from .parseformat import format_line, replace_placeholders, PlaceholderError
+from .parseformat import sizeof_fmt, sizeof_fmt_iec, sizeof_fmt_decimal, Location, text_validator
+from .parseformat import format_line, replace_placeholders, PlaceholderError, relative_time_marker_validator
 from .parseformat import format_archive, parse_stringified_list, clean_lines
-from .parseformat import Location, location_validator, archivename_validator, comment_validator, text_validator
+from .parseformat import location_validator, archivename_validator, comment_validator
 from .parseformat import BaseFormatter, ArchiveFormatter, ItemFormatter, file_status
 from .parseformat import swidth_slice, ellipsis_truncate
 from .parseformat import BorgJsonEncoder, basic_json_data, json_print, json_dump, prepare_dump_dict

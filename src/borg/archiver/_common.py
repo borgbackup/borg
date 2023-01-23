@@ -403,34 +403,34 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
         group = filters_group.add_mutually_exclusive_group()
         group.add_argument(
             "--oldest",
-            metavar="TIMESTAMP",
+            metavar="TIMESPAN",
             type=relative_time_marker_validator,
             dest="oldest",
-            help="consider archives between the oldest archive's timestamp and the TIMESTAMP offset. e.g. 3d 7m",
+            help="consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.",
         )
         group.add_argument(
             "--newest",
-            metavar="TIMESTAMP",
+            metavar="TIMESPAN",
             type=relative_time_marker_validator,
             dest="newest",
-            help="consider archives between the newest archive's timestamp and the TIMESTAMP offset. e.g. 3d 7m",
+            help="consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.",
         )
 
     if older_newer:
         group = filters_group.add_mutually_exclusive_group()
         group.add_argument(
             "--older",
-            metavar="TIMESTAMP",
+            metavar="TIMESPAN",
             type=relative_time_marker_validator,
             dest="older",
-            help="consider archives older than (now - TIMESTAMP). e.g. 3d 7m",
+            help="consider archives older than (now - TIMESPAN), e.g. 7d oder 12m.",
         )
         group.add_argument(
             "--newer",
-            metavar="TIMESTAMP",
+            metavar="TIMESPAN",
             type=relative_time_marker_validator,
             dest="newer",
-            help="consider archives after (now - TIMESTAMP). e.g. 3d 7m",
+            help="consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.",
         )
 
     return filters_group

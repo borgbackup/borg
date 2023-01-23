@@ -51,16 +51,16 @@ class CheckMixIn:
                 return EXIT_WARNING
         if not args.repo_only and not ArchiveChecker().check(
             repository,
+            verify_data=args.verify_data,
             repair=args.repair,
+            match=args.match_archives,
+            sort_by=args.sort_by or "ts",
             first=args.first,
             last=args.last,
-            sort_by=args.sort_by or "ts",
-            match=args.match_archives,
-            verify_data=args.verify_data,
-            oldest=args.oldest,
-            newest=args.newest,
             older=args.older,
             newer=args.newer,
+            oldest=args.oldest,
+            newest=args.newest,
         ):
             return EXIT_WARNING
         return EXIT_SUCCESS

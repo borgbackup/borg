@@ -1703,16 +1703,17 @@ class ArchiveChecker:
     def check(
         self,
         repository,
+        *,
+        verify_data=False,
         repair=False,
+        match=None,
+        sort_by="",
         first=0,
         last=0,
-        sort_by="",
-        match=None,
         older=None,
         newer=None,
         oldest=None,
         newest=None,
-        verify_data=False,
     ):
         """Perform a set of checks on 'repository'
 

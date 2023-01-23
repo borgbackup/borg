@@ -75,8 +75,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         output = self.cmd(
             f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--newest=1m", exit_code=0
         )
-        self.assert_in("archive2", output)
         self.assert_in("archive3", output)
+        self.assert_not_in("archive2", output)
         self.assert_not_in("archive1", output)
         output = self.cmd(
             f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--newer=1d", exit_code=0

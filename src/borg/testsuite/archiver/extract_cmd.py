@@ -59,6 +59,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 assert st1.st_ino == st2.st_ino
                 assert st1.st_size == st2.st_size
 
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
+    def test_directory_timestamps(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        # extracting a file inside a directory touches the directory mtime
+        assert os.path.exists('output/input/dir2/file2')
+        # make sure borg fixes the directory mtime after touching it
+        sti = os.stat('input/dir2')
+        sto = os.stat('output/input/dir2')
+        assert sti.st_mtime_ns == sto.st_mtime_ns
+
     @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
     def test_atime(self):
         def has_noatime(some_file):

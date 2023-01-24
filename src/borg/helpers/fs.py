@@ -8,6 +8,8 @@ import subprocess
 import sys
 import textwrap
 
+import platformdirs
+
 from .errors import Error
 
 from .process import prepare_subprocess_env
@@ -58,37 +60,42 @@ def get_base_dir():
     return base_dir
 
 
-def get_keys_dir():
+def get_keys_dir(legacy=True):
     """Determine where to repository keys and cache"""
     keys_dir = os.environ.get("BORG_KEYS_DIR")
     if keys_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        keys_dir = os.path.join(get_config_dir(), "keys")
+        keys_dir = os.path.join(get_config_dir(legacy), "keys")
     ensure_dir(keys_dir)
     return keys_dir
 
 
-def get_security_dir(repository_id=None):
+def get_security_dir(repository_id=None, legacy=True):
     """Determine where to store local security information."""
     security_dir = os.environ.get("BORG_SECURITY_DIR")
     if security_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        security_dir = os.path.join(get_config_dir(), "security")
+        security_dir = os.path.join(get_config_dir(legacy), "security")
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
     ensure_dir(security_dir)
     return security_dir
 
 
-def get_cache_dir():
+def get_cache_dir(legacy=True):
     """Determine where to repository keys and cache"""
-    # Get cache home path
-    cache_home = os.path.join(get_base_dir(), ".cache")
-    # Try to use XDG_CACHE_HOME instead if BORG_BASE_DIR isn't explicitly set
-    if not os.environ.get("BORG_BASE_DIR"):
-        cache_home = os.environ.get("XDG_CACHE_HOME", cache_home)
-    # Use BORG_CACHE_DIR if set, otherwise assemble final path from cache home path
-    cache_dir = os.environ.get("BORG_CACHE_DIR", os.path.join(cache_home, "borg"))
+
+    if legacy:
+        # Get cache home path
+        cache_home = os.path.join(get_base_dir(), ".cache")
+        # Try to use XDG_CACHE_HOME instead if BORG_BASE_DIR isn't explicitly set
+        if not os.environ.get("BORG_BASE_DIR"):
+            cache_home = os.environ.get("XDG_CACHE_HOME", cache_home)
+        # Use BORG_CACHE_DIR if set, otherwise assemble final path from cache home path
+        cache_dir = os.environ.get("BORG_CACHE_DIR", os.path.join(cache_home, "borg"))
+    else:
+        cache_dir = os.environ.get("BORG_CACHE_DIR", platformdirs.user_cache_dir("borg"))
+
     # Create path if it doesn't exist yet
     ensure_dir(cache_dir)
     cache_tag_fn = os.path.join(cache_dir, CACHE_TAG_NAME)
@@ -110,15 +117,20 @@ def get_cache_dir():
     return cache_dir
 
 
-def get_config_dir():
+def get_config_dir(legacy=True):
     """Determine where to store whole config"""
+
     # Get config home path
-    config_home = os.path.join(get_base_dir(), ".config")
-    # Try to use XDG_CONFIG_HOME instead if BORG_BASE_DIR isn't explicitly set
-    if not os.environ.get("BORG_BASE_DIR"):
-        config_home = os.environ.get("XDG_CONFIG_HOME", config_home)
-    # Use BORG_CONFIG_DIR if set, otherwise assemble final path from config home path
-    config_dir = os.environ.get("BORG_CONFIG_DIR", os.path.join(config_home, "borg"))
+    if legacy:
+        config_home = os.path.join(get_base_dir(), ".config")
+        # Try to use XDG_CONFIG_HOME instead if BORG_BASE_DIR isn't explicitly set
+        if not os.environ.get("BORG_BASE_DIR"):
+            config_home = os.environ.get("XDG_CONFIG_HOME", config_home)
+        # Use BORG_CONFIG_DIR if set, otherwise assemble final path from config home path
+        config_dir = os.environ.get("BORG_CONFIG_DIR", os.path.join(config_home, "borg"))
+    else:
+        config_dir = os.environ.get("BORG_CONFIG_DIR", platformdirs.user_config_dir("borg"))
+
     # Create path if it doesn't exist yet
     ensure_dir(config_dir)
     return config_dir

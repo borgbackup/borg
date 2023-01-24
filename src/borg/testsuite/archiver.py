@@ -508,10 +508,50 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert os.readlink('input/link1') == 'somewhere'
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
-    def test_directory_timestamps(self):
+    def test_directory_timestamps1(self):
         self.create_test_files()
         self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        # default file archiving order (internal recursion)
         self.cmd('create', self.repository_location + '::test', 'input')
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        # extracting a file inside a directory touches the directory mtime
+        assert os.path.exists('output/input/dir2/file2')
+        # make sure borg fixes the directory mtime after touching it
+        sti = os.stat('input/dir2')
+        sto = os.stat('output/input/dir2')
+        assert sti.st_mtime_ns == sto.st_mtime_ns
+
+    @pytest.mark.skipif(not is_utime_fully_supported(),
+                        reason='cannot properly setup and execute test without utime')
+    def test_directory_timestamps2(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        # given order, dir first, file second
+        flist_dir_first = b"input/dir2\ninput/dir2/file2\n"
+        self.cmd('create', '--paths-from-stdin', self.repository_location + '::test',
+                 input=flist_dir_first)
+        with changedir('output'):
+            self.cmd('extract', self.repository_location + '::test')
+        # extracting a file inside a directory touches the directory mtime
+        assert os.path.exists('output/input/dir2/file2')
+        # make sure borg fixes the directory mtime after touching it
+        sti = os.stat('input/dir2')
+        sto = os.stat('output/input/dir2')
+        assert sti.st_mtime_ns == sto.st_mtime_ns
+
+    @pytest.mark.skipif(not is_utime_fully_supported(),
+                        reason='cannot properly setup and execute test without utime')
+    def test_directory_timestamps3(self):
+        self.create_test_files()
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        # given order, file first, dir second
+        flist_file_first = b"input/dir2/file2\ninput/dir2\n"
+        self.cmd('create', '--paths-from-stdin', self.repository_location + '::test',
+                 input=flist_file_first)
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
         # extracting a file inside a directory touches the directory mtime

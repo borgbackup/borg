@@ -41,6 +41,8 @@ class UpgraderNoOp:
 
 
 class UpgraderFrom12To20:
+    borg1_header_fmt = Struct(">I")
+
     def __init__(self, *, cache):
         self.cache = cache
 
@@ -126,10 +128,9 @@ class UpgraderFrom12To20:
 
         if ctype == ObfuscateSize.ID:
             # in older borg, we used unusual byte order
-            borg1_header_fmt = Struct(">I")
-            hlen = borg1_header_fmt.size
+            hlen = self.borg1_header_fmt.size
             csize_bytes = data[2 : 2 + hlen]
-            csize = borg1_header_fmt.unpack(csize_bytes)[0]
+            csize = self.borg1_header_fmt.unpack(csize_bytes)[0]
             compressed = data[2 + hlen : 2 + hlen + csize]
             meta, compressed = upgrade_zlib_and_level(meta, compressed)
             meta["psize"] = csize

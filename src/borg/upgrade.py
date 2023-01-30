@@ -129,7 +129,7 @@ class UpgraderFrom12To20:
             borg1_header_fmt = Struct(">I")
             hlen = borg1_header_fmt.size
             csize_bytes = data[2 : 2 + hlen]
-            csize = borg1_header_fmt.unpack(csize_bytes)
+            csize = borg1_header_fmt.unpack(csize_bytes)[0]
             compressed = data[2 + hlen : 2 + hlen + csize]
             meta, compressed = upgrade_zlib_and_level(meta, compressed)
             meta["psize"] = csize

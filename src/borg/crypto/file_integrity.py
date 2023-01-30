@@ -13,6 +13,9 @@ logger = create_logger()
 
 
 class FileLikeWrapper:
+    def __init__(self, fd):
+        self.fd = fd
+
     def __enter__(self):
         self.fd.__enter__()
         return self
@@ -59,7 +62,7 @@ class FileHashingWrapper(FileLikeWrapper):
     FACTORY: Callable = None
 
     def __init__(self, backing_fd, write):
-        self.fd = backing_fd
+        super().__init__(backing_fd)
         self.writing = write
         self.hash = self.FACTORY()
 
@@ -142,7 +145,8 @@ class IntegrityCheckedFile(FileLikeWrapper):
             # TODO: When we're reading but don't have any digests, i.e. no integrity file existed,
             # TODO: then we could just short-circuit.
 
-        self.fd = self.hasher = hash_cls(backing_fd=self.file_fd, write=write)
+        self.hasher = hash_cls(backing_fd=self.file_fd, write=write)
+        super().__init__(self.hasher)
         self.hash_filename(filename)
 
     def load_integrity_data(self, path, integrity_data):

@@ -417,6 +417,7 @@ class AESKeyBase(KeyBase):
 
 class FlexiKey:
     FILE_ID = "BORG_KEY"
+    STORAGE = KeyBlobStorage.NO_STORAGE  # override in subclass
 
     @classmethod
     def detect(cls, repository, manifest_data):

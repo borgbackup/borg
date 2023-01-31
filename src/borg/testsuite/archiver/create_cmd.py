@@ -167,6 +167,46 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         )
         assert extracted_data == input_data
 
+    def test_create_stdin_checkpointing(self):
+        chunk_size = 1000  # fixed chunker with this size, also volume based checkpointing after that volume
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        input_data = b"X" * (chunk_size * 2 - 1)  # one full and one partial chunk
+        self.cmd(
+            f"--repo={self.repository_location}",
+            "create",
+            f"--chunker-params=fixed,{chunk_size}",
+            f"--checkpoint-volume={chunk_size}",
+            "test",
+            "-",
+            input=input_data,
+        )
+        # repo looking good overall?
+        self.cmd(f"--repo={self.repository_location}", "check", "-v")
+        # verify part files
+        out = self.cmd(
+            f"--repo={self.repository_location}",
+            "extract",
+            "test",
+            "stdin.borg_part_1",
+            "--consider-part-files",
+            "--stdout",
+            binary_output=True,
+        )
+        assert out == input_data[:chunk_size]
+        out = self.cmd(
+            f"--repo={self.repository_location}",
+            "extract",
+            "test",
+            "stdin.borg_part_2",
+            "--consider-part-files",
+            "--stdout",
+            binary_output=True,
+        )
+        assert out == input_data[: chunk_size - 1]
+        # verify full file
+        out = self.cmd(f"--repo={self.repository_location}", "extract", "test", "stdin", "--stdout", binary_output=True)
+        assert out == input_data
+
     def test_create_content_from_command(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         input_data = "some test content"

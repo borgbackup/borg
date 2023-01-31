@@ -39,6 +39,7 @@ class RecreateMixIn:
             stats=args.stats,
             file_status_printer=self.print_file_status,
             checkpoint_interval=args.checkpoint_interval,
+            checkpoint_volume=args.checkpoint_volume,
             dry_run=args.dry_run,
             timestamp=args.timestamp,
         )
@@ -159,6 +160,14 @@ class RecreateMixIn:
             default=1800,
             metavar="SECONDS",
             help="write checkpoint every SECONDS seconds (Default: 1800)",
+        )
+        archive_group.add_argument(
+            "--checkpoint-volume",
+            metavar="BYTES",
+            dest="checkpoint_volume",
+            type=int,
+            default=0,
+            help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
         )
         archive_group.add_argument(
             "--comment",

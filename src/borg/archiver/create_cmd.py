@@ -258,6 +258,7 @@ class CreateMixIn:
                     add_item=archive.add_item,
                     write_checkpoint=archive.write_checkpoint,
                     checkpoint_interval=args.checkpoint_interval,
+                    checkpoint_volume=args.checkpoint_volume,
                     rechunkify=False,
                 )
                 fso = FilesystemObjectProcessors(
@@ -844,6 +845,14 @@ class CreateMixIn:
             type=int,
             default=1800,
             help="write checkpoint every SECONDS seconds (Default: 1800)",
+        )
+        archive_group.add_argument(
+            "--checkpoint-volume",
+            metavar="BYTES",
+            dest="checkpoint_volume",
+            type=int,
+            default=0,
+            help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
         )
         archive_group.add_argument(
             "--chunker-params",

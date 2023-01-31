@@ -166,6 +166,10 @@ class Archives(abc.MutableMapping):
             match=args.match_archives,
             first=args.first,
             last=args.last,
+            older=args.older,
+            newer=args.newer,
+            oldest=args.oldest,
+            newest=args.newest
         )
 
     def set_raw_dict(self, d):

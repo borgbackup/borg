@@ -74,7 +74,6 @@ class UpgraderFrom12To20:
             "acl_access",
             "acl_default",
             "acl_extended",
-            "part",
         }
 
         if self.hlm.borg1_hardlink_master(item):

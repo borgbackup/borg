@@ -261,7 +261,6 @@ class TarMixIn:
             args.name,
             cache=cache,
             create=True,
-            checkpoint_interval=args.checkpoint_interval,
             progress=args.progress,
             chunker_params=args.chunker_params,
             start=t0,
@@ -274,6 +273,7 @@ class TarMixIn:
             add_item=archive.add_item,
             write_checkpoint=archive.write_checkpoint,
             checkpoint_interval=args.checkpoint_interval,
+            checkpoint_volume=args.checkpoint_volume,
             rechunkify=False,
         )
         tfo = TarfileObjectProcessors(
@@ -514,6 +514,14 @@ class TarMixIn:
             default=1800,
             metavar="SECONDS",
             help="write checkpoint every SECONDS seconds (Default: 1800)",
+        )
+        archive_group.add_argument(
+            "--checkpoint-volume",
+            metavar="BYTES",
+            dest="checkpoint_volume",
+            type=int,
+            default=0,
+            help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
         )
         archive_group.add_argument(
             "--chunker-params",

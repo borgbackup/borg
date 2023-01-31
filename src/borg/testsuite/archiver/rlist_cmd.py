@@ -47,31 +47,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_src_archive("archive1", ts=earliest_ts)
         self.create_src_archive("archive2", ts=ts_in_between)
         self.create_src_archive("archive3")
-        output = self.cmd(
-            f"--repo={self.repository_location}", "rlist", "-v", "--oldest=23e", exit_code=2
-        )
-        output = self.cmd(
-            f"--repo={self.repository_location}", "rlist", "-v", "--oldest=1m", exit_code=0
-        )
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "-v", "--oldest=23e", exit_code=2)
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "-v", "--oldest=1m", exit_code=0)
         self.assert_in("archive1", output)
         self.assert_in("archive2", output)
         self.assert_not_in("archive3", output)
 
-        output = self.cmd(
-            f"--repo={self.repository_location}", "rlist", "-v", "--newest=1m", exit_code=0
-        )
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "-v", "--newest=1m", exit_code=0)
         self.assert_in("archive3", output)
         self.assert_not_in("archive2", output)
         self.assert_not_in("archive1", output)
-        output = self.cmd(
-            f"--repo={self.repository_location}", "rlist", "-v", "--newer=1d", exit_code=0
-        )
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "-v", "--newer=1d", exit_code=0)
         self.assert_in("archive3", output)
         self.assert_not_in("archive1", output)
         self.assert_not_in("archive2", output)
-        output = self.cmd(
-            f"--repo={self.repository_location}", "rlist", "-v", "--older=1d", exit_code=0
-        )
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "-v", "--older=1d", exit_code=0)
         self.assert_in("archive1", output)
         self.assert_in("archive2", output)
         self.assert_not_in("archive3", output)

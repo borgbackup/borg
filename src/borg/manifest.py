@@ -169,7 +169,7 @@ class Archives(abc.MutableMapping):
             older=args.older,
             newer=args.newer,
             oldest=args.oldest,
-            newest=args.newest
+            newest=args.newest,
         )
 
     def set_raw_dict(self, d):

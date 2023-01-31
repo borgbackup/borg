@@ -261,7 +261,6 @@ class TarMixIn:
             args.name,
             cache=cache,
             create=True,
-            checkpoint_interval=args.checkpoint_interval,
             progress=args.progress,
             chunker_params=args.chunker_params,
             start=t0,

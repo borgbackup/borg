@@ -232,7 +232,6 @@ class CreateMixIn:
                     args.name,
                     cache=cache,
                     create=True,
-                    checkpoint_interval=args.checkpoint_interval,
                     numeric_ids=args.numeric_ids,
                     noatime=not args.atime,
                     noctime=args.noctime,

@@ -353,6 +353,7 @@ class ChunkBuffer:
         self.chunks = []
         self.key = key
         self.chunker = get_chunker(*chunker_params, seed=self.key.chunk_seed, sparse=False)
+        self.saved_chunks_len = None
 
     def add(self, item):
         self.buffer.write(self.packer.pack(item.as_dict()))
@@ -391,6 +392,18 @@ class ChunkBuffer:
 
     def is_full(self):
         return self.buffer.tell() > self.BUFFER_SIZE
+
+    def save_chunks_state(self):
+        # as we only append to self.chunks, remembering the current length is good enough
+        self.saved_chunks_len = len(self.chunks)
+
+    def restore_chunks_state(self):
+        scl = self.saved_chunks_len
+        assert scl is not None, "forgot to call save_chunks_state?"
+        tail_chunks = self.chunks[scl:]
+        del self.chunks[scl:]
+        self.saved_chunks_len = None
+        return tail_chunks
 
 
 class CacheChunkBuffer(ChunkBuffer):
@@ -649,6 +662,15 @@ Duration: {0.duration}
             stats.show_progress(item=item, dt=0.2)
         self.items_buffer.add(item)
 
+    def prepare_checkpoint(self):
+        # we need to flush the archive metadata stream to repo chunks, so that
+        # we have the metadata stream chunks WITHOUT the part file item we add later.
+        # The part file item will then get into its own metadata stream chunk, which we
+        # can easily NOT include into the next checkpoint or the final archive.
+        self.items_buffer.flush(flush=True)
+        # remember the current state of self.chunks, which corresponds to the flushed chunks
+        self.items_buffer.save_chunks_state()
+
     def write_checkpoint(self):
         metadata = self.save(self.checkpoint_name)
         # that .save() has committed the repo.
@@ -659,6 +681,11 @@ Duration: {0.duration}
         del self.manifest.archives[self.checkpoint_name]
         self.cache.chunk_decref(self.id, self.stats)
         for id in metadata.item_ptrs:
+            self.cache.chunk_decref(id, self.stats)
+        # also get rid of that part item, we do not want to have it in next checkpoint or final archive
+        tail_chunks = self.items_buffer.restore_chunks_state()
+        # tail_chunks contain the tail of the archive items metadata stream, not needed for next commit.
+        for id in tail_chunks:
             self.cache.chunk_decref(id, self.stats)
 
     def save(self, name=None, comment=None, timestamp=None, stats=None, additional_metadata=None):
@@ -1234,10 +1261,22 @@ def cached_hash(chunk, id_hash):
 class ChunksProcessor:
     # Processes an iterator of chunks for an Item
 
-    def __init__(self, *, key, cache, add_item, write_checkpoint, checkpoint_interval, checkpoint_volume, rechunkify):
+    def __init__(
+        self,
+        *,
+        key,
+        cache,
+        add_item,
+        prepare_checkpoint,
+        write_checkpoint,
+        checkpoint_interval,
+        checkpoint_volume,
+        rechunkify,
+    ):
         self.key = key
         self.cache = cache
         self.add_item = add_item
+        self.prepare_checkpoint = prepare_checkpoint
         self.write_checkpoint = write_checkpoint
         self.rechunkify = rechunkify
         # time interval based checkpointing
@@ -1248,38 +1287,35 @@ class ChunksProcessor:
         self.current_volume = 0
         self.last_volume_checkpoint = 0
 
-    def write_part_file(self, item, from_chunk, number):
+    def write_part_file(self, item):
+        self.prepare_checkpoint()
         item = Item(internal_dict=item.as_dict())
-        length = len(item.chunks)
-        # the item should only have the *additional* chunks we processed after the last partial item:
-        item.chunks = item.chunks[from_chunk:]
         # for borg recreate, we already have a size member in the source item (giving the total file size),
         # but we consider only a part of the file here, thus we must recompute the size from the chunks:
         item.get_size(memorize=True, from_chunks=True)
-        item.path += ".borg_part_%d" % number
-        item.part = number
-        number += 1
+        item.path += ".borg_part"
+        item.part = 1  # used to be an increasing number, but now just always 1 IF this is a partial file
         self.add_item(item, show_progress=False)
         self.write_checkpoint()
-        return length, number
 
-    def maybe_checkpoint(self, item, from_chunk, part_number, forced=False):
+    def maybe_checkpoint(self, item):
+        checkpoint_done = False
         sig_int_triggered = sig_int and sig_int.action_triggered()
         if (
-            forced
-            or sig_int_triggered
+            sig_int_triggered
             or (self.checkpoint_interval and time.monotonic() - self.last_checkpoint > self.checkpoint_interval)
             or (self.checkpoint_volume and self.current_volume - self.last_volume_checkpoint >= self.checkpoint_volume)
         ):
             if sig_int_triggered:
                 logger.info("checkpoint requested: starting checkpoint creation...")
-            from_chunk, part_number = self.write_part_file(item, from_chunk, part_number)
+            self.write_part_file(item)
+            checkpoint_done = True
             self.last_checkpoint = time.monotonic()
             self.last_volume_checkpoint = self.current_volume
             if sig_int_triggered:
                 sig_int.action_completed()
                 logger.info("checkpoint requested: finished checkpoint creation!")
-        return from_chunk, part_number
+        return checkpoint_done  # whether a checkpoint archive was created
 
     def process_file_chunks(self, item, cache, stats, show_progress, chunk_iter, chunk_processor=None):
         if not chunk_processor:
@@ -1297,28 +1333,15 @@ class ChunksProcessor:
         # to get rid of .chunks_healthy, as it might not correspond to .chunks any more.
         if self.rechunkify and "chunks_healthy" in item:
             del item.chunks_healthy
-        from_chunk = 0
-        part_number = 1
         for chunk in chunk_iter:
             cle = chunk_processor(chunk)
             item.chunks.append(cle)
             self.current_volume += cle[1]
             if show_progress:
                 stats.show_progress(item=item, dt=0.2)
-            from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=False)
+            self.maybe_checkpoint(item)
         else:
-            if part_number > 1:
-                if item.chunks[from_chunk:]:
-                    # if we already have created a part item inside this file, we want to put the final
-                    # chunks (if any) into a part item also (so all parts can be concatenated to get
-                    # the complete file):
-                    from_chunk, part_number = self.maybe_checkpoint(item, from_chunk, part_number, forced=True)
-
-                # if we created part files, we have referenced all chunks from the part files,
-                # but we also will reference the same chunks also from the final, complete file:
-                for chunk in item.chunks:
-                    cache.chunk_incref(chunk.id, stats, size=chunk.size, part=True)
-                stats.nfiles_parts += part_number - 1
+            stats.nfiles_parts += 0  # TODO: remove tracking of this
 
 
 class FilesystemObjectProcessors:
@@ -2474,6 +2497,7 @@ class ArchiveRecreater:
             cache=self.cache,
             key=self.key,
             add_item=target.add_item,
+            prepare_checkpoint=target.prepare_checkpoint,
             write_checkpoint=target.write_checkpoint,
             checkpoint_interval=self.checkpoint_interval,
             checkpoint_volume=self.checkpoint_volume,

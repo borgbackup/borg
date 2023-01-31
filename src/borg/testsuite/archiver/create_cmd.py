@@ -182,27 +182,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         )
         # repo looking good overall? checks for rc == 0.
         self.cmd(f"--repo={self.repository_location}", "check", "--debug")
-        # verify part files
-        out = self.cmd(
-            f"--repo={self.repository_location}",
-            "extract",
-            "test",
-            "stdin.borg_part_1",
-            "--consider-part-files",
-            "--stdout",
-            binary_output=True,
-        )
-        assert out == input_data[:chunk_size]
-        out = self.cmd(
-            f"--repo={self.repository_location}",
-            "extract",
-            "test",
-            "stdin.borg_part_2",
-            "--consider-part-files",
-            "--stdout",
-            binary_output=True,
-        )
-        assert out == input_data[: chunk_size - 1]
+        # verify that there are no part files in final archive
+        out = self.cmd(f"--repo={self.repository_location}", "list", "test", "--consider-part-files")
+        assert "stdin.borg_part" not in out
         # verify full file
         out = self.cmd(f"--repo={self.repository_location}", "extract", "test", "stdin", "--stdout", binary_output=True)
         assert out == input_data

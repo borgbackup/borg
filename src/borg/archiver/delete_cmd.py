@@ -79,9 +79,7 @@ class DeleteMixIn:
                         logger_list.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
 
                     if not dry_run:
-                        archive = Archive(
-                            manifest, archive_name, cache=cache, consider_part_files=args.consider_part_files
-                        )
+                        archive = Archive(manifest, archive_name, cache=cache)
                         archive.delete(stats, progress=args.progress, forced=args.forced)
                         checkpointed = self.maybe_checkpoint(
                             checkpoint_func=checkpoint_func, checkpoint_interval=args.checkpoint_interval

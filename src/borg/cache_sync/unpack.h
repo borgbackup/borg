@@ -40,7 +40,7 @@
 #endif
 
 typedef struct unpack_user {
-    /* Item.chunks and Item.part are at the top level; we don't care about anything else,
+    /* Item.chunks is at the top level; we don't care about anything else,
      * only need to track the current level to navigate arbitrary and unknown structure.
      * To discern keys from everything else on the top level we use expect_map_item_end.
      */
@@ -58,15 +58,12 @@ typedef struct unpack_user {
      */
     int inside_chunks;
 
-    /* is this item a .part file (created for checkpointing inside files)? */
-    int part;
-
     /* does this item have a chunks list in it? */
     int has_chunks;
 
     enum {
         /* the next thing is a map key at the Item root level,
-         * and it might be the "chunks" or "part" key we're looking for */
+         * and it might be e.g. the "chunks" key we're looking for */
         expect_map_key,
 
         /* blocking state to expect_map_key
@@ -113,11 +110,6 @@ typedef struct unpack_user {
     struct {
         uint64_t size, num_files;
     } totals;
-
-    /* total sizes and files count coming from part files */
-    struct {
-        uint64_t size, num_files;
-    } parts;
 
 } unpack_user;
 
@@ -317,7 +309,6 @@ static inline int unpack_callback_map(unpack_user* u, unsigned int n)
         }
         /* This begins a new Item */
         u->expect = expect_map_key;
-        u->part = 0;
         u->has_chunks = 0;
         u->item.size = 0;
     }
@@ -358,10 +349,6 @@ static inline int unpack_callback_map_end(unpack_user* u)
     if(u->level == 0) {
         /* This ends processing of an Item */
         if(u->has_chunks) {
-            if(u->part) {
-                u->parts.num_files += 1;
-                u->parts.size += u->item.size;
-            }
             u->totals.num_files += 1;
             u->totals.size += u->item.size;
         }
@@ -381,9 +368,6 @@ static inline int unpack_callback_raw(unpack_user* u, const char* b, const char*
             u->expect = expect_chunks_begin;
             u->inside_chunks = 1;
             u->has_chunks = 1;
-        } else if(length == 4 && !memcmp("part", p, 4)) {
-            u->expect = expect_map_item_end;
-            u->part = 1;
         } else {
             u->expect = expect_map_item_end;
         }

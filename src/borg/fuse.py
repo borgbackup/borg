@@ -147,7 +147,7 @@ class ItemCache:
         else:
             raise ValueError("Invalid entry type in self.meta")
 
-    def iter_archive_items(self, archive_item_ids, filter=None, consider_part_files=False):
+    def iter_archive_items(self, archive_item_ids, filter=None):
         unpacker = msgpack.Unpacker()
 
         # Current offset in the metadata stream, which consists of all metadata chunks glued together
@@ -193,7 +193,7 @@ class ItemCache:
                     break
 
                 item = Item(internal_dict=item)
-                if filter and not filter(item) or not consider_part_files and "part" in item:
+                if filter and not filter(item):
                     msgpacked_bytes = b""
                     continue
 
@@ -330,15 +330,13 @@ class FuseBackend:
         """Build FUSE inode hierarchy from archive metadata"""
         self.file_versions = {}  # for versions mode: original path -> version
         t0 = time.perf_counter()
-        archive = Archive(self._manifest, archive_name, consider_part_files=self._args.consider_part_files)
+        archive = Archive(self._manifest, archive_name)
         strip_components = self._args.strip_components
         matcher = build_matcher(self._args.patterns, self._args.paths)
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
         filter = build_filter(matcher, strip_components)
-        for item_inode, item in self.cache.iter_archive_items(
-            archive.metadata.items, filter=filter, consider_part_files=self._args.consider_part_files
-        ):
+        for item_inode, item in self.cache.iter_archive_items(archive.metadata.items, filter=filter):
             if strip_components:
                 item.path = os.sep.join(item.path.split(os.sep)[strip_components:])
             path = os.fsencode(item.path)

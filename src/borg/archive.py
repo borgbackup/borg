@@ -58,7 +58,6 @@ class Statistics:
         self.output_json = output_json
         self.iec = iec
         self.osize = self.usize = self.nfiles = 0
-        self.osize_parts = self.usize_parts = self.nfiles_parts = 0
         self.last_progress = 0  # timestamp when last progress was shown
         self.files_stats = defaultdict(int)
         self.chunking_time = 0.0
@@ -66,15 +65,10 @@ class Statistics:
         self.rx_bytes = 0
         self.tx_bytes = 0
 
-    def update(self, size, unique, part=False):
-        if not part:
-            self.osize += size
-            if unique:
-                self.usize += size
-        else:
-            self.osize_parts += size
-            if unique:
-                self.usize_parts += size
+    def update(self, size, unique):
+        self.osize += size
+        if unique:
+            self.usize += size
 
     def __add__(self, other):
         if not isinstance(other, Statistics):
@@ -83,9 +77,6 @@ class Statistics:
         stats.osize = self.osize + other.osize
         stats.usize = self.usize + other.usize
         stats.nfiles = self.nfiles + other.nfiles
-        stats.osize_parts = self.osize_parts + other.osize_parts
-        stats.usize_parts = self.usize_parts + other.usize_parts
-        stats.nfiles_parts = self.nfiles_parts + other.nfiles_parts
         stats.chunking_time = self.chunking_time + other.chunking_time
         stats.hashing_time = self.hashing_time + other.hashing_time
         for key in other.files_stats:
@@ -134,20 +125,13 @@ Bytes sent to remote: {stats.tx_bytes}
         }
 
     def as_raw_dict(self):
-        return {
-            "size": self.osize,
-            "nfiles": self.nfiles,
-            "size_parts": self.osize_parts,
-            "nfiles_parts": self.nfiles_parts,
-        }
+        return {"size": self.osize, "nfiles": self.nfiles}
 
     @classmethod
     def from_raw_dict(cls, **kw):
         self = cls()
         self.osize = kw["size"]
         self.nfiles = kw["nfiles"]
-        self.osize_parts = kw["size_parts"]
-        self.nfiles_parts = kw["nfiles_parts"]
         return self
 
     @property
@@ -497,7 +481,6 @@ class Archive:
         start=None,
         start_monotonic=None,
         end=None,
-        consider_part_files=False,
         log_json=False,
         iec=False,
     ):
@@ -532,7 +515,6 @@ class Archive:
         if end is None:
             end = archive_ts_now()
         self.end = end
-        self.consider_part_files = consider_part_files
         self.pipeline = DownloadPipeline(self.repository, self.repo_objs)
         self.create = create
         if self.create:
@@ -642,9 +624,6 @@ Duration: {0.duration}
         return "Archive(%r)" % self.name
 
     def item_filter(self, item, filter=None):
-        if not self.consider_part_files and "part" in item:
-            # this is a part(ial) file, we usually don't want to consider it.
-            return False
         return filter(item) if filter else True
 
     def iter_items(self, filter=None, preload=False):
@@ -721,14 +700,7 @@ Duration: {0.duration}
         # because borg info relies on them. so, either use the given stats (from args)
         # or fall back to self.stats if it was not given.
         stats = stats or self.stats
-        metadata.update(
-            {
-                "size": stats.osize,
-                "nfiles": stats.nfiles,
-                "size_parts": stats.osize_parts,
-                "nfiles_parts": stats.nfiles_parts,
-            }
-        )
+        metadata.update({"size": stats.osize, "nfiles": stats.nfiles})
         metadata.update(additional_metadata or {})
         metadata = ArchiveItem(metadata)
         data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b"archive")
@@ -778,12 +750,9 @@ Duration: {0.duration}
             pi.finish()
 
         stats = Statistics(iec=self.iec)
-        stats.usize = unique_size  # the part files use same chunks as the full file
+        stats.usize = unique_size
         stats.nfiles = self.metadata.nfiles
         stats.osize = self.metadata.size
-        if self.consider_part_files:
-            stats.nfiles += self.metadata.nfiles_parts
-            stats.osize += self.metadata.size_parts
         return stats
 
     @contextmanager
@@ -1065,9 +1034,9 @@ Duration: {0.duration}
                 error = True
                 return exception_ignored  # must not return None here
 
-        def chunk_decref(id, stats, part=False):
+        def chunk_decref(id, stats):
             try:
-                self.cache.chunk_decref(id, stats, wait=False, part=part)
+                self.cache.chunk_decref(id, stats, wait=False)
             except KeyError:
                 cid = bin_to_hex(id)
                 raise ChunksIndexError(cid)
@@ -1091,9 +1060,8 @@ Duration: {0.duration}
                     for item in unpacker:
                         item = Item(internal_dict=item)
                         if "chunks" in item:
-                            part = not self.consider_part_files and "part" in item
                             for chunk_id, size in item.chunks:
-                                chunk_decref(chunk_id, stats, part=part)
+                                chunk_decref(chunk_id, stats)
                 except (TypeError, ValueError):
                     # if items metadata spans multiple chunks and one chunk got dropped somehow,
                     # it could be that unpacker yields bad types
@@ -1294,7 +1262,6 @@ class ChunksProcessor:
         # but we consider only a part of the file here, thus we must recompute the size from the chunks:
         item.get_size(memorize=True, from_chunks=True)
         item.path += ".borg_part"
-        item.part = 1  # used to be an increasing number, but now just always 1 IF this is a partial file
         self.add_item(item, show_progress=False)
         self.write_checkpoint()
 
@@ -1340,8 +1307,6 @@ class ChunksProcessor:
             if show_progress:
                 stats.show_progress(item=item, dt=0.2)
             self.maybe_checkpoint(item)
-        else:
-            stats.nfiles_parts += 0  # TODO: remove tracking of this
 
 
 class FilesystemObjectProcessors:

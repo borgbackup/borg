@@ -27,7 +27,7 @@ class DiffMixIn:
         print_output = print_json_output if args.json_lines else print_text_output
 
         archive1 = archive
-        archive2 = Archive(manifest, args.other_name, consider_part_files=args.consider_part_files)
+        archive2 = Archive(manifest, args.other_name)
 
         can_compare_chunk_ids = (
             archive1.metadata.get("chunker_params", False) == archive2.metadata.get("chunker_params", True)

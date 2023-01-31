@@ -27,7 +27,7 @@ class ListMixIn:
             format = "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"
 
         def _list_inner(cache):
-            archive = Archive(manifest, args.name, cache=cache, consider_part_files=args.consider_part_files)
+            archive = Archive(manifest, args.name, cache=cache)
 
             formatter = ItemFormatter(archive, format, json_lines=args.json_lines)
             for item in archive.iter_items(lambda item: matcher.match(item.path)):

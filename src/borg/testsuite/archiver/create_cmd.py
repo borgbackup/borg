@@ -180,8 +180,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "-",
             input=input_data,
         )
-        # repo looking good overall?
-        self.cmd(f"--repo={self.repository_location}", "check", "-v")
+        # repo looking good overall? checks for rc == 0.
+        self.cmd(f"--repo={self.repository_location}", "check", "--debug")
         # verify part files
         out = self.cmd(
             f"--repo={self.repository_location}",

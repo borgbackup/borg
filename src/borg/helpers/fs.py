@@ -230,7 +230,7 @@ class HardLinkManager:
                      chunks / chunks_healthy list
                      hlid
         """
-        assert isinstance(id, self.id_type), f"key is {key!r}, not of type {self.key_type}"
+        assert isinstance(id, self.id_type), f"id is {id!r}, not of type {self.id_type}"
         assert isinstance(info, self.info_type), f"info is {info!r}, not of type {self.info_type}"
         self._map[id] = info
 
@@ -238,7 +238,7 @@ class HardLinkManager:
         """
         retrieve stuff to use it in a (usually contentless) item.
         """
-        assert isinstance(id, self.id_type)
+        assert isinstance(id, self.id_type), f"id is {id!r}, not of type {self.id_type}"
         return self._map.get(id, default)
 
 

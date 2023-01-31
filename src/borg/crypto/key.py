@@ -3,7 +3,7 @@ import os
 import textwrap
 from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, pbkdf2_hmac
-from typing import Literal, Callable
+from typing import Literal, Callable, ClassVar
 
 from ..logger import create_logger
 
@@ -170,7 +170,7 @@ class KeyBase:
     ARG_NAME = "UNDEFINED"
 
     # Storage type (no key blob storage / keyfile / repo)
-    STORAGE = KeyBlobStorage.NO_STORAGE
+    STORAGE: ClassVar[str] = KeyBlobStorage.NO_STORAGE
 
     # Seed for the buzhash chunker (borg.algorithms.chunker.Chunker)
     # type is int
@@ -279,7 +279,6 @@ class PlaintextKey(KeyBase):
     TYPES_ACCEPTABLE = {TYPE}
     NAME = "plaintext"
     ARG_NAME = "none"
-    STORAGE = KeyBlobStorage.NO_STORAGE
 
     chunk_seed = 0
     logically_encrypted = False
@@ -417,6 +416,7 @@ class AESKeyBase(KeyBase):
 
 class FlexiKey:
     FILE_ID = "BORG_KEY"
+    STORAGE: ClassVar[str] = KeyBlobStorage.NO_STORAGE  # override in subclass
 
     @classmethod
     def detect(cls, repository, manifest_data):

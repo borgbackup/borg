@@ -4,7 +4,7 @@ from .helpers import StableDict
 
 API_VERSION: str
 
-def want_bytes(v: Any, *, errors: str) -> bytes: ...
+def want_bytes(v: Any, *, errors: str = ...) -> bytes: ...
 def chunks_contents_equal(chunks1: Iterator, chunks2: Iterator) -> bool: ...
 
 class PropDict:
@@ -106,7 +106,6 @@ class ArchiveItem(PropDict):
 class ChunkListEntry(NamedTuple):
     id: bytes
     size: int
-    csize: int
 
 class Item(PropDict):
     @property
@@ -177,6 +176,10 @@ class Item(PropDict):
     def deleted(self) -> bool: ...
     @deleted.setter
     def deleted(self, val: bool) -> None: ...
+    @property
+    def hlid(self) -> bytes: ...
+    @hlid.setter
+    def hlid(self, val: bytes) -> None: ...
     @property
     def hardlink_master(self) -> bool: ...
     @hardlink_master.setter

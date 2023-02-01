@@ -784,6 +784,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         try:
             self.cmd(f"--repo={self.repository_location}", "create", "--read-special", "test", "input/link_fifo")
         finally:
+            # In case `borg create` failed to open FIFO, read all data to avoid join() hanging.
+            fd = os.open(fifo_fn, os.O_RDONLY | os.O_NONBLOCK)
+            try:
+                os.read(fd, len(data))
+            finally:
+                os.close(fd)
             t.join()
         with changedir("output"):
             self.cmd(f"--repo={self.repository_location}", "extract", "test")

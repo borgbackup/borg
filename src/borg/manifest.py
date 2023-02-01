@@ -164,8 +164,12 @@ class Archives(abc.MutableMapping):
             sort_by=args.sort_by.split(","),
             consider_checkpoints=consider_checkpoints,
             match=args.match_archives,
-            first=args.first,
-            last=args.last,
+            first=getattr(args, "first", None),
+            last=getattr(args, "last", None),
+            older=getattr(args, "older", None),
+            newer=getattr(args, "newer", None),
+            oldest=getattr(args, "oldest", None),
+            newest=getattr(args, "newest", None),
         )
 
     def set_raw_dict(self, d):

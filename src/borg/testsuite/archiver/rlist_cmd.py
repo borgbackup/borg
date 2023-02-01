@@ -40,6 +40,32 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in("test-1 comment 1" + os.linesep, output_3)
         self.assert_in("test-2 comment 2" + os.linesep, output_3)
 
+    def test_date_matching(self):
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        earliest_ts = "2022-11-20T23:59:59"
+        ts_in_between = "2022-12-18T23:59:59"
+        self.create_src_archive("archive1", ts=earliest_ts)
+        self.create_src_archive("archive2", ts=ts_in_between)
+        self.create_src_archive("archive3")
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "-v", "--oldest=23e", exit_code=2)
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "-v", "--oldest=1m", exit_code=0)
+        self.assert_in("archive1", output)
+        self.assert_in("archive2", output)
+        self.assert_not_in("archive3", output)
+
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "-v", "--newest=1m", exit_code=0)
+        self.assert_in("archive3", output)
+        self.assert_not_in("archive2", output)
+        self.assert_not_in("archive1", output)
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "-v", "--newer=1d", exit_code=0)
+        self.assert_in("archive3", output)
+        self.assert_not_in("archive1", output)
+        self.assert_not_in("archive2", output)
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "-v", "--older=1d", exit_code=0)
+        self.assert_in("archive1", output)
+        self.assert_in("archive2", output)
+        self.assert_not_in("archive3", output)
+
     def test_rlist_consider_checkpoints(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         self.cmd(f"--repo={self.repository_location}", "create", "test1", src_dir)

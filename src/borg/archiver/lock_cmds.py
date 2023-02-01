@@ -51,7 +51,6 @@ class LocksMixIn:
         return self.exit_code
 
     def build_parser_locks(self, subparsers, common_parser, mid_common_parser):
-
         from ._common import process_epilog
 
         break_lock_epilog = process_epilog(

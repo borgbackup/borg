@@ -132,7 +132,6 @@ class KeysMixIn:
         return EXIT_SUCCESS
 
     def build_parser_keys(self, subparsers, common_parser, mid_common_parser):
-
         from ._common import process_epilog
 
         subparser = subparsers.add_parser(

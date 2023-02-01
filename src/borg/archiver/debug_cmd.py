@@ -330,7 +330,6 @@ class DebugMixIn:
         return EXIT_SUCCESS
 
     def build_parser_debug(self, subparsers, common_parser, mid_common_parser):
-
         debug_epilog = process_epilog(
             """
         These commands are not intended for normal use and potentially very

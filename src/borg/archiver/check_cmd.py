@@ -66,7 +66,6 @@ class CheckMixIn:
         return EXIT_SUCCESS
 
     def build_parser_check(self, subparsers, common_parser, mid_common_parser):
-
         from ._common import process_epilog
         from ._common import define_archive_filters_group
 

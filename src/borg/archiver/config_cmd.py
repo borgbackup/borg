@@ -150,7 +150,6 @@ class ConfigMixIn:
                 cache.close()
 
     def build_parser_config(self, subparsers, common_parser, mid_common_parser):
-
         from ._common import process_epilog
 
         config_epilog = process_epilog(

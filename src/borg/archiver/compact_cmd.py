@@ -22,7 +22,6 @@ class CompactMixIn:
         return EXIT_SUCCESS
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):
-
         from ._common import process_epilog
 
         compact_epilog = process_epilog(

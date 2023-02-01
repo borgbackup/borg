@@ -26,7 +26,6 @@ def have_gnutar():
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
-
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason="GNU tar must be installed for this test.")
     requires_gzip = pytest.mark.skipif(not shutil.which("gzip"), reason="gzip must be installed for this test.")
 

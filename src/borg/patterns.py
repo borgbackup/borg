@@ -151,7 +151,7 @@ class PatternMatcher:
             return self.is_include_cmd[value]
 
         # this is the slow way, if we have many patterns in self._items:
-        for (pattern, cmd) in self._items:
+        for pattern, cmd in self._items:
             if pattern.match(path, normalize=False):
                 self.recurse_dir = pattern.recurse_dir
                 return self.is_include_cmd[cmd]

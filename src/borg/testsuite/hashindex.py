@@ -601,7 +601,6 @@ class AllIndexTestCase(BaseTestCase):
 
 class IndexCorruptionTestCase(BaseTestCase):
     def test_bug_4829(self):
-
         from struct import pack
 
         def HH(x, y, z):

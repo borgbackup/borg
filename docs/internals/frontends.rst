@@ -18,15 +18,23 @@ Important: JSON output is expected to be UTF-8, but currently borg depends on th
 for that (must be a UTF-8 locale and *not* "C" or "ascii"), so that Python will choose to encode to UTF-8.
 The same applies to any inputs read by borg, they are expected to be UTF-8 encoded also.
 
-We consider this a bug (see :issue:`2273`) and might fix it later, so borg will use UTF-8 independent of
-the locale.
-
 On POSIX systems, you can usually set environment vars to choose a UTF-8 locale:
 
 ::
 
     export LANG=en_US.UTF-8
     export LC_CTYPE=en_US.UTF-8
+
+
+Another way to get Python's stdin/stdout/stderr streams to use UTF-8 encoding (without having
+a UTF-8 locale / LANG / LC_CTYPE) is:
+
+::
+
+    export PYTHONIOENCODING=utf-8
+
+
+See :issue:`2273` for more details.
 
 
 Dealing with non-unicode byte sequences and JSON limitations

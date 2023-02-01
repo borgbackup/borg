@@ -331,7 +331,6 @@ class TarMixIn:
                 log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
 
     def build_parser_tar(self, subparsers, common_parser, mid_common_parser):
-
         from ._common import process_epilog
 
         export_tar_epilog = process_epilog(

@@ -113,7 +113,6 @@ def test_help(benchmark, cmd):
 
 @pytest.mark.parametrize("type, key, value", [(Item, "size", 1000), (Item, "mode", 0x777), (Item, "deleted", False)])
 def test_propdict_attributes(benchmark, type, key, value):
-
     propdict = type()
 
     def getattr_setattr(item, key, value):

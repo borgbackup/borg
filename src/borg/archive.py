@@ -1054,7 +1054,7 @@ Duration: {0.duration}
             pi = ProgressIndicatorPercent(
                 total=len(items_ids), msg="Decrementing references %3.0f%%", msgid="archive.delete"
             )
-            for (i, (items_id, data)) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
+            for i, (items_id, data) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
                 if progress:
                     pi.show(i)
                 _, data = self.repo_objs.parse(items_id, data)

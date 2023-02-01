@@ -217,7 +217,6 @@ class BenchmarkMixIn:
         return 0
 
     def build_parser_benchmarks(self, subparsers, common_parser, mid_common_parser):
-
         from ._common import process_epilog
 
         benchmark_epilog = process_epilog("These commands do various benchmarks.")

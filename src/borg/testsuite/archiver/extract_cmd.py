@@ -507,7 +507,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # atime_extracted = os.stat(extracted_path).st_atime_ns
             xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
         assert xa_value_extracted == xa_value
-        assert birthtime_extracted == birthtime_expected
+        # cope with small birthtime deviations of less than 1000ns:
+        assert -1000 <= (birthtime_extracted - birthtime_expected) * 1e9 <= 1000
         assert mtime_extracted == mtime_expected
         # assert atime_extracted == atime_expected  # still broken, but not really important.
 

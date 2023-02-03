@@ -93,7 +93,7 @@ def get_security_dir(repository_id=None, *, legacy=True):
     return security_dir
 
 
-def get_cache_dir(*, legacy=True):
+def get_cache_dir(*, legacy=False):
     """Determine where to repository keys and cache"""
 
     if legacy:

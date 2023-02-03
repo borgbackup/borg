@@ -646,9 +646,12 @@ def test_get_cache_dir(monkeypatch):
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)
     if is_win32:
         monkeypatch.delenv("BORG_CACHE_DIR", raising=False)
-        assert get_cache_dir(legacy=False) == os.path.join(
-            os.path.expanduser("~"), "AppData", "Local", "borg", "borg", "Cache"
-        )
+        assert get_cache_dir() == os.path.join(os.path.expanduser("~"), "AppData", "Local", "borg", "borg", "Cache")
+    elif is_darwin:
+        monkeypatch.delenv("BORG_CACHE_DIR", raising=False)
+        assert get_cache_dir() == os.path.join(os.path.expanduser("~"), "Library", "Caches", "borg")
+        monkeypatch.setenv("BORG_CACHE_DIR", "/var/tmp")
+        assert get_cache_dir() == "/var/tmp"
     else:
         monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
         monkeypatch.delenv("BORG_CACHE_DIR", raising=False)

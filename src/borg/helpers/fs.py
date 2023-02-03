@@ -42,7 +42,7 @@ def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_dea
             raise
 
 
-def get_base_dir():
+def get_base_dir(legacy=True):
     """Get home directory / base directory for borg:
 
     - BORG_BASE_DIR, if set
@@ -50,14 +50,25 @@ def get_base_dir():
     - ~$USER, if USER is set
     - ~
     """
-    base_dir = os.environ.get("BORG_BASE_DIR") or os.environ.get("HOME")
-    # os.path.expanduser() behaves differently for '~' and '~someuser' as
-    # parameters: when called with an explicit username, the possibly set
-    # environment variable HOME is no longer respected. So we have to check if
-    # it is set and only expand the user's home directory if HOME is unset.
-    if not base_dir:
-        base_dir = os.path.expanduser("~%s" % os.environ.get("USER", ""))
+    if legacy:
+        base_dir = os.environ.get("BORG_BASE_DIR") or os.environ.get("HOME")
+        # os.path.expanduser() behaves differently for '~' and '~someuser' as
+        # parameters: when called with an explicit username, the possibly set
+        # environment variable HOME is no longer respected. So we have to check if
+        # it is set and only expand the user's home directory if HOME is unset.
+        if not base_dir:
+            base_dir = os.path.expanduser("~%s" % os.environ.get("USER", ""))
+    else:
+        # we only care for BORG_BASE_DIR here, as it can be used to override the base dir
+        # and not use any more or less platform specific way to determine the base dir.
+        base_dir = os.environ.get("BORG_BASE_DIR")
     return base_dir
+
+
+def join_base_dir(*paths, **kw):
+    legacy = kw.get("legacy", True)
+    base_dir = get_base_dir(legacy=legacy)
+    return None if base_dir is None else os.path.join(base_dir, *paths)
 
 
 def get_keys_dir(legacy=True):
@@ -87,14 +98,16 @@ def get_cache_dir(legacy=True):
 
     if legacy:
         # Get cache home path
-        cache_home = os.path.join(get_base_dir(), ".cache")
+        cache_home = join_base_dir(".cache", legacy=legacy)
         # Try to use XDG_CACHE_HOME instead if BORG_BASE_DIR isn't explicitly set
         if not os.environ.get("BORG_BASE_DIR"):
             cache_home = os.environ.get("XDG_CACHE_HOME", cache_home)
         # Use BORG_CACHE_DIR if set, otherwise assemble final path from cache home path
         cache_dir = os.environ.get("BORG_CACHE_DIR", os.path.join(cache_home, "borg"))
     else:
-        cache_dir = os.environ.get("BORG_CACHE_DIR", platformdirs.user_cache_dir("borg"))
+        cache_dir = os.environ.get(
+            "BORG_CACHE_DIR", join_base_dir(".cache", legacy=legacy) or platformdirs.user_cache_dir("borg")
+        )
 
     # Create path if it doesn't exist yet
     ensure_dir(cache_dir)
@@ -122,14 +135,16 @@ def get_config_dir(legacy=True):
 
     # Get config home path
     if legacy:
-        config_home = os.path.join(get_base_dir(), ".config")
+        config_home = join_base_dir(".config", legacy=legacy)
         # Try to use XDG_CONFIG_HOME instead if BORG_BASE_DIR isn't explicitly set
         if not os.environ.get("BORG_BASE_DIR"):
             config_home = os.environ.get("XDG_CONFIG_HOME", config_home)
         # Use BORG_CONFIG_DIR if set, otherwise assemble final path from config home path
         config_dir = os.environ.get("BORG_CONFIG_DIR", os.path.join(config_home, "borg"))
     else:
-        config_dir = os.environ.get("BORG_CONFIG_DIR", platformdirs.user_config_dir("borg"))
+        config_dir = os.environ.get(
+            "BORG_CONFIG_DIR", join_base_dir(".config", legacy=legacy) or platformdirs.user_config_dir("borg")
+        )
 
     # Create path if it doesn't exist yet
     ensure_dir(config_dir)

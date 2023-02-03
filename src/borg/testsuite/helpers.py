@@ -593,6 +593,17 @@ def test_get_base_dir(monkeypatch):
     assert get_base_dir() == "/var/tmp/base"
 
 
+def test_get_base_dir_compat(monkeypatch):
+    """test that it works the same for legacy and for non-legacy implementation"""
+    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    # old way: if BORG_BASE_DIR is not set, make something up with HOME/USER/~
+    # new way: if BORG_BASE_DIR is not set, return None and let caller deal with it.
+    assert get_base_dir(legacy=False) is None
+    # new and old way: BORG_BASE_DIR overrides all other "base path determination".
+    monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
+    assert get_base_dir(legacy=False) == get_base_dir(legacy=True)
+
+
 def test_get_config_dir(monkeypatch):
     """test that get_config_dir respects environment"""
     monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)

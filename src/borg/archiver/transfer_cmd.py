@@ -86,7 +86,9 @@ class TransferMixIn:
                 if not dry_run:
                     print(f"{name}: copying archive to destination repo...")
                 other_archive = Archive(other_manifest, name)
-                archive = Archive(manifest, name, cache=cache, create=True) if not dry_run else None
+                archive = (
+                    Archive(manifest, name, cache=cache, create=True, progress=args.progress) if not dry_run else None
+                )
                 upgrader.new_archive(archive=archive)
                 for item in other_archive.iter_items():
                     is_part = bool(item.get("part", False))
@@ -130,7 +132,10 @@ class TransferMixIn:
                             item.chunks = chunks  # TODO: overwrite? IDs and sizes are same.
                             archive.stats.nfiles += 1
                     if not dry_run:
-                        archive.add_item(upgrader.upgrade_item(item=item))
+                        item = upgrader.upgrade_item(item=item)
+                        archive.add_item(item, show_progress=args.progress)
+                if args.progress:
+                    archive.stats.show_progress(final=True)
                 if not dry_run:
                     additional_metadata = upgrader.upgrade_archive_metadata(metadata=other_archive.metadata)
                     archive.save(additional_metadata=additional_metadata)

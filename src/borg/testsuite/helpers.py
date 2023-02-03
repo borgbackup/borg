@@ -607,6 +607,19 @@ def test_get_config_dir(monkeypatch):
         assert get_config_dir() == "/var/tmp"
 
 
+def test_get_config_dir_compat(monkeypatch):
+    """test that it works the same for legacy and for non-legacy implementation"""
+    monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
+    # TODO fails on macOS: assert '/Users/tw/Library/Preferences/borg' == '/Users/tw/.config/borg'
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/var/tmp/.config1")
+    assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
+    # TODO fails on macOS: assert '/Users/tw/Library/Preferences/borg' == '/var/tmp/.config1/borg'
+    monkeypatch.setenv("BORG_CONFIG_DIR", "/var/tmp/.config2")
+    assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
+
+
 def test_get_cache_dir(monkeypatch):
     """test that get_cache_dir respects environment"""
     monkeypatch.delenv("BORG_CACHE_DIR", raising=False)

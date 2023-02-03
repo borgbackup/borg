@@ -297,7 +297,7 @@ cdef class Item(PropDict):
     deleted = PropDictProperty(bool)
     nlink = PropDictProperty(int)
 
-    part = PropDictProperty(int)
+    part = PropDictProperty(int)  # legacy only
 
     def get_size(self, *, memorize=False, from_chunks=False, consider_ids=None):
         """
@@ -516,8 +516,8 @@ cdef class ArchiveItem(PropDict):
     recreate_partial_chunks = PropDictProperty(list)  # list of tuples
     size = PropDictProperty(int)
     nfiles = PropDictProperty(int)
-    size_parts = PropDictProperty(int)
-    nfiles_parts = PropDictProperty(int)
+    size_parts = PropDictProperty(int)  # legacy only
+    nfiles_parts = PropDictProperty(int)  # legacy only
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)

@@ -18,7 +18,9 @@ ARCHIVE_KEYS = frozenset(['version', 'name', 'hostname', 'username', 'time', 'ti
                           'command_line', 'recreate_command_line',  # v2+ archives
                           'cmdline', 'recreate_cmdline',  # legacy
                           'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',  # used in 1.1.0b1 .. b2
-                          'size', 'nfiles', 'size_parts', 'nfiles_parts'])
+                          'size', 'nfiles',
+                          'size_parts', 'nfiles_parts',  # legacy v1 archives
+                          ])
 # fmt: on
 
 # this is the set of keys that are always present in archives:

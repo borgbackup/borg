@@ -79,11 +79,7 @@ class FuseVersionsIndex(IndexBase):
     def __setitem__(self, key: bytes, value: Any) -> None: ...
 
 class CacheSynchronizer:
-    csize_parts: int
-    csize_totals: int
-    num_files_parts: int
-    num_files_totals: int
-    size_parts: int
     size_totals: int
+    num_files_totals: int
     def __init__(self, chunks_index: Any) -> None: ...
     def feed(self, chunk: bytes) -> None: ...

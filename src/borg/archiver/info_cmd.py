@@ -24,9 +24,7 @@ class InfoMixIn:
         output_data = []
 
         for i, archive_name in enumerate(archive_names, 1):
-            archive = Archive(
-                manifest, archive_name, cache=cache, consider_part_files=args.consider_part_files, iec=args.iec
-            )
+            archive = Archive(manifest, archive_name, cache=cache, iec=args.iec)
             info = archive.info()
             if args.json:
                 output_data.append(info)

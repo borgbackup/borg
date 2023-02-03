@@ -149,7 +149,6 @@ def with_repository(
                         progress=getattr(args, "progress", False),
                         lock_wait=self.lock_wait,
                         cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
-                        consider_part_files=getattr(args, "consider_part_files", False),
                         iec=getattr(args, "iec", False),
                     ) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
@@ -214,7 +213,6 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                         progress=False,
                         lock_wait=self.lock_wait,
                         cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
-                        consider_part_files=getattr(args, "consider_part_files", False),
                         iec=getattr(args, "iec", False),
                     ) as cache_:
                         kwargs["other_cache"] = cache_
@@ -240,7 +238,6 @@ def with_archive(method):
             noacls=getattr(args, "noacls", False),
             noxattrs=getattr(args, "noxattrs", False),
             cache=kwargs.get("cache"),
-            consider_part_files=args.consider_part_files,
             log_json=args.log_json,
             iec=args.iec,
         )
@@ -541,12 +538,6 @@ def define_common_options(add_common_option):
         dest="upload_buffer",
         type=int,
         help="set network upload buffer size in MiB. (default: 0=no buffer)",
-    )
-    add_common_option(
-        "--consider-part-files",
-        dest="consider_part_files",
-        action="store_true",
-        help="treat part files like normal files (e.g. to list/extract them)",
     )
     add_common_option(
         "--debug-profile",

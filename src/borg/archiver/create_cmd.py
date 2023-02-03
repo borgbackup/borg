@@ -255,6 +255,7 @@ class CreateMixIn:
                     cache=cache,
                     key=key,
                     add_item=archive.add_item,
+                    prepare_checkpoint=archive.prepare_checkpoint,
                     write_checkpoint=archive.write_checkpoint,
                     checkpoint_interval=args.checkpoint_interval,
                     checkpoint_volume=args.checkpoint_volume,

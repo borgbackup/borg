@@ -404,7 +404,6 @@ class Cache:
         lock_wait=None,
         permit_adhoc_cache=False,
         cache_mode=FILES_CACHE_MODE_DISABLED,
-        consider_part_files=False,
         iec=False,
     ):
         def local():
@@ -417,11 +416,10 @@ class Cache:
                 iec=iec,
                 lock_wait=lock_wait,
                 cache_mode=cache_mode,
-                consider_part_files=consider_part_files,
             )
 
         def adhoc():
-            return AdHocCache(manifest=manifest, lock_wait=lock_wait, iec=iec, consider_part_files=consider_part_files)
+            return AdHocCache(manifest=manifest, lock_wait=lock_wait, iec=iec)
 
         if not permit_adhoc_cache:
             return local()
@@ -464,14 +462,11 @@ Total chunks: {0.total_chunks}
 
         # XXX: this should really be moved down to `hashindex.pyx`
         total_size, unique_size, total_unique_chunks, total_chunks = self.chunks.summarize()
-        # the above values have the problem that they do not consider part files,
-        # thus the total_size might be too high (chunks referenced
-        # by the part files AND by the complete file).
         # since borg 1.2 we have new archive metadata telling the total size per archive,
         # so we can just sum up all archives to get the "all archives" stats:
         total_size = 0
         for archive_name in self.manifest.archives:
-            archive = Archive(self.manifest, archive_name, consider_part_files=self.consider_part_files)
+            archive = Archive(self.manifest, archive_name)
             stats = archive.calc_stats(self, want_unique=False)
             total_size += stats.osize
         stats = self.Summary(total_size, unique_size, total_unique_chunks, total_chunks)._asdict()
@@ -498,7 +493,6 @@ class LocalCache(CacheStatsMixin):
         progress=False,
         lock_wait=None,
         cache_mode=FILES_CACHE_MODE_DISABLED,
-        consider_part_files=False,
         iec=False,
     ):
         """
@@ -515,7 +509,6 @@ class LocalCache(CacheStatsMixin):
         self.repo_objs = manifest.repo_objs
         self.progress = progress
         self.cache_mode = cache_mode
-        self.consider_part_files = consider_part_files
         self.timestamp = None
         self.txn_active = False
 
@@ -971,23 +964,23 @@ class LocalCache(CacheStatsMixin):
             )
         return refcount
 
-    def chunk_incref(self, id, stats, size=None, part=False):
+    def chunk_incref(self, id, stats, size=None):
         if not self.txn_active:
             self.begin_txn()
         count, _size = self.chunks.incref(id)
-        stats.update(_size, False, part=part)
+        stats.update(_size, False)
         return ChunkListEntry(id, _size)
 
-    def chunk_decref(self, id, stats, wait=True, part=False):
+    def chunk_decref(self, id, stats, wait=True):
         if not self.txn_active:
             self.begin_txn()
         count, size = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
-            stats.update(-size, True, part=part)
+            stats.update(-size, True)
         else:
-            stats.update(-size, False, part=part)
+            stats.update(-size, False)
 
     def file_known_and_unchanged(self, hashed_path, path_hash, st):
         """
@@ -1084,14 +1077,13 @@ All archives:                unknown              unknown              unknown
                        Unique chunks         Total chunks
 Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
-    def __init__(self, manifest, warn_if_unencrypted=True, lock_wait=None, consider_part_files=False, iec=False):
+    def __init__(self, manifest, warn_if_unencrypted=True, lock_wait=None, iec=False):
         CacheStatsMixin.__init__(self, iec=iec)
         assert isinstance(manifest, Manifest)
         self.manifest = manifest
         self.repository = manifest.repository
         self.key = manifest.key
         self.repo_objs = manifest.repo_objs
-        self.consider_part_files = consider_part_files
         self._txn_active = False
 
         self.security_manager = SecurityManager(self.repository)
@@ -1145,7 +1137,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
             self.chunks[id] = entry._replace(size=size)
         return entry.refcount
 
-    def chunk_incref(self, id, stats, size=None, part=False):
+    def chunk_incref(self, id, stats, size=None):
         if not self._txn_active:
             self.begin_txn()
         count, _size = self.chunks.incref(id)
@@ -1153,19 +1145,19 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         # size or add_chunk); we can't add references to those (size=0 is invalid) and generally don't try to.
         size = _size or size
         assert size
-        stats.update(size, False, part=part)
+        stats.update(size, False)
         return ChunkListEntry(id, size)
 
-    def chunk_decref(self, id, stats, wait=True, part=False):
+    def chunk_decref(self, id, stats, wait=True):
         if not self._txn_active:
             self.begin_txn()
         count, size = self.chunks.decref(id)
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
-            stats.update(-size, True, part=part)
+            stats.update(-size, True)
         else:
-            stats.update(-size, False, part=part)
+            stats.update(-size, False)
 
     def commit(self):
         if not self._txn_active:

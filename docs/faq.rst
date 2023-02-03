@@ -132,10 +132,10 @@ During a backup, a special checkpoint archive named ``<archive-name>.checkpoint`
 is saved at every checkpoint interval (the default value for this is 30
 minutes) containing all the data backed-up until that point.
 
-This checkpoint archive is a valid archive,
-but it is only a partial backup (not all files that you wanted to back up are
-contained in it). Having it in the repo until a successful, full backup is
-completed is useful because it references all the transmitted chunks up
+This checkpoint archive is a valid archive, but it is only a partial backup
+(not all files that you wanted to back up are contained in it and the last file
+in it might be a partial file). Having it in the repo until a successful, full
+backup is completed is useful because it references all the transmitted chunks up
 to the checkpoint. This means that in case of an interruption, you only need to
 retransfer the data since the last checkpoint.
 
@@ -154,14 +154,12 @@ Once your backup has finished successfully, you can delete all
 ``<archive-name>.checkpoint`` archives. If you run ``borg prune``, it will
 also care for deleting unneeded checkpoints.
 
-Note: the checkpointing mechanism creates hidden, partial files in an archive,
-so that checkpoints even work while a big file is being processed.
-They are named ``<filename>.borg_part_<N>`` and all operations usually ignore
-these files, but you can make them considered by giving the option
-``--consider-part-files``. You usually only need that option if you are
-really desperate (e.g. if you have no completed backup of that file and you'd
-rather get a partial file extracted than nothing). You do **not** want to give
-that option under any normal circumstances.
+Note: the checkpointing mechanism may create a partial (truncated) last file
+in a checkpoint archive named ``<filename>.borg_part``. Such partial files
+won't be contained in the final archive.
+This is done so that checkpoints work cleanly and promptly while a big
+file is being processed.
+
 
 How can I back up huge file(s) over a unstable connection?
 ---------------------------------------------------------
@@ -171,10 +169,8 @@ Yes. For more details, see :ref:`checkpoints_parts`.
 How can I restore huge file(s) over an unstable connection?
 -----------------------------------------------------------
 
-If you cannot manage to extract the whole big file in one go, you can extract
-all the part files and manually concatenate them together.
-
-For more details, see :ref:`checkpoints_parts`.
+Try using ``borg mount`` and ``rsync`` (or a similar tool that supports
+resuming a partial file copy from what's already copied).
 
 How can I switch append-only mode on and off?
 -----------------------------------------------------------------------------------------------------------------------------------

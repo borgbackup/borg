@@ -38,8 +38,6 @@ cache_sync_init(HashIndex *chunks)
     unpack_init(&ctx->ctx);
     /* needs to be set only once */
     ctx->ctx.user.chunks = chunks;
-    ctx->ctx.user.parts.size = 0;
-    ctx->ctx.user.parts.num_files = 0;
     ctx->ctx.user.totals.size = 0;
     ctx->ctx.user.totals.num_files = 0;
     ctx->buf = NULL;
@@ -72,21 +70,9 @@ cache_sync_num_files_totals(const CacheSyncCtx *ctx)
 }
 
 static uint64_t
-cache_sync_num_files_parts(const CacheSyncCtx *ctx)
-{
-    return ctx->ctx.user.parts.num_files;
-}
-
-static uint64_t
 cache_sync_size_totals(const CacheSyncCtx *ctx)
 {
     return ctx->ctx.user.totals.size;
-}
-
-static uint64_t
-cache_sync_size_parts(const CacheSyncCtx *ctx)
-{
-    return ctx->ctx.user.parts.size;
 }
 
 /**

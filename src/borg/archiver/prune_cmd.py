@@ -142,7 +142,7 @@ class PruneMixIn:
                     else:
                         archives_deleted += 1
                         log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
-                        archive = Archive(manifest, archive.name, cache, consider_part_files=args.consider_part_files)
+                        archive = Archive(manifest, archive.name, cache)
                         archive.delete(stats, forced=args.forced)
                         checkpointed = self.maybe_checkpoint(
                             checkpoint_func=checkpoint_func, checkpoint_interval=args.checkpoint_interval

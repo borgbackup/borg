@@ -33,7 +33,7 @@ class DebugMixIn:
     def do_debug_dump_archive_items(self, args, repository, manifest):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
         repo_objs = manifest.repo_objs
-        archive = Archive(manifest, args.name, consider_part_files=args.consider_part_files)
+        archive = Archive(manifest, args.name)
         for i, item_id in enumerate(archive.metadata.items):
             _, data = repo_objs.parse(item_id, repository.get(item_id))
             filename = "%06d_%s.items" % (i, bin_to_hex(item_id))

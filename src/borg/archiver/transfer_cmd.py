@@ -89,6 +89,14 @@ class TransferMixIn:
                 archive = Archive(manifest, name, cache=cache, create=True) if not dry_run else None
                 upgrader.new_archive(archive=archive)
                 for item in other_archive.iter_items():
+                    is_part = bool(item.get("part", False))
+                    if is_part:
+                        # borg 1.x created part files while checkpointing (in addition to the full
+                        # file in the final archive), like <filename>.borg_part_<part> with item.part >= 1.
+                        # borg2 archives do not have such special part items anymore.
+                        # so let's remove them from old archives also, considering there is no
+                        # code any more that deals with them in special ways (e.g. to get stats right).
+                        continue
                     if "chunks" in item:
                         chunks = []
                         for chunk_id, size in item.chunks:

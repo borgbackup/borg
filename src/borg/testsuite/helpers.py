@@ -693,12 +693,20 @@ def test_get_security_dir(monkeypatch):
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)
     if is_win32:
         monkeypatch.delenv("BORG_SECURITY_DIR", raising=False)
-        assert get_security_dir(legacy=False) == os.path.join(
+        assert get_security_dir() == os.path.join(
             os.path.expanduser("~"), "AppData", "Local", "borg", "borg", "security"
         )
-        assert get_security_dir(repository_id="1234", legacy=False) == os.path.join(
+        assert get_security_dir(repository_id="1234") == os.path.join(
             os.path.expanduser("~"), "AppData", "Local", "borg", "borg", "security", "1234"
         )
+    elif is_darwin:
+        monkeypatch.delenv("BORG_SECURITY_DIR", raising=False)
+        assert get_security_dir() == os.path.join(os.path.expanduser("~"), "Library", "Preferences", "borg", "security")
+        assert get_security_dir(repository_id="1234") == os.path.join(
+            os.path.expanduser("~"), "Library", "Preferences", "borg", "security", "1234"
+        )
+        monkeypatch.setenv("BORG_SECURITY_DIR", "/var/tmp")
+        assert get_security_dir() == "/var/tmp"
     else:
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         monkeypatch.delenv("BORG_SECURITY_DIR", raising=False)

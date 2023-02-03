@@ -81,7 +81,7 @@ def get_keys_dir(*, legacy=False):
     return keys_dir
 
 
-def get_security_dir(repository_id=None, *, legacy=True):
+def get_security_dir(repository_id=None, *, legacy=False):
     """Determine where to store local security information."""
     security_dir = os.environ.get("BORG_SECURITY_DIR")
     if security_dir is None:

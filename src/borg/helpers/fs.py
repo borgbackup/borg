@@ -130,7 +130,7 @@ def get_cache_dir(*, legacy=False):
     return cache_dir
 
 
-def get_config_dir(*, legacy=True):
+def get_config_dir(*, legacy=False):
     """Determine where to store whole config"""
 
     # Get config home path

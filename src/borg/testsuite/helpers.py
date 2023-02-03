@@ -614,7 +614,12 @@ def test_get_config_dir(monkeypatch):
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)
     if is_win32:
         monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
-        assert get_config_dir(legacy=False) == os.path.join(os.path.expanduser("~"), "AppData", "Local", "borg", "borg")
+        assert get_config_dir() == os.path.join(os.path.expanduser("~"), "AppData", "Local", "borg", "borg")
+    elif is_darwin:
+        monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
+        assert get_config_dir() == os.path.join(os.path.expanduser("~"), "Library", "Preferences", "borg")
+        monkeypatch.setenv("BORG_CONFIG_DIR", "/var/tmp")
+        assert get_config_dir() == "/var/tmp"
     else:
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)

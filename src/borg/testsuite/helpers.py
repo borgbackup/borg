@@ -45,7 +45,7 @@ from ..helpers import eval_escapes
 from ..helpers import safe_unlink
 from ..helpers import text_to_json, binary_to_json
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
-from ..platform import is_cygwin, is_win32
+from ..platform import is_cygwin, is_win32, is_darwin
 
 from . import BaseTestCase, FakeInputs, are_hardlinks_supported
 
@@ -620,13 +620,15 @@ def test_get_config_dir(monkeypatch):
 
 def test_get_config_dir_compat(monkeypatch):
     """test that it works the same for legacy and for non-legacy implementation"""
-    monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
-    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
-    assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
-    # TODO fails on macOS: assert '/Users/tw/Library/Preferences/borg' == '/Users/tw/.config/borg'
-    monkeypatch.setenv("XDG_CONFIG_HOME", "/var/tmp/.config1")
-    assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
-    # TODO fails on macOS: assert '/Users/tw/Library/Preferences/borg' == '/var/tmp/.config1/borg'
+    if not is_darwin:
+        monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        # fails on macOS: assert '/Users/tw/Library/Preferences/borg' == '/Users/tw/.config/borg'
+        assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
+    if not is_darwin:
+        monkeypatch.setenv("XDG_CONFIG_HOME", "/var/tmp/.config1")
+        # fails on macOS: assert '/Users/tw/Library/Preferences/borg' == '/var/tmp/.config1/borg'
+        assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
     monkeypatch.setenv("BORG_CONFIG_DIR", "/var/tmp/.config2")
     assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
 

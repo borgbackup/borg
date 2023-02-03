@@ -584,13 +584,18 @@ def test_get_base_dir(monkeypatch):
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)
     monkeypatch.delenv("HOME", raising=False)
     monkeypatch.delenv("USER", raising=False)
-    assert get_base_dir() == os.path.expanduser("~")
+    assert get_base_dir(legacy=True) == os.path.expanduser("~")
     monkeypatch.setenv("USER", "root")
-    assert get_base_dir() == os.path.expanduser("~root")
+    assert get_base_dir(legacy=True) == os.path.expanduser("~root")
     monkeypatch.setenv("HOME", "/var/tmp/home")
-    assert get_base_dir() == "/var/tmp/home"
+    assert get_base_dir(legacy=True) == "/var/tmp/home"
     monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
-    assert get_base_dir() == "/var/tmp/base"
+    assert get_base_dir(legacy=True) == "/var/tmp/base"
+    # non-legacy is much easier:
+    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    assert get_base_dir(legacy=False) is None
+    monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
+    assert get_base_dir(legacy=False) == "/var/tmp/base"
 
 
 def test_get_base_dir_compat(monkeypatch):

@@ -42,7 +42,7 @@ def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_dea
             raise
 
 
-def get_base_dir(*, legacy=True):
+def get_base_dir(*, legacy=False):
     """Get home directory / base directory for borg:
 
     - BORG_BASE_DIR, if set

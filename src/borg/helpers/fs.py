@@ -71,7 +71,7 @@ def join_base_dir(*paths, **kw):
     return None if base_dir is None else os.path.join(base_dir, *paths)
 
 
-def get_keys_dir(*, legacy=True):
+def get_keys_dir(*, legacy=False):
     """Determine where to repository keys and cache"""
     keys_dir = os.environ.get("BORG_KEYS_DIR")
     if keys_dir is None:

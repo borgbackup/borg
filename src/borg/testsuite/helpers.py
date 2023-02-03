@@ -672,9 +672,12 @@ def test_get_keys_dir(monkeypatch):
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)
     if is_win32:
         monkeypatch.delenv("BORG_KEYS_DIR", raising=False)
-        assert get_keys_dir(legacy=False) == os.path.join(
-            os.path.expanduser("~"), "AppData", "Local", "borg", "borg", "keys"
-        )
+        assert get_keys_dir() == os.path.join(os.path.expanduser("~"), "AppData", "Local", "borg", "borg", "keys")
+    elif is_darwin:
+        monkeypatch.delenv("BORG_KEYS_DIR", raising=False)
+        assert get_keys_dir() == os.path.join(os.path.expanduser("~"), "Library", "Preferences", "borg", "keys")
+        monkeypatch.setenv("BORG_KEYS_DIR", "/var/tmp")
+        assert get_keys_dir() == "/var/tmp"
     else:
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         monkeypatch.delenv("BORG_KEYS_DIR", raising=False)

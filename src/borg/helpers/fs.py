@@ -42,7 +42,7 @@ def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_dea
             raise
 
 
-def get_base_dir(legacy=True):
+def get_base_dir(*, legacy=True):
     """Get home directory / base directory for borg:
 
     - BORG_BASE_DIR, if set
@@ -71,29 +71,29 @@ def join_base_dir(*paths, **kw):
     return None if base_dir is None else os.path.join(base_dir, *paths)
 
 
-def get_keys_dir(legacy=True):
+def get_keys_dir(*, legacy=True):
     """Determine where to repository keys and cache"""
     keys_dir = os.environ.get("BORG_KEYS_DIR")
     if keys_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        keys_dir = os.path.join(get_config_dir(legacy), "keys")
+        keys_dir = os.path.join(get_config_dir(legacy=legacy), "keys")
     ensure_dir(keys_dir)
     return keys_dir
 
 
-def get_security_dir(repository_id=None, legacy=True):
+def get_security_dir(repository_id=None, *, legacy=True):
     """Determine where to store local security information."""
     security_dir = os.environ.get("BORG_SECURITY_DIR")
     if security_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        security_dir = os.path.join(get_config_dir(legacy), "security")
+        security_dir = os.path.join(get_config_dir(legacy=legacy), "security")
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
     ensure_dir(security_dir)
     return security_dir
 
 
-def get_cache_dir(legacy=True):
+def get_cache_dir(*, legacy=True):
     """Determine where to repository keys and cache"""
 
     if legacy:
@@ -130,7 +130,7 @@ def get_cache_dir(legacy=True):
     return cache_dir
 
 
-def get_config_dir(legacy=True):
+def get_config_dir(*, legacy=True):
     """Determine where to store whole config"""
 
     # Get config home path

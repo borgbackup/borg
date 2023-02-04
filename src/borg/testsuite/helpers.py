@@ -702,29 +702,28 @@ def test_get_keys_dir(monkeypatch):
 def test_get_security_dir(monkeypatch):
     """test that get_security_dir respects environment"""
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    home_dir = os.path.expanduser("~")
     if is_win32:
         monkeypatch.delenv("BORG_SECURITY_DIR", raising=False)
-        assert get_security_dir() == os.path.join(
-            os.path.expanduser("~"), "AppData", "Local", "borg", "borg", "security"
-        )
+        assert get_security_dir() == os.path.join(home_dir, "AppData", "Local", "borg", "borg", "security")
         assert get_security_dir(repository_id="1234") == os.path.join(
-            os.path.expanduser("~"), "AppData", "Local", "borg", "borg", "security", "1234"
+            home_dir, "AppData", "Local", "borg", "borg", "security", "1234"
         )
+        monkeypatch.setenv("BORG_SECURITY_DIR", home_dir)
+        assert get_security_dir() == home_dir
     elif is_darwin:
         monkeypatch.delenv("BORG_SECURITY_DIR", raising=False)
-        assert get_security_dir() == os.path.join(os.path.expanduser("~"), "Library", "Preferences", "borg", "security")
+        assert get_security_dir() == os.path.join(home_dir, "Library", "Preferences", "borg", "security")
         assert get_security_dir(repository_id="1234") == os.path.join(
-            os.path.expanduser("~"), "Library", "Preferences", "borg", "security", "1234"
+            home_dir, "Library", "Preferences", "borg", "security", "1234"
         )
         monkeypatch.setenv("BORG_SECURITY_DIR", "/var/tmp")
         assert get_security_dir() == "/var/tmp"
     else:
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         monkeypatch.delenv("BORG_SECURITY_DIR", raising=False)
-        assert get_security_dir() == os.path.join(os.path.expanduser("~"), ".config", "borg", "security")
-        assert get_security_dir(repository_id="1234") == os.path.join(
-            os.path.expanduser("~"), ".config", "borg", "security", "1234"
-        )
+        assert get_security_dir() == os.path.join(home_dir, ".config", "borg", "security")
+        assert get_security_dir(repository_id="1234") == os.path.join(home_dir, ".config", "borg", "security", "1234")
         monkeypatch.setenv("XDG_CONFIG_HOME", "/var/tmp/.config")
         assert get_security_dir() == os.path.join("/var/tmp/.config", "borg", "security")
         monkeypatch.setenv("BORG_SECURITY_DIR", "/var/tmp")

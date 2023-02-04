@@ -83,6 +83,7 @@ Compatibility notes:
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
   - removed --save-space option (does not change behaviour)
+- using --list together with --progress is now disallowed, #7219
 - the --glob-archives option was renamed to --match-archives (the short option
   name -a is unchanged) and extended to support different pattern styles:
 
@@ -98,34 +99,74 @@ Compatibility notes:
 
 New features:
 
-- adding used storage quota to borg info, #7121
+- info: add used storage quota, #7121
+- transfer: support --progress
+- create/recreate/import-tar: add --checkpoint-volume option
+- support date-based matching for archive selection,
+  add --newer/--older/--newest/--oldest options, #7062 #7296
 
 Fixes:
 
 - disallow --list with --progress, #7219
 - create: fix --list --dry-run output for directories, #7209
 - do no assume hardlink_master=True if not present, #7175
+- fix item_ptrs orphaned chunks of checkpoint archives
+- avoid orphan content chunks on BackupOSError, #6709
+- transfer: fix bug in obfuscated data upgrade code
+- fs.py: fix bug in f-string (thanks mypy!)
+- recreate: when --target is given, do not detect "nothing to do", #7254.
+- locking (win32): deal with os.rmdir/listdir PermissionErrors
+- locking: thread id must be parsed as hex from lock file name
+- extract: fix mtime when ResourceFork xattr is set (macOS specific), #7234
 
 Other changes:
 
-- switch archive and file timestamps to UTC, also output tzoffset
+- use local time / local timezone to output timestamps, #7283
 - update development.lock.txt, including a setuptools security fix, #7227
 - remove --save-space option (does not change behaviour)
+- remove part files from final archive
+- remove --consider-part-files, related stats code, update docs
+- transfer: drop part files
+- check: show id of orphaned chunks
+- ArchiveItem.cmdline list-of-str -> .command_line str, #7246
+- Item: symlinks: rename .source to .target, #7245
+- Item: make user/group/uid/gid optional
+- create: do not store user/group for stdin data by default, #7249
+- extract: chown only if we have u/g info in archived item, #7249
+- export-tar: for items w/o uid/gid, default to 0/0, #7249
+- fix some uid/gid lookup code / tests for win32
+- cache.py: be less verbose during cache sync
+- update bash completion script commands and options, #7273
 - validation / placeholders / JSON:
 
+  - implement (text|binary)_to_json: key (text), key_b64 (base64(binary))
+  - remove bpath, barchive, bcomment placeholders / JSON keys
+  - archive metadata: make sure hostname and username have no surrogate escapes
   - text attributes (like archive name, comment): validate more strictly, #2290
   - transfer: validate archive names and comment before transfer
-  - remove bpath, barchive, bcomment placeholders / JSON keys
+  - json output: use text_to_json (path, target), #6151
 - docs:
 
-  - docs and comments consistency and readability improvement
+  - docs and comments consistency, readability and spelling fixes
   - fix --progress display description, #7180
+  - document how borg deals with non-unicode bytes in JSON output
+  - document another way to get UTF-8 encoding on stdin/stdout/stderr, #2273
+  - pruning interprets timestamps in the local timezone where borg prune runs
+  - shellpattern: add license, use copyright/license markup
+  - key change-passphrase: fix --encryption value in examples
+  - remove BORG_LIBB2_PREFIX (not used any more)
 - tests:
 
-  - fix archiver tests on Windows
+  - fix archiver tests on Windows, add running the tests to Windows CI
   - fix tox4 passenv issue, #7199
   - github actions updates (fix deprecation warnings)
   - add tests for borg transfer/upgrade
+  - fix test hanging reading FIFO when `borg create` failed
+  - mypy inspired fixes / updates
+  - fix prune tests, prune in localtime
+  - do not look up uid 0 / gid 0, but current process uid/gid
+  - safe_unlink tests: use os.link to support win32 also
+  - fix test_size_on_disk_accurate for large st_blksize, #7250
 
 
 Version 2.0.0b4 (2022-11-27)

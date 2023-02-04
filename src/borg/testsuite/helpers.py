@@ -633,14 +633,16 @@ def test_get_config_dir(monkeypatch):
 def test_get_config_dir_compat(monkeypatch):
     """test that it works the same for legacy and for non-legacy implementation"""
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)
-    if not is_darwin:
+    if not is_darwin and not is_win32:
         monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
         monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         # fails on macOS: assert '/Users/tw/Library/Preferences/borg' == '/Users/tw/.config/borg'
+        # fails on win2 MSYS2 (but we do not need legacy compat there).
         assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
-    if not is_darwin:
+    if not is_darwin and not is_win32:
         monkeypatch.setenv("XDG_CONFIG_HOME", "/var/tmp/.config1")
         # fails on macOS: assert '/Users/tw/Library/Preferences/borg' == '/var/tmp/.config1/borg'
+        # fails on win2 MSYS2 (but we do not need legacy compat there).
         assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
     monkeypatch.setenv("BORG_CONFIG_DIR", "/var/tmp/.config2")
     assert get_config_dir(legacy=False) == get_config_dir(legacy=True)

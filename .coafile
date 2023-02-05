@@ -13,8 +13,7 @@ file_naming_convention = snake
 
 [all.python]
 files = src/borg/**/*.py
-bears = PEP8Bear, PyDocStyleBear, PyLintBear
-pep_ignore = E123,E125,E126,E127,E128,E226,E301,E309,E402,F401,F405,F811,W690
+bears = PyDocStyleBear, PyLintBear
 pylint_disable = C0103, C0111, C0112, C0122, C0123, C0301, C0302, C0325, C0330, C0411, C0412, C0413, C1801,
                  I1101,
                  W0102, W0104, W0106, W0108, W0120, W0201, W0212, W0221, W0231, W0401, W0404,

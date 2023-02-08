@@ -1,3 +1,5 @@
+# more hashindex tests. kept separate so we can use pytest here.
+
 import os
 import random
 

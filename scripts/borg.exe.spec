@@ -1,5 +1,5 @@
 # -*- mode: python -*-
-# this pyinstaller spec file is used to build borg binaries on posix platforms
+# this pyinstaller spec file is used to build borg binaries on posix platforms and Windows
 
 import os, sys
 
@@ -48,7 +48,8 @@ exe = EXE(pyz,
           debug=False,
           strip=False,
           upx=True,
-          console=True)
+          console=True,
+          icon='NONE')
 
 # Build a directory-based binary in addition to a packed
 # single file. This allows one to look at all included

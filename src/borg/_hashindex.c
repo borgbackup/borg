@@ -185,8 +185,8 @@ hashindex_lookup(HashIndex *index, const unsigned char *key, int *start_idx)
             return idx;
         }
         idx++;
-        if (idx >= index->num_buckets) {
-            idx -= index->num_buckets;
+        if (idx >= index->num_buckets) {  /* triggers at == already */
+            idx = 0;
         }
         if(idx == start) {
             /* We have done a full pass over all buckets.

@@ -253,8 +253,10 @@ int get_upper_limit(int num_buckets){
 }
 
 int get_min_empty(int num_buckets){
-    /* Differently from load, the effective load also considers tombstones (deleted buckets). */
-    return (int)(num_buckets * (1.0 - HASH_MAX_EFF_LOAD));
+    /* Differently from load, the effective load also considers tombstones (deleted buckets).
+     * We always add 1, so this never can return 0 (0 empty buckets would be a bad HT state).
+     */
+    return 1 + (int)(num_buckets * (1.0 - HASH_MAX_EFF_LOAD));
 }
 
 int size_idx(int size){

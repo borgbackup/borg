@@ -8,9 +8,14 @@ from ..hashindex import NSIndex
 
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
 def test_hashindex_stress():
-    """checks if the hashtable behaves as expected"""
+    """checks if the hashtable behaves as expected
+
+    This can be used in _hashindex.c before running this test to provoke more collisions (don't forget to compile):
+    #define HASH_MAX_LOAD .99
+    #define HASH_MAX_EFF_LOAD .999
+    """
     ENTRIES = 10000
-    LOOPS = 100
+    LOOPS = 1000
     idx = NSIndex()
     kv = {}
     for i in range(LOOPS):

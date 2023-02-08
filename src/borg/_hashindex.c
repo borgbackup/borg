@@ -225,6 +225,8 @@ hashindex_resize(HashIndex *index, int capacity)
             return 0;
         }
     }
+    assert(index->num_entries == new->num_entries);
+
     hashindex_free_buckets(index);
     index->buckets = new->buckets;
     index->num_buckets = new->num_buckets;

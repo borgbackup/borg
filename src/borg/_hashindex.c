@@ -160,22 +160,24 @@ static int
 hashindex_lookup(HashIndex *index, const unsigned char *key, int *start_idx)
 {
     int didx = -1;
-    int start = hashindex_index(index, key);
+    int start = hashindex_index(index, key);  /* perfect index for this key, if there is no collision. */
     int idx = start;
     for(;;) {
         if(BUCKET_IS_EMPTY(index, idx))
         {
-            break;
+            break;  /* if we encounter an empty bucket, we do not need to look any further. */
         }
         if(BUCKET_IS_DELETED(index, idx)) {
             if(didx == -1) {
-                didx = idx;
+                didx = idx;  /* remember the index of the first deleted bucket. */
             }
         }
         else if(BUCKET_MATCHES_KEY(index, idx, key)) {
+            /* we found the bucket with the key we are looking for! */
             if (didx != -1) {
                 // note: although lookup is logically a read-only operation,
-                // we optimize (change) the hashindex here "on the fly".
+                // we optimize (change) the hashindex here "on the fly":
+                // swap this full bucket with a previous deleted/tombstone bucket.
                 memcpy(BUCKET_ADDR(index, didx), BUCKET_ADDR(index, idx), index->bucket_size);
                 BUCKET_MARK_DELETED(index, idx);
                 idx = didx;
@@ -187,10 +189,16 @@ hashindex_lookup(HashIndex *index, const unsigned char *key, int *start_idx)
             idx -= index->num_buckets;
         }
         if(idx == start) {
+            /* we have done a full pass over all buckets. */
             break;
         }
     }
+    /* we get here if we did not find a bucket with the key we searched for. */
     if (start_idx != NULL) {
+        /* by giving a non-NULL pointer in start_idx, caller can request to
+         * get the index of the first empty or deleted bucket we encountered,
+         * e.g. to add a new entry for that key into that bucket.
+         */
         (*start_idx) = (didx == -1) ? idx : didx;
     }
     return -1;

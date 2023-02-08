@@ -749,8 +749,7 @@ hashindex_set(HashIndex *index, const unsigned char *key, const void *value)
         }
         idx = start_idx;
         if(BUCKET_IS_EMPTY(index, idx)){
-            index->num_empty--;
-            if(index->num_empty < index->min_empty) {
+            if(index->num_empty <= index->min_empty) {
                 /* too many tombstones here / not enough empty buckets, do a same-size rebuild */
                 if(!hashindex_resize(index, index->num_buckets)) {
                     return 0;
@@ -763,6 +762,7 @@ hashindex_set(HashIndex *index, const unsigned char *key, const void *value)
                 assert(BUCKET_IS_EMPTY(index, start_idx));
                 idx = start_idx;
             }
+            index->num_empty--;
         } else {
             /* Bucket must be either EMPTY (see above) or DELETED. */
             assert(BUCKET_IS_DELETED(index, idx));

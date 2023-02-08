@@ -763,10 +763,9 @@ hashindex_set(HashIndex *index, const unsigned char *key, const void *value)
                 assert(BUCKET_IS_EMPTY(index, start_idx));
                 idx = start_idx;
             }
-        } else if(BUCKET_IS_DELETED(index, idx)) {
-            /* as expected, nothing to do */
         } else {
-            assert(0);  /* bucket is full, must not happen! */
+            /* Bucket must be either EMPTY (see above) or DELETED. */
+            assert(BUCKET_IS_DELETED(index, idx));
         }
         ptr = BUCKET_ADDR(index, idx);
         memcpy(ptr, key, index->key_size);

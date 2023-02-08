@@ -8,21 +8,12 @@ import pytest
 from ..hashindex import NSIndex
 
 
-@pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
-def test_hashindex_stress():
-    """checks if the hashtable behaves as expected
-
-    This can be used in _hashindex.c before running this test to provoke more collisions (don't forget to compile):
-    #define HASH_MAX_LOAD .99
-    #define HASH_MAX_EFF_LOAD .999
-    """
-    ENTRIES = 10000
-    LOOPS = 1000
+def make_hashtables(*, entries, loops):
     idx = NSIndex()
     kv = {}
-    for i in range(LOOPS):
+    for i in range(loops):
         # put some entries
-        for j in range(ENTRIES):
+        for j in range(entries):
             k = random.randbytes(32)
             v = random.randint(0, NSIndex.MAX_VALUE - 1)
             idx[k] = (v, v, v)
@@ -37,3 +28,15 @@ def test_hashindex_stress():
             assert idx[k] == (v, v, v)
         # check entry count
         assert len(kv) == len(idx)
+    return idx, kv
+
+
+@pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+def test_hashindex_stress():
+    """checks if the hashtable behaves as expected
+
+    This can be used in _hashindex.c before running this test to provoke more collisions (don't forget to compile):
+    #define HASH_MAX_LOAD .99
+    #define HASH_MAX_EFF_LOAD .999
+    """
+    make_hashtables(entries=10000, loops=1000)  # we do quite some assertions while making them

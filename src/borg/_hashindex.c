@@ -160,22 +160,24 @@ static int
 hashindex_lookup(HashIndex *index, const unsigned char *key, int *start_idx)
 {
     int didx = -1;
-    int start = hashindex_index(index, key);
+    int start = hashindex_index(index, key);  /* perfect index for this key, if there is no collision. */
     int idx = start;
     for(;;) {
         if(BUCKET_IS_EMPTY(index, idx))
         {
-            break;
+            break;  /* if we encounter an empty bucket, we do not need to look any further. */
         }
         if(BUCKET_IS_DELETED(index, idx)) {
             if(didx == -1) {
-                didx = idx;
+                didx = idx;  /* remember the index of the first deleted bucket. */
             }
         }
         else if(BUCKET_MATCHES_KEY(index, idx, key)) {
+            /* we found the bucket with the key we are looking for! */
             if (didx != -1) {
                 // note: although lookup is logically a read-only operation,
-                // we optimize (change) the hashindex here "on the fly".
+                // we optimize (change) the hashindex here "on the fly":
+                // swap this full bucket with a previous deleted/tombstone bucket.
                 memcpy(BUCKET_ADDR(index, didx), BUCKET_ADDR(index, idx), index->bucket_size);
                 BUCKET_MARK_DELETED(index, idx);
                 idx = didx;
@@ -183,14 +185,24 @@ hashindex_lookup(HashIndex *index, const unsigned char *key, int *start_idx)
             return idx;
         }
         idx++;
-        if (idx >= index->num_buckets) {
-            idx -= index->num_buckets;
+        if (idx >= index->num_buckets) {  /* triggers at == already */
+            idx = 0;
         }
-        if(idx == start) {
-            break;
-        }
+        /* When idx == start, we have done a full pass over all buckets.
+         * - We did not find a bucket with the key we searched for.
+         * - We did not find an empty bucket either.
+         * So all buckets are either full or deleted/tombstones.
+         * This is an invalid state we never should get into, see
+         * upper_limit and min_empty.
+         */
+        assert(idx != start);
     }
+    /* we get here if we did not find a bucket with the key we searched for. */
     if (start_idx != NULL) {
+        /* by giving a non-NULL pointer in start_idx, caller can request to
+         * get the index of the first empty or deleted bucket we encountered,
+         * e.g. to add a new entry for that key into that bucket.
+         */
         (*start_idx) = (didx == -1) ? idx : didx;
     }
     return -1;
@@ -213,6 +225,8 @@ hashindex_resize(HashIndex *index, int capacity)
             return 0;
         }
     }
+    assert(index->num_entries == new->num_entries);
+
     hashindex_free_buckets(index);
     index->buckets = new->buckets;
     index->num_buckets = new->num_buckets;
@@ -239,21 +253,17 @@ int get_upper_limit(int num_buckets){
 }
 
 int get_min_empty(int num_buckets){
-    /* Differently from load, the effective load also considers tombstones (deleted buckets). */
-    return (int)(num_buckets * (1.0 - HASH_MAX_EFF_LOAD));
+    /* Differently from load, the effective load also considers tombstones (deleted buckets).
+     * We always add 1, so this never can return 0 (0 empty buckets would be a bad HT state).
+     */
+    return 1 + (int)(num_buckets * (1.0 - HASH_MAX_EFF_LOAD));
 }
 
 int size_idx(int size){
-    /* find the hash_sizes index with entry >= size */
-    int elems = NELEMS(hash_sizes);
-    int entry, i=0;
-    do{
-        entry = hash_sizes[i++];
-    }while((entry < size) && (i < elems));
-    if (i >= elems)
-        return elems - 1;
-    i--;
-    return i;
+    /* find the smallest hash_sizes index with entry >= size */
+    int i = NELEMS(hash_sizes) - 1;
+    while(i >= 0 && hash_sizes[i] >= size) i--;
+    return i + 1;
 }
 
 int fit_size(int current){
@@ -731,26 +741,25 @@ static int
 hashindex_set(HashIndex *index, const unsigned char *key, const void *value)
 {
     int start_idx;
-    int idx = hashindex_lookup(index, key, &start_idx);
+    int idx = hashindex_lookup(index, key, &start_idx);  /* if idx < 0: start_idx -> EMPTY or DELETED */
     uint8_t *ptr;
     if(idx < 0)
     {
         if(index->num_entries > index->upper_limit) {
+            /* hashtable too full, grow it! */
             if(!hashindex_resize(index, grow_size(index->num_buckets))) {
                 return 0;
             }
-            start_idx = hashindex_index(index, key);
+            /* we have just built a fresh hashtable and removed all tombstones,
+             * so we only have EMPTY or USED buckets, but no DELETED ones any more.
+             */
+            idx = hashindex_lookup(index, key, &start_idx);
+            assert(idx < 0);
+            assert(BUCKET_IS_EMPTY(index, start_idx));
         }
         idx = start_idx;
-        while(!BUCKET_IS_EMPTY(index, idx) && !BUCKET_IS_DELETED(index, idx)) {
-            idx++;
-            if (idx >= index->num_buckets){
-                idx -= index->num_buckets;
-            }
-        }
         if(BUCKET_IS_EMPTY(index, idx)){
-            index->num_empty--;
-            if(index->num_empty < index->min_empty) {
+            if(index->num_empty <= index->min_empty) {
                 /* too many tombstones here / not enough empty buckets, do a same-size rebuild */
                 if(!hashindex_resize(index, index->num_buckets)) {
                     return 0;
@@ -758,14 +767,15 @@ hashindex_set(HashIndex *index, const unsigned char *key, const void *value)
                 /* we have just built a fresh hashtable and removed all tombstones,
                  * so we only have EMPTY or USED buckets, but no DELETED ones any more.
                  */
-                idx = start_idx = hashindex_index(index, key);
-                while(!BUCKET_IS_EMPTY(index, idx)) {
-                    idx++;
-                    if (idx >= index->num_buckets){
-                        idx -= index->num_buckets;
-                    }
-                }
+                idx = hashindex_lookup(index, key, &start_idx);
+                assert(idx < 0);
+                assert(BUCKET_IS_EMPTY(index, start_idx));
+                idx = start_idx;
             }
+            index->num_empty--;
+        } else {
+            /* Bucket must be either EMPTY (see above) or DELETED. */
+            assert(BUCKET_IS_DELETED(index, idx));
         }
         ptr = BUCKET_ADDR(index, idx);
         memcpy(ptr, key, index->key_size);

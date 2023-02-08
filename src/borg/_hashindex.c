@@ -258,16 +258,10 @@ int get_min_empty(int num_buckets){
 }
 
 int size_idx(int size){
-    /* find the hash_sizes index with entry >= size */
-    int elems = NELEMS(hash_sizes);
-    int entry, i=0;
-    do{
-        entry = hash_sizes[i++];
-    }while((entry < size) && (i < elems));
-    if (i >= elems)
-        return elems - 1;
-    i--;
-    return i;
+    /* find the smallest hash_sizes index with entry >= size */
+    int i = NELEMS(hash_sizes) - 1;
+    while(i >= 0 && hash_sizes[i] >= size) i--;
+    return i + 1;
 }
 
 int fit_size(int current){

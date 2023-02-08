@@ -40,3 +40,29 @@ def test_hashindex_stress():
     #define HASH_MAX_EFF_LOAD .999
     """
     make_hashtables(entries=10000, loops=1000)  # we do quite some assertions while making them
+
+
+def test_hashindex_compact():
+    """test that we do not lose or corrupt data by the compaction nor by expanding/rebuilding"""
+    idx, kv = make_hashtables(entries=5000, loops=5)
+    size_noncompact = idx.size()
+    # compact the hashtable (remove empty/tombstone buckets)
+    saved_space = idx.compact()
+    # did we actually compact (reduce space usage)?
+    size_compact = idx.size()
+    assert saved_space > 0
+    assert size_noncompact - size_compact == saved_space
+    # did we lose anything?
+    for k, v in kv.items():
+        assert k in idx and idx[k] == (v, v, v)
+    assert len(idx) == len(kv)
+    # now expand the hashtable again. trigger a resize/rebuild by adding an entry.
+    k = b"x" * 32
+    idx[k] = (0, 0, 0)
+    kv[k] = 0
+    size_rebuilt = idx.size()
+    assert size_rebuilt > size_compact + 1
+    # did we lose anything?
+    for k, v in kv.items():
+        assert k in idx and idx[k] == (v, v, v)
+    assert len(idx) == len(kv)

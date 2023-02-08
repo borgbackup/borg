@@ -189,8 +189,14 @@ hashindex_lookup(HashIndex *index, const unsigned char *key, int *start_idx)
             idx -= index->num_buckets;
         }
         if(idx == start) {
-            /* we have done a full pass over all buckets. */
-            break;
+            /* We have done a full pass over all buckets.
+             * - We did not find a bucket with the key we searched for.
+             * - We did not find an empty bucket either.
+             * So all buckets are either full or deleted/tombstones.
+             * This is an invalid state we never should get into, see
+             * upper_limit and min_empty.
+             */
+            assert(0);  /* should never happen - something is wrong here. */
         }
     }
     /* we get here if we did not find a bucket with the key we searched for. */

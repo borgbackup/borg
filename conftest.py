@@ -20,13 +20,12 @@ from borg.testsuite.platform import fakeroot_detected  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def clean_env(tmpdir_factory, monkeypatch):
-    # avoid that we access / modify the user's normal .config / .cache directory:
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmpdir_factory.mktemp("xdg-config-home")))
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmpdir_factory.mktemp("xdg-cache-home")))
     # also avoid to use anything from the outside environment:
     keys = [key for key in os.environ if key.startswith("BORG_") and key not in ("BORG_FUSE_IMPL",)]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
+    # avoid that we access / modify the user's normal .config / .cache directory:
+    monkeypatch.setenv("BORG_BASE_DIR", str(tmpdir_factory.mktemp("borg-base-dir")))
     # Speed up tests
     monkeypatch.setenv("BORG_TESTONLY_WEAKEN_KDF", "1")
 

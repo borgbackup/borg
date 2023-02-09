@@ -134,7 +134,7 @@ jobs:
         #sudo -E bash -c "tox -e py"
         tox --skip-missing-interpreters
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
       env:
         OS: ${{ runner.os }}
         python: ${{ matrix.python-version }}

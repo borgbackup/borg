@@ -191,11 +191,14 @@ hashindex_lookup(HashIndex *index, const unsigned char *key, int *start_idx)
         /* When idx == start, we have done a full pass over all buckets.
          * - We did not find a bucket with the key we searched for.
          * - We did not find an empty bucket either.
-         * So all buckets are either full or deleted/tombstones.
-         * This is an invalid state we never should get into, see
-         * upper_limit and min_empty.
+         * - We may have found a deleted/tombstone bucket, though.
+         * This can easily happen if we have a compact hashtable.
          */
-        assert(idx != start);
+        if(idx == start) {
+            if(didx != -1)
+                break;  /* we have found a deleted/tombstone bucket at least */
+            return -2;  /* HT is completely full, no empty or deleted buckets. */
+        }
     }
     /* we get here if we did not find a bucket with the key we searched for. */
     if (start_idx != NULL) {
@@ -745,8 +748,8 @@ hashindex_set(HashIndex *index, const unsigned char *key, const void *value)
     uint8_t *ptr;
     if(idx < 0)
     {
-        if(index->num_entries > index->upper_limit) {
-            /* hashtable too full, grow it! */
+        if(index->num_entries >= index->upper_limit || idx == -2) {
+            /* hashtable too full or even a compact hashtable, grow/rebuild it! */
             if(!hashindex_resize(index, grow_size(index->num_buckets))) {
                 return 0;
             }
@@ -754,7 +757,7 @@ hashindex_set(HashIndex *index, const unsigned char *key, const void *value)
              * so we only have EMPTY or USED buckets, but no DELETED ones any more.
              */
             idx = hashindex_lookup(index, key, &start_idx);
-            assert(idx < 0);
+            assert(idx == -1);
             assert(BUCKET_IS_EMPTY(index, start_idx));
         }
         idx = start_idx;
@@ -768,7 +771,7 @@ hashindex_set(HashIndex *index, const unsigned char *key, const void *value)
                  * so we only have EMPTY or USED buckets, but no DELETED ones any more.
                  */
                 idx = hashindex_lookup(index, key, &start_idx);
-                assert(idx < 0);
+                assert(idx == -1);
                 assert(BUCKET_IS_EMPTY(index, start_idx));
                 idx = start_idx;
             }
@@ -879,6 +882,8 @@ hashindex_compact(HashIndex *index)
 
     index->num_buckets = index->num_entries;
     index->num_empty = 0;
+    index->min_empty = 0;
+    index->upper_limit = index->num_entries;  /* triggers a resize/rebuild when a new entry is added */
     return saved_size;
 }
 

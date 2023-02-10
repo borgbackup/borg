@@ -54,7 +54,7 @@ from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, llfuse
-from . import BaseTestCase, changedir, environment_variable, no_selinux
+from . import BaseTestCase, changedir, environment_variable, no_selinux, same_ts_ns
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected, is_darwin
 from .upgrader import make_attic_repo
@@ -521,7 +521,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # make sure borg fixes the directory mtime after touching it
         sti = os.stat('input/dir2')
         sto = os.stat('output/input/dir2')
-        assert sti.st_mtime_ns == sto.st_mtime_ns
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
 
     @pytest.mark.skipif(not is_utime_fully_supported(),
                         reason='cannot properly setup and execute test without utime')
@@ -540,7 +540,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # make sure borg fixes the directory mtime after touching it
         sti = os.stat('input/dir2')
         sto = os.stat('output/input/dir2')
-        assert sti.st_mtime_ns == sto.st_mtime_ns
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
 
     @pytest.mark.skipif(not is_utime_fully_supported(),
                         reason='cannot properly setup and execute test without utime')
@@ -559,7 +559,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # make sure borg fixes the directory mtime after touching it
         sti = os.stat('input/dir2')
         sto = os.stat('output/input/dir2')
-        assert sti.st_mtime_ns == sto.st_mtime_ns
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
     def test_atime(self):
@@ -573,7 +573,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             else:
                 atime_after = os.stat(some_file).st_atime_ns
                 noatime_used = flags_noatime != flags_normal
-                return noatime_used and atime_before == atime_after
+                return noatime_used and same_ts_ns(atime_before, atime_after)
 
         self.create_test_files()
         atime, mtime = 123456780, 234567890
@@ -585,12 +585,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
-        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
+        assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
         if have_noatime:
-            assert sti.st_atime_ns == sto.st_atime_ns == atime * 1e9
+            assert same_ts_ns(sti.st_atime_ns, sto.st_atime_ns)
+            assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
         else:
             # it touched the input file's atime while backing it up
-            assert sto.st_atime_ns == atime * 1e9
+            assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
     @pytest.mark.skipif(not is_birthtime_fully_supported(), reason='cannot properly setup and execute test without birthtime')
@@ -605,8 +607,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
-        assert int(sti.st_birthtime * 1e9) == int(sto.st_birthtime * 1e9) == birthtime * 1e9
-        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
+        assert same_ts_ns(sti.st_birthtime * 1e9, sto.st_birthtime * 1e9)
+        assert same_ts_ns(sto.st_birthtime * 1e9, birthtime * 1e9)
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
+        assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason='cannot properly setup and execute test without utime')
     @pytest.mark.skipif(not is_birthtime_fully_supported(), reason='cannot properly setup and execute test without birthtime')
@@ -621,9 +625,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd('extract', self.repository_location + '::test')
         sti = os.stat('input/file1')
         sto = os.stat('output/input/file1')
-        assert int(sti.st_birthtime * 1e9) == birthtime * 1e9
-        assert int(sto.st_birthtime * 1e9) == mtime * 1e9
-        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
+        assert same_ts_ns(sti.st_birthtime * 1e9, birthtime * 1e9)
+        assert same_ts_ns(sto.st_birthtime * 1e9, mtime * 1e9)
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
+        assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
 
     def _extract_repository_id(self, path):
         with Repository(self.repository_path) as repository:
@@ -1497,9 +1502,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # atime_extracted = os.stat(extracted_path).st_atime_ns
             xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
         assert xa_value_extracted == xa_value
-        assert birthtime_extracted == birthtime_expected
-        assert mtime_extracted == mtime_expected
-        # assert atime_extracted == atime_expected  # still broken, but not really important.
+        assert same_ts_ns(birthtime_extracted * 1e9, birthtime_expected * 1e9)
+        assert same_ts_ns(mtime_extracted, mtime_expected)
+        # assert same_ts_ns(atime_extracted, atime_expected)  # still broken, but not really important.
 
     def test_path_normalization(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -2589,7 +2594,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             else:
                 atime_after = os.stat(some_file).st_atime_ns
                 noatime_used = flags_noatime != flags_normal
-                return noatime_used and atime_before == atime_after
+                return noatime_used and same_ts_ns(atime_before, atime_after)
 
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_test_files()
@@ -2623,9 +2628,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert sti1.st_gid == sto1.st_gid
             assert sti1.st_size == sto1.st_size
             if have_noatime:
-                assert sti1.st_atime == sto1.st_atime
-            assert sti1.st_ctime == sto1.st_ctime
-            assert sti1.st_mtime == sto1.st_mtime
+                assert same_ts_ns(sti1.st_atime * 1e9, sto1.st_atime * 1e9)
+            assert same_ts_ns(sti1.st_ctime * 1e9, sto1.st_ctime * 1e9)
+            assert same_ts_ns(sti1.st_mtime * 1e9, sto1.st_mtime * 1e9)
             if are_hardlinks_supported():
                 # note: there is another hardlink to this, see below
                 assert sti1.st_nlink == sto1.st_nlink == 2

@@ -4652,10 +4652,10 @@ class Archiver:
                                         'If no MODE is given, `if-different` will be used. '
                                         'Not passing --recompress is equivalent to "--recompress never".')
         archive_group.add_argument('--chunker-params', metavar='PARAMS', dest='chunker_params', action=Highlander,
-                                   type=ChunkerParams, default=CHUNKER_PARAMS,
-                                   help='specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
-                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. '
-                                        'default: %s,%d,%d,%d,%d' % CHUNKER_PARAMS)
+                                   type=ChunkerParams, default=None,
+                                   help='rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, '
+                                        'HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. '
+                                        'default: do not rechunk')
 
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),

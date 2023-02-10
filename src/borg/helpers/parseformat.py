@@ -876,7 +876,7 @@ class ItemFormatter(BaseFormatter):
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
     def format_item_json(self, item):
-        return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder) + "\n"
+        return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder, sort_keys=True) + "\n"
 
     def get_item_data(self, item):
         item_data = {}

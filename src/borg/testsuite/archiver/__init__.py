@@ -195,6 +195,11 @@ class ArchiverTestCaseBase(BaseTestCase):
         filename = os.path.join(self.input_path, name)
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
+        self.write_to_file(filename, size=size, append_path=False, contents=contents)
+
+    def write_to_file(self, filename, size=0, append_path=True, contents=None):
+        if append_path:
+            filename = os.path.join(self.input_path, filename)
         with open(filename, "wb") as fd:
             if contents is None:
                 contents = b"X" * size

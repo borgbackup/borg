@@ -7,6 +7,7 @@ from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported
 from ..platform import is_win32
 from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
+from time import sleep
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -218,10 +219,34 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert not any(get_changes("input/hardlink_target_replaced", joutput))
 
-        do_asserts(self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1a"), True)
+        output = self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1a", "--content-only")
+        do_asserts(output, True)
         # We expect exit_code=1 due to the chunker params warning
-        do_asserts(self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1b", exit_code=1), False)
-        do_json_asserts(self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1a", "--json-lines"), True)
+        output = self.cmd(
+            f"--repo={self.repository_location}", "diff", "test0", "test1b", "--content-only", exit_code=1
+        )
+        do_asserts(output, False)
+        output = self.cmd(
+            f"--repo={self.repository_location}", "diff", "test0", "test1a", "--json-lines", "--content-only"
+        )
+        do_json_asserts(output, True)
+
+    def test_time_diffs(self):
+        self.create_regular_file("test_file", size=10)
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        self.cmd(f"--repo={self.repository_location}", "create", "archive1", "input")
+        sleep(1)
+        os.unlink("input/test_file")
+        self.create_regular_file("test_file", size=10)
+        self.cmd(f"--repo={self.repository_location}", "create", "archive2", "input", exit_code=0)
+        output = self.cmd(f"--repo={self.repository_location}", "diff", "archive1", "archive2")
+        self.assert_in("mtime", output)
+        self.assert_in("ctime", output)
+        os.chmod("input/test_file", 777)
+        self.cmd(f"--repo={self.repository_location}", "create", "archive3", "input", exit_code=0)
+        output = self.cmd(f"--repo={self.repository_location}", "diff", "archive2", "archive3")
+        self.assert_not_in("mtime", output)
+        self.assert_in("ctime", output)
 
     def test_sort_option(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
@@ -242,7 +267,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file("d_file_added", size=256)
         self.cmd(f"--repo={self.repository_location}", "create", "test1", "input")
 
-        output = self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1", "--sort")
+        output = self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1", "--sort", "--content-only")
         expected = [
             "a_file_removed",
             "b_file_added",

@@ -3080,6 +3080,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         num_chunks = int(output)
         assert num_chunks == 2
 
+    def test_recreate_no_rechunkify(self):
+        with open(os.path.join(self.input_path, 'file'), 'wb') as fd:
+            fd.write(b'a' * 8192)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        # first create an archive with non-default chunker params:
+        self.cmd('create', '--chunker-params', '7,9,8,128', self.repository_location + '::test', 'input')
+        output = self.cmd('list', self.repository_location + '::test', 'input/file',
+                          '--format', '{num_chunks}')
+        num_chunks = int(output)
+        # now recreate the archive and do NOT specify chunker params:
+        output = self.cmd('recreate', '--debug', '--exclude', 'filename_never_matches', self.repository_location + '::test')
+        assert 'Rechunking' not in output  # we did not give --chunker-params, so it must not rechunk!
+        output = self.cmd('list', self.repository_location + '::test', 'input/file',
+                          '--format', '{num_chunks}')
+        num_chunks_after_recreate = int(output)
+        assert num_chunks == num_chunks_after_recreate
+
     def test_recreate_recompress(self):
         self.create_regular_file('compressible', size=10000)
         self.cmd('init', '--encryption=repokey', self.repository_location)

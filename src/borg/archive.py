@@ -2341,10 +2341,10 @@ class ArchiveRecreater:
 
         for item in archive.iter_items():
             if not matcher.match(item.path):
-                self.print_file_status("x", item.path)
+                self.print_file_status("-", item.path)  # excluded (either by "-" or by "!")
                 continue
             if self.dry_run:
-                self.print_file_status("-", item.path)
+                self.print_file_status("+", item.path)  # included
             else:
                 self.process_item(archive, target, item)
         if self.progress:

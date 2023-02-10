@@ -171,6 +171,33 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         num_chunks = int(output)
         assert num_chunks == 2
 
+    def test_recreate_no_rechunkify(self):
+        with open(os.path.join(self.input_path, "file"), "wb") as fd:
+            fd.write(b"a" * 8192)
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        # first create an archive with non-default chunker params:
+        self.cmd(f"--repo={self.repository_location}", "create", "test", "input", "--chunker-params", "7,9,8,128")
+        output = self.cmd(
+            f"--repo={self.repository_location}", "list", "test", "input/file", "--format", "{num_chunks}"
+        )
+        num_chunks = int(output)
+        # now recreate the archive and do NOT specify chunker params:
+        output = self.cmd(
+            f"--repo={self.repository_location}",
+            "recreate",
+            "--debug",
+            "--exclude",
+            "filename_never_matches",
+            "-a",
+            "test",
+        )
+        assert "Rechunking" not in output  # we did not give --chunker-params, so it must not rechunk!
+        output = self.cmd(
+            f"--repo={self.repository_location}", "list", "test", "input/file", "--format", "{num_chunks}"
+        )
+        num_chunks_after_recreate = int(output)
+        assert num_chunks == num_chunks_after_recreate
+
     def test_recreate_recompress(self):
         self.create_regular_file("compressible", size=10000)
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)

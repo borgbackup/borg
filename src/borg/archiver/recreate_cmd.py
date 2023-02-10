@@ -219,10 +219,10 @@ class RecreateMixIn:
             dest="chunker_params",
             action=Highlander,
             type=ChunkerParams,
-            default=CHUNKER_PARAMS,
-            help="specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
-            "HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the current defaults. "
-            "default: %s,%d,%d,%d,%d" % CHUNKER_PARAMS,
+            default=None,
+            help="rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
+            "HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. "
+            "default: do not rechunk",
         )
 
         subparser.add_argument(

@@ -11,7 +11,7 @@ from ...constants import *  # NOQA
 from ...locking import Lock
 from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, llfuse
-from .. import changedir, no_selinux
+from .. import changedir, no_selinux, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform import fakeroot_detected
 from . import (
@@ -109,9 +109,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert sti1.st_gid == sto1.st_gid
             assert sti1.st_size == sto1.st_size
             if have_noatime:
-                assert sti1.st_atime == sto1.st_atime
-            assert sti1.st_ctime == sto1.st_ctime
-            assert sti1.st_mtime == sto1.st_mtime
+                assert same_ts_ns(sti1.st_atime * 1e9, sto1.st_atime * 1e9)
+            assert same_ts_ns(sti1.st_ctime * 1e9, sto1.st_ctime * 1e9)
+            assert same_ts_ns(sti1.st_mtime * 1e9, sto1.st_mtime * 1e9)
             if are_hardlinks_supported():
                 # note: there is another hardlink to this, see below
                 assert sti1.st_nlink == sto1.st_nlink == 2

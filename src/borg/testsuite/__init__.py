@@ -42,14 +42,21 @@ except OSError:
 
 # The mtime get/set precision varies on different OS and Python versions
 if posix and "HAVE_FUTIMENS" in getattr(posix, "_have_functions", []):
-    st_mtime_ns_round = 0
+    st_mtime_ns_round = 0  # 1ns resolution
 elif "HAVE_UTIMES" in sysconfig.get_config_vars():
-    st_mtime_ns_round = -6
+    st_mtime_ns_round = -3  # 1us resolution
 else:
-    st_mtime_ns_round = -9
+    st_mtime_ns_round = -9  # 1s resolution
 
 if sys.platform.startswith("netbsd"):
-    st_mtime_ns_round = -4  # only >1 microsecond resolution here?
+    st_mtime_ns_round = -4  # 10us - strange: only >1 microsecond resolution here?
+
+
+def same_ts_ns(ts_ns1, ts_ns2):
+    """compare 2 timestamps (both in nanoseconds) whether they are (roughly) equal"""
+    diff_ts = int(abs(ts_ns1 - ts_ns2))
+    diff_max = 10 ** (-st_mtime_ns_round)
+    return diff_ts <= diff_max
 
 
 @contextmanager

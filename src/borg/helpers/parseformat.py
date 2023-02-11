@@ -472,16 +472,6 @@ class Location:
             p = os.path.normpath(p)
             return ("/." + p) if relative else p
 
-        if is_win32:
-            m = self.win_file_re.match(text)
-            if m:
-                self.proto = "file"
-                self.path = m.group("path")
-                return True
-
-            # On windows we currently only support windows paths.
-            return False
-
         m = self.ssh_re.match(text)
         if m:
             self.proto = m.group("proto")

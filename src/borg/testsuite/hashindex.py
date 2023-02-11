@@ -464,17 +464,6 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         index = ChunkIndex.read(self.index_data)
         return index
 
-    def index_to_data(self, index):
-        data = io.BytesIO()
-        index.write(data)
-        return data.getvalue()
-
-    def index_from_data_compact_to_data(self):
-        index = self.index_from_data()
-        index.compact()
-        compact_index = self.index_to_data(index)
-        return compact_index
-
     def write_entry(self, key, *values):
         self.index_data.write(key)
         for value in values:
@@ -486,6 +475,11 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
     def write_deleted(self, key):
         self.write_entry(key, 0xFFFFFFFE, 0, 0)
 
+    def compare_indexes(self, idx1, idx2):
+        for k, v in idx1.iteritems():
+            assert v == idx2[k]
+        assert len(idx1) == len(idx2)
+
     def test_simple(self):
         self.index(num_entries=3, num_buckets=6, num_empty=2)
         self.write_entry(H2(0), 1, 2, 3)
@@ -495,13 +489,12 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         self.write_entry(H2(4), 8, 9, 10)
         self.write_empty(H2(5))
 
-        compact_index = self.index_from_data_compact_to_data()
-
-        self.index(num_entries=3, num_buckets=3, num_empty=0)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        assert compact_index == self.index_data.getvalue()
+        idx = self.index_from_data()
+        cpt = self.index_from_data()
+        cpt.compact()
+        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
+        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
+        self.compare_indexes(idx, cpt)
 
     def test_first_empty(self):
         self.index(num_entries=3, num_buckets=6, num_empty=2)
@@ -512,13 +505,12 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         self.write_entry(H2(4), 8, 9, 10)
         self.write_empty(H2(5))
 
-        compact_index = self.index_from_data_compact_to_data()
-
-        self.index(num_entries=3, num_buckets=3, num_empty=0)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        assert compact_index == self.index_data.getvalue()
+        idx = self.index_from_data()
+        cpt = self.index_from_data()
+        cpt.compact()
+        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
+        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
+        self.compare_indexes(idx, cpt)
 
     def test_last_used(self):
         self.index(num_entries=3, num_buckets=6, num_empty=2)
@@ -529,13 +521,12 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         self.write_empty(H2(5))
         self.write_entry(H2(4), 8, 9, 10)
 
-        compact_index = self.index_from_data_compact_to_data()
-
-        self.index(num_entries=3, num_buckets=3, num_empty=0)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        assert compact_index == self.index_data.getvalue()
+        idx = self.index_from_data()
+        cpt = self.index_from_data()
+        cpt.compact()
+        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
+        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
+        self.compare_indexes(idx, cpt)
 
     def test_too_few_empty_slots(self):
         self.index(num_entries=3, num_buckets=6, num_empty=2)
@@ -546,13 +537,12 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         self.write_empty(H2(5))
         self.write_entry(H2(4), 8, 9, 10)
 
-        compact_index = self.index_from_data_compact_to_data()
-
-        self.index(num_entries=3, num_buckets=3, num_empty=0)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        assert compact_index == self.index_data.getvalue()
+        idx = self.index_from_data()
+        cpt = self.index_from_data()
+        cpt.compact()
+        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
+        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
+        self.compare_indexes(idx, cpt)
 
     def test_empty(self):
         self.index(num_entries=0, num_buckets=6, num_empty=3)
@@ -563,10 +553,12 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         self.write_empty(H2(5))
         self.write_deleted(H2(4))
 
-        compact_index = self.index_from_data_compact_to_data()
-
-        self.index(num_entries=0, num_buckets=0, num_empty=0)
-        assert compact_index == self.index_data.getvalue()
+        idx = self.index_from_data()
+        cpt = self.index_from_data()
+        cpt.compact()
+        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
+        assert cpt.size() == 1024 + 0 * (32 + 3 * 4)
+        self.compare_indexes(idx, cpt)
 
     def test_merge(self):
         master = ChunkIndex()

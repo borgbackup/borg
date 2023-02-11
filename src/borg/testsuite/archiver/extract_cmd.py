@@ -60,6 +60,56 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 assert st1.st_size == st2.st_size
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
+    def test_directory_timestamps1(self):
+        self.create_test_files()
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+
+        # default file archiving order (internal recursion)
+        self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
+        with changedir("output"):
+            self.cmd(f"--repo={self.repository_location}", "extract", "test")
+        # extracting a file inside a directory touches the directory mtime
+        assert os.path.exists("output/input/dir2/file2")
+        # make sure borg fixes the directory mtime after touching it
+        sti = os.stat("input/dir2")
+        sto = os.stat("output/input/dir2")
+        assert sti.st_mtime_ns == sto.st_mtime_ns
+
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
+    def test_directory_timestamps2(self):
+        self.create_test_files()
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+
+        # given order, dir first, file second
+        flist_dir_first = b"input/dir2\ninput/dir2/file2\n"
+        self.cmd(f"--repo={self.repository_location}", "create", "--paths-from-stdin", "test", input=flist_dir_first)
+        with changedir("output"):
+            self.cmd(f"--repo={self.repository_location}", "extract", "test")
+        # extracting a file inside a directory touches the directory mtime
+        assert os.path.exists("output/input/dir2/file2")
+        # make sure borg fixes the directory mtime after touching it
+        sti = os.stat("input/dir2")
+        sto = os.stat("output/input/dir2")
+        assert sti.st_mtime_ns == sto.st_mtime_ns
+
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
+    def test_directory_timestamps3(self):
+        self.create_test_files()
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+
+        # given order, file first, dir second
+        flist_file_first = b"input/dir2/file2\ninput/dir2\n"
+        self.cmd(f"--repo={self.repository_location}", "create", "--paths-from-stdin", "test", input=flist_file_first)
+        with changedir("output"):
+            self.cmd(f"--repo={self.repository_location}", "extract", "test")
+        # extracting a file inside a directory touches the directory mtime
+        assert os.path.exists("output/input/dir2/file2")
+        # make sure borg fixes the directory mtime after touching it
+        sti = os.stat("input/dir2")
+        sto = os.stat("output/input/dir2")
+        assert sti.st_mtime_ns == sto.st_mtime_ns
+
+    @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
     def test_atime(self):
         def has_noatime(some_file):
             atime_before = os.stat(some_file).st_atime_ns

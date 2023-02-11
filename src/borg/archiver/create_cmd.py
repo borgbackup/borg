@@ -85,7 +85,7 @@ class CreateMixIn:
                         self.print_error("%s: %s", path, e)
                         return self.exit_code
                 else:
-                    status = "-"
+                    status = "+"  # included
                 self.print_file_status(status, path)
             elif args.paths_from_command or args.paths_from_stdin:
                 paths_sep = eval_escapes(args.paths_delimiter) if args.paths_delimiter is not None else "\n"
@@ -145,7 +145,7 @@ class CreateMixIn:
                                 status = "E"
                                 self.print_warning("%s: %s", path, e)
                         else:
-                            status = "-"
+                            status = "+"  # included
                         self.print_file_status(status, path)
                         if not dry_run and status is not None:
                             fso.stats.files_stats[status] += 1
@@ -285,7 +285,7 @@ class CreateMixIn:
         """
 
         if dry_run:
-            return "-"
+            return "+"  # included
         elif stat.S_ISREG(st.st_mode):
             return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st, cache=cache)
         elif stat.S_ISDIR(st.st_mode):
@@ -373,7 +373,7 @@ class CreateMixIn:
                 with backup_io("stat"):
                     st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
             else:
-                self.print_file_status("x", path)
+                self.print_file_status("-", path)  # excluded
                 # get out here as quickly as possible:
                 # we only need to continue if we shall recurse into an excluded directory.
                 # if we shall not recurse, then do not even touch (stat()) the item, it
@@ -397,7 +397,7 @@ class CreateMixIn:
                 # Ignore if nodump flag is set
                 with backup_io("flags"):
                     if get_flags(path=path, st=st) & stat.UF_NODUMP:
-                        self.print_file_status("x", path)
+                        self.print_file_status("-", path)  # excluded
                         return
 
             if not stat.S_ISDIR(st.st_mode):
@@ -447,13 +447,13 @@ class CreateMixIn:
                                             read_special=read_special,
                                             dry_run=dry_run,
                                         )
-                                self.print_file_status("x", path)
+                                self.print_file_status("-", path)  # excluded
                             return
                     if not recurse_excluded_dir:
                         if not dry_run:
                             status = fso.process_dir_with_fd(path=path, fd=child_fd, st=st)
                         else:
-                            status = "-"
+                            status = "+"  # included (dir)
                     if recurse:
                         with backup_io("scandir"):
                             entries = helpers.scandir_inorder(path=path, fd=child_fd)
@@ -630,9 +630,9 @@ class CreateMixIn:
 
         Other flags used include:
 
+        - '+' = included, item would be backed up (if not in dry-run mode)
+        - '-' = excluded, item would not be / was not backed up
         - 'i' = backup data was read from standard input (stdin)
-        - '-' = dry run, item was *not* backed up
-        - 'x' = excluded, item was *not* backed up
         - '?' = missing status code (if you see this, please file a bug report!)
 
         Reading from stdin

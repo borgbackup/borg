@@ -241,22 +241,22 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         )
         self.check_cache()
         self.assert_in("input/file1", output)
-        self.assert_in("x input/file2", output)
+        self.assert_in("- input/file2", output)
 
         output = self.cmd(f"--repo={self.repository_location}", "recreate", "-a", "test", "--list", "-e", "input/file3")
         self.check_cache()
         self.assert_in("input/file1", output)
-        self.assert_in("x input/file3", output)
+        self.assert_in("- input/file3", output)
 
         output = self.cmd(f"--repo={self.repository_location}", "recreate", "-a", "test", "-e", "input/file4")
         self.check_cache()
         self.assert_not_in("input/file1", output)
-        self.assert_not_in("x input/file4", output)
+        self.assert_not_in("- input/file4", output)
 
         output = self.cmd(f"--repo={self.repository_location}", "recreate", "-a", "test", "--info", "-e", "input/file5")
         self.check_cache()
         self.assert_not_in("input/file1", output)
-        self.assert_not_in("x input/file5", output)
+        self.assert_not_in("- input/file5", output)
 
     def test_comment(self):
         self.create_regular_file("file1", size=1024 * 80)

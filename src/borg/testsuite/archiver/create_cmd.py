@@ -332,8 +332,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "input",
         )
         self.assert_in("A input/file_important", output)
-        self.assert_in("x input/file1", output)
-        self.assert_in("x input/file2", output)
+        self.assert_in("- input/file1", output)
+        self.assert_in("- input/file2", output)
 
     def test_create_pattern_file(self):
         """test file patterns during create"""
@@ -353,9 +353,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "input",
         )
         self.assert_in("A input/file_important", output)
-        self.assert_in("x input/file1", output)
-        self.assert_in("x input/file2", output)
-        self.assert_in("x input/otherfile", output)
+        self.assert_in("- input/file1", output)
+        self.assert_in("- input/file2", output)
+        self.assert_in("- input/otherfile", output)
 
     def test_create_pattern_exclude_folder_but_recurse(self):
         """test when patterns exclude a parent folder, but include a child"""
@@ -376,7 +376,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "test",
             "input",
         )
-        self.assert_in("x input/x/a/foo_a", output)
+        self.assert_in("- input/x/a/foo_a", output)
         self.assert_in("A input/x/b/foo_b", output)
         self.assert_in("A input/y/foo_y", output)
 
@@ -645,7 +645,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in("A input/file1", output)
         self.assert_in("A input/file2", output)
         if has_lchflags:
-            self.assert_in("x input/file3", output)
+            self.assert_in("- input/file3", output)
         # should find second file as excluded
         output = self.cmd(
             f"--repo={self.repository_location}",
@@ -658,9 +658,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "*/file2",
         )
         self.assert_in("U input/file1", output)
-        self.assert_in("x input/file2", output)
+        self.assert_in("- input/file2", output)
         if has_lchflags:
-            self.assert_in("x input/file3", output)
+            self.assert_in("- input/file3", output)
 
     def test_file_status_counters(self):
         """Test file status counters in the stats of `borg create --stats`"""

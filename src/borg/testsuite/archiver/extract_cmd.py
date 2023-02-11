@@ -11,7 +11,7 @@ from ...chunker import has_seek_hole
 from ...constants import *  # NOQA
 from ...helpers import EXIT_WARNING
 from ...helpers import flags_noatime, flags_normal
-from .. import changedir
+from .. import changedir, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from ..platform import is_darwin
 from . import (
@@ -73,7 +73,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # make sure borg fixes the directory mtime after touching it
         sti = os.stat("input/dir2")
         sto = os.stat("output/input/dir2")
-        assert sti.st_mtime_ns == sto.st_mtime_ns
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
     def test_directory_timestamps2(self):
@@ -90,7 +90,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # make sure borg fixes the directory mtime after touching it
         sti = os.stat("input/dir2")
         sto = os.stat("output/input/dir2")
-        assert sti.st_mtime_ns == sto.st_mtime_ns
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
     def test_directory_timestamps3(self):
@@ -107,7 +107,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # make sure borg fixes the directory mtime after touching it
         sti = os.stat("input/dir2")
         sto = os.stat("output/input/dir2")
-        assert sti.st_mtime_ns == sto.st_mtime_ns
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
     def test_atime(self):
@@ -133,12 +133,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd(f"--repo={self.repository_location}", "extract", "test")
         sti = os.stat("input/file1")
         sto = os.stat("output/input/file1")
-        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
+        assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
         if have_noatime:
-            assert sti.st_atime_ns == sto.st_atime_ns == atime * 1e9
+            assert same_ts_ns(sti.st_atime_ns, sto.st_atime_ns)
+            assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
         else:
             # it touched the input file's atime while backing it up
-            assert sto.st_atime_ns == atime * 1e9
+            assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
 
     @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
     @pytest.mark.skipif(
@@ -155,8 +157,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd(f"--repo={self.repository_location}", "extract", "test")
         sti = os.stat("input/file1")
         sto = os.stat("output/input/file1")
-        assert int(sti.st_birthtime * 1e9) == int(sto.st_birthtime * 1e9) == birthtime * 1e9
-        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
+        assert same_ts_ns(sti.st_birthtime * 1e9, sto.st_birthtime * 1e9)
+        assert same_ts_ns(sto.st_birthtime * 1e9, birthtime * 1e9)
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
+        assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
 
     def test_sparse_file(self):
         def is_sparse(fn, total_size, hole_size):

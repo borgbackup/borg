@@ -23,6 +23,7 @@ from .. import (
     are_fifos_supported,
     is_utime_fully_supported,
     is_birthtime_fully_supported,
+    same_ts_ns,
 )
 from . import (
     ArchiverTestCaseBase,
@@ -151,9 +152,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd(f"--repo={self.repository_location}", "extract", "test")
         sti = os.stat("input/file1")
         sto = os.stat("output/input/file1")
-        assert int(sti.st_birthtime * 1e9) == birthtime * 1e9
-        assert int(sto.st_birthtime * 1e9) == mtime * 1e9
-        assert sti.st_mtime_ns == sto.st_mtime_ns == mtime * 1e9
+        assert same_ts_ns(sti.st_birthtime * 1e9, birthtime * 1e9)
+        assert same_ts_ns(sto.st_birthtime * 1e9, mtime * 1e9)
+        assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
+        assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
 
     def test_create_stdin(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)

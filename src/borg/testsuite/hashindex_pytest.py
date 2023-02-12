@@ -67,3 +67,9 @@ def test_hashindex_compact():
     assert size_rebuilt > size_compact + 1
     # did we lose anything?
     verify_hash_table(kv, idx)
+
+
+@pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+def test_hashindex_compact_stress():
+    for _ in range(100):
+        test_hashindex_compact()

@@ -570,11 +570,11 @@ hashindex_read(PyObject *file_py, int permit_compact, int legacy)
     }
     index->buckets = index->buckets_buffer.buf;
 
-    if(!permit_compact) {
-        index->min_empty = get_min_empty(index->num_buckets);
-        if (index->num_empty == -1)  // we read a legacy index without num_empty value
-            index->num_empty = count_empty(index);
+    index->min_empty = get_min_empty(index->num_buckets);
+    if (index->num_empty == -1)  // we read a legacy index without num_empty value
+        index->num_empty = count_empty(index);
 
+    if(!permit_compact) {
         if(index->num_empty < index->min_empty) {
             /* too many tombstones here / not enough empty buckets, do a same-size rebuild */
             if(!hashindex_resize(index, index->num_buckets)) {

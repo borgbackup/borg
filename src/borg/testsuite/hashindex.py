@@ -488,18 +488,18 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         and 'E' (empty).
         """
         num_buckets = len(layout)
-        num_empty = layout.count('E')
-        num_entries = layout.count('*')
+        num_empty = layout.count("E")
+        num_entries = layout.count("*")
         self.index(num_entries=num_entries, num_buckets=num_buckets, num_empty=num_empty)
         k = 0
         for c in layout:
-            if c == 'D':
+            if c == "D":
                 self.write_deleted(H2(k))
-            elif c == 'E':
+            elif c == "E":
                 self.write_empty(H2(k))
             else:
-                assert c == '*'
-                self.write_entry(H2(k), 3*k+1, 3*k+2, 3*k+3)
+                assert c == "*"
+                self.write_entry(H2(k), 3 * k + 1, 3 * k + 2, 3 * k + 3)
             k += 1
         idx = self.index_from_data()
         cpt = self.index_from_data()
@@ -509,25 +509,25 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         self.compare_indexes(idx, cpt)
 
     def test_simple(self):
-        self.compare_compact('*DE**E')
+        self.compare_compact("*DE**E")
 
     def test_first_empty(self):
-        self.compare_compact('D*E**E')
+        self.compare_compact("D*E**E")
 
     def test_last_used(self):
-        self.compare_compact('D*E*E*')
+        self.compare_compact("D*E*E*")
 
     def test_too_few_empty_slots(self):
-        self.compare_compact('D**EE*')
+        self.compare_compact("D**EE*")
 
     def test_empty(self):
-        self.compare_compact('DEDEED')
+        self.compare_compact("DEDEED")
 
     def test_already_compact(self):
-        self.compare_compact('***')
+        self.compare_compact("***")
 
     def test_all_at_front(self):
-        self.compare_compact('***EED')
+        self.compare_compact("***EED")
 
     def test_merge(self):
         master = ChunkIndex()

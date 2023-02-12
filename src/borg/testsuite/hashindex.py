@@ -601,9 +601,7 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         assert idx1.size() == 1024 + 3 * (32 + 2 * 4)
 
         master.merge(idx1)
-        assert master[H(1)] == (1, 100)
-        assert master[H(2)] == (2, 200)
-        assert master[H(3)] == (3, 300)
+        self.compare_indexes(idx1, master)
 
 
 class NSIndexTestCase(BaseTestCase):

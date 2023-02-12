@@ -1300,31 +1300,13 @@ class ChunksProcessor:
         # to get rid of .chunks_healthy, as it might not correspond to .chunks any more.
         if self.rechunkify and "chunks_healthy" in item:
             del item.chunks_healthy
-        try:
-            for chunk in chunk_iter:
-                cle = chunk_processor(chunk)
-                item.chunks.append(cle)
-                self.current_volume += cle[1]
-                if show_progress:
-                    stats.show_progress(item=item, dt=0.2)
-                self.maybe_checkpoint(item)
-        except BackupOSError:
-            # something went wrong (e.g. an I/O error while reading a source file), try to avoid orphan content chunks:
-            # case A: "no checkpoint archive has been created yet":
-            # we have incref'd (written) some chunks, no commit yet, no file item for these chunks yet.
-            # -> item.chunks has a list of orphaned content chunks, we need to decref them.
-            # case B: "some checkpoint archives have been created already":
-            # at the time we commit them, everything is fine and consistent:
-            # we have incref'd (written) some chunks, created a part file item referencing them, committed.
-            # directly after commit, we have removed the part file item, but kept chunks in the repo, kept refcounts.
-            # maybe we have incref'd (written) some more chunks after the commit, no file item for these chunks yet.
-            # -> item.chunks has a list of orphaned content chunks, we need to decref them.
-            # So, cases A and B need same treatment.
-            for chunk in item.chunks:
-                cache.chunk_decref(chunk.id, stats, wait=False)
-            # now that we have cleaned up the chunk references, we can re-raise the exception
-            # this will skip THIS processing of this file, but continue with the next one.
-            raise
+        for chunk in chunk_iter:
+            cle = chunk_processor(chunk)
+            item.chunks.append(cle)
+            self.current_volume += cle[1]
+            if show_progress:
+                stats.show_progress(item=item, dt=0.2)
+            self.maybe_checkpoint(item)
 
 
 class FilesystemObjectProcessors:

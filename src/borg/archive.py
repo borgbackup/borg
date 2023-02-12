@@ -1433,11 +1433,20 @@ class FilesystemObjectProcessors:
             item.uid = uid
         if gid is not None:
             item.gid = gid
-        self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd)))
-        item.get_size(memorize=True)
-        self.stats.nfiles += 1
-        self.add_item(item, stats=self.stats)
-        return status
+        try:
+            self.process_file_chunks(
+                item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd))
+            )
+        except BackupOSError:
+            # see comments in process_file's exception handler, same issue here.
+            for chunk in item.get("chunks", []):
+                cache.chunk_decref(chunk.id, self.stats, wait=False)
+            raise
+        else:
+            item.get_size(memorize=True)
+            self.stats.nfiles += 1
+            self.add_item(item, stats=self.stats)
+            return status
 
     def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hl_chunks):  # no status yet

@@ -523,11 +523,25 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
     def test_empty(self):
         self.compare_compact("DEDEED")
 
+    def test_num_buckets_zero(self):
+        self.compare_compact("")
+
     def test_already_compact(self):
         self.compare_compact("***")
 
     def test_all_at_front(self):
+        self.compare_compact("*DEEED")
+        self.compare_compact("**DEED")
         self.compare_compact("***EED")
+        self.compare_compact("****ED")
+        self.compare_compact("*****D")
+
+    def test_all_at_back(self):
+        self.compare_compact("EDEEE*")
+        self.compare_compact("DEDE**")
+        self.compare_compact("DED***")
+        self.compare_compact("ED****")
+        self.compare_compact("D*****")
 
     def test_merge(self):
         master = ChunkIndex()

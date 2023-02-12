@@ -478,6 +478,9 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         self.write_entry(key, 0xFFFFFFFE, 0, 0)
 
     def compare_indexes(self, idx1, idx2):
+        """Check that the two hash tables contain the same data.  idx1
+        is allowed to have "mis-filed" entries, because we only need to
+        iterate over it.  But idx2 needs to support lookup."""
         for k, v in idx1.iteritems():
             assert v == idx2[k]
         assert len(idx1) == len(idx2)
@@ -504,6 +507,9 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         idx = self.index_from_data()
         cpt = self.index_from_data()
         cpt.compact()
+        # Note that idx is not a valid hash table, since the entries are not
+        # stored where they should be.  So lookups of the form idx[k] can fail.
+        # But cpt is a valid hash table, since there are no empty buckets.
         assert idx.size() == 1024 + num_buckets * (32 + 3 * 4)
         assert cpt.size() == 1024 + num_entries * (32 + 3 * 4)
         self.compare_indexes(idx, cpt)

@@ -1301,9 +1301,9 @@ class ChunksProcessor:
         if self.rechunkify and "chunks_healthy" in item:
             del item.chunks_healthy
         for chunk in chunk_iter:
-            cle = chunk_processor(chunk)
-            item.chunks.append(cle)
-            self.current_volume += cle[1]
+            chunk_entry = chunk_processor(chunk)
+            item.chunks.append(chunk_entry)
+            self.current_volume += chunk_entry[1]
             if show_progress:
                 stats.show_progress(item=item, dt=0.2)
             self.maybe_checkpoint(item)
@@ -1347,6 +1347,7 @@ class FilesystemObjectProcessors:
         safe_path = make_path_safe(path)
         item = Item(path=safe_path)
         hardlinked = hardlinkable and st.st_nlink > 1
+        hl_chunks = None
         update_map = False
         if hardlinked:
             status = "h"  # hardlink
@@ -1355,9 +1356,9 @@ class FilesystemObjectProcessors:
             if chunks is nothing:
                 update_map = True
             elif chunks is not None:
-                item.chunks = chunks
+                hl_chunks = chunks
             item.hlid = self.hlm.hardlink_id_from_inode(ino=st.st_ino, dev=st.st_dev)
-        yield item, status, hardlinked
+        yield item, status, hardlinked, hl_chunks
         self.add_item(item, stats=self.stats)
         if update_map:
             # remember the hlid of this fs object and if the item has chunks,
@@ -1366,12 +1367,12 @@ class FilesystemObjectProcessors:
             self.hlm.remember(id=(st.st_ino, st.st_dev), info=chunks)
 
     def process_dir_with_fd(self, *, path, fd, st):
-        with self.create_helper(path, st, "d", hardlinkable=False) as (item, status, hardlinked):
+        with self.create_helper(path, st, "d", hardlinkable=False) as (item, status, hardlinked, hl_chunks):
             item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
             return status
 
     def process_dir(self, *, path, parent_fd, name, st):
-        with self.create_helper(path, st, "d", hardlinkable=False) as (item, status, hardlinked):
+        with self.create_helper(path, st, "d", hardlinkable=False) as (item, status, hardlinked, hl_chunks):
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir, noatime=True, op="dir_open") as fd:
                 # fd is None for directories on windows, in that case a race condition check is not possible.
                 if fd is not None:
@@ -1381,7 +1382,7 @@ class FilesystemObjectProcessors:
                 return status
 
     def process_fifo(self, *, path, parent_fd, name, st):
-        with self.create_helper(path, st, "f") as (item, status, hardlinked):  # fifo
+        with self.create_helper(path, st, "f") as (item, status, hardlinked, hl_chunks):  # fifo
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
                 with backup_io("fstat"):
                     st = stat_update_check(st, os.fstat(fd))
@@ -1389,7 +1390,7 @@ class FilesystemObjectProcessors:
                 return status
 
     def process_dev(self, *, path, parent_fd, name, st, dev_type):
-        with self.create_helper(path, st, dev_type) as (item, status, hardlinked):  # char/block device
+        with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hl_chunks):  # char/block device
             # looks like we can not work fd-based here without causing issues when trying to open/close the device
             with backup_io("stat"):
                 st = stat_update_check(st, os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False))
@@ -1398,7 +1399,7 @@ class FilesystemObjectProcessors:
             return status
 
     def process_symlink(self, *, path, parent_fd, name, st):
-        with self.create_helper(path, st, "s", hardlinkable=True) as (item, status, hardlinked):
+        with self.create_helper(path, st, "s", hardlinkable=True) as (item, status, hardlinked, hl_chunks):
             fname = name if name is not None and parent_fd is not None else path
             with backup_io("readlink"):
                 target = os.readlink(fname, dir_fd=parent_fd)
@@ -1439,7 +1440,7 @@ class FilesystemObjectProcessors:
         return status
 
     def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal):
-        with self.create_helper(path, st, None) as (item, status, hardlinked):  # no status yet
+        with self.create_helper(path, st, None) as (item, status, hardlinked, hl_chunks):  # no status yet
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
                 with backup_io("fstat"):
                     st = stat_update_check(st, os.fstat(fd))
@@ -1450,8 +1451,12 @@ class FilesystemObjectProcessors:
                     # so it can be extracted / accessed in FUSE mount like a regular file.
                     # this needs to be done early, so that part files also get the patched mode.
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
-                if "chunks" in item:  # create_helper might have put chunks from a previous hardlink there
-                    [cache.chunk_incref(id_, self.stats) for id_, _ in item.chunks]
+                if hl_chunks is not None:  # create_helper gave us chunks from a previous hardlink
+                    item.chunks = []
+                    for chunk_id, chunk_size in hl_chunks:
+                        # process one-by-one, so we will know in item.chunks how far we got
+                        chunk_entry = cache.chunk_incref(chunk_id, self.stats)
+                        item.chunks.append(chunk_entry)
                 else:  # normal case, no "2nd+" hardlink
                     if not is_special_file:
                         hashed_path = safe_encode(os.path.join(self.cwd, path))
@@ -1465,17 +1470,19 @@ class FilesystemObjectProcessors:
                         # read-special mode, but we better play safe as this was wrong in the past:
                         hashed_path = path_hash = None
                         known, ids = False, None
-                    chunks = None
                     if ids is not None:
                         # Make sure all ids are available
                         for id_ in ids:
                             if not cache.seen_chunk(id_):
-                                status = (
-                                    "M"  # cache said it is unmodified, but we lost a chunk: process file like modified
-                                )
+                                # cache said it is unmodified, but we lost a chunk: process file like modified
+                                status = "M"
                                 break
                         else:
-                            chunks = [cache.chunk_incref(id_, self.stats) for id_ in ids]
+                            item.chunks = []
+                            for chunk_id in ids:
+                                # process one-by-one, so we will know in item.chunks how far we got
+                                chunk_entry = cache.chunk_incref(chunk_id, self.stats)
+                                item.chunks.append(chunk_entry)
                             status = "U"  # regular file, unchanged
                     else:
                         status = "M" if known else "A"  # regular file, modified or added
@@ -1483,9 +1490,7 @@ class FilesystemObjectProcessors:
                     self.stats.files_stats[status] += 1
                     status = None  # we already printed the status
                     # Only chunkify the file if needed
-                    if chunks is not None:
-                        item.chunks = chunks
-                    else:
+                    if "chunks" not in item:
                         with backup_io("read"):
                             self.process_file_chunks(
                                 item,

@@ -8,6 +8,15 @@ import pytest
 from ..hashindex import NSIndex
 
 
+def verify_hash_table(kv, idx):
+    """kv should be a python dictionary and idx an NSIndex.  Check that idx
+    has the expected entries and the right number of entries.
+    """
+    for k, v in kv.items():
+        assert k in idx and idx[k] == (v, v, v)
+    assert len(idx) == len(kv)
+
+
 def make_hashtables(*, entries, loops):
     idx = NSIndex()
     kv = {}
@@ -23,11 +32,7 @@ def make_hashtables(*, entries, loops):
         for k in delete_keys:
             v = kv.pop(k)
             assert idx.pop(k) == (v, v, v)
-        # check if remaining entries are as expected
-        for k, v in kv.items():
-            assert idx[k] == (v, v, v)
-        # check entry count
-        assert len(kv) == len(idx)
+        verify_hash_table(kv, idx)
     return idx, kv
 
 
@@ -53,9 +58,7 @@ def test_hashindex_compact():
     assert saved_space > 0
     assert size_noncompact - size_compact == saved_space
     # did we lose anything?
-    for k, v in kv.items():
-        assert k in idx and idx[k] == (v, v, v)
-    assert len(idx) == len(kv)
+    verify_hash_table(kv, idx)
     # now expand the hashtable again. trigger a resize/rebuild by adding an entry.
     k = b"x" * 32
     idx[k] = (0, 0, 0)
@@ -63,6 +66,10 @@ def test_hashindex_compact():
     size_rebuilt = idx.size()
     assert size_rebuilt > size_compact + 1
     # did we lose anything?
-    for k, v in kv.items():
-        assert k in idx and idx[k] == (v, v, v)
-    assert len(idx) == len(kv)
+    verify_hash_table(kv, idx)
+
+
+@pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+def test_hashindex_compact_stress():
+    for _ in range(100):
+        test_hashindex_compact()

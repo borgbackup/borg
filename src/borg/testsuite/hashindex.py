@@ -461,19 +461,10 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
 
     def index_from_data(self):
         self.index_data.seek(0)
-        index = ChunkIndex.read(self.index_data)
+        # Since we are trying to carefully control the layout of the hashindex,
+        # we set permit_compact to prevent hashindex_read from resizing the hash table.
+        index = ChunkIndex.read(self.index_data, permit_compact=True)
         return index
-
-    def index_to_data(self, index):
-        data = io.BytesIO()
-        index.write(data)
-        return data.getvalue()
-
-    def index_from_data_compact_to_data(self):
-        index = self.index_from_data()
-        index.compact()
-        compact_index = self.index_to_data(index)
-        return compact_index
 
     def write_entry(self, key, *values):
         self.index_data.write(key)
@@ -486,87 +477,77 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
     def write_deleted(self, key):
         self.write_entry(key, 0xFFFFFFFE, 0, 0)
 
+    def compare_indexes(self, idx1, idx2):
+        """Check that the two hash tables contain the same data.  idx1
+        is allowed to have "mis-filed" entries, because we only need to
+        iterate over it.  But idx2 needs to support lookup."""
+        for k, v in idx1.iteritems():
+            assert v == idx2[k]
+        assert len(idx1) == len(idx2)
+
+    def compare_compact(self, layout):
+        """A generic test of a hashindex with the specified layout.  layout should
+        be a string consisting only of the characters '*' (filled), 'D' (deleted)
+        and 'E' (empty).
+        """
+        num_buckets = len(layout)
+        num_empty = layout.count("E")
+        num_entries = layout.count("*")
+        self.index(num_entries=num_entries, num_buckets=num_buckets, num_empty=num_empty)
+        k = 0
+        for c in layout:
+            if c == "D":
+                self.write_deleted(H2(k))
+            elif c == "E":
+                self.write_empty(H2(k))
+            else:
+                assert c == "*"
+                self.write_entry(H2(k), 3 * k + 1, 3 * k + 2, 3 * k + 3)
+            k += 1
+        idx = self.index_from_data()
+        cpt = self.index_from_data()
+        cpt.compact()
+        # Note that idx is not a valid hash table, since the entries are not
+        # stored where they should be.  So lookups of the form idx[k] can fail.
+        # But cpt is a valid hash table, since there are no empty buckets.
+        assert idx.size() == 1024 + num_buckets * (32 + 3 * 4)
+        assert cpt.size() == 1024 + num_entries * (32 + 3 * 4)
+        self.compare_indexes(idx, cpt)
+
     def test_simple(self):
-        self.index(num_entries=3, num_buckets=6, num_empty=2)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_deleted(H2(1))
-        self.write_empty(H2(2))
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        self.write_empty(H2(5))
-
-        compact_index = self.index_from_data_compact_to_data()
-
-        self.index(num_entries=3, num_buckets=3, num_empty=0)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        assert compact_index == self.index_data.getvalue()
+        self.compare_compact("*DE**E")
 
     def test_first_empty(self):
-        self.index(num_entries=3, num_buckets=6, num_empty=2)
-        self.write_deleted(H2(1))
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_empty(H2(2))
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        self.write_empty(H2(5))
-
-        compact_index = self.index_from_data_compact_to_data()
-
-        self.index(num_entries=3, num_buckets=3, num_empty=0)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        assert compact_index == self.index_data.getvalue()
+        self.compare_compact("D*E**E")
 
     def test_last_used(self):
-        self.index(num_entries=3, num_buckets=6, num_empty=2)
-        self.write_deleted(H2(1))
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_empty(H2(2))
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_empty(H2(5))
-        self.write_entry(H2(4), 8, 9, 10)
-
-        compact_index = self.index_from_data_compact_to_data()
-
-        self.index(num_entries=3, num_buckets=3, num_empty=0)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        assert compact_index == self.index_data.getvalue()
+        self.compare_compact("D*E*E*")
 
     def test_too_few_empty_slots(self):
-        self.index(num_entries=3, num_buckets=6, num_empty=2)
-        self.write_deleted(H2(1))
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_empty(H2(2))
-        self.write_empty(H2(5))
-        self.write_entry(H2(4), 8, 9, 10)
-
-        compact_index = self.index_from_data_compact_to_data()
-
-        self.index(num_entries=3, num_buckets=3, num_empty=0)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        assert compact_index == self.index_data.getvalue()
+        self.compare_compact("D**EE*")
 
     def test_empty(self):
-        self.index(num_entries=0, num_buckets=6, num_empty=3)
-        self.write_deleted(H2(1))
-        self.write_empty(H2(0))
-        self.write_deleted(H2(3))
-        self.write_empty(H2(2))
-        self.write_empty(H2(5))
-        self.write_deleted(H2(4))
+        self.compare_compact("DEDEED")
 
-        compact_index = self.index_from_data_compact_to_data()
+    def test_num_buckets_zero(self):
+        self.compare_compact("")
 
-        self.index(num_entries=0, num_buckets=0, num_empty=0)
-        assert compact_index == self.index_data.getvalue()
+    def test_already_compact(self):
+        self.compare_compact("***")
+
+    def test_all_at_front(self):
+        self.compare_compact("*DEEED")
+        self.compare_compact("**DEED")
+        self.compare_compact("***EED")
+        self.compare_compact("****ED")
+        self.compare_compact("*****D")
+
+    def test_all_at_back(self):
+        self.compare_compact("EDEEE*")
+        self.compare_compact("DEDE**")
+        self.compare_compact("DED***")
+        self.compare_compact("ED****")
+        self.compare_compact("D*****")
 
     def test_merge(self):
         master = ChunkIndex()
@@ -576,11 +557,8 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         idx1[H(3)] = 3, 300
         idx1.compact()
         assert idx1.size() == 1024 + 3 * (32 + 2 * 4)
-
         master.merge(idx1)
-        assert master[H(1)] == (1, 100)
-        assert master[H(2)] == (2, 200)
-        assert master[H(3)] == (3, 300)
+        self.compare_indexes(idx1, master)
 
 
 class NSIndexTestCase(BaseTestCase):

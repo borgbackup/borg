@@ -113,6 +113,7 @@ static int hash_sizes[] = {
 
 #define BUCKET_IS_DELETED(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) == DELETED)
 #define BUCKET_IS_EMPTY(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) == EMPTY)
+#define BUCKET_IS_EMPTY_OR_DELETED(index, idx) (BUCKET_IS_EMPTY(index, idx) || BUCKET_IS_DELETED(index, idx))
 
 #define BUCKET_MARK_DELETED(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = DELETED)
 #define BUCKET_MARK_EMPTY(index, idx) (*((uint32_t *)(BUCKET_ADDR(index, idx) + index->key_size)) = EMPTY)
@@ -569,11 +570,11 @@ hashindex_read(PyObject *file_py, int permit_compact, int legacy)
     }
     index->buckets = index->buckets_buffer.buf;
 
-    if(!permit_compact) {
-        index->min_empty = get_min_empty(index->num_buckets);
-        if (index->num_empty == -1)  // we read a legacy index without num_empty value
-            index->num_empty = count_empty(index);
+    index->min_empty = get_min_empty(index->num_buckets);
+    if (index->num_empty == -1)  // we read a legacy index without num_empty value
+        index->num_empty = count_empty(index);
 
+    if(!permit_compact) {
         if(index->num_empty < index->min_empty) {
             /* too many tombstones here / not enough empty buckets, do a same-size rebuild */
             if(!hashindex_resize(index, index->num_buckets)) {
@@ -819,7 +820,7 @@ hashindex_next_key(HashIndex *index, const unsigned char *key)
     if (idx == index->num_buckets) {
         return NULL;
     }
-    while(BUCKET_IS_EMPTY(index, idx) || BUCKET_IS_DELETED(index, idx)) {
+    while(BUCKET_IS_EMPTY_OR_DELETED(index, idx)) {
         idx ++;
         if (idx == index->num_buckets) {
             return NULL;
@@ -828,56 +829,32 @@ hashindex_next_key(HashIndex *index, const unsigned char *key)
     return BUCKET_ADDR(index, idx);
 }
 
+/* Move all non-empty/non-deleted entries in the hash table to the beginning. This does not preserve the order, and it does not mark the previously used entries as empty or deleted. But it reduces num_buckets so that those entries will never be accessed. */
 static uint64_t
 hashindex_compact(HashIndex *index)
 {
-    int idx = 0;
-    int start_idx;
-    int begin_used_idx;
-    int empty_slot_count, count, buckets_to_copy;
-    int compact_tail_idx = 0;
+    int idx = index->num_buckets - 1;
+    int tail = 0;
     uint64_t saved_size = (index->num_buckets - index->num_entries) * (uint64_t)index->bucket_size;
 
-    if(index->num_buckets - index->num_entries == 0) {
-        /* already compact */
-        return 0;
-    }
-
-    while(idx < index->num_buckets) {
-        /* Phase 1: Find some empty slots */
-        start_idx = idx;
-        while((idx < index->num_buckets) && (BUCKET_IS_EMPTY(index, idx) || BUCKET_IS_DELETED(index, idx))) {
-            idx++;
+    /* idx will point to the last filled spot and tail will point to the first empty or deleted spot. */
+    for(;;) {
+        /* Find the last filled spot >= index->num_entries. */
+        while((idx >= index->num_entries) && BUCKET_IS_EMPTY_OR_DELETED(index, idx)) {
+            idx--;
         }
-
-        /* everything from start_idx to idx-1 (inclusive) is empty or deleted */
-        count = empty_slot_count = idx - start_idx;
-        begin_used_idx = idx;
-
-        if(!empty_slot_count) {
-            /* In case idx==compact_tail_idx, the areas overlap */
-            memmove(BUCKET_ADDR(index, compact_tail_idx), BUCKET_ADDR(index, idx), index->bucket_size);
-            idx++;
-            compact_tail_idx++;
-            continue;
-        }
-
-        /* Phase 2: Find some non-empty/non-deleted slots we can move to the compact tail */
-
-        while(empty_slot_count && (idx < index->num_buckets) && !(BUCKET_IS_EMPTY(index, idx) || BUCKET_IS_DELETED(index, idx))) {
-            idx++;
-            empty_slot_count--;
-        }
-
-        buckets_to_copy = count - empty_slot_count;
-
-        if(!buckets_to_copy) {
-            /* Nothing to move, reached end of the buckets array with no used buckets. */
+        /* If all spots >= index->num_entries are empty, then we must be in a compact state. */
+        if(idx < index->num_entries) {
             break;
         }
-
-        memcpy(BUCKET_ADDR(index, compact_tail_idx), BUCKET_ADDR(index, begin_used_idx), buckets_to_copy * index->bucket_size);
-        compact_tail_idx += buckets_to_copy;
+        /* Find the first empty or deleted spot < index->num_entries. */
+        while((tail < index->num_entries) && !BUCKET_IS_EMPTY_OR_DELETED(index, tail)) {
+            tail++;
+        }
+        assert(tail < index->num_entries);
+        memcpy(BUCKET_ADDR(index, tail), BUCKET_ADDR(index, idx), index->bucket_size);
+        idx--;
+        tail++;
     }
 
     index->num_buckets = index->num_entries;

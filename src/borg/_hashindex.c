@@ -837,7 +837,7 @@ hashindex_compact(HashIndex *index)
     int tail = 0;
     uint64_t saved_size = (index->num_buckets - index->num_entries) * (uint64_t)index->bucket_size;
 
-    /* idx will point to the last filled spot and tail will point to the first empty spot. */
+    /* idx will point to the last filled spot and tail will point to the first empty or deleted spot. */
     for(;;) {
         /* Find the last filled spot >= index->num_entries. */
         while((idx >= index->num_entries) && BUCKET_IS_EMPTY_OR_DELETED(index, idx)) {

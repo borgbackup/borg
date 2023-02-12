@@ -461,7 +461,9 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
 
     def index_from_data(self):
         self.index_data.seek(0)
-        index = ChunkIndex.read(self.index_data)
+        # Since we are trying to carefully control the layout of the hashindex,
+        # we set permit_compact to prevent hashindex_read from resizing the hash table.
+        index = ChunkIndex.read(self.index_data, permit_compact=True)
         return index
 
     def write_entry(self, key, *values):
@@ -558,6 +560,35 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         cpt.compact()
         assert idx.size() == 1024 + 6 * (32 + 3 * 4)
         assert cpt.size() == 1024 + 0 * (32 + 3 * 4)
+        self.compare_indexes(idx, cpt)
+
+    def test_already_compact(self):
+        self.index(num_entries=3, num_buckets=3, num_empty=0)
+        self.write_entry(H2(0), 1, 2, 3)
+        self.write_entry(H2(3), 5, 6, 7)
+        self.write_entry(H2(4), 8, 9, 10)
+
+        idx = self.index_from_data()
+        cpt = self.index_from_data()
+        #cpt.compact()
+        assert idx.size() == 1024 + 3 * (32 + 3 * 4)
+        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
+        self.compare_indexes(idx, cpt)
+
+    def test_all_at_front(self):
+        self.index(num_entries=3, num_buckets=6, num_empty=2)
+        self.write_entry(H2(0), 1, 2, 3)
+        self.write_entry(H2(3), 5, 6, 7)
+        self.write_entry(H2(4), 8, 9, 10)
+        self.write_empty(H2(2))
+        self.write_empty(H2(5))
+        self.write_deleted(H2(1))
+
+        idx = self.index_from_data()
+        cpt = self.index_from_data()
+        cpt.compact()
+        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
+        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
         self.compare_indexes(idx, cpt)
 
     def test_merge(self):

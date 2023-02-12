@@ -1629,15 +1629,21 @@ class TarfileObjectProcessors:
         with self.create_helper(tarinfo, status, type) as (item, status):
             self.print_file_status(status, tarinfo.name)
             status = None  # we already printed the status
-            fd = tar.extractfile(tarinfo)
-            self.process_file_chunks(
-                item, self.cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd))
-            )
-            item.get_size(memorize=True, from_chunks=True)
-            self.stats.nfiles += 1
-            # we need to remember ALL files, see HardLinkManager.__doc__
-            self.hlm.remember(id=tarinfo.name, info=item.chunks)
-            return status
+            try:
+                fd = tar.extractfile(tarinfo)
+                self.process_file_chunks(
+                    item, self.cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd))
+                )
+                item.get_size(memorize=True, from_chunks=True)
+                self.stats.nfiles += 1
+                # we need to remember ALL files, see HardLinkManager.__doc__
+                self.hlm.remember(id=tarinfo.name, info=item.chunks)
+                return status
+            except BackupOSError:
+                # see comment in FilesystemObjectProcessors.process_file, same issue here.
+                for chunk in item.get("chunks", []):
+                    self.cache.chunk_decref(chunk.id, self.stats, wait=False)
+                raise
 
 
 def valid_msgpacked_dict(d, keys_serialized):

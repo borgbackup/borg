@@ -83,7 +83,7 @@ Compatibility notes:
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
   - removed --save-space option (does not change behaviour)
-- using --list together with --progress is now disallowed, #7219
+- using --list together with --progress is now disallowed (except with --log-json), #7219
 - the --glob-archives option was renamed to --match-archives (the short option
   name -a is unchanged) and extended to support different pattern styles:
 
@@ -95,6 +95,19 @@ Compatibility notes:
 
       borg 1.x: --glob-archives 'myserver-*'
       borg 2.0: --match-archives 'sh:myserver-*'
+
+- use platformdirs 3.x.x instead of home-grown code. Due to that:
+
+  - XDG_*_HOME is not honoured on macOS and on Windows.
+  - BORG_BASE_DIR can still be used to enforce some base dir + .config/ or .cache/.
+  - the default macOS config and cache dir will now be in ~/Library/Application Support/.
+- create: different included/excluded status chars, #7321
+
+  - dry-run: now uses "+" (was: "-") and "-" (was: "x") for included/excluded status
+  - non-dry-run: now uses "-" (was: "x") for excluded files
+
+  Option --filter=... might need an update, if you filter for the status chars
+  that were changed.
 
 
 New features:
@@ -118,6 +131,8 @@ Fixes:
 - locking (win32): deal with os.rmdir/listdir PermissionErrors
 - locking: thread id must be parsed as hex from lock file name
 - extract: fix mtime when ResourceFork xattr is set (macOS specific), #7234
+- recreate: without --chunker-params shall not rechunk, #7336
+- allow mixing --progress and --list in log-json mode
 
 Other changes:
 
@@ -137,6 +152,11 @@ Other changes:
 - fix some uid/gid lookup code / tests for win32
 - cache.py: be less verbose during cache sync
 - update bash completion script commands and options, #7273
+- require and use platformdirs 3.x.x package, tests
+- better included/excluded status chars, docs, #7321
+- undef NDEBUG for chunker and hashindex (make assert() work)
+- hashindex minor fixes, refactor, tweaks, tests
+- pyinstaller: remove icon
 - validation / placeholders / JSON:
 
   - implement (text|binary)_to_json: key (text), key_b64 (base64(binary))
@@ -167,6 +187,8 @@ Other changes:
   - do not look up uid 0 / gid 0, but current process uid/gid
   - safe_unlink tests: use os.link to support win32 also
   - fix test_size_on_disk_accurate for large st_blksize, #7250
+  - relaxed timestamp comparisons, use same_ts_ns
+  - add test for extracted directory mtime
 
 
 Version 2.0.0b4 (2022-11-27)

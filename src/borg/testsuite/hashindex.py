@@ -482,114 +482,52 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
             assert v == idx2[k]
         assert len(idx1) == len(idx2)
 
-    def test_simple(self):
-        self.index(num_entries=3, num_buckets=6, num_empty=2)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_deleted(H2(1))
-        self.write_empty(H2(2))
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        self.write_empty(H2(5))
-
+    def compare_compact(self, layout):
+        """A generic test of a hashindex with the specified layout.  layout should
+        be a string consisting only of the characters '*' (filled), 'D' (deleted)
+        and 'E' (empty).
+        """
+        num_buckets = len(layout)
+        num_empty = layout.count('E')
+        num_entries = layout.count('*')
+        self.index(num_entries=num_entries, num_buckets=num_buckets, num_empty=num_empty)
+        k = 0
+        for c in layout:
+            if c == 'D':
+                self.write_deleted(H2(k))
+            elif c == 'E':
+                self.write_empty(H2(k))
+            else:
+                assert c == '*'
+                self.write_entry(H2(k), 3*k+1, 3*k+2, 3*k+3)
+            k += 1
         idx = self.index_from_data()
         cpt = self.index_from_data()
         cpt.compact()
-        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
-        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
+        assert idx.size() == 1024 + num_buckets * (32 + 3 * 4)
+        assert cpt.size() == 1024 + num_entries * (32 + 3 * 4)
         self.compare_indexes(idx, cpt)
+
+    def test_simple(self):
+        self.compare_compact('*DE**E')
 
     def test_first_empty(self):
-        self.index(num_entries=3, num_buckets=6, num_empty=2)
-        self.write_deleted(H2(1))
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_empty(H2(2))
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        self.write_empty(H2(5))
-
-        idx = self.index_from_data()
-        cpt = self.index_from_data()
-        cpt.compact()
-        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
-        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
-        self.compare_indexes(idx, cpt)
+        self.compare_compact('D*E**E')
 
     def test_last_used(self):
-        self.index(num_entries=3, num_buckets=6, num_empty=2)
-        self.write_deleted(H2(1))
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_empty(H2(2))
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_empty(H2(5))
-        self.write_entry(H2(4), 8, 9, 10)
-
-        idx = self.index_from_data()
-        cpt = self.index_from_data()
-        cpt.compact()
-        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
-        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
-        self.compare_indexes(idx, cpt)
+        self.compare_compact('D*E*E*')
 
     def test_too_few_empty_slots(self):
-        self.index(num_entries=3, num_buckets=6, num_empty=2)
-        self.write_deleted(H2(1))
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_empty(H2(2))
-        self.write_empty(H2(5))
-        self.write_entry(H2(4), 8, 9, 10)
-
-        idx = self.index_from_data()
-        cpt = self.index_from_data()
-        cpt.compact()
-        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
-        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
-        self.compare_indexes(idx, cpt)
+        self.compare_compact('D**EE*')
 
     def test_empty(self):
-        self.index(num_entries=0, num_buckets=6, num_empty=3)
-        self.write_deleted(H2(1))
-        self.write_empty(H2(0))
-        self.write_deleted(H2(3))
-        self.write_empty(H2(2))
-        self.write_empty(H2(5))
-        self.write_deleted(H2(4))
-
-        idx = self.index_from_data()
-        cpt = self.index_from_data()
-        cpt.compact()
-        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
-        assert cpt.size() == 1024 + 0 * (32 + 3 * 4)
-        self.compare_indexes(idx, cpt)
+        self.compare_compact('DEDEED')
 
     def test_already_compact(self):
-        self.index(num_entries=3, num_buckets=3, num_empty=0)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-
-        idx = self.index_from_data()
-        cpt = self.index_from_data()
-        #cpt.compact()
-        assert idx.size() == 1024 + 3 * (32 + 3 * 4)
-        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
-        self.compare_indexes(idx, cpt)
+        self.compare_compact('***')
 
     def test_all_at_front(self):
-        self.index(num_entries=3, num_buckets=6, num_empty=2)
-        self.write_entry(H2(0), 1, 2, 3)
-        self.write_entry(H2(3), 5, 6, 7)
-        self.write_entry(H2(4), 8, 9, 10)
-        self.write_empty(H2(2))
-        self.write_empty(H2(5))
-        self.write_deleted(H2(1))
-
-        idx = self.index_from_data()
-        cpt = self.index_from_data()
-        cpt.compact()
-        assert idx.size() == 1024 + 6 * (32 + 3 * 4)
-        assert cpt.size() == 1024 + 3 * (32 + 3 * 4)
-        self.compare_indexes(idx, cpt)
+        self.compare_compact('***EED')
 
     def test_merge(self):
         master = ChunkIndex()
@@ -599,7 +537,6 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         idx1[H(3)] = 3, 300
         idx1.compact()
         assert idx1.size() == 1024 + 3 * (32 + 2 * 4)
-
         master.merge(idx1)
         self.compare_indexes(idx1, master)
 

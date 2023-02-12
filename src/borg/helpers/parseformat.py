@@ -139,6 +139,10 @@ def ChunkerParams(s):
     if count == 0:
         raise ValueError("no chunker params given")
     algo = params[0].lower()
+    if algo == CH_FAIL and count == 3:
+        block_size = int(params[1])
+        fail_map = str(params[2])
+        return algo, block_size, fail_map
     if algo == CH_FIXED and 2 <= count <= 3:  # fixed, block_size[, header_size]
         block_size = int(params[1])
         header_size = int(params[2]) if count == 3 else 0

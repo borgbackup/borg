@@ -78,6 +78,7 @@ FD_MAX_AGE = 4 * 60  # 4 minutes
 # chunker algorithms
 CH_BUZHASH = "buzhash"
 CH_FIXED = "fixed"
+CH_FAIL = "fail"
 
 # buzhash chunker params
 CHUNK_MIN_EXP = 19  # 2**19 == 512kiB

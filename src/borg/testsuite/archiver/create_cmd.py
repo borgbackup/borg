@@ -201,20 +201,20 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         out = self.cmd(
             f"--repo={self.repository_location}",
             "create",
-            f"--chunker-params=fail,{chunk_size},RRRERRR",
+            f"--chunker-params=fail,{chunk_size},rrrEEErrrr",
             "--paths-from-stdin",
             "--list",
             "test",
             input=flist.encode(),
-            exit_code=1,
+            exit_code=0,
         )
-        assert "E input/file2" in out
+        assert "E input/file2" not in out  # we managed to read it in the 3rd retry (after 3 failed reads)
         # repo looking good overall? checks for rc == 0.
         self.cmd(f"--repo={self.repository_location}", "check", "--debug")
         # check files in created archive
         out = self.cmd(f"--repo={self.repository_location}", "list", "test")
         assert "input/file1" in out
-        assert "input/file2" not in out
+        assert "input/file2" in out
         assert "input/file3" in out
 
     def test_create_content_from_command(self):

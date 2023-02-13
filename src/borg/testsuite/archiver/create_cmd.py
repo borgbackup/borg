@@ -191,6 +191,32 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         out = self.cmd(f"--repo={self.repository_location}", "extract", "test", "stdin", "--stdout", binary_output=True)
         assert out == input_data
 
+    def test_create_erroneous_file(self):
+        chunk_size = 1000  # fixed chunker with this size, also volume based checkpointing after that volume
+        self.create_regular_file(os.path.join(self.input_path, "file1"), size=chunk_size * 2)
+        self.create_regular_file(os.path.join(self.input_path, "file2"), size=chunk_size * 2)
+        self.create_regular_file(os.path.join(self.input_path, "file3"), size=chunk_size * 2)
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        flist = "".join(f"input/file{n}\n" for n in range(1, 4))
+        out = self.cmd(
+            f"--repo={self.repository_location}",
+            "create",
+            f"--chunker-params=fail,{chunk_size},RRRERRR",
+            "--paths-from-stdin",
+            "--list",
+            "test",
+            input=flist.encode(),
+            exit_code=1,
+        )
+        assert "E input/file2" in out
+        # repo looking good overall? checks for rc == 0.
+        self.cmd(f"--repo={self.repository_location}", "check", "--debug")
+        # check files in created archive
+        out = self.cmd(f"--repo={self.repository_location}", "list", "test")
+        assert "input/file1" in out
+        assert "input/file2" not in out
+        assert "input/file3" in out
+
     def test_create_content_from_command(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         input_data = "some test content"

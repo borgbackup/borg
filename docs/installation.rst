@@ -65,7 +65,7 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _Alpine repository: https://pkgs.alpinelinux.org/packages?name=borgbackup
 .. _[community]: https://www.archlinux.org/packages/?name=borg
 .. _Debian packages: https://packages.debian.org/search?keywords=borgbackup&searchon=names&exact=1&suite=all&section=all
-.. _Fedora official repository: https://apps.fedoraproject.org/packages/borgbackup
+.. _Fedora official repository: https://packages.fedoraproject.org/pkgs/borgbackup/borgbackup/
 .. _FreeBSD ports: https://www.freshports.org/archivers/py-borgbackup/
 .. _ebuild: https://packages.gentoo.org/packages/app-backup/borgbackup
 .. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg

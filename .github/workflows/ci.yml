@@ -94,7 +94,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
         restore-keys: |
             ${{ runner.os }}-pip-
             ${{ runner.os }}-
@@ -120,7 +120,7 @@ jobs:
     - name: Install Python requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        pip install -r requirements.d/development.txt
+        pip install -r requirements.d/development.lock.txt
     - name: Install borgbackup
       run: |
         # pip install -e .

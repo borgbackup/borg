@@ -840,11 +840,23 @@ class AEADKeyBase(KeyBase):
     MAX_IV = 2**48 - 1
 
     def assert_id(self, id, data):
-        # note: assert_id(id, data) is not needed any more for the new AEAD crypto.
-        # we put the id into AAD when storing the chunk, so it gets into the authentication tag computation.
+        # Comparing the id hash here would not be needed any more for the new AEAD crypto **IF** we
+        # could be sure that chunks were created by normal (not tampered, not evil) borg code:
+        # We put the id into AAD when storing the chunk, so it gets into the authentication tag computation.
         # when decrypting, we provide the id we **want** as AAD for the auth tag verification, so
         # decrypting only succeeds if we got the ciphertext we wrote **for that chunk id**.
-        pass
+        # So, basically the **repository** can not cheat on us by giving us a different chunk.
+        #
+        # **BUT**, if chunks are created by tampered, evil borg code, the borg client code could put
+        # a wrong chunkid into AAD and then AEAD-encrypt-and-auth this and store it into the
+        # repository using this bad chunkid as key (violating the usual chunkid == id_hash(data)).
+        # Later, when reading such a bad chunk, AEAD-auth-and-decrypt would not notice any
+        # issue and decrypt successfully.
+        # Thus, to notice such evil borg activity, we must check for such violations here:
+        if id and id != Manifest.MANIFEST_ID:
+            id_computed = self.id_hash(data)
+            if not hmac.compare_digest(id_computed, id):
+                raise IntegrityError("Chunk %s: id verification failed" % bin_to_hex(id))
 
     def encrypt(self, id, data):
         # to encrypt new data in this session we use always self.cipher and self.sessionid

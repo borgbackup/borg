@@ -79,8 +79,8 @@ class Statistics:
         stats.nfiles = self.nfiles + other.nfiles
         stats.chunking_time = self.chunking_time + other.chunking_time
         stats.hashing_time = self.hashing_time + other.hashing_time
-        for key in other.files_stats:
-            stats.files_stats[key] = self.files_stats[key] + other.files_stats[key]
+        st1, st2 = self.files_stats, other.files_stats
+        stats.files_stats = defaultdict(int, {key: (st1[key] + st2[key]) for key in st1.keys() | st2.keys()})
 
         return stats
 

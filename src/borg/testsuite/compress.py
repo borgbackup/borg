@@ -146,7 +146,8 @@ def test_auto():
     ratio = len(compressed_zlib) / len(compressed_lz4)
     assert meta["ctype"] == ZLIB.ID if ratio < 0.99 else LZ4.ID
     assert meta["clevel"] == 9 if ratio < 0.99 else 255
-    assert meta["csize"] == len(compressed_auto_zlib)
+    smallest_csize = min(len(compressed_zlib), len(compressed_lz4))
+    assert meta["csize"] == len(compressed_auto_zlib) == smallest_csize
 
     data = b"\x00\xb8\xa3\xa2-O\xe1i\xb6\x12\x03\xc21\xf3\x8a\xf78\\\x01\xa5b\x07\x95\xbeE\xf8\xa3\x9ahm\xb1~"
     meta, compressed = compressor_auto_zlib.compress(dict(meta), data)

@@ -1448,7 +1448,7 @@ class FilesystemObjectProcessors:
             self.add_item(item, stats=self.stats)
             return status
 
-    def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal):
+    def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal, last_try=False):
         with self.create_helper(path, st, None) as (item, status, hardlinked, hl_chunks):  # no status yet
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
                 with backup_io("fstat"):
@@ -1499,9 +1499,8 @@ class FilesystemObjectProcessors:
                         else:
                             status = "M" if known else "A"  # regular file, modified or added
                         self.print_file_status(status, path)
-                        self.stats.files_stats[status] += 1
-                        status = None  # we already printed the status
                         # Only chunkify the file if needed
+                        changed_while_backup = False
                         if "chunks" not in item:
                             with backup_io("read"):
                                 self.process_file_chunks(
@@ -1512,9 +1511,7 @@ class FilesystemObjectProcessors:
                                     backup_io_iter(self.chunker.chunkify(None, fd)),
                                 )
                                 self.stats.chunking_time = self.chunker.chunking_time
-                            if is_win32:
-                                changed_while_backup = False  # TODO
-                            else:
+                            if not is_win32:  # TODO for win32
                                 with backup_io("fstat2"):
                                     st2 = os.fstat(fd)
                                 # special files:
@@ -1523,13 +1520,19 @@ class FilesystemObjectProcessors:
                                 changed_while_backup = not is_special_file and st.st_ctime_ns != st2.st_ctime_ns
                             if changed_while_backup:
                                 # regular file changed while we backed it up, might be inconsistent/corrupt!
-                                status = "C"
+                                if last_try:
+                                    status = "C"  # crap! retries did not help.
+                                else:
+                                    raise BackupError("file changed while we read it!")
                             if not is_special_file and not changed_while_backup:
                                 # we must not memorize special files, because the contents of e.g. a
                                 # block or char device will change without its mtime/size/inode changing.
                                 # also, we must not memorize a potentially inconsistent/corrupt file that
                                 # changed while we backed it up.
                                 cache.memorize_file(hashed_path, path_hash, st, [c.id for c in item.chunks])
+                        self.stats.files_stats[status] += 1  # must be done late
+                        if not changed_while_backup:
+                            status = None  # we already called print_file_status
                     self.stats.nfiles += 1
                     item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
                     item.get_size(memorize=True)

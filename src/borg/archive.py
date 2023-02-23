@@ -1837,12 +1837,6 @@ class ArchiveChecker:
         chunks_count_index = len(self.chunks)
         chunks_count_segments = 0
         errors = 0
-        # for the new crypto, derived from AEADKeyBase, we know that it checks authenticity on
-        # the crypto.low_level level - invalid chunks will fail to AEAD authenticate.
-        # for these key types, we know that there is no need to decompress the data afterwards.
-        # for all other modes, we assume that we must decompress, so we can verify authenticity
-        # based on the plaintext MAC (via calling ._assert_id(id, plaintext)).
-        decompress = not isinstance(self.key, AEADKeyBase)
         defect_chunks = []
         pi = ProgressIndicatorPercent(
             total=chunks_count_index, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
@@ -1872,7 +1866,8 @@ class ArchiveChecker:
                         chunk_data_iter = self.repository.get_many(chunk_ids)
                 else:
                     try:
-                        self.repo_objs.parse(chunk_id, encrypted_data, decompress=decompress)
+                        # we must decompress, so it'll call assert_id() in there:
+                        self.repo_objs.parse(chunk_id, encrypted_data, decompress=True)
                     except IntegrityErrorBase as integrity_error:
                         self.error_found = True
                         errors += 1
@@ -1903,7 +1898,8 @@ class ArchiveChecker:
                     # from the underlying media.
                     try:
                         encrypted_data = self.repository.get(defect_chunk)
-                        self.repo_objs.parse(defect_chunk, encrypted_data, decompress=decompress)
+                        # we must decompress, so it'll call assert_id() in there:
+                        self.repo_objs.parse(defect_chunk, encrypted_data, decompress=True)
                     except IntegrityErrorBase:
                         # failed twice -> get rid of this chunk
                         del self.chunks[defect_chunk]

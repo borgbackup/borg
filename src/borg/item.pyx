@@ -629,6 +629,7 @@ class ItemDiff:
     def __init__(self, item1, item2, chunk_iterator1, chunk_iterator2, numeric_ids=False, can_compare_chunk_ids=False, content_only=False):
         self._item1 = item1
         self._item2 = item2
+        self._content_only = content_only
         self._numeric_ids = numeric_ids
         self._can_compare_chunk_ids = can_compare_chunk_ids
         self.equal = self._equal(chunk_iterator1, chunk_iterator2)
@@ -652,11 +653,10 @@ class ItemDiff:
         if self._item1.is_fifo() or self._item2.is_fifo():
             changes.append(self._presence_diff('fifo'))
 
-        if not (self._item1.get('deleted') or self._item2.get('deleted')):
-            changes.append(self._owner_diff())
-            changes.append(self._mode_diff())
-
-        if not content_only:
+        if not self._content_only:
+            if not (self._item1.get('deleted') or self._item2.get('deleted')):
+                changes.append(self._owner_diff())
+                changes.append(self._mode_diff())
             changes.extend(self._time_diffs())
 
         # filter out empty changes
@@ -675,8 +675,12 @@ class ItemDiff:
         if self._item1.get('deleted') and self._item2.get('deleted'):
             return True
 
-        attr_list = ['deleted', 'mode', 'target', 'ctime', 'mtime']
-        attr_list += ['uid', 'gid'] if self._numeric_ids else ['user', 'group']
+        attr_list = ['deleted', 'target']
+
+        if not self._content_only:
+            attr_list += ['mode', 'ctime', 'mtime']
+            attr_list += ['uid', 'gid'] if self._numeric_ids else ['user', 'group']
+
         for attr in attr_list:
             if self._item1.get(attr) != self._item2.get(attr):
                 return False
@@ -744,9 +748,9 @@ class ItemDiff:
         attrs = ["ctime", "mtime"]
         for attr in attrs:
             if attr in self._item1 and attr in self._item2 and self._item1.get(attr) != self._item2.get(attr):
-                timestamp1 = OutputTimestamp(safe_timestamp(self._item1.get(attr)))
-                timestamp2 = OutputTimestamp(safe_timestamp(self._item2.get(attr)))
-                changes.append(({"type": attr, f"old_{attr}": timestamp1, f"new_{attr}": timestamp2}, '[{}: {} -> {}]'.format(attr, timestamp1, timestamp2)))
+                ts1 = OutputTimestamp(safe_timestamp(self._item1.get(attr)))
+                ts2 = OutputTimestamp(safe_timestamp(self._item2.get(attr)))
+                changes.append(({"type": attr, f"old_{attr}": ts1, f"new_{attr}": ts2}, '[{}: {} -> {}]'.format(attr, ts1, ts2)))
         return changes
 
     def _content_equal(self, chunk_iterator1, chunk_iterator2):

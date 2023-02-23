@@ -2265,14 +2265,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert csize >= size
 
     def test_compression_auto_compressible(self):
-        # this is testing whether the "auto" meta-compressor chooses the "expensive" zlib compression
-        # if it detects that the data is very compressible (and not "lz4" nor "none" compression).
+        # this is testing whether the "auto" meta-compressor behaves as expected:
+        # - it checks whether the data is compressible (detector is the lz4 compressor)
+        # - as the data is compressible, it runs the "expensive" zlib compression on it
+        # - it returns whatever is shortest, either the lz4 compressed data or the zlib compressed data.
         auto_size, auto_csize = self._get_sizes('auto,zlib', compressible=True)
         self.cmd('delete', self.repository_location)
         zlib_size, zlib_csize = self._get_sizes('zlib', compressible=True)
-        assert auto_size == zlib_size
+        self.cmd('delete', self.repository_location)
+        lz4_size, lz4_csize = self._get_sizes('lz4', compressible=True)
+        assert auto_size == zlib_size == lz4_size
         assert auto_csize < auto_size * 0.1  # it did compress!
-        assert auto_csize == zlib_csize  # looking at the result size, it seems to be zlib compressed
+        smallest_csize = min(zlib_csize, lz4_csize)
+        assert auto_csize == smallest_csize
 
     def test_compression_auto_uncompressible(self):
         # this is testing whether the "auto" meta-compressor chooses the "none" compression (storing the

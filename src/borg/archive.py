@@ -97,6 +97,7 @@ Added files: {added_files}
 Unchanged files: {unchanged_files}
 Modified files: {modified_files}
 Error files: {error_files}
+Files changed while reading: {files_changed_while_reading}
 Bytes read from remote: {stats.rx_bytes}
 Bytes sent to remote: {stats.tx_bytes}
 """.format(
@@ -107,6 +108,7 @@ Bytes sent to remote: {stats.tx_bytes}
             unchanged_files=self.files_stats["U"],
             modified_files=self.files_stats["M"],
             error_files=self.files_stats["E"],
+            files_changed_while_reading=self.files_stats["C"],
         )
 
     def __repr__(self):

@@ -67,6 +67,7 @@ Added files: 0
 Unchanged files: 0
 Modified files: 0
 Error files: 0
+Files changed while reading: 0
 Bytes read from remote: 0
 Bytes sent to remote: 0
 """

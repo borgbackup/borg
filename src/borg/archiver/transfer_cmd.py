@@ -134,9 +134,9 @@ class TransferMixIn:
                     if not dry_run:
                         item = upgrader.upgrade_item(item=item)
                         archive.add_item(item, show_progress=args.progress)
-                if args.progress:
-                    archive.stats.show_progress(final=True)
                 if not dry_run:
+                    if args.progress:
+                        archive.stats.show_progress(final=True)
                     additional_metadata = upgrader.upgrade_archive_metadata(metadata=other_archive.metadata)
                     archive.save(additional_metadata=additional_metadata)
                     print(

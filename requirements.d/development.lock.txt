@@ -1,11 +1,11 @@
-setuptools==65.6.3
+setuptools==67.3.3
 setuptools-scm==7.1.0
-pip==22.3.1
-virtualenv==20.17.1
+pip==23.0.1
+virtualenv==20.19.0
 pkgconfig==1.5.5
-tox==4.0.18
-pytest==7.2.0
-pytest-xdist==3.1.0
+tox==4.0.19
+pytest==7.2.1
+pytest-xdist==3.2.0
 pytest-cov==4.0.0
 pytest-benchmark==4.0.0
 Cython==0.29.33

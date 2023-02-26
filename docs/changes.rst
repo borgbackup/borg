@@ -112,6 +112,8 @@ Compatibility notes:
 
 New features:
 
+- create: implement retries for individual fs files
+  (e.g. if a file changed while we read it, if a file had an OSError)
 - info: add used storage quota, #7121
 - transfer: support --progress
 - create/recreate/import-tar: add --checkpoint-volume option
@@ -133,6 +135,8 @@ Fixes:
 - extract: fix mtime when ResourceFork xattr is set (macOS specific), #7234
 - recreate: without --chunker-params shall not rechunk, #7336
 - allow mixing --progress and --list in log-json mode
+- add "files changed while reading" to Statistics class, #7354
+- fixed keys determination in Statistics.__add__(), #7355
 
 Other changes:
 
@@ -155,6 +159,9 @@ Other changes:
 - require and use platformdirs 3.x.x package, tests
 - better included/excluded status chars, docs, #7321
 - undef NDEBUG for chunker and hashindex (make assert() work)
+- assert_id: better be paranoid (add back same crypto code as in old borg), #7362
+- check --verify_data: always decompress and call assert_id(), #7362
+- make hashindex_compact simpler and probably faster, minor fixes, cleanups, more tests
 - hashindex minor fixes, refactor, tweaks, tests
 - pyinstaller: remove icon
 - validation / placeholders / JSON:
@@ -175,6 +182,8 @@ Other changes:
   - shellpattern: add license, use copyright/license markup
   - key change-passphrase: fix --encryption value in examples
   - remove BORG_LIBB2_PREFIX (not used any more)
+  - Installation: Update Fedora in distribution list, #7357
+  - add .readthedocs.yaml (use py311, use non-shallow clone)
 - tests:
 
   - fix archiver tests on Windows, add running the tests to Windows CI
@@ -189,6 +198,7 @@ Other changes:
   - fix test_size_on_disk_accurate for large st_blksize, #7250
   - relaxed timestamp comparisons, use same_ts_ns
   - add test for extracted directory mtime
+  - use "fail" chunker to test erroneous input file skipping
 
 
 Version 2.0.0b4 (2022-11-27)

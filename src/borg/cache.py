@@ -262,6 +262,7 @@ class CacheConfig:
     def __init__(self, repository, path=None, lock_wait=None):
         self.repository = repository
         self.path = cache_dir(repository, path)
+        logger.debug("Using %s as cache", self.path)
         self.config_path = os.path.join(self.path, "config")
         self.lock = None
         self.lock_wait = lock_wait

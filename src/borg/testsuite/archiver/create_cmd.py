@@ -798,6 +798,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd = os.open(fifo_fn, os.O_RDONLY | os.O_NONBLOCK)
             try:
                 os.read(fd, len(data))
+            except OSError:
+                # fails on FreeBSD 13 with BlockingIOError
+                pass
             finally:
                 os.close(fd)
             t.join()

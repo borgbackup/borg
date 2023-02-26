@@ -35,9 +35,9 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdin-name NAME``                             | use NAME in archive for stdin data (default: 'stdin')                                                                                                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--stdin-user USER``                             | set user USER in archive for stdin data (default: 'root')                                                                                                                                         |
+    |                                                       | ``--stdin-user USER``                             | set user USER in archive for stdin data (default: do not store user/uid)                                                                                                                          |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--stdin-group GROUP``                           | set group GROUP in archive for stdin data (default: 'wheel')                                                                                                                                      |
+    |                                                       | ``--stdin-group GROUP``                           | set group GROUP in archive for stdin data (default: do not store group/gid)                                                                                                                       |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdin-mode M``                                | set mode to M in archive for stdin data (default: 0660)                                                                                                                                           |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -103,6 +103,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-c SECONDS``, ``--checkpoint-interval SECONDS`` | write checkpoint every SECONDS seconds (Default: 1800)                                                                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--checkpoint-volume BYTES``                     | write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)                                                                                                            |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--chunker-params PARAMS``                       | specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details.                                                                                                  |
@@ -132,8 +134,8 @@ borg create
         --json          output stats as JSON. Implies ``--stats``.
         --no-cache-sync    experimental: do not synchronize the cache. Implies not using the files cache.
         --stdin-name NAME    use NAME in archive for stdin data (default: 'stdin')
-        --stdin-user USER    set user USER in archive for stdin data (default: 'root')
-        --stdin-group GROUP    set group GROUP in archive for stdin data (default: 'wheel')
+        --stdin-user USER    set user USER in archive for stdin data (default: do not store user/uid)
+        --stdin-group GROUP    set group GROUP in archive for stdin data (default: do not store group/gid)
         --stdin-mode M    set mode to M in archive for stdin data (default: 0660)
         --content-from-command    interpret PATH as command and store its stdout. See also section Reading from stdin below.
         --paths-from-stdin    read DELIM-separated list of paths to back up from stdin. Will not recurse into directories.
@@ -173,6 +175,7 @@ borg create
         --comment COMMENT                             add a comment text to the archive
         --timestamp TIMESTAMP                         manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
         -c SECONDS, --checkpoint-interval SECONDS     write checkpoint every SECONDS seconds (Default: 1800)
+        --checkpoint-volume BYTES                     write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)
         --chunker-params PARAMS                       specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
         -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
 
@@ -319,9 +322,9 @@ borg usually just stores their metadata:
 
 Other flags used include:
 
+- '+' = included, item would be backed up (if not in dry-run mode)
+- '-' = excluded, item would not be / was not backed up
 - 'i' = backup data was read from standard input (stdin)
-- '-' = dry run, item was *not* backed up
-- 'x' = excluded, item was *not* backed up
 - '?' = missing status code (if you see this, please file a bug report!)
 
 Reading from stdin

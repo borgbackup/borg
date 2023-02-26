@@ -121,8 +121,7 @@ Keys available only when listing files in an archive:
 - user
 - group
 - path: file path
-- source: link target for symlinks (identical to linktarget)
-- linktarget
+- target: link target for symlinks
 - hlid: hard link identity (same if hardlinking same fs object)
 - flags
 
@@ -154,6 +153,6 @@ Keys available only when listing files in an archive:
 
 - archiveid
 - archivename
-- extra: prepends {source} with " -> " for soft links and " link to " for hard links
+- extra: prepends {target} with " -> " for soft links and " link to " for hard links
 
 - health: either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)

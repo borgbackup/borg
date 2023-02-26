@@ -13,7 +13,7 @@ import pytest
 from ... import platform
 from ...constants import *  # NOQA
 from ...manifest import Manifest
-from ...platform import is_cygwin, is_win32
+from ...platform import is_cygwin, is_win32, is_darwin
 from ...repository import Repository
 from .. import has_lchflags
 from .. import changedir
@@ -713,7 +713,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert result["Modified files"] == 0
         # Archive a dir with two added files
         self.create_regular_file("testfile1", contents=b"test1")
-        time.sleep(0.01)  # testfile2 must have newer timestamps than testfile1
+        time.sleep(1.0 if is_darwin else 0.01)  # testfile2 must have newer timestamps than testfile1
         self.create_regular_file("testfile2", contents=b"test2")
         result = self.cmd(f"--repo={self.repository_location}", "create", "--stats", "test_archive2", self.input_path)
         result = to_dict(result)
@@ -798,6 +798,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd = os.open(fifo_fn, os.O_RDONLY | os.O_NONBLOCK)
             try:
                 os.read(fd, len(data))
+            except OSError:
+                # fails on FreeBSD 13 with BlockingIOError
+                pass
             finally:
                 os.close(fd)
             t.join()

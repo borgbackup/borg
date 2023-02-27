@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORGFS" 1 "2023-01-02" "" "borg backup tool"
+.TH "BORGFS" 1 "2023-02-26" "" "borg backup tool"
 .SH NAME
 borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
@@ -80,6 +80,18 @@ consider first N archives after other filters were applied
 .TP
 .BI \-\-last \ N
 consider last N archives after other filters were applied
+.TP
+.BI \-\-oldest \ TIMESPAN
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+.TP
+.BI \-\-newest \ TIMESPAN
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+.TP
+.BI \-\-older \ TIMESPAN
+consider archives older than (now \- TIMESPAN), e.g. 7d oder 12m.
+.TP
+.BI \-\-newer \ TIMESPAN
+consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
 .UNINDENT
 .SS Exclusion options
 .INDENT 0.0

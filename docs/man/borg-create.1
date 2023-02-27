@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2023-01-02" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2023-02-26" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -157,10 +157,10 @@ experimental: do not synchronize the cache. Implies not using the files cache.
 use NAME in archive for stdin data (default: \(aqstdin\(aq)
 .TP
 .BI \-\-stdin\-user \ USER
-set user USER in archive for stdin data (default: \(aqroot\(aq)
+set user USER in archive for stdin data (default: do not store user/uid)
 .TP
 .BI \-\-stdin\-group \ GROUP
-set group GROUP in archive for stdin data (default: \(aqwheel\(aq)
+set group GROUP in archive for stdin data (default: do not store group/gid)
 .TP
 .BI \-\-stdin\-mode \ M
 set mode to M in archive for stdin data (default: 0660)
@@ -251,6 +251,9 @@ manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:
 .TP
 .BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
 write checkpoint every SECONDS seconds (Default: 1800)
+.TP
+.BI \-\-checkpoint\-volume \ BYTES
+write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)
 .TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
@@ -420,11 +423,11 @@ borg usually just stores their metadata:
 Other flags used include:
 .INDENT 0.0
 .IP \(bu 2
+\(aq+\(aq = included, item would be backed up (if not in dry\-run mode)
+.IP \(bu 2
+\(aq\-\(aq = excluded, item would not be / was not backed up
+.IP \(bu 2
 \(aqi\(aq = backup data was read from standard input (stdin)
-.IP \(bu 2
-\(aq\-\(aq = dry run, item was \fInot\fP backed up
-.IP \(bu 2
-\(aqx\(aq = excluded, item was \fInot\fP backed up
 .IP \(bu 2
 \(aq?\(aq = missing status code (if you see this, please file a bug report!)
 .UNINDENT

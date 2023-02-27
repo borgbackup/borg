@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2023-01-02" "" "borg backup tool"
+.TH "BORG-PRUNE" 1 "2023-02-26" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -73,12 +73,12 @@ As an example, \fB\-\-keep\-daily 7\fP means to keep the latest backup on each d
 up to 7 most recent days with backups (days without backups do not count).
 The rules are applied from secondly to yearly, and backups selected by previous
 rules do not count towards those of later rules. The time that each backup
-starts is used for pruning purposes. Dates and times are interpreted in
-the local timezone, and weeks go from Monday to Sunday. Specifying a
-negative number of archives to keep means that there is no limit. As of borg
-1.2.0, borg will retain the oldest archive if any of the secondly, minutely,
-hourly, daily, weekly, monthly, or yearly rules was not otherwise able to meet
-its retention target. This enables the first chronological archive to continue
+starts is used for pruning purposes. Dates and times are interpreted in the local
+timezone of the system where borg prune runs, and weeks go from Monday to Sunday.
+Specifying a negative number of archives to keep means that there is no limit.
+As of borg 1.2.0, borg will retain the oldest archive if any of the secondly,
+minutely, hourly, daily, weekly, monthly, or yearly rules was not otherwise able to
+meet its retention target. This enables the first chronological archive to continue
 aging until it is replaced by a newer archive that meets the retention criteria.
 .sp
 The \fB\-\-keep\-last N\fP option is doing the same as \fB\-\-keep\-secondly N\fP (and it will
@@ -139,6 +139,18 @@ write checkpoint every SECONDS seconds (Default: 1800)
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
 only consider archive names matching the pattern. see \(dqborg help match\-archives\(dq.
+.TP
+.BI \-\-oldest \ TIMESPAN
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+.TP
+.BI \-\-newest \ TIMESPAN
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+.TP
+.BI \-\-older \ TIMESPAN
+consider archives older than (now \- TIMESPAN), e.g. 7d oder 12m.
+.TP
+.BI \-\-newer \ TIMESPAN
+consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
 .UNINDENT
 .SH EXAMPLES
 .sp

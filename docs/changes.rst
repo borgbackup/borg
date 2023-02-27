@@ -12,8 +12,8 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0b5 (not released yet)
-----------------------------------
+Version 2.0.0b5 (2023-02-27)
+----------------------------
 
 Please note:
 
@@ -40,7 +40,7 @@ Compatibility notes:
   - the scp-style REPO syntax was removed, please use ssh://..., #6697
   - ssh:// URLs: removed support for /~otheruser/, #6855.
     If you used this, just replace it by: ssh://user@host:port/home/otheruser/
-  - -P / --prefix option was removed, please use the similar -a / --glob-archives.
+  - -P / --prefix option was removed, please use the similar -a / --match-archives.
   - the archive name is always given separately from the repository
     (differently than with borg 1.x you must not give repo::archive).
   - the archive name is either given as a positional parameter, like:
@@ -50,8 +50,8 @@ Compatibility notes:
   - or, if the command makes sense for an arbitrary amount of archives, archives
     can be selected using a glob pattern, like:
 
-    - borg delete -a 'myarchive*'
-    - borg recreate -a 'myarchive*'
+    - borg delete -a 'sh:myarchive*'
+    - borg recreate -a 'sh:myarchive*'
   - some borg 1.x commands that supported working on a repo AND on an archive
     were split into 2 commands, some others were renamed:
 
@@ -100,7 +100,7 @@ Compatibility notes:
 
   - XDG_*_HOME is not honoured on macOS and on Windows.
   - BORG_BASE_DIR can still be used to enforce some base dir + .config/ or .cache/.
-  - the default macOS config and cache dir will now be in ~/Library/Application Support/.
+  - the default macOS config and cache dir will now be in ~/Library/Application Support/borg/.
 - create: different included/excluded status chars, #7321
 
   - dry-run: now uses "+" (was: "-") and "-" (was: "x") for included/excluded status
@@ -129,11 +129,11 @@ Fixes:
 - avoid orphan content chunks on BackupOSError, #6709
 - transfer: fix bug in obfuscated data upgrade code
 - fs.py: fix bug in f-string (thanks mypy!)
-- recreate: when --target is given, do not detect "nothing to do", #7254.
+- recreate: when --target is given, do not detect "nothing to do", #7254
 - locking (win32): deal with os.rmdir/listdir PermissionErrors
 - locking: thread id must be parsed as hex from lock file name
 - extract: fix mtime when ResourceFork xattr is set (macOS specific), #7234
-- recreate: without --chunker-params shall not rechunk, #7336
+- recreate: without --chunker-params borg shall not rechunk, #7336
 - allow mixing --progress and --list in log-json mode
 - add "files changed while reading" to Statistics class, #7354
 - fixed keys determination in Statistics.__add__(), #7355

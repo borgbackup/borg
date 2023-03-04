@@ -749,6 +749,12 @@ Check if your encoding is set correctly. For most POSIX-like systems, try::
 
   export LANG=en_US.UTF-8  # or similar, important is correct charset
 
+If that does not help:
+
+- check for typos, check if you really used ``export``.
+- check if you have set ``LC_ALL`` - if so, try not setting it.
+- check if you generated the respective locale via ``locale-gen``.
+
 I can't extract non-ascii filenames by giving them on the commandline!?
 -----------------------------------------------------------------------
 

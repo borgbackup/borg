@@ -23,15 +23,15 @@ def test_hashindex_stress():
         for j in range(ENTRIES):
             k = random.randbytes(32)
             v = random.randint(0, NSIndex.MAX_VALUE - 1)
-            idx[k] = (v, v, v)
+            idx[k] = (v, v)
             kv[k] = v
         # check and delete a random amount of entries
         delete_keys = random.sample(list(kv), k=random.randint(0, len(kv)))
         for k in delete_keys:
             v = kv.pop(k)
-            assert idx.pop(k) == (v, v, v)
+            assert idx.pop(k) == (v, v)
         # check if remaining entries are as expected
         for k, v in kv.items():
-            assert idx[k] == (v, v, v)
+            assert idx[k] == (v, v)
         # check entry count
         assert len(kv) == len(idx)

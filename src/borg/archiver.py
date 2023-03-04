@@ -9,7 +9,6 @@ try:
     import configparser
     import faulthandler
     import functools
-    import hashlib
     import inspect
     import itertools
     import json
@@ -2193,28 +2192,36 @@ class Archiver:
         hex_id = args.id
         try:
             id = unhexlify(hex_id)
-        except ValueError:
-            print("object id %s is invalid." % hex_id)
-        else:
-            try:
-                data = repository.get(id)
-            except Repository.ObjectNotFound:
-                print("object %s not found." % hex_id)
-            else:
-                with open(args.path, "wb") as f:
-                    f.write(data)
-                print("object %s fetched." % hex_id)
+            if len(id) != 32:  # 256bit
+                raise ValueError("id must be 256bits or 64 hex digits")
+        except ValueError as err:
+            print("object id %s is invalid [%s]." % (hex_id, str(err)))
+            return EXIT_ERROR
+        try:
+            data = repository.get(id)
+        except Repository.ObjectNotFound:
+            print("object %s not found." % hex_id)
+            return EXIT_ERROR
+        with open(args.path, "wb") as f:
+            f.write(data)
+        print("object %s fetched." % hex_id)
         return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True)
     def do_debug_put_obj(self, args, repository):
-        """put file(s) contents into the repository"""
-        for path in args.paths:
-            with open(path, "rb") as f:
-                data = f.read()
-            h = hashlib.sha256(data)  # XXX hardcoded
-            repository.put(h.digest(), data)
-            print("object %s put." % h.hexdigest())
+        """put file contents into the repository"""
+        with open(args.path, "rb") as f:
+            data = f.read()
+        hex_id = args.id
+        try:
+            id = unhexlify(hex_id)
+            if len(id) != 32:  # 256bit
+                raise ValueError("id must be 256bits or 64 hex digits")
+        except ValueError as err:
+            print("object id %s is invalid [%s]." % (hex_id, str(err)))
+            return EXIT_ERROR
+        repository.put(id, data)
+        print("object %s put." % hex_id)
         repository.commit(compact=False)
         return EXIT_SUCCESS
 
@@ -3744,7 +3751,7 @@ class Archiver:
                                help='file to write object data into')
 
         debug_put_obj_epilog = process_epilog("""
-        This command puts objects into the repository.
+        This command puts an object into the repository.
         """)
         subparser = debug_parsers.add_parser('put-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_put_obj.__doc__,
@@ -3755,8 +3762,8 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY',
                                type=location_validator(archive=False),
                                help='repository to use')
-        subparser.add_argument('paths', metavar='PATH', nargs='+', type=str,
-                               help='file(s) to read and create object(s) from')
+        subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to put into the repo")
+        subparser.add_argument("path", metavar="PATH", type=str, help="file to read and create object from")
 
         debug_delete_obj_epilog = process_epilog("""
         This command deletes objects from the repository.

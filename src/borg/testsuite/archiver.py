@@ -2908,18 +2908,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_debug_put_get_delete_obj(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         data = b'some data'
-        hexkey = sha256(data).hexdigest()
         self.create_regular_file('file', contents=data)
-        output = self.cmd('debug', 'put-obj', self.repository_location, 'input/file')
-        assert hexkey in output
-        output = self.cmd('debug', 'get-obj', self.repository_location, hexkey, 'output/file')
-        assert hexkey in output
+        # TODO: to compute the correct hexkey, we need: borg debug id-hash file
+        id_hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"  # 256bit = 64 hex digits
+        output = self.cmd('debug', 'put-obj', self.repository_location, id_hash, 'input/file')
+        assert id_hash in output
+        output = self.cmd('debug', 'get-obj', self.repository_location, id_hash, 'output/file')
+        assert id_hash in output
         with open('output/file', 'rb') as f:
             data_read = f.read()
         assert data == data_read
-        output = self.cmd('debug', 'delete-obj', self.repository_location, hexkey)
+        output = self.cmd('debug', 'delete-obj', self.repository_location, id_hash)
         assert "deleted" in output
-        output = self.cmd('debug', 'delete-obj', self.repository_location, hexkey)
+        output = self.cmd('debug', 'delete-obj', self.repository_location, id_hash)
         assert "not found" in output
         output = self.cmd('debug', 'delete-obj', self.repository_location, 'invalid')
         assert "is invalid" in output

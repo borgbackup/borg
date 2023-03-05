@@ -2521,20 +2521,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_compression_zlib_compressible(self):
         size, csize = self._get_sizes('zlib', compressible=True)
         assert csize < size * 0.1
-        assert csize == 35
 
     def test_compression_zlib_uncompressible(self):
         size, csize = self._get_sizes('zlib', compressible=False)
         assert csize >= size
-
-    def test_compression_auto_compressible(self):
-        size, csize = self._get_sizes('auto,zlib', compressible=True)
-        assert csize < size * 0.1
-        assert csize == 35  # same as compression 'zlib'
-
-    def test_compression_auto_uncompressible(self):
-        size, csize = self._get_sizes('auto,zlib', compressible=False)
-        assert csize == size + 3  # same as compression 'none'
 
     def test_compression_lz4_compressible(self):
         size, csize = self._get_sizes('lz4', compressible=True)
@@ -2558,6 +2548,28 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_compression_zstd_uncompressible(self):
         size, csize = self._get_sizes('zstd', compressible=False)
+        assert csize == size + 3  # same as compression 'none'
+
+    def test_compression_auto_compressible(self):
+        # this is testing whether the "auto" meta-compressor behaves as expected:
+        # - it checks whether the data is compressible (detector is the lz4 compressor)
+        # - as the data is compressible, it runs the "expensive" zlib compression on it
+        # - it returns whatever is shortest, either the lz4 compressed data or the zlib compressed data.
+        auto_size, auto_csize = self._get_sizes('auto,zlib', compressible=True)
+        self.cmd('delete', self.repository_location)
+        zlib_size, zlib_csize = self._get_sizes('zlib', compressible=True)
+        self.cmd('delete', self.repository_location)
+        lz4_size, lz4_csize = self._get_sizes('lz4', compressible=True)
+        assert auto_size == zlib_size == lz4_size
+        assert auto_csize < auto_size * 0.1  # it did compress!
+        smallest_csize = min(zlib_csize, lz4_csize)
+        assert auto_csize == smallest_csize
+
+    def test_compression_auto_uncompressible(self):
+        # this is testing whether the "auto" meta-compressor chooses the "none" compression (storing the
+        # data "as is" with just the 3 bytes header) if all else would result in something bigger.
+        size, csize = self._get_sizes('auto,zlib', compressible=False)
+        assert csize >= size
         assert csize == size + 3  # same as compression 'none'
 
     def test_change_passphrase(self):

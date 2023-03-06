@@ -8,6 +8,7 @@ try:
 except ImportError:
     posix = None
 
+import re
 import stat
 import sys
 import sysconfig
@@ -186,6 +187,9 @@ class BaseTestCase(unittest.TestCase):
     def assert_dirs_equal(self, dir1, dir2, **kwargs):
         diff = filecmp.dircmp(dir1, dir2)
         self._assert_dirs_equal_cmp(diff, **kwargs)
+
+    def assert_line_exists(self, lines, expected_regexpr):
+        assert any(re.search(expected_regexpr, line) for line in lines), f"no match for {expected_regexpr} in {lines}"
 
     def _assert_dirs_equal_cmp(self, diff, ignore_flags=False, ignore_xattrs=False, ignore_ns=False):
         self.assert_equal(diff.left_only, [])

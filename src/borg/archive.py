@@ -1096,7 +1096,7 @@ Duration: {0.duration}
             logger.warning("borg check --repair is required to free all space.")
 
     @staticmethod
-    def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False):
+    def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False, content_only=False):
         """
         Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
 
@@ -1111,6 +1111,7 @@ Duration: {0.duration}
                 archive1.pipeline.fetch_many([c.id for c in item1.get("chunks", [])]),
                 archive2.pipeline.fetch_many([c.id for c in item2.get("chunks", [])]),
                 can_compare_chunk_ids=can_compare_chunk_ids,
+                content_only=content_only,
             )
 
         orphans_archive1 = OrderedDict()

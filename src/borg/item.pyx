@@ -8,6 +8,7 @@ from .constants import ITEM_KEYS, ARCHIVE_KEYS
 from .helpers import StableDict
 from .helpers import format_file_size
 from .helpers.msgpack import timestamp_to_int, int_to_timestamp, Timestamp
+from .helpers.time import OutputTimestamp, safe_timestamp
 
 
 cdef extern from "_item.c":
@@ -626,9 +627,10 @@ class ItemDiff:
     It does not include extended or time attributes in the comparison.
     """
 
-    def __init__(self, item1, item2, chunk_iterator1, chunk_iterator2, numeric_ids=False, can_compare_chunk_ids=False):
+    def __init__(self, item1, item2, chunk_iterator1, chunk_iterator2, numeric_ids=False, can_compare_chunk_ids=False, content_only=False):
         self._item1 = item1
         self._item2 = item2
+        self._content_only = content_only
         self._numeric_ids = numeric_ids
         self._can_compare_chunk_ids = can_compare_chunk_ids
         self.equal = self._equal(chunk_iterator1, chunk_iterator2)
@@ -652,9 +654,11 @@ class ItemDiff:
         if self._item1.is_fifo() or self._item2.is_fifo():
             changes.append(self._presence_diff('fifo'))
 
-        if not (self._item1.get('deleted') or self._item2.get('deleted')):
-            changes.append(self._owner_diff())
-            changes.append(self._mode_diff())
+        if not self._content_only:
+            if not (self._item1.get('deleted') or self._item2.get('deleted')):
+                changes.append(self._owner_diff())
+                changes.append(self._mode_diff())
+                changes.extend(self._time_diffs())
 
         # filter out empty changes
         self._changes = [ch for ch in changes if ch]
@@ -672,8 +676,12 @@ class ItemDiff:
         if self._item1.get('deleted') and self._item2.get('deleted'):
             return True
 
-        attr_list = ['deleted', 'mode', 'target']
-        attr_list += ['uid', 'gid'] if self._numeric_ids else ['user', 'group']
+        attr_list = ['deleted', 'target']
+
+        if not self._content_only:
+            attr_list += ['mode', 'ctime', 'mtime']
+            attr_list += ['uid', 'gid'] if self._numeric_ids else ['user', 'group']
+
         for attr in attr_list:
             if self._item1.get(attr) != self._item2.get(attr):
                 return False
@@ -735,6 +743,16 @@ class ItemDiff:
             mode1 = stat.filemode(self._item1.mode)
             mode2 = stat.filemode(self._item2.mode)
             return ({"type": "mode", "old_mode": mode1, "new_mode": mode2}, '[{} -> {}]'.format(mode1, mode2))
+
+    def _time_diffs(self):
+        changes = []
+        attrs = ["ctime", "mtime"]
+        for attr in attrs:
+            if attr in self._item1 and attr in self._item2 and self._item1.get(attr) != self._item2.get(attr):
+                ts1 = OutputTimestamp(safe_timestamp(self._item1.get(attr)))
+                ts2 = OutputTimestamp(safe_timestamp(self._item2.get(attr)))
+                changes.append(({"type": attr, f"old_{attr}": ts1, f"new_{attr}": ts2}, '[{}: {} -> {}]'.format(attr, ts1, ts2)))
+        return changes
 
     def _content_equal(self, chunk_iterator1, chunk_iterator2):
         if self._can_compare_chunk_ids:

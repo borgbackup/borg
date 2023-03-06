@@ -6,6 +6,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator
 from ..manifest import Manifest
+from ..helpers.parseformat import BorgJsonEncoder
 
 from ..logger import create_logger
 
@@ -19,7 +20,7 @@ class DiffMixIn:
         """Diff contents of two archives"""
 
         def print_json_output(diff, path):
-            print(json.dumps({"path": path, "changes": [j for j, str in diff]}))
+            print(json.dumps({"path": path, "changes": [j for j, str in diff]}, sort_keys=True, cls=BorgJsonEncoder))
 
         def print_text_output(diff, path):
             print("{:<19} {}".format(" ".join([str for j, str in diff]), path))
@@ -42,7 +43,9 @@ class DiffMixIn:
 
         matcher = build_matcher(args.patterns, args.paths)
 
-        diffs = Archive.compare_archives_iter(archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids)
+        diffs = Archive.compare_archives_iter(
+            archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids, content_only=args.content_only
+        )
         # Conversion to string and filtering for diff.equal to save memory if sorting
         diffs = ((path, diff.changes()) for path, diff in diffs if not diff.equal)
 
@@ -105,6 +108,11 @@ class DiffMixIn:
         )
         subparser.add_argument("--sort", dest="sort", action="store_true", help="Sort the output lines by file path.")
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")
+        subparser.add_argument(
+            "--content-only",
+            action="store_true",
+            help="Only compare differences in content (exclude metadata differences)",
+        )
         subparser.add_argument("name", metavar="ARCHIVE1", type=archivename_validator, help="ARCHIVE1 name")
         subparser.add_argument("other_name", metavar="ARCHIVE2", type=archivename_validator, help="ARCHIVE2 name")
         subparser.add_argument(

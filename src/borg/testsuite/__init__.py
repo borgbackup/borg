@@ -8,13 +8,13 @@ try:
 except ImportError:
     posix = None
 
+import re
 import stat
 import sys
 import sysconfig
 import tempfile
 import time
 import unittest
-import re
 
 from ..xattr import get_all
 from ..platform import get_flags

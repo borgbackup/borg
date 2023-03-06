@@ -10,6 +10,7 @@ from .helpers import format_file_size
 from .helpers.msgpack import timestamp_to_int, int_to_timestamp, Timestamp
 from .helpers.time import OutputTimestamp, safe_timestamp
 
+
 cdef extern from "_item.c":
     object _object_to_optr(object obj)
     object _optr_to_object(object bytes)

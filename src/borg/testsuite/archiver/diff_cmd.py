@@ -1,13 +1,13 @@
 import json
 import os
 import stat
+import time
 import unittest
 
 from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported
 from ..platform import is_win32
 from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
-from time import sleep
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -76,7 +76,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             change = "B" if can_compare_ids else "{:<19}".format("modified")
             lines = output.splitlines()
             assert "file_replaced" in output  # added to debug #3494
-            assert "input/file_replaced" in output
+            self.assert_line_exists(lines, f"{change}.*input/file_replaced")
 
             # File unchanged
             assert "input/file_unchanged" not in output
@@ -106,9 +106,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # should notice the changes in both links. However, the symlink
             # pointing to the file is not changed.
             change = "0 B" if can_compare_ids else "{:<19}".format("modified")
-            self.assert_line_exists(lines, "%s.*input/empty" % change)
+            self.assert_line_exists(lines, f"{change}.*input/empty")
             if are_hardlinks_supported():
-                self.assert_line_exists(lines, "%s.*input/hardlink_contents_changed" % change)
+                self.assert_line_exists(lines, f"{change}.*input/hardlink_contents_changed")
             if are_symlinks_supported():
                 assert "input/link_target_contents_changed" not in output
 
@@ -127,15 +127,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert "removed       256 B input/hardlink_removed" in output
 
-            # Another link (marked previously as the source in borg) to the
-            # same inode was removed. This should not change this link at all.
             if are_hardlinks_supported() and content_only:
+                # Another link (marked previously as the source in borg) to the
+                # same inode was removed. This should only change the ctime since removing
+                # the link would result in the decrementation of the inode's hard-link count.
                 assert "input/hardlink_target_removed" not in output
 
-            # Another link (marked previously as the source in borg) to the
-            # same inode was replaced with a new regular file. This should not
-            # change this link at all.
-            if are_hardlinks_supported() and content_only:
+                # Another link (marked previously as the source in borg) to the
+                # same inode was replaced with a new regular file. This should only change
+                # its ctime. This should not be reflected in the output if content-only is set
                 assert "input/hardlink_target_replaced" not in output
 
         def do_json_asserts(output, can_compare_ids, content_only=False):
@@ -212,16 +212,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert {"type": "removed", "size": 256} in get_changes("input/hardlink_removed", joutput)
 
-            # Another link (marked previously as the source in borg) to the
-            # same inode was removed. This should not change this link except for its ctime mtime.
             if content_only:
                 if are_hardlinks_supported():
+                    # Another link (marked previously as the source in borg) to the
+                    # same inode was removed. This should only change the ctime since removing
+                    # the link would result in the decrementation of the inode's hard-link count.
                     assert not any(get_changes("input/hardlink_target_removed", joutput))
 
-                # Another link (marked previously as the source in borg) to the
-                # same inode was replaced with a new regular file. This should not
-                # change this link at all.
-                if are_hardlinks_supported():
+                    # Another link (marked previously as the source in borg) to the
+                    # same inode was replaced with a new regular file. This should only change
+                    # its ctime. This should not be reflected in the output if content-only is set
                     assert not any(get_changes("input/hardlink_target_replaced", joutput))
 
         output = self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1a")
@@ -244,11 +244,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         self.create_regular_file("test_file", size=10)
         self.cmd(f"--repo={self.repository_location}", "create", "archive1", "input")
-        sleep(0.1)
+        time.sleep(0.1)
         os.unlink("input/test_file")
         if is_win32:
             # Sleeping for 15s because Windows doesn't refresh ctime if file is deleted and recreated within 15 seconds.
-            sleep(15)
+            time.sleep(15)
         self.create_regular_file("test_file", size=15)
         self.cmd(f"--repo={self.repository_location}", "create", "archive2", "input")
         output = self.cmd(f"--repo={self.repository_location}", "diff", "archive1", "archive2")

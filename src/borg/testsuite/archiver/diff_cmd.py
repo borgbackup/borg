@@ -173,7 +173,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
                 # Symlink replacing or being replaced
 
-                # TODO: Add mode test flag to assert function
                 if not content_only:
                     assert any(
                         chg["type"] == "mode" and chg["new_mode"].startswith("l")
@@ -182,7 +181,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     assert any(
                         chg["type"] == "mode" and chg["old_mode"].startswith("l")
                         for chg in get_changes("input/link_replaced_by_file", joutput)
-                    )
+                    ), get_changes("input/link_replaced_by_file", joutput)
 
                 # Symlink target removed. Should not affect the symlink at all.
                 assert not any(get_changes("input/link_target_removed", joutput))
@@ -212,17 +211,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert {"type": "removed", "size": 256} in get_changes("input/hardlink_removed", joutput)
 
-            if content_only:
-                if are_hardlinks_supported():
-                    # Another link (marked previously as the source in borg) to the
-                    # same inode was removed. This should only change the ctime since removing
-                    # the link would result in the decrementation of the inode's hard-link count.
-                    assert not any(get_changes("input/hardlink_target_removed", joutput))
+            if are_hardlinks_supported() and content_only:
+                # Another link (marked previously as the source in borg) to the
+                # same inode was removed. This should only change the ctime since removing
+                # the link would result in the decrementation of the inode's hard-link count.
+                assert not any(get_changes("input/hardlink_target_removed", joutput))
 
-                    # Another link (marked previously as the source in borg) to the
-                    # same inode was replaced with a new regular file. This should only change
-                    # its ctime. This should not be reflected in the output if content-only is set
-                    assert not any(get_changes("input/hardlink_target_replaced", joutput))
+                # Another link (marked previously as the source in borg) to the
+                # same inode was replaced with a new regular file. This should only change
+                # its ctime. This should not be reflected in the output if content-only is set
+                assert not any(get_changes("input/hardlink_target_replaced", joutput))
 
         output = self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1a")
         do_asserts(output, True)

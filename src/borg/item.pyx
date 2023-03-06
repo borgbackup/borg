@@ -658,7 +658,7 @@ class ItemDiff:
             if not (self._item1.get('deleted') or self._item2.get('deleted')):
                 changes.append(self._owner_diff())
                 changes.append(self._mode_diff())
-            changes.extend(self._time_diffs())
+                changes.extend(self._time_diffs())
 
         # filter out empty changes
         self._changes = [ch for ch in changes if ch]

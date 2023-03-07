@@ -648,7 +648,7 @@ class ArchiveFormatter(BaseFormatter):
             self.item_data = static_keys
 
     def format_item_json(self, item):
-        return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder) + '\n'
+        return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder, sort_keys=True) + '\n'
 
     def get_item_data(self, archive_info):
         self.name = archive_info.name

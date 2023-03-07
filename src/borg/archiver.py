@@ -76,6 +76,7 @@ try:
     from .helpers import sig_int, ignore_sigint
     from .helpers import iter_separated
     from .helpers import get_tar_filter
+    from .helpers.parseformat import BorgJsonEncoder
     from .nanorst import rst_to_terminal
     from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
     from .patterns import PatternMatcher
@@ -1117,7 +1118,7 @@ class Archiver:
         """Diff contents of two archives"""
 
         def print_json_output(diff, path):
-            print(json.dumps({"path": path, "changes": [j for j, str in diff]}))
+            print(json.dumps({"path": path, "changes": [j for j, str in diff]}, sort_keys=True, cls=BorgJsonEncoder))
 
         def print_text_output(diff, path):
             print("{:<19} {}".format(' '.join([str for j, str in diff]), path))
@@ -1146,7 +1147,7 @@ class Archiver:
 
         matcher = self.build_matcher(args.patterns, args.paths)
 
-        diffs = Archive.compare_archives_iter(archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids)
+        diffs = Archive.compare_archives_iter(archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids, content_only=args.content_only)
         # Conversion to string and filtering for diff.equal to save memory if sorting
         diffs = ((path, diff.changes()) for path, diff in diffs if not diff.equal)
 
@@ -3908,6 +3909,11 @@ class Archiver:
                                help='Override check of chunker parameters.')
         subparser.add_argument('--sort', dest='sort', action='store_true',
                                help='Sort the output lines by file path.')
+        subparser.add_argument(
+            "--content-only",
+            action="store_true",
+            help="Only compare differences in content (exclude metadata differences)",
+        )
         subparser.add_argument('--json-lines', action='store_true',
                                help='Format output as JSON Lines. ')
         subparser.add_argument('location', metavar='REPO::ARCHIVE1',

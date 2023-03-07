@@ -1044,7 +1044,7 @@ Utilization of max. archive size: {csize_max:.0%}
             logger.warning('borg check --repair is required to free all space.')
 
     @staticmethod
-    def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False):
+    def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False, content_only=False):
         """
         Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
 
@@ -1073,7 +1073,8 @@ Utilization of max. archive size: {csize_max:.0%}
             return ItemDiff(item1, item2,
                             archive1.pipeline.fetch_many([c.id for c in item1.get('chunks', [])]),
                             archive2.pipeline.fetch_many([c.id for c in item2.get('chunks', [])]),
-                            can_compare_chunk_ids=can_compare_chunk_ids)
+                            can_compare_chunk_ids=can_compare_chunk_ids,
+                            content_only=content_only)
 
         def defer_if_necessary(item1, item2):
             """Adds item tuple to deferred if necessary and returns True, if items were deferred"""

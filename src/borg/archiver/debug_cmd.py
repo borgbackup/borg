@@ -294,6 +294,23 @@ class DebugMixIn:
         print("Done.")
         return EXIT_SUCCESS
 
+    @with_repository(manifest=False, exclusive=True)
+    def do_debug_id_hash_file(self, args, repository):
+        """calculate object id of a given plaintext file"""
+        with open(args.path, "rb") as f:
+            data = f.read()
+
+        from ..crypto.key import key_factory
+
+        # set up the key without depending on a manifest obj
+        ids = repository.list(limit=1, marker=None)
+        cdata = repository.get(ids[0])
+        key = key_factory(repository, cdata)
+        repo_objs = RepoObj(key)
+        id_hash = repo_objs.id_hash(data)
+        print(id_hash)
+        return EXIT_SUCCESS
+
     @with_repository(manifest=False, exclusive=True, cache=True, compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_refcount_obj(self, args, repository, manifest, cache):
         """display refcounts for the objects with the given IDs"""
@@ -544,6 +561,24 @@ class DebugMixIn:
         subparser.add_argument(
             "ids", metavar="IDs", nargs="+", type=str, help="hex object ID(s) to delete from the repo"
         )
+
+        debug_id_hash_obj_epilog = process_epilog(
+            """
+            This command reads a plaintext file and computes object id from it
+            """
+        )
+        subparser = debug_parsers.add_parser(
+            "id-hash",
+            parents=[common_parser],
+            add_help=False,
+            description=self.do_debug_id_hash_file.__doc__,
+            epilog=debug_id_hash_obj_epilog,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            help="calculate object id from plaintext file (debug)",
+        )
+
+        subparser.set_defaults(func=self.do_debug_id_hash_file)
+        subparser.add_argument("path", metavar="PATH", type=str, help="plaintext file to calculate object id from")
 
         debug_refcount_obj_epilog = process_epilog(
             """

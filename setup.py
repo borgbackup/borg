@@ -67,10 +67,10 @@ on_rtd = os.environ.get('READTHEDOCS')
 install_requires = [
     # we are rather picky about msgpack versions, because a good working msgpack is
     # very important for borg, see: https://github.com/borgbackup/borg/issues/3753
-    'msgpack >=0.5.6, <=1.0.4, !=1.0.1',
     # Please note:
-    # using any other version is not supported by borg development and
+    # using any other msgpack version is not supported by borg development and
     # any feedback related to issues caused by this will be ignored.
+    'msgpack >=0.5.6, <=1.0.5, !=1.0.1',
     'packaging',
 ]
 

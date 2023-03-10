@@ -1350,6 +1350,8 @@ class FilesystemObjectProcessors:
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
                 with backup_io('fstat'):
                     st = stat_update_check(st, os.fstat(fd))
+                if not hardlinked or hardlink_master:
+                    item.hardlink_master = hardlinked
                 item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
                 return status
 
@@ -1359,6 +1361,8 @@ class FilesystemObjectProcessors:
             with backup_io('stat'):
                 st = stat_update_check(st, os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False))
             item.rdev = st.st_rdev
+            if not hardlinked or hardlink_master:
+                item.hardlink_master = hardlinked
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 
@@ -1395,6 +1399,7 @@ class FilesystemObjectProcessors:
         self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd)))
         item.get_size(memorize=True)
         self.stats.nfiles += 1
+        item.hardlink_master = False
         self.add_item(item, stats=self.stats)
         return status
 

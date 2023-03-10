@@ -193,6 +193,8 @@ ports.
 After you have installed the dependencies, you can proceed with steps outlined
 under :ref:`pip-installation`.
 
+.. _debian-ubuntu:
+
 Debian / Ubuntu
 +++++++++++++++
 
@@ -375,6 +377,8 @@ Using git
 
 This uses latest, unreleased development code from git.
 While we try not to break master, there are no guarantees on anything.
+
+Install the dependencies for your OS, for example :ref:`debian-ubuntu`
 
 ::
 

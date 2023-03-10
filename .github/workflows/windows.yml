@@ -22,7 +22,9 @@ jobs:
       - name: Install dependencies
         run: ./scripts/msys2-install-deps development
       - name: Build
-        run: ./scripts/msys2-build
+        run: |
+          pip install -e .
+          pyinstaller -y scripts/borg.exe.spec
       - uses: actions/upload-artifact@v3
         with:
           name: borg-windows
@@ -30,5 +32,4 @@ jobs:
       - name: Run tests
         run: |
           ./dist/borg.exe -V
-          pip install -e .
           pytest --benchmark-skip -vv -rs -k "not remote"

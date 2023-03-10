@@ -145,6 +145,17 @@ the old version using the same steps as shown above.
 From Source
 -----------
 
+Operating System
+~~~~~~~~~~~~~~~~
+
+* :ref:`debian-ubuntu`
+* :ref:`fedora`
+* :ref:`opensuse-tumbleweed-leap`
+* :ref:`macos`
+* :ref:`freebsd`
+* :ref:`windows-10-s-linux-subsystem`
+* :ref:`cygwin`
+
 .. note::
 
   Some older Linux systems (like RHEL/CentOS 5) and Python interpreter binaries
@@ -326,6 +337,8 @@ Use the Cygwin installer to install the dependencies::
 Using pip
 ~~~~~~~~~
 
+Ensure to install the dependencies as described within :ref:`source-install`.
+
 Virtualenv_ can be used to build and install Borg without affecting
 the system Python or requiring root access.  Using a virtual environment is
 optional, but recommended except for the most simple use cases.
@@ -375,6 +388,8 @@ locally::
 
 Using git
 ~~~~~~~~~
+
+Ensure to install the dependencies as described within :ref:`source-install`.
 
 This uses latest, unreleased development code from git.
 While we try not to break master, there are no guarantees on anything.

@@ -1,4 +1,4 @@
-from typing import FrozenSet, Set, NamedTuple, Tuple, Mapping, Dict, List, Iterator, Callable, Any
+from typing import FrozenSet, Set, NamedTuple, Tuple, Mapping, Dict, List, Iterator, Callable, Any, Optional
 
 from .helpers import StableDict
 
@@ -251,6 +251,14 @@ class ManifestItem(PropDict):
 class DiffChange(NamedTuple):
     data: Dict[str, Any]
     info: str
+
+
+class Diff:
+    type: str
+    change: Dict[str, Any]
+    def __init__(self, _type: str, change: Optional[Dict[str, Any]] = ...) -> None: ...
+    def to_dict(self) -> Dict[str, Any]: ...
+
 
 class ItemDiff:
     equal: bool

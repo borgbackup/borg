@@ -97,14 +97,13 @@ class DiffMixIn:
         Examples:
         ::
 
-            $ borg diff --format '{mode} {size:8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
-            [ctime: Wed, 2023-02-22 00:08:47 +0800 -> Sat, 2023-03-11 13:34:35 +0800] [mtime: Wed, 2023-02-22 00:08:47 +0800 -> Sat, 2023-03-11 13:34:35 +0800] dev/Alconna
+            $ borg diff --format '{type} {content:8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
             modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
             ...
 
             # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
             # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
-            $ borg diff --format '{mode} {size:<8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            $ borg diff --format '{type} {content:<8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
             modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
             ...
 

@@ -618,8 +618,19 @@ cpdef _init_names():
 
 _init_names()
 
+# TODO: maybe remove DiffChange as info may generate by DiffFormatter later
+# TODO: and data can give a dataclass or typeddict 
 DiffChange = namedtuple("DiffChange", "data info")
 
+class Diff:
+    def __init__(self, _type, source, target, change=None):
+        self.type = _type
+        self.source = source
+        self.target = target
+        self.change = change or {}
+
+    def to_dict(self):
+        return {"type": self.type, **self.change}
 
 class ItemDiff:
     """

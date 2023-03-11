@@ -11,6 +11,7 @@ from functools import partial
 from getpass import getuser
 from io import BytesIO
 from itertools import groupby, zip_longest
+from typing import Iterator, Tuple # TODO: remove this if maintainers don't want it
 from shutil import get_terminal_size
 
 from .platformflags import is_win32
@@ -1095,8 +1096,15 @@ Duration: {0.duration}
             logger.warning("forced deletion succeeded, but the deleted archive was corrupted.")
             logger.warning("borg check --repair is required to free all space.")
 
+    #TODO: in final, remove type hints if maintainers don't want them
     @staticmethod
-    def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False, content_only=False):
+    def compare_archives_iter(
+        archive1: 'Archive', 
+        archive2: 'Archive', 
+        matcher=None, 
+        can_compare_chunk_ids=False, 
+        content_only=False
+    ) -> Iterator[Tuple[str, ItemDiff]]:
         """
         Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
 
@@ -1104,7 +1112,7 @@ Duration: {0.duration}
         :param can_compare_chunk_ids: Whether --chunker-params are the same for both archives.
         """
 
-        def compare_items(item1, item2):
+        def compare_items(item1: Item, item2: Item):
             return ItemDiff(
                 item1,
                 item2,
@@ -1114,13 +1122,17 @@ Duration: {0.duration}
                 content_only=content_only,
             )
 
-        orphans_archive1 = OrderedDict()
-        orphans_archive2 = OrderedDict()
+        orphans_archive1: OrderedDict[str, Item] = OrderedDict()
+        orphans_archive2: OrderedDict[str, Item] = OrderedDict()
+
+        assert matcher is not None, "matcher must be set"
 
         for item1, item2 in zip_longest(
             archive1.iter_items(lambda item: matcher.match(item.path)),
             archive2.iter_items(lambda item: matcher.match(item.path)),
         ):
+            item1: Item
+            item2: Item
             if item1 and item2 and item1.path == item2.path:
                 yield (item1.path, compare_items(item1, item2))
                 continue

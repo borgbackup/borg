@@ -247,9 +247,26 @@ class ManifestItem(PropDict):
     @item_keys.setter
     def item_keys(self, val: Tuple) -> None: ...
 
+
+class DiffChange(NamedTuple):
+    data: Dict[str, Any]
+    info: str
+
 class ItemDiff:
-    def __init__(self, *args, **kwargs) -> None: ...
-    def _chunk_content_equal(self, c1: Iterator, c2: Iterator) -> bool: ...
+    equal: bool
+    def __init__(
+        self, 
+        item1: Item, 
+        item2: Item, 
+        chunk_a: Iterator, 
+        chunk_b: Iterator, 
+        numeric_ids: bool = ..., 
+        can_compare_chunk_ids: bool = ..., 
+        content_only: bool = ...
+    ) -> None: ...
+    def changes(self) -> List[DiffChange]: ...
+
+def chunk_content_equal(chunks_a: Iterator, chunks_b: Iterator) -> bool: ...
 
 class Key(PropDict):
     @property

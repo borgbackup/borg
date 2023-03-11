@@ -618,6 +618,8 @@ cpdef _init_names():
 
 _init_names()
 
+DiffChange = namedtuple("DiffChange", "data info")
+
 
 class ItemDiff:
     """
@@ -627,13 +629,13 @@ class ItemDiff:
     It does not include extended or time attributes in the comparison.
     """
 
-    def __init__(self, item1, item2, chunk_iterator1, chunk_iterator2, numeric_ids=False, can_compare_chunk_ids=False, content_only=False):
+    def __init__(self, item1, item2, chunk_a, chunk_b, numeric_ids=False, can_compare_chunk_ids=False, content_only=False):
         self._item1 = item1
         self._item2 = item2
         self._content_only = content_only
         self._numeric_ids = numeric_ids
         self._can_compare_chunk_ids = can_compare_chunk_ids
-        self.equal = self._equal(chunk_iterator1, chunk_iterator2)
+        self.equal = self._equal(chunk_a, chunk_b)
         changes = []
 
         if self._item1.is_link() or self._item2.is_link():
@@ -654,11 +656,10 @@ class ItemDiff:
         if self._item1.is_fifo() or self._item2.is_fifo():
             changes.append(self._presence_diff('fifo'))
 
-        if not self._content_only:
-            if not (self._item1.get('deleted') or self._item2.get('deleted')):
-                changes.append(self._owner_diff())
-                changes.append(self._mode_diff())
-                changes.extend(self._time_diffs())
+        if not content_only and not (self._item1.get('deleted') or self._item2.get('deleted')):
+            changes.append(self._owner_diff())
+            changes.append(self._mode_diff())
+            changes.extend(self._time_diffs())
 
         # filter out empty changes
         self._changes = [ch for ch in changes if ch]
@@ -667,9 +668,7 @@ class ItemDiff:
         return self._changes
 
     def __repr__(self):
-        if self.equal:
-            return 'equal'
-        return ' '.join(str for d, str in self._changes)
+        return 'equal' if self.equal else ' '.join(change.info for change in self._changes)
 
     def _equal(self, chunk_iterator1, chunk_iterator2):
         # if both are deleted, there is nothing at path regardless of what was deleted
@@ -699,50 +698,59 @@ class ItemDiff:
     def _presence_diff(self, item_type):
         if not self._item1.get('deleted') and self._item2.get('deleted'):
             chg = 'removed ' + item_type
-            return ({"type": chg}, chg)
+            return DiffChange({"type": chg}, chg)
         if self._item1.get('deleted') and not self._item2.get('deleted'):
             chg = 'added ' + item_type
-            return ({"type": chg}, chg)
+            return DiffChange({"type": chg}, chg)
 
     def _link_diff(self):
         pd = self._presence_diff('link')
         if pd is not None:
             return pd
         if 'target' in self._item1 and 'target' in self._item2 and self._item1.target != self._item2.target:
-            return ({"type": 'changed link'}, 'changed link')
+            return DiffChange({"type": 'changed link'}, 'changed link')
 
     def _content_diff(self):
         if self._item1.get('deleted'):
             sz = self._item2.get_size()
-            return ({"type": "added", "size": sz}, 'added {:>13}'.format(format_file_size(sz)))
+            return DiffChange({"type": "added", "size": sz}, 'added {:>13}'.format(format_file_size(sz)))
         if self._item2.get('deleted'):
             sz = self._item1.get_size()
-            return ({"type": "removed", "size": sz}, 'removed {:>11}'.format(format_file_size(sz)))
+            return DiffChange({"type": "removed", "size": sz}, 'removed {:>11}'.format(format_file_size(sz)))
         if not self._can_compare_chunk_ids:
-            return ({"type": "modified"}, "modified")
+            return DiffChange({"type": "modified"}, "modified")
         chunk_ids1 = {c.id for c in self._item1.chunks}
         chunk_ids2 = {c.id for c in self._item2.chunks}
         added_ids = chunk_ids2 - chunk_ids1
         removed_ids = chunk_ids1 - chunk_ids2
         added = self._item2.get_size(consider_ids=added_ids)
         removed = self._item1.get_size(consider_ids=removed_ids)
-        return ({"type": "modified", "added": added, "removed": removed},
-            '{:>9} {:>9}'.format(format_file_size(added, precision=1, sign=True),
-            format_file_size(-removed, precision=1, sign=True)))
+        return DiffChange(
+            {"type": "modified", "added": added, "removed": removed},
+            '{:>9} {:>9}'.format(
+                format_file_size(added, precision=1, sign=True),
+                format_file_size(-removed, precision=1, sign=True)
+            )
+        )
 
     def _owner_diff(self):
         u_attr, g_attr = ('uid', 'gid') if self._numeric_ids else ('user', 'group')
         u1, g1 = self._item1.get(u_attr), self._item1.get(g_attr)
         u2, g2 = self._item2.get(u_attr), self._item2.get(g_attr)
         if (u1, g1) != (u2, g2):
-            return ({"type": "owner", "old_user": u1, "old_group": g1, "new_user": u2, "new_group": g2},
-                    '[{}:{} -> {}:{}]'.format(u1, g1, u2, g2))
+            return DiffChange(
+                {"type": "owner", "old_user": u1, "old_group": g1, "new_user": u2, "new_group": g2},
+                '[{}:{} -> {}:{}]'.format(u1, g1, u2, g2)
+            )
 
     def _mode_diff(self):
         if 'mode' in self._item1 and 'mode' in self._item2 and self._item1.mode != self._item2.mode:
             mode1 = stat.filemode(self._item1.mode)
             mode2 = stat.filemode(self._item2.mode)
-            return ({"type": "mode", "old_mode": mode1, "new_mode": mode2}, '[{} -> {}]'.format(mode1, mode2))
+            return DiffChange(
+                {"type": "mode", "old_mode": mode1, "new_mode": mode2}, 
+                '[{} -> {}]'.format(mode1, mode2)
+            )
 
     def _time_diffs(self):
         changes = []
@@ -751,7 +759,12 @@ class ItemDiff:
             if attr in self._item1 and attr in self._item2 and self._item1.get(attr) != self._item2.get(attr):
                 ts1 = OutputTimestamp(safe_timestamp(self._item1.get(attr)))
                 ts2 = OutputTimestamp(safe_timestamp(self._item2.get(attr)))
-                changes.append(({"type": attr, f"old_{attr}": ts1, f"new_{attr}": ts2}, '[{}: {} -> {}]'.format(attr, ts1, ts2)))
+                changes.append(
+                    DiffChange(
+                        {"type": attr, f"old_{attr}": ts1, f"new_{attr}": ts2}, 
+                        '[{}: {} -> {}]'.format(attr, ts1, ts2)
+                    )
+                )
         return changes
 
     def _content_equal(self, chunk_iterator1, chunk_iterator2):

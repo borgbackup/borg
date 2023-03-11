@@ -1,6 +1,7 @@
 import argparse
 import textwrap
 import json
+from typing import List
 
 from ._common import with_repository, with_archive, build_matcher
 from ..archive import Archive
@@ -8,7 +9,7 @@ from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator
 from ..manifest import Manifest
 from ..helpers.parseformat import BorgJsonEncoder
-
+from ..item import DiffChange
 from ..logger import create_logger
 
 logger = create_logger()
@@ -20,11 +21,11 @@ class DiffMixIn:
     def do_diff(self, args, repository, manifest, archive):
         """Diff contents of two archives"""
 
-        def print_json_output(diff, path):
-            print(json.dumps({"path": path, "changes": [j for j, str in diff]}, sort_keys=True, cls=BorgJsonEncoder))
+        def print_json_output(diffs: List[DiffChange], path: str):
+            print(json.dumps({"path": path, "changes": [diff.data for diff in diffs]}, sort_keys=True, cls=BorgJsonEncoder))
 
-        def print_text_output(diff, path):
-            print("{:<19} {}".format(" ".join([str for j, str in diff]), path))
+        def print_text_output(diffs: List[DiffChange], path: str):
+            print("{:<19} {}".format(" ".join([diff.info for diff in diffs]), path))
 
         print_output = print_json_output if args.json_lines else print_text_output
 
@@ -44,17 +45,17 @@ class DiffMixIn:
 
         matcher = build_matcher(args.patterns, args.paths)
 
-        diffs = Archive.compare_archives_iter(
+        diffs_iter = Archive.compare_archives_iter(
             archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids, content_only=args.content_only
         )
         # Conversion to string and filtering for diff.equal to save memory if sorting
-        diffs = ((path, diff.changes()) for path, diff in diffs if not diff.equal)
+        diffs_list = [(path, diff.changes()) for path, diff in diffs_iter if not diff.equal]
 
         if args.sort:
-            diffs = sorted(diffs)
+            diffs_list.sort()
 
-        for path, diff in diffs:
-            print_output(diff, path)
+        for path, diffs in diffs_list:
+            print_output(diffs, path)
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning("Include pattern '%s' never matched.", pattern)

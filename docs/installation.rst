@@ -206,6 +206,8 @@ ports.
 After you have installed the dependencies, you can proceed with steps outlined
 under :ref:`pip-installation`.
 
+.. _debian-ubuntu:
+
 Debian / Ubuntu
 +++++++++++++++
 
@@ -224,6 +226,8 @@ In case you get complaints about permission denied on ``/etc/fuse.conf``: on
 Ubuntu this means your user is not in the ``fuse`` group. Add yourself to that
 group, log out and log in again.
 
+.. _fedora:
+
 Fedora
 ++++++
 
@@ -237,6 +241,8 @@ Install the dependencies with development headers::
     sudo dnf install gcc gcc-c++ redhat-rpm-config
     sudo dnf install fuse-devel fuse         # needed for llfuse
     sudo dnf install fuse3-devel fuse3       # needed for pyfuse3
+
+.. _opensuse-tumbleweed-leap:
 
 openSUSE Tumbleweed / Leap
 ++++++++++++++++++++++++++
@@ -254,6 +260,8 @@ Alternatively, you can enumerate all build dependencies in the command line::
     python3-pytest python3-setuptools python3-setuptools_scm \
     python3-sphinx_rtd_theme gcc gcc-c++
     sudo zypper install python3-llfuse  # llfuse
+
+.. _macos:
 
 macOS
 +++++
@@ -288,6 +296,8 @@ To fix this problem, you should grant full disk access to cron, and to your
 Terminal application. More information `can be found here
 <https://osxdaily.com/2020/04/27/fix-cron-permissions-macos-full-disk-access/>`__.
 
+.. _freebsd:
+
 FreeBSD
 ++++++++
 
@@ -308,6 +318,7 @@ and commands to make FUSE work for using the mount command.
      kldload fuse
      sysctl vfs.usermount=1
 
+.. _windows-10-s-linux-subsystem:
 
 Windows 10's Linux Subsystem
 ++++++++++++++++++++++++++++
@@ -317,6 +328,7 @@ Windows 10's Linux Subsystem
 
 Just follow the Ubuntu Linux installation steps. You can omit the FUSE stuff, it won't work anyway.
 
+.. _cygwin:
 
 Cygwin
 ++++++

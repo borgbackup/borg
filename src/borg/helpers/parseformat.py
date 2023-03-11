@@ -950,6 +950,11 @@ class ItemFormatter(BaseFormatter):
         return self.format_time(key, item).isoformat()
 
 
+
+class DiffFormatter(BaseFormatter):
+    ...
+
+
 def file_status(mode):
     if stat.S_ISREG(mode):
         return "A"

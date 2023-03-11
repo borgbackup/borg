@@ -1,10 +1,11 @@
 import argparse
+import textwrap
 import json
 
 from ._common import with_repository, with_archive, build_matcher
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import archivename_validator
+from ..helpers import BaseFormatter, DiffFormatter, archivename_validator
 from ..manifest import Manifest
 from ..helpers.parseformat import BorgJsonEncoder
 
@@ -64,25 +65,63 @@ class DiffMixIn:
         from ._common import process_epilog
         from ._common import define_exclusion_group
 
-        diff_epilog = process_epilog(
-            """
-            This command finds differences (file contents, user/group/mode) between archives.
+        diff_epilog = (
+            process_epilog(
+                """
+        This command finds differences (file contents, user/group/mode) between archives.
 
-            A repository location and an archive name must be specified for REPO::ARCHIVE1.
-            ARCHIVE2 is just another archive name in same repository (no repository location
-            allowed).
+        A repository location and an archive name must be specified for REPO::ARCHIVE1.
+        ARCHIVE2 is just another archive name in same repository (no repository location
+        allowed).
 
-            For archives created with Borg 1.1 or newer diff automatically detects whether
-            the archives are created with the same chunker params. If so, only chunk IDs
-            are compared, which is very fast.
+        For archives created with Borg 1.1 or newer diff automatically detects whether
+        the archives are created with the same chunker params. If so, only chunk IDs
+        are compared, which is very fast.
 
-            For archives prior to Borg 1.1 chunk contents are compared by default.
-            If you did not create the archives with different chunker params,
-            pass ``--same-chunker-params``.
-            Note that the chunker params changed from Borg 0.xx to 1.0.
+        For archives prior to Borg 1.1 chunk contents are compared by default.
+        If you did not create the archives with different chunker params,
+        pass ``--same-chunker-params``.
+        Note that the chunker params changed from Borg 0.xx to 1.0.
 
-            For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
-            """
+        For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
+        
+        .. man NOTES
+
+        The FORMAT specifier syntax
+        +++++++++++++++++++++++++++
+
+        The ``--format`` option uses python's `format string syntax
+        <https://docs.python.org/3.9/library/string.html#formatstrings>`_.
+
+        Examples:
+        ::
+
+            $ borg diff --format '{mode} {size:8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            [ctime: Wed, 2023-02-22 00:08:47 +0800 -> Sat, 2023-03-11 13:34:35 +0800] [mtime: Wed, 2023-02-22 00:08:47 +0800 -> Sat, 2023-03-11 13:34:35 +0800] dev/Alconna
+            modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
+            ...
+
+            # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
+            # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
+            $ borg diff --format '{mode} {size:<8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
+            ...
+
+        The following keys are always available:
+
+
+        """
+            )
+            + BaseFormatter.keys_help()
+            + textwrap.dedent(
+                """
+
+        Keys available only when show differences between archives:
+
+        """
+            )
+            # TODO: impl DiffFormatter
+            + DiffFormatter.keys_help()
         )
         subparser = subparsers.add_parser(
             "diff",
@@ -107,6 +146,16 @@ class DiffMixIn:
             help="Override check of chunker parameters.",
         )
         subparser.add_argument("--sort", dest="sort", action="store_true", help="Sort the output lines by file path.")
+        subparser.add_argument(
+            "--short", dest="short", action="store_true", help="only print change and file/directory names, nothing else"
+        )
+        subparser.add_argument(
+            "--format",
+            metavar="FORMAT",
+            dest="format",
+            help="specify format for differences between archives"
+            '(default: "{change}{type}:{path}{NUL}")',
+        )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")
         subparser.add_argument(
             "--content-only",

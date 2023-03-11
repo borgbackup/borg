@@ -217,8 +217,8 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.3 (2022-12-24)
---------------------------
+Version 1.2.4 (not released yet)
+--------------------------------
 
 Upgrade notes:
 
@@ -296,6 +296,50 @@ Compatibility notes:
 - exit with 128 + signal number, #5161.
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
+
+
+New features:
+
+- debug id-hash: computes file/chunk content id-hash, #7406
+
+Bug fixes:
+
+- debug get-obj/put-obj: always give chunkid as cli param, see #7290
+  (this is an incompatible change, see also borg debug id-hash)
+- extract: fix mtime when ResourceFork xattr is set (macOS specific), #7234
+- recreate: without --chunker-params, do not re-chunk, #7337
+- recreate: when --target is given, do not detect "nothing to do".
+  use case: borg recreate -a src --target dst can be used to make a copy
+  of an archive inside the same repository, #7254.
+- set .hardlink_master for ALL hardlinkable items, #7175
+- locking: fix host, pid, tid order.
+  tid (thread id) must be parsed as hex from lock file name.
+- update development.lock.txt, including a setuptools security fix, #7227
+
+Other changes:
+
+- requirements: allow msgpack 1.0.5 also
+- upgrade Cython to 0.29.33
+- hashindex minor fixes, refactor, tweaks, tests
+- use os.replace not os.rename
+- remove BORG_LIBB2_PREFIX (not used any more)
+- docs:
+
+  - update FAQ about locale/unicode issues, #6999
+  - improve mount options rendering, #7359
+  - make timestamps in manual pages reproducible
+  - installation: update Fedora in distribution list, #7357
+- tests:
+
+  - fix test_size_on_disk_accurate for large st_blksize, #7250
+  - add same_ts_ns function and use it for relaxed timestamp comparisons
+  - "auto" compressor tests: don't assume a specific size,
+    do not assume zlib is better than lz4, #7363
+  - add test for extracted directory mtime
+
+
+Version 1.2.3 (2022-12-24)
+--------------------------
 
 Fixes:
 

@@ -145,17 +145,6 @@ the old version using the same steps as shown above.
 From Source
 -----------
 
-Operating System
-~~~~~~~~~~~~~~~~
-
-* :ref:`debian-ubuntu`
-* :ref:`fedora`
-* :ref:`opensuse-tumbleweed-leap`
-* :ref:`macos`
-* :ref:`freebsd`
-* :ref:`windows-10-s-linux-subsystem`
-* :ref:`cygwin`
-
 .. note::
 
   Some older Linux systems (like RHEL/CentOS 5) and Python interpreter binaries

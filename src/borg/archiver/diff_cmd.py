@@ -171,7 +171,7 @@ class DiffMixIn:
             metavar="FORMAT",
             dest="format",
             help="specify format for differences between archives"
-            '(default: "{flag} {change} {mtime} {path}{NL}")',
+            '(default: "{flag} {content} {mtime} {path}{NL}")',
         )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")
         subparser.add_argument(

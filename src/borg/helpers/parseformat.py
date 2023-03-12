@@ -8,6 +8,7 @@ import re
 import shlex
 import stat
 import uuid
+from typing import List, Dict, Tuple, ClassVar, Any
 from binascii import hexlify
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
@@ -629,7 +630,9 @@ def archivename_validator(text):
 
 
 class BaseFormatter:
-    FIXED_KEYS = {
+    format: str
+    item_data: Dict[str, Any]
+    FIXED_KEYS: ClassVar[Dict[str, str]] = {
         # Formatting aids
         "LF": "\n",
         "SPACE": " ",
@@ -639,24 +642,52 @@ class BaseFormatter:
         "NEWLINE": "\n",
         "NL": "\n",  # \n is automatically converted to os.linesep on write
     }
+    KEY_DESCRIPTIONS: ClassVar[Dict[str, str]] = {
+        "NEWLINE": "OS dependent line separator",
+        "NL": "alias of NEWLINE",
+        "NUL": "NUL character for creating print0 / xargs -0 like output",
+        "SPACE": "space character",
+        "TAB": "tab character",
+        "CR": "carriage return character",
+        "LF": "line feed character"
+    }
+    KEY_GROUPS: ClassVar[Tuple[Tuple[str, ...], ...]] = (
+        ("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),
+    )
 
-    def get_item_data(self, item):
+    def get_item_data(self, item, jsonline=False) -> dict:
         raise NotImplementedError
 
-    def format_item(self, item):
-        return self.format.format_map(self.get_item_data(item))
+    def format_item(self, item, jsonline=False, sort=False):
+        if jsonline:
+            self.item_data = {}
+            return json.dumps(self.get_item_data(item, jsonline), cls=BorgJsonEncoder, sort_keys=sort) + "\n"
+        return self.format.format_map(self.get_item_data(item, jsonline))
+    
+    @classmethod
+    def available_keys(cls) -> List[str]:
+        result = set()
+        result.update(cls.KEY_DESCRIPTIONS.keys())
+        result.update([key for group in cls.KEY_GROUPS for key in group])
+        return list(result) + list(cls.FIXED_KEYS.keys())
 
-    @staticmethod
-    def keys_help():
-        return (
-            "- NEWLINE: OS dependent line separator\n"
-            "- NL: alias of NEWLINE\n"
-            "- NUL: NUL character for creating print0 / xargs -0 like output\n"
-            "- SPACE\n"
-            "- TAB\n"
-            "- CR\n"
-            "- LF"
-        )
+    @classmethod
+    def keys_help(cls):
+        help = []
+        keys = cls.available_keys()
+        for key in cls.FIXED_KEYS:
+            keys.remove(key)
+
+        for group in cls.KEY_GROUPS:
+            for key in group:
+                keys.remove(key)
+                text = "- " + key
+                if key in cls.KEY_DESCRIPTIONS:
+                    text += ": " + cls.KEY_DESCRIPTIONS[key]
+                help.append(text)
+            help.append("")
+        assert not keys, str(keys)
+        return "\n".join(help)
 
 
 class ArchiveFormatter(BaseFormatter):
@@ -690,32 +721,13 @@ class ArchiveFormatter(BaseFormatter):
         keys.extend(formatter.get_item_data(fake_archive_info).keys())
         return keys
 
-    @classmethod
-    def keys_help(cls):
-        help = []
-        keys = cls.available_keys()
-        for key in cls.FIXED_KEYS:
-            keys.remove(key)
-
-        for group in cls.KEY_GROUPS:
-            for key in group:
-                keys.remove(key)
-                text = "- " + key
-                if key in cls.KEY_DESCRIPTIONS:
-                    text += ": " + cls.KEY_DESCRIPTIONS[key]
-                help.append(text)
-            help.append("")
-        assert not keys, str(keys)
-        return "\n".join(help)
-
-    def __init__(self, format, repository, manifest, key, *, json=False, iec=False):
+    def __init__(self, format, repository, manifest, key, *, iec=False):
         self.repository = repository
         self.manifest = manifest
         self.key = key
         self.name = None
         self.id = None
         self._archive = None
-        self.json = json
         self.iec = iec
         static_keys = {}  # here could be stuff on repo level, above archive level
         static_keys.update(self.FIXED_KEYS)
@@ -729,16 +741,9 @@ class ArchiveFormatter(BaseFormatter):
             "end": self.get_ts_end,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
-        if self.json:
-            self.item_data = {}
-            self.format_item = self.format_item_json
-        else:
-            self.item_data = static_keys
+        self.item_data = static_keys
 
-    def format_item_json(self, item):
-        return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder) + "\n"
-
-    def get_item_data(self, archive_info):
+    def get_item_data(self, archive_info, jsonline=False):
         self.name = archive_info.name
         self.id = archive_info.id
         item_data = {}
@@ -821,42 +826,20 @@ class ItemFormatter(BaseFormatter):
         keys.extend(formatter.get_item_data(fake_item).keys())
         return keys
 
-    @classmethod
-    def keys_help(cls):
-        help = []
-        keys = cls.available_keys()
-        for key in cls.FIXED_KEYS:
-            keys.remove(key)
-
-        for group in cls.KEY_GROUPS:
-            for key in group:
-                keys.remove(key)
-                text = "- " + key
-                if key in cls.KEY_DESCRIPTIONS:
-                    text += ": " + cls.KEY_DESCRIPTIONS[key]
-                help.append(text)
-            help.append("")
-        assert not keys, str(keys)
-        return "\n".join(help)
 
     @classmethod
     def format_needs_cache(cls, format):
         format_keys = {f[1] for f in Formatter().parse(format)}
         return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
-    def __init__(self, archive, format, *, json_lines=False):
+    def __init__(self, archive, format):
         from ..checksums import StreamingXXH64
 
         self.xxh64 = StreamingXXH64
         self.archive = archive
-        self.json_lines = json_lines
         static_keys = {"archivename": archive.name, "archiveid": archive.fpr}
         static_keys.update(self.FIXED_KEYS)
-        if self.json_lines:
-            self.item_data = {}
-            self.format_item = self.format_item_json
-        else:
-            self.item_data = static_keys
+        self.item_data = static_keys
         self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
@@ -875,17 +858,14 @@ class ItemFormatter(BaseFormatter):
             self.call_keys[hash_function] = partial(self.hash_item, hash_function)
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
-    def format_item_json(self, item):
-        return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder, sort_keys=True) + "\n"
-
-    def get_item_data(self, item):
+    def get_item_data(self, item, jsonline=False):
         item_data = {}
         item_data.update(self.item_data)
 
         item_data.update(text_to_json("path", item.path))
         target = item.get("target", "")
         item_data.update(text_to_json("target", target))
-        if not self.json_lines:
+        if not jsonline:
             item_data["extra"] = "" if not target else f" -> {item_data['target']}"
 
         hlid = item.get("hlid")
@@ -902,7 +882,7 @@ class ItemFormatter(BaseFormatter):
         item_data.update(text_to_json("user", item.get("user", str(item_data["uid"]))))
         item_data.update(text_to_json("group", item.get("group", str(item_data["gid"]))))
 
-        if self.json_lines:
+        if jsonline:
             item_data["healthy"] = "chunks_healthy" not in item
         else:
             item_data["health"] = "broken" if "chunks_healthy" in item else "healthy"
@@ -952,7 +932,22 @@ class ItemFormatter(BaseFormatter):
 
 
 class DiffFormatter(BaseFormatter):
-    ...
+    KEY_DESCRIPTIONS = {
+        "path": "path of the diff",
+        "flag": "flag of current change (added, removed, modified, ...)",
+        "change": "whole change of the diff",
+        "mode": "mode changed of the diff",
+        "type": "type changed of the diff (file, directory, symlink, ...)",
+        "content": "content changed size of the diff",
+        "owner": "owner changed of the diff",
+        "group": "group changed of the diff",
+        "user": "user changed of the diff",
+    }
+    KEY_GROUPS = (
+        ("path", "flag", "change"),
+        ("mode", "type", "content", "owner", "group", "user"),
+        ("mtime", "ctime"),
+    )
 
 
 def file_status(mode):

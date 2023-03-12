@@ -22,7 +22,7 @@ class RListMixIn:
             format = "{archive}{NL}"
         else:
             format = "{archive:<36} {time} [{id}]{NL}"
-        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, json=args.json, iec=args.iec)
+        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
         output_data = []
 
@@ -30,7 +30,7 @@ class RListMixIn:
             if args.json:
                 output_data.append(formatter.get_item_data(archive_info))
             else:
-                sys.stdout.write(formatter.format_item(archive_info))
+                sys.stdout.write(formatter.format_item(archive_info, args.json))
 
         if args.json:
             json_print(basic_json_data(manifest, extra={"archives": output_data}))

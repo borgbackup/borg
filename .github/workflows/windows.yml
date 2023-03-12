@@ -1,5 +1,29 @@
 name: Windows CI
-on: [push, pull_request]
+on:
+  push:
+    branches: [ master ]
+    paths:
+    - '**.py'
+    - '**.pyx'
+    - '**.c'
+    - '**.h'
+    - '**.yml'
+    - '**.cfg'
+    - '**.ini'
+    - 'requirements.d/*'
+    - '!docs/**'
+  pull_request:
+    branches: [ master ]
+    paths:
+    - '**.py'
+    - '**.pyx'
+    - '**.c'
+    - '**.h'
+    - '**.yml'
+    - '**.cfg'
+    - '**.ini'
+    - 'requirements.d/*'
+    - '!docs/**'
 
 env:
   SETUPTOOLS_USE_DISTUTILS: stdlib # Needed for pip to work - https://www.msys2.org/docs/python/#known-issues

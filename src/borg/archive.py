@@ -11,7 +11,7 @@ from functools import partial
 from getpass import getuser
 from io import BytesIO
 from itertools import groupby, zip_longest
-from typing import Iterator, Tuple # TODO: remove this if maintainers don't want it
+from typing import Iterator # TODO: remove this if maintainers don't want it
 from shutil import get_terminal_size
 
 from .platformflags import is_win32
@@ -1102,9 +1102,8 @@ Duration: {0.duration}
         archive1: 'Archive', 
         archive2: 'Archive', 
         matcher=None, 
-        can_compare_chunk_ids=False, 
-        content_only=False
-    ) -> Iterator[Tuple[str, ItemDiff]]:
+        can_compare_chunk_ids=False
+    ) -> Iterator[ItemDiff]:
         """
         Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
 
@@ -1112,14 +1111,14 @@ Duration: {0.duration}
         :param can_compare_chunk_ids: Whether --chunker-params are the same for both archives.
         """
 
-        def compare_items(item1: Item, item2: Item):
+        def compare_items(path: str, item1: Item, item2: Item):
             return ItemDiff(
+                path,
                 item1,
                 item2,
                 archive1.pipeline.fetch_many([c.id for c in item1.get("chunks", [])]),
                 archive2.pipeline.fetch_many([c.id for c in item2.get("chunks", [])]),
                 can_compare_chunk_ids=can_compare_chunk_ids,
-                content_only=content_only,
             )
 
         orphans_archive1: OrderedDict[str, Item] = OrderedDict()
@@ -1131,32 +1130,30 @@ Duration: {0.duration}
             archive1.iter_items(lambda item: matcher.match(item.path)),
             archive2.iter_items(lambda item: matcher.match(item.path)),
         ):
-            item1: Item
-            item2: Item
             if item1 and item2 and item1.path == item2.path:
-                yield (item1.path, compare_items(item1, item2))
+                yield compare_items(item1.path, item1, item2)
                 continue
             if item1:
                 matching_orphan = orphans_archive2.pop(item1.path, None)
                 if matching_orphan:
-                    yield (item1.path, compare_items(item1, matching_orphan))
+                    yield compare_items(item1.path, item1, matching_orphan)
                 else:
                     orphans_archive1[item1.path] = item1
             if item2:
                 matching_orphan = orphans_archive1.pop(item2.path, None)
                 if matching_orphan:
-                    yield (matching_orphan.path, compare_items(matching_orphan, item2))
+                    yield compare_items(matching_orphan.path, matching_orphan, item2)
                 else:
                     orphans_archive2[item2.path] = item2
         # At this point orphans_* contain items that had no matching partner in the other archive
         for added in orphans_archive2.values():
             path = added.path
             deleted_item = Item.create_deleted(path)
-            yield (path, compare_items(deleted_item, added))
+            yield compare_items(path, deleted_item, added)
         for deleted in orphans_archive1.values():
             path = deleted.path
             deleted_item = Item.create_deleted(path)
-            yield (path, compare_items(deleted, deleted_item))
+            yield compare_items(path, deleted, deleted_item)
 
 
 class MetadataCollector:

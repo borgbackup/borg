@@ -1,7 +1,7 @@
 import argparse
 import textwrap
 import json
-from typing import List
+from typing import Dict
 
 from ._common import with_repository, with_archive, build_matcher
 from ..archive import Archive
@@ -20,12 +20,32 @@ class DiffMixIn:
     @with_archive
     def do_diff(self, args, repository, manifest, archive):
         """Diff contents of two archives"""
+        if args.format is not None:
+            format: str = args.format
+        elif args.content_only:
+            format = "{change} {path}{NL}"
+        else:
+            format = "{flag} {change} {mtime} {path}{NL}"
 
-        def print_json_output(diffs: List[DiffChange], path: str):
-            print(json.dumps({"path": path, "changes": [diff.data for diff in diffs]}, sort_keys=True, cls=BorgJsonEncoder))
+        def print_json_output(diffs: Dict[str, DiffChange], path: str):
+            print(json.dumps({"path": path, "changes": [diff.to_dict() for diff in diffs.values()]}, sort_keys=True, cls=BorgJsonEncoder))
 
-        def print_text_output(diffs: List[DiffChange], path: str):
-            print("{:<19} {}".format(" ".join([diff.info for diff in diffs]), path))
+        def print_text_output(diffs: Dict[str, DiffChange], path: str):
+            changes = []
+            # TODO: use DiffFormatter
+            for name, diff in diffs.items():
+                if name == "ctime":
+                    changes.append("[{}: {} -> {}]".format(diff.flag, diff.origin['past'], diff.origin['current']))
+                if name == "mtime":
+                    changes.append("[{}: {} -> {}]".format(diff.flag, diff.origin['past'], diff.origin['current']))
+                if name == "content":
+                    if diff.flag == "added":
+                        changes.append("{}: {}".format(diff.flag, diff.origin['added']))
+                    elif diff.flag == "removed":
+                        changes.append("{}: {}".format(diff.flag, diff.origin['removed']))
+                    else:
+                        changes.append("{}: +{} -{}".format(diff.flag, diff.origin['added'], diff.origin['removed']))
+            print("{:<19} {}".format(" ".join(changes), path))
 
         print_output = print_json_output if args.json_lines else print_text_output
 
@@ -44,12 +64,12 @@ class DiffMixIn:
             )
 
         matcher = build_matcher(args.patterns, args.paths)
-
+        
         diffs_iter = Archive.compare_archives_iter(
-            archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids, content_only=args.content_only
+            archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids
         )
         # Conversion to string and filtering for diff.equal to save memory if sorting
-        diffs_list = [(path, diff.changes()) for path, diff in diffs_iter if not diff.equal]
+        diffs_list = [(diff.path, diff.changes()) for diff in diffs_iter if not diff.equal]
 
         if args.sort:
             diffs_list.sort()
@@ -97,13 +117,13 @@ class DiffMixIn:
         Examples:
         ::
 
-            $ borg diff --format '{type} {content:8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            $ borg diff --format '{flag} {content:8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
             modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
             ...
 
             # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
             # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
-            $ borg diff --format '{type} {content:<8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            $ borg diff --format '{flag} {content:<8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
             modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
             ...
 
@@ -147,14 +167,11 @@ class DiffMixIn:
         )
         subparser.add_argument("--sort", dest="sort", action="store_true", help="Sort the output lines by file path.")
         subparser.add_argument(
-            "--short", dest="short", action="store_true", help="only print change and file/directory names, nothing else"
-        )
-        subparser.add_argument(
             "--format",
             metavar="FORMAT",
             dest="format",
             help="specify format for differences between archives"
-            '(default: "{change}{type}:{path}{NUL}")',
+            '(default: "{flag} {change} {mtime} {path}{NL}")',
         )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")
         subparser.add_argument(

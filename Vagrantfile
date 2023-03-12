@@ -54,7 +54,7 @@ def packages_freebsd
     # make FUSE work
     echo 'fuse_load="YES"' >> /boot/loader.conf
     echo 'vfs.usermount=1' >> /etc/sysctl.conf
-    kldload fuse
+    kldload fusefs
     sysctl vfs.usermount=1
     pw groupmod operator -M vagrant
     # /dev/fuse has group operator

@@ -159,7 +159,7 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.10.0  # tests, version supporting openssl 1.1
+    pyenv install 3.10.1  # tests, version supporting openssl 1.1
     pyenv install 3.9.16  # tests, version supporting openssl 1.1, binary build
     pyenv install 3.8.0  # tests, version supporting openssl 1.1
     pyenv rehash
@@ -227,8 +227,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.8.0 3.9.16 3.10.0
-      pyenv local 3.8.0 3.9.16 3.10.0
+      pyenv global 3.8.0 3.9.16 3.10.1
+      pyenv local 3.8.0 3.9.16 3.10.1
     fi
     # otherwise: just use the system python
     # avoid that git complains about dubious ownership if we use fakeroot:

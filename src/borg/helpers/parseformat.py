@@ -1,3 +1,4 @@
+import abc
 import argparse
 import base64
 import hashlib
@@ -8,7 +9,7 @@ import re
 import shlex
 import stat
 import uuid
-from typing import List, Dict, Tuple, ClassVar, Any
+from typing import List, Dict, Tuple, ClassVar, Any, TYPE_CHECKING
 from binascii import hexlify
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
@@ -27,6 +28,10 @@ from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
 from ..platformflags import is_win32
+
+# TODO: remove this
+if TYPE_CHECKING:
+    from ..item import ItemDiff
 
 
 def bin_to_hex(binary):
@@ -629,7 +634,7 @@ def archivename_validator(text):
     return validate_text(text)
 
 
-class BaseFormatter:
+class BaseFormatter(metaclass=abc.ABCMeta):
     format: str
     item_data: Dict[str, Any]
     FIXED_KEYS: ClassVar[Dict[str, str]] = {
@@ -655,6 +660,11 @@ class BaseFormatter:
         ("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),
     )
 
+    def __init__(self, format: str) -> None:
+        self.format = format
+        self.item_data = {}
+
+    @abc.abstractmethod
     def get_item_data(self, item, jsonline=False) -> dict:
         raise NotImplementedError
 
@@ -722,6 +732,9 @@ class ArchiveFormatter(BaseFormatter):
         return keys
 
     def __init__(self, format, repository, manifest, key, *, iec=False):
+        static_keys = {}  # here could be stuff on repo level, above archive level
+        static_keys.update(self.FIXED_KEYS)
+        super().__init__(partial_format(format, static_keys))
         self.repository = repository
         self.manifest = manifest
         self.key = key
@@ -729,9 +742,6 @@ class ArchiveFormatter(BaseFormatter):
         self.id = None
         self._archive = None
         self.iec = iec
-        static_keys = {}  # here could be stuff on repo level, above archive level
-        static_keys.update(self.FIXED_KEYS)
-        self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             "hostname": partial(self.get_meta, "hostname"),
@@ -835,12 +845,12 @@ class ItemFormatter(BaseFormatter):
     def __init__(self, archive, format):
         from ..checksums import StreamingXXH64
 
-        self.xxh64 = StreamingXXH64
-        self.archive = archive
         static_keys = {"archivename": archive.name, "archiveid": archive.fpr}
         static_keys.update(self.FIXED_KEYS)
+        super().__init__(partial_format(format, static_keys))
+        self.xxh64 = StreamingXXH64
+        self.archive = archive
         self.item_data = static_keys
-        self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             "size": self.calculate_size,
@@ -946,8 +956,26 @@ class DiffFormatter(BaseFormatter):
     KEY_GROUPS = (
         ("path", "flag", "change"),
         ("mode", "type", "content", "owner", "group", "user"),
-        ("mtime", "ctime"),
+        ("mtime", "ctime", "isomtime", "isoctime"),
     )
+
+    def __init__(self, format):
+        static_keys = {}  # here could be stuff on repo level, above archive level
+        static_keys.update(self.FIXED_KEYS)
+        super().__init__(partial_format(format, static_keys))
+        self.format_keys = {f[1] for f in Formatter().parse(format)}
+        self.call_keys = {
+            "isomtime": lambda ts: ts.isoformat() if ts else "",
+            "isoctime": lambda ts: ts.isoformat() if ts else "",
+        }
+        self.used_call_keys = set(self.call_keys) & self.format_keys
+
+    def get_item_data(self, item: 'ItemDiff', jsonline=False) -> dict:
+        diff_data = {}
+        diff_data.update(self.item_data)
+        for key in self.used_call_keys:
+            diff_data[key] = self.call_keys[key](item)
+        return diff_data
 
 
 def file_status(mode):

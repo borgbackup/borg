@@ -9,7 +9,7 @@ from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator
 from ..manifest import Manifest
 from ..helpers.parseformat import BorgJsonEncoder
-from ..item import DiffChange
+from ..item import ItemDiff
 from ..logger import create_logger
 
 logger = create_logger()
@@ -27,13 +27,10 @@ class DiffMixIn:
         else:
             format = "{flag} {change} {mtime} {path}{NL}"
 
-        def print_json_output(diffs: Dict[str, DiffChange], path: str):
-            print(json.dumps({"path": path, "changes": [diff.to_dict() for diff in diffs.values()]}, sort_keys=True, cls=BorgJsonEncoder))
-
-        def print_text_output(diffs: Dict[str, DiffChange], path: str):
+        def print_text_output(diffs: ItemDiff):
             changes = []
             # TODO: use DiffFormatter
-            for name, diff in diffs.items():
+            for name, diff in diffs.changes().items():
                 if name == "ctime":
                     changes.append("[{}: {} -> {}]".format(diff.flag, diff.origin['past'], diff.origin['current']))
                 if name == "mtime":
@@ -45,9 +42,8 @@ class DiffMixIn:
                         changes.append("{}: {}".format(diff.flag, diff.origin['removed']))
                     else:
                         changes.append("{}: +{} -{}".format(diff.flag, diff.origin['added'], diff.origin['removed']))
-            print("{:<19} {}".format(" ".join(changes), path))
+            print("{:<19} {}".format(" ".join(changes), diffs.path))
 
-        print_output = print_json_output if args.json_lines else print_text_output
 
         archive1 = archive
         archive2 = Archive(manifest, args.other_name)
@@ -69,13 +65,18 @@ class DiffMixIn:
             archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids
         )
         # Conversion to string and filtering for diff.equal to save memory if sorting
-        diffs_list = [(diff.path, diff.changes()) for diff in diffs_iter if not diff.equal]
+        diffs_list = [diff for diff in diffs_iter if not diff.equal]
 
         if args.sort:
-            diffs_list.sort()
-
-        for path, diffs in diffs_list:
-            print_output(diffs, path)
+            diffs_list.sort(key=lambda diff: diff.path)
+        
+        for diff in diffs_list:
+            if args.content_only and not diff.content():
+                continue
+            if args.json_lines:
+                print(json.dumps({"path": diff.path, "changes": [change.to_dict() for change in diff.changes().values()]}, sort_keys=True, cls=BorgJsonEncoder))
+            else:
+                print_text_output(diff)
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning("Include pattern '%s' never matched.", pattern)

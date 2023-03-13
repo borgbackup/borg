@@ -736,11 +736,6 @@ class ItemDiff:
         self._changes['content'] = DiffChange("modified", {"added": added, "removed": removed})
         return True
 
-        # TODO: move this to the formatter
-        # '{:>9} {:>9}'.format(
-        #     format_file_size(added, precision=1, sign=True),
-        #     format_file_size(-removed, precision=1, sign=True)
-        # )
 
     def _owner_diff(self):
         u_attr, g_attr = ('uid', 'gid') if self._numeric_ids else ('user', 'group')

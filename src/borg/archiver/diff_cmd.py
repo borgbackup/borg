@@ -1,6 +1,7 @@
 import argparse
 import textwrap
 import json
+import sys
 from typing import Dict
 
 from ._common import with_repository, with_archive, build_matcher
@@ -23,27 +24,9 @@ class DiffMixIn:
         if args.format is not None:
             format: str = args.format
         elif args.content_only:
-            format = "{change} {path}{NL}"
+            format = "{content:<29} {path}{NL}"
         else:
-            format = "{flag} {change} {mtime} {path}{NL}"
-
-        def print_text_output(diffs: ItemDiff):
-            changes = []
-            # TODO: use DiffFormatter
-            for name, diff in diffs.changes().items():
-                if name == "ctime":
-                    changes.append("[{}: {} -> {}]".format(diff.flag, diff.origin['past'], diff.origin['current']))
-                if name == "mtime":
-                    changes.append("[{}: {} -> {}]".format(diff.flag, diff.origin['past'], diff.origin['current']))
-                if name == "content":
-                    if diff.flag == "added":
-                        changes.append("{}: {}".format(diff.flag, diff.origin['added']))
-                    elif diff.flag == "removed":
-                        changes.append("{}: {}".format(diff.flag, diff.origin['removed']))
-                    else:
-                        changes.append("{}: +{} -{}".format(diff.flag, diff.origin['added'], diff.origin['removed']))
-            print("{:<19} {}".format(" ".join(changes), diffs.path))
-
+            format = "{change:<19} {mtime} {path}{NL}"
 
         archive1 = archive
         archive2 = Archive(manifest, args.other_name)
@@ -70,13 +53,16 @@ class DiffMixIn:
         if args.sort:
             diffs_list.sort(key=lambda diff: diff.path)
         
+        formatter = DiffFormatter(format)
         for diff in diffs_list:
             if args.content_only and not diff.content():
                 continue
             if args.json_lines:
                 print(json.dumps({"path": diff.path, "changes": [change.to_dict() for change in diff.changes().values()]}, sort_keys=True, cls=BorgJsonEncoder))
             else:
-                print_text_output(diff)
+                res: str = formatter.format_item(diff)
+                if res.strip():
+                    sys.stdout.write(res)
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning("Include pattern '%s' never matched.", pattern)
@@ -118,13 +104,13 @@ class DiffMixIn:
         Examples:
         ::
 
-            $ borg diff --format '{flag} {content:8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            $ borg diff --format '{content:8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
             modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
             ...
 
             # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
             # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
-            $ borg diff --format '{flag} {content:<8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            $ borg diff --format '{content:<8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
             modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
             ...
 
@@ -172,7 +158,7 @@ class DiffMixIn:
             metavar="FORMAT",
             dest="format",
             help="specify format for differences between archives"
-            '(default: "{flag} {content} {mtime} {path}{NL}")',
+            '(default: "{content:<19} {mtime} {path}{NL}")',
         )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")
         subparser.add_argument(

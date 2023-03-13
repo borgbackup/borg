@@ -255,6 +255,16 @@ class DebugMixIn:
         print("object %s fetched." % hex_id)
         return EXIT_SUCCESS
 
+    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
+    def do_debug_id_hash(self, args, repository, manifest):
+        """compute id-hash for file contents"""
+        with open(args.path, "rb") as f:
+            data = f.read()
+        key = manifest.key
+        id = key.id_hash(data)
+        print(id.hex())
+        return EXIT_SUCCESS
+
     @with_repository(manifest=False, exclusive=True)
     def do_debug_put_obj(self, args, repository):
         """put file contents into the repository"""
@@ -488,6 +498,24 @@ class DebugMixIn:
             metavar="WANTED",
             type=str,
             help="term to search the repo for, either 0x1234abcd hex term or a string",
+        )
+        debug_id_hash_epilog = process_epilog(
+            """
+                This command computes the id-hash for some file content.
+                """
+        )
+        subparser = debug_parsers.add_parser(
+            "id-hash",
+            parents=[common_parser],
+            add_help=False,
+            description=self.do_debug_id_hash.__doc__,
+            epilog=debug_id_hash_epilog,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            help="compute id-hash for some file content (debug)",
+        )
+        subparser.set_defaults(func=self.do_debug_id_hash)
+        subparser.add_argument(
+            "path", metavar="PATH", type=str, help="content for which the id-hash shall get computed"
         )
 
         debug_get_obj_epilog = process_epilog(

@@ -47,8 +47,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         data = b"some data"
         self.create_regular_file("file", contents=data)
-        # TODO: to compute the correct hexkey, we need: borg debug id-hash file
-        id_hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"  # 256bit = 64 hex digits
+        output = self.cmd(f"--repo={self.repository_location}", "debug", "id-hash", "input/file")
+        id_hash = output.strip()
         output = self.cmd(f"--repo={self.repository_location}", "debug", "put-obj", id_hash, "input/file")
         assert id_hash in output
         output = self.cmd(f"--repo={self.repository_location}", "debug", "get-obj", id_hash, "output/file")

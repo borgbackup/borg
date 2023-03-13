@@ -13,6 +13,7 @@ There are different ways to install Borg:
   that comes bundled with all dependencies.
 - :ref:`source-install`, either:
 
+  - :ref:`windows-binary` - builds a binary file for Windows using MSYS2.
   - :ref:`pip-installation` - installing a source package with pip needs
     more installation steps and requires all dependencies with
     development headers and a compiler.
@@ -294,6 +295,20 @@ and commands to make FUSE work for using the mount command.
      kldload fuse
      sysctl vfs.usermount=1
 
+.. _windows_deps:
+
+Windows
++++++++
+
+.. note::
+    Running under Windows is experimental.
+
+.. warning::
+    This script needs to be run in the UCRT64 environment in MSYS2.
+
+Install the dependencies with the provided script::
+
+    ./scripts/msys2-install-deps
 
 Windows 10's Linux Subsystem
 ++++++++++++++++++++++++++++
@@ -317,6 +332,27 @@ Use the Cygwin installer to install the dependencies::
     libssl-devel libxxhash-devel liblz4-devel libzstd-devel
     binutils gcc-g++ git make openssh
 
+
+.. _windows-binary:
+
+Building a binary on Windows
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. note::
+    This is experimental.
+
+.. warning::
+    This needs to be run in the UCRT64 environment in MSYS2.
+
+Ensure to install the dependencies as described within :ref:`Dependencies: Windows <windows_deps>`.
+
+::
+
+    export SETUPTOOLS_USE_DISTUTILS=stdlib # Needed for pip to work - https://www.msys2.org/docs/python/#known-issues
+    pip install -e .
+    pyinstaller -y scripts/borg.exe.spec
+
+A standalone executable will be created in ``dist/borg.exe``.
 
 .. _pip-installation:
 

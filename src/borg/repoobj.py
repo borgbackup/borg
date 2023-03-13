@@ -66,7 +66,7 @@ class RepoObj:
         hdr = obj[:offs]
         len_meta_encrypted = self.meta_len_hdr.unpack(hdr)[0]
         assert offs + len_meta_encrypted <= len(obj)
-        meta_encrypted = obj[offs: offs + len_meta_encrypted]
+        meta_encrypted = obj[offs : offs + len_meta_encrypted]
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta = msgpack.unpackb(meta_packed)
         return meta
@@ -79,7 +79,7 @@ class RepoObj:
         hdr = obj[:offs]
         len_meta_encrypted = self.meta_len_hdr.unpack(hdr)[0]
         assert offs + len_meta_encrypted <= len(obj)
-        meta_encrypted = obj[offs: offs + len_meta_encrypted]
+        meta_encrypted = obj[offs : offs + len_meta_encrypted]
         offs += len_meta_encrypted
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta = msgpack.unpackb(meta_packed)

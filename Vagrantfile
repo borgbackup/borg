@@ -42,9 +42,9 @@ def packages_freebsd
     pkg install -y fusefs-libs3 || true
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python (for the tests we use pyenv built pythons):
-    pkg install -y python39 py39-sqlite3
+    pkg install -y python38 py38-sqlite3
     # make sure there is a python3 command
-    ln -sf /usr/local/bin/python3.9 /usr/local/bin/python3
+    ln -sf /usr/local/bin/python3.8 /usr/local/bin/python3
     python3 -m ensurepip
     pip3 install virtualenv
     # make bash default / work:
@@ -54,7 +54,7 @@ def packages_freebsd
     # make FUSE work
     echo 'fuse_load="YES"' >> /boot/loader.conf
     echo 'vfs.usermount=1' >> /etc/sysctl.conf
-    kldload fuse
+    kldload fusefs
     sysctl vfs.usermount=1
     pw groupmod operator -M vagrant
     # /dev/fuse has group operator
@@ -160,9 +160,8 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     pyenv install 3.11.1  # tests, version supporting openssl 1.1
-    pyenv install 3.10.1  # tests, version supporting openssl 1.1
+    pyenv install 3.10.2  # tests, version supporting openssl 1.1
     pyenv install 3.9.16  # tests, version supporting openssl 1.1, binary build
-    pyenv install 3.8.0  # tests, version supporting openssl 1.1
     pyenv rehash
   EOF
 end
@@ -228,8 +227,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.8.0 3.9.16 3.10.1 3.11.1
-      pyenv local 3.8.0 3.9.16 3.10.1 3.11.1
+      pyenv global 3.9.16 3.10.2 3.11.1
+      pyenv local 3.9.16 3.10.2 3.11.1
     fi
     # otherwise: just use the system python
     # avoid that git complains about dubious ownership if we use fakeroot:

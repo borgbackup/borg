@@ -24,9 +24,9 @@ class DiffMixIn:
         if args.format is not None:
             format: str = args.format
         elif args.content_only:
-            format = "{content:<29} {path}{NL}"
+            format = "{content} {path}{NL}"
         else:
-            format = "{change:<19} {mtime} {path}{NL}"
+            format = "{change} {mtime} {path}{NL}"
 
         archive1 = archive
         archive2 = Archive(manifest, args.other_name)
@@ -104,13 +104,13 @@ class DiffMixIn:
         Examples:
         ::
 
-            $ borg diff --format '{content:8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            $ borg diff --format '{content:18} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
             modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
             ...
 
             # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
             # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
-            $ borg diff --format '{content:<8} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            $ borg diff --format '{content:<18} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
             modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
             ...
 

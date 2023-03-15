@@ -945,16 +945,16 @@ class DiffFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
         "path": "path of the diff",
         "change": "whole change of the diff",
+        "content": "content changed size of the diff",
         "mode": "mode changed of the diff",
         "type": "type changed of the diff (file, directory, symlink, ...)",
-        "content": "content changed size of the diff",
         "owner": "owner changed of the diff",
         "group": "group changed of the diff",
         "user": "user changed of the diff",
     }
     KEY_GROUPS = (
         ("path", "change"),
-        ("mode", "type", "content", "owner", "group", "user"),
+        ("content", "mode", "type", "owner", "group", "user"),
         ("link", "directory", "blkdev", "chrdev", "fifo"),
         ("mtime", "ctime", "isomtime", "isoctime"),
     )
@@ -986,15 +986,15 @@ class DiffFormatter(BaseFormatter):
             "owner": partial(self.format_owner),
             "group": partial(self.format_owner, spec="group"),
             "user": partial(self.format_owner, spec="user"),
-            "isomtime": partial(self.format_iso_time, "mtime"),
-            "isoctime": partial(self.format_iso_time, "ctime"),
-            "mtime": partial(self.format_time, "mtime"),
-            "ctime": partial(self.format_time, "ctime"),
             "link": partial(self.format_other, "link"),
             "directory": partial(self.format_other, "directory"),
             "blkdev": partial(self.format_other, "blkdev"),
             "chrdev": partial(self.format_other, "chrdev"),
             "fifo": partial(self.format_other, "fifo"),
+            "mtime": partial(self.format_time, "mtime"),
+            "ctime": partial(self.format_time, "ctime"),
+            "isomtime": partial(self.format_iso_time, "mtime"),
+            "isoctime": partial(self.format_iso_time, "ctime"),
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
@@ -1016,13 +1016,13 @@ class DiffFormatter(BaseFormatter):
     
     def format_other(self, key, diff: 'ItemDiff'):
         if key in diff.changes():
-            return f"{diff.changes()[key].flag}"
+            return f"{diff.changes()[key].flag}".ljust(27)
         return ""
     
     def format_mode(self, diff: 'ItemDiff', ft=False):
         change = diff.type() if ft else diff.mode()
         if change:
-            return f"{change.origin['past']:04o} -> {change.origin['current']:04o}"
+            return f"[{change.origin['past']} -> {change.origin['current']}]"
         return ""
 
     def format_owner(self, diff: 'ItemDiff', spec='owner'):
@@ -1042,10 +1042,12 @@ class DiffFormatter(BaseFormatter):
         change = diff.content()
         if change:
             if change.flag == "added":
-                return "{}: {:>15}".format(change.flag, format_file_size(change.origin['added']))
+                return "{}: {:>20}".format(change.flag, format_file_size(change.origin['added']))
             if change.flag == "removed":
-                return "{}: {:>13}".format(change.flag, format_file_size(change.origin['removed']))
-            return "{}: {:>9} {:>9}".format(
+                return "{}: {:>18}".format(change.flag, format_file_size(change.origin['removed']))
+            if 'added' not in change.origin and 'removed' not in change.origin:
+                return "modified:  (can't get size)"
+            return "{}: {:>8} {:>8}".format(
                 change.flag,
                 format_file_size(change.origin['added'], precision=1, sign=True),
                 format_file_size(-change.origin['removed'], precision=1, sign=True)

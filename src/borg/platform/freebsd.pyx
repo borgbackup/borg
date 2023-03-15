@@ -50,59 +50,77 @@ cdef extern from "unistd.h":
     int _PC_ACL_NFS4
 
 
-def listxattr(path, *, follow_symlinks=False):
-    ns, prefix = EXTATTR_NAMESPACE_USER, b'user.'
+# On FreeBSD, borg currently only deals with the USER namespace as it is unclear
+# whether (and if so, how exactly) it should deal with the SYSTEM namespace.
+NS_ID_MAP = {b"user": EXTATTR_NAMESPACE_USER, }
 
+
+def split_ns(ns_name, default_ns):
+    # split ns_name (which is in the form of b"namespace.name") into namespace and name.
+    # if there is no namespace given in ns_name, default to default_ns.
+    # note:
+    # borg < 1.1.10 on FreeBSD did not prefix the namespace to the names, see #3952.
+    # we also need to deal with "unexpected" namespaces here, they could come
+    # from borg archives made on other operating systems.
+    ns_name_tuple = ns_name.split(b".", 1)
+    if len(ns_name_tuple) == 2:
+        # we have a namespace prefix in the given name
+        ns, name = ns_name_tuple
+    else:
+        # no namespace given in ns_name (== no dot found), maybe data coming from an old borg archive.
+        ns, name = default_ns, ns_name
+    return ns, name
+
+
+def listxattr(path, *, follow_symlinks=False):
     def func(path, buf, size):
         if isinstance(path, int):
-            return c_extattr_list_fd(path, ns, <char *> buf, size)
+            return c_extattr_list_fd(path, ns_id, <char *> buf, size)
         else:
             if follow_symlinks:
-                return c_extattr_list_file(path, ns, <char *> buf, size)
+                return c_extattr_list_file(path, ns_id, <char *> buf, size)
             else:
-                return c_extattr_list_link(path, ns, <char *> buf, size)
+                return c_extattr_list_link(path, ns_id, <char *> buf, size)
 
+    ns = b"user"
+    ns_id = NS_ID_MAP[ns]
     n, buf = _listxattr_inner(func, path)
-    return [prefix + name for name in split_lstring(buf[:n]) if name]
+    return [ns + b"." + name for name in split_lstring(buf[:n]) if name]
 
 
 def getxattr(path, name, *, follow_symlinks=False):
-    ns, prefix = EXTATTR_NAMESPACE_USER, b'user.'
-
     def func(path, name, buf, size):
         if isinstance(path, int):
-            return c_extattr_get_fd(path, ns, name, <char *> buf, size)
+            return c_extattr_get_fd(path, ns_id, name, <char *> buf, size)
         else:
             if follow_symlinks:
-                return c_extattr_get_file(path, ns, name, <char *> buf, size)
+                return c_extattr_get_file(path, ns_id, name, <char *> buf, size)
             else:
-                return c_extattr_get_link(path, ns, name, <char *> buf, size)
+                return c_extattr_get_link(path, ns_id, name, <char *> buf, size)
 
-    # strip namespace if there, but ignore if not there.
-    # older borg / attic versions did not prefix the namespace to the names.
-    if name.startswith(prefix):
-        name = name[len(prefix):]
+    ns, name = split_ns(name, b"user")
+    ns_id = NS_ID_MAP[ns]  # this will raise a KeyError it the namespace is unsupported
     n, buf = _getxattr_inner(func, path, name)
     return bytes(buf[:n])
 
 
 def setxattr(path, name, value, *, follow_symlinks=False):
-    ns, prefix = EXTATTR_NAMESPACE_USER, b'user.'
-
     def func(path, name, value, size):
         if isinstance(path, int):
-            return c_extattr_set_fd(path, ns, name, <char *> value, size)
+            return c_extattr_set_fd(path, ns_id, name, <char *> value, size)
         else:
             if follow_symlinks:
-                return c_extattr_set_file(path, ns, name, <char *> value, size)
+                return c_extattr_set_file(path, ns_id, name, <char *> value, size)
             else:
-                return c_extattr_set_link(path, ns, name, <char *> value, size)
+                return c_extattr_set_link(path, ns_id, name, <char *> value, size)
 
-    # strip namespace if there, but ignore if not there.
-    # older borg / attic versions did not prefix the namespace to the names.
-    if name.startswith(prefix):
-        name = name[len(prefix):]
-    _setxattr_inner(func, path, name, value)
+    ns, name = split_ns(name, b"user")
+    try:
+        ns_id = NS_ID_MAP[ns]  # this will raise a KeyError it the namespace is unsupported
+    except KeyError:
+        pass
+    else:
+        _setxattr_inner(func, path, name, value)
 
 
 cdef _get_acl(p, type, item, attribute, flags, fd=None):

@@ -1,5 +1,4 @@
 from struct import Struct
-from typing import Optional
 
 from .helpers import msgpack
 from .compress import Compressor, LZ4_COMPRESSOR, get_compressor

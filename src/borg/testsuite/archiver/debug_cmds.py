@@ -68,13 +68,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         data = b"some data"
-        meta = b'{"some" : "property"}'
-        meta_dict = json.loads(meta)
+        meta_dict = {"some": "property"}
+        meta = json.dumps(meta_dict, ensure_ascii=False).encode()
 
-        self.create_regular_file("file", contents=data)
+        self.create_regular_file("plain.bin", contents=data)
         self.create_regular_file("meta.json", contents=meta)
 
-        output = self.cmd(f"--repo={self.repository_location}", "debug", "id-hash", "input/file")
+        output = self.cmd(f"--repo={self.repository_location}", "debug", "id-hash", "input/plain.bin")
         id_hash = output.strip()
 
         output = self.cmd(
@@ -82,16 +82,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "debug",
             "format-obj",
             id_hash,
-            "input/file",
+            "input/plain.bin",
             "input/meta.json",
-            "output/formatted_file",
-            "--compression=lz4",
+            "output/data.bin",
+            "--compression=zstd,2",
         )
 
-        output = self.cmd(f"--repo={self.repository_location}", "debug", "put-obj", id_hash, "output/formatted_file")
+        output = self.cmd(f"--repo={self.repository_location}", "debug", "put-obj", id_hash, "output/data.bin")
         assert id_hash in output
 
-        output = self.cmd(f"--repo={self.repository_location}", "debug", "get-obj", id_hash, "output/get_file")
+        output = self.cmd(f"--repo={self.repository_location}", "debug", "get-obj", id_hash, "output/compressed.bin")
         assert id_hash in output
 
         output = self.cmd(
@@ -99,12 +99,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "debug",
             "parse-obj",
             id_hash,
-            "output/get_file",
-            "output/parsed_file",
+            "output/compressed.bin",
+            "output/plain.bin",
             "output/meta.json",
         )
 
-        with open("output/parsed_file", "rb") as f:
+        with open("output/plain.bin", "rb") as f:
             data_read = f.read()
         assert data == data_read
 
@@ -112,6 +112,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             meta_read = json.load(f)
         for key, value in meta_dict.items():
             assert meta_read.get(key) == value
+
+        assert meta_read.get("size") == len(data_read)
 
     def test_debug_dump_manifest(self):
         self.create_regular_file("file1", size=1024 * 80)

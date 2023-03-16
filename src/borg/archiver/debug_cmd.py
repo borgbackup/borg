@@ -3,7 +3,6 @@ from binascii import unhexlify, hexlify
 import functools
 import json
 import textwrap
-import traceback
 
 from ..archive import Archive
 from ..compress import CompressionSpec
@@ -285,12 +284,7 @@ class DebugMixIn:
             cdata = f.read()
 
         repo_objs = manifest.repo_objs
-
-        try:
-            meta, data = repo_objs.parse(id=id, cdata=cdata, decompress=True)
-        except Exception:
-            traceback.print_exc()
-            return EXIT_ERROR
+        meta, data = repo_objs.parse(id=id, cdata=cdata, decompress=True)
 
         with open(args.json_path, "w") as f:
             json.dump(meta, f)
@@ -321,19 +315,11 @@ class DebugMixIn:
             meta = json.load(f)
 
         repo_objs = manifest.repo_objs
+        data_encrypted = repo_objs.format(id=id, meta=meta, data=data)
 
-        ctype = repo_objs.compressor.ID
-        clevel = repo_objs.compressor.level
-
-        try:
-            data_encrypted = repo_objs.format(id=id, meta=meta, data=data, ctype=ctype, clevel=clevel)
-        except Exception:
-            traceback.print_exc()
-            return EXIT_ERROR
-        else:
-            with open(args.output_path, "wb") as f:
-                f.write(data_encrypted)
-            return EXIT_SUCCESS
+        with open(args.output_path, "wb") as f:
+            f.write(data_encrypted)
+        return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True)
     def do_debug_put_obj(self, args, repository):

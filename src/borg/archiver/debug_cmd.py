@@ -3,8 +3,10 @@ from binascii import unhexlify, hexlify
 import functools
 import json
 import textwrap
+import traceback
 
 from ..archive import Archive
+from ..compress import CompressionSpec
 from ..constants import *  # NOQA
 from ..helpers import msgpack
 from ..helpers import sysinfo
@@ -278,28 +280,22 @@ class DebugMixIn:
         except ValueError as err:
             print("object id %s is invalid [%s]." % (hex_id, str(err)))
             return EXIT_ERROR
-        try:
-            cdata = repository.get(id)
-        except Repository.ObjectNotFound:
-            print("object %s not found." % hex_id)
-            return EXIT_ERROR
 
-        output_metadata_path: str = args.json_path
-        output_data_path: str = args.data_path
+        with open(args.cdata, "rb") as f:
+            cdata = f.read()
 
-        key = manifest.key
-        repo_objs = RepoObj(key)
+        repo_objs = manifest.repo_objs
 
         try:
             meta, data = repo_objs.parse(obj_id=id, cdata=cdata, decompress=True)
-        except Exception as e:
-            print(f"encountered exception {e.__str__}")
+        except Exception:
+            traceback.print_exc()
             return EXIT_ERROR
 
-        with open(output_metadata_path, "wb") as f:
-            f.write(json.dump(meta))
+        with open(args.json_path, "wb") as f:
+            json.dump(meta, f)
 
-        with open(output_data_path, "wb") as f:
+        with open(args.data_path, "wb") as f:
             f.write(data)
 
         return EXIT_SUCCESS
@@ -307,23 +303,32 @@ class DebugMixIn:
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_format_obj(self, args, repository, manifest):
         """format file and metadata into borg object file"""
+
+        # get the object from id
+        hex_id = args.id
+        try:
+            id = unhexlify(hex_id)
+            if len(id) != 32:  # 256bit
+                raise ValueError("id must be 256bits or 64 hex digits")
+        except ValueError as err:
+            print("object id %s is invalid [%s]." % (hex_id, str(err)))
+            return EXIT_ERROR
+
         with open(args.data_path, "rb") as f:
             data = f.read()
 
-        with open(args.json_path, "rb") as f:
+        with open(args.json_path, "r") as f:
             meta = json.load(f)
 
-        key = manifest.key
-        repo_objs = RepoObj(key)
+        repo_objs = manifest.repo_objs
 
-        id = repo_objs.id_hash(data)
-        ctype = args.ctype
-        clevel = args.clevel
+        ctype = repo_objs.compressor.ID
+        clevel = repo_objs.compressor.level
 
         try:
-            data_encrypted = repo_objs.format(id=id, meta=meta, data=data, ctype=ctype, clevel=clevel)
-        except Exception as e:
-            print(f"Encountered exception {e.__str__}")
+            data_encrypted = repo_objs.format(id=hex_id, meta=meta, data=data, ctype=ctype, clevel=clevel)
+        except Exception:
+            traceback.print_exc()
             return EXIT_ERROR
         else:
             with open(args.output_path, "wb") as f:
@@ -599,7 +604,10 @@ class DebugMixIn:
             help="parse objectfile into meta dict and data",
         )
         subparser.set_defaults(func=self.do_debug_parse_obj)
-        subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get objectfile from the repo")
+        subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
+        subparser.add_argument(
+            "cdata", metavar="COMPRESSED_DATA", type=str, help="path of the objectfile to parse data from"
+        )
         subparser.add_argument(
             "data_path", metavar="DATA_PATH", type=str, help="path of the file to write uncompressed data into"
         )
@@ -610,7 +618,7 @@ class DebugMixIn:
         # format_obj
         debug_format_obj_epilog = process_epilog(
             """
-                This command format the file and metadata into borg objectfile.
+                This command formats the file and metadata into objectfile.
                 """
         )
         subparser = debug_parsers.add_parser(
@@ -623,14 +631,22 @@ class DebugMixIn:
             help="format file and metadata into borg objectfile",
         )
         subparser.set_defaults(func=self.do_debug_format_obj)
+        subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
         subparser.add_argument(
             "data_path", metavar="DATA_PATH", type=str, help="path of the file to convert into objectfile"
         )
         subparser.add_argument(
             "json_path", metavar="JSON_PATH", type=str, help="path of the json file to read metadata from"
         )
-        subparser.add_argument("ctype", metavar="CTYPE", type=int, help="compression type 0..255")
-        subparser.add_argument("clevel", metavar="CLEVEL", type=int, help="compression level 0..255")
+        subparser.add_argument(
+            "-C",
+            "--compression",
+            metavar="COMPRESSION",
+            dest="compression",
+            type=CompressionSpec,
+            default=CompressionSpec("lz4"),
+            help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+        )
         subparser.add_argument(
             "output_path",
             metavar="OUTPUT_PATH",

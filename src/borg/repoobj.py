@@ -30,9 +30,9 @@ class RepoObj:
         meta: dict,
         data: bytes,
         compress: bool = True,
-        size: Optional[int] = None,
-        ctype: Optional[int] = None,
-        clevel: Optional[int] = None,
+        size: int = None,
+        ctype: int = None,
+        clevel: int = None,
     ) -> bytes:
         assert isinstance(id, bytes)
         assert isinstance(meta, dict)

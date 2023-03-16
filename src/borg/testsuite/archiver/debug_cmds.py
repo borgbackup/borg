@@ -63,7 +63,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd(f"--repo={self.repository_location}", "debug", "delete-obj", "invalid")
         assert "is invalid" in output
 
-    def test_debug_id_hash_format_put_parse_obj(self):
+    def test_debug_id_hash_format_put_get_parse_obj(self):
+        """Test format-obj and parse-obj commands"""
+
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         data = b"some data"
         meta = b'{"some" : "property"}'
@@ -83,6 +85,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "input/file",
             "input/meta.json",
             "output/formatted_file",
+            "--compression=lz4",
         )
 
         output = self.cmd(f"--repo={self.repository_location}", "debug", "put-obj", id_hash, "output/formatted_file")
@@ -103,12 +106,10 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         with open("output/parsed_file", "rb") as f:
             data_read = f.read()
-
         assert data == data_read
 
         with open("output/meta.json") as f:
             meta_read = json.load(f)
-
         for key, value in meta_dict.items():
             assert meta_read.get(key) == value
 

@@ -287,12 +287,12 @@ class DebugMixIn:
         repo_objs = manifest.repo_objs
 
         try:
-            meta, data = repo_objs.parse(obj_id=id, cdata=cdata, decompress=True)
+            meta, data = repo_objs.parse(id=id, cdata=cdata, decompress=True)
         except Exception:
             traceback.print_exc()
             return EXIT_ERROR
 
-        with open(args.json_path, "wb") as f:
+        with open(args.json_path, "w") as f:
             json.dump(meta, f)
 
         with open(args.data_path, "wb") as f:
@@ -326,7 +326,7 @@ class DebugMixIn:
         clevel = repo_objs.compressor.level
 
         try:
-            data_encrypted = repo_objs.format(id=hex_id, meta=meta, data=data, ctype=ctype, clevel=clevel)
+            data_encrypted = repo_objs.format(id=id, meta=meta, data=data, ctype=ctype, clevel=clevel)
         except Exception:
             traceback.print_exc()
             return EXIT_ERROR

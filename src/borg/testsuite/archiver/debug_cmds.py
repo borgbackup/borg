@@ -63,6 +63,55 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd(f"--repo={self.repository_location}", "debug", "delete-obj", "invalid")
         assert "is invalid" in output
 
+    def test_debug_id_hash_format_put_parse_obj(self):
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        data = b"some data"
+        meta = b'{"some" : "property"}'
+        meta_dict = json.loads(meta)
+
+        self.create_regular_file("file", contents=data)
+        self.create_regular_file("meta.json", contents=meta)
+
+        output = self.cmd(f"--repo={self.repository_location}", "debug", "id-hash", "input/file")
+        id_hash = output.strip()
+
+        output = self.cmd(
+            f"--repo={self.repository_location}",
+            "debug",
+            "format-obj",
+            id_hash,
+            "input/file",
+            "input/meta.json",
+            "output/formatted_file",
+        )
+
+        output = self.cmd(f"--repo={self.repository_location}", "debug", "put-obj", id_hash, "output/formatted_file")
+        assert id_hash in output
+
+        output = self.cmd(f"--repo={self.repository_location}", "debug", "get-obj", id_hash, "output/get_file")
+        assert id_hash in output
+
+        output = self.cmd(
+            f"--repo={self.repository_location}",
+            "debug",
+            "parse-obj",
+            id_hash,
+            "output/get_file",
+            "output/parsed_file",
+            "output/meta.json",
+        )
+
+        with open("output/parsed_file", "rb") as f:
+            data_read = f.read()
+
+        assert data == data_read
+
+        with open("output/meta.json") as f:
+            meta_read = json.load(f)
+
+        for key, value in meta_dict.items():
+            assert meta_read.get(key) == value
+
     def test_debug_dump_manifest(self):
         self.create_regular_file("file1", size=1024 * 80)
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)

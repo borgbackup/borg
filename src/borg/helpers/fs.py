@@ -143,7 +143,7 @@ def get_config_dir(*, legacy=False):
         config_dir = os.environ.get("BORG_CONFIG_DIR", os.path.join(config_home, "borg"))
     else:
         config_dir = os.environ.get(
-            "BORG_CONFIG_DIR", join_base_dir(".config", legacy=legacy) or platformdirs.user_config_dir("borg")
+            "BORG_CONFIG_DIR", join_base_dir(".config", "borg", legacy=legacy) or platformdirs.user_config_dir("borg")
         )
 
     # Create path if it doesn't exist yet

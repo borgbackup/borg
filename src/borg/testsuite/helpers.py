@@ -647,6 +647,8 @@ def test_get_config_dir_compat(monkeypatch):
         # fails on macOS: assert '/Users/tw/Library/Application Support/borg' == '/var/tmp/.config1/borg'
         # fails on win32 MSYS2 (but we do not need legacy compat there).
         assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
+    monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
+    assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
     monkeypatch.setenv("BORG_CONFIG_DIR", "/var/tmp/.config2")
     assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
 

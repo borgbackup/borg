@@ -106,7 +106,7 @@ def get_cache_dir(*, legacy=False):
         cache_dir = os.environ.get("BORG_CACHE_DIR", os.path.join(cache_home, "borg"))
     else:
         cache_dir = os.environ.get(
-            "BORG_CACHE_DIR", join_base_dir(".cache", legacy=legacy) or platformdirs.user_cache_dir("borg")
+            "BORG_CACHE_DIR", join_base_dir(".cache", "borg", legacy=legacy) or platformdirs.user_cache_dir("borg")
         )
 
     # Create path if it doesn't exist yet

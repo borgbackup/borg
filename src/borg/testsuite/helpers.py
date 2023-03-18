@@ -677,6 +677,22 @@ def test_get_cache_dir(monkeypatch):
         assert get_cache_dir() == "/var/tmp"
 
 
+def test_get_cache_dir_compat(monkeypatch):
+    """test that it works the same for legacy and for non-legacy implementation"""
+    monkeypatch.delenv("BORG_CACHE_DIR", raising=False)
+    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+    if not is_darwin and not is_win32:
+        # Please try again on darwin and win32 and update test accordingly
+        assert get_cache_dir(legacy=False) == get_cache_dir(legacy=True)
+        monkeypatch.setenv("XDG_CACHE_HOME", "/var/tmp/.cache.xdg.d")
+        assert get_cache_dir(legacy=False) == get_cache_dir(legacy=True)
+    monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
+    assert get_cache_dir(legacy=False) == get_cache_dir(legacy=True)
+    monkeypatch.setenv("BORG_CACHE_DIR", "/var/tmp/.cache.borg.d")
+    assert get_cache_dir(legacy=False) == get_cache_dir(legacy=True)
+
+
 def test_get_keys_dir(monkeypatch):
     """test that get_keys_dir respects environment"""
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)

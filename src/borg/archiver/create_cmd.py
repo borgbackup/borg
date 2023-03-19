@@ -1,3 +1,4 @@
+import errno
 import sys
 import argparse
 import logging
@@ -370,6 +371,10 @@ class CreateMixIn:
                     self.print_warning("Unknown file type: %s", path)
                     return
             except (BackupError, BackupOSError) as err:
+                if isinstance(err, BackupOSError):
+                    if err.errno in (errno.EPERM, errno.EACCES):
+                        # Do not try again, such errors can not be fixed by retrying.
+                        raise
                 # sleep a bit, so temporary problems might go away...
                 sleep_s = 1000.0 / 1e6 * 10 ** (retry / 2)  # retry 0: 1ms, retry 6: 1s, ...
                 time.sleep(sleep_s)

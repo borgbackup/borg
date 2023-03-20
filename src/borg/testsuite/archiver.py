@@ -56,7 +56,7 @@ from ..repository import Repository
 from . import has_lchflags, llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux, same_ts_ns
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from .platform import fakeroot_detected, is_darwin
+from .platform import fakeroot_detected, is_darwin, is_win32
 from .upgrader import make_attic_repo
 from . import key
 
@@ -4263,18 +4263,19 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test1a', 'input')
         self.cmd('create', '--chunker-params', '16,18,17,4095', self.repository_location + '::test1b', 'input')
 
-        def do_asserts(output, can_compare_ids):
+        def do_asserts(output, can_compare_ids, content_only=False):
             # File contents changed (deleted and replaced with a new file)
             change = 'B' if can_compare_ids else '{:<19}'.format('modified')
+            lines = output.splitlines()
             assert 'file_replaced' in output  # added to debug #3494
-            assert f'{change} input/file_replaced' in output
+            self.assert_line_exists(lines, f"{change}.*input/file_replaced")
 
             # File unchanged
             assert 'input/file_unchanged' not in output
 
             # Directory replaced with a regular file
-            if 'BORG_TESTS_IGNORE_MODES' not in os.environ:
-                assert '[drwxr-xr-x -> -rwxr-xr-x] input/dir_replaced_with_file' in output
+            if "BORG_TESTS_IGNORE_MODES" not in os.environ and not is_win32 and not content_only:
+                self.assert_line_exists(lines, "drwxr-xr-x -> -rwxr-xr-x.*input/dir_replaced_with_file")
 
             # Basic directory cases
             assert 'added directory     input/dir_added' in output
@@ -4282,13 +4283,13 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
             if are_symlinks_supported():
                 # Basic symlink cases
-                assert 'changed link        input/link_changed' in output
-                assert 'added link          input/link_added' in output
-                assert 'removed link        input/link_removed' in output
+                self.assert_line_exists(lines, "changed link.*input/link_changed")
+                self.assert_line_exists(lines, "added link.*input/link_added")
+                self.assert_line_exists(lines, "removed link.*input/link_removed")
 
                 # Symlink replacing or being replaced
-                assert '] input/dir_replaced_with_link' in output
-                assert '] input/link_replaced_by_file' in output
+                assert 'input/dir_replaced_with_link' in output
+                assert 'input/link_replaced_by_file' in output
 
                 # Symlink target removed. Should not affect the symlink at all.
                 assert 'input/link_target_removed' not in output
@@ -4297,9 +4298,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             # should notice the changes in both links. However, the symlink
             # pointing to the file is not changed.
             change = '0 B' if can_compare_ids else '{:<19}'.format('modified')
-            assert f'{change} input/empty' in output
+            self.assert_line_exists(lines, f"{change}.*input/empty")
+
             if are_hardlinks_supported():
-                assert f'{change} input/hardlink_contents_changed' in output
+                self.assert_line_exists(lines, f"{change}.*input/hardlink_contents_changed")
             if are_symlinks_supported():
                 assert 'input/link_target_contents_changed' not in output
 
@@ -4318,18 +4320,18 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert 'removed       256 B input/hardlink_removed' in output
 
-            # Another link (marked previously as the source in borg) to the
-            # same inode was removed. This should not change this link at all.
-            if are_hardlinks_supported():
-                assert 'input/hardlink_target_removed' not in output
+            if are_hardlinks_supported() and content_only:
+                # Another link (marked previously as the source in borg) to the
+                # same inode was removed. This should only change the ctime since removing
+                # the link would result in the decrementation of the inode's hard-link count.
+                assert "input/hardlink_target_removed" not in output
 
-            # Another link (marked previously as the source in borg) to the
-            # same inode was replaced with a new regular file. This should not
-            # change this link at all.
-            if are_hardlinks_supported():
-                assert 'input/hardlink_target_replaced' not in output
+                # Another link (marked previously as the source in borg) to the
+                # same inode was replaced with a new regular file. This should only change
+                # its ctime. This should not be reflected in the output if content-only is set
+                assert "input/hardlink_target_replaced" not in output
 
-        def do_json_asserts(output, can_compare_ids):
+        def do_json_asserts(output, can_compare_ids, content_only=False):
             def get_changes(filename, data):
                 chgsets = [j['changes'] for j in data if j['path'] == filename]
                 assert len(chgsets) < 2
@@ -4347,7 +4349,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             assert not any(get_changes('input/file_unchanged', joutput))
 
             # Directory replaced with a regular file
-            if 'BORG_TESTS_IGNORE_MODES' not in os.environ:
+            if 'BORG_TESTS_IGNORE_MODES' not in os.environ and not content_only:
                 assert {'type': 'mode', 'old_mode': 'drwxr-xr-x', 'new_mode': '-rwxr-xr-x'} in \
                     get_changes('input/dir_replaced_with_file', joutput)
 
@@ -4362,10 +4364,15 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
                 assert {'type': 'removed link'} in get_changes('input/link_removed', joutput)
 
                 # Symlink replacing or being replaced
-                assert any(chg['type'] == 'mode' and chg['new_mode'].startswith('l') for chg in
-                    get_changes('input/dir_replaced_with_link', joutput))
-                assert any(chg['type'] == 'mode' and chg['old_mode'].startswith('l') for chg in
-                    get_changes('input/link_replaced_by_file', joutput))
+                if not content_only:
+                    assert any(
+                        chg["type"] == "mode" and chg["new_mode"].startswith("l")
+                        for chg in get_changes("input/dir_replaced_with_link", joutput)
+                    ), get_changes("input/dir_replaced_with_link", joutput)
+                    assert any(
+                        chg["type"] == "mode" and chg["old_mode"].startswith("l")
+                        for chg in get_changes("input/link_replaced_by_file", joutput)
+                    ), get_changes("input/link_replaced_by_file", joutput)
 
                 # Symlink target removed. Should not affect the symlink at all.
                 assert not any(get_changes('input/link_target_removed', joutput))
@@ -4395,21 +4402,27 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             if are_hardlinks_supported():
                 assert {'type': 'removed', 'size': 256} in get_changes('input/hardlink_removed', joutput)
 
-            # Another link (marked previously as the source in borg) to the
-            # same inode was removed. This should not change this link at all.
-            if are_hardlinks_supported():
-                assert not any(get_changes('input/hardlink_target_removed', joutput))
+            if are_hardlinks_supported() and content_only:
+                # Another link (marked previously as the source in borg) to the
+                # same inode was removed. This should only change the ctime since removing
+                # the link would result in the decrementation of the inode's hard-link count.
+                assert not any(get_changes("input/hardlink_target_removed", joutput))
 
-            # Another link (marked previously as the source in borg) to the
-            # same inode was replaced with a new regular file. This should not
-            # change this link at all.
-            if are_hardlinks_supported():
-                assert not any(get_changes('input/hardlink_target_replaced', joutput))
+                # Another link (marked previously as the source in borg) to the
+                # same inode was replaced with a new regular file. This should only change
+                # its ctime. This should not be reflected in the output if content-only is set
+                assert not any(get_changes("input/hardlink_target_replaced", joutput))
 
-        do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a'), True)
-        # We expect exit_code=1 due to the chunker params warning
-        do_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1b', exit_code=1), False)
-        do_json_asserts(self.cmd('diff', self.repository_location + '::test0', 'test1a', '--json-lines'), True)
+        output = self.cmd("diff", self.repository_location + "::test0", "test1a")
+        do_asserts(output, True)
+        output = self.cmd("diff", self.repository_location + "::test0", "test1b", "--content-only", exit_code=1)
+        do_asserts(output, False, content_only=True)
+
+        output = self.cmd("diff", self.repository_location + "::test0", "test1a", "--json-lines")
+        do_json_asserts(output, True)
+
+        output = self.cmd("diff", self.repository_location + "::test0", "test1a", "--json-lines", "--content-only")
+        do_json_asserts(output, True, content_only=True)
 
     def test_sort_option(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -4430,7 +4443,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('d_file_added', size=256)
         self.cmd('create', self.repository_location + '::test1', 'input')
 
-        output = self.cmd('diff', '--sort', self.repository_location + '::test0', 'test1')
+        output = self.cmd('diff', '--sort', self.repository_location + '::test0', 'test1', '--content-only')
         expected = [
             'a_file_removed',
             'b_file_added',
@@ -4441,6 +4454,30 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         ]
 
         assert all(x in line for x, line in zip(expected, output.splitlines()))
+
+    def test_time_diffs(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_regular_file("test_file", size=10)
+        self.cmd('create', self.repository_location + '::archive1', 'input')
+        time.sleep(0.1)
+        os.unlink("input/test_file")
+        if is_win32:
+            # Sleeping for 15s because Windows doesn't refresh ctime if file is deleted and recreated within 15 seconds.
+            time.sleep(15)
+        self.create_regular_file("test_file", size=15)
+        self.cmd('create', self.repository_location + '::archive2', 'input')
+        output = self.cmd("diff", self.repository_location + "::archive1", "archive2")
+        self.assert_in("mtime", output)
+        self.assert_in("ctime", output)  # Should show up on windows as well since it is a new file.
+        os.chmod("input/test_file", 777)
+        self.cmd('create', self.repository_location + '::archive3', 'input')
+        output = self.cmd("diff", self.repository_location + "::archive2", "archive3")
+        self.assert_not_in("mtime", output)
+        # Checking platform because ctime should not be shown on windows since it wasn't recreated.
+        if not is_win32:
+            self.assert_in("ctime", output)
+        else:
+            self.assert_not_in("ctime", output)
 
 
 def test_get_args():

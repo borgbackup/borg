@@ -301,9 +301,13 @@ Compatibility notes:
 New features:
 
 - debug id-hash: computes file/chunk content id-hash, #7406
+- diff: --content-only does not show mode/ctime/mtime changes, #7248
+- diff: JSON strings in diff output are now sorted alphabetically
 
 Bug fixes:
 
+- xattrs: fix namespace processing on FreeBSD, #6997
+- diff: fix path related bug seen when addressing deferred items.
 - debug get-obj/put-obj: always give chunkid as cli param, see #7290
   (this is an incompatible change, see also borg debug id-hash)
 - extract: fix mtime when ResourceFork xattr is set (macOS specific), #7234
@@ -336,6 +340,12 @@ Other changes:
   - "auto" compressor tests: don't assume a specific size,
     do not assume zlib is better than lz4, #7363
   - add test for extracted directory mtime
+- vagrant:
+
+  - upgrade local freebsd 12.1 box -> generic/freebsd13 box (13.1)
+  - use pythons > 3.8 which work on freebsd 13.1
+  - pyenv: also install python 3.11.1 for testing
+  - pyenv: use python 3.10.1, 3.10.0 build is broken on freebsd
 
 
 Version 1.2.3 (2022-12-24)

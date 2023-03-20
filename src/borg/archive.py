@@ -1125,7 +1125,8 @@ Utilization of max. archive size: {csize_max:.0%}
         for item1, item2 in deferred:
             assert hardlink_master_seen(item1)
             assert hardlink_master_seen(item2)
-            yield (path, compare_items(item1, item2))
+            assert item1.path == item2.path, "Deferred items have different paths"
+            yield (item1.path, compare_items(item1, item2))
 
 
 class MetadataCollector:

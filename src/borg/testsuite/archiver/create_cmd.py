@@ -5,6 +5,7 @@ from random import randbytes
 import shutil
 import socket
 import stat
+import subprocess
 import time
 import unittest
 
@@ -208,6 +209,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             input=flist.encode(),
             exit_code=0,
         )
+        assert "retry: 3 of " in out
         assert "E input/file2" not in out  # we managed to read it in the 3rd retry (after 3 failed reads)
         # repo looking good overall? checks for rc == 0.
         self.cmd(f"--repo={self.repository_location}", "check", "--debug")
@@ -215,6 +217,37 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         out = self.cmd(f"--repo={self.repository_location}", "list", "test")
         assert "input/file1" in out
         assert "input/file2" in out
+        assert "input/file3" in out
+
+    def test_create_no_permission_file(self):
+        file_path = os.path.join(self.input_path, "file")
+        self.create_regular_file(file_path + "1", size=1000)
+        self.create_regular_file(file_path + "2", size=1000)
+        self.create_regular_file(file_path + "3", size=1000)
+        # revoke read permissions on file2 for everybody, including us:
+        if is_win32:
+            subprocess.run(["icacls.exe", file_path + "2", "/deny", "everyone:(R)"])
+        else:
+            os.chmod(file_path + "2", 0o000)
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        flist = "".join(f"input/file{n}\n" for n in range(1, 4))
+        out = self.cmd(
+            f"--repo={self.repository_location}",
+            "create",
+            "--paths-from-stdin",
+            "--list",
+            "test",
+            input=flist.encode(),
+            exit_code=1,  # WARNING status: could not back up file2.
+        )
+        assert "retry: 1 of " not in out  # retries were NOT attempted!
+        assert "E input/file2" in out  # no permissions!
+        # repo looking good overall? checks for rc == 0.
+        self.cmd(f"--repo={self.repository_location}", "check", "--debug")
+        # check files in created archive
+        out = self.cmd(f"--repo={self.repository_location}", "list", "test")
+        assert "input/file1" in out
+        assert "input/file2" not in out  # it skipped file2
         assert "input/file3" in out
 
     def test_create_content_from_command(self):

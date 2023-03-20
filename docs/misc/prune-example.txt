@@ -1,10 +1,14 @@
 borg prune visualized
 =====================
 
-Assume it is 2016-01-01, today's backup has not yet been made, you have
-created at least one backup on each day in 2015 except on 2015-12-19 (no
-backup made on that day), and you started backing up with borg on
-2015-01-01.
+To understand prune, it helps to substitute the term `prune` with `delete all backups but keep the latest backup of the x and those of the last nx's that have backups`, and then simply replace `x` with the time frame (secondly, minutely, hourly, daily, weekly, monthly, or yearly), and replace `n` with a number (1, 2, 3, etc.). 
+So `prune --keep-daily 7` means `delete all backups but keep the latest backup of the day and those of the last 7 days that have backups`.
+Similarly, `--keep-monthly 6` means `delete all backups but keep the latest backup of the month and those of the last 6 months that have backups`.
+
+Assume you started using borg on 2015-01-01.
+You created one backup on each day in 2015 except on 2015-12-19 (no
+backup made on that day)
+It is 2016-01-01, and today's backup has not yet been made.
 
 This is what borg prune --keep-daily 14 --keep-monthly 6 --keep-yearly 1
 would keep.

@@ -1,26 +1,17 @@
 borg prune visualized
 =====================
 
-To understand prune, it helps to substitute the terms `prune --keep` with `delete all backups but keep the latest backup of each of the last 'n' INTERVALS (secondly, minutely, hourly, daily, weekly, monthly, or yearly), including the present, that have backups. 
-So `prune --keep-daily 7` means `delete all backups but keep the latest backup of each of the last 7 DAYS (including today) that have backups`.
-Note that it's not simply "keep the latest backup of each of the last 7 days," but rather "keep the latest backup of each of the last 7 days _that have backups._"
-For otherwise it would mean that if backups weren't taken on two days in the last 7 days, then you'd be left with only 5 backups after running prune. 
+To understand prune, it helps to substitute the terms `prune --keep` with `delete all backups except the latest backup of each of the last 'n' INTERVALS (secondly, minutely, hourly, daily, weekly, monthly, or yearly), including the present, that have backups. 
+So `prune --keep-daily 7` means delete all backups except the latest backup of each of the last 7 DAYS (including today) that have backups.
+Note that it's "keep the latest...of the last 7 days _that have backups,_" and not simply "keep the latest...of the last 7 days."
+For that would mean that if backups weren't taken on two days in the last 7 days, then you'd be left with only 5 backups after running prune. 
 Such a scenario, however, will play out only if there aren't any backups before the last 7 days. 
 But if backups are available, then prune will be leave you with 7 backups.
-Similarly, `--keep-monthly 6` means `delete all backups but keep the latest backup of each of the last 6 MONTHS (including this month) that have backups`.
+Similarly, `--keep-monthly 6` means delete all backups but keep the latest backup of each of the last 6 MONTHS (including this month) that have backups.
 
-You can also combine parameters. 
-So `prune --keep-daily 31 --keep-monthly 12 --keep-yearly 3` would delete all backups except the latest backup of each of the last 7 days that have backups, the latest backup of each of the last 12 months that have backups, and the latest backup of each of the last 3 years that have backups. 
-Overlapping parameters are ignored. 
-So, if the second parameter, `--keep-monthly 12`, is satisfied by the first, then no extra backup will be taken; and similarly, if the third parameter is satisfied by the first or second, then too no extra backups are taken. 
-The only exception, however, is that when backup is taken for the first time, the oldest backup will be retained. 
-So in the above example, `--keep-yearly 3` will keep the oldest archive of the first year (since backups started being taken) as one extra backup.
-
-If you want to keep only the latest version, use ``--keep-last 1`.
-A negative `n` means that there is no limit to the number of n. 
-So prune `--keep-daily -2` means delete all except the last two backups of the day every day forever.
-
-Note that `prune` works in local time, and there might be strange effects if used in an international context; but these effects won't vary more than one day (+/-).
+If you just want to keep the latest versions, you can use ``--keep-last 47`.
+A negative `n` after `--keep` means that there is no limit to the number of n. 
+So prune `--keep-daily -2` means delete all backups except TWO of the latest backups of each DAY that has backups.
 
 To help you visualize how prune works, assume you started using borg on 2015-01-01.
 You created one backup on each day in 2015 except on 2015-12-19 (no
@@ -100,26 +91,24 @@ List view
 Notes
 -----
 
-2015-12-31 is kept due to the --keep-daily 14 rule (because it is applied
-first), not due to the --keep-monthly or --keep-yearly rule.
+2015-12-31 is kept due to the `--keep-daily 14` rule (because it is applied
+first), not due to the `--keep-monthly` or `--keep-yearly` rule.
 
-The --keep-yearly 1 rule does not consider the December 31st backup because it
-has already been kept due to the daily rule. There are no backups available
-from previous years, so the --keep-yearly target of 1 backup is not satisfied.
-Because of this, the 2015-01-01 archive (the oldest archive available) is kept.
+The `--keep-yearly 1` rule does not consider the December 31st backup, because it
+has already been kept by the daily rule. 
+So far the --keep-yearly target of 1 backup is not satisfied.
+And because there are no backups available from previous years, prune keeps the 2015-01-01 archive (the oldest available).
 
-The --keep-monthly 6 rule keeps Nov, Oct, Sep, Aug, Jul and Jun. December is
-not considered for this rule, because that backup was already kept because of
-the daily rule.
+The `--keep-monthly 6` rule keeps Nov, Oct, Sep, Aug, Jul and Jun. December is not considered by this rule, because that backup is kept by the daily rule.
 
-2015-12-17 is kept to satisfy the --keep-daily 14 rule - because no backup was
-made on 2015-12-19. If a backup had been made on that day, it would not keep
-the one from 2015-12-17.
+2015-12-17 is kept to satisfy the `--keep-daily 14 rule`, because no backup was made on 2015-12-19. 
+If a backup had been made on that day, it would not keep the one from 2015-12-17.
 
-We did not include weekly, hourly, minutely or secondly rules to keep this
-example simple. They all work in basically the same way.
-Borg 1.2 onwards now "explains" which rule was used to keep a specific archive.
-Use `--list` or `-v`.
+We did not include weekly, hourly, minutely or secondly rules to keep this example simple. 
+They all work in basically the same way.
+Borg v1.2 onwards now "explains" which rule was used to keep a specific archive, with `--list` or `-v`.
 
-The weekly rule is easy to understand roughly, but hard to understand in all
-details. If interested, read "ISO 8601:2000 standard week-based year".
+The weekly rule is easy to understand roughly, but hard to understand in all details. 
+If you're interested, read "ISO 8601:2000 standard week-based year".
+If you are using prune in an international context, you should take into account the time zone in which prune is executed.
+Prune operates in the local time of the system running borg.

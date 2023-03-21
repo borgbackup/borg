@@ -1,13 +1,13 @@
 borg prune visualized
 =====================
 
-To understand prune, it helps to substitute the term `prune --keep` with `delete all backups but keep the latest backup of each of the last 'n' INTERVALS (secondly, minutely, hourly, daily, weekly, monthly, or yearly), including the present, that have backups. 
+To understand prune, it helps to substitute the terms `prune --keep` with `delete all backups but keep the latest backup of each of the last 'n' INTERVALS (secondly, minutely, hourly, daily, weekly, monthly, or yearly), including the present, that have backups. 
 So `prune --keep-daily 7` means `delete all backups but keep the latest backup of each of the last 7 DAYS (including today) that have backups`.
-Note that it's not "keep the latest backup on each of the last 7 days," but rather "keep the latest backup for each of the last 7 days _that have backups._"
-For otherwise it would mean that if backups weren't taken on two days in the last 7 days, you'd be left with only 5 backups after running prune. 
+Note that it's not simply "keep the latest backup of each of the last 7 days," but rather "keep the latest backup of each of the last 7 days _that have backups._"
+For otherwise it would mean that if backups weren't taken on two days in the last 7 days, then you'd be left with only 5 backups after running prune. 
 Such a scenario, however, will play out only if there aren't any backups before the last 7 days. 
 But if backups are available, then prune will be leave you with 7 backups.
-Similarly, `--keep-monthly 6` means `delete all backups but keep the latest backup for each of the last 6 MONTHS (including this month) that have backups`.
+Similarly, `--keep-monthly 6` means `delete all backups but keep the latest backup of each of the last 6 MONTHS (including this month) that have backups`.
 
 You can also combine parameters. 
 So `prune --keep-daily 31 --keep-monthly 12 --keep-yearly 3` would delete all backups except the latest backup of each of the last 7 days that have backups, the latest backup of each of the last 12 months that have backups, and the latest backup of each of the last 3 years that have backups. 

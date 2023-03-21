@@ -143,6 +143,33 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd(f"--repo={self.repository_location}", "extract", "dst")
         self.assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
 
+    @requires_gnutar
+    def test_import_tar_with_ignore_zeros(self):
+        self.create_test_files(create_hardlinks=False)  # hardlinks become separate files
+        os.unlink("input/flagfile")
+        with changedir("input"):
+            subprocess.check_call(["tar", "cf", "file1.tar", "file1"])
+            subprocess.check_call(["tar", "cf", "the_rest.tar", "--exclude", "file1*", "."])
+            with open("concatenated.tar", "wb") as concatenated:
+                with open("file1.tar", "rb") as file1:
+                    concatenated.write(file1.read())
+                # Clean up for assert_dirs_equal.
+                os.unlink("file1.tar")
+
+                with open("the_rest.tar", "rb") as the_rest:
+                    concatenated.write(the_rest.read())
+                # Clean up for assert_dirs_equal.
+                os.unlink("the_rest.tar")
+
+        self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
+        self.cmd(f"--repo={self.repository_location}", "import-tar", "--ignore-zeros", "dst", "input/concatenated.tar")
+        # Clean up for assert_dirs_equal.
+        os.unlink("input/concatenated.tar")
+
+        with changedir(self.output_path):
+            self.cmd(f"--repo={self.repository_location}", "extract", "dst")
+        self.assert_dirs_equal("input", "output", ignore_ns=True, ignore_xattrs=True)
+
     def test_roundtrip_pax_borg(self):
         self.create_test_files()
         self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")

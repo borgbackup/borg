@@ -1,11 +1,28 @@
 borg prune visualized
 =====================
 
-To understand prune, it helps to substitute the term `prune` with `delete all backups but keep the latest backup of the x and those of the last nx's that have backups`, and then simply replace `x` with the time frame (secondly, minutely, hourly, daily, weekly, monthly, or yearly), and replace `n` with a number (1, 2, 3, etc.). 
-So `prune --keep-daily 7` means `delete all backups but keep the latest backup of the day and those of the last 7 days that have backups`.
-Similarly, `--keep-monthly 6` means `delete all backups but keep the latest backup of the month and those of the last 6 months that have backups`.
+To understand prune, it helps to substitute the term `prune --keep` with `delete all backups but keep the latest backup of each of the last 'n' INTERVALS (secondly, minutely, hourly, daily, weekly, monthly, or yearly), including the present, that have backups. 
+So `prune --keep-daily 7` means `delete all backups but keep the latest backup of each of the last 7 DAYS (including today) that have backups`.
+Note that it's not "keep the latest backup on each of the last 7 days," but rather "keep the latest backup for each of the last 7 days _that have backups._"
+For otherwise it would mean that if backups weren't taken on two days in the last 7 days, you'd be left with only 5 backups after running prune. 
+Such a scenario, however, will play out only if there aren't any backups before the last 7 days. 
+But if backups are available, then prune will be leave you with 7 backups.
+Similarly, `--keep-monthly 6` means `delete all backups but keep the latest backup for each of the last 6 MONTHS (including this month) that have backups`.
 
-Assume you started using borg on 2015-01-01.
+You can also combine parameters. 
+So `prune --keep-daily 31 --keep-monthly 12 --keep-yearly 3` would delete all backups except the latest backup of each of the last 7 days that have backups, the latest backup of each of the last 12 months that have backups, and the latest backup of each of the last 3 years that have backups. 
+Overlapping parameters are ignored. 
+So, if the second parameter, `--keep-monthly 12`, is satisfied by the first, then no extra backup will be taken; and similarly, if the third parameter is satisfied by the first or second, then too no extra backups are taken. 
+The only exception, however, is that when backup is taken for the first time, the oldest backup will be retained. 
+So in the above example, `--keep-yearly 3` will keep the oldest archive of the first year (since backups started being taken) as one extra backup.
+
+If you want to keep only the latest version, use ``--keep-last 1`.
+A negative `n` means that there is no limit to the number of n. 
+So prune `--keep-daily -2` means delete all except the last two backups of the day every day forever.
+
+Note that `prune` works in local time, and there might be strange effects if used in an international context; but these effects won't vary more than one day (+/-).
+
+To help you visualize how prune works, assume you started using borg on 2015-01-01.
 You created one backup on each day in 2015 except on 2015-12-19 (no
 backup made on that day)
 It is 2016-01-01, and today's backup has not yet been made.
@@ -13,9 +30,9 @@ It is 2016-01-01, and today's backup has not yet been made.
 This is what borg prune --keep-daily 14 --keep-monthly 6 --keep-yearly 1
 would keep.
 
-Backups kept by the --keep-daily rule are marked by a "d" to the right,
-backups kept by the --keep-monthly rule are marked by a "m" to the right,
-and backups kept by the --keep-yearly rule are marked by a "y" to the
+Backups kept by the `--keep-daily` rule are marked with a "d" to the right,
+backups kept by the `--keep-monthly` rule are marked with a "m" to the right,
+and backups kept by the `--keep-yearly` rule are marked with a "y" to the
 right.
 
 Calendar view
@@ -101,6 +118,8 @@ the one from 2015-12-17.
 
 We did not include weekly, hourly, minutely or secondly rules to keep this
 example simple. They all work in basically the same way.
+Borg 1.2 onwards now "explains" which rule was used to keep a specific archive.
+Use `--list` or `-v`.
 
 The weekly rule is easy to understand roughly, but hard to understand in all
 details. If interested, read "ISO 8601:2000 standard week-based year".

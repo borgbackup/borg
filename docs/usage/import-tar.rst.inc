@@ -31,6 +31,8 @@ borg import-tar
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--json``                                        | output stats as JSON (implies --stats)                                                                                                |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--ignore-zeros``                                | ignore zero-filled blocks in the input tarball                                                                                        |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                    |
     |                                                                                                                                                                                                                                                   |
     | :ref:`common_options`                                                                                                                                                                                                                             |
@@ -70,6 +72,7 @@ borg import-tar
         --list          output verbose list of items (files, dirs, ...)
         --filter STATUSCHARS    only display items with the given status characters
         --json          output stats as JSON (implies --stats)
+        --ignore-zeros    ignore zero-filled blocks in the input tarball
 
 
     :ref:`common_options`
@@ -115,3 +118,7 @@ A ``--sparse`` option (as found in borg create) is not supported.
 
 import-tar reads POSIX.1-1988 (ustar), POSIX.1-2001 (pax), GNU tar, UNIX V7 tar
 and SunOS tar with extended attributes.
+
+To import multiple tarballs into a single archive, they can be simply
+concatenated (e.g. using "cat") into a single file, and imported with an
+``--ignore-zeros`` option to skip through the stop markers between them.

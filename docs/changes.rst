@@ -300,6 +300,7 @@ Compatibility notes:
 
 New features:
 
+- import-tar: add --ignore-zeros to process concatenated tars, #7432.
 - debug id-hash: computes file/chunk content id-hash, #7406
 - diff: --content-only does not show mode/ctime/mtime changes, #7248
 - diff: JSON strings in diff output are now sorted alphabetically
@@ -329,6 +330,7 @@ Other changes:
 - remove BORG_LIBB2_PREFIX (not used any more)
 - docs:
 
+  - BORG_KEY_FILE: clarify docs, #7444
   - update FAQ about locale/unicode issues, #6999
   - improve mount options rendering, #7359
   - make timestamps in manual pages reproducible

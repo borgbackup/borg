@@ -180,18 +180,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with open("concatenated.tar", "wb") as concatenated:
                 with open("file1.tar", "rb") as file1:
                     concatenated.write(file1.read())
-                # Clean up for assert_dirs_equal.
-                os.unlink("file1.tar")
-
                 with open("the_rest.tar", "rb") as the_rest:
                     concatenated.write(the_rest.read())
-                # Clean up for assert_dirs_equal.
                 os.unlink("the_rest.tar")
 
         self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
         self.cmd(f"--repo={self.repository_location}", "import-tar", "dst", "input/concatenated.tar")
-        # Clean up for assert_dirs_equal.
-        os.unlink("input/concatenated.tar")
 
         with changedir(self.output_path):
             self.cmd(f"--repo={self.repository_location}", "extract", "dst")

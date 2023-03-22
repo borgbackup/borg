@@ -322,8 +322,12 @@ class ArchiverTestCaseBase(BaseTestCase):
                 contents = b'X' * size
             fd.write(contents)
 
-    def create_test_files(self):
+    def create_test_files(self, create_hardlinks=True):
         """Create a minimal test case including all supported file types
+
+        Args:
+          create_hardlinks: whether to create a sample hardlink. When set to
+                            False, the hardlink file will not be created at all.
         """
         # File
         self.create_regular_file('file1', size=1024 * 80)
@@ -333,7 +337,7 @@ class ArchiverTestCaseBase(BaseTestCase):
         # File mode
         os.chmod('input/file1', 0o4755)
         # Hard link
-        if are_hardlinks_supported():
+        if create_hardlinks and are_hardlinks_supported():
             os.link(os.path.join(self.input_path, 'file1'),
                     os.path.join(self.input_path, 'hardlink'))
         # Symlink
@@ -3587,6 +3591,61 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with changedir(self.output_path):
             self.cmd('extract', self.repository_location + '::dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
+
+    @requires_gnutar
+    def test_import_concatenated_tar_with_ignore_zeros(self):
+        # file1 has a hardlink reference to it, but we put it in a separate
+        # tarball, breaking the link during import-tar. It could be any other
+        # file though, so we won't take chances and just avoid hardlinks.
+        self.create_test_files(create_hardlinks=False)
+        os.unlink('input/flagfile')
+
+        with changedir('input'):
+            subprocess.check_call(['tar', 'cf', 'file1.tar', 'file1'])
+            subprocess.check_call(['tar', 'cf', 'the_rest.tar', '--exclude', 'file1*', '.'])
+            with open('concatenated.tar', 'wb') as concatenated:
+                with open('file1.tar', 'rb') as file1:
+                    concatenated.write(file1.read())
+                # Clean up for assert_dirs_equal.
+                os.unlink('file1.tar')
+
+                with open('the_rest.tar', 'rb') as the_rest:
+                    concatenated.write(the_rest.read())
+                # Clean up for assert_dirs_equal.
+                os.unlink('the_rest.tar')
+
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('import-tar', '--ignore-zeros', self.repository_location + '::dst', 'input/concatenated.tar')
+        os.unlink('input/concatenated.tar')
+
+        with changedir(self.output_path):
+            self.cmd('extract', self.repository_location + '::dst')
+        self.assert_dirs_equal('input', 'output', ignore_ns=True, ignore_xattrs=True)
+
+    @requires_gnutar
+    def test_import_concatenated_tar_without_ignore_zeros(self):
+        self.create_test_files()
+        os.unlink('input/flagfile')
+
+        with changedir('input'):
+            subprocess.check_call(['tar', 'cf', 'file1.tar', 'file1'])
+            subprocess.check_call(['tar', 'cf', 'the_rest.tar', '--exclude', 'file1*', '.'])
+            with open('concatenated.tar', 'wb') as concatenated:
+                with open('file1.tar', 'rb') as file1:
+                    concatenated.write(file1.read())
+
+                with open('the_rest.tar', 'rb') as the_rest:
+                    concatenated.write(the_rest.read())
+
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('import-tar', self.repository_location + '::dst', 'input/concatenated.tar')
+
+        with changedir(self.output_path):
+            self.cmd('extract', self.repository_location + '::dst')
+
+        # Negative test -- assert that only file1 has been extracted, and the_rest has been ignored
+        # due to zero-filled block marker.
+        self.assert_equal(os.listdir('output'), ['file1'])
 
     def test_detect_attic_repo(self):
         path = make_attic_repo(self.repository_path)

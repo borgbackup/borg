@@ -217,16 +217,14 @@ The best check that everything is ok is to run a dry-run extraction::
 Change Log
 ==========
 
-Version 1.2.4 (not released yet)
---------------------------------
+Version 1.2.4 (2023-03-24)
+--------------------------
 
 Upgrade notes:
 
 Some things can be recommended for the upgrade process from borg 1.1.x
 (please also read the important compatibility notes below):
 
-- do you already want to upgrade? 1.1.x also will get fixes for a while.
-- be careful, first upgrade your less critical / smaller repos.
 - first upgrade to a recent 1.1.x release - especially if you run some older
   1.1.* or even 1.0.* borg release.
 - using that, run at least one `borg create` (your normal backup), `prune`

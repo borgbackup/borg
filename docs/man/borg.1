@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2022-12-24" "" "borg backup tool"
+.TH "BORG" 1 "2023-03-22" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -564,7 +564,24 @@ Defaults to \fB$BORG_CONFIG_DIR/keys\fP\&.
 This directory contains keys for encrypted repositories.
 .TP
 .B BORG_KEY_FILE
-When set, use the given filename as repository key file.
+When set, use the given path as repository key file. Please note that this is only
+for rather special applications that externally fully manage the key files:
+.INDENT 7.0
+.IP \(bu 2
+this setting only applies to the keyfile modes (not to the repokey modes).
+.IP \(bu 2
+using a full, absolute path to the key file is recommended.
+.IP \(bu 2
+all directories in the given path must exist.
+.IP \(bu 2
+this setting forces borg to use the key file at the given location.
+.IP \(bu 2
+the key file must either exist (for most commands) or will be created (\fBborg rcreate\fP).
+.IP \(bu 2
+you need to give a different path for different repositories.
+.IP \(bu 2
+you need to point to the correct key file matching the repository the command will operate on.
+.UNINDENT
 .TP
 .B TMPDIR
 This is where temporary files are stored (might need a lot of temporary space for some
@@ -580,10 +597,6 @@ Adds given OpenSSL header file directory to the default locations (setup.py).
 .B BORG_LIBLZ4_PREFIX
 Adds given prefix directory to the default locations. If a \(aqinclude/lz4.h\(aq is found Borg
 will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
-.TP
-.B BORG_LIBB2_PREFIX
-Adds given prefix directory to the default locations. If a \(aqinclude/blake2.h\(aq is found Borg
-will be linked against the system libb2 instead of a bundled implementation. (setup.py)
 .TP
 .B BORG_LIBZSTD_PREFIX
 Adds given prefix directory to the default locations. If a \(aqinclude/zstd.h\(aq is found Borg

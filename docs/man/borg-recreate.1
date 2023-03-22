@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RECREATE" 1 "2022-12-24" "" "borg backup tool"
+.TH "BORG-RECREATE" 1 "2023-03-22" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .SH SYNOPSIS
@@ -158,7 +158,7 @@ select compression algorithm, see the output of the \(dqborg help compression\(d
 recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIif\-different\fP: recompress if current compression is with a different compression algorithm (the level is not considered); \fIalways\fP: recompress even if current compression is with the same compression algorithm (use this to change the compression level); and \fInever\fP: do not recompress (use this option to explicitly prevent recompression). If no MODE is given, \fIif\-different\fP will be used. Not passing \-\-recompress is equivalent to \(dq\-\-recompress never\(dq.
 .TP
 .BI \-\-chunker\-params \ PARAMS
-specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the current defaults. default: buzhash,19,23,21,4095
+rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the chunker defaults. default: do not rechunk
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

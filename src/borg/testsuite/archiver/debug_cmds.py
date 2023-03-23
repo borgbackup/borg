@@ -6,6 +6,7 @@ import unittest
 from ...constants import *  # NOQA
 from .. import changedir
 from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
+from ..compress import Compressor
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -114,6 +115,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             assert meta_read.get(key) == value
 
         assert meta_read.get("size") == len(data_read)
+
+        c = Compressor(name="zstd", level=2)
+        _, data_compressed = c.compress(meta_dict, data=data)
+        assert meta_read.get("csize") == len(data_compressed)
+        assert "ctype" in meta_read
+        assert "clevel" in meta_read
 
     def test_debug_dump_manifest(self):
         self.create_regular_file("file1", size=1024 * 80)

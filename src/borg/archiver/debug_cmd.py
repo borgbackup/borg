@@ -284,12 +284,12 @@ class DebugMixIn:
             cdata = f.read()
 
         repo_objs = manifest.repo_objs
-        meta, data = repo_objs.parse(id=id, cdata=cdata, decompress=True)
+        meta, data = repo_objs.parse(id=id, cdata=cdata)
 
         with open(args.json_path, "w") as f:
             json.dump(meta, f)
 
-        with open(args.data_path, "wb") as f:
+        with open(args.binary_path, "wb") as f:
             f.write(data)
 
         return EXIT_SUCCESS
@@ -308,7 +308,7 @@ class DebugMixIn:
             print("object id %s is invalid [%s]." % (hex_id, str(err)))
             return EXIT_ERROR
 
-        with open(args.data_path, "rb") as f:
+        with open(args.binary_path, "rb") as f:
             data = f.read()
 
         with open(args.json_path, "r") as f:
@@ -317,7 +317,7 @@ class DebugMixIn:
         repo_objs = manifest.repo_objs
         data_encrypted = repo_objs.format(id=id, meta=meta, data=data)
 
-        with open(args.output_path, "wb") as f:
+        with open(args.object_path, "wb") as f:
             f.write(data_encrypted)
         return EXIT_SUCCESS
 
@@ -595,7 +595,7 @@ class DebugMixIn:
             "cdata", metavar="COMPRESSED_DATA", type=str, help="path of the objectfile to parse data from"
         )
         subparser.add_argument(
-            "data_path", metavar="DATA_PATH", type=str, help="path of the file to write uncompressed data into"
+            "binary_path", metavar="BINARY_PATH", type=str, help="path of the file to write uncompressed data into"
         )
         subparser.add_argument(
             "json_path", metavar="JSON_PATH", type=str, help="path of the json file to write metadata into"
@@ -619,7 +619,7 @@ class DebugMixIn:
         subparser.set_defaults(func=self.do_debug_format_obj)
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
         subparser.add_argument(
-            "data_path", metavar="DATA_PATH", type=str, help="path of the file to convert into objectfile"
+            "binary_path", metavar="BINARY_PATH", type=str, help="path of the file to convert into objectfile"
         )
         subparser.add_argument(
             "json_path", metavar="JSON_PATH", type=str, help="path of the json file to read metadata from"
@@ -634,8 +634,8 @@ class DebugMixIn:
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
         subparser.add_argument(
-            "output_path",
-            metavar="OUTPUT_PATH",
+            "object_path",
+            metavar="OBJECT_PATH",
             type=str,
             help="path of the objectfile to write compressed encrypted data into",
         )

@@ -31,6 +31,8 @@ borg diff
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     |                                                       | ``--sort``                            | Sort the output lines by file path.                                   |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
+    |                                                       | ``--content-only``                    | Only compare differences in content (exclude metadata differences)    |
+    +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     |                                                       | ``--json-lines``                      | Format output as JSON Lines.                                          |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                        |
@@ -71,6 +73,7 @@ borg diff
         --numeric-ids    only consider numeric user and group identifiers
         --same-chunker-params    Override check of chunker parameters.
         --sort     Sort the output lines by file path.
+        --content-only    Only compare differences in content (exclude metadata differences)
         --json-lines    Format output as JSON Lines. 
 
 

@@ -4523,12 +4523,16 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         if is_win32:
             # Sleeping for 15s because Windows doesn't refresh ctime if file is deleted and recreated within 15 seconds.
             time.sleep(15)
+        elif is_darwin:
+            time.sleep(1)  # HFS has a 1s timestamp granularity
         self.create_regular_file("test_file", size=15)
         self.cmd('create', self.repository_location + '::archive2', 'input')
         output = self.cmd("diff", self.repository_location + "::archive1", "archive2")
         self.assert_in("mtime", output)
         self.assert_in("ctime", output)  # Should show up on windows as well since it is a new file.
-        os.chmod("input/test_file", 777)
+        if is_darwin:
+            time.sleep(1)  # HFS has a 1s timestamp granularity
+        os.chmod("input/test_file", 0o777)
         self.cmd('create', self.repository_location + '::archive3', 'input')
         output = self.cmd("diff", self.repository_location + "::archive2", "archive3")
         self.assert_not_in("mtime", output)

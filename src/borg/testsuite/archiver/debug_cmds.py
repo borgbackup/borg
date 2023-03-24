@@ -68,7 +68,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         """Test format-obj and parse-obj commands"""
 
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        data = b"some data"
+        data = b"some data" * 100
         meta_dict = {"some": "property"}
         meta = json.dumps(meta_dict, ensure_ascii=False).encode()
 
@@ -119,8 +119,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         c = Compressor(name="zstd", level=2)
         _, data_compressed = c.compress(meta_dict, data=data)
         assert meta_read.get("csize") == len(data_compressed)
-        assert "ctype" in meta_read
-        assert "clevel" in meta_read
+        assert meta_read.get("ctype") == c.compressor.ID
+        assert meta_read.get("clevel") == c.compressor.level
 
     def test_debug_dump_manifest(self):
         self.create_regular_file("file1", size=1024 * 80)

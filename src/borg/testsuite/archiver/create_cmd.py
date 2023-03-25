@@ -13,6 +13,7 @@ import pytest
 
 from ... import platform
 from ...constants import *  # NOQA
+from ...helpers import get_cache_dir
 from ...manifest import Manifest
 from ...platform import is_cygwin, is_win32, is_darwin
 from ...repository import Repository
@@ -658,6 +659,30 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             f"--repo={self.repository_location}", "create", "test2", "input", "--list", "--files-cache=ctime,size"
         )
         self.assert_in("M input/file1", output)
+
+    @pytest.mark.allow_cache_wipe
+    def test_cache_rebuild_on_missing_cache_files(self):
+        """test if borg rebuilds cache if any of the cache files have gone missing"""
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        self.create_regular_file("file1", size=10)
+        self.cmd(f"--repo={self.repository_location}", "create", "archive1", "input")
+        info = json.loads(self.cmd(f"--repo={self.repository_location}", "rinfo", "--json"))
+        repository = info["repository"]
+        cache_dir = os.path.join(get_cache_dir(), repository["id"])
+        config_cache_path = os.path.join(cache_dir, "config")
+        chunk_cache_path = os.path.join(cache_dir, "chunks")
+        os.unlink(config_cache_path)
+        self.create_regular_file("file2", size=10)
+        self.cmd(f"--repo={self.repository_location}", "create", "archive2", "input")
+        assert os.path.exists(config_cache_path)
+        os.unlink(chunk_cache_path)
+        self.create_regular_file("file3", size=10)
+        self.cmd(f"--repo={self.repository_location}", "create", "archive3", "input")
+        assert os.path.exists(chunk_cache_path)
+        self.create_regular_file("file4", size=10)
+        os.unlink(config_cache_path)
+        self.cmd(f"--repo={self.repository_location}", "create", "archive4", "input")
+        assert os.path.exists(config_cache_path)
 
     def test_file_status_ms_cache_mode(self):
         """test that a chmod'ed file with no content changes does not get chunked again in mtime,size cache_mode"""

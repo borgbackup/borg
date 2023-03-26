@@ -15,7 +15,8 @@ def packages_debianoid(user)
     apt-get -y -qq update
     apt-get -y -qq dist-upgrade
     # for building borgbackup and dependencies:
-    apt install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev pkg-config
+    apt install -y pkg-config
+    apt install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev || true
     apt install -y libfuse-dev fuse || true
     apt install -y libfuse3-dev fuse3 || true
     apt install -y locales || true
@@ -136,9 +137,95 @@ def packages_openindiana
   EOF
 end
 
+
+# Build and install borg dependencies from source
+def install_source_dependencies(user)
+  return <<-EOF
+    set -e -o pipefail
+
+    # Install in /usr/local
+    export PREFIX=/usr/local
+
+    # Make PKG_CONFIG_PATH explicit, even if /usr/local/lib/pkgconfig is enabled per default
+    export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig
+    echo 'export PKG_CONFIG_PATH="'${PKG_CONFIG_PATH}'"' >> ~#{user}/.bash_profile
+
+    # All source packages integrate with pkg-config, remove any previous overrides
+    sed -i '/BORG_.*_PREFIX/d' ~#{user}/.bash_profile
+
+    # Setup pyenv to pick up the custom openssl version (python >= 3.9 requires openssl >= 1.1.1)
+    echo 'export PYTHON_CONFIGURE_OPTS="--with-openssl='"${PREFIX}"' --with-openssl-rpath=auto"' >> ~#{user}/.bash_profile
+    echo 'export LDFLAGS=-Wl,-rpath,'"${PREFIX}"'/lib' >> ~#{user}/.bash_profile
+
+    # Silence git warning about shallow clones
+    git config --global advice.detachedHead false
+
+    # libattr
+    VERSION_LIBATTR=2.5.1
+    curl -s -L https://download.savannah.nongnu.org/releases/attr/attr-${VERSION_LIBATTR}.tar.gz | tar xvz --strip-components=1 --one-top-level=attr -f - -C ${PREFIX}/src
+    cd ${PREFIX}/src/attr
+    ./configure --prefix=${PREFIX}
+    make -j$(nproc) install
+
+    # libacl
+    VERSION_LIBACL=2.3.1
+    curl -s -L https://download.savannah.nongnu.org/releases/acl/acl-${VERSION_LIBACL}.tar.gz | tar xvz --strip-components=1 --one-top-level=acl -f - -C ${PREFIX}/src
+    cd ${PREFIX}/src/acl
+    ./configure --prefix=${PREFIX}
+    make -j$(nproc) install
+
+    # liblz4
+    VERSION_LIBLZ4=1.9.4
+    git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_LIBLZ4} https://github.com/lz4/lz4.git
+    cd ${PREFIX}/src/lz4
+    make -j$(nproc) install PREFIX=${PREFIX}
+
+    # libzstd
+    VERSION_LIBZSTD=1.5.4
+    git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_LIBZSTD} https://github.com/facebook/zstd.git
+    cd ${PREFIX}/src/zstd
+    make -j$(nproc) install PREFIX=${PREFIX}
+
+    # xxHash
+    VERSION_LIBXXHASH=0.8.1
+    git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_LIBXXHASH} https://github.com/Cyan4973/xxHash.git
+    cd ${PREFIX}/src/xxHash
+    make -j$(nproc) install PREFIX=${PREFIX}
+
+    # openssl
+    VERSION_OPENSSL=1_1_1t
+    git -C ${PREFIX}/src clone --depth 1 --branch OpenSSL_${VERSION_OPENSSL} https://github.com/openssl/openssl.git
+    cd ${PREFIX}/src/openssl
+    ./config --prefix=${PREFIX} --openssldir=${PREFIX}/lib/ssl
+    make -j$(nproc)
+    make -j$(nproc) install
+
+    # libfuse3 requires ninja
+    VERSION_NINJA=1.11.1
+    git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_NINJA} https://github.com/ninja-build/ninja.git
+    cd ${PREFIX}/src/ninja
+    python3 configure.py --bootstrap
+    install --mode=755 --target-directory=${PREFIX}/bin ninja
+
+    # libfuse3 requires meson >= 0.50; python3.5 support is dropped in meson >= 0.57
+    VERSION_MESON=0.56.2
+    git -C ${PREFIX}/src clone --depth 1 --branch ${VERSION_MESON} https://github.com/mesonbuild/meson.git
+    ln -s ${PREFIX}/src/meson/meson.py ${PREFIX}/bin/meson
+
+    # libfuse3
+    VERSION_LIBFUSE=3.14.0
+    git -C ${PREFIX}/src clone --depth 1 --branch fuse-${VERSION_LIBFUSE} https://github.com/libfuse/libfuse.git
+    cd ${PREFIX}/src/libfuse
+    mkdir build; cd build
+    meson setup --prefix ${PREFIX} --libdir ${PREFIX}/lib ..
+    ninja
+    ninja install
+  EOF
+end
+
 def install_pyenv(boxname)
   return <<-EOF
-    echo 'export PYTHON_CONFIGURE_OPTS="--enable-shared"' >> ~/.bash_profile
+    echo 'export PYTHON_CONFIGURE_OPTS="${PYTHON_CONFIGURE_OPTS} --enable-shared"' >> ~/.bash_profile
     echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bash_profile
     echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bash_profile
     . ~/.bash_profile
@@ -160,6 +247,7 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
+    echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
     pyenv install 3.11.2  # tests, binary build
     pyenv install 3.10.1  # tests
     pyenv install 3.9.1   # tests

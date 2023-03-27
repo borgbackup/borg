@@ -10,3 +10,4 @@ pytest-cov
 pytest-benchmark
 Cython
 twine
+pre-commit

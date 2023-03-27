@@ -39,6 +39,7 @@ class ExtractMixIn:
         progress = args.progress
         output_list = args.output_list
         dry_run = args.dry_run
+        skip_errors = args.skip_errors
         stdout = args.stdout
         sparse = args.sparse
         strip_components = args.strip_components
@@ -76,9 +77,16 @@ class ExtractMixIn:
                         dirs.append(item)
                         archive.extract_item(item, stdout=stdout, restore_attrs=False)
                     else:
-                        archive.extract_item(
-                            item, stdout=stdout, sparse=sparse, hlm=hlm, pi=pi, continue_extraction=continue_extraction
-                        )
+                        if not archive.extract_item(
+                            item,
+                            stdout=stdout,
+                            sparse=sparse,
+                            hlm=hlm,
+                            pi=pi,
+                            continue_extraction=continue_extraction,
+                            skip_integrity_errors=skip_errors,
+                        ):
+                            self.exit_code = EXIT_WARNING
             except (BackupOSError, BackupError) as e:
                 self.print_warning("%s: %s", remove_surrogates(orig_path), e)
 
@@ -174,6 +182,13 @@ class ExtractMixIn:
             dest="continue_extraction",
             action="store_true",
             help="continue a previously interrupted extraction of same archive",
+        )
+        subparser.add_argument(
+            "--skip-errors",
+            dest="skip_errors",
+            action="store_true",
+            help="skip corrupted chunks with a log message (exit 1) instead of aborting "
+            "(no effect for --dry-run and --stdout)",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(

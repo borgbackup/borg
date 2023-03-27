@@ -788,6 +788,7 @@ Duration: {0.duration}
         hlm=None,
         pi=None,
         continue_extraction=False,
+        skip_integrity_errors=False,
     ):
         """
         Extract archive item.
@@ -800,6 +801,8 @@ Duration: {0.duration}
         :param hlm: maps hlid to link_target for extracting subtrees with hardlinks correctly
         :param pi: ProgressIndicatorPercent (or similar) for file extraction progress (in bytes)
         :param continue_extraction: continue a previously interrupted extraction of same archive
+        :param skip_integrity_errors: skip over corrupted chunks instead of raising IntegrityError
+        (ignored for dry_run and stdout)
         """
 
         def same_item(item, st):
@@ -849,7 +852,7 @@ Duration: {0.duration}
                                 )
             if has_damaged_chunks:
                 raise BackupError("File has damaged (all-zero) chunks. Try running borg check --repair.")
-            return
+            return True
 
         dest = self.cwd
         path = os.path.join(dest, item.path)
@@ -857,7 +860,7 @@ Duration: {0.duration}
         try:
             st = os.stat(path, follow_symlinks=False)
             if continue_extraction and same_item(item, st):
-                return  # done! we already have fully extracted this file in a previous run.
+                return True  # done! we already have fully extracted this file in a previous run.
             elif stat.S_ISDIR(st.st_mode):
                 os.rmdir(path)
             else:
@@ -878,20 +881,43 @@ Duration: {0.duration}
                 make_parent(path)
             with self.extract_helper(item, path, hlm) as hardlink_set:
                 if hardlink_set:
-                    return
+                    return True
                 with backup_io("open"):
                     fd = open(path, "wb")
                 with fd:
                     ids = [c.id for c in item.chunks]
-                    for data in self.pipeline.fetch_many(ids, is_preloaded=True, ro_type=ROBJ_FILE_STREAM):
+                    chunk_index = -1
+                    chunk_iterator = self.pipeline.fetch_many(ids, is_preloaded=True, ro_type=ROBJ_FILE_STREAM)
+                    skipped_errors = False
+                    while True:
+                        try:
+                            chunk_index += 1
+                            data = next(chunk_iterator)
+                        except StopIteration:
+                            break
+                        except IntegrityError as err:
+                            if not skip_integrity_errors:
+                                raise
+                            c = item.chunks[chunk_index]
+                            size = c.size
+                            logger.warning("%s: chunk %s: %s", remove_surrogates(item.path), bin_to_hex(c.id), err)
+                            with backup_io("seek"):
+                                fd.seek(size, 1)
+                            skipped_errors = True
+                            # restart chunk data generator
+                            ids = [c.id for c in item.chunks[chunk_index + 1 :]]
+                            chunk_iterator = self.pipeline.fetch_many(ids, is_preloaded=True, ro_type=ROBJ_FILE_STREAM)
+                        else:
+                            with backup_io("write"):
+                                size = len(data)
+                                if sparse and zeros.startswith(data):
+                                    # all-zero chunk: create a hole in a sparse file
+                                    fd.seek(size, 1)
+                                else:
+                                    fd.write(data)
                         if pi:
-                            pi.show(increase=len(data), info=[remove_surrogates(item.path)])
-                        with backup_io("write"):
-                            if sparse and zeros.startswith(data):
-                                # all-zero chunk: create a hole in a sparse file
-                                fd.seek(len(data), 1)
-                            else:
-                                fd.write(data)
+                            pi.show(increase=size, info=[remove_surrogates(item.path)])
+
                     with backup_io("truncate_and_attrs"):
                         pos = item_chunks_size = fd.tell()
                         fd.truncate(pos)
@@ -905,7 +931,7 @@ Duration: {0.duration}
                         )
                 if has_damaged_chunks:
                     raise BackupError("File has damaged (all-zero) chunks. Try running borg check --repair.")
-            return
+            return not skipped_errors
         with backup_io:
             # No repository access beyond this point.
             if stat.S_ISDIR(mode):
@@ -919,7 +945,7 @@ Duration: {0.duration}
                 with self.extract_helper(item, path, hlm) as hardlink_set:
                     if hardlink_set:
                         # unusual, but possible: this is a hardlinked symlink.
-                        return
+                        return True
                     target = item.target
                     try:
                         os.symlink(target, path)
@@ -930,18 +956,19 @@ Duration: {0.duration}
                 make_parent(path)
                 with self.extract_helper(item, path, hlm) as hardlink_set:
                     if hardlink_set:
-                        return
+                        return True
                     os.mkfifo(path)
                     self.restore_attrs(path, item)
             elif stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
                 make_parent(path)
                 with self.extract_helper(item, path, hlm) as hardlink_set:
                     if hardlink_set:
-                        return
+                        return True
                     os.mknod(path, item.mode, item.rdev)
                     self.restore_attrs(path, item)
             else:
                 raise Exception("Unknown archive item type %r" % item.mode)
+            return True
 
     def restore_attrs(self, path, item, symlink=False, fd=None):
         """

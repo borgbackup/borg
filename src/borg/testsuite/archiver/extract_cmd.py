@@ -625,6 +625,28 @@ def test_overwrite(archivers, request):
         cmd(archiver, "extract", "test", exit_code=1)
 
 
+def test_extract_skip_errors(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", contents=b"a" * 280 + b"b" * 280)
+    cmd(archiver, "rcreate", "-e" "none")
+    cmd(archiver, "create", "--chunker-params", "7,9,8,128", "test", "input")
+    segment_files = sorted(os.listdir(os.path.join(archiver.repository_path, "data", "0")), reverse=True)
+    print(
+        ", ".join(
+            f"{fn}: {os.stat(os.path.join(archiver.repository_path, 'data', '0', fn)).st_size}b" for fn in segment_files
+        )
+    )
+    name = segment_files[3]  # must be the segment file that has the file's chunks
+    with open(os.path.join(archiver.repository_path, "data", "0", name), "r+b") as fd:
+        fd.seek(100)
+        fd.write(b"XXXX")
+    with changedir("output"):
+        output = cmd(archiver, "extract", "--skip-errors", "test", exit_code=1)
+        assert "input/file1: chunk" in output
+        assert os.stat("input/file1").st_size == 560
+    cmd(archiver, "check", exit_code=1)
+
+
 # derived from test_extract_xattrs_errors()
 @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason="xattr not supported on this system, or this version of fakeroot")
 def test_do_not_fail_when_percent_is_in_xattr_name(archivers, request):

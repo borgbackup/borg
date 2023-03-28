@@ -289,7 +289,7 @@ class TarMixIn:
             file_status_printer=self.print_file_status,
         )
 
-        tar = tarfile.open(fileobj=tarstream, mode="r|")
+        tar = tarfile.open(fileobj=tarstream, mode="r|", ignore_zeros=args.ignore_zeros)
 
         while True:
             tarinfo = tar.next()
@@ -445,6 +445,9 @@ class TarMixIn:
         - UNIX V7 tar
         - SunOS tar with extended attributes
 
+        To import multiple tarballs into a single archive, they can be simply
+        concatenated (e.g. using "cat") into a single file, and imported with an
+        ``--ignore-zeros`` option to skip through the stop markers between them.
         """
         )
         subparser = subparsers.add_parser(
@@ -487,6 +490,12 @@ class TarMixIn:
             help="only display items with the given status characters",
         )
         subparser.add_argument("--json", action="store_true", help="output stats as JSON (implies --stats)")
+        subparser.add_argument(
+            "--ignore-zeros",
+            dest="ignore_zeros",
+            action="store_true",
+            help="ignore zero-filled blocks in the input tarball",
+        )
 
         archive_group = subparser.add_argument_group("Archive options")
         archive_group.add_argument(

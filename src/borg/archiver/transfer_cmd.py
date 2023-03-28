@@ -106,8 +106,11 @@ class TransferMixIn:
                             if refcount == 0:  # target repo does not yet have this chunk
                                 if not dry_run:
                                     cdata = other_repository.get(chunk_id)
-                                    # keep compressed payload same, avoid decompression / recompression
-                                    meta, data = other_manifest.repo_objs.parse(chunk_id, cdata, decompress=False)
+                                    # keep compressed payload same, verify via assert_id (that will
+                                    # decompress, but avoid needing to compress it again):
+                                    meta, data = other_manifest.repo_objs.parse(
+                                        chunk_id, cdata, decompress=True, want_compressed=True
+                                    )
                                     meta, data = upgrader.upgrade_compressed_chunk(meta, data)
                                     chunk_entry = cache.add_chunk(
                                         chunk_id,

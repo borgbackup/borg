@@ -143,12 +143,6 @@ class DeleteMixIn:
             "-s", "--stats", dest="stats", action="store_true", help="print statistics for the deleted archive"
         )
         subparser.add_argument(
-            "--cache-only",
-            dest="cache_only",
-            action="store_true",
-            help="delete only the local cache for the given repository",
-        )
-        subparser.add_argument(
             "--force",
             dest="forced",
             action="count",

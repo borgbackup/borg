@@ -18,6 +18,7 @@ import unittest
 
 from ..xattr import get_all
 from ..platform import get_flags
+from ..platformflags import is_win32
 from ..helpers import umount
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .. import platform
@@ -64,6 +65,14 @@ def same_ts_ns(ts_ns1, ts_ns2):
 def unopened_tempfile():
     with tempfile.TemporaryDirectory() as tempdir:
         yield os.path.join(tempdir, "file")
+
+
+def is_root():
+    """return True if running with high privileges, like as root"""
+    if is_win32:
+        return False  # TODO
+    else:
+        return os.getuid() == 0
 
 
 @functools.lru_cache

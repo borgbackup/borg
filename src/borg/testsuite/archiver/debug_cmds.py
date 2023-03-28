@@ -70,7 +70,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         data = b"some data" * 100
         meta_dict = {"some": "property"}
-        meta = json.dumps(meta_dict, ensure_ascii=False).encode()
+        meta = json.dumps(meta_dict).encode()
 
         self.create_regular_file("plain.bin", contents=data)
         self.create_regular_file("meta.json", contents=meta)
@@ -92,7 +92,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd(f"--repo={self.repository_location}", "debug", "put-obj", id_hash, "output/data.bin")
         assert id_hash in output
 
-        output = self.cmd(f"--repo={self.repository_location}", "debug", "get-obj", id_hash, "output/compressed.bin")
+        output = self.cmd(f"--repo={self.repository_location}", "debug", "get-obj", id_hash, "output/object.bin")
         assert id_hash in output
 
         output = self.cmd(
@@ -100,7 +100,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "debug",
             "parse-obj",
             id_hash,
-            "output/compressed.bin",
+            "output/object.bin",
             "output/plain.bin",
             "output/meta.json",
         )

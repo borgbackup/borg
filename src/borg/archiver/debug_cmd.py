@@ -280,11 +280,11 @@ class DebugMixIn:
             print("object id %s is invalid [%s]." % (hex_id, str(err)))
             return EXIT_ERROR
 
-        with open(args.cdata, "rb") as f:
-            cdata = f.read()
+        with open(args.object_path, "rb") as f:
+            object_file = f.read()
 
         repo_objs = manifest.repo_objs
-        meta, data = repo_objs.parse(id=id, cdata=cdata)
+        meta, data = repo_objs.parse(id=id, cdata=object_file)
 
         with open(args.json_path, "w") as f:
             json.dump(meta, f)
@@ -592,7 +592,7 @@ class DebugMixIn:
         subparser.set_defaults(func=self.do_debug_parse_obj)
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
         subparser.add_argument(
-            "cdata", metavar="COMPRESSED_DATA", type=str, help="path of the objectfile to parse data from"
+            "object_path", metavar="OBJECT_PATH", type=str, help="path of the objectfile to parse data from"
         )
         subparser.add_argument(
             "binary_path", metavar="BINARY_PATH", type=str, help="path of the file to write uncompressed data into"

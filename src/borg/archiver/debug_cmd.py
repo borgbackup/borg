@@ -5,6 +5,7 @@ import json
 import textwrap
 
 from ..archive import Archive
+from ..compress import CompressionSpec
 from ..constants import *  # NOQA
 from ..helpers import msgpack
 from ..helpers import sysinfo
@@ -265,6 +266,61 @@ class DebugMixIn:
         print(id.hex())
         return EXIT_SUCCESS
 
+    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
+    def do_debug_parse_obj(self, args, repository, manifest):
+        """parse borg object file into meta dict and data (decrypting, decompressing)"""
+
+        # get the object from id
+        hex_id = args.id
+        try:
+            id = unhexlify(hex_id)
+            if len(id) != 32:  # 256bit
+                raise ValueError("id must be 256bits or 64 hex digits")
+        except ValueError as err:
+            print("object id %s is invalid [%s]." % (hex_id, str(err)))
+            return EXIT_ERROR
+
+        with open(args.object_path, "rb") as f:
+            cdata = f.read()
+
+        repo_objs = manifest.repo_objs
+        meta, data = repo_objs.parse(id=id, cdata=cdata)
+
+        with open(args.json_path, "w") as f:
+            json.dump(meta, f)
+
+        with open(args.binary_path, "wb") as f:
+            f.write(data)
+
+        return EXIT_SUCCESS
+
+    @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
+    def do_debug_format_obj(self, args, repository, manifest):
+        """format file and metadata into borg object file"""
+
+        # get the object from id
+        hex_id = args.id
+        try:
+            id = unhexlify(hex_id)
+            if len(id) != 32:  # 256bit
+                raise ValueError("id must be 256bits or 64 hex digits")
+        except ValueError as err:
+            print("object id %s is invalid [%s]." % (hex_id, str(err)))
+            return EXIT_ERROR
+
+        with open(args.binary_path, "rb") as f:
+            data = f.read()
+
+        with open(args.json_path, "r") as f:
+            meta = json.load(f)
+
+        repo_objs = manifest.repo_objs
+        data_encrypted = repo_objs.format(id=id, meta=meta, data=data)
+
+        with open(args.object_path, "wb") as f:
+            f.write(data_encrypted)
+        return EXIT_SUCCESS
+
     @with_repository(manifest=False, exclusive=True)
     def do_debug_put_obj(self, args, repository):
         """put file contents into the repository"""
@@ -516,6 +572,72 @@ class DebugMixIn:
         subparser.set_defaults(func=self.do_debug_id_hash)
         subparser.add_argument(
             "path", metavar="PATH", type=str, help="content for which the id-hash shall get computed"
+        )
+
+        # parse_obj
+        debug_parse_obj_epilog = process_epilog(
+            """
+                This command parses the object file into metadata (as json) and uncompressed data.
+                """
+        )
+        subparser = debug_parsers.add_parser(
+            "parse-obj",
+            parents=[common_parser],
+            add_help=False,
+            description=self.do_debug_parse_obj.__doc__,
+            epilog=debug_parse_obj_epilog,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            help="parse borg object file into meta dict and data",
+        )
+        subparser.set_defaults(func=self.do_debug_parse_obj)
+        subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
+        subparser.add_argument(
+            "object_path", metavar="OBJECT_PATH", type=str, help="path of the object file to parse data from"
+        )
+        subparser.add_argument(
+            "binary_path", metavar="BINARY_PATH", type=str, help="path of the file to write uncompressed data into"
+        )
+        subparser.add_argument(
+            "json_path", metavar="JSON_PATH", type=str, help="path of the json file to write metadata into"
+        )
+
+        # format_obj
+        debug_format_obj_epilog = process_epilog(
+            """
+                This command formats the file and metadata into objectfile.
+                """
+        )
+        subparser = debug_parsers.add_parser(
+            "format-obj",
+            parents=[common_parser],
+            add_help=False,
+            description=self.do_debug_format_obj.__doc__,
+            epilog=debug_format_obj_epilog,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            help="format file and metadata into borg objectfile",
+        )
+        subparser.set_defaults(func=self.do_debug_format_obj)
+        subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
+        subparser.add_argument(
+            "binary_path", metavar="BINARY_PATH", type=str, help="path of the file to convert into objectfile"
+        )
+        subparser.add_argument(
+            "json_path", metavar="JSON_PATH", type=str, help="path of the json file to read metadata from"
+        )
+        subparser.add_argument(
+            "-C",
+            "--compression",
+            metavar="COMPRESSION",
+            dest="compression",
+            type=CompressionSpec,
+            default=CompressionSpec("lz4"),
+            help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+        )
+        subparser.add_argument(
+            "object_path",
+            metavar="OBJECT_PATH",
+            type=str,
+            help="path of the objectfile to write compressed encrypted data into",
         )
 
         debug_get_obj_epilog = process_epilog(

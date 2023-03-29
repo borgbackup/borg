@@ -220,25 +220,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 # its ctime. This should not be reflected in the output if content-only is set
                 assert not any(get_changes("input/hardlink_target_replaced", joutput))
 
-        output = self.cmd(
-            f"--repo={self.repository_location}",
-            "diff",
-            "test0",
-            "test1a",
-            "--format",
-            "'{content}{link}{directory}{mode} {path}{NL}'",
-        )
+        output = self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1a")
         do_asserts(output, True)
         # We expect exit_code=1 due to the chunker params warning
         output = self.cmd(
-            f"--repo={self.repository_location}",
-            "diff",
-            "test0",
-            "test1b",
-            "--content-only",
-            "--format",
-            "'{content}{link}{directory}{mode} {path}{NL}'",
-            exit_code=1,
+            f"--repo={self.repository_location}", "diff", "test0", "test1b", "--content-only", exit_code=1
         )
         do_asserts(output, False, content_only=True)
 

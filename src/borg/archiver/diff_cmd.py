@@ -19,12 +19,10 @@ class DiffMixIn:
     @with_archive
     def do_diff(self, args, repository, manifest, archive):
         """Diff contents of two archives"""
-        if args.format is not None:
-            format: str = args.format
-        elif args.content_only:
-            format = "{content} {path}{NL}"
+        if args.content_only:
+            format = "{content}{link}{directory}{blkdev}{chrdev}{fifo} {path}{NL}"
         else:
-            format = "{change} {mtime} {path}{NL}"
+            format = args.format or "{change} {mtime} {path}{NL}"
 
         archive1 = archive
         archive2 = Archive(manifest, args.other_name)
@@ -53,12 +51,18 @@ class DiffMixIn:
 
         formatter = DiffFormatter(format)
         for diff in diffs_list:
-            if args.content_only and not diff.content():
-                continue
             if args.json_lines:
                 print(
                     json.dumps(
-                        {"path": diff.path, "changes": [change.to_dict() for change in diff.changes().values()]},
+                        {
+                            "path": diff.path,
+                            "changes": [
+                                change.to_dict()
+                                for name, change in diff.changes().items()
+                                if not args.content_only
+                                or (name in ("content", "link", "directory", "blkdev", "chrdev", "fifo"))
+                            ],
+                        },
                         sort_keys=True,
                         cls=BorgJsonEncoder,
                     )

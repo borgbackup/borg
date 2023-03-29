@@ -28,7 +28,7 @@ class RListMixIn:
 
         for archive_info in manifest.archives.list_considering(args):
             if args.json:
-                output_data.append(formatter.get_item_data(archive_info))
+                output_data.append(formatter.get_item_data(archive_info, args.json))
             else:
                 sys.stdout.write(formatter.format_item(archive_info, args.json))
 

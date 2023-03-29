@@ -11,7 +11,7 @@ from functools import partial
 from getpass import getuser
 from io import BytesIO
 from itertools import groupby, zip_longest
-from typing import Iterator # TODO: remove this if maintainers don't want it
+from typing import Iterator  # TODO: remove this if maintainers don't want it
 from shutil import get_terminal_size
 
 from .platformflags import is_win32
@@ -1096,12 +1096,12 @@ Duration: {0.duration}
             logger.warning("forced deletion succeeded, but the deleted archive was corrupted.")
             logger.warning("borg check --repair is required to free all space.")
 
-    #TODO: in final, remove type hints if maintainers don't want them
+    # TODO: in final, remove type hints if maintainers don't want them
     @staticmethod
     def compare_archives_iter(
-        archive1: 'Archive', 
-        archive2: 'Archive', 
-        matcher=None, 
+        archive1: 'Archive',
+        archive2: 'Archive',
+        matcher=None,
         can_compare_chunk_ids=False
     ) -> Iterator[ItemDiff]:
         """

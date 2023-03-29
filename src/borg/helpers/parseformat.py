@@ -654,7 +654,7 @@ class BaseFormatter(metaclass=abc.ABCMeta):
         "SPACE": "space character",
         "TAB": "tab character",
         "CR": "carriage return character",
-        "LF": "line feed character"
+        "LF": "line feed character",
     }
     KEY_GROUPS: ClassVar[Tuple[Tuple[str, ...], ...]] = (
         ("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),
@@ -673,7 +673,7 @@ class BaseFormatter(metaclass=abc.ABCMeta):
             self.item_data = {}
             return json.dumps(self.get_item_data(item, jsonline), cls=BorgJsonEncoder, sort_keys=sort) + "\n"
         return self.format.format_map(self.get_item_data(item, jsonline))
-    
+
     @classmethod
     def available_keys(cls) -> List[str]:
         result = set()
@@ -757,7 +757,7 @@ class ArchiveFormatter(BaseFormatter):
         self.name = archive_info.name
         self.id = archive_info.id
         item_data = {}
-        item_data.update(self.item_data)
+        item_data.update({} if jsonline else self.item_data)
         item_data.update(
             {
                 "name": archive_info.name,
@@ -836,7 +836,6 @@ class ItemFormatter(BaseFormatter):
         keys.extend(formatter.get_item_data(fake_item).keys())
         return keys
 
-
     @classmethod
     def format_needs_cache(cls, format):
         format_keys = {f[1] for f in Formatter().parse(format)}
@@ -908,7 +907,7 @@ class ItemFormatter(BaseFormatter):
 
         item: The item to sum its unique chunks' metadata
         metadata_func: A function that takes a parameter of type ChunkIndexEntry and returns a number, used to return
-                       the metadata needed from the chunk
+        the metadata needed from the chunk
         """
         chunk_index = self.archive.cache.chunks
         chunks = item.get("chunks", [])
@@ -938,7 +937,6 @@ class ItemFormatter(BaseFormatter):
 
     def format_iso_time(self, key, item):
         return self.format_time(key, item).isoformat()
-
 
 
 class DiffFormatter(BaseFormatter):
@@ -976,7 +974,7 @@ class DiffFormatter(BaseFormatter):
         static_keys = {}  # here could be stuff on repo level, above archive level
         static_keys.update(self.FIXED_KEYS)
         super().__init__(partial_format(format, static_keys))
-        
+
         self.item_data = static_keys
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
@@ -998,12 +996,12 @@ class DiffFormatter(BaseFormatter):
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
-    def get_item_data(self, item: 'ItemDiff', jsonline=False) -> dict:
+    def get_item_data(self, item: "ItemDiff", jsonline=False) -> dict:
         diff_data = {}
 
         for key in self.used_call_keys:
             diff_data[key] = self.call_keys[key](item)
-        
+
         change = []
         for key in self.call_keys:
             if key in ("isomtime", "isoctime"):
@@ -1013,58 +1011,61 @@ class DiffFormatter(BaseFormatter):
         diff_data["path"] = item.path
         diff_data.update(self.item_data)
         return diff_data
-    
-    def format_other(self, key, diff: 'ItemDiff'):
+
+    def format_other(self, key, diff: "ItemDiff"):
         if key in diff.changes():
             return f"{diff.changes()[key].flag}".ljust(27)
         return ""
-    
-    def format_mode(self, diff: 'ItemDiff', ft=False):
+
+    def format_mode(self, diff: "ItemDiff", ft=False):
         change = diff.type() if ft else diff.mode()
         if change:
             return f"[{change.origin['past']} -> {change.origin['current']}]"
         return ""
 
-    def format_owner(self, diff: 'ItemDiff', spec='owner'):
-        if spec != 'owner':
-            change = diff.group() if spec == 'group' else diff.user()
+    def format_owner(self, diff: "ItemDiff", spec="owner"):
+        if spec != "owner":
+            change = diff.group() if spec == "group" else diff.user()
             if change:
                 return f"[{change.origin['past']} -> {change.origin['current']}]"
         change = diff.owner()
         if change:
             return "[{}:{} -> {}:{}]".format(
-                change.origin['past'][0], change.origin['past'][1],
-                change.origin['current'][0], change.origin['current'][1]
+                change.origin["past"][0],
+                change.origin["past"][1],
+                change.origin["current"][0],
+                change.origin["current"][1],
             )
         return ""
 
-    def format_content(self, diff: 'ItemDiff'):
+    def format_content(self, diff: "ItemDiff"):
         change = diff.content()
         if change:
             if change.flag == "added":
-                return "{}: {:>20}".format(change.flag, format_file_size(change.origin['added']))
+                return "{}: {:>20}".format(change.flag, format_file_size(change.origin["added"]))
             if change.flag == "removed":
-                return "{}: {:>18}".format(change.flag, format_file_size(change.origin['removed']))
-            if 'added' not in change.origin and 'removed' not in change.origin:
+                return "{}: {:>18}".format(change.flag, format_file_size(change.origin["removed"]))
+            if "added" not in change.origin and "removed" not in change.origin:
                 return "modified:  (can't get size)"
             return "{}: {:>8} {:>8}".format(
                 change.flag,
-                format_file_size(change.origin['added'], precision=1, sign=True),
-                format_file_size(-change.origin['removed'], precision=1, sign=True)
+                format_file_size(change.origin["added"], precision=1, sign=True),
+                format_file_size(-change.origin["removed"], precision=1, sign=True),
             )
         return ""
 
-    def format_time(self, key, diff: 'ItemDiff'):
+    def format_time(self, key, diff: "ItemDiff"):
         if key in diff.changes():
             change = diff.changes()[key]
             return f"[{key}: {change.origin['past']} -> {change.origin['current']}]"
         return ""
-    
-    def format_iso_time(self, key, diff: 'ItemDiff'):
+
+    def format_iso_time(self, key, diff: "ItemDiff"):
         if key in diff.changes():
             change = diff.changes()[key]
             return f"[iso{key}: {change.origin['past'].isoformat()} -> {change.origin['current'].isoformat()}]"
         return ""
+
 
 def file_status(mode):
     if stat.S_ISREG(mode):

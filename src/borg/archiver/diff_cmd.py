@@ -2,7 +2,6 @@ import argparse
 import textwrap
 import json
 import sys
-from typing import Dict
 
 from ._common import with_repository, with_archive, build_matcher
 from ..archive import Archive
@@ -10,7 +9,6 @@ from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator
 from ..manifest import Manifest
 from ..helpers.parseformat import BorgJsonEncoder
-from ..item import ItemDiff
 from ..logger import create_logger
 
 logger = create_logger()
@@ -43,7 +41,7 @@ class DiffMixIn:
             )
 
         matcher = build_matcher(args.patterns, args.paths)
-        
+
         diffs_iter = Archive.compare_archives_iter(
             archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids
         )
@@ -52,13 +50,25 @@ class DiffMixIn:
 
         if args.sort:
             diffs_list.sort(key=lambda diff: diff.path)
-        
+
         formatter = DiffFormatter(format)
         for diff in diffs_list:
             if args.content_only and not diff.content():
                 continue
             if args.json_lines:
-                print(json.dumps({"path": diff.path, "changes": [change.to_dict() for change in diff.changes().values()]}, sort_keys=True, cls=BorgJsonEncoder))
+                print(
+                    json.dumps(
+                        {
+                            "path": diff.path,
+                            "changes": [
+                                change.to_dict()
+                                for change in diff.changes().values()
+                            ]
+                        },
+                        sort_keys=True,
+                        cls=BorgJsonEncoder,
+                    )
+                )
             else:
                 res: str = formatter.format_item(diff)
                 if res.strip():
@@ -157,8 +167,7 @@ class DiffMixIn:
             "--format",
             metavar="FORMAT",
             dest="format",
-            help="specify format for differences between archives"
-            '(default: "{content:<19} {mtime} {path}{NL}")',
+            help="specify format for differences between archives" '(default: "{content:<19} {mtime} {path}{NL}")',
         )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")
         subparser.add_argument(

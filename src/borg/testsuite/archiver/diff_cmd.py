@@ -74,7 +74,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         def do_asserts(output, can_compare_ids, content_only=False):
             lines: list = output.splitlines()
             assert "file_replaced" in output  # added to debug #3494
-            self.assert_line_exists(lines, f"modified.*input/file_replaced")
+            self.assert_line_exists(lines, "modified.*input/file_replaced")
 
             # File unchanged
             assert "input/file_unchanged" not in output
@@ -98,7 +98,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 assert "input/link_replaced_by_file" in output
 
                 # Symlink target removed. Should not affect the symlink at all.
-                assert "input/link_target_removed" in output  # FIXME: Not sure cause of time
+                assert not "input/link_target_removed" in output
 
             # The inode has two links and the file contents changed. Borg
             # should notice the changes in both links. However, the symlink
@@ -129,12 +129,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 # Another link (marked previously as the source in borg) to the
                 # same inode was removed. This should only change the ctime since removing
                 # the link would result in the decrementation of the inode's hard-link count.
-                assert "input/hardlink_target_removed" in output  # FIXME: Not sure cause of time
+                assert not "input/hardlink_target_removed" in output
 
                 # Another link (marked previously as the source in borg) to the
                 # same inode was replaced with a new regular file. This should only change
                 # its ctime. This should not be reflected in the output if content-only is set
-                assert "input/hardlink_target_replaced" in output  # FIXME: Not sure cause of time
+                assert not "input/hardlink_target_replaced" in output
 
         def do_json_asserts(output, can_compare_ids, content_only=False):
             def get_changes(filename, data):
@@ -182,7 +182,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                     ), get_changes("input/link_replaced_by_file", joutput)
 
                 # Symlink target removed. Should not affect the symlink at all.
-                assert any(get_changes("input/link_target_removed", joutput))  # FIXME: Not sure cause of time
+                assert not any(get_changes("input/link_target_removed", joutput))
 
             # The inode has two links and the file contents changed. Borg
             # should notice the changes in both links. However, the symlink
@@ -213,18 +213,32 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 # Another link (marked previously as the source in borg) to the
                 # same inode was removed. This should only change the ctime since removing
                 # the link would result in the decrementation of the inode's hard-link count.
-                assert any(get_changes("input/hardlink_target_removed", joutput))  # FIXME: Not sure cause of time
+                assert not any(get_changes("input/hardlink_target_removed", joutput))
 
                 # Another link (marked previously as the source in borg) to the
                 # same inode was replaced with a new regular file. This should only change
                 # its ctime. This should not be reflected in the output if content-only is set
-                assert any(get_changes("input/hardlink_target_replaced", joutput))  # FIXME: Not sure cause of time
+                assert not any(get_changes("input/hardlink_target_replaced", joutput))
 
-        output = self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1a", "--format", "'{content}{link}{directory}{mode} {path}{NL}'")
+        output = self.cmd(
+            f"--repo={self.repository_location}",
+            "diff",
+            "test0",
+            "test1a",
+            "--format",
+            "'{content}{link}{directory}{mode} {path}{NL}'",
+        )
         do_asserts(output, True)
         # We expect exit_code=1 due to the chunker params warning
         output = self.cmd(
-            f"--repo={self.repository_location}", "diff", "test0", "test1b", "--content-only", "--format", "'{content}{link}{directory}{mode} {path}{NL}'", exit_code=1
+            f"--repo={self.repository_location}",
+            "diff",
+            "test0",
+            "test1b",
+            "--content-only",
+            "--format",
+            "'{content}{link}{directory}{mode} {path}{NL}'",
+            exit_code=1,
         )
         do_asserts(output, False, content_only=True)
 
@@ -249,14 +263,28 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             time.sleep(1)  # HFS has a 1s timestamp granularity
         self.create_regular_file("test_file", size=15)
         self.cmd(f"--repo={self.repository_location}", "create", "archive2", "input")
-        output = self.cmd(f"--repo={self.repository_location}", "diff", "archive1", "archive2", "--format", "'{mtime}{ctime} {path}{NL}'")
+        output = self.cmd(
+            f"--repo={self.repository_location}",
+            "diff",
+            "archive1",
+            "archive2",
+            "--format",
+            "'{mtime}{ctime} {path}{NL}'",
+        )
         self.assert_in("mtime", output)
         self.assert_in("ctime", output)  # Should show up on windows as well since it is a new file.
         if is_darwin:
             time.sleep(1)  # HFS has a 1s timestamp granularity
         os.chmod("input/test_file", 0o777)
         self.cmd(f"--repo={self.repository_location}", "create", "archive3", "input")
-        output = self.cmd(f"--repo={self.repository_location}", "diff", "archive2", "archive3", "--format", "'{mtime}{ctime} {path}{NL}'")
+        output = self.cmd(
+            f"--repo={self.repository_location}",
+            "diff",
+            "archive2",
+            "archive3",
+            "--format",
+            "'{mtime}{ctime} {path}{NL}'",
+        )
         self.assert_not_in("mtime", output)
         # Checking platform because ctime should not be shown on windows since it wasn't recreated.
         if not is_win32:

@@ -58,13 +58,7 @@ class DiffMixIn:
             if args.json_lines:
                 print(
                     json.dumps(
-                        {
-                            "path": diff.path,
-                            "changes": [
-                                change.to_dict()
-                                for change in diff.changes().values()
-                            ]
-                        },
+                        {"path": diff.path, "changes": [change.to_dict() for change in diff.changes().values()]},
                         sort_keys=True,
                         cls=BorgJsonEncoder,
                     )
@@ -102,7 +96,7 @@ class DiffMixIn:
         Note that the chunker params changed from Borg 0.xx to 1.0.
 
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
-        
+
         .. man NOTES
 
         The FORMAT specifier syntax

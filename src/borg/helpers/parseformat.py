@@ -656,9 +656,7 @@ class BaseFormatter(metaclass=abc.ABCMeta):
         "CR": "carriage return character",
         "LF": "line feed character",
     }
-    KEY_GROUPS: ClassVar[Tuple[Tuple[str, ...], ...]] = (
-        ("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),
-    )
+    KEY_GROUPS: ClassVar[Tuple[Tuple[str, ...], ...]] = (("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),)
 
     def __init__(self, format: str) -> None:
         self.format = format

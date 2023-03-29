@@ -98,7 +98,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 assert "input/link_replaced_by_file" in output
 
                 # Symlink target removed. Should not affect the symlink at all.
-                assert not "input/link_target_removed" in output
+                assert "input/link_target_removed" not in output
 
             # The inode has two links and the file contents changed. Borg
             # should notice the changes in both links. However, the symlink
@@ -129,12 +129,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 # Another link (marked previously as the source in borg) to the
                 # same inode was removed. This should only change the ctime since removing
                 # the link would result in the decrementation of the inode's hard-link count.
-                assert not "input/hardlink_target_removed" in output
+                assert "input/hardlink_target_removed" not in output
 
                 # Another link (marked previously as the source in borg) to the
                 # same inode was replaced with a new regular file. This should only change
                 # its ctime. This should not be reflected in the output if content-only is set
-                assert not "input/hardlink_target_replaced" in output
+                assert "input/hardlink_target_replaced" not in output
 
         def do_json_asserts(output, can_compare_ids, content_only=False):
             def get_changes(filename, data):

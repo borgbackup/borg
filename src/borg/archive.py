@@ -1099,10 +1099,7 @@ Duration: {0.duration}
     # TODO: in final, remove type hints if maintainers don't want them
     @staticmethod
     def compare_archives_iter(
-        archive1: 'Archive',
-        archive2: 'Archive',
-        matcher=None,
-        can_compare_chunk_ids=False
+        archive1: "Archive", archive2: "Archive", matcher=None, can_compare_chunk_ids=False
     ) -> Iterator[ItemDiff]:
         """
         Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.

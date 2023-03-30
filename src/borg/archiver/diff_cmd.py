@@ -22,7 +22,7 @@ class DiffMixIn:
         if args.content_only:
             format = "{content}{link}{directory}{blkdev}{chrdev}{fifo} {path}{NL}"
         else:
-            format = args.format or "{change} {mtime} {path}{NL}"
+            format = args.format or "{change} {path}{NL}"
 
         archive1 = archive
         archive2 = Archive(manifest, args.other_name)
@@ -59,8 +59,7 @@ class DiffMixIn:
                             "changes": [
                                 change.to_dict()
                                 for name, change in diff.changes().items()
-                                if not args.content_only
-                                or (name in DiffFormatter.CONTENT)
+                                if not args.content_only or (name in DiffFormatter.CONTENT)
                             ],
                         },
                         sort_keys=True,
@@ -112,13 +111,13 @@ class DiffMixIn:
         Examples:
         ::
 
-            $ borg diff --format '{content:18} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            $ borg diff --format '{content:18} {path}{NL}' ArchiveFoo ArchiveBar
             modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
             ...
 
             # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
             # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
-            $ borg diff --format '{content:<18} {mtime} {path}{NL}' ArchiveFoo ArchiveBar
+            $ borg diff --format '{content:<18} {path}{NL}' ArchiveFoo ArchiveBar
             modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
             ...
 

@@ -9,11 +9,11 @@ import re
 import shlex
 import stat
 import uuid
-from typing import List, Dict, Tuple, ClassVar, Any, TYPE_CHECKING
+from typing import List, Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING
 from binascii import hexlify
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
-from functools import partial
+from functools import partial, lru_cache
 from string import Formatter
 
 from ..logger import create_logger
@@ -673,8 +673,9 @@ class BaseFormatter(metaclass=abc.ABCMeta):
         return self.format.format_map(self.get_item_data(item, jsonline))
 
     @classmethod
+    @lru_cache(4096)
     def available_keys(cls) -> List[str]:
-        result = set()
+        result: Set[str] = set()
         result.update(cls.KEY_DESCRIPTIONS.keys())
         result.update([key for group in cls.KEY_GROUPS for key in group])
         return list(result) + list(cls.FIXED_KEYS.keys())
@@ -719,6 +720,7 @@ class ArchiveFormatter(BaseFormatter):
     )
 
     @classmethod
+    @lru_cache(4096)
     def available_keys(cls):
         from ..manifest import ArchiveInfo
 
@@ -821,6 +823,7 @@ class ItemFormatter(BaseFormatter):
     KEYS_REQUIRING_CACHE = ("dsize", "unique_chunks")
 
     @classmethod
+    @lru_cache(4096)
     def available_keys(cls):
         class FakeArchive:
             fpr = name = ""
@@ -954,8 +957,10 @@ class DiffFormatter(BaseFormatter):
         ("link", "directory", "blkdev", "chrdev", "fifo"),
         ("mtime", "ctime", "isomtime", "isoctime"),
     )
+    CONTENT = ("content", "link", "directory", "blkdev", "chrdev", "fifo")
 
     @classmethod
+    @lru_cache(4096)
     def available_keys(cls):
         from ..item import Item, ItemDiff
 
@@ -968,11 +973,13 @@ class DiffFormatter(BaseFormatter):
         keys.extend(formatter.get_item_data(fake_diff).keys())
         return keys
 
-    def __init__(self, format):
+    def __init__(self, format, content_only=False):
         static_keys = {}  # here could be stuff on repo level, above archive level
         static_keys.update(self.FIXED_KEYS)
-        super().__init__(partial_format(format, static_keys))
-
+        super().__init__(
+            partial_format(format or "{content}{link}{directory}{blkdev}{chrdev}{fifo} {path}{NL}", static_keys)
+        )
+        self.content_only = content_only
         self.item_data = static_keys
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
@@ -996,7 +1003,8 @@ class DiffFormatter(BaseFormatter):
 
     def get_item_data(self, item: "ItemDiff", jsonline=False) -> dict:
         diff_data = {}
-
+        if self.content_only and all(key not in item.changes() for key in self.CONTENT):
+            return {key: "" for key in self.available_keys()}
         for key in self.used_call_keys:
             diff_data[key] = self.call_keys[key](item)
 

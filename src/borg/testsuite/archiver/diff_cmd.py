@@ -84,8 +84,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 self.assert_line_exists(lines, "[drwxr-xr-x -> -rwxr-xr-x].*input/dir_replaced_with_file")
 
             # Basic directory cases
-            assert "added directory             input/dir_added" in output
-            assert "removed directory           input/dir_removed" in output
+            assert "added directory              input/dir_added" in output
+            assert "removed directory            input/dir_removed" in output
 
             if are_symlinks_supported():
                 # Basic symlink cases
@@ -112,18 +112,18 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
             # Added a new file and a hard link to it. Both links to the same
             # inode should appear as separate files.
-            assert "added:              2.05 kB input/file_added" in output
+            assert "added:              2.05 kB  input/file_added" in output
             if are_hardlinks_supported():
-                assert "added:              2.05 kB input/hardlink_added" in output
+                assert "added:              2.05 kB  input/hardlink_added" in output
 
             # check if a diff between nonexistent and empty new file is found
-            assert "added:                  0 B input/file_empty_added" in output
+            assert "added:                  0 B  input/file_empty_added" in output
 
             # The inode has two links and both of them are deleted. They should
             # appear as two deleted files.
-            assert "removed:              256 B input/file_removed" in output
+            assert "removed:              256 B  input/file_removed" in output
             if are_hardlinks_supported():
-                assert "removed:              256 B input/hardlink_removed" in output
+                assert "removed:              256 B  input/hardlink_removed" in output
 
             if are_hardlinks_supported() and content_only:
                 # Another link (marked previously as the source in borg) to the
@@ -306,6 +306,9 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             "e_file_changed",
             "f_file_removed",
         ]
+        assert isinstance(output, str)
+        outputs = output.splitlines()
+        assert len(outputs) == len(expected)
         assert all(x in line for x, line in zip(expected, output.splitlines()))
 
 

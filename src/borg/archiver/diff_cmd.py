@@ -49,7 +49,7 @@ class DiffMixIn:
         if args.sort:
             diffs_list.sort(key=lambda diff: diff.path)
 
-        formatter = DiffFormatter(format)
+        formatter = DiffFormatter(format, args.content_only)
         for diff in diffs_list:
             if args.json_lines:
                 print(
@@ -60,7 +60,7 @@ class DiffMixIn:
                                 change.to_dict()
                                 for name, change in diff.changes().items()
                                 if not args.content_only
-                                or (name in ("content", "link", "directory", "blkdev", "chrdev", "fifo"))
+                                or (name in DiffFormatter.CONTENT)
                             ],
                         },
                         sort_keys=True,

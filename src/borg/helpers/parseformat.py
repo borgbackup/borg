@@ -13,7 +13,7 @@ from typing import List, Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING
 from binascii import hexlify
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
-from functools import partial, lru_cache
+from functools import partial
 from string import Formatter
 
 from ..logger import create_logger
@@ -673,7 +673,6 @@ class BaseFormatter(metaclass=abc.ABCMeta):
         return self.format.format_map(self.get_item_data(item, jsonline))
 
     @classmethod
-    @lru_cache(4096)
     def available_keys(cls) -> List[str]:
         result: Set[str] = set()
         result.update(cls.KEY_DESCRIPTIONS.keys())
@@ -720,7 +719,6 @@ class ArchiveFormatter(BaseFormatter):
     )
 
     @classmethod
-    @lru_cache(4096)
     def available_keys(cls):
         from ..manifest import ArchiveInfo
 
@@ -823,7 +821,6 @@ class ItemFormatter(BaseFormatter):
     KEYS_REQUIRING_CACHE = ("dsize", "unique_chunks")
 
     @classmethod
-    @lru_cache(4096)
     def available_keys(cls):
         class FakeArchive:
             fpr = name = ""
@@ -960,7 +957,6 @@ class DiffFormatter(BaseFormatter):
     CONTENT = ("content", "link", "directory", "blkdev", "chrdev", "fifo")
 
     @classmethod
-    @lru_cache(4096)
     def available_keys(cls):
         from ..item import Item, ItemDiff
 
@@ -1004,7 +1000,7 @@ class DiffFormatter(BaseFormatter):
     def get_item_data(self, item: "ItemDiff", jsonline=False) -> dict:
         diff_data = {}
         if self.content_only and all(key not in item.changes() for key in self.CONTENT):
-            return {key: "" for key in self.available_keys()}
+            return {key: "" for key in [*self.used_call_keys, "path", "change", *self.item_data.keys()]}
         for key in self.used_call_keys:
             diff_data[key] = self.call_keys[key](item)
 

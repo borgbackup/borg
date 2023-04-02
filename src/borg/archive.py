@@ -885,7 +885,7 @@ Duration: {0.duration}
                     item_size = item.size
                     if item_size != item_chunks_size:
                         raise BackupError(
-                            "Size inconsistency detected: size {}, chunks size {}".format(item_size, item_chunks_size)
+                            f"Size inconsistency detected: size {item_size}, chunks size {item_chunks_size}"
                         )
                 if has_damaged_chunks:
                     raise BackupError("File has damaged (all-zero) chunks. Try running borg check --repair.")

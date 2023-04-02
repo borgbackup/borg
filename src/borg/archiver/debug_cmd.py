@@ -244,7 +244,7 @@ class DebugMixIn:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print("object id %s is invalid [%s]." % (hex_id, str(err)))
+            print(f"object id {hex_id} is invalid [{str(err)}].")
             return EXIT_ERROR
         try:
             data = repository.get(id)
@@ -277,7 +277,7 @@ class DebugMixIn:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print("object id %s is invalid [%s]." % (hex_id, str(err)))
+            print(f"object id {hex_id} is invalid [{str(err)}].")
             return EXIT_ERROR
 
         with open(args.object_path, "rb") as f:
@@ -305,13 +305,13 @@ class DebugMixIn:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print("object id %s is invalid [%s]." % (hex_id, str(err)))
+            print(f"object id {hex_id} is invalid [{str(err)}].")
             return EXIT_ERROR
 
         with open(args.binary_path, "rb") as f:
             data = f.read()
 
-        with open(args.json_path, "r") as f:
+        with open(args.json_path) as f:
             meta = json.load(f)
 
         repo_objs = manifest.repo_objs
@@ -332,7 +332,7 @@ class DebugMixIn:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print("object id %s is invalid [%s]." % (hex_id, str(err)))
+            print(f"object id {hex_id} is invalid [{str(err)}].")
             return EXIT_ERROR
         repository.put(id, data)
         print("object %s put." % hex_id)

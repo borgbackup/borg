@@ -156,9 +156,7 @@ class PruneMixIn:
                             rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
                         )
                 if args.output_list:
-                    list_logger.info(
-                        "{message:<40} {archive}".format(message=log_message, archive=format_archive(archive))
-                    )
+                    list_logger.info(f"{log_message:<40} {format_archive(archive)}")
             pi.finish()
             if sig_int:
                 # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.

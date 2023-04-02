@@ -426,11 +426,11 @@ Parentheses are not needed when using a dedicated bash process.
 Remote forwarding
 =================
 
-The ssh client allows to create tunnels to forward local ports to a remote server and also to allow remote ports to
-be forwarded to local ports.borg
+The standard ssh client allows to create tunnels to forward local ports to a remote server (local forwarding) and also
+to allow remote ports to be forwarded to local ports (remote forwarding).
 
 This remote forwarding can be used to allow remote backup clients to access the backup server even if the backup server
-usually cannot be reached by the backup client.
+cannot be reached by the backup client.
 
 This can even be used in cases where neither the backup server can reach the backup client and the backup client cannot
 reach the backup server, but some intermediate host can access both.
@@ -443,7 +443,7 @@ A schematic approach is as follows
 
                                               1. Establish SSH remote forwarding  ----------->  SSH listen on local port
 
-                                                                                                2. Starting borg create establishes
+                                                                                                2. Starting ``borg create`` establishes
                                               3. SSH forwards to intermediate machine  <------- SSH connection to the local port
       4. Receives backup connection <-------  and further on to backup server
       via SSH
@@ -453,26 +453,26 @@ performed via ssh.
 
 In order to achieve this, the following commands can be used to create the remote port forwarding:
 
-1. On machine `myinter`
+1. On machine ``myinter``
 
 ``ssh bob@myclient -v -C -R 8022:mybackup:22 -N``
 
-This will listen for ssh-connections on port `8022` on `myclient` and forward connections to port 22 on `mybackup`.
+This will listen for ssh-connections on port ``8022`` on ``myclient`` and forward connections to port 22 on ``mybackup``.
 
-You can also remove the need for machine `myinter` and create the port forwarding on the backup server directly by
-using `localhost` instead of `mybackup`
+You can also remove the need for machine ``myinter`` and create the port forwarding on the backup server directly by
+using ``localhost`` instead of ``mybackup``
 
-2. On machine `myclient`
+2. On machine ``myclient``
 
 ``borg create -v --progress --stats ssh://backup@localhost:8022/home/backup/repos/myclient /``
 
-Make sure to use port `8022` and `localhost` for the repository as this instructs borg on `myclient` to use the
+Make sure to use port ``8022`` and ``localhost`` for the repository as this instructs borg on ``myclient`` to use the
 remote forwarded ssh connection.
 
 SSH Keys
 ~~~~~~~~
 
-If you want to automate backups when using this method, the ssh `known_hosts` and `authorized_keys` need to be set up
+If you want to automate backups when using this method, the ssh ``known_hosts`` and ``authorized_keys`` need to be set up
 to allow connections.
 
 Security Considerations
@@ -483,3 +483,11 @@ backup server on the client even if it is located outside of your company networ
 
 All the additional security considerations for borg should be applied, see :ref:`central-backup-server` for some additional
 hints.
+
+More information
+~~~~~~~~~~~~~~~~
+
+See `remote forwarding`_ and the `ssh man page`_ for more information about remote forwarding.
+
+   .. _remote forwarding: https://linuxize.com/post/how-to-setup-ssh-tunneling/
+   .. _ssh man page: https://manpages.debian.org/testing/manpages-de/ssh.1.de.html

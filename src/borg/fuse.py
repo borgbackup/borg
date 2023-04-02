@@ -562,14 +562,14 @@ class FuseOperations(llfuse.Operations, FuseBackend):
     @async_wrapper
     def statfs(self, ctx=None):
         stat_ = llfuse.StatvfsData()
-        stat_.f_bsize = 512
-        stat_.f_frsize = 512
-        stat_.f_blocks = 0
-        stat_.f_bfree = 0
-        stat_.f_bavail = 0
-        stat_.f_files = 0
-        stat_.f_ffree = 0
-        stat_.f_favail = 0
+        stat_.f_bsize = 512  # Filesystem block size
+        stat_.f_frsize = 512  # Fragment size
+        stat_.f_blocks = 0  # Size of fs in f_frsize units
+        stat_.f_bfree = 0  # Number of free blocks
+        stat_.f_bavail = 0  # Number of free blocks for unprivileged users
+        stat_.f_files = 0  # Number of inodes
+        stat_.f_ffree = 0  # Number of free inodes
+        stat_.f_favail = 0  # Number of free inodes for unprivileged users
         stat_.f_namemax = 255  # == NAME_MAX (depends on archive source OS / FS)
         return stat_
 

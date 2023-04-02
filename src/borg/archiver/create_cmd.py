@@ -819,7 +819,8 @@ class CreateMixIn:
             "--one-file-system",
             dest="one_file_system",
             action="store_true",
-            help="stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.",
+            help="stay in the same file system and do not store mount points of other file systems - "
+            "this might behave different from your expectations, see the description below.",
         )
         fs_group.add_argument(
             "--numeric-ids",

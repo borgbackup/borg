@@ -481,6 +481,17 @@ Security Considerations
 Opening up SSH access this way can pose a security risk as it effectively opens remote access to your
 backup server on the client even if it is located outside of your company network.
 
+To reduce the chances of compromise, you should configure a forced command in ``authorized_keys`` to prevent
+anyone from performing any other action on the backup server.
+
+This can be done e.g. by adding the following in ``$HOME/.ssh/authorized_keys`` on ``mybackup`` with proper
+path and client-fqdn:
+
+::
+
+  command="cd /home/backup/repos/<client fqdn>;borg serve --restrict-to-path /home/backup/repos/<client fqdn>"
+
+
 All the additional security considerations for borg should be applied, see :ref:`central-backup-server` for some additional
 hints.
 

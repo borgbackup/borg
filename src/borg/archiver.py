@@ -3580,7 +3580,8 @@ class Archiver:
 
         fs_group = subparser.add_argument_group('Filesystem options')
         fs_group.add_argument('-x', '--one-file-system', dest='one_file_system', action='store_true',
-                              help='stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.')
+                              help='stay in the same file system and do not store mount points of other file systems - '
+                              'this might behave different from your expectations, see the description below.')
         fs_group.add_argument('--numeric-owner', dest='numeric_ids', action='store_true',
                               help='deprecated, use ``--numeric-ids`` instead')
         fs_group.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',

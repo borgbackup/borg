@@ -455,9 +455,12 @@ In order to achieve this, the following commands can be used to create the remot
 
 1. On machine `myinter`
 
-``ssh bob@myclient -v -C -R 8022:myclient:22 -N``
+``ssh bob@myclient -v -C -R 8022:mybackup:22 -N``
 
-This will listen for ssh-connections on port `8022` on `myclient`.
+This will listen for ssh-connections on port `8022` on `myclient` and forward connections to port 22 on `mybackup`.
+
+You can also remove the need for machine `myinter` and create the port forwarding on the backup server directly by
+using `localhost` instead of `mybackup`
 
 2. On machine `myclient`
 

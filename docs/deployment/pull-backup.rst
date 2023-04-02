@@ -464,7 +464,7 @@ using `localhost` instead of `mybackup`
 
 2. On machine `myclient`
 
-``borg create -v --progress --stats ssh://backup@localhost:8022/home/backup/repos/dogado /``
+``borg create -v --progress --stats ssh://backup@localhost:8022/home/backup/repos/myclient /``
 
 Make sure to use port `8022` and `localhost` for the repository as this instructs borg on `myclient` to use the
 remote forwarded ssh connection.

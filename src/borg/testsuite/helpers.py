@@ -45,7 +45,7 @@ from ..helpers import eval_escapes
 from ..helpers import safe_unlink
 from ..helpers import text_to_json, binary_to_json
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
-from ..platform import is_cygwin, is_win32, is_darwin
+from ..platform import is_cygwin, is_win32, is_darwin, swidth
 
 from . import BaseTestCase, FakeInputs, are_hardlinks_supported
 
@@ -1015,6 +1015,29 @@ def test_progress_percentage_sameline(capfd, monkeypatch):
     pi.finish()
     out, err = capfd.readouterr()
     assert err == " " * 4 + "\r"
+
+
+@pytest.mark.skipif(is_win32, reason="no working swidth() implementation on this platform")
+def test_progress_percentage_widechars(capfd, monkeypatch):
+    st = "スター・トレック"  # "startrek" :-)
+    assert swidth(st) == 16
+    path = "/カーク船長です。"  # "Captain Kirk"
+    assert swidth(path) == 17
+    spaces = " " * 4  # to avoid usage of "..."
+    width = len("100%") + 1 + swidth(st) + 1 + swidth(path) + swidth(spaces)
+    monkeypatch.setenv("COLUMNS", str(width))
+    monkeypatch.setenv("LINES", "1")
+    pi = ProgressIndicatorPercent(100, step=5, start=0, msg=f"%3.0f%% {st} %s")
+    pi.logger.setLevel("INFO")
+    pi.show(0, info=[path])
+    out, err = capfd.readouterr()
+    assert err == f"  0% {st} {path}{spaces}\r"
+    pi.show(100, info=[path])
+    out, err = capfd.readouterr()
+    assert err == f"100% {st} {path}{spaces}\r"
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == " " * width + "\r"
 
 
 def test_progress_percentage_step(capfd, monkeypatch):

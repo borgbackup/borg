@@ -130,12 +130,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 # Another link (marked previously as the source in borg) to the
                 # same inode was removed. This should only change the ctime since removing
                 # the link would result in the decrementation of the inode's hard-link count.
-                assert "input/hardlink_target_removed" in output  # FIXME: unknown perf in other platforms
+                assert "input/hardlink_target_removed" not in output
 
                 # Another link (marked previously as the source in borg) to the
                 # same inode was replaced with a new regular file. This should only change
                 # its ctime. This should not be reflected in the output if content-only is set
-                assert "input/hardlink_target_replaced" in output  # FIXME: unknown perf in other platforms
+                assert "input/hardlink_target_replaced" not in output
 
         def do_json_asserts(output, can_compare_ids, content_only=False):
             def get_changes(filename, data):
@@ -156,7 +156,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
             # Directory replaced with a regular file
             if "BORG_TESTS_IGNORE_MODES" not in os.environ and not is_win32 and not content_only:
-                assert {"type": "changed mode", "past": "drwxr-xr-x", "current": "-rwxr-xr-x"} in get_changes(
+                assert {"type": "changed mode", "item1": "drwxr-xr-x", "item2": "-rwxr-xr-x"} in get_changes(
                     "input/dir_replaced_with_file", joutput
                 )
 
@@ -174,11 +174,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
                 if not content_only:
                     assert any(
-                        chg["type"] == "changed mode" and chg["current"].startswith("l")
+                        chg["type"] == "changed mode" and chg["item1"].startswith("d") and chg["item2"].startswith("l")
                         for chg in get_changes("input/dir_replaced_with_link", joutput)
                     ), get_changes("input/dir_replaced_with_link", joutput)
                     assert any(
-                        chg["type"] == "changed mode" and chg["past"].startswith("l")
+                        chg["type"] == "changed mode" and chg["item1"].startswith("l") and chg["item2"].startswith("-")
                         for chg in get_changes("input/link_replaced_by_file", joutput)
                     ), get_changes("input/link_replaced_by_file", joutput)
 
@@ -214,12 +214,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 # Another link (marked previously as the source in borg) to the
                 # same inode was removed. This should only change the ctime since removing
                 # the link would result in the decrementation of the inode's hard-link count.
-                assert any(get_changes("input/hardlink_target_removed", joutput))
+                assert not any(get_changes("input/hardlink_target_removed", joutput))
 
                 # Another link (marked previously as the source in borg) to the
                 # same inode was replaced with a new regular file. This should only change
                 # its ctime. This should not be reflected in the output if content-only is set
-                assert any(get_changes("input/hardlink_target_replaced", joutput))
+                assert not any(get_changes("input/hardlink_target_replaced", joutput))
 
         output = self.cmd(f"--repo={self.repository_location}", "diff", "test0", "test1a")
         do_asserts(output, True)

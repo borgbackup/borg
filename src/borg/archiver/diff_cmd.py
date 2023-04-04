@@ -44,7 +44,7 @@ class DiffMixIn:
             archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids
         )
         # Conversion to string and filtering for diff.equal to save memory if sorting
-        diffs_list = [diff for diff in diffs_iter if not diff.equal]
+        diffs_list = [diff for diff in diffs_iter if not diff.equal(args.content_only)]
 
         if args.sort:
             diffs_list.sort(key=lambda diff: diff.path)
@@ -59,7 +59,7 @@ class DiffMixIn:
                             "changes": [
                                 change.to_dict()
                                 for name, change in diff.changes().items()
-                                if not args.content_only or (name in DiffFormatter.CONTENT)
+                                if not args.content_only or (name not in DiffFormatter.NOT_CONTENT)
                             ],
                         },
                         sort_keys=True,
@@ -85,7 +85,7 @@ class DiffMixIn:
                 """
         This command finds differences (file contents, user/group/mode) between archives.
 
-        A repository location and an archive name must be specified for REPO::ARCHIVE1.
+        A repository location and an archive name must be specified for ARCHIVE1.
         ARCHIVE2 is just another archive name in same repository (no repository location
         allowed).
 
@@ -111,14 +111,14 @@ class DiffMixIn:
         Examples:
         ::
 
-            $ borg diff --format '{content:18} {path}{NL}' ArchiveFoo ArchiveBar
-            modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
+            $ borg diff --format '{content:30} {path}{NL}' ArchiveFoo ArchiveBar
+            modified:  +4.1 kB  -1.0 kB    file-diff
             ...
 
             # {VAR:<NUMBER} - pad to NUMBER columns left-aligned.
             # {VAR:>NUMBER} - pad to NUMBER columns right-aligned.
-            $ borg diff --format '{content:<18} {path}{NL}' ArchiveFoo ArchiveBar
-            modified +1.7 kB -1.7 kB Wed, 2023-02-22 00:06:51 +0800 -> Sat, 2023-03-11 13:34:35 +0800 file-diff
+            $ borg diff --format '{content:>30} {path}{NL}' ArchiveFoo ArchiveBar
+               modified:  +4.1 kB  -1.0 kB file-diff
             ...
 
         The following keys are always available:
@@ -134,7 +134,6 @@ class DiffMixIn:
 
         """
             )
-            # TODO: impl DiffFormatter
             + DiffFormatter.keys_help()
         )
         subparser = subparsers.add_parser(
@@ -164,7 +163,7 @@ class DiffMixIn:
             "--format",
             metavar="FORMAT",
             dest="format",
-            help="specify format for differences between archives" '(default: "{content:<19} {mtime} {path}{NL}")',
+            help="specify format for differences between archives" '(default: "{change} {path}{NL}")',
         )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")
         subparser.add_argument(

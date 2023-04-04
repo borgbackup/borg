@@ -620,12 +620,18 @@ _init_names()
 
 
 class DiffChange:
-    def __init__(self, flag, origin=None):
-        self.flag = flag
-        self.origin = origin or {}
+    """
+    Stores a change in a diff.
+
+    The diff_type denotes the type of change, e.g. "added", "removed", "modified".
+    The diff_data contains additional information about the change, e.g. the old and new mode.
+    """
+    def __init__(self, diff_type, diff_data=None):
+        self.diff_type = diff_type
+        self.diff_data = diff_data or {}
 
     def to_dict(self):
-        return {"type": self.flag, **self.origin}
+        return {"type": self.diff_type, **self.diff_data}
 
 
 class ItemDiff:
@@ -642,7 +648,8 @@ class ItemDiff:
         self._item2 = item2
         self._numeric_ids = numeric_ids
         self._can_compare_chunk_ids = can_compare_chunk_ids
-        self.equal = self._equal(chunk_a, chunk_b)
+        self._chunk_a = chunk_a
+        self._chunk_b = chunk_b
         
         self._changes = {}
 
@@ -664,7 +671,6 @@ class ItemDiff:
         if self._item1.is_fifo() or self._item2.is_fifo():
             self._presence_diff('fifo')
 
-        # These are not content-only before
         if not (self._item1.get('deleted') or self._item2.get('deleted')):
             self._owner_diff()
             self._mode_diff()
@@ -675,16 +681,17 @@ class ItemDiff:
         return self._changes
 
     def __repr__(self):
-        return 'equal' if self.equal else ' '.join(self._changes.keys())
+        return (' '.join(self._changes.keys())) or 'equal'
 
-    def _equal(self, chunk_iterator1, chunk_iterator2):
+    def equal(self, content_only=False):
         # if both are deleted, there is nothing at path regardless of what was deleted
         if self._item1.get('deleted') and self._item2.get('deleted'):
             return True
 
         attr_list = ['deleted', 'target']
-        attr_list += ['mode', 'ctime', 'mtime']
-        attr_list += ['uid', 'gid'] if self._numeric_ids else ['user', 'group']
+        if not content_only:
+            attr_list += ['mode', 'ctime', 'mtime']
+            attr_list += ['uid', 'gid'] if self._numeric_ids else ['user', 'group']
 
         for attr in attr_list:
             if self._item1.get(attr) != self._item2.get(attr):
@@ -696,7 +703,7 @@ class ItemDiff:
                 return False
 
         if 'chunks' in self._item1 and 'chunks' in self._item2:
-            return self._content_equal(chunk_iterator1, chunk_iterator2)
+            return self._content_equal()
 
         return True
 
@@ -743,19 +750,19 @@ class ItemDiff:
         u2, g2 = self._item2.get(u_attr), self._item2.get(g_attr)
         if (u1, g1) == (u2, g2):
             return False
-        self._changes['owner'] = DiffChange("changed owner", {"past": (u1, g1), "current": (u2, g2)})
+        self._changes['owner'] = DiffChange("changed owner", {"item1": (u1, g1), "item2": (u2, g2)})
         if u1 != u2:
-            self._changes['user'] = DiffChange("changed user", {"past": u1, "current": u2})
+            self._changes['user'] = DiffChange("changed user", {"item1": u1, "item2": u2})
         if g1 != g2:
-            self._changes['group'] = DiffChange("changed group", {"past": g1, "current": g2})
+            self._changes['group'] = DiffChange("changed group", {"item1": g1, "item2": g2})
         return True
 
     def _mode_diff(self):
         if 'mode' in self._item1 and 'mode' in self._item2 and self._item1.mode != self._item2.mode:
             mode1 = stat.filemode(self._item1.mode)
             mode2 = stat.filemode(self._item2.mode)
-            self._changes['mode'] = DiffChange("changed mode", {"past": mode1, "current": mode2})
-            self._changes['type'] = DiffChange("changed type", {"past": mode1[0], "current": mode2[0]})
+            self._changes['mode'] = DiffChange("changed mode", {"item1": mode1, "item2": mode2})
+            self._changes['type'] = DiffChange("changed type", {"item1": mode1[0], "item2": mode2[0]})
 
     def _time_diffs(self):
         attrs = ["ctime", "mtime"]
@@ -763,7 +770,7 @@ class ItemDiff:
             if attr in self._item1 and attr in self._item2 and self._item1.get(attr) != self._item2.get(attr):
                 ts1 = OutputTimestamp(safe_timestamp(self._item1.get(attr)))
                 ts2 = OutputTimestamp(safe_timestamp(self._item2.get(attr)))
-                self._changes[attr] = DiffChange(attr, {"past": ts1, "current": ts2},)
+                self._changes[attr] = DiffChange(attr, {"item1": ts1, "item2": ts2},)
         return True
 
     def content(self):
@@ -790,12 +797,12 @@ class ItemDiff:
     def group(self):
         return self._changes.get('group')
 
-    def _content_equal(self, chunk_iterator1, chunk_iterator2):
+    def _content_equal(self):
         if self._can_compare_chunk_ids:
             return self._item1.chunks == self._item2.chunks
         if self._item1.get_size() != self._item2.get_size():
             return False
-        return chunks_contents_equal(chunk_iterator1, chunk_iterator2)
+        return chunks_contents_equal(self._chunk_a, self._chunk_b)
 
 
 def chunks_contents_equal(chunks_a, chunks_b):

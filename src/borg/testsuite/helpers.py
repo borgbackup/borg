@@ -45,7 +45,7 @@ from ..helpers import eval_escapes
 from ..helpers import safe_unlink
 from ..helpers import text_to_json, binary_to_json
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
-from ..platform import is_cygwin, is_win32, is_darwin
+from ..platform import is_cygwin, is_win32, is_darwin, swidth
 
 from . import BaseTestCase, FakeInputs, are_hardlinks_supported
 
@@ -635,19 +635,20 @@ def test_get_config_dir(monkeypatch):
 
 def test_get_config_dir_compat(monkeypatch):
     """test that it works the same for legacy and for non-legacy implementation"""
+    monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
     monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     if not is_darwin and not is_win32:
-        monkeypatch.delenv("BORG_CONFIG_DIR", raising=False)
-        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
         # fails on macOS: assert '/Users/tw/Library/Application Support/borg' == '/Users/tw/.config/borg'
         # fails on win32 MSYS2 (but we do not need legacy compat there).
         assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
-    if not is_darwin and not is_win32:
-        monkeypatch.setenv("XDG_CONFIG_HOME", "/var/tmp/.config1")
-        # fails on macOS: assert '/Users/tw/Library/Application Support/borg' == '/var/tmp/.config1/borg'
+        monkeypatch.setenv("XDG_CONFIG_HOME", "/var/tmp/xdg.config.d")
+        # fails on macOS: assert '/Users/tw/Library/Application Support/borg' == '/var/tmp/xdg.config.d'
         # fails on win32 MSYS2 (but we do not need legacy compat there).
         assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
-    monkeypatch.setenv("BORG_CONFIG_DIR", "/var/tmp/.config2")
+    monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
+    assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
+    monkeypatch.setenv("BORG_CONFIG_DIR", "/var/tmp/borg.config.d")
     assert get_config_dir(legacy=False) == get_config_dir(legacy=True)
 
 
@@ -673,6 +674,25 @@ def test_get_cache_dir(monkeypatch):
         assert get_cache_dir() == os.path.join("/var/tmp/.cache", "borg")
         monkeypatch.setenv("BORG_CACHE_DIR", "/var/tmp")
         assert get_cache_dir() == "/var/tmp"
+
+
+def test_get_cache_dir_compat(monkeypatch):
+    """test that it works the same for legacy and for non-legacy implementation"""
+    monkeypatch.delenv("BORG_CACHE_DIR", raising=False)
+    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+    if not is_darwin and not is_win32:
+        # fails on macOS: assert '/Users/tw/Library/Caches/borg' == '/Users/tw/.cache/borg'
+        # fails on win32 MSYS2 (but we do not need legacy compat there).
+        assert get_cache_dir(legacy=False) == get_cache_dir(legacy=True)
+        # fails on macOS: assert '/Users/tw/Library/Caches/borg' == '/var/tmp/xdg.cache.d'
+        # fails on win32 MSYS2 (but we do not need legacy compat there).
+        monkeypatch.setenv("XDG_CACHE_HOME", "/var/tmp/xdg.cache.d")
+        assert get_cache_dir(legacy=False) == get_cache_dir(legacy=True)
+    monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")
+    assert get_cache_dir(legacy=False) == get_cache_dir(legacy=True)
+    monkeypatch.setenv("BORG_CACHE_DIR", "/var/tmp/borg.cache.d")
+    assert get_cache_dir(legacy=False) == get_cache_dir(legacy=True)
 
 
 def test_get_keys_dir(monkeypatch):
@@ -995,6 +1015,29 @@ def test_progress_percentage_sameline(capfd, monkeypatch):
     pi.finish()
     out, err = capfd.readouterr()
     assert err == " " * 4 + "\r"
+
+
+@pytest.mark.skipif(is_win32, reason="no working swidth() implementation on this platform")
+def test_progress_percentage_widechars(capfd, monkeypatch):
+    st = "スター・トレック"  # "startrek" :-)
+    assert swidth(st) == 16
+    path = "/カーク船長です。"  # "Captain Kirk"
+    assert swidth(path) == 17
+    spaces = " " * 4  # to avoid usage of "..."
+    width = len("100%") + 1 + swidth(st) + 1 + swidth(path) + swidth(spaces)
+    monkeypatch.setenv("COLUMNS", str(width))
+    monkeypatch.setenv("LINES", "1")
+    pi = ProgressIndicatorPercent(100, step=5, start=0, msg=f"%3.0f%% {st} %s")
+    pi.logger.setLevel("INFO")
+    pi.show(0, info=[path])
+    out, err = capfd.readouterr()
+    assert err == f"  0% {st} {path}{spaces}\r"
+    pi.show(100, info=[path])
+    out, err = capfd.readouterr()
+    assert err == f"100% {st} {path}{spaces}\r"
+    pi.finish()
+    out, err = capfd.readouterr()
+    assert err == " " * width + "\r"
 
 
 def test_progress_percentage_step(capfd, monkeypatch):

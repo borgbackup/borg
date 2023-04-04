@@ -56,7 +56,7 @@ class Passphrase(str):
             # passcommand is a system command (not inside pyinstaller env)
             env = prepare_subprocess_env(system=True)
             try:
-                passphrase = subprocess.check_output(shlex.split(passcommand), universal_newlines=True, env=env)
+                passphrase = subprocess.check_output(shlex.split(passcommand), text=True, env=env)
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 raise PasscommandFailure(e)
             return cls(passphrase.rstrip("\n"))

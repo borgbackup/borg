@@ -25,6 +25,7 @@ from .. import (
     is_utime_fully_supported,
     is_birthtime_fully_supported,
     same_ts_ns,
+    is_root,
 )
 from . import (
     ArchiverTestCaseBase,
@@ -219,6 +220,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "input/file2" in out
         assert "input/file3" in out
 
+    @pytest.mark.skipif(is_root(), reason="test must not be run as (fake)root")
     def test_create_no_permission_file(self):
         file_path = os.path.join(self.input_path, "file")
         self.create_regular_file(file_path + "1", size=1000)
@@ -228,6 +230,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         if is_win32:
             subprocess.run(["icacls.exe", file_path + "2", "/deny", "everyone:(R)"])
         else:
+            # note: this will NOT take away read permissions for root
             os.chmod(file_path + "2", 0o000)
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         flist = "".join(f"input/file{n}\n" for n in range(1, 4))

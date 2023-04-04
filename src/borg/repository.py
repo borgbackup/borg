@@ -1693,7 +1693,7 @@ class LoggedIO:
         size, tag, key, data = self._read(fd, header, segment, offset, (TAG_PUT2, TAG_PUT), read_data=read_data)
         if id != key:
             raise IntegrityError(
-                "Invalid segment entry header, is not for wanted id [segment {}, offset {}]".format(segment, offset)
+                f"Invalid segment entry header, is not for wanted id [segment {segment}, offset {offset}]"
             )
         data_size_from_header = size - header_size(tag)
         if expected_size is not None and expected_size != data_size_from_header:

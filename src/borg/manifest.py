@@ -5,7 +5,7 @@ import re
 from collections import abc, namedtuple
 from datetime import datetime, timedelta, timezone
 from operator import attrgetter
-from typing import Sequence, FrozenSet
+from collections.abc import Sequence
 
 from .logger import create_logger
 
@@ -211,7 +211,7 @@ class Manifest:
 
     NO_OPERATION_CHECK: Sequence[Operation] = tuple()
 
-    SUPPORTED_REPO_FEATURES: FrozenSet[str] = frozenset([])
+    SUPPORTED_REPO_FEATURES: frozenset[str] = frozenset([])
 
     MANIFEST_ID = b"\0" * 32
 

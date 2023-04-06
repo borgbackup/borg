@@ -74,7 +74,7 @@ jobs:
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     steps:
     - uses: actions/checkout@v3

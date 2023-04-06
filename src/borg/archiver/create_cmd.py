@@ -763,6 +763,7 @@ class CreateMixIn:
             metavar="NAME",
             dest="stdin_name",
             default="stdin",
+            action=Highlander,
             help="use NAME in archive for stdin data (default: %(default)r)",
         )
         subparser.add_argument(
@@ -770,6 +771,7 @@ class CreateMixIn:
             metavar="USER",
             dest="stdin_user",
             default=None,
+            action=Highlander,
             help="set user USER in archive for stdin data (default: do not store user/uid)",
         )
         subparser.add_argument(
@@ -777,6 +779,7 @@ class CreateMixIn:
             metavar="GROUP",
             dest="stdin_group",
             default=None,
+            action=Highlander,
             help="set group GROUP in archive for stdin data (default: do not store group/gid)",
         )
         subparser.add_argument(
@@ -785,6 +788,7 @@ class CreateMixIn:
             dest="stdin_mode",
             type=lambda s: int(s, 8),
             default=STDIN_MODE_DEFAULT,
+            action=Highlander,
             help="set mode to M in archive for stdin data (default: %(default)04o)",
         )
         subparser.add_argument(
@@ -804,6 +808,7 @@ class CreateMixIn:
         )
         subparser.add_argument(
             "--paths-delimiter",
+            action=Highlander,
             metavar="DELIM",
             help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \\n) ",
         )
@@ -878,6 +883,7 @@ class CreateMixIn:
             dest="comment",
             type=comment_validator,
             default="",
+            action=Highlander,
             help="add a comment text to the archive",
         )
         archive_group.add_argument(
@@ -886,6 +892,7 @@ class CreateMixIn:
             dest="timestamp",
             type=timestamp,
             default=None,
+            action=Highlander,
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
             "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
         )
@@ -896,6 +903,7 @@ class CreateMixIn:
             dest="checkpoint_interval",
             type=int,
             default=1800,
+            action=Highlander,
             help="write checkpoint every SECONDS seconds (Default: 1800)",
         )
         archive_group.add_argument(
@@ -904,6 +912,7 @@ class CreateMixIn:
             dest="checkpoint_volume",
             type=int,
             default=0,
+            action=Highlander,
             help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
         )
         archive_group.add_argument(
@@ -923,6 +932,7 @@ class CreateMixIn:
             dest="compression",
             type=CompressionSpec,
             default=CompressionSpec("lz4"),
+            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
 

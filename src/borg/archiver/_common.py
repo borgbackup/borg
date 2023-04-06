@@ -339,6 +339,7 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
             dest="strip_components",
             type=int,
             default=0,
+            action=Highlander,
             help="Remove the specified number of leading path elements. "
             "Paths with fewer elements will be silently skipped.",
         )

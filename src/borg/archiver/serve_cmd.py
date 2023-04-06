@@ -1,5 +1,6 @@
 import argparse
 
+from ._common import Highlander
 from ..constants import *  # NOQA
 from ..helpers import EXIT_SUCCESS
 from ..helpers import parse_storage_quota
@@ -76,6 +77,7 @@ class ServeMixIn:
             dest="storage_quota",
             type=parse_storage_quota,
             default=None,
+            action=Highlander,
             help="Override storage quota of the repository (e.g. 5G, 1.5T). "
             "When a new repository is initialized, sets the storage quota on the new "
             "repository as well. Default: no quota.",

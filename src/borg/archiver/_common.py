@@ -372,6 +372,7 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             dest="sort_by",
             type=SortBySpec,
             default=sort_by_default,
+            action=Highlander,
             help="Comma-separated list of sorting keys; valid keys are: {}; default is: {}".format(
                 ", ".join(AI_HUMAN_SORT_KEYS), sort_by_default
             ),
@@ -383,16 +384,18 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             "--first",
             metavar="N",
             dest="first",
-            default=0,
             type=positive_int_validator,
+            default=0,
+            action=Highlander,
             help="consider first N archives after other filters were applied",
         )
         group.add_argument(
             "--last",
             metavar="N",
             dest="last",
-            default=0,
             type=positive_int_validator,
+            default=0,
+            action=Highlander,
             help="consider last N archives after other filters were applied",
         )
 
@@ -401,15 +404,17 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
         group.add_argument(
             "--oldest",
             metavar="TIMESPAN",
-            type=relative_time_marker_validator,
             dest="oldest",
+            type=relative_time_marker_validator,
+            action=Highlander,
             help="consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.",
         )
         group.add_argument(
             "--newest",
             metavar="TIMESPAN",
-            type=relative_time_marker_validator,
             dest="newest",
+            type=relative_time_marker_validator,
+            action=Highlander,
             help="consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.",
         )
 
@@ -418,15 +423,17 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
         group.add_argument(
             "--older",
             metavar="TIMESPAN",
-            type=relative_time_marker_validator,
             dest="older",
+            type=relative_time_marker_validator,
+            action=Highlander,
             help="consider archives older than (now - TIMESPAN), e.g. 7d oder 12m.",
         )
         group.add_argument(
             "--newer",
             metavar="TIMESPAN",
-            type=relative_time_marker_validator,
             dest="newer",
+            type=relative_time_marker_validator,
+            action=Highlander,
             help="consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.",
         )
 

@@ -12,8 +12,8 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0b5 (2023-02-27)
-----------------------------
+Version 2.0.0b6 (not released yet)
+----------------------------------
 
 Please note:
 
@@ -108,7 +108,59 @@ Compatibility notes:
 
   Option --filter=... might need an update, if you filter for the status chars
   that were changed.
+- borg is now more strict and disallows giving some options multiple times -
+  if that makes no sense. Highlander options, see #6269. That might make scripts
+  fail now that somehow "worked" before (but maybe didn't work as intended due to
+  the contradicting options).
 
+New features:
+
+- diff: include changes in ctime and mtime, #7248
+- diff: sort JSON output alphabetically
+- diff --content-only: option added to ignore metadata changes
+- import-tar --ignore-zeros: new option to support importing concatenated tars, #7432
+- debug id-hash / parse-obj / format-obj: new debug commands, #7406
+
+Fixes:
+
+- do not retry on permission errors (pointless)
+- transfer: verify chunks we get using assert_id, #7383
+- fix config/cache dir compatibility issues, #7445
+- xattrs: fix namespace processing on FreeBSD, #6997
+- ProgressIndicatorPercent: fix space computation for wide chars, #3027
+- delete: remove --cache-only option, #7440.
+  for deleting the cache only, use: borg rdelete --cache-only
+- borg debug get-obj/put-obj: fixed chunk id
+
+Other changes:
+
+- allow msgpack 1.0.5 also
+- clarify platformdirs requirements, #7393.
+  3.0.0 is only required for macOS due to breaking changes.
+  2.6.0 was the last breaking change for Linux/UNIX.
+- mount: improve mountpoint error msgs, see #7496
+- more Highlander options, #6269
+- Windows: simplify building (just use pip)
+- docs:
+
+  - add installation instructions for Windows
+  - improve --one-file-system help and docs (macOS APFS), #5618 #4876
+  - BORG_KEY_FILE: clarify docs, #7444
+  - installation: add link to OS dependencies, #7356
+  - update FAQ about locale/unicode issues, #6999
+  - improve mount options rendering, #7359
+  - make timestamps in manual pages reproducible.
+- CI / tests / vagrant:
+
+  - added pre-commit for linting purposes, #7476
+  - resolved mode bug and added sleep clause for darwin systems, #7470
+  - "auto" compressor tests: do not assume zlib is better than lz4, #7363
+  - add stretch64 VM with deps built from source
+  - misc. other CI / test fixes and updates
+
+
+Version 2.0.0b5 (2023-02-27)
+----------------------------
 
 New features:
 

@@ -390,7 +390,11 @@ class TarMixIn:
         )
         subparser.set_defaults(func=self.do_export_tar)
         subparser.add_argument(
-            "--tar-filter", dest="tar_filter", default="auto", help="filter program to pipe data through"
+            "--tar-filter",
+            dest="tar_filter",
+            default="auto",
+            action=Highlander,
+            help="filter program to pipe data through",
         )
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output verbose list of items (files, dirs, ...)"
@@ -401,6 +405,7 @@ class TarMixIn:
             dest="tar_format",
             default="GNU",
             choices=("BORG", "PAX", "GNU"),
+            action=Highlander,
             help="select tar format: BORG, PAX or GNU",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
@@ -504,6 +509,7 @@ class TarMixIn:
             dest="comment",
             type=comment_validator,
             default="",
+            action=Highlander,
             help="add a comment text to the archive",
         )
         archive_group.add_argument(
@@ -511,6 +517,7 @@ class TarMixIn:
             dest="timestamp",
             type=timestamp,
             default=None,
+            action=Highlander,
             metavar="TIMESTAMP",
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
             "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
@@ -521,6 +528,7 @@ class TarMixIn:
             dest="checkpoint_interval",
             type=int,
             default=1800,
+            action=Highlander,
             metavar="SECONDS",
             help="write checkpoint every SECONDS seconds (Default: 1800)",
         )
@@ -530,14 +538,15 @@ class TarMixIn:
             dest="checkpoint_volume",
             type=int,
             default=0,
+            action=Highlander,
             help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
         )
         archive_group.add_argument(
             "--chunker-params",
             dest="chunker_params",
-            action=Highlander,
             type=ChunkerParams,
             default=CHUNKER_PARAMS,
+            action=Highlander,
             metavar="PARAMS",
             help="specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
             "HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %s,%d,%d,%d,%d" % CHUNKER_PARAMS,
@@ -549,6 +558,7 @@ class TarMixIn:
             dest="compression",
             type=CompressionSpec,
             default=CompressionSpec("lz4"),
+            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
 

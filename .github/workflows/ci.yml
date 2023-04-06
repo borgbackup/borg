@@ -65,8 +65,8 @@ jobs:
               python-version: '3.11'
               toxenv: py311-fuse3
             - os: macos-12
-              python-version: '3.9'
-              toxenv: py39-none  # note: no fuse testing, due to #6099, see also #6196.
+              python-version: '3.11'
+              toxenv: py311-none  # note: no fuse testing, due to #6099, see also #6196.
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew

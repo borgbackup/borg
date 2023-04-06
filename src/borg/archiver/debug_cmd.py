@@ -18,7 +18,7 @@ from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
 from ..repoobj import RepoObj
 
-from ._common import with_repository
+from ._common import with_repository, Highlander
 from ._common import process_epilog
 
 
@@ -521,16 +521,18 @@ class DebugMixIn:
             "--segment",
             metavar="SEG",
             dest="segment",
-            default=None,
             type=positive_int_validator,
+            default=None,
+            action=Highlander,
             help="used together with --ghost: limit processing to given segment.",
         )
         subparser.add_argument(
             "--offset",
             metavar="OFFS",
             dest="offset",
-            default=None,
             type=positive_int_validator,
+            default=None,
+            action=Highlander,
             help="used together with --ghost: limit processing to given offset.",
         )
 
@@ -553,6 +555,7 @@ class DebugMixIn:
             "wanted",
             metavar="WANTED",
             type=str,
+            action=Highlander,
             help="term to search the repo for, either 0x1234abcd hex term or a string",
         )
         debug_id_hash_epilog = process_epilog(
@@ -631,6 +634,7 @@ class DebugMixIn:
             dest="compression",
             type=CompressionSpec,
             default=CompressionSpec("lz4"),
+            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
         subparser.add_argument(

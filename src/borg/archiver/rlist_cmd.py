@@ -2,7 +2,7 @@ import argparse
 import textwrap
 import sys
 
-from ._common import with_repository
+from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
 from ..manifest import Manifest
@@ -106,6 +106,7 @@ class RListMixIn:
             "--format",
             metavar="FORMAT",
             dest="format",
+            action=Highlander,
             help="specify format for archive listing " '(default: "{archive:<36} {time} [{id}]{NL}")',
         )
         subparser.add_argument(

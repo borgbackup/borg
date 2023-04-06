@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-from ._common import with_repository
+from ._common import with_repository, Highlander
 from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -156,6 +156,7 @@ class DeleteMixIn:
             dest="checkpoint_interval",
             type=int,
             default=1800,
+            action=Highlander,
             help="write checkpoint every SECONDS seconds (Default: 1800)",
         )
         define_archive_filters_group(subparser)

@@ -1,7 +1,7 @@
 import argparse
 from collections import defaultdict
 
-from ._common import with_repository
+from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec, ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..helpers import sig_int, ProgressIndicatorPercent
@@ -230,6 +230,7 @@ class RCompressMixIn:
             dest="compression",
             type=CompressionSpec,
             default=CompressionSpec("lz4"),
+            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
 
@@ -242,5 +243,6 @@ class RCompressMixIn:
             dest="checkpoint_interval",
             type=int,
             default=1800,
+            action=Highlander,
             help="write checkpoint every SECONDS seconds (Default: 1800)",
         )

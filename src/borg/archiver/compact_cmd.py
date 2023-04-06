@@ -1,6 +1,6 @@
 import argparse
 
-from ._common import with_repository
+from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import EXIT_SUCCESS
 from ..manifest import Manifest
@@ -61,5 +61,6 @@ class CompactMixIn:
             dest="threshold",
             type=int,
             default=10,
+            action=Highlander,
             help="set minimum threshold for saved space in PERCENT (Default: 10)",
         )

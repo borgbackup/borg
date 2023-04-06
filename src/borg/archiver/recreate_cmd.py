@@ -149,6 +149,7 @@ class RecreateMixIn:
             metavar="TARGET",
             default=None,
             type=archivename_validator,
+            action=Highlander,
             help="create a new archive with the name ARCHIVE, do not replace existing archive "
             "(only applies for a single archive)",
         )
@@ -158,6 +159,7 @@ class RecreateMixIn:
             dest="checkpoint_interval",
             type=int,
             default=1800,
+            action=Highlander,
             metavar="SECONDS",
             help="write checkpoint every SECONDS seconds (Default: 1800)",
         )
@@ -167,6 +169,7 @@ class RecreateMixIn:
             dest="checkpoint_volume",
             type=int,
             default=0,
+            action=Highlander,
             help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
         )
         archive_group.add_argument(
@@ -175,6 +178,7 @@ class RecreateMixIn:
             dest="comment",
             type=comment_validator,
             default=None,
+            action=Highlander,
             help="add a comment text to the archive",
         )
         archive_group.add_argument(
@@ -183,6 +187,7 @@ class RecreateMixIn:
             dest="timestamp",
             type=timestamp,
             default=None,
+            action=Highlander,
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
             "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
         )
@@ -193,6 +198,7 @@ class RecreateMixIn:
             dest="compression",
             type=CompressionSpec,
             default=CompressionSpec("lz4"),
+            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
         archive_group.add_argument(
@@ -203,6 +209,7 @@ class RecreateMixIn:
             default="never",
             const="if-different",
             choices=("never", "if-different", "always"),
+            action=Highlander,
             help="recompress data chunks according to `MODE` and ``--compression``. "
             "Possible modes are "
             "`if-different`: recompress if current compression is with a different "
@@ -217,9 +224,9 @@ class RecreateMixIn:
             "--chunker-params",
             metavar="PARAMS",
             dest="chunker_params",
-            action=Highlander,
             type=ChunkerParams,
             default=None,
+            action=Highlander,
             help="rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
             "HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. "
             "default: do not rechunk",

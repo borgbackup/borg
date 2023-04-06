@@ -1,6 +1,6 @@
 import argparse
 
-from ._common import with_repository, with_other_repository
+from ._common import with_repository, with_other_repository, Highlander
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
@@ -210,6 +210,7 @@ class TransferMixIn:
             dest="other_location",
             type=location_validator(other=True),
             default=Location(other=True),
+            action=Highlander,
             help="transfer archives from the other repository",
         )
         subparser.add_argument(
@@ -218,6 +219,7 @@ class TransferMixIn:
             dest="upgrader",
             type=str,
             default="NoOp",
+            action=Highlander,
             help="use the upgrader to convert transferred data (default: no conversion)",
         )
         define_archive_filters_group(subparser)

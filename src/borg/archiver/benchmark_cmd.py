@@ -2,7 +2,7 @@ import argparse
 from contextlib import contextmanager
 import functools
 import os
-import shutil
+import tempfile
 import time
 
 from ..constants import *  # NOQA
@@ -60,9 +60,7 @@ class BenchmarkMixIn:
 
         @contextmanager
         def test_files(path, count, size, random):
-            try:
-                path = os.path.join(path, "borg-test-data")
-                os.makedirs(path)
+            with tempfile.TemporaryDirectory(prefix="borg-test-data-", dir=path) as path:
                 z_buff = None if random else memoryview(zeros)[:size] if size <= len(zeros) else b"\0" * size
                 for i in range(count):
                     fname = os.path.join(path, "file_%d" % i)
@@ -70,8 +68,6 @@ class BenchmarkMixIn:
                     with SyncFile(fname, binary=True) as fd:  # used for posix_fadvise's sake
                         fd.write(data)
                 yield path
-            finally:
-                shutil.rmtree(path)
 
         if "_BORG_BENCHMARK_CRUD_TEST" in os.environ:
             tests = [("Z-TEST", 1, 1, False), ("R-TEST", 1, 1, True)]

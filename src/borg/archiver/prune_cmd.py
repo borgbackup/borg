@@ -9,7 +9,7 @@ from ._common import with_repository, Highlander
 from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import format_archive, interval, sig_int, log_multi, ProgressIndicatorPercent
+from ..helpers import ArchiveFormatter, interval, sig_int, log_multi, ProgressIndicatorPercent
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -82,6 +82,14 @@ class PruneMixIn:
                 '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.'
             )
             return self.exit_code
+        if args.format is not None:
+            format = args.format
+        elif args.short:
+            format = "{archive}"
+        else:
+            format = "{archive:<36} {time} [{id}]"
+        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, json=False, iec=args.iec)
+
         checkpoint_re = r"\.checkpoint(\.\d+)?"
         archives_checkpoints = manifest.archives.list(
             match=args.match_archives,
@@ -156,7 +164,7 @@ class PruneMixIn:
                             rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
                         )
                 if args.output_list:
-                    list_logger.info(f"{log_message:<40} {format_archive(archive)}")
+                    list_logger.info(f"{log_message:<40} {formatter.format_item(archive)}")
             pi.finish()
             if sig_int:
                 # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
@@ -227,6 +235,10 @@ class PruneMixIn:
         deleted - the "Deleted data" deduplicated size there is most interesting as
         that is how much your repository will shrink.
         Please note that the "All archives" stats refer to the state after pruning.
+
+        You can influence how the ``--list`` output is formatted by using the ``--short``
+        option (less wide output) or by giving a custom format using ``--format`` (see
+        the ``borg rlist`` description for more details about the format string).
         """
         )
         subparser = subparsers.add_parser(
@@ -251,6 +263,14 @@ class PruneMixIn:
         )
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output verbose list of archives it keeps/prunes"
+        )
+        subparser.add_argument("--short", dest="short", action="store_true", help="use a less wide archive part format")
+        subparser.add_argument(
+            "--format",
+            metavar="FORMAT",
+            dest="format",
+            action=Highlander,
+            help="specify format for the archive part " '(default: "{archive:<36} {time} [{id}]")',
         )
         subparser.add_argument(
             "--keep-within",

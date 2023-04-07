@@ -722,10 +722,10 @@ class ArchiveFormatter(BaseFormatter):
         self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
-            "hostname": partial(self.get_meta, "hostname"),
-            "username": partial(self.get_meta, "username"),
-            "comment": partial(self.get_meta, "comment"),
-            "command_line": partial(self.get_meta, "command_line"),
+            "hostname": partial(self.get_meta, "hostname", ""),
+            "username": partial(self.get_meta, "username", ""),
+            "comment": partial(self.get_meta, "comment", ""),
+            "command_line": partial(self.get_meta, "command_line", ""),
             "end": self.get_ts_end,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
@@ -771,8 +771,8 @@ class ArchiveFormatter(BaseFormatter):
             self._archive = Archive(self.manifest, self.name, iec=self.iec)
         return self._archive
 
-    def get_meta(self, key):
-        return self.archive.metadata.get(key, "")
+    def get_meta(self, key, default=None):
+        return self.archive.metadata.get(key, default)
 
     def get_ts_end(self):
         return self.format_time(self.archive.ts_end)

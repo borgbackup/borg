@@ -672,11 +672,14 @@ class ArchiveFormatter(BaseFormatter):
         "id": "internal ID of the archive",
         "hostname": "hostname of host on which this archive was created",
         "username": "username of user who created this archive",
+        "size": "size of this archive (data plus metadata, not considering compression and deduplication)",
+        "nfiles": "count of files in this archive",
     }
     KEY_GROUPS = (
         ("archive", "name", "comment", "id"),
         ("start", "time", "end", "command_line"),
         ("hostname", "username"),
+        ("size", "nfiles"),
     )
 
     @classmethod
@@ -722,10 +725,12 @@ class ArchiveFormatter(BaseFormatter):
         self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
-            "hostname": partial(self.get_meta, "hostname"),
-            "username": partial(self.get_meta, "username"),
-            "comment": partial(self.get_meta, "comment"),
-            "command_line": partial(self.get_meta, "command_line"),
+            "hostname": partial(self.get_meta, "hostname", ""),
+            "username": partial(self.get_meta, "username", ""),
+            "comment": partial(self.get_meta, "comment", ""),
+            "command_line": partial(self.get_meta, "command_line", ""),
+            "size": partial(self.get_meta, "size", 0),
+            "nfiles": partial(self.get_meta, "nfiles", 0),
             "end": self.get_ts_end,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
@@ -771,8 +776,8 @@ class ArchiveFormatter(BaseFormatter):
             self._archive = Archive(self.manifest, self.name, iec=self.iec)
         return self._archive
 
-    def get_meta(self, key):
-        return self.archive.metadata.get(key, "")
+    def get_meta(self, key, default=None):
+        return self.archive.metadata.get(key, default)
 
     def get_ts_end(self):
         return self.format_time(self.archive.ts_end)

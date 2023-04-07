@@ -1,4 +1,5 @@
 import argparse
+import os
 import textwrap
 import sys
 
@@ -24,7 +25,7 @@ class ListMixIn:
         elif args.short:
             format = "{path}{NL}"
         else:
-            format = "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}"
+            format = os.environ.get("BORG_LIST_FORMAT", "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")
 
         def _list_inner(cache):
             archive = Archive(manifest, args.name, cache=cache)

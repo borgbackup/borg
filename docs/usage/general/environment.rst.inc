@@ -104,6 +104,14 @@ General:
             caused EROFS. You will need this to make archives from volume shadow copies
             in WSL1 (Windows Subsystem for Linux 1).
 
+Output formatting:
+    BORG_LIST_FORMAT
+        Giving the default value for ``borg list --format=X``.
+    BORG_RLIST_FORMAT
+        Giving the default value for ``borg rlist --format=X``.
+    BORG_PRUNE_FORMAT
+        Giving the default value for ``borg prune --format=X``.
+
 Some automatic "answerers" (if set, they automatically answer confirmation questions):
     BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)
         For "Warning: Attempting to access a previously unknown unencrypted repository"

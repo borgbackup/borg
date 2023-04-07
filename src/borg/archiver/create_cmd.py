@@ -132,6 +132,9 @@ class CreateMixIn:
                         return self.exit_code
             else:
                 for path in args.paths:
+                    if path == "":  # issue #5637
+                        self.print_warning("An empty string was given as PATH, ignoring.")
+                        continue
                     if path == "-":  # stdin
                         path = args.stdin_name
                         mode = args.stdin_mode

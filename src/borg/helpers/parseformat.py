@@ -672,11 +672,14 @@ class ArchiveFormatter(BaseFormatter):
         "id": "internal ID of the archive",
         "hostname": "hostname of host on which this archive was created",
         "username": "username of user who created this archive",
+        "size": "size of this archive (data plus metadata, not considering compression and deduplication)",
+        "nfiles": "count of files in this archive",
     }
     KEY_GROUPS = (
         ("archive", "name", "comment", "id"),
         ("start", "time", "end", "command_line"),
         ("hostname", "username"),
+        ("size", "nfiles"),
     )
 
     @classmethod
@@ -726,6 +729,8 @@ class ArchiveFormatter(BaseFormatter):
             "username": partial(self.get_meta, "username", ""),
             "comment": partial(self.get_meta, "comment", ""),
             "command_line": partial(self.get_meta, "command_line", ""),
+            "size": partial(self.get_meta, "size", 0),
+            "nfiles": partial(self.get_meta, "nfiles", 0),
             "end": self.get_ts_end,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys

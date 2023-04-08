@@ -441,7 +441,6 @@ class Archiver(
         """turn on INFO level logging for args that imply that they will produce output"""
         # map of option name to name of logger for that option
         option_logger = {
-            "output_list": "borg.output.list",
             "show_version": "borg.output.show-version",
             "show_rc": "borg.output.show-rc",
             "stats": "borg.output.stats",
@@ -450,6 +449,10 @@ class Archiver(
         for option, logger_name in option_logger.items():
             option_set = args.get(option, False)
             logging.getLogger(logger_name).setLevel("INFO" if option_set else "WARN")
+
+        # special-case --list / --list-kept / --list-pruned as they all work on same logger
+        options = [args.get(name, False) for name in ("output_list", "list_kept", "list_pruned")]
+        logging.getLogger("borg.output.list").setLevel("INFO" if any(options) else "WARN")
 
     def _setup_topic_debugging(self, args):
         """Turn on DEBUG level logging for specified --debug-topics."""

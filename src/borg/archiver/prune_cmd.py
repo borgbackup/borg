@@ -164,7 +164,11 @@ class PruneMixIn:
                         log_message = "Keeping archive (rule: {rule} #{num}):".format(
                             rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
                         )
-                if args.output_list:
+                if (
+                    args.output_list
+                    or (args.list_pruned and archive in to_delete)
+                    or (args.list_kept and archive not in to_delete)
+                ):
                     list_logger.info(f"{log_message:<40} {formatter.format_item(archive)}")
             pi.finish()
             if sig_int:
@@ -266,6 +270,12 @@ class PruneMixIn:
             "--list", dest="output_list", action="store_true", help="output verbose list of archives it keeps/prunes"
         )
         subparser.add_argument("--short", dest="short", action="store_true", help="use a less wide archive part format")
+        subparser.add_argument(
+            "--list-pruned", dest="list_pruned", action="store_true", help="output verbose list of archives it prunes"
+        )
+        subparser.add_argument(
+            "--list-kept", dest="list_kept", action="store_true", help="output verbose list of archives it keeps"
+        )
         subparser.add_argument(
             "--format",
             metavar="FORMAT",

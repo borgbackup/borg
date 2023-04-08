@@ -591,7 +591,7 @@ def build_filter(matcher, strip_components):
     if strip_components:
 
         def item_filter(item):
-            matched = matcher.match(item.path) and os.sep.join(item.path.split(os.sep)[strip_components:])
+            matched = matcher.match(item.path) and len(item.path.split(os.sep)) > strip_components
             return matched
 
     else:

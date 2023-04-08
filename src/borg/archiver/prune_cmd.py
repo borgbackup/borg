@@ -3,6 +3,7 @@ from collections import OrderedDict
 from datetime import datetime, timezone, timedelta
 import logging
 from operator import attrgetter
+import os
 import re
 
 from ._common import with_repository, Highlander
@@ -87,7 +88,7 @@ class PruneMixIn:
         elif args.short:
             format = "{archive}"
         else:
-            format = "{archive:<36} {time} [{id}]"
+            format = os.environ.get("BORG_PRUNE_FORMAT", "{archive:<36} {time} [{id}]")
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, json=False, iec=args.iec)
 
         checkpoint_re = r"\.checkpoint(\.\d+)?"

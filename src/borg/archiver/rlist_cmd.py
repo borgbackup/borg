@@ -1,4 +1,5 @@
 import argparse
+import os
 import textwrap
 import sys
 
@@ -21,7 +22,7 @@ class RListMixIn:
         elif args.short:
             format = "{archive}{NL}"
         else:
-            format = "{archive:<36} {time} [{id}]{NL}"
+            format = os.environ.get("BORG_RLIST_FORMAT", "{archive:<36} {time} [{id}]{NL}")
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, json=args.json, iec=args.iec)
 
         output_data = []

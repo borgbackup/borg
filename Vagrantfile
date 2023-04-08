@@ -351,6 +351,18 @@ Vagrant.configure(2) do |config|
     v.cpus = $cpus
   end
 
+  config.vm.define "lunar64" do |b|
+    b.vm.box = "ubuntu/lunar64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("lunar64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("lunar64", ".*none.*")
+  end
+
   config.vm.define "jammy64" do |b|
     b.vm.box = "ubuntu/jammy64"
     b.vm.provider :virtualbox do |v|

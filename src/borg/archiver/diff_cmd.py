@@ -2,8 +2,9 @@ import argparse
 import textwrap
 import json
 import sys
+import os
 
-from ._common import with_repository, with_archive, build_matcher
+from ._common import with_repository, with_archive, build_matcher, Highlander
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator
@@ -19,10 +20,12 @@ class DiffMixIn:
     @with_archive
     def do_diff(self, args, repository, manifest, archive):
         """Diff contents of two archives"""
+        if args.format is not None:
+            format = args.format
         if args.content_only:
             format = "{content}{link}{directory}{blkdev}{chrdev}{fifo} {path}{NL}"
         else:
-            format = args.format or "{change} {path}{NL}"
+            format = os.environ.get("BORG_DIFF_FORMAT", "{change} {path}{NL}")
 
         archive1 = archive
         archive2 = Archive(manifest, args.other_name)
@@ -163,6 +166,7 @@ class DiffMixIn:
             "--format",
             metavar="FORMAT",
             dest="format",
+            action=Highlander,
             help="specify format for differences between archives" '(default: "{change} {path}{NL}")',
         )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")

@@ -89,7 +89,7 @@ class PruneMixIn:
             format = "{archive}"
         else:
             format = os.environ.get("BORG_PRUNE_FORMAT", "{archive:<36} {time} [{id}]")
-        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, json=False, iec=args.iec)
+        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
         checkpoint_re = r"\.checkpoint(\.\d+)?"
         archives_checkpoints = manifest.archives.list(
@@ -169,7 +169,7 @@ class PruneMixIn:
                     or (args.list_pruned and archive in to_delete)
                     or (args.list_kept and archive not in to_delete)
                 ):
-                    list_logger.info(f"{log_message:<40} {formatter.format_item(archive)}")
+                    list_logger.info(f"{log_message:<40} {formatter.format_item(archive, jsonline=False)}")
             pi.finish()
             if sig_int:
                 # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.

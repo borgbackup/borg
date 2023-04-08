@@ -85,26 +85,19 @@ end
 
 def packages_netbsd
   return <<-EOF
-    # use the latest stuff, some packages in "9.2" are quite broken
-    echo 'http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/9.0_current/All' > /usr/pkg/etc/pkgin/repositories.conf
+    echo 'http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/9.3/All' > /usr/pkg/etc/pkgin/repositories.conf
     pkgin update
     pkgin -y upgrade
     pkg_add zstd lz4 xxhash git
     pkg_add bash
     chsh -s bash vagrant
-    echo "export PROMPT_COMMAND=" >> ~vagrant/.bash_profile  # bug in netbsd 9.2, .bash_profile broken for screen
-    echo "export PROMPT_COMMAND=" >> ~root/.bash_profile  # bug in netbsd 9.2, .bash_profile broken for screen
+    echo "export PROMPT_COMMAND=" >> ~vagrant/.bash_profile  # bug in netbsd 9.3, .bash_profile broken for screen
+    echo "export PROMPT_COMMAND=" >> ~root/.bash_profile  # bug in netbsd 9.3, .bash_profile broken for screen
     pkg_add pkg-config
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
-    pkg_add python39 py39-sqlite3 py39-pip py39-virtualenv py39-expat
-    pkg_add py310-sqlite3 py310-pip py310-virtualenv py310-expat
-    ln -s /usr/pkg/bin/python3.9 /usr/pkg/bin/python
-    ln -s /usr/pkg/bin/python3.9 /usr/pkg/bin/python3
-    ln -s /usr/pkg/bin/pip3.9 /usr/pkg/bin/pip
-    ln -s /usr/pkg/bin/pip3.9 /usr/pkg/bin/pip3
-    ln -s /usr/pkg/bin/virtualenv-3.9 /usr/pkg/bin/virtualenv
-    ln -s /usr/pkg/bin/virtualenv-3.9 /usr/pkg/bin/virtualenv3
+    pkg_add python39  py39-sqlite3  py39-pip  py39-virtualenv  py39-expat
+    pkg_add python310 py310-sqlite3 py310-pip py310-virtualenv py310-expat
   EOF
 end
 

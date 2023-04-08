@@ -1,8 +1,9 @@
 import argparse
+import os
 import textwrap
 import sys
 
-from ._common import with_repository
+from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
 from ..manifest import Manifest
@@ -21,8 +22,8 @@ class RListMixIn:
         elif args.short:
             format = "{archive}{NL}"
         else:
-            format = "{archive:<36} {time} [{id}]{NL}"
-        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
+            format = os.environ.get("BORG_RLIST_FORMAT", "{archive:<36} {time} [{id}]{NL}")
+        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, json=args.json, iec=args.iec)
 
         output_data = []
 
@@ -106,6 +107,7 @@ class RListMixIn:
             "--format",
             metavar="FORMAT",
             dest="format",
+            action=Highlander,
             help="specify format for archive listing " '(default: "{archive:<36} {time} [{id}]{NL}")',
         )
         subparser.add_argument(

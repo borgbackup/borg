@@ -1,6 +1,6 @@
 import argparse
 
-from ._common import with_repository, with_other_repository
+from ._common import with_repository, with_other_repository, Highlander
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names, tam_required_file
@@ -184,6 +184,7 @@ class RCreateMixIn:
             dest="other_location",
             type=location_validator(other=True),
             default=Location(other=True),
+            action=Highlander,
             help="reuse the key material from the other repository",
         )
         subparser.add_argument(
@@ -193,6 +194,7 @@ class RCreateMixIn:
             dest="encryption",
             required=True,
             choices=key_argument_names(),
+            action=Highlander,
             help="select encryption key mode **(required)**",
         )
         subparser.add_argument(
@@ -210,6 +212,7 @@ class RCreateMixIn:
             dest="storage_quota",
             default=None,
             type=parse_storage_quota,
+            action=Highlander,
             help="Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.",
         )
         subparser.add_argument(

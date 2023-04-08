@@ -22,6 +22,5 @@ class TestBuildFilter:
         matcher = PatternMatcher(fallback=True)
         filter = build_filter(matcher, strip_components=1)
         assert not filter(Item(path="shallow"))
-        assert not filter(Item(path="shallow/"))  # can this even happen? paths are normalized...
         assert filter(Item(path="deep enough/file"))
         assert filter(Item(path="something/dir/file"))

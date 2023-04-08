@@ -40,6 +40,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_in("test-1 comment 1" + os.linesep, output_3)
         self.assert_in("test-2 comment 2" + os.linesep, output_3)
 
+    def test_size_nfiles(self):
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        self.create_regular_file("file1", size=123000)
+        self.create_regular_file("file2", size=456)
+        self.cmd(f"--repo={self.repository_location}", "create", "test", "input/file1", "input/file2")
+        output = self.cmd(f"--repo={self.repository_location}", "list", "test")
+        print(output)
+        output = self.cmd(f"--repo={self.repository_location}", "rlist", "--format", "{name} {nfiles} {size}")
+        o_t = output.split()
+        assert o_t[0] == "test"
+        assert int(o_t[1]) == 2
+        assert 123456 <= int(o_t[2]) < 123999  # there is some metadata overhead
+
     def test_date_matching(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         earliest_ts = "2022-11-20T23:59:59"

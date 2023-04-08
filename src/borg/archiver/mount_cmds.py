@@ -24,8 +24,12 @@ class MountMixIn:
             self.print_error("borg mount not available: no FUSE support, BORG_FUSE_IMPL=%s." % BORG_FUSE_IMPL)
             return self.exit_code
 
-        if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
-            self.print_error("%s: Mountpoint must be a writable directory" % args.mountpoint)
+        if not os.path.isdir(args.mountpoint):
+            self.print_error(f"{args.mountpoint}: Mountpoint must be an **existing directory**")
+            return self.exit_code
+
+        if not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
+            self.print_error(f"{args.mountpoint}: Mountpoint must be a **writable** directory")
             return self.exit_code
 
         return self._do_mount(args)

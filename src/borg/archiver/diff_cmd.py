@@ -22,7 +22,7 @@ class DiffMixIn:
         """Diff contents of two archives"""
         if args.format is not None:
             format = args.format
-        if args.content_only:
+        elif args.content_only:
             format = "{content}{link}{directory}{blkdev}{chrdev}{fifo} {path}{NL}"
         else:
             format = os.environ.get("BORG_DIFF_FORMAT", "{change} {path}{NL}")

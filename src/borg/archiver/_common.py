@@ -29,7 +29,7 @@ logger = create_logger(__name__)
 
 
 def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args):
-    if location.proto == "ssh":
+    if location.proto in ("ssh", "socket"):
         repository = RemoteRepository(
             location,
             create=create,

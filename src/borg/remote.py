@@ -7,6 +7,7 @@ import os
 import select
 import shlex
 import shutil
+import socket
 import struct
 import sys
 import tempfile
@@ -164,7 +165,7 @@ class RepositoryServer:  # pragma: no cover
         "inject_exception",
     )
 
-    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota):
+    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota, socket_path):
         self.repository = None
         self.restrict_to_paths = restrict_to_paths
         self.restrict_to_repositories = restrict_to_repositories
@@ -174,6 +175,7 @@ class RepositoryServer:  # pragma: no cover
         # (see RepositoryServer.open below).
         self.append_only = append_only
         self.storage_quota = storage_quota
+        self.socket_path = socket_path
         self.client_version = parse_version(
             "1.0.8"
         )  # fallback version if client is too old to send version information
@@ -196,12 +198,33 @@ class RepositoryServer:  # pragma: no cover
         return {name: kwargs[name] for name in kwargs if name in known}
 
     def serve(self):
-        stdin_fd = sys.stdin.fileno()
-        stdout_fd = sys.stdout.fileno()
-        stderr_fd = sys.stdout.fileno()
+        if self.socket_path:
+            try:
+                # remove any left-over socket file
+                os.unlink(self.socket_path)
+            except OSError:
+                if os.path.exists(self.socket_path):
+                    raise
+            sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
+            sock.bind(self.socket_path)  # this creates the socket file in the fs
+            sock.listen(0)  # no backlog
+            connection, client_address = sock.accept()
+            stdin_fd = connection.makefile("rb").fileno()
+            stdout_fd = connection.makefile("wb").fileno()
+            stderr_fd = stdout_fd  # TODO log output on sys.stderr is not going over the socket
+        else:
+            stdin_fd = sys.stdin.fileno()
+            stdout_fd = sys.stdout.fileno()
+            stderr_fd = stdout_fd
+
         os.set_blocking(stdin_fd, False)
+        assert not os.get_blocking(stdin_fd)
         os.set_blocking(stdout_fd, True)
-        os.set_blocking(stderr_fd, True)
+        assert os.get_blocking(stdout_fd)
+        if stderr_fd != stdout_fd:
+            os.set_blocking(stderr_fd, True)
+            assert os.get_blocking(stderr_fd)
+
         unpacker = get_limited_unpacker("server")
         while True:
             r, w, es = select.select([stdin_fd], [], [], 10)
@@ -574,27 +597,47 @@ class RemoteRepository:
         self.server_version = parse_version(
             "1.0.8"
         )  # fallback version if server is too old to send version information
-        self.p = None
+        self.p = self.sock = None
         self._args = args
-        testing = location.host == "__testsuite__"
-        # when testing, we invoke and talk to a borg process directly (no ssh).
-        # when not testing, we invoke the system-installed ssh binary to talk to a remote borg.
-        env = prepare_subprocess_env(system=not testing)
-        borg_cmd = self.borg_cmd(args, testing)
-        if not testing:
-            borg_cmd = self.ssh_cmd(location) + borg_cmd
-        logger.debug("SSH command line: %s", borg_cmd)
-        # we do not want the ssh getting killed by Ctrl-C/SIGINT because it is needed for clean shutdown of borg.
-        # borg's SIGINT handler tries to write a checkpoint and requires the remote repo connection.
-        self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, preexec_fn=ignore_sigint)
-        self.stdin_fd = self.p.stdin.fileno()
-        self.stdout_fd = self.p.stdout.fileno()
-        self.stderr_fd = self.p.stderr.fileno()
+        if self.location.proto != "socket":
+            testing = location.host == "__testsuite__"
+            # when testing, we invoke and talk to a borg process directly (no ssh).
+            # when not testing, we invoke the system-installed ssh binary to talk to a remote borg.
+            env = prepare_subprocess_env(system=not testing)
+            borg_cmd = self.borg_cmd(args, testing)
+            if not testing:
+                borg_cmd = self.ssh_cmd(location) + borg_cmd
+            logger.debug("SSH command line: %s", borg_cmd)
+            # we do not want the ssh getting killed by Ctrl-C/SIGINT because it is needed for clean shutdown of borg.
+            # borg's SIGINT handler tries to write a checkpoint and requires the remote repo connection.
+            self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, preexec_fn=ignore_sigint)
+            self.stdin_fd = self.p.stdin.fileno()
+            self.stdout_fd = self.p.stdout.fileno()
+            self.stderr_fd = self.p.stderr.fileno()
+            self.r_fds = [self.stdout_fd, self.stderr_fd]
+            self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
+        else:  # socket
+            socket_path = os.path.join(location.path, "socket")
+            self.sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
+            try:
+                self.sock.connect(socket_path)
+            except FileNotFoundError:
+                raise Error(f"The socket file {socket_path} does not exist.")
+            except ConnectionRefusedError:
+                raise Error(f"There is no borg serve running for the socket file {socket_path}.")
+            self.stdin_fd = self.sock.makefile("wb").fileno()
+            self.stdout_fd = self.sock.makefile("rb").fileno()
+            self.stderr_fd = None
+            self.r_fds = [self.stdout_fd]
+            self.x_fds = [self.stdin_fd, self.stdout_fd]
+
         os.set_blocking(self.stdin_fd, False)
+        assert not os.get_blocking(self.stdin_fd)
         os.set_blocking(self.stdout_fd, False)
-        os.set_blocking(self.stderr_fd, False)
-        self.r_fds = [self.stdout_fd, self.stderr_fd]
-        self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
+        assert not os.get_blocking(self.stdout_fd)
+        if self.stderr_fd is not None:
+            os.set_blocking(self.stderr_fd, False)
+            assert not os.get_blocking(self.stderr_fd)
 
         try:
             try:
@@ -653,7 +696,7 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
     def __del__(self):
         if len(self.responses):
             logging.debug("still %d cached responses left in RemoteRepository" % (len(self.responses),))
-        if self.p:
+        if self.p or self.sock:
             self.close()
             assert False, "cleanup happened in Repository.__del__"
 
@@ -1042,6 +1085,14 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
             self.p.stdout.close()
             self.p.wait()
             self.p = None
+        if self.sock:
+            try:
+                self.sock.shutdown(socket.SHUT_RDWR)
+            except OSError as e:
+                if e.errno != errno.ENOTCONN:
+                    raise
+            self.sock.close()
+            self.sock = None
 
     def async_response(self, wait=True):
         for resp in self.call_many("async_responses", calls=[], wait=True, async_wait=wait):

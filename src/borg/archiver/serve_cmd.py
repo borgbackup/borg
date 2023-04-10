@@ -19,6 +19,7 @@ class ServeMixIn:
             restrict_to_repositories=args.restrict_to_repositories,
             append_only=args.append_only,
             storage_quota=args.storage_quota,
+            socket_path=args.socket_path,
         ).serve()
         return EXIT_SUCCESS
 
@@ -81,4 +82,11 @@ class ServeMixIn:
             help="Override storage quota of the repository (e.g. 5G, 1.5T). "
             "When a new repository is initialized, sets the storage quota on the new "
             "repository as well. Default: no quota.",
+        )
+        subparser.add_argument(
+            "--socket",
+            metavar="PATH",
+            dest="socket_path",
+            action=Highlander,
+            help="create a UNIX DOMAIN (IPC) socket at PATH and listen on it.",
         )

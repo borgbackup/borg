@@ -11,7 +11,7 @@ from ..constants import *  # NOQA
 from .checks import check_extension_modules, check_python
 from .datastruct import StableDict, Buffer, EfficientCollectionQueue
 from .errors import Error, ErrorWithTraceback, IntegrityError, DecompressionError
-from .fs import ensure_dir, join_base_dir
+from .fs import ensure_dir, join_base_dir, get_socket_filename
 from .fs import get_security_dir, get_keys_dir, get_base_dir, get_cache_dir, get_config_dir, get_runtime_dir
 from .fs import dir_is_tagged, dir_is_cachedir, make_path_safe, scandir_inorder
 from .fs import secure_erase, safe_unlink, dash_open, os_open, os_stat, umount

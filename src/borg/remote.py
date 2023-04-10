@@ -1,3 +1,4 @@
+import atexit
 import errno
 import functools
 import inspect
@@ -7,6 +8,7 @@ import queue
 import select
 import shlex
 import shutil
+import socket
 import struct
 import sys
 import tempfile
@@ -27,6 +29,7 @@ from .helpers import sysinfo
 from .helpers import format_file_size
 from .helpers import safe_unlink
 from .helpers import prepare_subprocess_env, ignore_sigint
+from .helpers import get_socket_filename
 from .logger import create_logger, borg_serve_log_queue
 from .helpers import msgpack
 from .repository import Repository
@@ -136,7 +139,7 @@ class RepositoryServer:  # pragma: no cover
         "inject_exception",
     )
 
-    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota):
+    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota, use_socket):
         self.repository = None
         self.restrict_to_paths = restrict_to_paths
         self.restrict_to_repositories = restrict_to_repositories
@@ -147,6 +150,12 @@ class RepositoryServer:  # pragma: no cover
         self.append_only = append_only
         self.storage_quota = storage_quota
         self.client_version = None  # we update this after client sends version information
+        if use_socket is False:
+            self.socket_path = None
+        elif use_socket is True:  # --socket
+            self.socket_path = get_socket_filename()
+        else:  # --socket=/some/path
+            self.socket_path = use_socket
 
     def filter_args(self, f, kwargs):
         """Remove unknown named parameters from call, because client did (implicitly) say it's ok."""
@@ -165,95 +174,133 @@ class RepositoryServer:  # pragma: no cover
                 os_write(self.stdout_fd, msg)
 
     def serve(self):
-        self.stdin_fd = sys.stdin.fileno()
-        self.stdout_fd = sys.stdout.fileno()
-        os.set_blocking(self.stdin_fd, False)
-        os.set_blocking(self.stdout_fd, True)
-        unpacker = get_limited_unpacker("server")
-        shutdown_serve = False
-        while True:
-            # before processing any new RPCs, send out all pending log output
-            self.send_queued_log()
+        def inner_serve():
+            os.set_blocking(self.stdin_fd, False)
+            assert not os.get_blocking(self.stdin_fd)
+            os.set_blocking(self.stdout_fd, True)
+            assert os.get_blocking(self.stdout_fd)
 
-            if shutdown_serve:
-                # shutdown wanted! get out of here after sending all log output.
-                if self.repository is not None:
-                    self.repository.close()
-                return
+            unpacker = get_limited_unpacker("server")
+            shutdown_serve = False
+            while True:
+                # before processing any new RPCs, send out all pending log output
+                self.send_queued_log()
 
-            # process new RPCs
-            r, w, es = select.select([self.stdin_fd], [], [], 10)
-            if r:
-                data = os.read(self.stdin_fd, BUFSIZE)
-                if not data:
+                if shutdown_serve:
+                    # shutdown wanted! get out of here after sending all log output.
+                    assert self.repository is None
+                    return
+
+                # process new RPCs
+                r, w, es = select.select([self.stdin_fd], [], [], 10)
+                if r:
+                    data = os.read(self.stdin_fd, BUFSIZE)
+                    if not data:
+                        shutdown_serve = True
+                        continue
+                    unpacker.feed(data)
+                    for unpacked in unpacker:
+                        if isinstance(unpacked, dict):
+                            msgid = unpacked[MSGID]
+                            method = unpacked[MSG]
+                            args = unpacked[ARGS]
+                        else:
+                            if self.repository is not None:
+                                self.repository.close()
+                            raise UnexpectedRPCDataFormatFromClient(__version__)
+                        try:
+                            if method not in self.rpc_methods:
+                                raise InvalidRPCMethod(method)
+                            try:
+                                f = getattr(self, method)
+                            except AttributeError:
+                                f = getattr(self.repository, method)
+                            args = self.filter_args(f, args)
+                            res = f(**args)
+                        except BaseException as e:
+                            ex_short = traceback.format_exception_only(e.__class__, e)
+                            ex_full = traceback.format_exception(*sys.exc_info())
+                            ex_trace = True
+                            if isinstance(e, Error):
+                                ex_short = [e.get_message()]
+                                ex_trace = e.traceback
+                            if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
+                                # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                                # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                                # for these, except ErrorWithTraceback, which should always display a traceback.
+                                pass
+                            else:
+                                logging.debug("\n".join(ex_full))
+
+                            sys_info = sysinfo()
+                            try:
+                                msg = msgpack.packb(
+                                    {
+                                        MSGID: msgid,
+                                        "exception_class": e.__class__.__name__,
+                                        "exception_args": e.args,
+                                        "exception_full": ex_full,
+                                        "exception_short": ex_short,
+                                        "exception_trace": ex_trace,
+                                        "sysinfo": sys_info,
+                                    }
+                                )
+                            except TypeError:
+                                msg = msgpack.packb(
+                                    {
+                                        MSGID: msgid,
+                                        "exception_class": e.__class__.__name__,
+                                        "exception_args": [
+                                            x if isinstance(x, (str, bytes, int)) else None for x in e.args
+                                        ],
+                                        "exception_full": ex_full,
+                                        "exception_short": ex_short,
+                                        "exception_trace": ex_trace,
+                                        "sysinfo": sys_info,
+                                    }
+                                )
+                            os_write(self.stdout_fd, msg)
+                        else:
+                            os_write(self.stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
+                if es:
                     shutdown_serve = True
                     continue
-                unpacker.feed(data)
-                for unpacked in unpacker:
-                    if isinstance(unpacked, dict):
-                        msgid = unpacked[MSGID]
-                        method = unpacked[MSG]
-                        args = unpacked[ARGS]
-                    else:
-                        if self.repository is not None:
-                            self.repository.close()
-                        raise UnexpectedRPCDataFormatFromClient(__version__)
-                    try:
-                        if method not in self.rpc_methods:
-                            raise InvalidRPCMethod(method)
-                        try:
-                            f = getattr(self, method)
-                        except AttributeError:
-                            f = getattr(self.repository, method)
-                        args = self.filter_args(f, args)
-                        res = f(**args)
-                    except BaseException as e:
-                        ex_short = traceback.format_exception_only(e.__class__, e)
-                        ex_full = traceback.format_exception(*sys.exc_info())
-                        ex_trace = True
-                        if isinstance(e, Error):
-                            ex_short = [e.get_message()]
-                            ex_trace = e.traceback
-                        if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
-                            # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
-                            # and will be handled just like locally raised exceptions. Suppress the remote traceback
-                            # for these, except ErrorWithTraceback, which should always display a traceback.
-                            pass
-                        else:
-                            logging.debug("\n".join(ex_full))
 
-                        sys_info = sysinfo()
-                        try:
-                            msg = msgpack.packb(
-                                {
-                                    MSGID: msgid,
-                                    "exception_class": e.__class__.__name__,
-                                    "exception_args": e.args,
-                                    "exception_full": ex_full,
-                                    "exception_short": ex_short,
-                                    "exception_trace": ex_trace,
-                                    "sysinfo": sys_info,
-                                }
-                            )
-                        except TypeError:
-                            msg = msgpack.packb(
-                                {
-                                    MSGID: msgid,
-                                    "exception_class": e.__class__.__name__,
-                                    "exception_args": [x if isinstance(x, (str, bytes, int)) else None for x in e.args],
-                                    "exception_full": ex_full,
-                                    "exception_short": ex_short,
-                                    "exception_trace": ex_trace,
-                                    "sysinfo": sys_info,
-                                }
-                            )
+        if self.socket_path:  # server for socket:// connections
+            try:
+                # remove any left-over socket file
+                os.unlink(self.socket_path)
+            except OSError:
+                if os.path.exists(self.socket_path):
+                    raise
+            sock_dir = os.path.dirname(self.socket_path)
+            os.makedirs(sock_dir, exist_ok=True)
+            if self.socket_path.endswith(".sock"):
+                pid_file = self.socket_path.replace(".sock", ".pid")
+            else:
+                pid_file = self.socket_path + ".pid"
+            pid = os.getpid()
+            with open(pid_file, "w") as f:
+                f.write(str(pid))
+            atexit.register(functools.partial(os.remove, pid_file))
+            atexit.register(functools.partial(os.remove, self.socket_path))
+            sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
+            sock.bind(self.socket_path)  # this creates the socket file in the fs
+            sock.listen(0)  # no backlog
+            os.chmod(self.socket_path, mode=0o0770)  # group members may use the socket, too.
+            print(f"borg serve: PID {pid}, listening on socket {self.socket_path} ...", file=sys.stderr)
 
-                        os_write(self.stdout_fd, msg)
-                    else:
-                        os_write(self.stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
-            if es:
-                shutdown_serve = True
-                continue
+            while True:
+                connection, client_address = sock.accept()
+                print(f"Accepted a connection on socket {self.socket_path} ...", file=sys.stderr)
+                self.stdin_fd = connection.makefile("rb").fileno()
+                self.stdout_fd = connection.makefile("wb").fileno()
+                inner_serve()
+                print(f"Finished with connection on socket {self.socket_path} .", file=sys.stderr)
+        else:  # server for one ssh:// connection
+            self.stdin_fd = sys.stdin.fileno()
+            self.stdout_fd = sys.stdout.fileno()
+            inner_serve()
 
     def negotiate(self, client_data):
         if isinstance(client_data, dict):
@@ -318,6 +365,7 @@ class RepositoryServer:  # pragma: no cover
     def close(self):
         if self.repository is not None:
             self.repository.__exit__(None, None, None)
+            self.repository = None
         borg.logger.teardown_logging()
         self.send_queued_log()
 
@@ -489,6 +537,7 @@ class RemoteRepository:
         self.rx_bytes = 0
         self.tx_bytes = 0
         self.to_send = EfficientCollectionQueue(1024 * 1024, bytes)
+        self.stdin_fd = self.stdout_fd = self.stderr_fd = None
         self.stderr_received = b""  # incomplete stderr line bytes received (no \n yet)
         self.chunkid_to_msgids = {}
         self.ignore_responses = set()
@@ -499,27 +548,54 @@ class RemoteRepository:
         self.upload_buffer_size_limit = args.upload_buffer * 1024 * 1024 if args and args.upload_buffer else 0
         self.unpacker = get_limited_unpacker("client")
         self.server_version = None  # we update this after server sends its version
-        self.p = None
+        self.p = self.sock = None
         self._args = args
-        testing = location.host == "__testsuite__"
-        # when testing, we invoke and talk to a borg process directly (no ssh).
-        # when not testing, we invoke the system-installed ssh binary to talk to a remote borg.
-        env = prepare_subprocess_env(system=not testing)
-        borg_cmd = self.borg_cmd(args, testing)
-        if not testing:
-            borg_cmd = self.ssh_cmd(location) + borg_cmd
-        logger.debug("SSH command line: %s", borg_cmd)
-        # we do not want the ssh getting killed by Ctrl-C/SIGINT because it is needed for clean shutdown of borg.
-        # borg's SIGINT handler tries to write a checkpoint and requires the remote repo connection.
-        self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, preexec_fn=ignore_sigint)
-        self.stdin_fd = self.p.stdin.fileno()
-        self.stdout_fd = self.p.stdout.fileno()
-        self.stderr_fd = self.p.stderr.fileno()
+        if self.location.proto == "ssh":
+            testing = location.host == "__testsuite__"
+            # when testing, we invoke and talk to a borg process directly (no ssh).
+            # when not testing, we invoke the system-installed ssh binary to talk to a remote borg.
+            env = prepare_subprocess_env(system=not testing)
+            borg_cmd = self.borg_cmd(args, testing)
+            if not testing:
+                borg_cmd = self.ssh_cmd(location) + borg_cmd
+            logger.debug("SSH command line: %s", borg_cmd)
+            # we do not want the ssh getting killed by Ctrl-C/SIGINT because it is needed for clean shutdown of borg.
+            # borg's SIGINT handler tries to write a checkpoint and requires the remote repo connection.
+            self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, preexec_fn=ignore_sigint)
+            self.stdin_fd = self.p.stdin.fileno()
+            self.stdout_fd = self.p.stdout.fileno()
+            self.stderr_fd = self.p.stderr.fileno()
+            self.r_fds = [self.stdout_fd, self.stderr_fd]
+            self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
+        elif self.location.proto == "socket":
+            if args.use_socket is False or args.use_socket is True:  # nothing or --socket
+                socket_path = get_socket_filename()
+            else:  # --socket=/some/path
+                socket_path = args.use_socket
+            self.sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
+            try:
+                self.sock.connect(socket_path)  # note: socket_path length is rather limited.
+            except FileNotFoundError:
+                self.sock = None
+                raise Error(f"The socket file {socket_path} does not exist.")
+            except ConnectionRefusedError:
+                self.sock = None
+                raise Error(f"There is no borg serve running for the socket file {socket_path}.")
+            self.stdin_fd = self.sock.makefile("wb").fileno()
+            self.stdout_fd = self.sock.makefile("rb").fileno()
+            self.stderr_fd = None
+            self.r_fds = [self.stdout_fd]
+            self.x_fds = [self.stdin_fd, self.stdout_fd]
+        else:
+            raise Error(f"Unsupported protocol {location.proto}")
+
         os.set_blocking(self.stdin_fd, False)
+        assert not os.get_blocking(self.stdin_fd)
         os.set_blocking(self.stdout_fd, False)
-        os.set_blocking(self.stderr_fd, False)
-        self.r_fds = [self.stdout_fd, self.stderr_fd]
-        self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
+        assert not os.get_blocking(self.stdout_fd)
+        if self.stderr_fd is not None:
+            os.set_blocking(self.stderr_fd, False)
+            assert not os.get_blocking(self.stderr_fd)
 
         try:
             try:
@@ -551,7 +627,7 @@ class RemoteRepository:
     def __del__(self):
         if len(self.responses):
             logging.debug("still %d cached responses left in RemoteRepository" % (len(self.responses),))
-        if self.p:
+        if self.p or self.sock:
             self.close()
             assert False, "cleanup happened in Repository.__del__"
 
@@ -906,12 +982,21 @@ class RemoteRepository:
         """actual remoting is done via self.call in the @api decorator"""
 
     def close(self):
-        self.call("close", {}, wait=True)
+        if self.p or self.sock:
+            self.call("close", {}, wait=True)
         if self.p:
             self.p.stdin.close()
             self.p.stdout.close()
             self.p.wait()
             self.p = None
+        if self.sock:
+            try:
+                self.sock.shutdown(socket.SHUT_RDWR)
+            except OSError as e:
+                if e.errno != errno.ENOTCONN:
+                    raise
+            self.sock.close()
+            self.sock = None
 
     def async_response(self, wait=True):
         for resp in self.call_many("async_responses", calls=[], wait=True, async_wait=wait):

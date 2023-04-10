@@ -118,6 +118,10 @@ def get_runtime_dir(*, legacy=False):
     return runtime_dir
 
 
+def get_socket_filename():
+    return os.path.join(get_runtime_dir(), "borg.sock")
+
+
 def get_cache_dir(*, legacy=False):
     """Determine where to repository keys and cache"""
 

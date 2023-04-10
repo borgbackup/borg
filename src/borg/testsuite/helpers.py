@@ -184,6 +184,14 @@ class TestLocationWithoutEnv:
             == "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='/some/path')"
         )
 
+    def test_socket(self, monkeypatch, keys_dir):
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        assert (
+            repr(Location("socket:///repo/path"))
+            == "Location(proto='socket', user=None, host=None, port=None, path='/repo/path')"
+        )
+        assert Location("socket:///some/path").to_key_filename() == keys_dir + "some_path"
+
     def test_file(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
@@ -275,6 +283,7 @@ class TestLocationWithoutEnv:
             "file://some/path",
             "host:some/path",
             "host:~user/some/path",
+            "socket:///some/path",
             "ssh://host/some/path",
             "ssh://user@host:1234/some/path",
         ]

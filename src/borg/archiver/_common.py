@@ -249,9 +249,14 @@ def with_archive(method):
 class Highlander(argparse.Action):
     """make sure some option is only given once"""
 
+    def __init__(self, *args, **kwargs):
+        self.__called = False
+        super().__init__(*args, **kwargs)
+
     def __call__(self, parser, namespace, values, option_string=None):
-        if getattr(namespace, self.dest, None) != self.default:
+        if self.__called:
             raise argparse.ArgumentError(self, "There can be only one.")
+        self.__called = True
         setattr(namespace, self.dest, values)
 
 

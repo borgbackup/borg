@@ -183,11 +183,13 @@ def FilesCacheMode(s):
     VALID_MODES = ("cis", "ims", "cs", "ms", "cr", "mr", "d", "s")  # letters in alpha order
     entries = set(s.strip().split(","))
     if not entries <= set(ENTRIES_MAP):
-        raise ValueError("cache mode must be a comma-separated list of: %s" % ",".join(sorted(ENTRIES_MAP)))
+        raise argparse.ArgumentTypeError(
+            "cache mode must be a comma-separated list of: %s" % ",".join(sorted(ENTRIES_MAP))
+        )
     short_entries = {ENTRIES_MAP[entry] for entry in entries}
     mode = "".join(sorted(short_entries))
     if mode not in VALID_MODES:
-        raise ValueError("cache mode short must be one of: %s" % ",".join(VALID_MODES))
+        raise argparse.ArgumentTypeError("cache mode short must be one of: %s" % ",".join(VALID_MODES))
     return mode
 
 

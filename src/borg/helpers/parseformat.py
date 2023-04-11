@@ -137,7 +137,7 @@ def ChunkerParams(s):
     params = s.strip().split(",")
     count = len(params)
     if count == 0:
-        raise ValueError("no chunker params given")
+        raise argparse.ArgumentTypeError("no chunker params given")
     algo = params[0].lower()
     if algo == CH_FAIL and count == 3:
         block_size = int(params[1])
@@ -152,9 +152,11 @@ def ChunkerParams(s):
             # or in-memory chunk management.
             # choose the block (chunk) size wisely: if you have a lot of data and you cut
             # it into very small chunks, you are asking for trouble!
-            raise ValueError("block_size must not be less than 64 Bytes")
+            raise argparse.ArgumentTypeError("block_size must not be less than 64 Bytes")
         if block_size > MAX_DATA_SIZE or header_size > MAX_DATA_SIZE:
-            raise ValueError("block_size and header_size must not exceed MAX_DATA_SIZE [%d]" % MAX_DATA_SIZE)
+            raise argparse.ArgumentTypeError(
+                "block_size and header_size must not exceed MAX_DATA_SIZE [%d]" % MAX_DATA_SIZE
+            )
         return algo, block_size, header_size
     if algo == "default" and count == 1:  # default
         return CHUNKER_PARAMS
@@ -162,14 +164,18 @@ def ChunkerParams(s):
     if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[count - 4 :])
         if not (chunk_min <= chunk_mask <= chunk_max):
-            raise ValueError("required: chunk_min <= chunk_mask <= chunk_max")
+            raise argparse.ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
         if chunk_min < 6:
             # see comment in 'fixed' algo check
-            raise ValueError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
+            raise argparse.ArgumentTypeError(
+                "min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)"
+            )
         if chunk_max > 23:
-            raise ValueError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
+            raise argparse.ArgumentTypeError(
+                "max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)"
+            )
         return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
-    raise ValueError("invalid chunker params")
+    raise argparse.ArgumentTypeError("invalid chunker params")
 
 
 def FilesCacheMode(s):

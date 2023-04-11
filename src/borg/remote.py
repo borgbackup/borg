@@ -198,6 +198,15 @@ class RepositoryServer:  # pragma: no cover
         return {name: kwargs[name] for name in kwargs if name in known}
 
     def serve(self):
+        def setup_blocking(stdin_fd, stdout_fd, stderr_fd):
+            os.set_blocking(stdin_fd, False)
+            assert not os.get_blocking(stdin_fd)
+            os.set_blocking(stdout_fd, True)
+            assert os.get_blocking(stdout_fd)
+            if stderr_fd != stdout_fd:
+                os.set_blocking(stderr_fd, True)
+                assert os.get_blocking(stderr_fd)
+
         if self.socket_path:
             try:
                 # remove any left-over socket file
@@ -212,18 +221,12 @@ class RepositoryServer:  # pragma: no cover
             stdin_fd = connection.makefile("rb").fileno()
             stdout_fd = connection.makefile("wb").fileno()
             stderr_fd = stdout_fd  # TODO log output on sys.stderr is not going over the socket
+            setup_blocking(stdin_fd, stdout_fd, stderr_fd)
         else:
             stdin_fd = sys.stdin.fileno()
             stdout_fd = sys.stdout.fileno()
             stderr_fd = stdout_fd
-
-        os.set_blocking(stdin_fd, False)
-        assert not os.get_blocking(stdin_fd)
-        os.set_blocking(stdout_fd, True)
-        assert os.get_blocking(stdout_fd)
-        if stderr_fd != stdout_fd:
-            os.set_blocking(stderr_fd, True)
-            assert os.get_blocking(stderr_fd)
+            setup_blocking(stdin_fd, stdout_fd, stderr_fd)
 
         unpacker = get_limited_unpacker("server")
         while True:

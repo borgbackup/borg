@@ -207,7 +207,120 @@ class RepositoryServer:  # pragma: no cover
                 os.set_blocking(stderr_fd, True)
                 assert os.get_blocking(stderr_fd)
 
-        if self.socket_path:
+        def inner_serve():
+            unpacker = get_limited_unpacker("server")
+            while True:
+                r, w, es = select.select([stdin_fd], [], [], 10)
+                if r:
+                    data = os.read(stdin_fd, BUFSIZE)
+                    if not data:
+                        if self.repository is not None:
+                            self.repository.close()
+                        else:
+                            os_write(
+                                stderr_fd,
+                                "Borg {}: Got connection close before repository was opened.\n".format(
+                                    __version__
+                                ).encode(),
+                            )
+                        return
+                    unpacker.feed(data)
+                    for unpacked in unpacker:
+                        if isinstance(unpacked, dict):
+                            dictFormat = True
+                            msgid = unpacked[MSGID]
+                            method = unpacked[MSG]
+                            args = unpacked[ARGS]
+                        elif isinstance(unpacked, tuple) and len(unpacked) == 4:
+                            dictFormat = False
+                            # The first field 'type' was always 1 and has always been ignored
+                            _, msgid, method, args = unpacked
+                            args = self.positional_to_named(method, args)
+                        else:
+                            if self.repository is not None:
+                                self.repository.close()
+                            raise UnexpectedRPCDataFormatFromClient(__version__)
+                        try:
+                            if method not in self.rpc_methods:
+                                raise InvalidRPCMethod(method)
+                            try:
+                                f = getattr(self, method)
+                            except AttributeError:
+                                f = getattr(self.repository, method)
+                            args = self.filter_args(f, args)
+                            res = f(**args)
+                        except BaseException as e:
+                            if dictFormat:
+                                ex_short = traceback.format_exception_only(e.__class__, e)
+                                ex_full = traceback.format_exception(*sys.exc_info())
+                                ex_trace = True
+                                if isinstance(e, Error):
+                                    ex_short = [e.get_message()]
+                                    ex_trace = e.traceback
+                                if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
+                                    # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                                    # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                                    # for these, except ErrorWithTraceback, which should always display a traceback.
+                                    pass
+                                else:
+                                    logging.debug("\n".join(ex_full))
+
+                                try:
+                                    msg = msgpack.packb(
+                                        {
+                                            MSGID: msgid,
+                                            "exception_class": e.__class__.__name__,
+                                            "exception_args": e.args,
+                                            "exception_full": ex_full,
+                                            "exception_short": ex_short,
+                                            "exception_trace": ex_trace,
+                                            "sysinfo": sysinfo(),
+                                        }
+                                    )
+                                except TypeError:
+                                    msg = msgpack.packb(
+                                        {
+                                            MSGID: msgid,
+                                            "exception_class": e.__class__.__name__,
+                                            "exception_args": [
+                                                x if isinstance(x, (str, bytes, int)) else None for x in e.args
+                                            ],
+                                            "exception_full": ex_full,
+                                            "exception_short": ex_short,
+                                            "exception_trace": ex_trace,
+                                            "sysinfo": sysinfo(),
+                                        }
+                                    )
+
+                                os_write(stdout_fd, msg)
+                            else:
+                                if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
+                                    # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                                    # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                                    # for these, except ErrorWithTraceback, which should always display a traceback.
+                                    pass
+                                else:
+                                    if isinstance(e, Error):
+                                        tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
+                                        msg = e.get_message()
+                                    else:
+                                        tb_log_level = logging.ERROR
+                                        msg = "%s Exception in RPC call" % e.__class__.__name__
+                                    tb = f"{traceback.format_exc()}\n{sysinfo()}"
+                                    logging.error(msg)
+                                    logging.log(tb_log_level, tb)
+                                exc = "Remote Exception (see remote log for the traceback)"
+                                os_write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
+                        else:
+                            if dictFormat:
+                                os_write(stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
+                            else:
+                                os_write(stdout_fd, msgpack.packb((1, msgid, None, res)))
+                if es:
+                    self.repository.close()
+                    return
+
+        if self.socket_path:  # server for socket:// connections
             try:
                 # remove any left-over socket file
                 os.unlink(self.socket_path)
@@ -217,128 +330,19 @@ class RepositoryServer:  # pragma: no cover
             sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
             sock.bind(self.socket_path)  # this creates the socket file in the fs
             sock.listen(0)  # no backlog
-            connection, client_address = sock.accept()
-            stdin_fd = connection.makefile("rb").fileno()
-            stdout_fd = connection.makefile("wb").fileno()
-            stderr_fd = stdout_fd  # TODO log output on sys.stderr is not going over the socket
-            setup_blocking(stdin_fd, stdout_fd, stderr_fd)
-        else:
+            while True:
+                connection, client_address = sock.accept()
+                stdin_fd = connection.makefile("rb").fileno()
+                stdout_fd = connection.makefile("wb").fileno()
+                stderr_fd = stdout_fd  # TODO log output on sys.stderr is not going over the socket
+                setup_blocking(stdin_fd, stdout_fd, stderr_fd)
+                inner_serve()
+        else:  # server for one ssh:// connection
             stdin_fd = sys.stdin.fileno()
             stdout_fd = sys.stdout.fileno()
             stderr_fd = stdout_fd
             setup_blocking(stdin_fd, stdout_fd, stderr_fd)
-
-        unpacker = get_limited_unpacker("server")
-        while True:
-            r, w, es = select.select([stdin_fd], [], [], 10)
-            if r:
-                data = os.read(stdin_fd, BUFSIZE)
-                if not data:
-                    if self.repository is not None:
-                        self.repository.close()
-                    else:
-                        os_write(
-                            stderr_fd,
-                            "Borg {}: Got connection close before repository was opened.\n".format(
-                                __version__
-                            ).encode(),
-                        )
-                    return
-                unpacker.feed(data)
-                for unpacked in unpacker:
-                    if isinstance(unpacked, dict):
-                        dictFormat = True
-                        msgid = unpacked[MSGID]
-                        method = unpacked[MSG]
-                        args = unpacked[ARGS]
-                    elif isinstance(unpacked, tuple) and len(unpacked) == 4:
-                        dictFormat = False
-                        # The first field 'type' was always 1 and has always been ignored
-                        _, msgid, method, args = unpacked
-                        args = self.positional_to_named(method, args)
-                    else:
-                        if self.repository is not None:
-                            self.repository.close()
-                        raise UnexpectedRPCDataFormatFromClient(__version__)
-                    try:
-                        if method not in self.rpc_methods:
-                            raise InvalidRPCMethod(method)
-                        try:
-                            f = getattr(self, method)
-                        except AttributeError:
-                            f = getattr(self.repository, method)
-                        args = self.filter_args(f, args)
-                        res = f(**args)
-                    except BaseException as e:
-                        if dictFormat:
-                            ex_short = traceback.format_exception_only(e.__class__, e)
-                            ex_full = traceback.format_exception(*sys.exc_info())
-                            ex_trace = True
-                            if isinstance(e, Error):
-                                ex_short = [e.get_message()]
-                                ex_trace = e.traceback
-                            if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
-                                # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
-                                # and will be handled just like locally raised exceptions. Suppress the remote traceback
-                                # for these, except ErrorWithTraceback, which should always display a traceback.
-                                pass
-                            else:
-                                logging.debug("\n".join(ex_full))
-
-                            try:
-                                msg = msgpack.packb(
-                                    {
-                                        MSGID: msgid,
-                                        "exception_class": e.__class__.__name__,
-                                        "exception_args": e.args,
-                                        "exception_full": ex_full,
-                                        "exception_short": ex_short,
-                                        "exception_trace": ex_trace,
-                                        "sysinfo": sysinfo(),
-                                    }
-                                )
-                            except TypeError:
-                                msg = msgpack.packb(
-                                    {
-                                        MSGID: msgid,
-                                        "exception_class": e.__class__.__name__,
-                                        "exception_args": [
-                                            x if isinstance(x, (str, bytes, int)) else None for x in e.args
-                                        ],
-                                        "exception_full": ex_full,
-                                        "exception_short": ex_short,
-                                        "exception_trace": ex_trace,
-                                        "sysinfo": sysinfo(),
-                                    }
-                                )
-
-                            os_write(stdout_fd, msg)
-                        else:
-                            if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
-                                # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
-                                # and will be handled just like locally raised exceptions. Suppress the remote traceback
-                                # for these, except ErrorWithTraceback, which should always display a traceback.
-                                pass
-                            else:
-                                if isinstance(e, Error):
-                                    tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
-                                    msg = e.get_message()
-                                else:
-                                    tb_log_level = logging.ERROR
-                                    msg = "%s Exception in RPC call" % e.__class__.__name__
-                                tb = f"{traceback.format_exc()}\n{sysinfo()}"
-                                logging.error(msg)
-                                logging.log(tb_log_level, tb)
-                            exc = "Remote Exception (see remote log for the traceback)"
-                            os_write(stdout_fd, msgpack.packb((1, msgid, e.__class__.__name__, exc)))
-                    else:
-                        if dictFormat:
-                            os_write(stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
-                        else:
-                            os_write(stdout_fd, msgpack.packb((1, msgid, None, res)))
-            if es:
-                self.repository.close()
-                return
+            inner_serve()
 
     def negotiate(self, client_data):
         # old format used in 1.0.x

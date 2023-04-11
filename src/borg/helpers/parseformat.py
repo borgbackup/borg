@@ -285,7 +285,7 @@ def SortBySpec(text):
 
     for token in text.split(","):
         if token not in AI_HUMAN_SORT_KEYS:
-            raise ValueError("Invalid sort key: %s" % token)
+            raise argparse.ArgumentTypeError("Invalid sort key: %s" % token)
     return text.replace("timestamp", "ts")
 
 

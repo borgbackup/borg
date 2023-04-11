@@ -599,7 +599,7 @@ class RemoteRepository:
         )  # fallback version if server is too old to send version information
         self.p = self.sock = None
         self._args = args
-        if self.location.proto != "socket":
+        if self.location.proto == "ssh":
             testing = location.host == "__testsuite__"
             # when testing, we invoke and talk to a borg process directly (no ssh).
             # when not testing, we invoke the system-installed ssh binary to talk to a remote borg.
@@ -616,7 +616,7 @@ class RemoteRepository:
             self.stderr_fd = self.p.stderr.fileno()
             self.r_fds = [self.stdout_fd, self.stderr_fd]
             self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
-        else:  # socket
+        elif self.location.proto == "socket":
             socket_path = os.path.join(location.path, "socket")
             self.sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
             try:
@@ -630,6 +630,8 @@ class RemoteRepository:
             self.stderr_fd = None
             self.r_fds = [self.stdout_fd]
             self.x_fds = [self.stdin_fd, self.stdout_fd]
+        else:
+            raise Error(f"Unsupported protocol {location.proto}")
 
         os.set_blocking(self.stdin_fd, False)
         assert not os.get_blocking(self.stdin_fd)

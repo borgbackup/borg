@@ -15,6 +15,7 @@ which compressor has been used to compress the data and dispatch to the correct
 decompressor.
 """
 
+from argparse import ArgumentTypeError
 import random
 from struct import Struct
 import zlib
@@ -652,7 +653,7 @@ class CompressionSpec:
         values = s.split(',')
         count = len(values)
         if count < 1:
-            raise ValueError
+            raise ArgumentTypeError("not enough arguments")
         # --compression algo[,level]
         self.name = values[0]
         if self.name in ('none', 'lz4', ):
@@ -663,9 +664,9 @@ class CompressionSpec:
             elif count == 2:
                 level = int(values[1])
                 if not 0 <= level <= 9:
-                    raise ValueError
+                    raise ArgumentTypeError("level must be >= 0 and <= 9")
             else:
-                raise ValueError
+                raise ArgumentTypeError("too many arguments")
             self.level = level
         elif self.name in ('zstd', ):
             if count < 2:
@@ -673,28 +674,28 @@ class CompressionSpec:
             elif count == 2:
                 level = int(values[1])
                 if not 1 <= level <= 22:
-                    raise ValueError
+                    raise ArgumentTypeError("level must be >= 1 and <= 22")
             else:
-                raise ValueError
+                raise ArgumentTypeError("too many arguments")
             self.level = level
         elif self.name == 'auto':
             if 2 <= count <= 3:
                 compression = ','.join(values[1:])
             else:
-                raise ValueError
+                raise ArgumentTypeError("bad arguments")
             self.inner = CompressionSpec(compression)
         elif self.name == 'obfuscate':
             if 3 <= count <= 5:
                 level = int(values[1])
                 if not ((1 <= level <= 6) or (110 <= level <= 123)):
-                    raise ValueError
+                    raise ArgumentTypeError("level must be >= 1 and <= 6 or >= 110 and <= 123")
                 self.level = level
                 compression = ','.join(values[2:])
             else:
-                raise ValueError
+                raise ArgumentTypeError("bad arguments")
             self.inner = CompressionSpec(compression)
         else:
-            raise ValueError
+            raise ArgumentTypeError("unsupported compression type")
 
     @property
     def compressor(self):

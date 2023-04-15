@@ -10,6 +10,7 @@ from ...helpers import msgpack
 from ...manifest import Manifest
 from ...repository import Repository
 from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
+from . import src_file
 
 
 class ArchiverCheckTestCase(ArchiverTestCaseBase):
@@ -95,7 +96,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         archive, repository = self.open_archive("archive1")
         with repository:
             for item in archive.iter_items():
-                if item.path.endswith("testsuite/archiver/__init__.py"):
+                if item.path.endswith(src_file):
                     valid_chunks = item.chunks
                     killed_chunk = valid_chunks[-1]
                     repository.delete(killed_chunk.id)
@@ -116,7 +117,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             archive, repository = self.open_archive(archive_name)
             with repository:
                 for item in archive.iter_items():
-                    if item.path.endswith("testsuite/archiver/__init__.py"):
+                    if item.path.endswith(src_file):
                         self.assert_not_equal(valid_chunks, item.chunks)
                         self.assert_not_in(killed_chunk, item.chunks)
                         break
@@ -128,13 +129,13 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         # check should be able to heal the file now:
         output = self.cmd(f"--repo={self.repository_location}", "check", "-v", "--repair", exit_code=0)
         self.assert_in("Healed previously missing file chunk", output)
-        self.assert_in("testsuite/archiver/__init__.py: Completely healed previously damaged file!", output)
+        self.assert_in(f"{src_file}: Completely healed previously damaged file!", output)
         # check that the file in the old archives has the correct chunks again
         for archive_name in ("archive1", "archive2"):
             archive, repository = self.open_archive(archive_name)
             with repository:
                 for item in archive.iter_items():
-                    if item.path.endswith("testsuite/archiver/__init__.py"):
+                    if item.path.endswith(src_file):
                         self.assert_equal(valid_chunks, item.chunks)
                         break
                 else:
@@ -251,7 +252,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         archive, repository = self.open_archive("archive1")
         with repository:
             for item in archive.iter_items():
-                if item.path.endswith("testsuite/archiver/__init__.py"):
+                if item.path.endswith(src_file):
                     chunk = item.chunks[-1]
                     data = repository.get(chunk.id)
                     data = data[0:100] + b"x" + data[101:]
@@ -264,7 +265,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         # repair (heal is tested in another test)
         output = self.cmd(f"--repo={self.repository_location}", "check", "--repair", "--verify-data", exit_code=0)
         assert bin_to_hex(chunk.id) + ", integrity error" in output
-        assert "testsuite/archiver/__init__.py: New missing file chunk detected" in output
+        assert f"{src_file}: New missing file chunk detected" in output
 
     def test_verify_data(self):
         self._test_verify_data(RK_ENCRYPTION)

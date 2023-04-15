@@ -14,14 +14,8 @@ from .. import has_lchflags, llfuse
 from .. import changedir, no_selinux, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform import fakeroot_detected
-from . import (
-    ArchiverTestCaseBase,
-    ArchiverTestCaseBinaryBase,
-    RemoteArchiverTestCaseBase,
-    RK_ENCRYPTION,
-    requires_hardlinks,
-    BORG_EXES,
-)
+from . import ArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RemoteArchiverTestCaseBase, RK_ENCRYPTION, BORG_EXES
+from . import src_file, requires_hardlinks
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -205,7 +199,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         archive, repository = self.open_archive("archive")
         with repository:
             for item in archive.iter_items():
-                if item.path.endswith("testsuite/archiver/__init__.py"):
+                if item.path.endswith(src_file):
                     repository.delete(item.chunks[-1].id)
                     path = item.path  # store full path for later
                     break

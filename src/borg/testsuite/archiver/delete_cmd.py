@@ -5,6 +5,7 @@ from ...constants import *  # NOQA
 from ...manifest import Manifest
 from ...repository import Repository
 from . import ArchiverTestCaseBase, RemoteArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
+from . import src_file
 
 
 class ArchiverTestCase(ArchiverTestCaseBase):
@@ -48,7 +49,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             archive = Archive(manifest, "test")
             for item in archive.iter_items():
-                if item.path.endswith("testsuite/archiver/__init__.py"):
+                if item.path.endswith(src_file):
                     repository.delete(item.chunks[-1].id)
                     break
             else:

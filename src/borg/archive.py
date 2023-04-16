@@ -984,6 +984,16 @@ Duration: {0.duration}
                     set_flags(path, item.bsdflags, fd=fd)
                 except OSError:
                     pass
+        else:  # win32
+            # set timestamps rather late
+            mtime = item.mtime
+            atime = item.atime if "atime" in item else mtime
+            try:
+                # note: no fd support on win32
+                os.utime(path, None, ns=(atime, mtime))
+            except OSError:
+                # some systems don't support calling utime on a symlink
+                pass
 
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)

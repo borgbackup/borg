@@ -13,7 +13,7 @@ from ...helpers import EXIT_WARNING
 from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from ..platform import is_darwin
+from ..platform import is_darwin, is_win32
 from . import (
     ArchiverTestCaseBase,
     ArchiverTestCaseBinaryBase,
@@ -620,6 +620,49 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with changedir("output"):
             with patch.object(xattr, "setxattr", patched_setxattr_EACCES):
                 self.cmd(f"--repo={self.repository_location}", "extract", "test", exit_code=EXIT_WARNING)
+
+    def test_extract_continue(self):
+        CONTENTS1, CONTENTS2, CONTENTS3 = b"contents1" * 100, b"contents2" * 200, b"contents3" * 300
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        self.create_regular_file("file1", contents=CONTENTS1)
+        self.create_regular_file("file2", contents=CONTENTS2)
+        self.create_regular_file("file3", contents=CONTENTS3)
+        self.cmd(f"--repo={self.repository_location}", "create", "arch", "input")
+        with changedir("output"):
+            # we simulate an interrupted/partial extraction:
+            self.cmd(f"--repo={self.repository_location}", "extract", "arch")
+            # do not modify file1, it stands for a successfully extracted file
+            file1_st = os.stat("input/file1")
+            # simulate a partially extracted file2 (smaller size, archived mtime not yet set)
+            file2_st = os.stat("input/file2")
+            os.truncate("input/file2", 123)  # -> incorrect size, incorrect mtime
+            # simulate file3 has not yet been extracted
+            file3_st = os.stat("input/file3")
+            os.remove("input/file3")
+        with changedir("output"):
+            # now try to continue extracting, using the same archive, same output dir:
+            self.cmd(f"--repo={self.repository_location}", "extract", "arch", "--continue")
+            now_file1_st = os.stat("input/file1")
+            assert file1_st.st_ino == now_file1_st.st_ino  # file1 was NOT extracted again
+            assert file1_st.st_mtime_ns == now_file1_st.st_mtime_ns  # has correct mtime
+            new_file2_st = os.stat("input/file2")
+            assert file2_st.st_ino != new_file2_st.st_ino  # file2 was extracted again
+            assert file2_st.st_mtime_ns == new_file2_st.st_mtime_ns  # has correct mtime
+            new_file3_st = os.stat("input/file3")
+            assert file3_st.st_ino != new_file3_st.st_ino  # file3 was extracted again
+            assert file3_st.st_mtime_ns == new_file3_st.st_mtime_ns  # has correct mtime
+            # windows has a strange ctime behaviour when deleting and recreating a file
+            if not is_win32:
+                assert file1_st.st_ctime_ns == now_file1_st.st_ctime_ns  # file not extracted again
+                assert file2_st.st_ctime_ns != new_file2_st.st_ctime_ns  # file extracted again
+                assert file3_st.st_ctime_ns != new_file3_st.st_ctime_ns  # file extracted again
+            # check if all contents (and thus also file sizes) are correct:
+            with open("input/file1", "rb") as f:
+                assert f.read() == CONTENTS1
+            with open("input/file2", "rb") as f:
+                assert f.read() == CONTENTS2
+            with open("input/file3", "rb") as f:
+                assert f.read() == CONTENTS3
 
 
 class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):

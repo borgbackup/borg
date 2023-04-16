@@ -780,7 +780,18 @@ Duration: {0.duration}
                 # In this case, we *want* to extract twice, because there is no other way.
                 pass
 
-    def extract_item(self, item, *, restore_attrs=True, dry_run=False, stdout=False, sparse=False, hlm=None, pi=None):
+    def extract_item(
+        self,
+        item,
+        *,
+        restore_attrs=True,
+        dry_run=False,
+        stdout=False,
+        sparse=False,
+        hlm=None,
+        pi=None,
+        continue_extraction=False,
+    ):
         """
         Extract archive item.
 
@@ -791,7 +802,27 @@ Duration: {0.duration}
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
         :param hlm: maps hlid to link_target for extracting subtrees with hardlinks correctly
         :param pi: ProgressIndicatorPercent (or similar) for file extraction progress (in bytes)
+        :param continue_extraction: continue a previously interrupted extraction of same archive
         """
+
+        def same_item(item, st):
+            """is the archived item the same as the fs item at same path with stat st?"""
+            if not stat.S_ISREG(st.st_mode):
+                # we only "optimize" for regular files.
+                # other file types are less frequent and have no content extraction we could "optimize away".
+                return False
+            if item.mode != st.st_mode or item.size != st.st_size:
+                # the size check catches incomplete previous file extraction
+                return False
+            if item.get("mtime") != st.st_mtime_ns:
+                # note: mtime is "extracted" late, after xattrs and ACLs, but before flags.
+                return False
+            # this is good enough for the intended use case:
+            # continuing an extraction of same archive that initially started in an empty directory.
+            # there is a very small risk that "bsdflags" of one file are wrong:
+            # if a previous extraction was interrupted between setting the mtime and setting non-default flags.
+            return True
+
         has_damaged_chunks = "chunks_healthy" in item
         if dry_run or stdout:
             with self.extract_helper(item, "", hlm, dry_run=dry_run or stdout) as hardlink_set:
@@ -828,7 +859,9 @@ Duration: {0.duration}
         # Attempt to remove existing files, ignore errors on failure
         try:
             st = os.stat(path, follow_symlinks=False)
-            if stat.S_ISDIR(st.st_mode):
+            if continue_extraction and same_item(item, st):
+                return  # done! we already have fully extracted this file in a previous run.
+            elif stat.S_ISDIR(st.st_mode):
                 os.rmdir(path)
             else:
                 os.unlink(path)

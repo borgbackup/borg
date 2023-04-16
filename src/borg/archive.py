@@ -780,18 +780,7 @@ Duration: {0.duration}
                 # In this case, we *want* to extract twice, because there is no other way.
                 pass
 
-    def extract_item(
-        self,
-        item,
-        restore_attrs=True,
-        dry_run=False,
-        stdout=False,
-        sparse=False,
-        hlm=None,
-        stripped_components=0,
-        original_path=None,
-        pi=None,
-    ):
+    def extract_item(self, item, *, restore_attrs=True, dry_run=False, stdout=False, sparse=False, hlm=None, pi=None):
         """
         Extract archive item.
 
@@ -801,8 +790,6 @@ Duration: {0.duration}
         :param stdout: write extracted data to stdout
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
         :param hlm: maps hlid to link_target for extracting subtrees with hardlinks correctly
-        :param stripped_components: stripped leading path components to correct hard link extraction
-        :param original_path: 'path' key as stored in archive
         :param pi: ProgressIndicatorPercent (or similar) for file extraction progress (in bytes)
         """
         has_damaged_chunks = "chunks_healthy" in item
@@ -834,7 +821,6 @@ Duration: {0.duration}
                 raise BackupError("File has damaged (all-zero) chunks. Try running borg check --repair.")
             return
 
-        original_path = original_path or item.path
         dest = self.cwd
         if item.path.startswith(("/", "../")):
             raise Exception("Path should be relative and local")

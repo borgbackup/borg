@@ -75,15 +75,7 @@ class ExtractMixIn:
                         dirs.append(item)
                         archive.extract_item(item, stdout=stdout, restore_attrs=False)
                     else:
-                        archive.extract_item(
-                            item,
-                            stdout=stdout,
-                            sparse=sparse,
-                            hlm=hlm,
-                            stripped_components=strip_components,
-                            original_path=orig_path,
-                            pi=pi,
-                        )
+                        archive.extract_item(item, stdout=stdout, sparse=sparse, hlm=hlm, pi=pi)
             except (BackupOSError, BackupError) as e:
                 self.print_warning("%s: %s", remove_surrogates(orig_path), e)
 

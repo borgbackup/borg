@@ -103,6 +103,32 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
 
+    @pytest.mark.skipif(is_win32, reason="still broken on windows")
+    def test_archived_paths(self):
+        # As borg comes from the POSIX (Linux, UNIX) world, a lot of stuff assumes path separators
+        # to be slashes "/", e.g.: in archived items, for pattern matching.
+        # To make our lives easier and to support cross-platform extraction we always use slashes.
+        # Similarly, archived paths are expected to be full, but relative (have no leading slash).
+        full_path = os.path.abspath(os.path.join(self.input_path, "test"))
+        # remove windows drive letter, if any:
+        posix_path = full_path[2:] if full_path[1] == ":" else full_path
+        # only needed on windows in case there are backslashes:
+        posix_path = posix_path.replace("\\", "/")
+        # no leading slash in borg archives:
+        archived_path = posix_path.lstrip("/")
+        self.create_regular_file("test")
+        self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
+        self.cmd(f"--repo={self.repository_location}", "create", "test", "input", full_path)
+        # "input" directory is recursed into, "input/test" is discovered and joined by borg's recursion.
+        # full_path was directly given as a cli argument and should end up as archive_path in the borg archive.
+        expected_paths = sorted(["input", "input/test", archived_path])
+        # check path in archived items:
+        archive_list = self.cmd(f"--repo={self.repository_location}", "list", "test", "--short")
+        assert expected_paths == sorted([path for path in archive_list.splitlines() if path])
+        # check path in archived items (json):
+        archive_list = self.cmd(f"--repo={self.repository_location}", "list", "test", "--json-lines")
+        assert expected_paths == sorted([json.loads(line)["path"] for line in archive_list.splitlines() if line])
+
     @requires_hardlinks
     def test_create_duplicate_root(self):
         # setup for #5603

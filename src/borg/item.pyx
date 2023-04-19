@@ -639,17 +639,16 @@ class ItemDiff:
     Comparison of two items from different archives.
 
     The items may have different paths and still be considered equal (e.g. for renames).
-    It does not include extended or time attributes in the comparison.
     """
 
-    def __init__(self, path, item1, item2, chunk_a, chunk_b, numeric_ids=False, can_compare_chunk_ids=False):
+    def __init__(self, path, item1, item2, chunk_1, chunk_2, numeric_ids=False, can_compare_chunk_ids=False):
         self.path = path
         self._item1 = item1
         self._item2 = item2
         self._numeric_ids = numeric_ids
         self._can_compare_chunk_ids = can_compare_chunk_ids
-        self._chunk_a = chunk_a
-        self._chunk_b = chunk_b
+        self._chunk_1 = chunk_1
+        self._chunk_2 = chunk_2
         
         self._changes = {}
 
@@ -802,7 +801,7 @@ class ItemDiff:
             return self._item1.chunks == self._item2.chunks
         if self._item1.get_size() != self._item2.get_size():
             return False
-        return chunks_contents_equal(self._chunk_a, self._chunk_b)
+        return chunks_contents_equal(self._chunk_1, self._chunk_2)
 
 
 def chunks_contents_equal(chunks_a, chunks_b):

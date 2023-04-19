@@ -62,7 +62,7 @@ class DiffMixIn:
                             "changes": [
                                 change.to_dict()
                                 for name, change in diff.changes().items()
-                                if not args.content_only or (name not in DiffFormatter.NOT_CONTENT)
+                                if not args.content_only or (name not in DiffFormatter.METADATA)
                             ],
                         },
                         sort_keys=True,
@@ -86,20 +86,7 @@ class DiffMixIn:
         diff_epilog = (
             process_epilog(
                 """
-        This command finds differences (file contents, user/group/mode) between archives.
-
-        A repository location and an archive name must be specified for ARCHIVE1.
-        ARCHIVE2 is just another archive name in same repository (no repository location
-        allowed).
-
-        For archives created with Borg 1.1 or newer diff automatically detects whether
-        the archives are created with the same chunker params. If so, only chunk IDs
-        are compared, which is very fast.
-
-        For archives prior to Borg 1.1 chunk contents are compared by default.
-        If you did not create the archives with different chunker params,
-        pass ``--same-chunker-params``.
-        Note that the chunker params changed from Borg 0.xx to 1.0.
+        This command finds differences (file contents, metadata) between ARCHIVE1 and ARCHIVE2.
 
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
@@ -133,7 +120,7 @@ class DiffMixIn:
             + textwrap.dedent(
                 """
 
-        Keys available only when show differences between archives:
+        Keys available only when showing differences between archives:
 
         """
             )

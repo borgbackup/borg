@@ -959,7 +959,7 @@ class DiffFormatter(BaseFormatter):
         ("link", "directory", "blkdev", "chrdev", "fifo"),
         ("mtime", "ctime", "isomtime", "isoctime"),
     )
-    NOT_CONTENT = ("mode", "type", "owner", "group", "user", "mtime", "ctime")
+    METADATA = ("mode", "type", "owner", "group", "user", "mtime", "ctime")
 
     @classmethod
     def available_keys(cls):
@@ -1002,7 +1002,7 @@ class DiffFormatter(BaseFormatter):
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
         if self.content_only:
-            self.used_call_keys -= set(self.NOT_CONTENT)
+            self.used_call_keys -= set(self.METADATA)
 
     def get_item_data(self, item: "ItemDiff", jsonline=False) -> dict:
         diff_data = {}
@@ -1013,7 +1013,7 @@ class DiffFormatter(BaseFormatter):
         for key in self.call_keys:
             if key in ("isomtime", "isoctime"):
                 continue
-            if self.content_only and key in self.NOT_CONTENT:
+            if self.content_only and key in self.METADATA:
                 continue
             change.append(self.call_keys[key](item))
         diff_data["change"] = " ".join([v for v in change if v])

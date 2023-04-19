@@ -11,6 +11,23 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd(f"--repo={self.repository_location}", "create", "test", "input")
         self.cmd(f"--repo={self.repository_location}", "delete", "--first", "1", "--last", "1", fork=True, exit_code=2)
 
+    def test_highlander(self):
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        self.cmd(f"--repo={self.repository_location}", "create", "--comment", "comment 1", "test-1", __file__)
+        error_msg = "There can be only one"
+        # Default umask value is 0077
+        # Test that it works with a one time specified default or custom value
+        output_default = self.cmd(f"--repo={self.repository_location}", "--umask", "0077", "rlist")
+        assert error_msg not in output_default
+        output_custom = self.cmd(f"--repo={self.repository_location}", "--umask", "0007", "rlist")
+        assert error_msg not in output_custom
+        # Test that all combinations of custom and default values fail
+        for first, second in [("0007", "0007"), ("0007", "0077"), ("0077", "0007"), ("0077", "0077")]:
+            output_custom = self.cmd(
+                f"--repo={self.repository_location}", "--umask", first, "--umask", second, "rlist", exit_code=2
+            )
+            assert error_msg in output_custom
+
 
 def test_get_args():
     archiver = Archiver()

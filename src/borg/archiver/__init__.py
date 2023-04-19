@@ -564,6 +564,29 @@ def sig_trace_handler(sig_no, stack):  # pragma: no cover
     faulthandler.dump_traceback()
 
 
+def format_tb(exc):
+    qualname = type(exc).__qualname__
+    remote = isinstance(exc, RemoteRepository.RPCError)
+    if remote:
+        prefix = "Borg server: "
+        trace_back = "\n".join(prefix + l for l in exc.exception_full.splitlines())
+        sys_info = "\n".join(prefix + l for l in exc.sysinfo.splitlines())
+    else:
+        trace_back = traceback.format_exc()
+        sys_info = sysinfo()
+    result = f"""
+Error:
+
+{qualname}: {exc}
+
+If reporting bugs, please include the following:
+
+{trace_back}
+{sys_info}
+"""
+    return result
+
+
 def main():  # pragma: no cover
     # Make sure stdout and stderr have errors='replace' to avoid unicode
     # issues when print()-ing unicode file names
@@ -594,12 +617,11 @@ def main():  # pragma: no cover
         try:
             args = archiver.get_args(sys.argv, os.environ.get("SSH_ORIGINAL_COMMAND"))
         except Error as e:
-            msg = e.get_message()
-            tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
-            tb = f"{traceback.format_exc()}\n{sysinfo()}"
             # we might not have logging setup yet, so get out quickly
+            msg = e.get_message()
             print(msg, file=sys.stderr)
-            if tb_log_level == logging.ERROR:
+            if e.traceback:
+                tb = format_tb(e)
                 print(tb, file=sys.stderr)
             sys.exit(e.exit_code)
         try:
@@ -609,39 +631,37 @@ def main():  # pragma: no cover
             msg = e.get_message()
             msgid = type(e).__qualname__
             tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
-            tb = f"{traceback.format_exc()}\n{sysinfo()}"
+            tb = format_tb(e)
             exit_code = e.exit_code
         except RemoteRepository.RPCError as e:
             important = e.exception_class not in ("LockTimeout",) and e.traceback
+            msg = e.exception_full if important else e.get_message()
             msgid = e.exception_class
             tb_log_level = logging.ERROR if important else logging.DEBUG
-            if important:
-                msg = e.exception_full
-            else:
-                msg = e.get_message()
-            tb = "\n".join("Borg server: " + l for l in e.sysinfo.splitlines())
-            tb += "\n" + sysinfo()
+            tb = format_tb(e)
             exit_code = EXIT_ERROR
-        except Exception:
+        except Exception as e:
             msg = "Local Exception"
             msgid = "Exception"
             tb_log_level = logging.ERROR
-            tb = f"{traceback.format_exc()}\n{sysinfo()}"
+            tb = format_tb(e)
             exit_code = EXIT_ERROR
-        except KeyboardInterrupt:
+        except KeyboardInterrupt as e:
             msg = "Keyboard interrupt"
             tb_log_level = logging.DEBUG
-            tb = f"{traceback.format_exc()}\n{sysinfo()}"
+            tb = format_tb(e)
             exit_code = EXIT_SIGNAL_BASE + 2
-        except SigTerm:
+        except SigTerm as e:
             msg = "Received SIGTERM"
             msgid = "Signal.SIGTERM"
             tb_log_level = logging.DEBUG
-            tb = f"{traceback.format_exc()}\n{sysinfo()}"
+            tb = format_tb(e)
             exit_code = EXIT_SIGNAL_BASE + 15
-        except SigHup:
+        except SigHup as e:
             msg = "Received SIGHUP."
             msgid = "Signal.SIGHUP"
+            tb_log_level = logging.DEBUG
+            tb = format_tb(e)
             exit_code = EXIT_SIGNAL_BASE + 1
         if msg:
             logger.error(msg, msgid=msgid)

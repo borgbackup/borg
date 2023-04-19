@@ -42,6 +42,7 @@ class ExtractMixIn:
         stdout = args.stdout
         sparse = args.sparse
         strip_components = args.strip_components
+        continue_extraction = args.continue_extraction
         dirs = []
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
@@ -76,13 +77,7 @@ class ExtractMixIn:
                         archive.extract_item(item, stdout=stdout, restore_attrs=False)
                     else:
                         archive.extract_item(
-                            item,
-                            stdout=stdout,
-                            sparse=sparse,
-                            hlm=hlm,
-                            stripped_components=strip_components,
-                            original_path=orig_path,
-                            pi=pi,
+                            item, stdout=stdout, sparse=sparse, hlm=hlm, pi=pi, continue_extraction=continue_extraction
                         )
             except (BackupOSError, BackupError) as e:
                 self.print_warning("%s: %s", remove_surrogates(orig_path), e)
@@ -173,6 +168,12 @@ class ExtractMixIn:
             dest="sparse",
             action="store_true",
             help="create holes in output sparse file from all-zero chunks",
+        )
+        subparser.add_argument(
+            "--continue",
+            dest="continue_extraction",
+            action="store_true",
+            help="continue a previously interrupted extraction of same archive",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(

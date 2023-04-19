@@ -33,7 +33,9 @@ from ..platform import is_win32
 RK_ENCRYPTION = "--encryption=repokey-aes-ocb"
 KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"
 
-src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# this points to src/borg/archiver directory (which is small and has only a few files)
+src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "archiver"))
+src_file = "archiver/__init__.py"  # relative path of one file in src_dir
 
 requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
 

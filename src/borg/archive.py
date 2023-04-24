@@ -298,31 +298,24 @@ class DownloadPipeline:
         unpacker = msgpack.Unpacker(use_list=False)
         for data in self.fetch_many(ids):
             unpacker.feed(data)
-            items = [Item(internal_dict=item) for item in unpacker]
-            for item in items:
+            for _item in unpacker:
+                item = Item(internal_dict=_item)
                 if "chunks" in item:
                     item.chunks = [ChunkListEntry(*e) for e in item.chunks]
-
-            if filter:
-                items = [item for item in items if filter(item)]
-
-            if preload:
-                for item in items:
-                    if "chunks" in item:
-                        hlid = item.get("hlid", None)
-                        if hlid is None:
-                            preload_chunks = True
-                        else:
-                            if hlid in hlids_preloaded:
-                                preload_chunks = False
-                            else:
-                                # not having the hardlink's chunks already preloaded for other hardlink to same inode
-                                preload_chunks = True
-                                hlids_preloaded.add(hlid)
-                        if preload_chunks:
-                            self.repository.preload([c.id for c in item.chunks])
-
-            for item in items:
+                if filter and not filter(item):
+                    continue
+                if preload and "chunks" in item:
+                    hlid = item.get("hlid", None)
+                    if hlid is None:
+                        preload_chunks = True
+                    elif hlid in hlids_preloaded:
+                        preload_chunks = False
+                    else:
+                        # not having the hardlink's chunks already preloaded for other hardlink to same inode
+                        preload_chunks = True
+                        hlids_preloaded.add(hlid)
+                    if preload_chunks:
+                        self.repository.preload([c.id for c in item.chunks])
                 yield item
 
     def fetch_many(self, ids, is_preloaded=False):
@@ -632,10 +625,9 @@ Duration: {0.duration}
     def iter_items(self, filter=None, preload=False):
         # note: when calling this with preload=True, later fetch_many() must be called with
         # is_preloaded=True or the RemoteRepository code will leak memory!
-        for item in self.pipeline.unpack_many(
+        yield from self.pipeline.unpack_many(
             self.metadata.items, preload=preload, filter=lambda item: self.item_filter(item, filter)
-        ):
-            yield item
+        )
 
     def add_item(self, item, show_progress=True, stats=None):
         if show_progress and self.show_progress:
@@ -1125,13 +1117,12 @@ Duration: {0.duration}
             logger.warning("forced deletion succeeded, but the deleted archive was corrupted.")
             logger.warning("borg check --repair is required to free all space.")
 
-    # TODO: in final, remove type hints if maintainers don't want them
     @staticmethod
     def compare_archives_iter(
         archive1: "Archive", archive2: "Archive", matcher=None, can_compare_chunk_ids=False
     ) -> Iterator[ItemDiff]:
         """
-        Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
+        Yields an ItemDiff instance describing changes/indicating equality.
 
         :param matcher: PatternMatcher class to restrict results to only matching paths.
         :param can_compare_chunk_ids: Whether --chunker-params are the same for both archives.

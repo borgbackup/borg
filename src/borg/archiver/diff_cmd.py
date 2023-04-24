@@ -47,13 +47,13 @@ class DiffMixIn:
             archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids
         )
         # Conversion to string and filtering for diff.equal to save memory if sorting
-        diffs_list = [diff for diff in diffs_iter if not diff.equal(args.content_only)]
+        diffs = (diff for diff in diffs_iter if not diff.equal(args.content_only))
 
         if args.sort:
-            diffs_list.sort(key=lambda diff: diff.path)
+            diffs = sorted(diffs, key=lambda diff: diff.path)
 
         formatter = DiffFormatter(format, args.content_only)
-        for diff in diffs_list:
+        for diff in diffs:
             if args.json_lines:
                 print(
                     json.dumps(

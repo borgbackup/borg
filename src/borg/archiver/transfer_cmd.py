@@ -2,6 +2,7 @@ import argparse
 
 from ._common import with_repository, with_other_repository, Highlander
 from ..archive import Archive
+from ..compress import CompressionSpec
 from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
 from ..helpers import EXIT_SUCCESS, EXIT_ERROR, Error
@@ -106,23 +107,32 @@ class TransferMixIn:
                             if refcount == 0:  # target repo does not yet have this chunk
                                 if not dry_run:
                                     cdata = other_repository.get(chunk_id)
-                                    # keep compressed payload same, verify via assert_id (that will
-                                    # decompress, but avoid needing to compress it again):
-                                    meta, data = other_manifest.repo_objs.parse(
-                                        chunk_id, cdata, decompress=True, want_compressed=True
-                                    )
-                                    meta, data = upgrader.upgrade_compressed_chunk(meta, data)
-                                    chunk_entry = cache.add_chunk(
-                                        chunk_id,
-                                        meta,
-                                        data,
-                                        stats=archive.stats,
-                                        wait=False,
-                                        compress=False,
-                                        size=size,
-                                        ctype=meta["ctype"],
-                                        clevel=meta["clevel"],
-                                    )
+                                    if args.recompress == "never":
+                                        # keep compressed payload same, verify via assert_id (that will
+                                        # decompress, but avoid needing to compress it again):
+                                        meta, data = other_manifest.repo_objs.parse(
+                                            chunk_id, cdata, decompress=True, want_compressed=True
+                                        )
+                                        meta, data = upgrader.upgrade_compressed_chunk(meta, data)
+                                        chunk_entry = cache.add_chunk(
+                                            chunk_id,
+                                            meta,
+                                            data,
+                                            stats=archive.stats,
+                                            wait=False,
+                                            compress=False,
+                                            size=size,
+                                            ctype=meta["ctype"],
+                                            clevel=meta["clevel"],
+                                        )
+                                    elif args.recompress == "always":
+                                        # always decompress and re-compress file data chunks
+                                        meta, data = other_manifest.repo_objs.parse(chunk_id, cdata)
+                                        chunk_entry = cache.add_chunk(
+                                            chunk_id, meta, data, stats=archive.stats, wait=False
+                                        )
+                                    else:
+                                        raise ValueError(f"unsupported recompress mode: {args.recompress}")
                                     cache.repository.async_response(wait=False)
                                     chunks.append(chunk_entry)
                                 transfer_size += size
@@ -165,6 +175,14 @@ class TransferMixIn:
             """
         This command transfers archives from one repository to another repository.
         Optionally, it can also upgrade the transferred data.
+        Optionally, it can also recompress the transferred data.
+
+        It is easiest (and fastest) to give ``--compression=COMPRESSION --recompress=never`` using
+        the same COMPRESSION mode as in the SRC_REPO - borg will use that COMPRESSION for metadata (in
+        any case) and keep data compressed "as is" (saves time as no data compression is needed).
+
+        If you want to globally change compression while transferring archives to the DST_REPO,
+        give ``--compress=WANTED_COMPRESSION --recompress=always``.
 
         Suggested use for general purpose archive transfer (not repo upgrades)::
 
@@ -180,13 +198,19 @@ class TransferMixIn:
         The default is to transfer all archives, including checkpoint archives.
 
         You could use the misc. archive filter options to limit which archives it will
-        transfer, e.g. using the -a option. This is recommended for big
+        transfer, e.g. using the ``-a`` option. This is recommended for big
         repositories with multiple data sets to keep the runtime per invocation lower.
 
         For repository upgrades (e.g. from a borg 1.2 repo to a related borg 2.0 repo), usage is
         quite similar to the above::
 
-            borg --repo=DST_REPO transfer --other-repo=SRC_REPO --upgrader=From12To20
+            # fast: compress metadata with zstd,3, but keep data chunks compressed as they are:
+            borg --repo=DST_REPO transfer --other-repo=SRC_REPO --upgrader=From12To20 \\
+                 --compress=zstd,3 --recompress=never
+
+            # compress metadata and recompress data with zstd,3
+            borg --repo=DST_REPO transfer --other-repo=SRC_REPO --upgrader=From12To20 \\
+                 --compress=zstd,3 --recompress=always
 
 
         """
@@ -222,4 +246,31 @@ class TransferMixIn:
             action=Highlander,
             help="use the upgrader to convert transferred data (default: no conversion)",
         )
+        subparser.add_argument(
+            "-C",
+            "--compression",
+            metavar="COMPRESSION",
+            dest="compression",
+            type=CompressionSpec,
+            default=CompressionSpec("lz4"),
+            action=Highlander,
+            help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+        )
+        subparser.add_argument(
+            "--recompress",
+            metavar="MODE",
+            dest="recompress",
+            nargs="?",
+            default="never",
+            const="always",
+            choices=("never", "always"),
+            action=Highlander,
+            help="recompress data chunks according to `MODE` and ``--compression``. "
+            "Possible modes are "
+            "`always`: recompress unconditionally; and "
+            "`never`: do not recompress (faster: re-uses compressed data chunks w/o change)."
+            "If no MODE is given, `always` will be used. "
+            'Not passing --recompress is equivalent to "--recompress never".',
+        )
+
         define_archive_filters_group(subparser)

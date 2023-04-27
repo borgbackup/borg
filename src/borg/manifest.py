@@ -37,6 +37,8 @@ AI_HUMAN_SORT_KEYS.remove("ts")
 def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newest=None):
     def get_first_and_last_archive_ts(archives_list):
         timestamps = [x.ts for x in archives_list]
+        if not timestamps:
+            return None, None
         return min(timestamps), max(timestamps)
 
     now = archive_ts_now()

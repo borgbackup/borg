@@ -29,7 +29,6 @@ from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
 from ..platformflags import is_win32
 
-# TODO: remove this
 if TYPE_CHECKING:
     from ..item import ItemDiff
 

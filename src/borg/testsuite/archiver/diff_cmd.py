@@ -74,8 +74,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         def do_asserts(output, can_compare_ids, content_only=False):
             lines: list = output.splitlines()
             assert "file_replaced" in output  # added to debug #3494
-            self.assert_line_exists(lines, "modified.*input/file_replaced")
-
+            change = "modified.*B" if can_compare_ids else r"modified:  \(can't get size\)"
+            self.assert_line_exists(lines, f"{change}.*input/file_replaced")
             # File unchanged
             assert "input/file_unchanged" not in output
 
@@ -104,7 +104,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # The inode has two links and the file contents changed. Borg
             # should notice the changes in both links. However, the symlink
             # pointing to the file is not changed.
-            change = "modified.* B" if can_compare_ids else r"modified:  \(can't get size\)"
+            change = "modified.*0 B" if can_compare_ids else r"modified:  \(can't get size\)"
             self.assert_line_exists(lines, f"{change}.*input/empty")
             if are_hardlinks_supported():
                 self.assert_line_exists(lines, f"{change}.*input/hardlink_contents_changed")
@@ -310,7 +310,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert isinstance(output, str)
         outputs = output.splitlines()
         assert len(outputs) == len(expected)
-        assert all(x in line for x, line in zip(expected, output.splitlines()))
+        assert all(x in line for x, line in zip(expected, outputs))
 
 
 class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):

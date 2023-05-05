@@ -11,7 +11,7 @@ from functools import partial
 from getpass import getuser
 from io import BytesIO
 from itertools import groupby, zip_longest
-from typing import Iterator  # TODO: remove this if maintainers don't want it
+from typing import Iterator
 from shutil import get_terminal_size
 
 from .platformflags import is_win32

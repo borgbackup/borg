@@ -7,9 +7,8 @@ import os
 from ._common import with_repository, with_archive, build_matcher, Highlander
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import BaseFormatter, DiffFormatter, archivename_validator
+from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, BorgJsonEncoder
 from ..manifest import Manifest
-from ..helpers.parseformat import BorgJsonEncoder
 from ..logger import create_logger
 
 logger = create_logger()

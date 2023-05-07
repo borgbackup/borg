@@ -9,7 +9,7 @@ import re
 import shlex
 import stat
 import uuid
-from typing import List, Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING
+from typing import List, Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING, Literal
 from binascii import hexlify
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
@@ -982,7 +982,7 @@ class DiffFormatter(BaseFormatter):
         return keys
 
     def __init__(self, format, content_only=False):
-        static_keys = {}  # here could be stuff on repo level, above archive level
+        static_keys = {}
         static_keys.update(self.FIXED_KEYS)
         super().__init__(
             partial_format(format or "{content}{link}{directory}{blkdev}{chrdev}{fifo} {path}{NL}", static_keys)
@@ -993,7 +993,7 @@ class DiffFormatter(BaseFormatter):
         self.call_keys = {
             "content": self.format_content,
             "mode": self.format_mode,
-            "type": partial(self.format_mode, ft=True),
+            "type": partial(self.format_mode, filetype=True),
             "owner": partial(self.format_owner),
             "group": partial(self.format_owner, spec="group"),
             "user": partial(self.format_owner, spec="user"),
@@ -1030,21 +1030,21 @@ class DiffFormatter(BaseFormatter):
 
     def format_other(self, key, diff: "ItemDiff"):
         change = diff.changes().get(key)
-        if change is None:
-            return ""
-        return f"{change.diff_type}".ljust(27)
+        return f"{change.diff_type}".ljust(27) if change else ""  # 27 is the length of the content change
 
-    def format_mode(self, diff: "ItemDiff", ft=False):
-        change = diff.type() if ft else diff.mode()
-        if change:
-            return f"[{change.diff_data['item1']} -> {change.diff_data['item2']}]"
-        return ""
+    def format_mode(self, diff: "ItemDiff", filetype=False):
+        change = diff.type() if filetype else diff.mode()
+        return f"[{change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
 
-    def format_owner(self, diff: "ItemDiff", spec="owner"):
+    def format_owner(self, diff: "ItemDiff", spec: Literal["owner", "user", "group"] = "owner"):
+        if spec == "user":
+            change = diff.user()
+            return f"[{change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
+        if spec == "group":
+            change = diff.group()
+            return f"[{change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
         if spec != "owner":
-            change = diff.group() if spec == "group" else diff.user()
-            if change:
-                return f"[{change.diff_data['item1']} -> {change.diff_data['item2']}]"
+            raise ValueError(f"Invalid owner spec: {spec}")
         change = diff.owner()
         if change:
             return "[{}:{} -> {}:{}]".format(
@@ -1072,16 +1072,16 @@ class DiffFormatter(BaseFormatter):
         return ""
 
     def format_time(self, key, diff: "ItemDiff"):
-        if key in diff.changes():
-            change = diff.changes()[key]
-            return f"[{key}: {change.diff_data['item1']} -> {change.diff_data['item2']}]"
-        return ""
+        change = diff.changes().get(key)
+        return f"[{key}: {change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
 
     def format_iso_time(self, key, diff: "ItemDiff"):
-        if key in diff.changes():
-            change = diff.changes()[key]
-            return f"[iso{key}: {change.diff_data['item1'].isoformat()} -> {change.diff_data['item2'].isoformat()}]"
-        return ""
+        change = diff.changes().get(key)
+        return (
+            f"[iso{key}: {change.diff_data['item1'].isoformat()} -> {change.diff_data['item2'].isoformat()}]"
+            if change
+            else ""
+        )
 
 
 def file_status(mode):

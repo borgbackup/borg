@@ -1,3 +1,4 @@
+import argparse
 import os
 import zlib
 try:
@@ -198,7 +199,7 @@ def test_obfuscate():
 
 
 def test_compression_specs():
-    with pytest.raises(ValueError):
+    with pytest.raises(argparse.ArgumentTypeError):
         CompressionSpec('')
 
     assert isinstance(CompressionSpec('none').compressor, CNONE)
@@ -213,7 +214,7 @@ def test_compression_specs():
     zlib = CompressionSpec('zlib,9').compressor
     assert isinstance(zlib, ZLIB)
     assert zlib.level == 9
-    with pytest.raises(ValueError):
+    with pytest.raises(argparse.ArgumentTypeError):
         CompressionSpec('zlib,9,invalid')
 
     lzma = CompressionSpec('lzma').compressor
@@ -236,7 +237,7 @@ def test_compression_specs():
     assert isinstance(zstd, ZSTD)
     assert zstd.level == 22
 
-    with pytest.raises(ValueError):
+    with pytest.raises(argparse.ArgumentTypeError):
         CompressionSpec('lzma,9,invalid')
-    with pytest.raises(ValueError):
+    with pytest.raises(argparse.ArgumentTypeError):
         CompressionSpec('invalid')

@@ -98,7 +98,7 @@ def ChunkerParams(s):
     params = s.strip().split(',')
     count = len(params)
     if count == 0:
-        raise ValueError('no chunker params given')
+        raise argparse.ArgumentTypeError('no chunker params given')
     algo = params[0].lower()
     if algo == CH_FIXED and 2 <= count <= 3:  # fixed, block_size[, header_size]
         block_size = int(params[1])
@@ -109,9 +109,11 @@ def ChunkerParams(s):
             # or in-memory chunk management.
             # choose the block (chunk) size wisely: if you have a lot of data and you cut
             # it into very small chunks, you are asking for trouble!
-            raise ValueError('block_size must not be less than 64 Bytes')
+            raise argparse.ArgumentTypeError('block_size must not be less than 64 Bytes')
         if block_size > MAX_DATA_SIZE or header_size > MAX_DATA_SIZE:
-            raise ValueError('block_size and header_size must not exceed MAX_DATA_SIZE [%d]' % MAX_DATA_SIZE)
+            raise argparse.ArgumentTypeError(
+                'block_size and header_size must not exceed MAX_DATA_SIZE [%d]' % MAX_DATA_SIZE
+            )
         return algo, block_size, header_size
     if algo == 'default' and count == 1:  # default
         return CHUNKER_PARAMS
@@ -119,14 +121,18 @@ def ChunkerParams(s):
     if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[count - 4:])
         if not (chunk_min <= chunk_mask <= chunk_max):
-            raise ValueError('required: chunk_min <= chunk_mask <= chunk_max')
+            raise argparse.ArgumentTypeError('required: chunk_min <= chunk_mask <= chunk_max')
         if chunk_min < 6:
             # see comment in 'fixed' algo check
-            raise ValueError('min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)')
+            raise argparse.ArgumentTypeError(
+                'min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)'
+            )
         if chunk_max > 23:
-            raise ValueError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
+            raise argparse.ArgumentTypeError(
+                'max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)'
+            )
         return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
-    raise ValueError('invalid chunker params')
+    raise argparse.ArgumentTypeError('invalid chunker params')
 
 
 def FilesCacheMode(s):
@@ -134,11 +140,13 @@ def FilesCacheMode(s):
     VALID_MODES = ('cis', 'ims', 'cs', 'ms', 'cr', 'mr', 'd', 's')  # letters in alpha order
     entries = set(s.strip().split(','))
     if not entries <= set(ENTRIES_MAP):
-        raise ValueError('cache mode must be a comma-separated list of: %s' % ','.join(sorted(ENTRIES_MAP)))
+        raise argparse.ArgumentTypeError(
+            'cache mode must be a comma-separated list of: %s' % ','.join(sorted(ENTRIES_MAP))
+        )
     short_entries = {ENTRIES_MAP[entry] for entry in entries}
     mode = ''.join(sorted(short_entries))
     if mode not in VALID_MODES:
-        raise ValueError('cache mode short must be one of: %s' % ','.join(VALID_MODES))
+        raise argparse.ArgumentTypeError('cache mode short must be one of: %s' % ','.join(VALID_MODES))
     return mode
 
 
@@ -219,7 +227,7 @@ def SortBySpec(text):
     from .manifest import AI_HUMAN_SORT_KEYS
     for token in text.split(','):
         if token not in AI_HUMAN_SORT_KEYS:
-            raise ValueError('Invalid sort key: %s' % token)
+            raise argparse.ArgumentTypeError('Invalid sort key: %s' % token)
     return text.replace('timestamp', 'ts')
 
 

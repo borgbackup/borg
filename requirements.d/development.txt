@@ -11,3 +11,4 @@ pytest-benchmark
 Cython
 twine
 python-dateutil
+pre-commit

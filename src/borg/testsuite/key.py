@@ -116,12 +116,6 @@ class TestKey:
         id = bytes(32)
         id_str = bin_to_hex(id)
 
-        def get_free_nonce(self):
-            return None
-
-        def commit_nonce_reservation(self, next_unreserved, start_nonce):
-            pass
-
         def save_key(self, data):
             self.key_data = data
 

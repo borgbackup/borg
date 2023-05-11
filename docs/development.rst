@@ -110,6 +110,81 @@ most minor changes and fixes where committed to a maintenance branch
 back into the main development branch. This became more and more
 troublesome due to merges growing more conflict-heavy and error-prone.
 
+How to Submit Pull Requests
+---------------------------
+
+In order to work on a copy of Borg's repository, you will need to fork
+the repository to your own Github repository, and then clone the repository
+to your local machine. The instructions for forking and cloning a repository
+can be found at the following page on GitHub docs:
+`<https://docs.github.com/en/get-started/quickstart/fork-a-repo>`_ .
+
+In order to make changes to files and commit those changes, you will need
+to create and check out a new feature branch using the following command:
+::
+    git checkout -b MYFEATURE
+
+Next, add changes to the feature branch. In order to see the changes made
+to the feature branch, add the new or modified files to the branch, and
+commit those changes, use the following sequence of commands:
+::
+    git status
+    git add *
+    git commit
+
+After making the changes, push the changes to your remote repository
+using the following command:
+::
+    git push -u origin MYFEATURE
+
+Finally, make a pull request on Github against the ``master`` branch so
+that your changes can be reviewed.
+
+How to Work in a Feature Branch if Work Was Started in a Local Branch
+---------------------------------------------------------------------
+
+It is best practice for a developer to keep a local ``master`` branch as an
+up-to-date copy of the upstream ``master`` branch, to always work in a
+separate feature or bugfix branch, and to be able to rebase that branch onto the
+``master`` branch if necessary.
+
+.. rubric:: Update Local Branch with Remote Master
+
+If changes have been made to the ``master`` branch, check out the ``master``
+branch and make sure there are no uncommitted changes. Then, check out
+a feature branch so that your code is in a feature branch.
+::
+
+    git checkout master
+    git checkout -b MYFEATURE
+
+Next, check out the ``master`` branch. Find the commit hash of the last
+commit that you made before working on your feature branch, and perform
+a hard reset. Then, update the local ``master`` branch with changes
+made in the upstream repository using a pull request.
+::
+    git checkout master
+    git log
+    git reset --hard THATHASH
+    git pull borg master
+
+.. rubric:: Rebase Feature Branch to Updated Master Branch
+
+After updating the local ``master`` branch to reflect any changes
+made in the upstream version, the feature branch can be checked
+out and rebased onto the local ``master`` branch.
+::
+    git checkout MYFEATURE
+    git rebase -i master
+
+Next, check if there are any commits that exist in the feature branch
+but not in the ``master`` branch and vice versa. If there are no
+conflicts, push your changes to your personal repository on Github.
+::
+    git log
+    git diff master
+    git push -f
+
 Code and issues
 ---------------
 

@@ -25,7 +25,6 @@ from ..platform import SaveFile
 from ..repoobj import RepoObj
 
 
-from .nonces import NonceManager
 from .low_level import AES, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, AES256_OCB, CHACHA20_POLY1305
 from . import low_level
@@ -372,7 +371,8 @@ class AESKeyBase(KeyBase):
     logically_encrypted = True
 
     def encrypt(self, id, data):
-        next_iv = self.nonce_manager.ensure_reservation(self.cipher.next_iv(), self.cipher.block_count(len(data)))
+        # legacy, this is only used by the tests.
+        next_iv = self.cipher.next_iv()
         return self.cipher.encrypt(data, header=self.TYPE_STR, iv=next_iv)
 
     def decrypt(self, id, data):
@@ -411,7 +411,6 @@ class AESKeyBase(KeyBase):
             manifest_blocks = num_cipher_blocks(len(manifest_data))
             nonce = self.cipher.extract_iv(manifest_data) + manifest_blocks
         self.cipher.set_iv(nonce)
-        self.nonce_manager = NonceManager(self.repository, nonce)
 
 
 class FlexiKey:

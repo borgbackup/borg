@@ -134,8 +134,6 @@ compatMap = {
     "negotiate": ("client_data",),
     "open": ("path", "create", "lock_wait", "lock", "exclusive", "append_only"),
     "info": (),
-    "get_free_nonce": (),
-    "commit_nonce_reservation": ("next_unreserved", "start_nonce"),
 }
 
 
@@ -159,8 +157,6 @@ class RepositoryServer:  # pragma: no cover
         "save_key",
         "load_key",
         "break_lock",
-        "get_free_nonce",
-        "commit_nonce_reservation",
         "inject_exception",
     )
 
@@ -1022,14 +1018,6 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
 
     @api(since=parse_version("1.0.0"))
     def load_key(self):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"))
-    def get_free_nonce(self):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"))
-    def commit_nonce_reservation(self, next_unreserved, start_nonce):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("1.0.0"))

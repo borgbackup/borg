@@ -63,6 +63,8 @@ cdef extern from "openssl/evp.h":
     const EVP_CIPHER *EVP_aes_256_ocb()
     const EVP_CIPHER *EVP_chacha20_poly1305()
 
+    EVP_CIPHER_CTX *EVP_CIPHER_CTX_new()
+    void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *a)
     void EVP_CIPHER_CTX_init(EVP_CIPHER_CTX *a)
     void EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *a)
 
@@ -81,17 +83,6 @@ cdef extern from "openssl/evp.h":
     int EVP_CTRL_AEAD_GET_TAG
     int EVP_CTRL_AEAD_SET_TAG
     int EVP_CTRL_AEAD_SET_IVLEN
-
-    const EVP_MD *EVP_sha256() nogil
-
-    EVP_CIPHER_CTX *EVP_CIPHER_CTX_new()
-    void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *a)
-
-cdef extern from "openssl/hmac.h":
-    unsigned char *HMAC(const EVP_MD *evp_md,
-                    const void *key, int key_len,
-                    const unsigned char *data, int data_len,
-                    unsigned char *md, unsigned int *md_len) nogil
 
 
 import struct

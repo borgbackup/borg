@@ -166,7 +166,7 @@ class UNENCRYPTED:
 
 
 cdef class AES256_CTR_BASE:
-    # Layout: HEADER + MAC 32 + IV 8 + CT (same as attic / borg < 1.3 IF HEADER = TYPE_BYTE, no AAD)
+    # Layout: HEADER + MAC 32 + IV 8 + CT (same as attic / borg < 2.0 IF HEADER = TYPE_BYTE, no AAD)
 
     cdef EVP_CIPHER_CTX *ctx
     cdef unsigned char enc_key[32]
@@ -398,7 +398,7 @@ ctypedef const EVP_CIPHER * (* CIPHER)()
 
 
 cdef class _AEAD_BASE:
-    # new crypto used in borg >= 1.3
+    # new crypto used in borg >= 2.0
     # Layout: HEADER + MAC 16 + CT
 
     cdef CIPHER cipher

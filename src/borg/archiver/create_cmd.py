@@ -813,7 +813,7 @@ class CreateMixIn:
             "--paths-delimiter",
             action=Highlander,
             metavar="DELIM",
-            help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \\n) ",
+            help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\\n``) ",
         )
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)

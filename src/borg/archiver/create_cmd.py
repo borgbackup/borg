@@ -802,7 +802,7 @@ class CreateMixIn:
         subparser.add_argument(
             "--paths-from-stdin",
             action="store_true",
-            help="read DELIM-separated list of paths to back up from stdin. Will not " "recurse into directories.",
+            help="read DELIM-separated list of paths to back up from stdin. Exclusive option - no recursion, no excludes, ``-x`` does not apply.",
         )
         subparser.add_argument(
             "--paths-from-command",

@@ -3572,7 +3572,7 @@ class Archiver:
         subparser.add_argument('--paths-from-command', action='store_true',
                                help='interpret PATH as command and treat its output as ``--paths-from-stdin``')
         subparser.add_argument('--paths-delimiter', metavar='DELIM',
-                               help='set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \\n) ')
+                               help='set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\\n``)')
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)
         exclude_group.add_argument('--exclude-nodump', dest='exclude_nodump', action='store_true',

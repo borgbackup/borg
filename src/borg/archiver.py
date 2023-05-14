@@ -3582,8 +3582,8 @@ class Archiver:
                                help='interpret PATH as command and store its stdout. See also section Reading from'
                                     ' stdin below.')
         subparser.add_argument('--paths-from-stdin', action='store_true',
-                               help='read DELIM-separated list of paths to backup from stdin. Will not '
-                                    'recurse into directories.')
+                               help='read DELIM-separated list of paths to backup from stdin. Exclusive option - no recursion'
+                                    ', no excludes, ``-x`` does not apply.')
         subparser.add_argument('--paths-from-command', action='store_true',
                                help='interpret PATH as command and treat its output as ``--paths-from-stdin``')
         subparser.add_argument('--paths-delimiter', metavar='DELIM',

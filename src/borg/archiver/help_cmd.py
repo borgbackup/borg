@@ -385,29 +385,44 @@ class HelpMixIn:
 
         obfuscate,SPEC,C[,L]
             Use compressed-size obfuscation to make fingerprinting attacks based on
-            the observable stored chunk size more difficult.
-            Note:
-            - you must combine this with encryption or it won't make any sense.
-            - your repo size will be bigger, of course.
+            the observable stored chunk size more difficult. Note:
 
-            The SPEC value will determine how the size obfuscation will work:
+            - You must combine this with encryption, or it won't make any sense.
+            - Your repo size will be bigger, of course.
+            - A chunk is limited by the constant ``MAX_DATA_SIZE`` (cur. ~20MiB).
 
-            Relative random reciprocal size variation:
+            The SPEC value determines how the size obfuscation works:
+
+            *Relative random reciprocal size variation* (multiplicative)
+
             Size will increase by a factor, relative to the compressed data size.
-            Smaller factors are often used, larger factors rarely.
-            1: factor 0.01 .. 100.0
-            2: factor 0.1 .. 1000.0
-            3: factor 1.0 .. 10000.0
-            4: factor 10.0 .. 100000.0
-            5: factor 100.0 .. 1000000.0
-            6: factor 1000.0 .. 10000000.0
+            Smaller factors are used often, larger factors rarely.
 
-            Add a randomly sized padding up to the given size:
-            110: 1kiB
-            ...
-            120: 1MiB
-            ...
-            123: 8MiB (max.)
+            Available factors::
+
+              1:     0.01 ..        100
+              2:     0.1  ..      1,000
+              3:     1    ..     10,000
+              4:    10    ..    100,000
+              5:   100    ..  1,000,000
+              6: 1,000    .. 10,000,000
+
+            Example probabilities for SPEC ``1``::
+
+              90   %  0.01 ..   0.1
+               9   %  0.1  ..   1
+               0.9 %  1    ..  10
+               0.09% 10    .. 100
+
+            *Randomly sized padding up to the given size* (additive)
+
+            ::
+
+              110: 1kiB (2 ^ (SPEC - 100))
+              ...
+              120: 1MiB
+              ...
+              123: 8MiB (max.)
 
         Examples::
 
@@ -418,7 +433,7 @@ class HelpMixIn:
             borg create --compression zlib,1 REPO::ARCHIVE data
             borg create --compression auto,lzma,6 REPO::ARCHIVE data
             borg create --compression auto,lzma ...
-            borg create --compression obfuscate,3,none ...
+            borg create --compression obfuscate,110,none ...
             borg create --compression obfuscate,3,auto,zstd,10 ...
             borg create --compression obfuscate,2,zstd,6 ...\n\n"""
     )

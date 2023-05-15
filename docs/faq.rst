@@ -369,8 +369,8 @@ different prefixes. For example, you could have a script that does::
 
 Then you would have two different prune calls with different policies::
 
-    borg prune --verbose --list -d 30 -a 'main-*'
-    borg prune --verbose --list -d 7  -a 'logs-*'
+    borg prune --verbose --list -d 30 -a 'sh:main-*'
+    borg prune --verbose --list -d 7  -a 'sh:logs-*'
 
 This will keep 7 days of logs and 30 days of everything else.
 

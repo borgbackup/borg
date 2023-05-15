@@ -48,8 +48,8 @@
 
     $ borg -r /path/to/repo delete -a Monday
 
-   Please note the ``-a`` option here (short for ``--glob-archives``) which enables you
-   to give a globbing pattern to delete multiple archives, like ``-a 'oldcrap-*'``.
+   Please note the ``-a`` option here (short for ``--match-archives``) which enables you
+   to give a pattern to delete multiple archives, like ``-a 'sh:oldcrap-*'``.
    You can also combine this with ``--first``, ``--last`` and ``--sort-by``.
    Be careful, always first use with ``--dry-run`` and ``--list``!
 

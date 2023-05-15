@@ -2972,7 +2972,7 @@ class Archiver:
                                 'Paths with fewer elements will be silently skipped.')
 
         def define_exclusion_group(subparser, **kwargs):
-            exclude_group = subparser.add_argument_group('Exclusion options')
+            exclude_group = subparser.add_argument_group('Include/Exclude options')
             define_exclude_and_patterns(exclude_group.add_argument, **kwargs)
             return exclude_group
 
@@ -3582,8 +3582,8 @@ class Archiver:
                                help='interpret PATH as command and store its stdout. See also section Reading from'
                                     ' stdin below.')
         subparser.add_argument('--paths-from-stdin', action='store_true',
-                               help='read DELIM-separated list of paths to backup from stdin. Will not '
-                                    'recurse into directories.')
+                               help='read DELIM-separated list of paths to backup from stdin. All control is external:'
+                                    ' it will back up all files given - no more, no less.')
         subparser.add_argument('--paths-from-command', action='store_true',
                                help='interpret PATH as command and treat its output as ``--paths-from-stdin``')
         subparser.add_argument('--paths-delimiter', metavar='DELIM',

@@ -1,6 +1,7 @@
 import errno
 import os
 import shutil
+import time
 import unittest
 from unittest.mock import patch
 
@@ -643,6 +644,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             # make a hardlink, so it does not free the inode when unlinking input/file3
             os.link("input/file3", "hardlink-to-keep-inode-f3")
             os.remove("input/file3")
+        time.sleep(1)  # needed due to timestamp granularity of apple hfs+
         with changedir("output"):
             # now try to continue extracting, using the same archive, same output dir:
             self.cmd(f"--repo={self.repository_location}", "extract", "arch", "--continue")

@@ -1,6 +1,7 @@
 setuptools==67.3.3
 setuptools-scm==7.1.0
 pip==23.0.1
+wheel==0.40.0
 virtualenv==20.19.0
 pkgconfig==1.5.5
 tox==4.0.19

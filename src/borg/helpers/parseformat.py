@@ -643,7 +643,7 @@ def archivename_validator(text):
 
 class BaseFormatter(metaclass=abc.ABCMeta):
     format: str
-    item_data: Dict[str, Any]
+    static_data: Dict[str, Any]
     FIXED_KEYS: ClassVar[Dict[str, str]] = {
         # Formatting aids
         "LF": "\n",
@@ -665,19 +665,19 @@ class BaseFormatter(metaclass=abc.ABCMeta):
     }
     KEY_GROUPS: ClassVar[Tuple[Tuple[str, ...], ...]] = (("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),)
 
-    def __init__(self, format: str) -> None:
-        self.format = format
-        self.item_data = {}
+    def __init__(self, format: str, static: Dict[str, Any]) -> None:
+        self.format = partial_format(format, static)
+        self.static_data = static
 
     @abc.abstractmethod
     def get_item_data(self, item, jsonline=False) -> dict:
         raise NotImplementedError
 
     def format_item(self, item, jsonline=False, sort=False):
-        if jsonline:
-            self.item_data = {}
-            return json.dumps(self.get_item_data(item, jsonline), cls=BorgJsonEncoder, sort_keys=sort) + "\n"
-        return self.format.format_map(self.get_item_data(item, jsonline))
+        data = self.get_item_data(item, jsonline)
+        return (
+            f"{json.dumps(data, cls=BorgJsonEncoder, sort_keys=sort)}\n" if jsonline else self.format.format_map(data)
+        )
 
     @classmethod
     def available_keys(cls) -> List[str]:
@@ -740,9 +740,9 @@ class ArchiveFormatter(BaseFormatter):
         return keys
 
     def __init__(self, format, repository, manifest, key, *, iec=False):
-        static_keys = {}  # here could be stuff on repo level, above archive level
-        static_keys.update(self.FIXED_KEYS)
-        super().__init__(partial_format(format, static_keys))
+        static_data = {}  # here could be stuff on repo level, above archive level
+        static_data.update(self.FIXED_KEYS)
+        super().__init__(format, static_data)
         self.repository = repository
         self.manifest = manifest
         self.key = key
@@ -761,13 +761,12 @@ class ArchiveFormatter(BaseFormatter):
             "end": self.get_ts_end,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
-        self.item_data = static_keys
 
     def get_item_data(self, archive_info, jsonline=False):
         self.name = archive_info.name
         self.id = archive_info.id
         item_data = {}
-        item_data.update({} if jsonline else self.item_data)
+        item_data.update({} if jsonline else self.static_data)
         item_data.update(
             {
                 "name": archive_info.name,
@@ -854,12 +853,11 @@ class ItemFormatter(BaseFormatter):
     def __init__(self, archive, format):
         from ..checksums import StreamingXXH64
 
-        static_keys = {"archivename": archive.name, "archiveid": archive.fpr}
-        static_keys.update(self.FIXED_KEYS)
-        super().__init__(partial_format(format, static_keys))
+        static_data = {"archivename": archive.name, "archiveid": archive.fpr}
+        static_data.update(self.FIXED_KEYS)
+        super().__init__(format, static_data)
         self.xxh64 = StreamingXXH64
         self.archive = archive
-        self.item_data = static_keys
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             "size": self.calculate_size,
@@ -879,7 +877,7 @@ class ItemFormatter(BaseFormatter):
 
     def get_item_data(self, item, jsonline=False):
         item_data = {}
-        item_data.update(self.item_data)
+        item_data.update({} if jsonline else self.static_data)
 
         item_data.update(text_to_json("path", item.path))
         target = item.get("target", "")
@@ -982,13 +980,10 @@ class DiffFormatter(BaseFormatter):
         return keys
 
     def __init__(self, format, content_only=False):
-        static_keys = {}
-        static_keys.update(self.FIXED_KEYS)
-        super().__init__(
-            partial_format(format or "{content}{link}{directory}{blkdev}{chrdev}{fifo} {path}{NL}", static_keys)
-        )
+        static_data = {}
+        static_data.update(self.FIXED_KEYS)
+        super().__init__(format or "{content}{link}{directory}{blkdev}{chrdev}{fifo} {path}{NL}", static_data)
         self.content_only = content_only
-        self.item_data = static_keys
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             "content": self.format_content,
@@ -1025,7 +1020,7 @@ class DiffFormatter(BaseFormatter):
             change.append(self.call_keys[key](item))
         diff_data["change"] = " ".join([v for v in change if v])
         diff_data["path"] = item.path
-        diff_data.update(self.item_data)
+        diff_data.update({} if jsonline else self.static_data)
         return diff_data
 
     def format_other(self, key, diff: "ItemDiff"):

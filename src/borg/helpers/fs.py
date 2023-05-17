@@ -85,12 +85,25 @@ def get_security_dir(repository_id=None, *, legacy=False):
     """Determine where to store local security information."""
     security_dir = os.environ.get("BORG_SECURITY_DIR")
     if security_dir is None:
+        get_dir = get_config_dir if legacy else get_data_dir
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        security_dir = os.path.join(get_config_dir(legacy=legacy), "security")
+        security_dir = os.path.join(get_dir(legacy=legacy), "security")
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
     ensure_dir(security_dir)
     return security_dir
+
+
+def get_data_dir(*, legacy=False):
+    """Determine where to store borg changing data on the client"""
+    assert legacy is False, "there is no legacy variant of the borg data dir"
+    data_dir = os.environ.get(
+        "BORG_DATA_DIR", join_base_dir(".local", "share", "borg", legacy=legacy) or platformdirs.user_data_dir("borg")
+    )
+
+    # Create path if it doesn't exist yet
+    ensure_dir(data_dir)
+    return data_dir
 
 
 def get_cache_dir(*, legacy=False):

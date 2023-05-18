@@ -315,7 +315,11 @@ class TestTAM:
         with pytest.raises(exc):
             key.unpack_and_verify_manifest(blob)
 
-    @pytest.mark.parametrize("hmac, salt", (({}, bytes(64)), (bytes(64), {}), (None, bytes(64)), (bytes(64), None)))
+    @pytest.mark.parametrize(
+        "hmac, salt",
+        (({}, bytes(64)), (bytes(64), {}), (None, bytes(64)), (bytes(64), None)),
+        ids=["ed-b64", "b64-ed", "n-b64", "b64-n"],
+    )
     def test_wrong_types(self, key, hmac, salt):
         data = {"tam": {"type": "HKDF_HMAC_SHA512", "hmac": hmac, "salt": salt}}
         tam = data["tam"]

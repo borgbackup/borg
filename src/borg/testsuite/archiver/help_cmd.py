@@ -51,6 +51,7 @@ def test_help_formatting(command, parser):
         assert parser.epilog.rst
 
 
-@pytest.mark.parametrize("topic, helptext", list(Archiver.helptext.items()))
-def test_help_formatting_helptexts(topic, helptext):
+@pytest.mark.parametrize("topic", list(Archiver.helptext.keys()))
+def test_help_formatting_helptexts(topic):
+    helptext = Archiver.helptext[topic]
     assert str(rst_to_terminal(helptext))

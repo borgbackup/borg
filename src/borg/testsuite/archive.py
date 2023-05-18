@@ -245,7 +245,8 @@ IK = sorted(list(ITEM_KEYS))
         {b'path': b'/a/b/c'},  # small (different msgpack mapping type!)
         OrderedDict((k, b'') for k in IK),  # as big (key count) as it gets
         OrderedDict((k, b'x' * 1000) for k in IK),  # as big (key count and volume) as it gets
-    ]])
+    ]],
+    ids=["minimal", "empty-values", "long-values"])
 def test_valid_msgpacked_items(packed, item_keys_serialized):
     assert valid_msgpacked_dict(packed, item_keys_serialized)
 

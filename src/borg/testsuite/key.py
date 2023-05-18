@@ -384,7 +384,7 @@ class TestTAM:
         (bytes(64), {}),
         (None, bytes(64)),
         (bytes(64), None),
-    ))
+    ), ids=["ed-b64", "b64-ed", "n-b64", "b64-n"])
     def test_wrong_types(self, key, hmac, salt):
         data = {
             'tam': {

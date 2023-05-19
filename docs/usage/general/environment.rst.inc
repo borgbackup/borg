@@ -145,10 +145,14 @@ Directories and files:
         `XDG env var`_ ``XDG_CONFIG_HOME`` is set, then ``$XDG_CONFIG_HOME/borg`` is being used instead.
         This directory contains all borg configuration directories, see the FAQ
         for a security advisory about the data in this directory: :ref:`home_config_borg`
+    BORG_DATA_DIR
+        Defaults to ``$BORG_BASE_DIR/.local/share/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
+        `XDG env var`_ ``XDG_DATA_HOME`` is set, then ``$XDG_DATA_HOME/borg`` is being used instead.
+        This directory contains all borg data directories, see the FAQ
+        for a security advisory about the data in this directory: :ref:`home_data_borg`
     BORG_SECURITY_DIR
-        Defaults to ``$BORG_CONFIG_DIR/security``.
-        This directory contains information borg uses to track its usage of NONCES ("numbers used
-        once" - usually in encryption context) and other security relevant data.
+        Defaults to ``$BORG_DATA_DIR/security``.
+        This directory contains security relevant data.
     BORG_KEYS_DIR
         Defaults to ``$BORG_CONFIG_DIR/keys``.
         This directory contains keys for encrypted repositories.

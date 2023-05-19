@@ -242,8 +242,8 @@ def install_pythons(boxname)
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
     pyenv install 3.11.2  # tests, binary build
-    pyenv install 3.10.1  # tests
-    pyenv install 3.9.1   # tests
+    pyenv install 3.10.2  # tests
+    pyenv install 3.9.10  # tests
     pyenv rehash
   EOF
 end
@@ -309,8 +309,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.1 3.10.1 3.11.2
-      pyenv local 3.9.1 3.10.1 3.11.2
+      pyenv global 3.9.10 3.10.2 3.11.2
+      pyenv local 3.9.10 3.10.2 3.11.2
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -349,6 +349,18 @@ Vagrant.configure(2) do |config|
   config.vm.provider :virtualbox do |v|
     #v.gui = true
     v.cpus = $cpus
+  end
+
+  config.vm.define "lunar64" do |b|
+    b.vm.box = "ubuntu/lunar64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("lunar64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("lunar64", ".*none.*")
   end
 
   config.vm.define "jammy64" do |b|

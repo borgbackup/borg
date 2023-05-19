@@ -120,6 +120,12 @@ New features:
 - diff --content-only: option added to ignore metadata changes
 - import-tar --ignore-zeros: new option to support importing concatenated tars, #7432
 - debug id-hash / parse-obj / format-obj: new debug commands, #7406
+- transfer --compression=C --recompress=M: recompress while transferring, #7529
+- extract --continue: continue a previously interrupted extraction, #1356
+- prune --list-kept/--list-pruned: only list the kept (or pruned) archives, #7511
+- prune --short/--format: enable users to format the list output, #3238
+- implement BORG_<CMD>_FORMAT env vars for prune, list, rlist, #5166
+- rlist: size and nfiles format keys
 
 Fixes:
 
@@ -131,6 +137,14 @@ Fixes:
 - delete: remove --cache-only option, #7440.
   for deleting the cache only, use: borg rdelete --cache-only
 - borg debug get-obj/put-obj: fixed chunk id
+- create: ignore empty paths, print warning, #5637
+- extract: support extraction of atime/mtime on win32
+- benchmark crud: use TemporaryDirectory below given path, #4706
+- Ensure that cli options specified with action=Highlander can only be set once, even
+  if the set value is a default value. Add tests for action=Highlander, #7500, #6269.
+- Fix argparse error messages from misc. validators (being more specific).
+- put security infos into data dir, add BORG_DATA_DIR env var, #5760
+- setup.cfg: remove setup_requires (we have a pyproject.toml for that), #7574
 
 Other changes:
 
@@ -141,6 +155,8 @@ Other changes:
 - mount: improve mountpoint error msgs, see #7496
 - more Highlander options, #6269
 - Windows: simplify building (just use pip)
+- refactor toplevel exception handling, #6018
+- remove nonce management, related repo methods (not needed for borg2)
 - docs:
 
   - add installation instructions for Windows
@@ -150,6 +166,11 @@ Other changes:
   - update FAQ about locale/unicode issues, #6999
   - improve mount options rendering, #7359
   - make timestamps in manual pages reproducible.
+  - describe performing pull-backups via ssh remote forwarding
+  - suggest to use forced command when using remote-fowarding via ssh
+  - fix some -a / --match-archives docs issues
+  - incl./excl. options header, clarify --path-from-stdin exclusive control
+  - add note about MAX_DATA_SIZE
 - CI / tests / vagrant:
 
   - added pre-commit for linting purposes, #7476
@@ -157,6 +178,10 @@ Other changes:
   - "auto" compressor tests: do not assume zlib is better than lz4, #7363
   - add stretch64 VM with deps built from source
   - misc. other CI / test fixes and updates
+  - vagrant: add lunar64 VM, fix packages_netbsd
+  - avoid long ids in pytest output
+  - tox: package = editable-legacy, #7580
+  - tox under fakeroot: fix finding setup_docs, #7391
 
 
 Version 2.0.0b5 (2023-02-27)

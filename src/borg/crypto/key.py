@@ -114,7 +114,7 @@ def key_factory(repository, manifest_chunk, *, ro_cls=RepoObj):
 
 
 def tam_required_file(repository):
-    security_dir = get_security_dir(bin_to_hex(repository.id))
+    security_dir = get_security_dir(bin_to_hex(repository.id), legacy=(repository.version == 1))
     return os.path.join(security_dir, "tam_required")
 
 

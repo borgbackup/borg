@@ -740,11 +740,13 @@ def test_get_security_dir(monkeypatch):
         monkeypatch.setenv("BORG_SECURITY_DIR", "/var/tmp")
         assert get_security_dir() == "/var/tmp"
     else:
-        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.delenv("XDG_DATA_HOME", raising=False)
         monkeypatch.delenv("BORG_SECURITY_DIR", raising=False)
-        assert get_security_dir() == os.path.join(home_dir, ".config", "borg", "security")
-        assert get_security_dir(repository_id="1234") == os.path.join(home_dir, ".config", "borg", "security", "1234")
-        monkeypatch.setenv("XDG_CONFIG_HOME", "/var/tmp/.config")
+        assert get_security_dir() == os.path.join(home_dir, ".local", "share", "borg", "security")
+        assert get_security_dir(repository_id="1234") == os.path.join(
+            home_dir, ".local", "share", "borg", "security", "1234"
+        )
+        monkeypatch.setenv("XDG_DATA_HOME", "/var/tmp/.config")
         assert get_security_dir() == os.path.join("/var/tmp/.config", "borg", "security")
         monkeypatch.setenv("BORG_SECURITY_DIR", "/var/tmp")
         assert get_security_dir() == "/var/tmp"

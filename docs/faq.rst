@@ -410,13 +410,6 @@ How important is the $HOME/.config/borg directory?
 
 The Borg config directory has content that you should take care of:
 
-``security`` subdirectory
-  Each directory here represents one Borg repository by its ID and contains the last known status.
-  If a repository's status is different from this information at the beginning of BorgBackup
-  operation, Borg outputs warning messages and asks for confirmation, so make sure you do not lose
-  or manipulate these files. However, apart from those warnings, a loss of these files can be
-  recovered.
-
 ``keys`` subdirectory
   All your borg keyfile keys are stored in this directory. Please note that
   borg repokey keys are stored inside the repository. You MUST make sure to have an
@@ -425,6 +418,22 @@ The Borg config directory has content that you should take care of:
   the corresponding keyfile (and the key passphrase) can extract it.
 
 Make sure that only you have access to the Borg config directory.
+
+.. _home_data_borg:
+
+How important is the $HOME/.local/share/borg directory?
+-------------------------------------------------------
+
+The Borg data directory has content that you should take care of:
+
+``security`` subdirectory
+  Each directory here represents one Borg repository by its ID and contains the last known status.
+  If a repository's status is different from this information at the beginning of BorgBackup
+  operation, Borg outputs warning messages and asks for confirmation, so make sure you do not lose
+  or manipulate these files. However, apart from those warnings, a loss of these files can be
+  recovered.
+
+Make sure that only you have access to the Borg data directory.
 
 .. _cache_security:
 

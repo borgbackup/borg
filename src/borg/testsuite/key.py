@@ -115,6 +115,7 @@ class TestKey:
         _location = _Location()
         id = bytes(32)
         id_str = bin_to_hex(id)
+        version = 2
 
         def save_key(self, data):
             self.key_data = data

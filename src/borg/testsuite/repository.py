@@ -61,7 +61,7 @@ class RepositoryTestCaseBase(BaseTestCase):
         self.repository.__enter__()
 
     def tearDown(self):
-        self.repository.close()
+        self.repository.__exit__(None, None, None)
         shutil.rmtree(self.tmppath)
 
     def reopen(self, exclusive=UNSPECIFIED):

@@ -61,13 +61,13 @@ class RepositoryTestCaseBase(BaseTestCase):
         self.repository.__enter__()
 
     def tearDown(self):
-        self.repository.close()
+        self.repository.__exit__(None, None, None)
         shutil.rmtree(self.tmppath)
 
     def reopen(self, exclusive=UNSPECIFIED):
-        if self.repository:
-            self.repository.close()
+        self.repository.__exit__(None, None, None)
         self.repository = self.open(exclusive=exclusive)
+        self.repository.__enter__()
 
     def add_keys(self):
         self.repository.put(H(0), fchunk(b"foo"))
@@ -353,9 +353,8 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             if name.startswith("index."):
                 os.unlink(os.path.join(self.repository.path, name))
         self.reopen()
-        with self.repository:
-            self.assert_equal(len(self.repository), 3)
-            self.assert_equal(self.repository.check(), True)
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
 
     def test_crash_before_compact_segments(self):
         self.add_keys()
@@ -365,9 +364,8 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         except TypeError:
             pass
         self.reopen()
-        with self.repository:
-            self.assert_equal(len(self.repository), 3)
-            self.assert_equal(self.repository.check(), True)
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
 
     def test_crash_before_write_index(self):
         self.add_keys()
@@ -377,9 +375,8 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         except TypeError:
             pass
         self.reopen()
-        with self.repository:
-            self.assert_equal(len(self.repository), 3)
-            self.assert_equal(self.repository.check(), True)
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
 
     def test_replay_lock_upgrade_old(self):
         self.add_keys()
@@ -415,17 +412,15 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         except TypeError:
             pass
         self.reopen()
-        with self.repository:
-            self.assert_equal(len(self.repository), 3)
-            self.assert_equal(self.repository.check(), True)
-            self.assert_equal(len(self.repository), 3)
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
+        self.assert_equal(len(self.repository), 3)
 
     def test_ignores_commit_tag_in_data(self):
         self.repository.put(H(0), LoggedIO.COMMIT)
         self.reopen()
-        with self.repository:
-            io = self.repository.io
-            assert not io.is_committed_segment(io.get_latest_segment())
+        io = self.repository.io
+        assert not io.is_committed_segment(io.get_latest_segment())
 
     def test_moved_deletes_are_tracked(self):
         self.repository.put(H(1), fchunk(b"1"))
@@ -548,11 +543,9 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
         self.repository.config.set("repository", "additional_free_space", "1000T")
         self.repository.save_key(b"shortcut to save_config")
         self.reopen()
-
-        with self.repository:
-            self.repository.put(H(0), fchunk(b"foobar"))
-            with pytest.raises(Repository.InsufficientFreeSpaceError):
-                self.repository.commit(compact=False)
+        self.repository.put(H(0), fchunk(b"foobar"))
+        with pytest.raises(Repository.InsufficientFreeSpaceError):
+            self.repository.commit(compact=False)
         assert os.path.exists(self.repository.path)
 
     def test_create_free_space(self):
@@ -576,16 +569,15 @@ class QuotaTestCase(RepositoryTestCaseBase):
         self.repository.commit(compact=False)
         assert self.repository.storage_quota_use == len(ch1) + len(ch2) + 2 * (41 + 8)  # we have not compacted yet
         self.reopen()
-        with self.repository:
-            # Open new transaction; hints and thus quota data is not loaded unless needed.
-            ch3 = fchunk(b"")
-            self.repository.put(H(3), ch3)
-            self.repository.delete(H(3))
-            assert self.repository.storage_quota_use == len(ch1) + len(ch2) + len(ch3) + 3 * (
-                41 + 8
-            )  # we have not compacted yet
-            self.repository.commit(compact=True)
-            assert self.repository.storage_quota_use == len(ch2) + 41 + 8
+        # Open new transaction; hints and thus quota data is not loaded unless needed.
+        ch3 = fchunk(b"")
+        self.repository.put(H(3), ch3)
+        self.repository.delete(H(3))
+        assert self.repository.storage_quota_use == len(ch1) + len(ch2) + len(ch3) + 3 * (
+            41 + 8
+        )  # we have not compacted yet
+        self.repository.commit(compact=True)
+        assert self.repository.storage_quota_use == len(ch2) + 41 + 8
 
     def test_exceed_quota(self):
         assert self.repository.storage_quota_use == 0
@@ -602,15 +594,14 @@ class QuotaTestCase(RepositoryTestCaseBase):
             self.repository.commit(compact=False)
         assert self.repository.storage_quota_use == len(ch1) + len(ch2) + (41 + 8) * 2  # check ch2!?
         self.reopen()
-        with self.repository:
-            self.repository.storage_quota = 150
-            # Open new transaction; hints and thus quota data is not loaded unless needed.
-            self.repository.put(H(1), ch1)
-            assert (
-                self.repository.storage_quota_use == len(ch1) * 2 + (41 + 8) * 2
-            )  # we have 2 puts for H(1) here and not yet compacted.
-            self.repository.commit(compact=True)
-            assert self.repository.storage_quota_use == len(ch1) + 41 + 8  # now we have compacted.
+        self.repository.storage_quota = 150
+        # Open new transaction; hints and thus quota data is not loaded unless needed.
+        self.repository.put(H(1), ch1)
+        assert (
+            self.repository.storage_quota_use == len(ch1) * 2 + (41 + 8) * 2
+        )  # we have 2 puts for H(1) here and not yet compacted.
+        self.repository.commit(compact=True)
+        assert self.repository.storage_quota_use == len(ch1) + 41 + 8  # now we have compacted.
 
 
 class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
@@ -896,9 +887,8 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
             self.repository.commit(compact=True)
             compact.assert_called_once_with(0.1)
         self.reopen()
-        with self.repository:
-            self.check(repair=True)
-            self.assert_equal(pdchunk(self.repository.get(H(0))), b"data2")
+        self.check(repair=True)
+        self.assert_equal(pdchunk(self.repository.get(H(0))), b"data2")
 
 
 class RepositoryHintsTestCase(RepositoryTestCaseBase):
@@ -912,14 +902,13 @@ class RepositoryHintsTestCase(RepositoryTestCaseBase):
         # close and re-open the repository (create fresh Repository instance) to
         # check whether hints were persisted to / reloaded from disk
         self.reopen()
-        with self.repository:
-            # see also do_compact()
-            self.repository.put(H(42), fchunk(b"foobar"))  # this will call prepare_txn() and load the hints data
-            # check if hints persistence worked:
-            self.assert_equal(shadow_index_expected, self.repository.shadow_index)
-            self.assert_equal(compact_expected, self.repository.compact)
-            del self.repository.segments[2]  # ignore the segment created by put(H(42), ...)
-            self.assert_equal(segments_expected, self.repository.segments)
+        # see also do_compact()
+        self.repository.put(H(42), fchunk(b"foobar"))  # this will call prepare_txn() and load the hints data
+        # check if hints persistence worked:
+        self.assert_equal(shadow_index_expected, self.repository.shadow_index)
+        self.assert_equal(compact_expected, self.repository.compact)
+        del self.repository.segments[2]  # ignore the segment created by put(H(42), ...)
+        self.assert_equal(segments_expected, self.repository.segments)
 
     def test_hints_behaviour(self):
         self.repository.put(H(0), fchunk(b"data"))

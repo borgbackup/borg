@@ -349,16 +349,20 @@ def test_chunkerparams():
     assert ChunkerParams('fixed,4096') == ('fixed', 4096, 0)
     assert ChunkerParams('fixed,4096,200') == ('fixed', 4096, 200)
     # invalid values checking
+    borg2 = False  # for borg < 2, we only emit a warning, but do not raise ArgumentTypeError for some cases
     with pytest.raises(ArgumentTypeError):
         ChunkerParams('crap,1,2,3,4')  # invalid algo
-    with pytest.raises(ArgumentTypeError):
-        ChunkerParams('buzhash,5,7,6,4095')  # too small min. size
+    if borg2:
+        with pytest.raises(ArgumentTypeError):
+            ChunkerParams('buzhash,5,7,6,4095')  # too small min. size
     with pytest.raises(ArgumentTypeError):
         ChunkerParams('buzhash,19,24,21,4095')  # too big max. size
-    with pytest.raises(ArgumentTypeError):
-        ChunkerParams('buzhash,23,19,21,4095')  # violates min <= mask <= max
-    with pytest.raises(ArgumentTypeError):
-        ChunkerParams('fixed,63')  # too small block size
+    if borg2:
+        with pytest.raises(ArgumentTypeError):
+            ChunkerParams('buzhash,23,19,21,4095')  # violates min <= mask <= max
+    if borg2:
+        with pytest.raises(ArgumentTypeError):
+            ChunkerParams('fixed,63')  # too small block size
     with pytest.raises(ArgumentTypeError):
         ChunkerParams('fixed,%d,%d' % (MAX_DATA_SIZE + 1, 4096))  # too big block size
     with pytest.raises(ArgumentTypeError):

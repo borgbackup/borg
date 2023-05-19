@@ -1,6 +1,7 @@
 import errno
 import os
 import shutil
+import time
 import unittest
 from unittest.mock import patch
 
@@ -635,10 +636,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             file1_st = os.stat("input/file1")
             # simulate a partially extracted file2 (smaller size, archived mtime not yet set)
             file2_st = os.stat("input/file2")
+            # make a hardlink, so it does not free the inode when unlinking input/file2
+            os.link("input/file2", "hardlink-to-keep-inode-f2")
             os.truncate("input/file2", 123)  # -> incorrect size, incorrect mtime
             # simulate file3 has not yet been extracted
             file3_st = os.stat("input/file3")
+            # make a hardlink, so it does not free the inode when unlinking input/file3
+            os.link("input/file3", "hardlink-to-keep-inode-f3")
             os.remove("input/file3")
+        time.sleep(1)  # needed due to timestamp granularity of apple hfs+
         with changedir("output"):
             # now try to continue extracting, using the same archive, same output dir:
             self.cmd(f"--repo={self.repository_location}", "extract", "arch", "--continue")

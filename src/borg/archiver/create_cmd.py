@@ -802,7 +802,8 @@ class CreateMixIn:
         subparser.add_argument(
             "--paths-from-stdin",
             action="store_true",
-            help="read DELIM-separated list of paths to back up from stdin. Will not " "recurse into directories.",
+            help="read DELIM-separated list of paths to back up from stdin. All control is external: it will back"
+            " up all files given - no more, no less.",
         )
         subparser.add_argument(
             "--paths-from-command",
@@ -813,7 +814,7 @@ class CreateMixIn:
             "--paths-delimiter",
             action=Highlander,
             metavar="DELIM",
-            help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \\n) ",
+            help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\\n``) ",
         )
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)

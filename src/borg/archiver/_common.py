@@ -351,7 +351,7 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
 
 
 def define_exclusion_group(subparser, **kwargs):
-    exclude_group = subparser.add_argument_group("Exclusion options")
+    exclude_group = subparser.add_argument_group("Include/Exclude options")
     define_exclude_and_patterns(exclude_group.add_argument, **kwargs)
     return exclude_group
 

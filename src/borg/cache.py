@@ -62,7 +62,7 @@ class SecurityManager:
 
     def __init__(self, repository):
         self.repository = repository
-        self.dir = get_security_dir(repository.id_str)
+        self.dir = get_security_dir(repository.id_str, legacy=(repository.version == 1))
         self.cache_dir = cache_dir(repository)
         self.key_type_file = os.path.join(self.dir, "key-type")
         self.location_file = os.path.join(self.dir, "location")
@@ -71,7 +71,7 @@ class SecurityManager:
     @staticmethod
     def destroy(repository, path=None):
         """destroy the security dir for ``repository`` or at ``path``"""
-        path = path or get_security_dir(repository.id_str)
+        path = path or get_security_dir(repository.id_str, legacy=(repository.version == 1))
         if os.path.exists(path):
             shutil.rmtree(path)
 

@@ -143,6 +143,8 @@ Fixes:
 - Ensure that cli options specified with action=Highlander can only be set once, even
   if the set value is a default value. Add tests for action=Highlander, #7500, #6269.
 - Fix argparse error messages from misc. validators (being more specific).
+- put security infos into data dir, add BORG_DATA_DIR env var, #5760
+- setup.cfg: remove setup_requires (we have a pyproject.toml for that), #7574
 
 Other changes:
 
@@ -154,6 +156,7 @@ Other changes:
 - more Highlander options, #6269
 - Windows: simplify building (just use pip)
 - refactor toplevel exception handling, #6018
+- remove nonce management, related repo methods (not needed for borg2)
 - docs:
 
   - add installation instructions for Windows
@@ -165,6 +168,9 @@ Other changes:
   - make timestamps in manual pages reproducible.
   - describe performing pull-backups via ssh remote forwarding
   - suggest to use forced command when using remote-fowarding via ssh
+  - fix some -a / --match-archives docs issues
+  - incl./excl. options header, clarify --path-from-stdin exclusive control
+  - add note about MAX_DATA_SIZE
 - CI / tests / vagrant:
 
   - added pre-commit for linting purposes, #7476
@@ -173,6 +179,9 @@ Other changes:
   - add stretch64 VM with deps built from source
   - misc. other CI / test fixes and updates
   - vagrant: add lunar64 VM, fix packages_netbsd
+  - avoid long ids in pytest output
+  - tox: package = editable-legacy, #7580
+  - tox under fakeroot: fix finding setup_docs, #7391
 
 
 Version 2.0.0b5 (2023-02-27)

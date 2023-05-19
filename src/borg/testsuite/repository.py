@@ -41,8 +41,7 @@ class RepositoryTestCaseBase(BaseTestCase):
         shutil.rmtree(self.tmppath)
 
     def reopen(self, exclusive=UNSPECIFIED):
-        if self.repository:
-            self.repository.close()
+        self.repository.close()
         self.repository = self.open(exclusive=exclusive)
 
     def add_keys(self):

@@ -39,12 +39,18 @@ def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newes
         timestamps = [x.ts for x in archives_list]
         return min(timestamps), max(timestamps)
 
+    if not archives:
+        return archives
+
     now = archive_ts_now()
     earliest_ts, latest_ts = get_first_and_last_archive_ts(archives)
 
     until_ts = calculate_relative_offset(older, now, earlier=True) if older is not None else latest_ts
     from_ts = calculate_relative_offset(newer, now, earlier=True) if newer is not None else earliest_ts
     archives = [x for x in archives if from_ts <= x.ts <= until_ts]
+
+    if not archives:
+        return archives
 
     earliest_ts, latest_ts = get_first_and_last_archive_ts(archives)
     if oldest:
@@ -136,7 +142,7 @@ class Archives(abc.MutableMapping):
         regex = re.compile(regex + match_end)
         archives = [x for x in archives if regex.match(x.name) is not None]
 
-        if any([oldest, newest, older, newer]) and len(archives) > 0:
+        if any([oldest, newest, older, newer]):
             archives = filter_archives_by_date(archives, oldest=oldest, newest=newest, newer=newer, older=older)
         if not consider_checkpoints:
             archives = [x for x in archives if ".checkpoint" not in x.name]

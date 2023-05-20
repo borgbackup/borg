@@ -92,6 +92,13 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.assert_in("archive2", output)
         self.assert_not_in("archive3", output)
 
+        # check for output when timespan older than earliest archive is given. Issue #1711
+        output = self.cmd(
+            f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--older=9999m", exit_code=0
+        )
+        for archive in ("archive1", "archive2", "archive3"):
+            self.assert_not_in(archive, output)
+
     def test_missing_file_chunk(self):
         archive, repository = self.open_archive("archive1")
         with repository:

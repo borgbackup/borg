@@ -5,7 +5,7 @@ import tempfile
 import pytest
 
 from .chunker import cf
-from ..chunker import ChunkerFixed, sparsemap, has_seek_hole, ChunkerFailing
+from ..chunker import Chunker, ChunkerFixed, sparsemap, has_seek_hole, ChunkerFailing
 from ..constants import *  # NOQA
 
 BS = 4096  # fs block size
@@ -151,3 +151,29 @@ def test_chunker_failing():
         assert c1.data == data[:SIZE]
         assert c2.data == data[SIZE : 2 * SIZE]
         assert c3.data == data[2 * SIZE :]
+
+
+def test_buzhash_chunksize_distribution():
+    data = os.urandom(1048576)
+    min_exp, max_exp, mask = 10, 16, 14  # chunk size target 16kiB, clip at 1kiB and 64kiB
+    chunker = Chunker(0, min_exp, max_exp, mask, 4095)
+    f = BytesIO(data)
+    chunks = cf(chunker.chunkify(f))
+    chunk_sizes = [len(chunk) for chunk in chunks]
+    chunks_count = len(chunks)
+    min_chunksize_observed = min(chunk_sizes)
+    max_chunksize_observed = max(chunk_sizes)
+    min_count = sum((int(size == 2**min_exp) for size in chunk_sizes))
+    max_count = sum((int(size == 2**max_exp) for size in chunk_sizes))
+    print(
+        f"count: {chunks_count} min: {min_chunksize_observed} max: {max_chunksize_observed} "
+        f"min count: {min_count} max count: {max_count}"
+    )
+    # usually there will about 64 chunks
+    assert 32 < chunks_count < 128
+    # chunks always must be between min and max (clipping must work):
+    assert min_chunksize_observed >= 2**min_exp
+    assert max_chunksize_observed <= 2**max_exp
+    # most chunks should be cut due to buzhash triggering, not due to clipping at min/max size:
+    assert min_count < 10
+    assert max_count < 10

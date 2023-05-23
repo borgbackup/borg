@@ -6,6 +6,7 @@ These borg releases are currently supported with security updates.
 
 | Version | Supported          |
 |---------|--------------------|
+| 2.0.x   | :x: (not released) |
 | 1.2.x   | :white_check_mark: |
 | 1.1.x   | :x:                |
 | < 1.1   | :x:                |

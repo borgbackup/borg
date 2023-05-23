@@ -1083,29 +1083,18 @@ class RemoteLoggerTestCase(BaseTestCase):
 
     def test_stderr_messages(self):
         handle_remote_line("unstructured stderr message\n")
-        self.assert_equal(self.stream.getvalue(), "")
-        # stderr messages don't get an implicit newline
-        self.assert_equal(self.stderr.getvalue(), "Remote: unstructured stderr message\n")
-
-    def test_stderr_progress_messages(self):
-        handle_remote_line("unstructured stderr progress message\r")
-        self.assert_equal(self.stream.getvalue(), "")
-        # stderr messages don't get an implicit newline
-        self.assert_equal(self.stderr.getvalue(), "Remote: unstructured stderr progress message\r")
-
-    def test_pre11_format_messages(self):
-        self.handler.setLevel(logging.DEBUG)
-        logging.getLogger().setLevel(logging.DEBUG)
-
-        handle_remote_line("$LOG INFO Remote: borg < 1.1 format message\n")
-        self.assert_equal(self.stream.getvalue(), "Remote: borg < 1.1 format message\n")
+        self.assert_equal(self.stream.getvalue(), "stderr/remote: unstructured stderr message\n")
         self.assert_equal(self.stderr.getvalue(), "")
 
     def test_post11_format_messages(self):
         self.handler.setLevel(logging.DEBUG)
         logging.getLogger().setLevel(logging.DEBUG)
 
-        handle_remote_line("$LOG INFO borg.repository Remote: borg >= 1.1 format message\n")
+        msg = (
+            """{"type": "log_message", "levelname": "INFO", "name": "borg.repository", "msgid": 42,"""
+            """ "message": "borg >= 1.1 format message"}\n"""
+        )
+        handle_remote_line(msg)
         self.assert_equal(self.stream.getvalue(), "Remote: borg >= 1.1 format message\n")
         self.assert_equal(self.stderr.getvalue(), "")
 
@@ -1114,7 +1103,11 @@ class RemoteLoggerTestCase(BaseTestCase):
         self.handler.setLevel(logging.WARNING)
         logging.getLogger().setLevel(logging.WARNING)
 
-        handle_remote_line("$LOG INFO borg.repository Remote: new format info message\n")
+        msg = (
+            """{"type": "log_message", "levelname": "INFO", "name": "borg.repository", "msgid": 42,"""
+            """ "message": "new format info message"}\n"""
+        )
+        handle_remote_line(msg)
         self.assert_equal(self.stream.getvalue(), "")
         self.assert_equal(self.stderr.getvalue(), "")
 
@@ -1134,7 +1127,11 @@ class RemoteLoggerTestCase(BaseTestCase):
         foo_handler.setLevel(logging.INFO)
         logging.getLogger("borg.repository.foo").handlers[:] = [foo_handler]
 
-        handle_remote_line("$LOG INFO borg.repository Remote: new format child message\n")
+        msg = (
+            """{"type": "log_message", "levelname": "INFO", "name": "borg.repository", "msgid": 42,"""
+            """ "message": "new format child message"}\n"""
+        )
+        handle_remote_line(msg)
         self.assert_equal(foo_stream.getvalue(), "")
         self.assert_equal(child_stream.getvalue(), "Remote: new format child message\n")
         self.assert_equal(self.stream.getvalue(), "")

@@ -1047,34 +1047,6 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         assert self.repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]
 
 
-class RemoteLegacyFree(RepositoryTestCaseBase):
-    # Keep testing this so we can someday safely remove the legacy tuple format.
-
-    def open(self, create=False):
-        with patch.object(RemoteRepository, "dictFormat", True):
-            return RemoteRepository(
-                Location("ssh://__testsuite__" + os.path.join(self.tmppath, "repository")),
-                exclusive=True,
-                create=create,
-            )
-
-    def test_legacy_free(self):
-        # put
-        self.repository.put(H(0), fchunk(b"foo"))
-        self.repository.commit(compact=False)
-        self.repository.close()
-        # replace
-        self.repository = self.open()
-        with self.repository:
-            self.repository.put(H(0), fchunk(b"bar"))
-            self.repository.commit(compact=False)
-        # delete
-        self.repository = self.open()
-        with self.repository:
-            self.repository.delete(H(0))
-            self.repository.commit(compact=False)
-
-
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
     def open(self, create=False):
         return RemoteRepository(

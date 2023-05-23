@@ -421,15 +421,11 @@ class RemoteRepository:
 
     class RPCError(Exception):
         def __init__(self, unpacked):
-            # for borg < 1.1: unpacked only has 'exception_class' as key
-            # for borg 1.1+: unpacked has keys: 'exception_args', 'exception_full', 'exception_short', 'sysinfo'
+            # unpacked has keys: 'exception_args', 'exception_full', 'exception_short', 'sysinfo'
             self.unpacked = unpacked
 
         def get_message(self):
-            if "exception_short" in self.unpacked:
-                return "\n".join(self.unpacked["exception_short"])
-            else:
-                return self.exception_class
+            return "\n".join(self.unpacked["exception_short"])
 
         @property
         def traceback(self):
@@ -441,17 +437,11 @@ class RemoteRepository:
 
         @property
         def exception_full(self):
-            if "exception_full" in self.unpacked:
-                return "\n".join(self.unpacked["exception_full"])
-            else:
-                return self.get_message() + "\nRemote Exception (see remote log for the traceback)"
+            return "\n".join(self.unpacked["exception_full"])
 
         @property
         def sysinfo(self):
-            if "sysinfo" in self.unpacked:
-                return self.unpacked["sysinfo"]
-            else:
-                return ""
+            return self.unpacked.get("sysinfo", "")
 
     class RPCServerOutdated(Error):
         """Borg server is too old for {}. Required version {}"""
@@ -661,8 +651,7 @@ class RemoteRepository:
 
         def handle_error(unpacked):
             error = unpacked["exception_class"]
-            old_server = "exception_args" not in unpacked
-            args = unpacked.get("exception_args")
+            args = unpacked["exception_args"]
 
             if error == "DoesNotExist":
                 raise Repository.DoesNotExist(self.location.processed)
@@ -671,27 +660,15 @@ class RemoteRepository:
             elif error == "CheckNeeded":
                 raise Repository.CheckNeeded(self.location.processed)
             elif error == "IntegrityError":
-                if old_server:
-                    raise IntegrityError("(not available)")
-                else:
-                    raise IntegrityError(args[0])
+                raise IntegrityError(args[0])
             elif error == "PathNotAllowed":
-                if old_server:
-                    raise PathNotAllowed("(unknown)")
-                else:
-                    raise PathNotAllowed(args[0])
+                raise PathNotAllowed(args[0])
             elif error == "ParentPathDoesNotExist":
                 raise Repository.ParentPathDoesNotExist(args[0])
             elif error == "ObjectNotFound":
-                if old_server:
-                    raise Repository.ObjectNotFound("(not available)", self.location.processed)
-                else:
-                    raise Repository.ObjectNotFound(args[0], self.location.processed)
+                raise Repository.ObjectNotFound(args[0], self.location.processed)
             elif error == "InvalidRPCMethod":
-                if old_server:
-                    raise InvalidRPCMethod("(not available)")
-                else:
-                    raise InvalidRPCMethod(args[0])
+                raise InvalidRPCMethod(args[0])
             else:
                 raise self.RPCError(unpacked)
 

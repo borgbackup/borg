@@ -36,9 +36,30 @@ import logging
 import logging.config
 import logging.handlers  # needed for handlers defined there being configurable in logging.conf file
 import os
+import queue
 import warnings
 
 configured = False
+borg_serve_log_queue = queue.SimpleQueue()
+
+
+class BorgQueueHandler(logging.handlers.QueueHandler):
+    """borg serve writes log record dicts to a borg_serve_log_queue"""
+
+    def prepare(self, record: logging.LogRecord) -> dict:
+        return dict(
+            # kwargs needed for LogRecord constructor:
+            name=record.name,
+            level=record.levelno,
+            pathname=record.pathname,
+            lineno=record.lineno,
+            msg=record.msg,
+            args=record.args,
+            exc_info=record.exc_info,
+            func=record.funcName,
+            sinfo=record.stack_info,
+        )
+
 
 # use something like this to ignore warnings:
 # warnings.filterwarnings('ignore', r'... regex for warning message to ignore ...')
@@ -53,7 +74,7 @@ def _log_warning(message, category, filename, lineno, file=None, line=None):
     logger.warning(msg)
 
 
-def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", level="info", json=False):
+def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", level="info", is_serve=False, json=False):
     """setup logging module according to the arguments provided
 
     if conf_fname is given (or the config file name can be determined via
@@ -61,6 +82,8 @@ def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", lev
 
     otherwise, set up a stream handler logger on stderr (by default, if no
     stream is provided).
+
+    is_serve: are we setting up the logging for "borg serve"?
     """
     global configured
     err_msg = None
@@ -86,7 +109,7 @@ def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", lev
             err_msg = str(err)
     # if we did not / not successfully load a logging configuration, fallback to this:
     logger = logging.getLogger("")
-    handler = logging.StreamHandler(stream)
+    handler = BorgQueueHandler(borg_serve_log_queue) if is_serve else logging.StreamHandler(stream)
     fmt = "%(message)s"
     formatter = JsonFormatter(fmt) if json else logging.Formatter(fmt)
     handler.setFormatter(formatter)

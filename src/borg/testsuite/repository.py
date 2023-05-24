@@ -1,4 +1,3 @@
-import io
 import logging
 import os
 import shutil
@@ -13,7 +12,7 @@ from ..helpers import Location
 from ..helpers import IntegrityError
 from ..helpers import msgpack
 from ..locking import Lock, LockFailed
-from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed, handle_remote_line
+from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed
 from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
 from ..repoobj import RepoObj
 from . import BaseTestCase
@@ -1064,75 +1063,3 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
     def test_repair_missing_segment(self):
         # skip this test, files in RemoteRepository cannot be deleted
         pass
-
-
-class RemoteLoggerTestCase(BaseTestCase):
-    def setUp(self):
-        self.stream = io.StringIO()
-        self.handler = logging.StreamHandler(self.stream)
-        logging.getLogger().handlers[:] = [self.handler]
-        logging.getLogger("borg.repository").handlers[:] = []
-        logging.getLogger("borg.repository.foo").handlers[:] = []
-        # capture stderr
-        sys.stderr.flush()
-        self.old_stderr = sys.stderr
-        self.stderr = sys.stderr = io.StringIO()
-
-    def tearDown(self):
-        sys.stderr = self.old_stderr
-
-    def test_stderr_messages(self):
-        handle_remote_line("unstructured stderr message\n")
-        self.assert_equal(self.stream.getvalue(), "stderr/remote: unstructured stderr message\n")
-        self.assert_equal(self.stderr.getvalue(), "")
-
-    def test_post11_format_messages(self):
-        self.handler.setLevel(logging.DEBUG)
-        logging.getLogger().setLevel(logging.DEBUG)
-
-        msg = (
-            """{"type": "log_message", "levelname": "INFO", "name": "borg.repository", "msgid": 42,"""
-            """ "message": "borg >= 1.1 format message"}\n"""
-        )
-        handle_remote_line(msg)
-        self.assert_equal(self.stream.getvalue(), "Remote: borg >= 1.1 format message\n")
-        self.assert_equal(self.stderr.getvalue(), "")
-
-    def test_remote_messages_screened(self):
-        # default borg config for root logger
-        self.handler.setLevel(logging.WARNING)
-        logging.getLogger().setLevel(logging.WARNING)
-
-        msg = (
-            """{"type": "log_message", "levelname": "INFO", "name": "borg.repository", "msgid": 42,"""
-            """ "message": "new format info message"}\n"""
-        )
-        handle_remote_line(msg)
-        self.assert_equal(self.stream.getvalue(), "")
-        self.assert_equal(self.stderr.getvalue(), "")
-
-    def test_info_to_correct_local_child(self):
-        logging.getLogger("borg.repository").setLevel(logging.INFO)
-        logging.getLogger("borg.repository.foo").setLevel(logging.INFO)
-        # default borg config for root logger
-        self.handler.setLevel(logging.WARNING)
-        logging.getLogger().setLevel(logging.WARNING)
-
-        child_stream = io.StringIO()
-        child_handler = logging.StreamHandler(child_stream)
-        child_handler.setLevel(logging.INFO)
-        logging.getLogger("borg.repository").handlers[:] = [child_handler]
-        foo_stream = io.StringIO()
-        foo_handler = logging.StreamHandler(foo_stream)
-        foo_handler.setLevel(logging.INFO)
-        logging.getLogger("borg.repository.foo").handlers[:] = [foo_handler]
-
-        msg = (
-            """{"type": "log_message", "levelname": "INFO", "name": "borg.repository", "msgid": 42,"""
-            """ "message": "new format child message"}\n"""
-        )
-        handle_remote_line(msg)
-        self.assert_equal(foo_stream.getvalue(), "")
-        self.assert_equal(child_stream.getvalue(), "Remote: new format child message\n")
-        self.assert_equal(self.stream.getvalue(), "")
-        self.assert_equal(self.stderr.getvalue(), "")

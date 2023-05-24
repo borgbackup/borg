@@ -209,6 +209,7 @@ class RepositoryServer:  # pragma: no cover
                         else:
                             logging.debug("\n".join(ex_full))
 
+                        sys_info = sysinfo()
                         try:
                             msg = msgpack.packb(
                                 {
@@ -218,7 +219,7 @@ class RepositoryServer:  # pragma: no cover
                                     "exception_full": ex_full,
                                     "exception_short": ex_short,
                                     "exception_trace": ex_trace,
-                                    "sysinfo": sysinfo(),
+                                    "sysinfo": sys_info,
                                 }
                             )
                         except TypeError:
@@ -230,7 +231,7 @@ class RepositoryServer:  # pragma: no cover
                                     "exception_full": ex_full,
                                     "exception_short": ex_short,
                                     "exception_trace": ex_trace,
-                                    "sysinfo": sysinfo(),
+                                    "sysinfo": sys_info,
                                 }
                             )
 
@@ -438,7 +439,7 @@ class RemoteRepository:
 
         @property
         def sysinfo(self):
-            return self.unpacked.get("sysinfo", "")
+            return self.unpacked["sysinfo"]
 
     class RPCServerOutdated(Error):
         """Borg server is too old for {}. Required version {}"""

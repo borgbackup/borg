@@ -647,6 +647,9 @@ class RemoteRepository:
             return msgid
 
         def handle_error(unpacked):
+            if "exception_class" not in unpacked:
+                return
+
             error = unpacked["exception_class"]
             args = unpacked["exception_args"]
 
@@ -687,12 +690,10 @@ class RemoteRepository:
                 try:
                     unpacked = self.responses.pop(waiting_for[0])
                     waiting_for.pop(0)
-                    if "exception_class" in unpacked:
-                        handle_error(unpacked)
-                    else:
-                        yield unpacked[RESULT]
-                        if not waiting_for and not calls:
-                            return
+                    handle_error(unpacked)
+                    yield unpacked[RESULT]
+                    if not waiting_for and not calls:
+                        return
                 except KeyError:
                     break
             if cmd == "async_responses":
@@ -707,10 +708,8 @@ class RemoteRepository:
                         else:
                             return
                     else:
-                        if "exception_class" in unpacked:
-                            handle_error(unpacked)
-                        else:
-                            yield unpacked[RESULT]
+                        handle_error(unpacked)
+                        yield unpacked[RESULT]
             if self.to_send or ((calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT):
                 w_fds = [self.stdin_fd]
             else:

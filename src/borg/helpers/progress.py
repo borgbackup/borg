@@ -162,37 +162,3 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
             if justify:
                 message = justify_to_terminal_size(message)
             self.logger.info(message)
-
-
-class ProgressIndicatorEndless:
-    def __init__(self, step=10, file=None):
-        """
-        Progress indicator (long row of dots)
-
-        :param step: every Nth call, call the func
-        :param file: output file, default: sys.stderr
-        """
-        self.counter = 0  # call counter
-        self.triggered = 0  # increases 1 per trigger event
-        self.step = step  # trigger every <step> calls
-        if file is None:
-            file = sys.stderr
-        self.file = file
-
-    def progress(self):
-        self.counter += 1
-        trigger = self.counter % self.step == 0
-        if trigger:
-            self.triggered += 1
-        return trigger
-
-    def show(self):
-        trigger = self.progress()
-        if trigger:
-            return self.output(self.triggered)
-
-    def output(self, triggered):
-        print(".", end="", file=self.file, flush=True)
-
-    def finish(self):
-        print(file=self.file)

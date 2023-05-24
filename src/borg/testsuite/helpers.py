@@ -34,7 +34,7 @@ from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
 from ..helpers import archivename_validator, text_validator
-from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
+from ..helpers import ProgressIndicatorPercent
 from ..helpers import swidth_slice
 from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
@@ -1071,35 +1071,6 @@ def test_progress_percentage_quiet(capfd):
     pi.finish()
     out, err = capfd.readouterr()
     assert err == ""
-
-
-def test_progress_endless(capfd):
-    pi = ProgressIndicatorEndless(step=1, file=sys.stderr)
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
-    pi.finish()
-    out, err = capfd.readouterr()
-    assert err == "\n"
-
-
-def test_progress_endless_step(capfd):
-    pi = ProgressIndicatorEndless(step=2, file=sys.stderr)
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == ""  # no output here as we have step == 2
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == ""  # no output here as we have step == 2
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
 
 
 def test_partial_format():

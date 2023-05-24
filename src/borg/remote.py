@@ -20,7 +20,6 @@ from .compress import Compressor
 from .constants import *  # NOQA
 from .helpers import Error, IntegrityError
 from .helpers import bin_to_hex
-from .helpers import get_base_dir
 from .helpers import get_limited_unpacker
 from .helpers import replace_placeholders
 from .helpers import sysinfo
@@ -255,7 +254,8 @@ class RepositoryServer:  # pragma: no cover
         if isinstance(path, bytes):
             path = os.fsdecode(path)
         if path.startswith("/~/"):  # /~/x = path x relative to own home dir
-            path = os.path.join(get_base_dir(), path[3:])
+            home_dir = os.environ.get("HOME") or os.path.expanduser("~%s" % os.environ.get("USER", ""))
+            path = os.path.join(home_dir, path[3:])
         elif path.startswith("/./"):  # /./x = path x relative to cwd
             path = path[3:]
         return os.path.realpath(path)

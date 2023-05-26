@@ -22,7 +22,6 @@ from ...helpers import Location
 from ...helpers import EXIT_SUCCESS
 from ...helpers import bin_to_hex
 from ...manifest import Manifest
-from ...logger import setup_logging
 from ...remote import RemoteRepository
 from ...repository import Repository
 from .. import has_lchflags
@@ -155,7 +154,6 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.chdir(self._old_wd)
         # note: ignore_errors=True as workaround for issue #862
         shutil.rmtree(self.tmpdir, ignore_errors=True)
-        setup_logging()
 
     def cmd(self, *args, **kw):
         exit_code = kw.pop("exit_code", 0)

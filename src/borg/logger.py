@@ -37,10 +37,11 @@ import logging.config
 import logging.handlers  # needed for handlers defined there being configurable in logging.conf file
 import os
 import queue
+import sys
 import warnings
 
 configured = False
-borg_serve_log_queue = queue.SimpleQueue()
+borg_serve_log_queue: queue.SimpleQueue = queue.SimpleQueue()
 
 
 class BorgQueueHandler(logging.handlers.QueueHandler):
@@ -59,6 +60,35 @@ class BorgQueueHandler(logging.handlers.QueueHandler):
             func=record.funcName,
             sinfo=record.stack_info,
         )
+
+
+class StderrHandler(logging.StreamHandler):
+    """
+    This class is like a StreamHandler using sys.stderr, but always uses
+    whatever sys.stderr is currently set to rather than the value of
+    sys.stderr at handler construction time.
+    """
+
+    def __init__(self, stream=None):
+        logging.Handler.__init__(self)
+
+    @property
+    def stream(self):
+        return sys.stderr
+
+
+class TextProgressFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        # record.msg contains json (because we always do json for progress log)
+        j = json.loads(record.msg)
+        # inside the json, the text log line can be found under "message"
+        return f"{j['message']}"
+
+
+class JSONProgressFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        # record.msg contains json (because we always do json for progress log)
+        return f"{record.msg}"
 
 
 # use something like this to ignore warnings:
@@ -100,25 +130,37 @@ def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", lev
                 logging.config.fileConfig(f)
             configured = True
             logger = logging.getLogger(__name__)
-            borg_logger = logging.getLogger("borg")
-            borg_logger.json = json
             logger.debug(f'using logging configuration read from "{conf_fname}"')
             warnings.showwarning = _log_warning
             return None
         except Exception as err:  # XXX be more precise
             err_msg = str(err)
+
     # if we did not / not successfully load a logging configuration, fallback to this:
-    logger = logging.getLogger("")
-    handler = BorgQueueHandler(borg_serve_log_queue) if is_serve else logging.StreamHandler(stream)
+    level = level.upper()
     fmt = "%(message)s"
     formatter = JsonFormatter(fmt) if json else logging.Formatter(fmt)
+    SHandler = StderrHandler if stream is None else logging.StreamHandler
+    handler = BorgQueueHandler(borg_serve_log_queue) if is_serve else SHandler(stream)
     handler.setFormatter(formatter)
-    borg_logger = logging.getLogger("borg")
-    borg_logger.formatter = formatter
-    borg_logger.json = json
+    logger = logging.getLogger()
+    (h.close() for h in list(logger.handlers))
+    logger.handlers.clear()
     logger.addHandler(handler)
-    logger.setLevel(level.upper())
+    logger.setLevel(level)
+
+    bop_formatter = JSONProgressFormatter() if json else TextProgressFormatter()
+    bop_handler = BorgQueueHandler(borg_serve_log_queue) if is_serve else SHandler(stream)
+    bop_handler.setFormatter(bop_formatter)
+    bop_logger = logging.getLogger("borg.output.progress")
+    (h.close() for h in list(bop_logger.handlers))
+    bop_logger.handlers.clear()
+    bop_logger.addHandler(bop_handler)
+    bop_logger.setLevel("INFO")
+    bop_logger.propagate = False
+
     configured = True
+
     logger = logging.getLogger(__name__)
     if err_msg:
         logger.warning(f'setup_logging for "{conf_fname}" failed with "{err_msg}".')

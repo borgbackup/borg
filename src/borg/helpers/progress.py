@@ -1,28 +1,15 @@
 import logging
 import json
-import sys
 import time
-from shutil import get_terminal_size
 
 from ..logger import create_logger
 
 logger = create_logger()
 
-from .parseformat import ellipsis_truncate
-
-
-def justify_to_terminal_size(message):
-    terminal_space = get_terminal_size(fallback=(-1, -1))[0]
-    # justify only if we are outputting to a terminal
-    if terminal_space != -1:
-        return message.ljust(terminal_space)
-    return message
-
 
 class ProgressIndicatorBase:
     LOGGER = "borg.output.progress"
     JSON_TYPE: str = None
-    json = False
 
     operation_id_counter = 0
 
@@ -33,73 +20,27 @@ class ProgressIndicatorBase:
         return cls.operation_id_counter
 
     def __init__(self, msgid=None):
-        self.handler = None
         self.logger = logging.getLogger(self.LOGGER)
         self.id = self.operation_id()
         self.msgid = msgid
 
-        # If there are no handlers, set one up explicitly because the
-        # terminator and propagation needs to be set.  If there are,
-        # they must have been set up by BORG_LOGGING_CONF: skip setup.
-        if not self.logger.handlers:
-            self.handler = logging.StreamHandler(stream=sys.stderr)
-            self.handler.setLevel(logging.INFO)
-            logger = logging.getLogger("borg")
-            # Some special attributes on the borg logger, created by setup_logging
-            # But also be able to work without that
-            try:
-                formatter = logger.formatter
-                terminator = "\n" if logger.json else "\r"
-                self.json = logger.json
-            except AttributeError:
-                terminator = "\r"
-            else:
-                self.handler.setFormatter(formatter)
-            self.handler.terminator = terminator
-
-            self.logger.addHandler(self.handler)
-            if self.logger.level == logging.NOTSET:
-                self.logger.setLevel(logging.WARN)
-            self.logger.propagate = False
-
-        # If --progress is not set then the progress logger level will be WARN
-        # due to setup_implied_logging (it may be NOTSET with a logging config file,
-        # but the interactions there are generally unclear), so self.emit becomes
-        # False, which is correct.
-        # If --progress is set then the level will be INFO as per setup_implied_logging;
-        # note that this is always the case for serve processes due to a "args.progress |= is_serve".
-        # In this case self.emit is True.
-        self.emit = self.logger.getEffectiveLevel() == logging.INFO
-
-    def __del__(self):
-        if self.handler is not None:
-            self.logger.removeHandler(self.handler)
-            self.handler.close()
-
-    def output_json(self, *, finished=False, **kwargs):
-        assert self.json
-        if not self.emit:
-            return
+    def make_json(self, *, finished=False, **kwargs):
         kwargs.update(
             dict(operation=self.id, msgid=self.msgid, type=self.JSON_TYPE, finished=finished, time=time.time())
         )
-        print(json.dumps(kwargs), file=sys.stderr, flush=True)
+        return json.dumps(kwargs)
 
     def finish(self):
-        if self.json:
-            self.output_json(finished=True)
-        else:
-            self.output("")
+        j = self.make_json(message="", finished=True)
+        self.logger.info(j)
 
 
 class ProgressIndicatorMessage(ProgressIndicatorBase):
     JSON_TYPE = "progress_message"
 
     def output(self, msg):
-        if self.json:
-            self.output_json(message=msg)
-        else:
-            self.logger.info(justify_to_terminal_size(msg))
+        j = self.make_json(message=msg)
+        self.logger.info(j)
 
 
 class ProgressIndicatorPercent(ProgressIndicatorBase):
@@ -141,24 +82,11 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
         """
         pct = self.progress(current, increase)
         if pct is not None:
-            # truncate the last argument, if no space is available
             if info is not None:
-                if not self.json:
-                    from ..platform import swidth  # avoid circular import
+                return self.output(self.msg % tuple([pct] + info), info=info)
+            else:
+                return self.output(self.msg % pct)
 
-                    # no need to truncate if we're not outputting to a terminal
-                    terminal_space = get_terminal_size(fallback=(-1, -1))[0]
-                    if terminal_space != -1:
-                        space = terminal_space - swidth(self.msg % tuple([pct] + info[:-1] + [""]))
-                        info[-1] = ellipsis_truncate(info[-1], space)
-                return self.output(self.msg % tuple([pct] + info), justify=False, info=info)
-
-            return self.output(self.msg % pct)
-
-    def output(self, message, justify=True, info=None):
-        if self.json:
-            self.output_json(message=message, current=self.counter, total=self.total, info=info)
-        else:
-            if justify:
-                message = justify_to_terminal_size(message)
-            self.logger.info(message)
+    def output(self, message, info=None):
+        j = self.make_json(message=message, current=self.counter, total=self.total, info=info)
+        self.logger.info(j)

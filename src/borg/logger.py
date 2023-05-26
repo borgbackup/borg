@@ -38,7 +38,11 @@ import logging.handlers  # needed for handlers defined there being configurable 
 import os
 import queue
 import sys
+import time
+from typing import Optional
 import warnings
+
+logging_debugging_path: Optional[str] = None  # if set, write borg.logger debugging log to path/borg-*.log
 
 configured = False
 borg_serve_log_queue: queue.SimpleQueue = queue.SimpleQueue()
@@ -117,7 +121,9 @@ def teardown_logging():
     configured = False
 
 
-def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", level="info", is_serve=False, json=False):
+def setup_logging(
+    stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", level="info", is_serve=False, log_json=False, func=None
+):
     """setup logging module according to the arguments provided
 
     if conf_fname is given (or the config file name can be determined via
@@ -152,23 +158,44 @@ def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", lev
     # if we did not / not successfully load a logging configuration, fallback to this:
     level = level.upper()
     fmt = "%(message)s"
-    formatter = JsonFormatter(fmt) if json else logging.Formatter(fmt)
+    formatter = JsonFormatter(fmt) if log_json else logging.Formatter(fmt)
     SHandler = StderrHandler if stream is None else logging.StreamHandler
     handler = BorgQueueHandler(borg_serve_log_queue) if is_serve else SHandler(stream)
     handler.setFormatter(formatter)
     logger = logging.getLogger()
     remove_handlers(logger)
-    logger.addHandler(handler)
     logger.setLevel(level)
 
-    bop_formatter = JSONProgressFormatter() if json else TextProgressFormatter()
+    if logging_debugging_path is not None:
+        # add an addtl. root handler for debugging purposes
+        log_fname = os.path.join(logging_debugging_path, f"borg-{'serve' if is_serve else 'client'}-root.log")
+        handler2 = logging.StreamHandler(open(log_fname, "a"))
+        handler2.setFormatter(formatter)
+        logger.addHandler(handler2)
+        logger.warning(f"--- {func} ---")  # only handler2 shall get this
+
+    logger.addHandler(handler)  # do this late, so handler is not added while debug handler is set up
+
+    bop_formatter = JSONProgressFormatter() if log_json else TextProgressFormatter()
     bop_handler = BorgQueueHandler(borg_serve_log_queue) if is_serve else SHandler(stream)
     bop_handler.setFormatter(bop_formatter)
     bop_logger = logging.getLogger("borg.output.progress")
     remove_handlers(bop_logger)
-    bop_logger.addHandler(bop_handler)
     bop_logger.setLevel("INFO")
     bop_logger.propagate = False
+
+    if logging_debugging_path is not None:
+        # add an addtl. progress handler for debugging purposes
+        log_fname = os.path.join(logging_debugging_path, f"borg-{'serve' if is_serve else 'client'}-progress.log")
+        bop_handler2 = logging.StreamHandler(open(log_fname, "a"))
+        bop_handler2.setFormatter(bop_formatter)
+        bop_logger.addHandler(bop_handler2)
+        json_dict = dict(
+            message=f"--- {func} ---", operation=0, msgid="", type="progress_message", finished=False, time=time.time()
+        )
+        bop_logger.warning(json.dumps(json_dict))  # only bop_handler2 shall get this
+
+    bop_logger.addHandler(bop_handler)  # do this late, so bop_handler is not added while debug handler is set up
 
     configured = True
 

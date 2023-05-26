@@ -104,6 +104,12 @@ def _log_warning(message, category, filename, lineno, file=None, line=None):
     logger.warning(msg)
 
 
+def remove_handlers(logger):
+    for handler in logger.handlers[:]:
+        handler.close()
+        logger.removeHandler(handler)
+
+
 def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", level="info", is_serve=False, json=False):
     """setup logging module according to the arguments provided
 
@@ -144,8 +150,7 @@ def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", lev
     handler = BorgQueueHandler(borg_serve_log_queue) if is_serve else SHandler(stream)
     handler.setFormatter(formatter)
     logger = logging.getLogger()
-    (h.close() for h in list(logger.handlers))
-    logger.handlers.clear()
+    remove_handlers(logger)
     logger.addHandler(handler)
     logger.setLevel(level)
 
@@ -153,8 +158,7 @@ def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", lev
     bop_handler = BorgQueueHandler(borg_serve_log_queue) if is_serve else SHandler(stream)
     bop_handler.setFormatter(bop_formatter)
     bop_logger = logging.getLogger("borg.output.progress")
-    (h.close() for h in list(bop_logger.handlers))
-    bop_logger.handlers.clear()
+    remove_handlers(bop_logger)
     bop_logger.addHandler(bop_handler)
     bop_logger.setLevel("INFO")
     bop_logger.propagate = False

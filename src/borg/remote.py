@@ -157,6 +157,7 @@ class RepositoryServer:  # pragma: no cover
         os.set_blocking(stdin_fd, False)
         os.set_blocking(stdout_fd, True)
         unpacker = get_limited_unpacker("server")
+        shutdown_serve = False
         while True:
             # before processing any new RPCs, send out all pending log output
             while True:
@@ -169,14 +170,19 @@ class RepositoryServer:  # pragma: no cover
                     msg = msgpack.packb({LOG: lr_dict})
                     os_write(stdout_fd, msg)
 
+            if shutdown_serve:
+                # shutdown wanted! get out of here after sending all log output.
+                if self.repository is not None:
+                    self.repository.close()
+                return
+
             # process new RPCs
             r, w, es = select.select([stdin_fd], [], [], 10)
             if r:
                 data = os.read(stdin_fd, BUFSIZE)
                 if not data:
-                    if self.repository is not None:
-                        self.repository.close()
-                    return
+                    shutdown_serve = True
+                    continue
                 unpacker.feed(data)
                 for unpacked in unpacker:
                     if isinstance(unpacked, dict):
@@ -241,8 +247,8 @@ class RepositoryServer:  # pragma: no cover
                     else:
                         os_write(stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
             if es:
-                self.repository.close()
-                return
+                shutdown_serve = True
+                continue
 
     def negotiate(self, client_data):
         if isinstance(client_data, dict):

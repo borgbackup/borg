@@ -106,8 +106,15 @@ def _log_warning(message, category, filename, lineno, file=None, line=None):
 
 def remove_handlers(logger):
     for handler in logger.handlers[:]:
+        handler.flush()
         handler.close()
         logger.removeHandler(handler)
+
+
+def teardown_logging():
+    global configured
+    logging.shutdown()
+    configured = False
 
 
 def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", level="info", is_serve=False, json=False):

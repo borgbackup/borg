@@ -1319,41 +1319,37 @@ class LoggedIO:
         safe_fadvise(fd.fileno(), 0, 0, 'DONTNEED')
         fd.close()
 
-    def get_segment_dirs(self, start_index=None, end_index=None):
-        """Returns generator yeilding required segment dirs as `os.DirEntry` objects. Start and end are inclusive.
+    def get_segment_dirs(self, data_dir, start_index=0, end_index=2**30):
+        """Returns generator yielding required segment dirs in data_dir as `os.DirEntry` objects.
+        Start and end are inclusive.
         """
-        data_dir = os.path.join(self.path, 'data')
-        if start_index is None and end_index is None:
-            segment_dirs = (f for f in os.scandir(data_dir) if f.is_dir() and f.name.isdigit())
-        elif start_index is not None and end_index is None:
-            segment_dirs = (f for f in os.scandir(data_dir) if f.is_dir() and f.name.isdigit() and start_index <= int(f.name))
-        elif start_index is None and end_index is not None:
-            segment_dirs = (f for f in os.scandir(data_dir) if f.is_dir() and f.name.isdigit() and int(f.name) <= end_index)
-        elif start_index is not None and end_index is not None:
-            segment_dirs = (f for f in os.scandir(data_dir) if f.is_dir() and f.name.isdigit() and start_index <= int(f.name) <= end_index)
+        segment_dirs = (
+            f
+            for f in os.scandir(data_dir)
+            if f.is_dir() and f.name.isdigit() and start_index <= int(f.name) <= end_index
+        )
         return segment_dirs
 
-    def get_segment_files(self, segment_dir, start_index=None, end_index=None):
-        """Returns generator yeilding required segment files in segment_dir as `os.DirEntry` objects. Start and end are inclusive.
+    def get_segment_files(self, segment_dir, start_index=0, end_index=2**32):
+        """Returns generator yielding required segment files in segment_dir as `os.DirEntry` objects.
+        Start and end are inclusive.
         """
-        if start_index is None and end_index is None:
-            segment_files = (f for f in os.scandir(segment_dir) if f.is_file() and f.name.isdigit())
-        elif start_index is not None and end_index is None:
-            segment_files = (f for f in os.scandir(segment_dir) if f.is_file() and f.name.isdigit() and start_index <= int(f.name))
-        elif start_index is None and end_index is not None:
-            segment_files = (f for f in os.scandir(segment_dir) if f.is_file() and f.name.isdigit() and int(f.name) <= end_index)
-        elif start_index is not None and end_index is not None:
-            segment_files = (f for f in os.scandir(segment_dir) if f.is_file() and f.name.isdigit() and start_index <= int(f.name) <= end_index)
+        segment_files = (
+            f
+            for f in os.scandir(segment_dir)
+            if f.is_file() and f.name.isdigit() and start_index <= int(f.name) <= end_index
+        )
         return segment_files
 
     def segment_iterator(self, segment=None, reverse=False):
         if segment is None:
             segment = 0 if not reverse else 2 ** 32 - 1
         start_segment_dir = segment // self.segments_per_dir
+        data_path = os.path.join(self.path, 'data')
         if not reverse:
-            dirs = self.get_segment_dirs(start_index=start_segment_dir)
+            dirs = self.get_segment_dirs(data_path, start_index=start_segment_dir)
         else:
-            dirs = self.get_segment_dirs(end_index=start_segment_dir)
+            dirs = self.get_segment_dirs(data_path, end_index=start_segment_dir)
         dirs = sorted(dirs, key=lambda dir: int(dir.name), reverse=reverse)
         for dir in dirs:
             if not reverse:

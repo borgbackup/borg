@@ -75,6 +75,12 @@ LIST_SCAN_LIMIT = 100000
 
 FD_MAX_AGE = 4 * 60  # 4 minutes
 
+# Some bounds on segment / segment_dir indexes
+MIN_SEGMENT_INDEX = 0
+MAX_SEGMENT_INDEX = 2**32 - 1
+MIN_SEGMENT_DIR_INDEX = 0
+MAX_SEGMENT_DIR_INDEX = 2**32 - 1
+
 # chunker algorithms
 CH_BUZHASH = "buzhash"
 CH_FIXED = "fixed"

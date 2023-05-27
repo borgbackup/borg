@@ -792,15 +792,31 @@ class ItemFormatter(BaseFormatter):
     # shake_* is not provided because it uses an incompatible .digest() method to support variable length.
     hash_algorithms = set(hashlib.algorithms_guaranteed).union({"xxh64"}).difference({"shake_128", "shake_256"})
     KEY_DESCRIPTIONS = {
+        "type": "file type (file, dir, symlink, ...)",
+        "mode": "file mode (as in stat)",
+        "uid": "user id of file owner",
+        "gid": "group id of file owner",
+        "user": "user name of file owner",
+        "group": "group name of file owner",
         "path": "file path",
         "target": "link target for symlinks",
         "hlid": "hard link identity (same if hardlinking same fs object)",
+        "flags": "file flags",
         "extra": 'prepends {target} with " -> " for soft links and " link to " for hard links',
+        "size": "file size",
         "dsize": "deduplicated size",
         "num_chunks": "number of chunks in this file",
         "unique_chunks": "number of unique chunks in this file",
+        "mtime": "file modification time",
+        "ctime": "file change time",
+        "atime": "file access time",
+        "isomtime": "file modification time (ISO 8601 format)",
+        "isoctime": "file change time (ISO 8601 format)",
+        "isoatime": "file access time (ISO 8601 format)",
         "xxh64": "XXH64 checksum of this file (note: this is NOT a cryptographic hash!)",
         "health": 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
+        "archiveid": "internal ID of the archive",
+        "archivename": "name of the archive",
     }
     KEY_GROUPS = (
         ("type", "mode", "uid", "gid", "user", "group", "path", "target", "hlid", "flags"),
@@ -925,6 +941,15 @@ class DiffFormatter(BaseFormatter):
         "owner": "file owner (user/group) change",
         "user": "file user change",
         "group": "file group change",
+        "link": "file link change",
+        "directory": "file directory change",
+        "blkdev": "file block device change",
+        "chrdev": "file character device change",
+        "fifo": "file fifo change",
+        "mtime": "file modification time change",
+        "ctime": "file change time change",
+        "isomtime": "file modification time change (ISO 8601)",
+        "isoctime": "file creation time change (ISO 8601)",
     }
     KEY_GROUPS = (
         ("path", "change"),

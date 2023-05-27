@@ -1319,7 +1319,7 @@ class LoggedIO:
         safe_fadvise(fd.fileno(), 0, 0, 'DONTNEED')
         fd.close()
 
-    def get_segment_dirs(self, data_dir, start_index=0, end_index=2**30):
+    def get_segment_dirs(self, data_dir, start_index=MIN_SEGMENT_DIR_INDEX, end_index=MAX_SEGMENT_DIR_INDEX):
         """Returns generator yielding required segment dirs in data_dir as `os.DirEntry` objects.
         Start and end are inclusive.
         """
@@ -1330,7 +1330,7 @@ class LoggedIO:
         )
         return segment_dirs
 
-    def get_segment_files(self, segment_dir, start_index=0, end_index=2**32):
+    def get_segment_files(self, segment_dir, start_index=MIN_SEGMENT_INDEX, end_index=MAX_SEGMENT_INDEX):
         """Returns generator yielding required segment files in segment_dir as `os.DirEntry` objects.
         Start and end are inclusive.
         """
@@ -1343,7 +1343,7 @@ class LoggedIO:
 
     def segment_iterator(self, segment=None, reverse=False):
         if segment is None:
-            segment = 0 if not reverse else 2 ** 32 - 1
+            segment = MIN_SEGMENT_INDEX if not reverse else MAX_SEGMENT_INDEX
         start_segment_dir = segment // self.segments_per_dir
         data_path = os.path.join(self.path, 'data')
         if not reverse:

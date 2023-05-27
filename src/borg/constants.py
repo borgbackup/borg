@@ -62,6 +62,12 @@ LIST_SCAN_LIMIT = 100000
 
 DEFAULT_SEGMENTS_PER_DIR = 1000
 
+# Some bounds on segment / segment_dir indexes
+MIN_SEGMENT_INDEX = 0
+MAX_SEGMENT_INDEX = 2**32 - 1
+MIN_SEGMENT_DIR_INDEX = 0
+MAX_SEGMENT_DIR_INDEX = 2**32 - 1
+
 FD_MAX_AGE = 4 * 60  # 4 minutes
 
 CHUNK_MIN_EXP = 19  # 2**19 == 512kiB

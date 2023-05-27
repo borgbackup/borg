@@ -680,18 +680,11 @@ class BaseFormatter(metaclass=abc.ABCMeta):
         )
 
     @classmethod
-    def available_keys(cls) -> List[str]:
-        result: Set[str] = set()
-        result.update(cls.KEY_DESCRIPTIONS.keys())
-        result.update([key for group in cls.KEY_GROUPS for key in group])
-        return list(result) + list(cls.FIXED_KEYS.keys())
-
-    @classmethod
     def keys_help(cls):
         help = []
-        keys = cls.available_keys()
-        for key in cls.FIXED_KEYS:
-            keys.remove(key)
+        keys: Set[str] = set()
+        keys.update(cls.KEY_DESCRIPTIONS.keys())
+        keys.update(key for group in cls.KEY_GROUPS for key in group)
 
         for group in cls.KEY_GROUPS:
             for key in group:
@@ -727,17 +720,6 @@ class ArchiveFormatter(BaseFormatter):
         ("hostname", "username"),
         ("size", "nfiles"),
     )
-
-    @classmethod
-    def available_keys(cls):
-        from ..manifest import ArchiveInfo
-
-        fake_archive_info = ArchiveInfo("archivename", b"\1" * 32, datetime(1970, 1, 1, tzinfo=timezone.utc))
-        formatter = cls("", None, None, None)
-        keys = []
-        keys.extend(formatter.call_keys.keys())
-        keys.extend(formatter.get_item_data(fake_archive_info).keys())
-        return keys
 
     def __init__(self, format, repository, manifest, key, *, iec=False):
         static_data = {}  # here could be stuff on repo level, above archive level
@@ -830,20 +812,6 @@ class ItemFormatter(BaseFormatter):
     )
 
     KEYS_REQUIRING_CACHE = ("dsize", "unique_chunks")
-
-    @classmethod
-    def available_keys(cls):
-        class FakeArchive:
-            fpr = name = ""
-
-        from ..item import Item
-
-        fake_item = Item(mode=0, path="", user="", group="", mtime=0, uid=0, gid=0)
-        formatter = cls(FakeArchive, "")
-        keys = []
-        keys.extend(formatter.call_keys.keys())
-        keys.extend(formatter.get_item_data(fake_item).keys())
-        return keys
 
     @classmethod
     def format_needs_cache(cls, format):
@@ -950,7 +918,7 @@ class ItemFormatter(BaseFormatter):
 class DiffFormatter(BaseFormatter):
     KEY_DESCRIPTIONS = {
         "path": "archived file path",
-        "change": "all changes",
+        "change": "all available changes",
         "content": "file content change",
         "mode": "file mode change",
         "type": "file type change",
@@ -965,19 +933,6 @@ class DiffFormatter(BaseFormatter):
         ("mtime", "ctime", "isomtime", "isoctime"),
     )
     METADATA = ("mode", "type", "owner", "group", "user", "mtime", "ctime")
-
-    @classmethod
-    def available_keys(cls):
-        from ..item import Item, ItemDiff
-
-        fake_item1 = Item(mode=0, path="", user="", group="", mtime=0, uid=0, gid=0)
-        fake_item2 = Item(mode=0, path="", user="", group="", mtime=0, uid=0, gid=0)
-        fake_diff = ItemDiff("", fake_item1, fake_item2, iter([]), iter([]))
-        formatter = cls("")
-        keys = []
-        keys.extend(formatter.call_keys.keys())
-        keys.extend(formatter.get_item_data(fake_diff).keys())
-        return keys
 
     def __init__(self, format, content_only=False):
         static_data = {}

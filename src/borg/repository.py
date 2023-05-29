@@ -1566,7 +1566,7 @@ class LoggedIO:
                 os.rmdir(segment_dir)
             except OSError:
                 # OSError is raised by os.rmdir if directory is not empty. This is expected.
-                # It's subclass FileNotFoundError may be raised if the directory already does not exist. Ignorable.
+                # Its subclass FileNotFoundError may be raised if the directory already does not exist. Ignorable.
                 pass
         sync_dir(data_dir)
 

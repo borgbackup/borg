@@ -482,8 +482,9 @@ class Archiver(
         func = get_func(args)
         # do not use loggers before this!
         is_serve = func == self.do_serve
-        self.log_json = args.log_json or is_serve
-        setup_logging(level=args.log_level, json=self.log_json)
+        self.log_json = args.log_json and not is_serve
+        func_name = getattr(func, "__name__", "none")
+        setup_logging(level=args.log_level, is_serve=is_serve, log_json=self.log_json, func=func_name)
         args.progress |= is_serve
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)

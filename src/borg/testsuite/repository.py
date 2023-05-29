@@ -1,4 +1,3 @@
-import io
 import logging
 import os
 import shutil
@@ -13,7 +12,7 @@ from ..helpers import Location
 from ..helpers import IntegrityError
 from ..helpers import msgpack
 from ..locking import Lock, LockFailed
-from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed, handle_remote_line
+from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed
 from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
 from ..repoobj import RepoObj
 from . import BaseTestCase
@@ -98,13 +97,12 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.repository.delete(key50)
         self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(key50))
         self.repository.commit(compact=False)
-        self.repository.close()
-        with self.open() as repository2:
-            self.assert_raises(Repository.ObjectNotFound, lambda: repository2.get(key50))
-            for x in range(100):
-                if x == 50:
-                    continue
-                self.assert_equal(pdchunk(repository2.get(H(x))), b"SOMEDATA")
+        self.reopen()
+        self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(key50))
+        for x in range(100):
+            if x == 50:
+                continue
+            self.assert_equal(pdchunk(self.repository.get(H(x))), b"SOMEDATA")
 
     def test2(self):
         """Test multiple sequential transactions"""
@@ -159,17 +157,14 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         # put
         self.repository.put(H(0), fchunk(b"foo"))
         self.repository.commit(compact=False)
-        self.repository.close()
+        self.reopen()
         # replace
-        self.repository = self.open()
-        with self.repository:
-            self.repository.put(H(0), fchunk(b"bar"))
-            self.repository.commit(compact=False)
+        self.repository.put(H(0), fchunk(b"bar"))
+        self.repository.commit(compact=False)
+        self.reopen()
         # delete
-        self.repository = self.open()
-        with self.repository:
-            self.repository.delete(H(0))
-            self.repository.commit(compact=False)
+        self.repository.delete(H(0))
+        self.repository.commit(compact=False)
 
     def test_list(self):
         for x in range(100):
@@ -276,14 +271,11 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         # we do not set flags for H(0), so we can later check their default state.
         self.repository.flags(H(1), mask=0x00000007, value=0x00000006)
         self.repository.commit(compact=False)
-        self.repository.close()
-
-        self.repository = self.open()
-        with self.repository:
-            # we query all flags to check if the initial flags were all zero and
-            # only the ones we explicitly set to one are as expected.
-            self.assert_equal(self.repository.flags(H(0), mask=0xFFFFFFFF), 0x00000000)
-            self.assert_equal(self.repository.flags(H(1), mask=0xFFFFFFFF), 0x00000006)
+        self.reopen()
+        # we query all flags to check if the initial flags were all zero and
+        # only the ones we explicitly set to one are as expected.
+        self.assert_equal(self.repository.flags(H(0), mask=0xFFFFFFFF), 0x00000000)
+        self.assert_equal(self.repository.flags(H(1), mask=0xFFFFFFFF), 0x00000006)
 
 
 class LocalRepositoryTestCase(RepositoryTestCaseBase):
@@ -337,12 +329,10 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
         last_segment = self.repository.io.get_latest_segment()
         with open(self.repository.io.segment_filename(last_segment + 1), "wb") as f:
             f.write(MAGIC + b"crapcrapcrap")
-        self.repository.close()
+        self.reopen()
         # usually, opening the repo and starting a transaction should trigger a cleanup.
-        self.repository = self.open()
-        with self.repository:
-            self.repository.put(H(0), fchunk(b"bar"))  # this may trigger compact_segments()
-            self.repository.commit(compact=True)
+        self.repository.put(H(0), fchunk(b"bar"))  # this may trigger compact_segments()
+        self.repository.commit(compact=True)
         # the point here is that nothing blows up with an exception.
 
 
@@ -385,11 +375,10 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
                 os.unlink(os.path.join(self.repository.path, name))
         with patch.object(Lock, "upgrade", side_effect=LockFailed) as upgrade:
             self.reopen(exclusive=None)  # simulate old client that always does lock upgrades
-            with self.repository:
-                # the repo is only locked by a shared read lock, but to replay segments,
-                # we need an exclusive write lock - check if the lock gets upgraded.
-                self.assert_raises(LockFailed, lambda: len(self.repository))
-                upgrade.assert_called_once_with()
+            # the repo is only locked by a shared read lock, but to replay segments,
+            # we need an exclusive write lock - check if the lock gets upgraded.
+            self.assert_raises(LockFailed, lambda: len(self.repository))
+            upgrade.assert_called_once_with()
 
     def test_replay_lock_upgrade(self):
         self.add_keys()
@@ -398,11 +387,10 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
                 os.unlink(os.path.join(self.repository.path, name))
         with patch.object(Lock, "upgrade", side_effect=LockFailed) as upgrade:
             self.reopen(exclusive=False)  # current client usually does not do lock upgrade, except for replay
-            with self.repository:
-                # the repo is only locked by a shared read lock, but to replay segments,
-                # we need an exclusive write lock - check if the lock gets upgraded.
-                self.assert_raises(LockFailed, lambda: len(self.repository))
-                upgrade.assert_called_once_with()
+            # the repo is only locked by a shared read lock, but to replay segments,
+            # we need an exclusive write lock - check if the lock gets upgraded.
+            self.assert_raises(LockFailed, lambda: len(self.repository))
+            upgrade.assert_called_once_with()
 
     def test_crash_before_deleting_compacted_segments(self):
         self.add_keys()
@@ -932,7 +920,7 @@ class RepositoryHintsTestCase(RepositoryTestCaseBase):
 class RemoteRepositoryTestCase(RepositoryTestCase):
     repository = None  # type: RemoteRepository
 
-    def open(self, create=False):
+    def open(self, create=False, exclusive=UNSPECIFIED):
         return RemoteRepository(
             Location("ssh://__testsuite__" + os.path.join(self.tmppath, "repository")), exclusive=True, create=create
         )
@@ -1064,75 +1052,3 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
     def test_repair_missing_segment(self):
         # skip this test, files in RemoteRepository cannot be deleted
         pass
-
-
-class RemoteLoggerTestCase(BaseTestCase):
-    def setUp(self):
-        self.stream = io.StringIO()
-        self.handler = logging.StreamHandler(self.stream)
-        logging.getLogger().handlers[:] = [self.handler]
-        logging.getLogger("borg.repository").handlers[:] = []
-        logging.getLogger("borg.repository.foo").handlers[:] = []
-        # capture stderr
-        sys.stderr.flush()
-        self.old_stderr = sys.stderr
-        self.stderr = sys.stderr = io.StringIO()
-
-    def tearDown(self):
-        sys.stderr = self.old_stderr
-
-    def test_stderr_messages(self):
-        handle_remote_line("unstructured stderr message\n")
-        self.assert_equal(self.stream.getvalue(), "stderr/remote: unstructured stderr message\n")
-        self.assert_equal(self.stderr.getvalue(), "")
-
-    def test_post11_format_messages(self):
-        self.handler.setLevel(logging.DEBUG)
-        logging.getLogger().setLevel(logging.DEBUG)
-
-        msg = (
-            """{"type": "log_message", "levelname": "INFO", "name": "borg.repository", "msgid": 42,"""
-            """ "message": "borg >= 1.1 format message"}\n"""
-        )
-        handle_remote_line(msg)
-        self.assert_equal(self.stream.getvalue(), "Remote: borg >= 1.1 format message\n")
-        self.assert_equal(self.stderr.getvalue(), "")
-
-    def test_remote_messages_screened(self):
-        # default borg config for root logger
-        self.handler.setLevel(logging.WARNING)
-        logging.getLogger().setLevel(logging.WARNING)
-
-        msg = (
-            """{"type": "log_message", "levelname": "INFO", "name": "borg.repository", "msgid": 42,"""
-            """ "message": "new format info message"}\n"""
-        )
-        handle_remote_line(msg)
-        self.assert_equal(self.stream.getvalue(), "")
-        self.assert_equal(self.stderr.getvalue(), "")
-
-    def test_info_to_correct_local_child(self):
-        logging.getLogger("borg.repository").setLevel(logging.INFO)
-        logging.getLogger("borg.repository.foo").setLevel(logging.INFO)
-        # default borg config for root logger
-        self.handler.setLevel(logging.WARNING)
-        logging.getLogger().setLevel(logging.WARNING)
-
-        child_stream = io.StringIO()
-        child_handler = logging.StreamHandler(child_stream)
-        child_handler.setLevel(logging.INFO)
-        logging.getLogger("borg.repository").handlers[:] = [child_handler]
-        foo_stream = io.StringIO()
-        foo_handler = logging.StreamHandler(foo_stream)
-        foo_handler.setLevel(logging.INFO)
-        logging.getLogger("borg.repository.foo").handlers[:] = [foo_handler]
-
-        msg = (
-            """{"type": "log_message", "levelname": "INFO", "name": "borg.repository", "msgid": 42,"""
-            """ "message": "new format child message"}\n"""
-        )
-        handle_remote_line(msg)
-        self.assert_equal(foo_stream.getvalue(), "")
-        self.assert_equal(child_stream.getvalue(), "Remote: new format child message\n")
-        self.assert_equal(self.stream.getvalue(), "")
-        self.assert_equal(self.stderr.getvalue(), "")

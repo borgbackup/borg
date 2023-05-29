@@ -34,7 +34,7 @@ from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
 from ..helpers import archivename_validator, text_validator
-from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
+from ..helpers import ProgressIndicatorPercent
 from ..helpers import swidth_slice
 from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
@@ -998,65 +998,36 @@ def test_yes_env_output(capfd, monkeypatch):
     assert "yes" in err
 
 
-def test_progress_percentage_sameline(capfd, monkeypatch):
-    # run the test as if it was in a 4x1 terminal
-    monkeypatch.setenv("COLUMNS", "4")
-    monkeypatch.setenv("LINES", "1")
+def test_progress_percentage(capfd):
     pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
     pi.show(0)
     out, err = capfd.readouterr()
-    assert err == "  0%\r"
+    assert err == "  0%\n"
     pi.show(420)
     pi.show(680)
     out, err = capfd.readouterr()
-    assert err == " 42%\r 68%\r"
+    assert err == " 42%\n 68%\n"
     pi.show(1000)
     out, err = capfd.readouterr()
-    assert err == "100%\r"
+    assert err == "100%\n"
     pi.finish()
     out, err = capfd.readouterr()
-    assert err == " " * 4 + "\r"
+    assert err == "\n"
 
 
-@pytest.mark.skipif(is_win32, reason="no working swidth() implementation on this platform")
-def test_progress_percentage_widechars(capfd, monkeypatch):
-    st = "スター・トレック"  # "startrek" :-)
-    assert swidth(st) == 16
-    path = "/カーク船長です。"  # "Captain Kirk"
-    assert swidth(path) == 17
-    spaces = " " * 4  # to avoid usage of "..."
-    width = len("100%") + 1 + swidth(st) + 1 + swidth(path) + swidth(spaces)
-    monkeypatch.setenv("COLUMNS", str(width))
-    monkeypatch.setenv("LINES", "1")
-    pi = ProgressIndicatorPercent(100, step=5, start=0, msg=f"%3.0f%% {st} %s")
-    pi.logger.setLevel("INFO")
-    pi.show(0, info=[path])
-    out, err = capfd.readouterr()
-    assert err == f"  0% {st} {path}{spaces}\r"
-    pi.show(100, info=[path])
-    out, err = capfd.readouterr()
-    assert err == f"100% {st} {path}{spaces}\r"
-    pi.finish()
-    out, err = capfd.readouterr()
-    assert err == " " * width + "\r"
-
-
-def test_progress_percentage_step(capfd, monkeypatch):
-    # run the test as if it was in a 4x1 terminal
-    monkeypatch.setenv("COLUMNS", "4")
-    monkeypatch.setenv("LINES", "1")
+def test_progress_percentage_step(capfd):
     pi = ProgressIndicatorPercent(100, step=2, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
     pi.show()
     out, err = capfd.readouterr()
-    assert err == "  0%\r"
+    assert err == "  0%\n"
     pi.show()
     out, err = capfd.readouterr()
     assert err == ""  # no output at 1% as we have step == 2
     pi.show()
     out, err = capfd.readouterr()
-    assert err == "  2%\r"
+    assert err == "  2%\n"
 
 
 def test_progress_percentage_quiet(capfd):
@@ -1071,35 +1042,6 @@ def test_progress_percentage_quiet(capfd):
     pi.finish()
     out, err = capfd.readouterr()
     assert err == ""
-
-
-def test_progress_endless(capfd):
-    pi = ProgressIndicatorEndless(step=1, file=sys.stderr)
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
-    pi.finish()
-    out, err = capfd.readouterr()
-    assert err == "\n"
-
-
-def test_progress_endless_step(capfd):
-    pi = ProgressIndicatorEndless(step=2, file=sys.stderr)
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == ""  # no output here as we have step == 2
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == ""  # no output here as we have step == 2
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
 
 
 def test_partial_format():
@@ -1322,19 +1264,19 @@ def test_safe_unlink_is_safe_ENOSPC(tmpdir, monkeypatch):
 
 class TestPassphrase:
     def test_passphrase_new_verification(self, capsys, monkeypatch):
-        monkeypatch.setattr(getpass, "getpass", lambda prompt: "12aöäü")
+        monkeypatch.setattr(getpass, "getpass", lambda prompt: "1234aöäü")
         monkeypatch.setenv("BORG_DISPLAY_PASSPHRASE", "no")
         Passphrase.new()
         out, err = capsys.readouterr()
-        assert "12" not in out
-        assert "12" not in err
+        assert "1234" not in out
+        assert "1234" not in err
 
         monkeypatch.setenv("BORG_DISPLAY_PASSPHRASE", "yes")
         passphrase = Passphrase.new()
         out, err = capsys.readouterr()
-        assert "313261c3b6c3a4c3bc" not in out
-        assert "313261c3b6c3a4c3bc" in err
-        assert passphrase == "12aöäü"
+        assert "3132333461c3b6c3a4c3bc" not in out
+        assert "3132333461c3b6c3a4c3bc" in err
+        assert passphrase == "1234aöäü"
 
         monkeypatch.setattr(getpass, "getpass", lambda prompt: "1234/@=")
         Passphrase.new()

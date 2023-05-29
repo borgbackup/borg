@@ -21,8 +21,8 @@ from ...constants import *  # NOQA
 from ...helpers import Location
 from ...helpers import EXIT_SUCCESS
 from ...helpers import bin_to_hex
+from ...logger import teardown_logging
 from ...manifest import Manifest
-from ...logger import setup_logging
 from ...remote import RemoteRepository
 from ...repository import Repository
 from .. import has_lchflags
@@ -82,7 +82,10 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             except SystemExit as e:
                 output_text.flush()
                 return e.code, output.getvalue() if binary_output else output.getvalue().decode()
-            ret = archiver.run(args)
+            try:
+                ret = archiver.run(args)
+            finally:
+                teardown_logging()  # usually done via atexit, but we do not exit here
             output_text.flush()
             return ret, output.getvalue() if binary_output else output.getvalue().decode()
         finally:
@@ -155,7 +158,6 @@ class ArchiverTestCaseBase(BaseTestCase):
         os.chdir(self._old_wd)
         # note: ignore_errors=True as workaround for issue #862
         shutil.rmtree(self.tmpdir, ignore_errors=True)
-        setup_logging()
 
     def cmd(self, *args, **kw):
         exit_code = kw.pop("exit_code", 0)

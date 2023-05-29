@@ -1,9 +1,9 @@
 import errno
 import functools
 import inspect
-import json
 import logging
 import os
+import queue
 import select
 import shlex
 import shutil
@@ -15,6 +15,7 @@ import time
 import traceback
 from subprocess import Popen, PIPE
 
+import borg.logger
 from . import __version__
 from .compress import Compressor
 from .constants import *  # NOQA
@@ -26,7 +27,7 @@ from .helpers import sysinfo
 from .helpers import format_file_size
 from .helpers import safe_unlink
 from .helpers import prepare_subprocess_env, ignore_sigint
-from .logger import create_logger
+from .logger import create_logger, borg_serve_log_queue
 from .helpers import msgpack
 from .repository import Repository
 from .version import parse_version, format_version
@@ -36,7 +37,7 @@ from .helpers.datastruct import EfficientCollectionQueue
 logger = create_logger(__name__)
 
 BORG_VERSION = parse_version(__version__)
-MSGID, MSG, ARGS, RESULT = "i", "m", "a", "r"
+MSGID, MSG, ARGS, RESULT, LOG = "i", "m", "a", "r", "l"
 
 MAX_INFLIGHT = 100
 
@@ -125,6 +126,7 @@ class RepositoryServer:  # pragma: no cover
         "scan",
         "negotiate",
         "open",
+        "close",
         "info",
         "put",
         "rollback",
@@ -151,29 +153,41 @@ class RepositoryServer:  # pragma: no cover
         known = set(inspect.signature(f).parameters)
         return {name: kwargs[name] for name in kwargs if name in known}
 
-    def serve(self):
-        stdin_fd = sys.stdin.fileno()
-        stdout_fd = sys.stdout.fileno()
-        stderr_fd = sys.stdout.fileno()
-        os.set_blocking(stdin_fd, False)
-        os.set_blocking(stdout_fd, True)
-        os.set_blocking(stderr_fd, True)
-        unpacker = get_limited_unpacker("server")
+    def send_queued_log(self):
         while True:
-            r, w, es = select.select([stdin_fd], [], [], 10)
+            try:
+                # lr_dict contents see BorgQueueHandler
+                lr_dict = borg_serve_log_queue.get_nowait()
+            except queue.Empty:
+                break
+            else:
+                msg = msgpack.packb({LOG: lr_dict})
+                os_write(self.stdout_fd, msg)
+
+    def serve(self):
+        self.stdin_fd = sys.stdin.fileno()
+        self.stdout_fd = sys.stdout.fileno()
+        os.set_blocking(self.stdin_fd, False)
+        os.set_blocking(self.stdout_fd, True)
+        unpacker = get_limited_unpacker("server")
+        shutdown_serve = False
+        while True:
+            # before processing any new RPCs, send out all pending log output
+            self.send_queued_log()
+
+            if shutdown_serve:
+                # shutdown wanted! get out of here after sending all log output.
+                if self.repository is not None:
+                    self.repository.close()
+                return
+
+            # process new RPCs
+            r, w, es = select.select([self.stdin_fd], [], [], 10)
             if r:
-                data = os.read(stdin_fd, BUFSIZE)
+                data = os.read(self.stdin_fd, BUFSIZE)
                 if not data:
-                    if self.repository is not None:
-                        self.repository.close()
-                    else:
-                        os_write(
-                            stderr_fd,
-                            "Borg {}: Got connection close before repository was opened.\n".format(
-                                __version__
-                            ).encode(),
-                        )
-                    return
+                    shutdown_serve = True
+                    continue
                 unpacker.feed(data)
                 for unpacked in unpacker:
                     if isinstance(unpacked, dict):
@@ -234,12 +248,12 @@ class RepositoryServer:  # pragma: no cover
                                 }
                             )
 
-                        os_write(stdout_fd, msg)
+                        os_write(self.stdout_fd, msg)
                     else:
-                        os_write(stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
+                        os_write(self.stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
             if es:
-                self.repository.close()
-                return
+                shutdown_serve = True
+                continue
 
     def negotiate(self, client_data):
         if isinstance(client_data, dict):
@@ -300,6 +314,12 @@ class RepositoryServer:  # pragma: no cover
         )
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
+
+    def close(self):
+        if self.repository is not None:
+            self.repository.__exit__(None, None, None)
+        borg.logger.teardown_logging()
+        self.send_queued_log()
 
     def inject_exception(self, kind):
         s1 = "test string"
@@ -726,10 +746,18 @@ class RemoteRepository:
                     self.rx_bytes += len(data)
                     self.unpacker.feed(data)
                     for unpacked in self.unpacker:
-                        if isinstance(unpacked, dict):
-                            msgid = unpacked[MSGID]
-                        else:
+                        if not isinstance(unpacked, dict):
                             raise UnexpectedRPCDataFormatFromServer(data)
+
+                        lr_dict = unpacked.get(LOG)
+                        if lr_dict is not None:
+                            # Re-emit remote log messages locally.
+                            _logger = logging.getLogger(lr_dict["name"])
+                            if _logger.isEnabledFor(lr_dict["level"]):
+                                _logger.handle(logging.LogRecord(**lr_dict))
+                            continue
+
+                        msgid = unpacked[MSGID]
                         if msgid in self.ignore_responses:
                             self.ignore_responses.remove(msgid)
                             # async methods never return values, but may raise exceptions.
@@ -755,8 +783,14 @@ class RemoteRepository:
                     if lines and not lines[-1].endswith((b"\r", b"\n")):
                         self.stderr_received = lines.pop()
                     # now we have complete lines in <lines> and any partial line in self.stderr_received.
+                    _logger = logging.getLogger()
                     for line in lines:
-                        handle_remote_line(line.decode())  # decode late, avoid partial utf-8 sequences
+                        # borg serve (remote/server side) should not emit stuff on stderr,
+                        # but e.g. the ssh process (local/client side) might output errors there.
+                        assert line.endswith((b"\r", b"\n"))
+                        # something came in on stderr, log it to not lose it.
+                        # decode late, avoid partial utf-8 sequences.
+                        _logger.warning("stderr: " + line.decode().strip())
             if w:
                 while (
                     (len(self.to_send) <= maximum_to_send)
@@ -872,6 +906,7 @@ class RemoteRepository:
         """actual remoting is done via self.call in the @api decorator"""
 
     def close(self):
+        self.call("close", {}, wait=True)
         if self.p:
             self.p.stdin.close()
             self.p.stdout.close()
@@ -884,57 +919,6 @@ class RemoteRepository:
 
     def preload(self, ids):
         self.preload_ids += ids
-
-
-def handle_remote_line(line):
-    """
-    Handle a remote log line.
-
-    This function is remarkably complex because it handles multiple wire formats.
-    """
-    assert line.endswith(("\r", "\n"))
-    if line.startswith("{"):
-        msg = json.loads(line)
-
-        if msg["type"] not in ("progress_message", "progress_percent", "log_message"):
-            logger.warning("Dropped remote log message with unknown type %r: %s", msg["type"], line)
-            return
-
-        if msg["type"] == "log_message":
-            # Re-emit log messages on the same level as the remote to get correct log suppression and verbosity.
-            level = getattr(logging, msg["levelname"], logging.CRITICAL)
-            assert isinstance(level, int)
-            target_logger = logging.getLogger(msg["name"])
-            msg["message"] = "Remote: " + msg["message"]
-            # In JSON mode, we manually check whether the log message should be propagated.
-            if logging.getLogger("borg").json and level >= target_logger.getEffectiveLevel():
-                sys.stderr.write(json.dumps(msg) + "\n")
-            else:
-                target_logger.log(level, "%s", msg["message"])
-        elif msg["type"].startswith("progress_"):
-            # Progress messages are a bit more complex.
-            # First of all, we check whether progress output is enabled. This is signalled
-            # through the effective level of the borg.output.progress logger
-            # (also see ProgressIndicatorBase in borg.helpers).
-            progress_logger = logging.getLogger("borg.output.progress")
-            if progress_logger.getEffectiveLevel() == logging.INFO:
-                # When progress output is enabled, we check whether the client is in
-                # --log-json mode, as signalled by the "json" attribute on the "borg" logger.
-                if logging.getLogger("borg").json:
-                    # In --log-json mode we re-emit the progress JSON line as sent by the server,
-                    # with the message, if any, prefixed with "Remote: ".
-                    if "message" in msg:
-                        msg["message"] = "Remote: " + msg["message"]
-                    sys.stderr.write(json.dumps(msg) + "\n")
-                elif "message" in msg:
-                    # In text log mode we write only the message to stderr and terminate with \r
-                    # (carriage return, i.e. move the write cursor back to the beginning of the line)
-                    # so that the next message, progress or not, overwrites it. This mirrors the behaviour
-                    # of local progress displays.
-                    sys.stderr.write("Remote: " + msg["message"] + "\r")
-    else:
-        # We don't know what priority the line had.
-        logging.getLogger("").warning("stderr/remote: " + line.strip())
 
 
 class RepositoryNoCache:

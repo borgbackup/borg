@@ -27,7 +27,7 @@ from ..helpers import (
 )
 from ..helpers import make_path_safe, clean_lines
 from ..helpers import interval
-from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir
+from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir, get_runtime_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
@@ -750,6 +750,30 @@ def test_get_security_dir(monkeypatch):
         assert get_security_dir() == os.path.join("/var/tmp/.config", "borg", "security")
         monkeypatch.setenv("BORG_SECURITY_DIR", "/var/tmp")
         assert get_security_dir() == "/var/tmp"
+
+
+def test_get_runtime_dir(monkeypatch):
+    """test that get_runtime_dir respects environment"""
+    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    home_dir = os.path.expanduser("~")
+    if is_win32:
+        monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
+        assert get_runtime_dir() == os.path.join(home_dir, "AppData", "Local", "Temp", "borg", "borg")
+        monkeypatch.setenv("BORG_RUNTIME_DIR", home_dir)
+        assert get_runtime_dir() == home_dir
+    elif is_darwin:
+        monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
+        assert get_runtime_dir() == os.path.join(home_dir, "Library", "Caches", "TemporaryItems", "borg")
+        monkeypatch.setenv("BORG_RUNTIME_DIR", "/var/tmp")
+        assert get_runtime_dir() == "/var/tmp"
+    else:
+        monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+        monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
+        assert get_runtime_dir() == os.path.join("/run/user", str(os.getuid()), "borg")
+        monkeypatch.setenv("XDG_RUNTIME_DIR", "/var/tmp/.cache")
+        assert get_runtime_dir() == os.path.join("/var/tmp/.cache", "borg")
+        monkeypatch.setenv("BORG_RUNTIME_DIR", "/var/tmp")
+        assert get_runtime_dir() == "/var/tmp"
 
 
 def test_file_size():

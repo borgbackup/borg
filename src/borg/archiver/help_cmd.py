@@ -59,7 +59,8 @@ class HelpMixIn:
             Like fnmatch patterns these are similar to shell patterns. The difference
             is that the pattern may include ``**/`` for matching zero or more directory
             levels, ``*`` for matching zero or more arbitrary characters with the
-            exception of any path separator. A leading path separator is always removed.
+            exception of any path separator, ``{}`` containing comma-separated
+            alternative patterns. A leading path separator is always removed.
 
         `Regular expressions <https://docs.python.org/3/library/re.html>`_, selector ``re:``
             Unlike shell patterns, regular expressions are not required to match the full

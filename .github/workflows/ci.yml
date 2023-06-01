@@ -141,3 +141,40 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         env_vars: OS, python
+
+  windows:
+
+    runs-on: windows-latest
+    timeout-minutes: 60
+    needs: lint
+
+    env:
+      SETUPTOOLS_USE_DISTUTILS: stdlib # Needed for pip to work - https://www.msys2.org/docs/python/#known-issues
+      PY_COLORS: 1
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+      - name: Install dependencies
+        run: ./scripts/msys2-install-deps development
+      - name: Build
+        run: |
+          pip install -e .
+          pyinstaller -y scripts/borg.exe.spec
+      - uses: actions/upload-artifact@v3
+        with:
+          name: borg-windows
+          path: dist/borg.exe
+      - name: Run tests
+        run: |
+          ./dist/borg.exe -V
+          pytest --benchmark-skip -vv -rs -k "not remote"

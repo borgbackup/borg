@@ -30,15 +30,10 @@ def test_parse_version(version_str, version_tuple):
     assert parse_version(version_str) == version_tuple
 
 
-def test_parse_version_invalid():
+@pytest.mark.parametrize("invalid_version", ["", "1", "1.2", "crap"])
+def test_parse_version_invalid(invalid_version):
     with pytest.raises(ValueError):
-        assert parse_version("")  # we require x.y.z versions
-    with pytest.raises(ValueError):
-        assert parse_version("1")  # we require x.y.z versions
-    with pytest.raises(ValueError):
-        assert parse_version("1.2")  # we require x.y.z versions
-    with pytest.raises(ValueError):
-        assert parse_version("crap")
+        assert parse_version(invalid_version)  # we require x.y.z versions
 
 
 @pytest.mark.parametrize(

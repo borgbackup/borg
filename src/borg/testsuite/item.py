@@ -35,30 +35,32 @@ def test_item_empty():
         del item.path
 
 
-def test_item_from_dict():
-    # does not matter whether we get str or bytes keys
-    item = Item({b"path": "/a/b/c", b"mode": 0o666})
-    assert item.path == "/a/b/c"
-    assert item.mode == 0o666
+@pytest.mark.parametrize(
+    "item_dict, path, mode",
+    [  # does not matter whether we get str or bytes keys
+        ({b"path": "/a/b/c", b"mode": 0o666}, "/a/b/c", 0o666),
+        ({"path": "/a/b/c", "mode": 0o666}, "/a/b/c", 0o666),
+    ],
+)
+def test_item_from_dict(item_dict, path, mode):
+    item = Item(item_dict)
+    assert item.path == path
+    assert item.mode == mode
     assert "path" in item
-
-    # does not matter whether we get str or bytes keys
-    item = Item({"path": "/a/b/c", "mode": 0o666})
-    assert item.path == "/a/b/c"
-    assert item.mode == 0o666
     assert "mode" in item
 
-    # invalid - no dict
-    with pytest.raises(TypeError):
-        Item(42)
 
-    # invalid - no bytes/str key
-    with pytest.raises(TypeError):
-        Item({42: 23})
-
-    # invalid - unknown key
-    with pytest.raises(ValueError):
-        Item({"foobar": "baz"})
+@pytest.mark.parametrize(
+    "invalid_item, error",
+    [
+        (42, TypeError),  # invalid - no dict
+        ({42: 23}, TypeError),  # invalid - no bytes/str key
+        ({"foobar": "baz"}, ValueError),  # invalid - unknown key
+    ],
+)
+def test_item_invalid(invalid_item, error):
+    with pytest.raises(error):
+        Item(invalid_item)
 
 
 def test_item_from_kw():
@@ -78,15 +80,12 @@ def test_item_int_property():
         item.mode = "invalid"
 
 
-def test_item_mptimestamp_property():
+@pytest.mark.parametrize("atime", [42, 2**65])
+def test_item_mptimestamp_property(atime):
     item = Item()
-    small, big = 42, 2**65
-    item.atime = small
-    assert item.atime == small
-    assert item.as_dict() == {"atime": Timestamp.from_unix_nano(small)}
-    item.atime = big
-    assert item.atime == big
-    assert item.as_dict() == {"atime": Timestamp.from_unix_nano(big)}
+    item.atime = atime
+    assert item.atime == atime
+    assert item.as_dict() == {"atime": Timestamp.from_unix_nano(atime)}
 
 
 def test_item_se_str_property():
@@ -158,19 +157,19 @@ def test_item_optr():
     assert Item.from_optr(item.to_optr()) is item
 
 
-def test_chunk_content_equal():
-    def ccc(a, b):
-        chunks_a = [data for data in a]
-        chunks_b = [data for data in b]
-        compare1 = chunks_contents_equal(iter(chunks_a), iter(chunks_b))
-        compare2 = chunks_contents_equal(iter(chunks_b), iter(chunks_a))
-        assert compare1 == compare2
-        return compare1
-
-    assert ccc([b"1234", b"567A", b"bC"], [b"1", b"23", b"4567A", b"b", b"C"])
-    # one iterator exhausted before the other
-    assert not ccc([b"12345"], [b"1234", b"56"])
-    # content mismatch
-    assert not ccc([b"1234", b"65"], [b"1234", b"56"])
-    # first is the prefix of second
-    assert not ccc([b"1234", b"56"], [b"1234", b"565"])
+@pytest.mark.parametrize(
+    "chunk_a, chunk_b, chunks_equal",
+    [
+        (["1234", "567A", "bC"], ["1", "23", "4567A", "b", "C"], True),  # equal
+        (["12345"], ["1234", "56"], False),  # one iterator exhausted before the other
+        (["1234", "65"], ["1234", "56"], False),  # content mismatch
+        (["1234", "56"], ["1234", "565"], False),  # first is the prefix of second
+    ],
+)
+def test_chunk_content_equal(chunk_a: str, chunk_b: str, chunks_equal):
+    chunks_a = [data.encode() for data in chunk_a]
+    chunks_b = [data.encode() for data in chunk_b]
+    compare1 = chunks_contents_equal(iter(chunks_a), iter(chunks_b))
+    compare2 = chunks_contents_equal(iter(chunks_b), iter(chunks_a))
+    assert compare1 == compare2
+    assert compare1 == chunks_equal

@@ -159,6 +159,7 @@ def test_buzhash_chunksize_distribution():
     chunker = Chunker(0, min_exp, max_exp, mask, 4095)
     f = BytesIO(data)
     chunks = cf(chunker.chunkify(f))
+    del chunks[-1]  # get rid of the last chunk, it can be smaller than 2**min_exp
     chunk_sizes = [len(chunk) for chunk in chunks]
     chunks_count = len(chunks)
     min_chunksize_observed = min(chunk_sizes)

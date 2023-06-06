@@ -21,7 +21,7 @@ from ...constants import *  # NOQA
 from ...helpers import Location
 from ...helpers import EXIT_SUCCESS
 from ...helpers import bin_to_hex
-from ...logger import teardown_logging
+from ...logger import flush_logging
 from ...manifest import Manifest
 from ...remote import RemoteRepository
 from ...repository import Repository
@@ -83,9 +83,9 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
                 output_text.flush()
                 return e.code, output.getvalue() if binary_output else output.getvalue().decode()
             try:
-                ret = archiver.run(args)
+                ret = archiver.run(args)  # calls setup_logging internally
             finally:
-                teardown_logging()  # usually done via atexit, but we do not exit here
+                flush_logging()  # usually done via atexit, but we do not exit here
             output_text.flush()
             return ret, output.getvalue() if binary_output else output.getvalue().decode()
         finally:

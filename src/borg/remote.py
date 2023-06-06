@@ -366,7 +366,7 @@ class RepositoryServer:  # pragma: no cover
         if self.repository is not None:
             self.repository.__exit__(None, None, None)
             self.repository = None
-        borg.logger.teardown_logging()
+        borg.logger.flush_logging()
         self.send_queued_log()
 
     def inject_exception(self, kind):

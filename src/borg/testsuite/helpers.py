@@ -27,7 +27,7 @@ from ..helpers import (
 )
 from ..helpers import make_path_safe, clean_lines
 from ..helpers import interval
-from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir
+from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir, get_runtime_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
@@ -184,6 +184,14 @@ class TestLocationWithoutEnv:
             == "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='/some/path')"
         )
 
+    def test_socket(self, monkeypatch, keys_dir):
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        assert (
+            repr(Location("socket:///repo/path"))
+            == "Location(proto='socket', user=None, host=None, port=None, path='/repo/path')"
+        )
+        assert Location("socket:///some/path").to_key_filename() == keys_dir + "some_path"
+
     def test_file(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
@@ -275,6 +283,7 @@ class TestLocationWithoutEnv:
             "file://some/path",
             "host:some/path",
             "host:~user/some/path",
+            "socket:///some/path",
             "ssh://host/some/path",
             "ssh://user@host:1234/some/path",
         ]
@@ -750,6 +759,30 @@ def test_get_security_dir(monkeypatch):
         assert get_security_dir() == os.path.join("/var/tmp/.config", "borg", "security")
         monkeypatch.setenv("BORG_SECURITY_DIR", "/var/tmp")
         assert get_security_dir() == "/var/tmp"
+
+
+def test_get_runtime_dir(monkeypatch):
+    """test that get_runtime_dir respects environment"""
+    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    home_dir = os.path.expanduser("~")
+    if is_win32:
+        monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
+        assert get_runtime_dir() == os.path.join(home_dir, "AppData", "Local", "Temp", "borg", "borg")
+        monkeypatch.setenv("BORG_RUNTIME_DIR", home_dir)
+        assert get_runtime_dir() == home_dir
+    elif is_darwin:
+        monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
+        assert get_runtime_dir() == os.path.join(home_dir, "Library", "Caches", "TemporaryItems", "borg")
+        monkeypatch.setenv("BORG_RUNTIME_DIR", "/var/tmp")
+        assert get_runtime_dir() == "/var/tmp"
+    else:
+        monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+        monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
+        assert get_runtime_dir() == os.path.join("/run/user", str(os.getuid()), "borg")
+        monkeypatch.setenv("XDG_RUNTIME_DIR", "/var/tmp/.cache")
+        assert get_runtime_dir() == os.path.join("/var/tmp/.cache", "borg")
+        monkeypatch.setenv("BORG_RUNTIME_DIR", "/var/tmp")
+        assert get_runtime_dir() == "/var/tmp"
 
 
 def test_file_size():

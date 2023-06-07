@@ -463,6 +463,10 @@ class Repository:
         self.id = unhexlify(self.config.get("repository", "id").strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
+    def reopen(self, exclusive=True):
+        self.__exit__(None, None, None)
+        self.__enter__()
+
     def _load_hints(self):
         if (transaction_id := self.get_transaction_id()) is None:
             # self is a fresh repo, so transaction_id is None and there is no hints file

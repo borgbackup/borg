@@ -3,6 +3,8 @@ import os
 import pytest
 
 # needed to get pretty assertion failures in unit tests:
+from borg.repository import Repository
+
 if hasattr(pytest, "register_assert_rewrite"):
     pytest.register_assert_rewrite("borg.testsuite")
 
@@ -28,6 +30,13 @@ def clean_env(tmpdir_factory, monkeypatch):
     monkeypatch.setenv("BORG_BASE_DIR", str(tmpdir_factory.mktemp("borg-base-dir")))
     # Speed up tests
     monkeypatch.setenv("BORG_TESTONLY_WEAKEN_KDF", "1")
+
+
+@pytest.fixture(autouse=True)
+def repository(tmpdir):
+    repository_location = os.path.join(str(tmpdir), "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        yield repository
 
 
 def pytest_report_header(config, startdir):

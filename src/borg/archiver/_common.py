@@ -29,7 +29,7 @@ logger = create_logger(__name__)
 
 
 def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args):
-    if location.proto == "ssh":
+    if location.proto in ("ssh", "socket"):
         repository = RemoteRepository(
             location,
             create=create,
@@ -572,6 +572,16 @@ def define_common_options(add_common_option):
         dest="rsh",
         action=Highlander,
         help="Use this command to connect to the 'borg serve' process (default: 'ssh')",
+    )
+    add_common_option(
+        "--socket",
+        metavar="PATH",
+        dest="use_socket",
+        default=False,
+        const=True,
+        nargs="?",
+        action=Highlander,
+        help="Use UNIX DOMAIN (IPC) socket at PATH for client/server communication with socket: protocol.",
     )
     add_common_option(
         "-r",

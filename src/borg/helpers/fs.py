@@ -106,6 +106,22 @@ def get_data_dir(*, legacy=False):
     return data_dir
 
 
+def get_runtime_dir(*, legacy=False):
+    """Determine where to store runtime files, like sockets, PID files, ..."""
+    assert legacy is False, "there is no legacy variant of the borg runtime dir"
+    runtime_dir = os.environ.get(
+        "BORG_RUNTIME_DIR", join_base_dir(".cache", "borg", legacy=legacy) or platformdirs.user_runtime_dir("borg")
+    )
+
+    # Create path if it doesn't exist yet
+    ensure_dir(runtime_dir)
+    return runtime_dir
+
+
+def get_socket_filename():
+    return os.path.join(get_runtime_dir(), "borg.sock")
+
+
 def get_cache_dir(*, legacy=False):
     """Determine where to repository keys and cache"""
 

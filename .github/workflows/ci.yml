@@ -129,6 +129,7 @@ jobs:
         # we already have that in the global env, but something is broken and overwrites that.
         # so, set it here, again.
         PKG_CONFIG_PATH: "/usr/local/opt/openssl@1.1/lib/pkgconfig:$PKG_CONFIG_PATH"
+        XDISTN: "4"
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
@@ -177,4 +178,4 @@ jobs:
       - name: Run tests
         run: |
           ./dist/borg.exe -V
-          pytest --benchmark-skip -vv -rs -k "not remote"
+          pytest -n4 --benchmark-skip -vv -rs -k "not remote"

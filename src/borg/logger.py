@@ -28,6 +28,24 @@ The way to use this is as follows:
 
 * what is output on INFO level is additionally controlled by commandline
   flags
+
+Logging setup is a bit complicated in borg, as it needs to work under misc. conditions:
+- purely local, not client/server (easy)
+- client/server: RemoteRepository ("borg serve" process) writes log records into a global
+  queue, which is then sent to the client side by the main serve loop (via the RPC protocol,
+  either over ssh stdout, more directly via process stdout without ssh [used in the tests]
+  or via a socket. On the client side, the log records are fed into the clientside logging
+  system. When remote_repo.close() is called, server side must send all queued log records
+  via the RPC channel before returning the close() call's return value (as the client will
+  then shut down the connection).
+- progress output is always given as json to the logger (including the plain text inside
+  the json), but then formatted by the logging system's formatter as either plain text or
+  json depending on the cli args given (--log-json?).
+- tests: potentially running in parallel via pytest-xdist, capturing borg output into a
+  given stream.
+- logging might be short-lived (e.g. when invoking a single borg command via the cli)
+  or long-lived (e.g. borg serve --socket or when running the tests)
+- logging is global and exists only once per process.
 """
 
 import inspect
@@ -115,10 +133,14 @@ def remove_handlers(logger):
         logger.removeHandler(handler)
 
 
-def teardown_logging():
-    global configured
-    logging.shutdown()
-    configured = False
+def flush_logging():
+    # make sure all log output is flushed,
+    # this is especially important for the "borg serve" RemoteRepository logging:
+    # all log output needs to be sent via the ssh / socket connection before closing it.
+    for logger_name in "borg.output.progress", "":
+        logger = logging.getLogger(logger_name)
+        for handler in logger.handlers:
+            handler.flush()
 
 
 def setup_logging(

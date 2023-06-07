@@ -390,7 +390,7 @@ class Location:
     # path must not contain :: (it ends at :: or string end), but may contain single colons.
     # to avoid ambiguities with other regexes, it must also not start with ":" nor with "//" nor with "ssh://".
     local_path_re = r"""
-        (?!(:|//|ssh://))                                   # not starting with ":" or // or ssh://
+        (?!(:|//|ssh://|socket://))                         # not starting with ":" or // or ssh:// or socket://
         (?P<path>([^:]|(:(?!:)))+)                          # any chars, but no "::"
         """
 
@@ -424,6 +424,14 @@ class Location:
         + host_re
         + r"""                 # user@  (optional), host name or address
         (?::(?P<port>\d+))?                                     # :port (optional)
+        """
+        + abs_path_re,
+        re.VERBOSE,
+    )  # path
+
+    socket_re = re.compile(
+        r"""
+        (?P<proto>socket)://                                    # socket://
         """
         + abs_path_re,
         re.VERBOSE,
@@ -497,6 +505,11 @@ class Location:
             self.proto = m.group("proto")
             self.path = normpath_special(m.group("path"))
             return True
+        m = self.socket_re.match(text)
+        if m:
+            self.proto = m.group("proto")
+            self.path = normpath_special(m.group("path"))
+            return True
         m = self.local_re.match(text)
         if m:
             self.proto = "file"
@@ -516,7 +529,7 @@ class Location:
 
     def to_key_filename(self):
         name = re.sub(r"[^\w]", "_", self.path).strip("_")
-        if self.proto != "file":
+        if self.proto not in ("file", "socket"):
             name = re.sub(r"[^\w]", "_", self.host) + "__" + name
         if len(name) > 100:
             # Limit file names to some reasonable length. Most file systems
@@ -535,7 +548,7 @@ class Location:
             return self._host.lstrip("[").rstrip("]")
 
     def canonical_path(self):
-        if self.proto == "file":
+        if self.proto in ("file", "socket"):
             return self.path
         else:
             if self.path and self.path.startswith("~"):

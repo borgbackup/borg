@@ -1,4 +1,6 @@
 import os
+import shutil
+from contextlib import contextmanager
 
 import pytest
 
@@ -8,6 +10,27 @@ from ..repoobj import RepoObj
 from .hashindex import H
 
 UNSPECIFIED = object()  # for default values where we can't use None
+EXCLUSIVE = True
+
+
+@pytest.fixture()
+def repository(tmpdir, exclusive=UNSPECIFIED, create=True):
+    if exclusive is UNSPECIFIED:
+        exclusive = EXCLUSIVE
+    repository_location = os.path.join(str(tmpdir), "repository")
+    repository = Repository(repository_location, exclusive=exclusive, create=create)
+    yield repository.__enter__()
+    repository.__exit__(None, None, None)
+    shutil.rmtree(str(tmpdir))
+
+
+@pytest.fixture()
+@contextmanager
+def reopened_repository(repository, exclusive=UNSPECIFIED):
+    repository.__exit__(None, None, None)
+    reopened_repository = Repository(repository.path, exclusive=exclusive, create=False)
+    yield reopened_repository.__enter__()
+    repository.__exit__(None, None, None)
 
 
 def fchunk(data, meta=b""):
@@ -54,7 +77,7 @@ def repo_dump(repository, label=None):
     print()
 
 
-def test1(repository):
+def test1(repository, reopened_repository):
     for x in range(100):
         repository.put(H(x), fchunk(b"SOMEDATA"))
     key50 = H(50)
@@ -63,13 +86,13 @@ def test1(repository):
     with pytest.raises(Repository.ObjectNotFound):
         repository.get(key50)
     repository.commit(compact=False)
-    repository.reopen()
-    with pytest.raises(Repository.ObjectNotFound):
-        repository.get(key50)
-    for x in range(100):
-        if x == 50:
-            continue
-        assert pdchunk(repository.get(H(x))) == b"SOMEDATA"
+    with reopened_repository as repository:
+        with pytest.raises(Repository.ObjectNotFound):
+            repository.get(key50)
+        for x in range(100):
+            if x == 50:
+                continue
+            assert pdchunk(repository.get(H(x))) == b"SOMEDATA"
 
 
 def test2(repository):
@@ -128,12 +151,9 @@ def test_single_kind_transactions(repository):
     # put
     repository.put(H(0), fchunk(b"foo"))
     repository.commit(compact=False)
-    repository.reopen()
-
     # replace
     repository.put(H(0), fchunk(b"bar"))
     repository.commit(compact=False)
-    repository.reopen()
     # delete
     repository.delete(H(0))
     repository.commit(compact=False)
@@ -246,18 +266,18 @@ def test_flags_many(repository):
     assert list(repository.flags_many(ids_flagged, mask=0x0000FFFF)) == [0x0000BEEF, 0x0000BEEF]
 
 
-def test_flags_persistence(repository):
+def test_flags_persistence(repository, reopened_repository):
     repository.put(H(0), fchunk(b"default"))
     repository.put(H(1), fchunk(b"one one zero"))
     # we do not set flags for H(0), so we can later check their default state.
     repository.flags(H(1), mask=0x00000007, value=0x00000006)
     repository.commit(compact=False)
-    repository.reopen()
-    # we query all flags to check if the initial flags were all zero and
-    # only the ones we explicitly set to one are as expected.
-    assert repository.flags(H(0), mask=0xFFFFFFFF) == 0x00000000
-    assert repository.flags(H(1), mask=0xFFFFFFFF) == 0x00000006
-    # test case that doesn't work with remote repositories
+    with reopened_repository as repository:
+        # we query all flags to check if the initial flags were all zero and
+        # only the ones we explicitly set to one are as expected.
+        assert repository.flags(H(0), mask=0xFFFFFFFF) == 0x00000000
+        assert repository.flags(H(1), mask=0xFFFFFFFF) == 0x00000006
+        # test case that doesn't work with remote repositories
 
 
 def _assert_sparse(repository):
@@ -301,7 +321,7 @@ def test_sparse_delete(repository):
     assert 0 not in [segment for segment, _ in repository.io.segment_iterator()]
 
 
-def test_uncommitted_garbage(repository):
+def test_uncommitted_garbage(repository, reopened_repository):
     # uncommitted garbage should be no problem, it is cleaned up automatically.
     # we just have to be careful with invalidation of cached FDs in LoggedIO.
     repository.put(H(0), fchunk(b"foo"))
@@ -310,43 +330,42 @@ def test_uncommitted_garbage(repository):
     last_segment = repository.io.get_latest_segment()
     with open(repository.io.segment_filename(last_segment + 1), "wb") as f:
         f.write(MAGIC + b"crapcrapcrap")
-    repository.reopen()
-    # usually, opening the repo and starting a transaction should trigger a cleanup.
-    repository.put(H(0), fchunk(b"bar"))  # this may trigger compact_segments()
-    repository.commit(compact=True)
-    # the point here is that nothing blows up with an exception.
+    with reopened_repository as repository:
+        # usually, opening the repo and starting a transaction should trigger a cleanup.
+        repository.put(H(0), fchunk(b"bar"))  # this may trigger compact_segments()
+        repository.commit(compact=True)
+        # the point here is that nothing blows up with an exception.
 
 
-def test_replay_of_missing_index(repository):
+def test_replay_of_missing_index(repository, reopened_repository):
     add_keys(repository)
     for name in os.listdir(repository.path):
         if name.startswith("index."):
             os.unlink(os.path.join(repository.path, name))
-    repository.reopen()
-    assert len(repository) == 3
-    # assert repository.check() is True - repository._active_txn is not false, causing check() to fail.
-    # my reopen method in repository isn't working as intended
+    with reopened_repository as repository:
+        assert len(repository) == 3
+        assert repository.check() is True
 
 
-def test_crash_before_compact_segments(repository):
+def test_crash_before_compact_segments(repository, reopened_repository):
     add_keys(repository)
     repository.compact_segments = None
     try:
         repository.commit(compact=True)
     except TypeError:
         pass
-    repository.reopen()
-    assert len(repository) == 3
-    # assert repository.check() is True - breaks test, same reason as above
+    with reopened_repository as repository:
+        assert len(repository) == 3
+        assert repository.check() is True
 
 
-def test_crash_before_write_index(repository):
+def test_crash_before_write_index(repository, reopened_repository):
     add_keys(repository)
     repository.write_index = None
     try:
         repository.commit(compact=False)
     except TypeError:
         pass
-    repository.reopen()
-    assert len(repository) == 3
-    # assert repository.check() is True - breaks test, same reason as above
+    with reopened_repository as repository:
+        assert len(repository) == 3
+        assert repository.check() is True

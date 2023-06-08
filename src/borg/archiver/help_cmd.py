@@ -32,11 +32,9 @@ class HelpMixIn:
         If you give ``../../relative`` as root, the paths will be normalized
         as ``relative/``.
 
-        File patterns support five different styles. If followed by a colon ':',
-        the first two characters of a pattern are used as a style selector.
-        Explicit style selection is necessary if a non-default style is desired
-        or when the desired pattern starts with two alphanumeric characters
-        followed by a colon (i.e. ``aa:something/*``).
+        Borg supports different pattern styles. To define a non-default
+        style for a specific pattern, prefix it with two characters followed
+        by a colon ':' (i.e. ``fm:path/*``, ``sh:path/**``).
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector ``fm:``
             This is the default style for ``--exclude`` and ``--exclude-from``.

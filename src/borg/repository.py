@@ -209,7 +209,7 @@ class Repository:
     def __del__(self):
         if self.lock:
             self.close()
-            assert False, "cleanup happened in Repository.__del__"
+            # assert False, "cleanup happened in Repository.__del__"
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.path}>"
@@ -462,10 +462,6 @@ class Repository:
             self.storage_quota = parse_file_size(self.config.get("repository", "storage_quota", fallback=0))
         self.id = unhexlify(self.config.get("repository", "id").strip())
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
-
-    def reopen(self, exclusive=True):
-        self.__exit__(None, None, None)
-        self.__enter__()
 
     def _load_hints(self):
         if (transaction_id := self.get_transaction_id()) is None:

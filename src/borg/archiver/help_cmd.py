@@ -28,9 +28,9 @@ class HelpMixIn:
 
         Starting with Borg 1.2, paths that are matched against patterns always
         appear relative. If you give ``/absolute/`` as root, the paths going
-        into the matcher will look relative like ``absolute/.../file.ext``.
-        If you give ``../some/path`` as root, the paths will look like
-        ``some/path/.../file.ext``.
+        into the matcher will start with ``absolute/``.
+        If you give ``../../relative`` as root, the paths will be normalized
+        as ``relative/``.
 
         File patterns support five different styles. If followed by a colon ':',
         the first two characters of a pattern are used as a style selector.

@@ -126,6 +126,12 @@ New features:
 - prune --short/--format: enable users to format the list output, #3238
 - implement BORG_<CMD>_FORMAT env vars for prune, list, rlist, #5166
 - rlist: size and nfiles format keys
+- implement unix domain (ipc) socket support, #6183::
+
+      borg serve --socket  # server side (not started automatically!)
+      borg -r socket:///path/to/repo ...  # client side
+- add get_runtime_dir / BORG_RUNTIME_DIR (contains e.g. .sock and .pid file)
+- support shell-style alternatives, like: sh:image.{png,jpg}, #7602
 
 Fixes:
 
@@ -145,10 +151,12 @@ Fixes:
 - Fix argparse error messages from misc. validators (being more specific).
 - put security infos into data dir, add BORG_DATA_DIR env var, #5760
 - setup.cfg: remove setup_requires (we have a pyproject.toml for that), #7574
+- do not crash for empty archives list in borg rlist date based matching, #7522
 
 Other changes:
 
 - allow msgpack 1.0.5 also
+- development.lock.txt: upgrade cython to 0.29.35, misc. other upgrades
 - clarify platformdirs requirements, #7393.
   3.0.0 is only required for macOS due to breaking changes.
   2.6.0 was the last breaking change for Linux/UNIX.
@@ -157,6 +165,12 @@ Other changes:
 - Windows: simplify building (just use pip)
 - refactor toplevel exception handling, #6018
 - remove nonce management, related repo methods (not needed for borg2)
+- borg.remote: remove support for borg < 1.1.0
+  ($LOG, logging setup, exceptions, rpc tuple data format, version)
+- new remote and progress logging, #7604
+- borg.logger: add logging debugging functionality
+- add function to clear empty directories at end of compact process
+- unify scanning and listing of segment dirs / segment files, #7597
 - docs:
 
   - add installation instructions for Windows
@@ -171,6 +185,7 @@ Other changes:
   - fix some -a / --match-archives docs issues
   - incl./excl. options header, clarify --path-from-stdin exclusive control
   - add note about MAX_DATA_SIZE
+  - update security support docs
 - CI / tests / vagrant:
 
   - added pre-commit for linting purposes, #7476
@@ -182,6 +197,7 @@ Other changes:
   - avoid long ids in pytest output
   - tox: package = editable-legacy, #7580
   - tox under fakeroot: fix finding setup_docs, #7391
+  - check buzhash chunksize distribution, #7586
 
 
 Version 2.0.0b5 (2023-02-27)

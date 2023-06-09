@@ -178,6 +178,25 @@ class HelpMixIn:
         exclude stops examination of subdirectories so that potential includes
         will not match - use normal excludes for such use cases.
 
+        Example::
+
+            # Define the recursion root
+            R /
+            # Exclude all iso files in any directory
+            - **/*.iso
+            # Explicitly include all inside etc and root
+            + etc/**
+            + root/**
+            # Exclude a specific directory under each user's home directories
+            - home/*/.cache
+            # Explicitly include everything in /home
+            + home/**
+            # Explicitly exclude some directories without recursing into them
+            ! re:^(dev|proc|run|sys|tmp)
+            # Exclude all other files and directories
+            # that are not specifically included earlier.
+            - **
+
         **Tip: You can easily test your patterns with --dry-run and  --list**::
 
             $ borg create --dry-run --list --patterns-from patterns.txt archive

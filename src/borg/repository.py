@@ -209,7 +209,7 @@ class Repository:
     def __del__(self):
         if self.lock:
             self.close()
-            # assert False, "cleanup happened in Repository.__del__"
+            assert False, "cleanup happened in Repository.__del__"
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.path}>"

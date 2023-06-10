@@ -369,36 +369,6 @@ class Repository:
         # note: if we return an empty string, it means there is no repo key
         return keydata.encode("utf-8")  # remote repo: msgpack issue #99, returning bytes
 
-    def get_free_nonce(self):
-        if self.do_lock and not self.lock.got_exclusive_lock():
-            raise AssertionError("bug in code, exclusive lock should exist here")
-
-        nonce_path = os.path.join(self.path, "nonce")
-        try:
-            with open(nonce_path) as fd:
-                return int.from_bytes(unhexlify(fd.read()), byteorder="big")
-        except FileNotFoundError:
-            return None
-
-    def commit_nonce_reservation(self, next_unreserved, start_nonce):
-        if self.do_lock and not self.lock.got_exclusive_lock():
-            raise AssertionError("bug in code, exclusive lock should exist here")
-
-        if self.get_free_nonce() != start_nonce:
-            raise Exception("nonce space reservation with mismatched previous state")
-        nonce_path = os.path.join(self.path, "nonce")
-        try:
-            with SaveFile(nonce_path, binary=False) as fd:
-                fd.write(bin_to_hex(next_unreserved.to_bytes(8, byteorder="big")))
-        except PermissionError as e:
-            # error is only a problem if we even had a lock
-            if self.do_lock:
-                raise
-            logger.warning(
-                "%s: Failed writing to '%s'. This is expected when working on "
-                "read-only repositories." % (e.strerror, e.filename)
-            )
-
     def destroy(self):
         """Destroy the repository at `self.path`"""
         if self.append_only:
@@ -937,6 +907,7 @@ class Repository:
             pi.show()
         pi.finish()
         complete_xfer(intermediate=False)
+        self.io.clear_empty_dirs()
         quota_use_after = self.storage_quota_use
         logger.info("Compaction freed about %s repository space.", format_file_size(quota_use_before - quota_use_after))
         logger.debug("Compaction completed.")
@@ -1406,39 +1377,51 @@ class LoggedIO:
         safe_fadvise(fd.fileno(), 0, 0, "DONTNEED")
         fd.close()
 
+    def get_segment_dirs(self, data_dir, start_index=MIN_SEGMENT_DIR_INDEX, end_index=MAX_SEGMENT_DIR_INDEX):
+        """Returns generator yielding required segment dirs in data_dir as `os.DirEntry` objects.
+        Start and end are inclusive.
+        """
+        segment_dirs = (
+            f
+            for f in os.scandir(data_dir)
+            if f.is_dir() and f.name.isdigit() and start_index <= int(f.name) <= end_index
+        )
+        return segment_dirs
+
+    def get_segment_files(self, segment_dir, start_index=MIN_SEGMENT_INDEX, end_index=MAX_SEGMENT_INDEX):
+        """Returns generator yielding required segment files in segment_dir as `os.DirEntry` objects.
+        Start and end are inclusive.
+        """
+        segment_files = (
+            f
+            for f in os.scandir(segment_dir)
+            if f.is_file() and f.name.isdigit() and start_index <= int(f.name) <= end_index
+        )
+        return segment_files
+
     def segment_iterator(self, start_segment=None, end_segment=None, reverse=False):
         if start_segment is None:
-            start_segment = 0 if not reverse else 2**32 - 1
+            start_segment = MIN_SEGMENT_INDEX if not reverse else MAX_SEGMENT_INDEX
         if end_segment is None:
-            end_segment = 2**32 - 1 if not reverse else 0
+            end_segment = MAX_SEGMENT_INDEX if not reverse else MIN_SEGMENT_INDEX
         data_path = os.path.join(self.path, "data")
         start_segment_dir = start_segment // self.segments_per_dir
         end_segment_dir = end_segment // self.segments_per_dir
-        dirs = os.listdir(data_path)
         if not reverse:
-            dirs = [dir for dir in dirs if dir.isdigit() and start_segment_dir <= int(dir) <= end_segment_dir]
+            dirs = self.get_segment_dirs(data_path, start_index=start_segment_dir, end_index=end_segment_dir)
         else:
-            dirs = [dir for dir in dirs if dir.isdigit() and start_segment_dir >= int(dir) >= end_segment_dir]
-        dirs = sorted(dirs, key=int, reverse=reverse)
+            dirs = self.get_segment_dirs(data_path, start_index=end_segment_dir, end_index=start_segment_dir)
+        dirs = sorted(dirs, key=lambda dir: int(dir.name), reverse=reverse)
         for dir in dirs:
-            filenames = os.listdir(os.path.join(data_path, dir))
             if not reverse:
-                filenames = [
-                    filename
-                    for filename in filenames
-                    if filename.isdigit() and start_segment <= int(filename) <= end_segment
-                ]
+                files = self.get_segment_files(dir, start_index=start_segment, end_index=end_segment)
             else:
-                filenames = [
-                    filename
-                    for filename in filenames
-                    if filename.isdigit() and start_segment >= int(filename) >= end_segment
-                ]
-            filenames = sorted(filenames, key=int, reverse=reverse)
-            for filename in filenames:
+                files = self.get_segment_files(dir, start_index=end_segment, end_index=start_segment)
+            files = sorted(files, key=lambda file: int(file.name), reverse=reverse)
+            for file in files:
                 # Note: Do not filter out logically deleted segments  (see "File system interaction" above),
                 # since this is used by cleanup and txn state detection as well.
-                yield int(filename), os.path.join(data_path, dir, filename)
+                yield int(file.name), file.path
 
     def get_latest_segment(self):
         for segment, filename in self.segment_iterator(reverse=True):
@@ -1571,6 +1554,21 @@ class LoggedIO:
             safe_unlink(self.segment_filename(segment))
         except FileNotFoundError:
             pass
+
+    def clear_empty_dirs(self):
+        """Delete empty segment dirs, i.e those with no segment files."""
+        data_dir = os.path.join(self.path, "data")
+        segment_dirs = self.get_segment_dirs(data_dir)
+        for segment_dir in segment_dirs:
+            try:
+                # os.rmdir will only delete the directory if it is empty
+                # so we don't need to explicitly check for emptiness first.
+                os.rmdir(segment_dir)
+            except OSError:
+                # OSError is raised by os.rmdir if directory is not empty. This is expected.
+                # Its subclass FileNotFoundError may be raised if the directory already does not exist. Ignorable.
+                pass
+        sync_dir(data_dir)
 
     def segment_exists(self, segment):
         filename = self.segment_filename(segment)

@@ -25,16 +25,16 @@ from ..helpers import (
     PlaceholderError,
     replace_placeholders,
 )
-from ..helpers import make_path_safe, clean_lines
+from ..helpers import remove_dotdot_prefixes, make_path_safe, clean_lines
 from ..helpers import interval
-from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir
+from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir, get_runtime_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import msgpack
 from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
 from ..helpers import StableDict, bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
 from ..helpers import archivename_validator, text_validator
-from ..helpers import ProgressIndicatorPercent, ProgressIndicatorEndless
+from ..helpers import ProgressIndicatorPercent
 from ..helpers import swidth_slice
 from ..helpers import chunkit
 from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
@@ -48,6 +48,7 @@ from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 from ..platform import is_cygwin, is_win32, is_darwin, swidth
 
 from . import BaseTestCase, FakeInputs, are_hardlinks_supported
+from . import rejected_dotdot_paths
 
 
 def test_bin_to_hex():
@@ -184,6 +185,14 @@ class TestLocationWithoutEnv:
             == "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='/some/path')"
         )
 
+    def test_socket(self, monkeypatch, keys_dir):
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        assert (
+            repr(Location("socket:///repo/path"))
+            == "Location(proto='socket', user=None, host=None, port=None, path='/repo/path')"
+        )
+        assert Location("socket:///some/path").to_key_filename() == keys_dir + "some_path"
+
     def test_file(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
@@ -275,6 +284,7 @@ class TestLocationWithoutEnv:
             "file://some/path",
             "host:some/path",
             "host:~user/some/path",
+            "socket:///some/path",
             "ssh://host/some/path",
             "ssh://user@host:1234/some/path",
         ]
@@ -384,16 +394,37 @@ def test_chunkerparams():
         ChunkerParams("fixed,%d,%d" % (4096, MAX_DATA_SIZE + 1))  # too big header size
 
 
+class RemoveDotdotPrefixesTestCase(BaseTestCase):
+    def test(self):
+        self.assert_equal(remove_dotdot_prefixes("."), ".")
+        self.assert_equal(remove_dotdot_prefixes(".."), ".")
+        self.assert_equal(remove_dotdot_prefixes("/"), ".")
+        self.assert_equal(remove_dotdot_prefixes("//"), ".")
+        self.assert_equal(remove_dotdot_prefixes("foo"), "foo")
+        self.assert_equal(remove_dotdot_prefixes("foo/bar"), "foo/bar")
+        self.assert_equal(remove_dotdot_prefixes("/foo/bar"), "foo/bar")
+        self.assert_equal(remove_dotdot_prefixes("../foo/bar"), "foo/bar")
+
+
 class MakePathSafeTestCase(BaseTestCase):
     def test(self):
+        self.assert_equal(make_path_safe("."), ".")
+        self.assert_equal(make_path_safe("./"), ".")
+        self.assert_equal(make_path_safe("./foo"), "foo")
+        self.assert_equal(make_path_safe(".//foo"), "foo")
+        self.assert_equal(make_path_safe(".//foo//bar//"), "foo/bar")
         self.assert_equal(make_path_safe("/foo/bar"), "foo/bar")
-        self.assert_equal(make_path_safe("/foo/bar"), "foo/bar")
-        self.assert_equal(make_path_safe("/f/bar"), "f/bar")
-        self.assert_equal(make_path_safe("fo/bar"), "fo/bar")
-        self.assert_equal(make_path_safe("../foo/bar"), "foo/bar")
-        self.assert_equal(make_path_safe("../../foo/bar"), "foo/bar")
-        self.assert_equal(make_path_safe("/"), ".")
-        self.assert_equal(make_path_safe("/"), ".")
+        self.assert_equal(make_path_safe("//foo/bar"), "foo/bar")
+        self.assert_equal(make_path_safe("//foo/./bar"), "foo/bar")
+        self.assert_equal(make_path_safe(".test"), ".test")
+        self.assert_equal(make_path_safe(".test."), ".test.")
+        self.assert_equal(make_path_safe("..test.."), "..test..")
+        self.assert_equal(make_path_safe("/te..st/foo/bar"), "te..st/foo/bar")
+        self.assert_equal(make_path_safe("/..test../abc//"), "..test../abc")
+
+        for path in rejected_dotdot_paths:
+            with pytest.raises(ValueError, match="unexpected '..' element in path"):
+                make_path_safe(path)
 
 
 class MockArchive:
@@ -740,14 +771,40 @@ def test_get_security_dir(monkeypatch):
         monkeypatch.setenv("BORG_SECURITY_DIR", "/var/tmp")
         assert get_security_dir() == "/var/tmp"
     else:
-        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+        monkeypatch.delenv("XDG_DATA_HOME", raising=False)
         monkeypatch.delenv("BORG_SECURITY_DIR", raising=False)
-        assert get_security_dir() == os.path.join(home_dir, ".config", "borg", "security")
-        assert get_security_dir(repository_id="1234") == os.path.join(home_dir, ".config", "borg", "security", "1234")
-        monkeypatch.setenv("XDG_CONFIG_HOME", "/var/tmp/.config")
+        assert get_security_dir() == os.path.join(home_dir, ".local", "share", "borg", "security")
+        assert get_security_dir(repository_id="1234") == os.path.join(
+            home_dir, ".local", "share", "borg", "security", "1234"
+        )
+        monkeypatch.setenv("XDG_DATA_HOME", "/var/tmp/.config")
         assert get_security_dir() == os.path.join("/var/tmp/.config", "borg", "security")
         monkeypatch.setenv("BORG_SECURITY_DIR", "/var/tmp")
         assert get_security_dir() == "/var/tmp"
+
+
+def test_get_runtime_dir(monkeypatch):
+    """test that get_runtime_dir respects environment"""
+    monkeypatch.delenv("BORG_BASE_DIR", raising=False)
+    home_dir = os.path.expanduser("~")
+    if is_win32:
+        monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
+        assert get_runtime_dir() == os.path.join(home_dir, "AppData", "Local", "Temp", "borg", "borg")
+        monkeypatch.setenv("BORG_RUNTIME_DIR", home_dir)
+        assert get_runtime_dir() == home_dir
+    elif is_darwin:
+        monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
+        assert get_runtime_dir() == os.path.join(home_dir, "Library", "Caches", "TemporaryItems", "borg")
+        monkeypatch.setenv("BORG_RUNTIME_DIR", "/var/tmp")
+        assert get_runtime_dir() == "/var/tmp"
+    else:
+        monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+        monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
+        assert get_runtime_dir() == os.path.join("/run/user", str(os.getuid()), "borg")
+        monkeypatch.setenv("XDG_RUNTIME_DIR", "/var/tmp/.cache")
+        assert get_runtime_dir() == os.path.join("/var/tmp/.cache", "borg")
+        monkeypatch.setenv("BORG_RUNTIME_DIR", "/var/tmp")
+        assert get_runtime_dir() == "/var/tmp"
 
 
 def test_file_size():
@@ -996,65 +1053,36 @@ def test_yes_env_output(capfd, monkeypatch):
     assert "yes" in err
 
 
-def test_progress_percentage_sameline(capfd, monkeypatch):
-    # run the test as if it was in a 4x1 terminal
-    monkeypatch.setenv("COLUMNS", "4")
-    monkeypatch.setenv("LINES", "1")
+def test_progress_percentage(capfd):
     pi = ProgressIndicatorPercent(1000, step=5, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
     pi.show(0)
     out, err = capfd.readouterr()
-    assert err == "  0%\r"
+    assert err == "  0%\n"
     pi.show(420)
     pi.show(680)
     out, err = capfd.readouterr()
-    assert err == " 42%\r 68%\r"
+    assert err == " 42%\n 68%\n"
     pi.show(1000)
     out, err = capfd.readouterr()
-    assert err == "100%\r"
+    assert err == "100%\n"
     pi.finish()
     out, err = capfd.readouterr()
-    assert err == " " * 4 + "\r"
+    assert err == "\n"
 
 
-@pytest.mark.skipif(is_win32, reason="no working swidth() implementation on this platform")
-def test_progress_percentage_widechars(capfd, monkeypatch):
-    st = "スター・トレック"  # "startrek" :-)
-    assert swidth(st) == 16
-    path = "/カーク船長です。"  # "Captain Kirk"
-    assert swidth(path) == 17
-    spaces = " " * 4  # to avoid usage of "..."
-    width = len("100%") + 1 + swidth(st) + 1 + swidth(path) + swidth(spaces)
-    monkeypatch.setenv("COLUMNS", str(width))
-    monkeypatch.setenv("LINES", "1")
-    pi = ProgressIndicatorPercent(100, step=5, start=0, msg=f"%3.0f%% {st} %s")
-    pi.logger.setLevel("INFO")
-    pi.show(0, info=[path])
-    out, err = capfd.readouterr()
-    assert err == f"  0% {st} {path}{spaces}\r"
-    pi.show(100, info=[path])
-    out, err = capfd.readouterr()
-    assert err == f"100% {st} {path}{spaces}\r"
-    pi.finish()
-    out, err = capfd.readouterr()
-    assert err == " " * width + "\r"
-
-
-def test_progress_percentage_step(capfd, monkeypatch):
-    # run the test as if it was in a 4x1 terminal
-    monkeypatch.setenv("COLUMNS", "4")
-    monkeypatch.setenv("LINES", "1")
+def test_progress_percentage_step(capfd):
     pi = ProgressIndicatorPercent(100, step=2, start=0, msg="%3.0f%%")
     pi.logger.setLevel("INFO")
     pi.show()
     out, err = capfd.readouterr()
-    assert err == "  0%\r"
+    assert err == "  0%\n"
     pi.show()
     out, err = capfd.readouterr()
     assert err == ""  # no output at 1% as we have step == 2
     pi.show()
     out, err = capfd.readouterr()
-    assert err == "  2%\r"
+    assert err == "  2%\n"
 
 
 def test_progress_percentage_quiet(capfd):
@@ -1069,35 +1097,6 @@ def test_progress_percentage_quiet(capfd):
     pi.finish()
     out, err = capfd.readouterr()
     assert err == ""
-
-
-def test_progress_endless(capfd):
-    pi = ProgressIndicatorEndless(step=1, file=sys.stderr)
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
-    pi.finish()
-    out, err = capfd.readouterr()
-    assert err == "\n"
-
-
-def test_progress_endless_step(capfd):
-    pi = ProgressIndicatorEndless(step=2, file=sys.stderr)
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == ""  # no output here as we have step == 2
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == ""  # no output here as we have step == 2
-    pi.show()
-    out, err = capfd.readouterr()
-    assert err == "."
 
 
 def test_partial_format():
@@ -1320,19 +1319,19 @@ def test_safe_unlink_is_safe_ENOSPC(tmpdir, monkeypatch):
 
 class TestPassphrase:
     def test_passphrase_new_verification(self, capsys, monkeypatch):
-        monkeypatch.setattr(getpass, "getpass", lambda prompt: "12aöäü")
+        monkeypatch.setattr(getpass, "getpass", lambda prompt: "1234aöäü")
         monkeypatch.setenv("BORG_DISPLAY_PASSPHRASE", "no")
         Passphrase.new()
         out, err = capsys.readouterr()
-        assert "12" not in out
-        assert "12" not in err
+        assert "1234" not in out
+        assert "1234" not in err
 
         monkeypatch.setenv("BORG_DISPLAY_PASSPHRASE", "yes")
         passphrase = Passphrase.new()
         out, err = capsys.readouterr()
-        assert "313261c3b6c3a4c3bc" not in out
-        assert "313261c3b6c3a4c3bc" in err
-        assert passphrase == "12aöäü"
+        assert "3132333461c3b6c3a4c3bc" not in out
+        assert "3132333461c3b6c3a4c3bc" in err
+        assert passphrase == "1234aöäü"
 
         monkeypatch.setattr(getpass, "getpass", lambda prompt: "1234/@=")
         Passphrase.new()

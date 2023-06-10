@@ -28,6 +28,24 @@ The way to use this is as follows:
 
 * what is output on INFO level is additionally controlled by commandline
   flags
+
+Logging setup is a bit complicated in borg, as it needs to work under misc. conditions:
+- purely local, not client/server (easy)
+- client/server: RemoteRepository ("borg serve" process) writes log records into a global
+  queue, which is then sent to the client side by the main serve loop (via the RPC protocol,
+  either over ssh stdout, more directly via process stdout without ssh [used in the tests]
+  or via a socket. On the client side, the log records are fed into the clientside logging
+  system. When remote_repo.close() is called, server side must send all queued log records
+  via the RPC channel before returning the close() call's return value (as the client will
+  then shut down the connection).
+- progress output is always given as json to the logger (including the plain text inside
+  the json), but then formatted by the logging system's formatter as either plain text or
+  json depending on the cli args given (--log-json?).
+- tests: potentially running in parallel via pytest-xdist, capturing borg output into a
+  given stream.
+- logging might be short-lived (e.g. when invoking a single borg command via the cli)
+  or long-lived (e.g. borg serve --socket or when running the tests)
+- logging is global and exists only once per process.
 """
 
 import inspect
@@ -36,9 +54,64 @@ import logging
 import logging.config
 import logging.handlers  # needed for handlers defined there being configurable in logging.conf file
 import os
+import queue
+import sys
+import time
+from typing import Optional
 import warnings
 
+logging_debugging_path: Optional[str] = None  # if set, write borg.logger debugging log to path/borg-*.log
+
 configured = False
+borg_serve_log_queue: queue.SimpleQueue = queue.SimpleQueue()
+
+
+class BorgQueueHandler(logging.handlers.QueueHandler):
+    """borg serve writes log record dicts to a borg_serve_log_queue"""
+
+    def prepare(self, record: logging.LogRecord) -> dict:
+        return dict(
+            # kwargs needed for LogRecord constructor:
+            name=record.name,
+            level=record.levelno,
+            pathname=record.pathname,
+            lineno=record.lineno,
+            msg=record.msg,
+            args=record.args,
+            exc_info=record.exc_info,
+            func=record.funcName,
+            sinfo=record.stack_info,
+        )
+
+
+class StderrHandler(logging.StreamHandler):
+    """
+    This class is like a StreamHandler using sys.stderr, but always uses
+    whatever sys.stderr is currently set to rather than the value of
+    sys.stderr at handler construction time.
+    """
+
+    def __init__(self, stream=None):
+        logging.Handler.__init__(self)
+
+    @property
+    def stream(self):
+        return sys.stderr
+
+
+class TextProgressFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        # record.msg contains json (because we always do json for progress log)
+        j = json.loads(record.msg)
+        # inside the json, the text log line can be found under "message"
+        return f"{j['message']}"
+
+
+class JSONProgressFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        # record.msg contains json (because we always do json for progress log)
+        return f"{record.msg}"
+
 
 # use something like this to ignore warnings:
 # warnings.filterwarnings('ignore', r'... regex for warning message to ignore ...')
@@ -53,7 +126,26 @@ def _log_warning(message, category, filename, lineno, file=None, line=None):
     logger.warning(msg)
 
 
-def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", level="info", is_serve=False, json=False):
+def remove_handlers(logger):
+    for handler in logger.handlers[:]:
+        handler.flush()
+        handler.close()
+        logger.removeHandler(handler)
+
+
+def flush_logging():
+    # make sure all log output is flushed,
+    # this is especially important for the "borg serve" RemoteRepository logging:
+    # all log output needs to be sent via the ssh / socket connection before closing it.
+    for logger_name in "borg.output.progress", "":
+        logger = logging.getLogger(logger_name)
+        for handler in logger.handlers:
+            handler.flush()
+
+
+def setup_logging(
+    stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", level="info", is_serve=False, log_json=False, func=None
+):
     """setup logging module according to the arguments provided
 
     if conf_fname is given (or the config file name can be determined via
@@ -62,8 +154,7 @@ def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", lev
     otherwise, set up a stream handler logger on stderr (by default, if no
     stream is provided).
 
-    if is_serve == True, we configure a special log format as expected by
-    the borg client log message interceptor.
+    is_serve: are we setting up the logging for "borg serve"?
     """
     global configured
     err_msg = None
@@ -80,34 +171,56 @@ def setup_logging(stream=None, conf_fname=None, env_var="BORG_LOGGING_CONF", lev
                 logging.config.fileConfig(f)
             configured = True
             logger = logging.getLogger(__name__)
-            borg_logger = logging.getLogger("borg")
-            borg_logger.json = json
             logger.debug(f'using logging configuration read from "{conf_fname}"')
             warnings.showwarning = _log_warning
             return None
         except Exception as err:  # XXX be more precise
             err_msg = str(err)
+
     # if we did not / not successfully load a logging configuration, fallback to this:
-    logger = logging.getLogger("")
-    handler = logging.StreamHandler(stream)
-    if is_serve and not json:
-        fmt = "$LOG %(levelname)s %(name)s Remote: %(message)s"
-    else:
-        fmt = "%(message)s"
-    formatter = JsonFormatter(fmt) if json else logging.Formatter(fmt)
+    level = level.upper()
+    fmt = "%(message)s"
+    formatter = JsonFormatter(fmt) if log_json else logging.Formatter(fmt)
+    SHandler = StderrHandler if stream is None else logging.StreamHandler
+    handler = BorgQueueHandler(borg_serve_log_queue) if is_serve else SHandler(stream)
     handler.setFormatter(formatter)
-    borg_logger = logging.getLogger("borg")
-    borg_logger.formatter = formatter
-    borg_logger.json = json
-    if configured and logger.handlers:
-        # The RepositoryServer can call setup_logging a second time to adjust the output
-        # mode from text-ish is_serve to json is_serve.
-        # Thus, remove the previously installed handler, if any.
-        logger.handlers[0].close()
-        logger.handlers.clear()
-    logger.addHandler(handler)
-    logger.setLevel(level.upper())
+    logger = logging.getLogger()
+    remove_handlers(logger)
+    logger.setLevel(level)
+
+    if logging_debugging_path is not None:
+        # add an addtl. root handler for debugging purposes
+        log_fname = os.path.join(logging_debugging_path, f"borg-{'serve' if is_serve else 'client'}-root.log")
+        handler2 = logging.StreamHandler(open(log_fname, "a"))
+        handler2.setFormatter(formatter)
+        logger.addHandler(handler2)
+        logger.warning(f"--- {func} ---")  # only handler2 shall get this
+
+    logger.addHandler(handler)  # do this late, so handler is not added while debug handler is set up
+
+    bop_formatter = JSONProgressFormatter() if log_json else TextProgressFormatter()
+    bop_handler = BorgQueueHandler(borg_serve_log_queue) if is_serve else SHandler(stream)
+    bop_handler.setFormatter(bop_formatter)
+    bop_logger = logging.getLogger("borg.output.progress")
+    remove_handlers(bop_logger)
+    bop_logger.setLevel("INFO")
+    bop_logger.propagate = False
+
+    if logging_debugging_path is not None:
+        # add an addtl. progress handler for debugging purposes
+        log_fname = os.path.join(logging_debugging_path, f"borg-{'serve' if is_serve else 'client'}-progress.log")
+        bop_handler2 = logging.StreamHandler(open(log_fname, "a"))
+        bop_handler2.setFormatter(bop_formatter)
+        bop_logger.addHandler(bop_handler2)
+        json_dict = dict(
+            message=f"--- {func} ---", operation=0, msgid="", type="progress_message", finished=False, time=time.time()
+        )
+        bop_logger.warning(json.dumps(json_dict))  # only bop_handler2 shall get this
+
+    bop_logger.addHandler(bop_handler)  # do this late, so bop_handler is not added while debug handler is set up
+
     configured = True
+
     logger = logging.getLogger(__name__)
     if err_msg:
         logger.warning(f'setup_logging for "{conf_fname}" failed with "{err_msg}".')

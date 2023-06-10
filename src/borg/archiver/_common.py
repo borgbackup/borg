@@ -9,6 +9,7 @@ from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
 from ..helpers import SortBySpec, positive_int_validator, location_validator, Location, relative_time_marker_validator
+from ..helpers import Highlander
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
@@ -29,7 +30,7 @@ logger = create_logger(__name__)
 
 
 def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args):
-    if location.proto == "ssh":
+    if location.proto in ("ssh", "socket"):
         repository = RemoteRepository(
             location,
             create=create,
@@ -246,20 +247,6 @@ def with_archive(method):
     return wrapper
 
 
-class Highlander(argparse.Action):
-    """make sure some option is only given once"""
-
-    def __init__(self, *args, **kwargs):
-        self.__called = False
-        super().__init__(*args, **kwargs)
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        if self.__called:
-            raise argparse.ArgumentError(self, "There can be only one.")
-        self.__called = True
-        setattr(namespace, self.dest, values)
-
-
 # You can use :ref:`xyz` in the following usage pages. However, for plain-text view,
 # e.g. through "borg ... --help", define a substitution for the reference here.
 # It will replace the entire :ref:`foo` verbatim.
@@ -351,7 +338,7 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
 
 
 def define_exclusion_group(subparser, **kwargs):
-    exclude_group = subparser.add_argument_group("Exclusion options")
+    exclude_group = subparser.add_argument_group("Include/Exclude options")
     define_exclude_and_patterns(exclude_group.add_argument, **kwargs)
     return exclude_group
 
@@ -572,6 +559,16 @@ def define_common_options(add_common_option):
         dest="rsh",
         action=Highlander,
         help="Use this command to connect to the 'borg serve' process (default: 'ssh')",
+    )
+    add_common_option(
+        "--socket",
+        metavar="PATH",
+        dest="use_socket",
+        default=False,
+        const=True,
+        nargs="?",
+        action=Highlander,
+        help="Use UNIX DOMAIN (IPC) socket at PATH for client/server communication with socket: protocol.",
     )
     add_common_option(
         "-r",

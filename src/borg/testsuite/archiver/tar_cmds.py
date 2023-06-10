@@ -129,6 +129,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             self.cmd(f"--repo={self.repository_location}", "extract", "dst")
         self.assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
 
+    def test_import_unusual_tar(self):
+        # Contains these, unusual entries:
+        # /foobar
+        # ./bar
+        # ./foo2/
+        # ./foo//bar
+        # ./
+        tar_archive = os.path.join(os.path.dirname(__file__), "unusual_paths.tar")
+
+        self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
+        self.cmd(f"--repo={self.repository_location}", "import-tar", "dst", tar_archive)
+        files = self.cmd(f"--repo={self.repository_location}", "list", "dst", "--format", "{path}{NL}").splitlines()
+        self.assert_equal(set(files), {"foobar", "bar", "foo2", "foo/bar", "."})
+
+    def test_import_tar_with_dotdot(self):
+        # Contains this file:
+        # ../../../../etc/shadow
+        tar_archive = os.path.join(os.path.dirname(__file__), "dotdot_path.tar")
+
+        self.cmd(f"--repo={self.repository_location}", "rcreate", "--encryption=none")
+        with pytest.raises(ValueError, match="unexpected '..' element in path '../../../../etc/shadow'"):
+            self.cmd(f"--repo={self.repository_location}", "import-tar", "dst", tar_archive, exit_code=2)
+
     @requires_gzip
     def test_import_tar_gz(self, tar_format="GNU"):
         if not shutil.which("gzip"):
@@ -212,3 +235,8 @@ class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
 class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
     """runs the same tests, but via the borg binary"""
+
+    @unittest.skip("does not work with binaries")
+    def test_import_tar_with_dotdot(self):
+        # the test checks for a raised exception. that can't work if the code runs in a separate process.
+        pass

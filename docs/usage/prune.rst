@@ -7,7 +7,7 @@ Be careful, prune is a potentially dangerous command, it will remove backup
 archives.
 
 The default of prune is to apply to **all archives in the repository** unless
-you restrict its operation to a subset of the archives using ``-a`` / ``--glob-archives``.
+you restrict its operation to a subset of the archives using ``-a`` / ``--match-archives``.
 When using ``-a``, be careful to choose a good pattern - e.g. do not use a
 prefix "foo" if you do not also want to match "foobar".
 
@@ -22,7 +22,7 @@ first so you will see what it would do without it actually doing anything.
 
     # Same as above but only apply to archive names starting with the hostname
     # of the machine followed by a "-" character:
-    $ borg prune -v --list --keep-daily=7 --keep-weekly=4 -a '{hostname}-*'
+    $ borg prune -v --list --keep-daily=7 --keep-weekly=4 -a 'sh:{hostname}-*'
     # actually free disk space:
     $ borg compact
 

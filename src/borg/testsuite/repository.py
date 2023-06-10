@@ -1,4 +1,3 @@
-import io
 import logging
 import os
 import shutil
@@ -13,7 +12,7 @@ from ..helpers import Location
 from ..helpers import IntegrityError
 from ..helpers import msgpack
 from ..locking import Lock, LockFailed
-from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed, handle_remote_line
+from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed
 from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
 from ..repoobj import RepoObj
 from . import BaseTestCase
@@ -61,13 +60,13 @@ class RepositoryTestCaseBase(BaseTestCase):
         self.repository.__enter__()
 
     def tearDown(self):
-        self.repository.close()
+        self.repository.__exit__(None, None, None)
         shutil.rmtree(self.tmppath)
 
     def reopen(self, exclusive=UNSPECIFIED):
-        if self.repository:
-            self.repository.close()
+        self.repository.__exit__(None, None, None)
         self.repository = self.open(exclusive=exclusive)
+        self.repository.__enter__()
 
     def add_keys(self):
         self.repository.put(H(0), fchunk(b"foo"))
@@ -98,13 +97,12 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.repository.delete(key50)
         self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(key50))
         self.repository.commit(compact=False)
-        self.repository.close()
-        with self.open() as repository2:
-            self.assert_raises(Repository.ObjectNotFound, lambda: repository2.get(key50))
-            for x in range(100):
-                if x == 50:
-                    continue
-                self.assert_equal(pdchunk(repository2.get(H(x))), b"SOMEDATA")
+        self.reopen()
+        self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(key50))
+        for x in range(100):
+            if x == 50:
+                continue
+            self.assert_equal(pdchunk(self.repository.get(H(x))), b"SOMEDATA")
 
     def test2(self):
         """Test multiple sequential transactions"""
@@ -159,17 +157,14 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         # put
         self.repository.put(H(0), fchunk(b"foo"))
         self.repository.commit(compact=False)
-        self.repository.close()
+        self.reopen()
         # replace
-        self.repository = self.open()
-        with self.repository:
-            self.repository.put(H(0), fchunk(b"bar"))
-            self.repository.commit(compact=False)
+        self.repository.put(H(0), fchunk(b"bar"))
+        self.repository.commit(compact=False)
+        self.reopen()
         # delete
-        self.repository = self.open()
-        with self.repository:
-            self.repository.delete(H(0))
-            self.repository.commit(compact=False)
+        self.repository.delete(H(0))
+        self.repository.commit(compact=False)
 
     def test_list(self):
         for x in range(100):
@@ -276,14 +271,11 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         # we do not set flags for H(0), so we can later check their default state.
         self.repository.flags(H(1), mask=0x00000007, value=0x00000006)
         self.repository.commit(compact=False)
-        self.repository.close()
-
-        self.repository = self.open()
-        with self.repository:
-            # we query all flags to check if the initial flags were all zero and
-            # only the ones we explicitly set to one are as expected.
-            self.assert_equal(self.repository.flags(H(0), mask=0xFFFFFFFF), 0x00000000)
-            self.assert_equal(self.repository.flags(H(1), mask=0xFFFFFFFF), 0x00000006)
+        self.reopen()
+        # we query all flags to check if the initial flags were all zero and
+        # only the ones we explicitly set to one are as expected.
+        self.assert_equal(self.repository.flags(H(0), mask=0xFFFFFFFF), 0x00000000)
+        self.assert_equal(self.repository.flags(H(1), mask=0xFFFFFFFF), 0x00000006)
 
 
 class LocalRepositoryTestCase(RepositoryTestCaseBase):
@@ -337,12 +329,10 @@ class LocalRepositoryTestCase(RepositoryTestCaseBase):
         last_segment = self.repository.io.get_latest_segment()
         with open(self.repository.io.segment_filename(last_segment + 1), "wb") as f:
             f.write(MAGIC + b"crapcrapcrap")
-        self.repository.close()
+        self.reopen()
         # usually, opening the repo and starting a transaction should trigger a cleanup.
-        self.repository = self.open()
-        with self.repository:
-            self.repository.put(H(0), fchunk(b"bar"))  # this may trigger compact_segments()
-            self.repository.commit(compact=True)
+        self.repository.put(H(0), fchunk(b"bar"))  # this may trigger compact_segments()
+        self.repository.commit(compact=True)
         # the point here is that nothing blows up with an exception.
 
 
@@ -353,9 +343,8 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
             if name.startswith("index."):
                 os.unlink(os.path.join(self.repository.path, name))
         self.reopen()
-        with self.repository:
-            self.assert_equal(len(self.repository), 3)
-            self.assert_equal(self.repository.check(), True)
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
 
     def test_crash_before_compact_segments(self):
         self.add_keys()
@@ -365,9 +354,8 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         except TypeError:
             pass
         self.reopen()
-        with self.repository:
-            self.assert_equal(len(self.repository), 3)
-            self.assert_equal(self.repository.check(), True)
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
 
     def test_crash_before_write_index(self):
         self.add_keys()
@@ -377,9 +365,8 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         except TypeError:
             pass
         self.reopen()
-        with self.repository:
-            self.assert_equal(len(self.repository), 3)
-            self.assert_equal(self.repository.check(), True)
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
 
     def test_replay_lock_upgrade_old(self):
         self.add_keys()
@@ -388,11 +375,10 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
                 os.unlink(os.path.join(self.repository.path, name))
         with patch.object(Lock, "upgrade", side_effect=LockFailed) as upgrade:
             self.reopen(exclusive=None)  # simulate old client that always does lock upgrades
-            with self.repository:
-                # the repo is only locked by a shared read lock, but to replay segments,
-                # we need an exclusive write lock - check if the lock gets upgraded.
-                self.assert_raises(LockFailed, lambda: len(self.repository))
-                upgrade.assert_called_once_with()
+            # the repo is only locked by a shared read lock, but to replay segments,
+            # we need an exclusive write lock - check if the lock gets upgraded.
+            self.assert_raises(LockFailed, lambda: len(self.repository))
+            upgrade.assert_called_once_with()
 
     def test_replay_lock_upgrade(self):
         self.add_keys()
@@ -401,11 +387,10 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
                 os.unlink(os.path.join(self.repository.path, name))
         with patch.object(Lock, "upgrade", side_effect=LockFailed) as upgrade:
             self.reopen(exclusive=False)  # current client usually does not do lock upgrade, except for replay
-            with self.repository:
-                # the repo is only locked by a shared read lock, but to replay segments,
-                # we need an exclusive write lock - check if the lock gets upgraded.
-                self.assert_raises(LockFailed, lambda: len(self.repository))
-                upgrade.assert_called_once_with()
+            # the repo is only locked by a shared read lock, but to replay segments,
+            # we need an exclusive write lock - check if the lock gets upgraded.
+            self.assert_raises(LockFailed, lambda: len(self.repository))
+            upgrade.assert_called_once_with()
 
     def test_crash_before_deleting_compacted_segments(self):
         self.add_keys()
@@ -415,17 +400,15 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         except TypeError:
             pass
         self.reopen()
-        with self.repository:
-            self.assert_equal(len(self.repository), 3)
-            self.assert_equal(self.repository.check(), True)
-            self.assert_equal(len(self.repository), 3)
+        self.assert_equal(len(self.repository), 3)
+        self.assert_equal(self.repository.check(), True)
+        self.assert_equal(len(self.repository), 3)
 
     def test_ignores_commit_tag_in_data(self):
         self.repository.put(H(0), LoggedIO.COMMIT)
         self.reopen()
-        with self.repository:
-            io = self.repository.io
-            assert not io.is_committed_segment(io.get_latest_segment())
+        io = self.repository.io
+        assert not io.is_committed_segment(io.get_latest_segment())
 
     def test_moved_deletes_are_tracked(self):
         self.repository.put(H(1), fchunk(b"1"))
@@ -548,11 +531,9 @@ class RepositoryFreeSpaceTestCase(RepositoryTestCaseBase):
         self.repository.config.set("repository", "additional_free_space", "1000T")
         self.repository.save_key(b"shortcut to save_config")
         self.reopen()
-
-        with self.repository:
-            self.repository.put(H(0), fchunk(b"foobar"))
-            with pytest.raises(Repository.InsufficientFreeSpaceError):
-                self.repository.commit(compact=False)
+        self.repository.put(H(0), fchunk(b"foobar"))
+        with pytest.raises(Repository.InsufficientFreeSpaceError):
+            self.repository.commit(compact=False)
         assert os.path.exists(self.repository.path)
 
     def test_create_free_space(self):
@@ -576,16 +557,15 @@ class QuotaTestCase(RepositoryTestCaseBase):
         self.repository.commit(compact=False)
         assert self.repository.storage_quota_use == len(ch1) + len(ch2) + 2 * (41 + 8)  # we have not compacted yet
         self.reopen()
-        with self.repository:
-            # Open new transaction; hints and thus quota data is not loaded unless needed.
-            ch3 = fchunk(b"")
-            self.repository.put(H(3), ch3)
-            self.repository.delete(H(3))
-            assert self.repository.storage_quota_use == len(ch1) + len(ch2) + len(ch3) + 3 * (
-                41 + 8
-            )  # we have not compacted yet
-            self.repository.commit(compact=True)
-            assert self.repository.storage_quota_use == len(ch2) + 41 + 8
+        # Open new transaction; hints and thus quota data is not loaded unless needed.
+        ch3 = fchunk(b"")
+        self.repository.put(H(3), ch3)
+        self.repository.delete(H(3))
+        assert self.repository.storage_quota_use == len(ch1) + len(ch2) + len(ch3) + 3 * (
+            41 + 8
+        )  # we have not compacted yet
+        self.repository.commit(compact=True)
+        assert self.repository.storage_quota_use == len(ch2) + 41 + 8
 
     def test_exceed_quota(self):
         assert self.repository.storage_quota_use == 0
@@ -602,57 +582,14 @@ class QuotaTestCase(RepositoryTestCaseBase):
             self.repository.commit(compact=False)
         assert self.repository.storage_quota_use == len(ch1) + len(ch2) + (41 + 8) * 2  # check ch2!?
         self.reopen()
-        with self.repository:
-            self.repository.storage_quota = 150
-            # Open new transaction; hints and thus quota data is not loaded unless needed.
-            self.repository.put(H(1), ch1)
-            assert (
-                self.repository.storage_quota_use == len(ch1) * 2 + (41 + 8) * 2
-            )  # we have 2 puts for H(1) here and not yet compacted.
-            self.repository.commit(compact=True)
-            assert self.repository.storage_quota_use == len(ch1) + 41 + 8  # now we have compacted.
-
-
-class NonceReservation(RepositoryTestCaseBase):
-    def test_get_free_nonce_asserts(self):
-        self.reopen(exclusive=False)
-        with pytest.raises(AssertionError):
-            with self.repository:
-                self.repository.get_free_nonce()
-
-    def test_get_free_nonce(self):
-        with self.repository:
-            assert self.repository.get_free_nonce() is None
-
-            with open(os.path.join(self.repository.path, "nonce"), "w") as fd:
-                fd.write("0000000000000000")
-            assert self.repository.get_free_nonce() == 0
-
-            with open(os.path.join(self.repository.path, "nonce"), "w") as fd:
-                fd.write("5000000000000000")
-            assert self.repository.get_free_nonce() == 0x5000000000000000
-
-    def test_commit_nonce_reservation_asserts(self):
-        self.reopen(exclusive=False)
-        with pytest.raises(AssertionError):
-            with self.repository:
-                self.repository.commit_nonce_reservation(0x200, 0x100)
-
-    def test_commit_nonce_reservation(self):
-        with self.repository:
-            with pytest.raises(Exception):
-                self.repository.commit_nonce_reservation(0x200, 15)
-
-            self.repository.commit_nonce_reservation(0x200, None)
-            with open(os.path.join(self.repository.path, "nonce")) as fd:
-                assert fd.read() == "0000000000000200"
-
-            with pytest.raises(Exception):
-                self.repository.commit_nonce_reservation(0x200, 15)
-
-            self.repository.commit_nonce_reservation(0x400, 0x200)
-            with open(os.path.join(self.repository.path, "nonce")) as fd:
-                assert fd.read() == "0000000000000400"
+        self.repository.storage_quota = 150
+        # Open new transaction; hints and thus quota data is not loaded unless needed.
+        self.repository.put(H(1), ch1)
+        assert (
+            self.repository.storage_quota_use == len(ch1) * 2 + (41 + 8) * 2
+        )  # we have 2 puts for H(1) here and not yet compacted.
+        self.repository.commit(compact=True)
+        assert self.repository.storage_quota_use == len(ch1) + 41 + 8  # now we have compacted.
 
 
 class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
@@ -938,9 +875,8 @@ class RepositoryCheckTestCase(RepositoryTestCaseBase):
             self.repository.commit(compact=True)
             compact.assert_called_once_with(0.1)
         self.reopen()
-        with self.repository:
-            self.check(repair=True)
-            self.assert_equal(pdchunk(self.repository.get(H(0))), b"data2")
+        self.check(repair=True)
+        self.assert_equal(pdchunk(self.repository.get(H(0))), b"data2")
 
 
 class RepositoryHintsTestCase(RepositoryTestCaseBase):
@@ -954,14 +890,13 @@ class RepositoryHintsTestCase(RepositoryTestCaseBase):
         # close and re-open the repository (create fresh Repository instance) to
         # check whether hints were persisted to / reloaded from disk
         self.reopen()
-        with self.repository:
-            # see also do_compact()
-            self.repository.put(H(42), fchunk(b"foobar"))  # this will call prepare_txn() and load the hints data
-            # check if hints persistence worked:
-            self.assert_equal(shadow_index_expected, self.repository.shadow_index)
-            self.assert_equal(compact_expected, self.repository.compact)
-            del self.repository.segments[2]  # ignore the segment created by put(H(42), ...)
-            self.assert_equal(segments_expected, self.repository.segments)
+        # see also do_compact()
+        self.repository.put(H(42), fchunk(b"foobar"))  # this will call prepare_txn() and load the hints data
+        # check if hints persistence worked:
+        self.assert_equal(shadow_index_expected, self.repository.shadow_index)
+        self.assert_equal(compact_expected, self.repository.compact)
+        del self.repository.segments[2]  # ignore the segment created by put(H(42), ...)
+        self.assert_equal(segments_expected, self.repository.segments)
 
     def test_hints_behaviour(self):
         self.repository.put(H(0), fchunk(b"data"))
@@ -985,7 +920,7 @@ class RepositoryHintsTestCase(RepositoryTestCaseBase):
 class RemoteRepositoryTestCase(RepositoryTestCase):
     repository = None  # type: RemoteRepository
 
-    def open(self, create=False):
+    def open(self, create=False, exclusive=UNSPECIFIED):
         return RemoteRepository(
             Location("ssh://__testsuite__" + os.path.join(self.tmppath, "repository")), exclusive=True, create=create
         )
@@ -1100,34 +1035,6 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
         assert self.repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]
 
 
-class RemoteLegacyFree(RepositoryTestCaseBase):
-    # Keep testing this so we can someday safely remove the legacy tuple format.
-
-    def open(self, create=False):
-        with patch.object(RemoteRepository, "dictFormat", True):
-            return RemoteRepository(
-                Location("ssh://__testsuite__" + os.path.join(self.tmppath, "repository")),
-                exclusive=True,
-                create=create,
-            )
-
-    def test_legacy_free(self):
-        # put
-        self.repository.put(H(0), fchunk(b"foo"))
-        self.repository.commit(compact=False)
-        self.repository.close()
-        # replace
-        self.repository = self.open()
-        with self.repository:
-            self.repository.put(H(0), fchunk(b"bar"))
-            self.repository.commit(compact=False)
-        # delete
-        self.repository = self.open()
-        with self.repository:
-            self.repository.delete(H(0))
-            self.repository.commit(compact=False)
-
-
 class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
     def open(self, create=False):
         return RemoteRepository(
@@ -1145,78 +1052,3 @@ class RemoteRepositoryCheckTestCase(RepositoryCheckTestCase):
     def test_repair_missing_segment(self):
         # skip this test, files in RemoteRepository cannot be deleted
         pass
-
-
-class RemoteLoggerTestCase(BaseTestCase):
-    def setUp(self):
-        self.stream = io.StringIO()
-        self.handler = logging.StreamHandler(self.stream)
-        logging.getLogger().handlers[:] = [self.handler]
-        logging.getLogger("borg.repository").handlers[:] = []
-        logging.getLogger("borg.repository.foo").handlers[:] = []
-        # capture stderr
-        sys.stderr.flush()
-        self.old_stderr = sys.stderr
-        self.stderr = sys.stderr = io.StringIO()
-
-    def tearDown(self):
-        sys.stderr = self.old_stderr
-
-    def test_stderr_messages(self):
-        handle_remote_line("unstructured stderr message\n")
-        self.assert_equal(self.stream.getvalue(), "")
-        # stderr messages don't get an implicit newline
-        self.assert_equal(self.stderr.getvalue(), "Remote: unstructured stderr message\n")
-
-    def test_stderr_progress_messages(self):
-        handle_remote_line("unstructured stderr progress message\r")
-        self.assert_equal(self.stream.getvalue(), "")
-        # stderr messages don't get an implicit newline
-        self.assert_equal(self.stderr.getvalue(), "Remote: unstructured stderr progress message\r")
-
-    def test_pre11_format_messages(self):
-        self.handler.setLevel(logging.DEBUG)
-        logging.getLogger().setLevel(logging.DEBUG)
-
-        handle_remote_line("$LOG INFO Remote: borg < 1.1 format message\n")
-        self.assert_equal(self.stream.getvalue(), "Remote: borg < 1.1 format message\n")
-        self.assert_equal(self.stderr.getvalue(), "")
-
-    def test_post11_format_messages(self):
-        self.handler.setLevel(logging.DEBUG)
-        logging.getLogger().setLevel(logging.DEBUG)
-
-        handle_remote_line("$LOG INFO borg.repository Remote: borg >= 1.1 format message\n")
-        self.assert_equal(self.stream.getvalue(), "Remote: borg >= 1.1 format message\n")
-        self.assert_equal(self.stderr.getvalue(), "")
-
-    def test_remote_messages_screened(self):
-        # default borg config for root logger
-        self.handler.setLevel(logging.WARNING)
-        logging.getLogger().setLevel(logging.WARNING)
-
-        handle_remote_line("$LOG INFO borg.repository Remote: new format info message\n")
-        self.assert_equal(self.stream.getvalue(), "")
-        self.assert_equal(self.stderr.getvalue(), "")
-
-    def test_info_to_correct_local_child(self):
-        logging.getLogger("borg.repository").setLevel(logging.INFO)
-        logging.getLogger("borg.repository.foo").setLevel(logging.INFO)
-        # default borg config for root logger
-        self.handler.setLevel(logging.WARNING)
-        logging.getLogger().setLevel(logging.WARNING)
-
-        child_stream = io.StringIO()
-        child_handler = logging.StreamHandler(child_stream)
-        child_handler.setLevel(logging.INFO)
-        logging.getLogger("borg.repository").handlers[:] = [child_handler]
-        foo_stream = io.StringIO()
-        foo_handler = logging.StreamHandler(foo_stream)
-        foo_handler.setLevel(logging.INFO)
-        logging.getLogger("borg.repository.foo").handlers[:] = [foo_handler]
-
-        handle_remote_line("$LOG INFO borg.repository Remote: new format child message\n")
-        self.assert_equal(foo_stream.getvalue(), "")
-        self.assert_equal(child_stream.getvalue(), "Remote: new format child message\n")
-        self.assert_equal(self.stream.getvalue(), "")
-        self.assert_equal(self.stderr.getvalue(), "")

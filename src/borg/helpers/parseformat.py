@@ -21,7 +21,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 from .errors import Error
-from .fs import get_keys_dir
+from .fs import get_keys_dir, make_path_safe
 from .msgpack import Timestamp
 from .time import OutputTimestamp, format_time, safe_timestamp
 from .. import __version__ as borg_version
@@ -395,7 +395,7 @@ class Location:
     # path must not contain :: (it ends at :: or string end), but may contain single colons.
     # to avoid ambiguities with other regexes, it must also not start with ":" nor with "//" nor with "ssh://".
     local_path_re = r"""
-        (?!(:|//|ssh://))                                   # not starting with ":" or // or ssh://
+        (?!(:|//|ssh://|socket://))                         # not starting with ":" or // or ssh:// or socket://
         (?P<path>([^:]|(:(?!:)))+)                          # any chars, but no "::"
         """
 
@@ -429,6 +429,14 @@ class Location:
         + host_re
         + r"""                 # user@  (optional), host name or address
         (?::(?P<port>\d+))?                                     # :port (optional)
+        """
+        + abs_path_re,
+        re.VERBOSE,
+    )  # path
+
+    socket_re = re.compile(
+        r"""
+        (?P<proto>socket)://                                    # socket://
         """
         + abs_path_re,
         re.VERBOSE,
@@ -502,6 +510,11 @@ class Location:
             self.proto = m.group("proto")
             self.path = normpath_special(m.group("path"))
             return True
+        m = self.socket_re.match(text)
+        if m:
+            self.proto = m.group("proto")
+            self.path = normpath_special(m.group("path"))
+            return True
         m = self.local_re.match(text)
         if m:
             self.proto = "file"
@@ -521,7 +534,7 @@ class Location:
 
     def to_key_filename(self):
         name = re.sub(r"[^\w]", "_", self.path).strip("_")
-        if self.proto != "file":
+        if self.proto not in ("file", "socket"):
             name = re.sub(r"[^\w]", "_", self.host) + "__" + name
         if len(name) > 100:
             # Limit file names to some reasonable length. Most file systems
@@ -540,7 +553,7 @@ class Location:
             return self._host.lstrip("[").rstrip("]")
 
     def canonical_path(self):
-        if self.proto == "file":
+        if self.proto in ("file", "socket"):
             return self.path
         else:
             if self.path and self.path.startswith("~"):
@@ -1230,3 +1243,28 @@ def prepare_dump_dict(d):
         return res
 
     return decode(d)
+
+
+class Highlander(argparse.Action):
+    """make sure some option is only given once"""
+
+    def __init__(self, *args, **kwargs):
+        self.__called = False
+        super().__init__(*args, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if self.__called:
+            raise argparse.ArgumentError(self, "There can be only one.")
+        self.__called = True
+        setattr(namespace, self.dest, values)
+
+
+class MakePathSafeAction(Highlander):
+    def __call__(self, parser, namespace, path, option_string=None):
+        try:
+            sanitized_path = make_path_safe(path)
+        except ValueError as e:
+            raise argparse.ArgumentError(self, e)
+        if sanitized_path == ".":
+            raise argparse.ArgumentError(self, f"{path!r} is not a valid file name")
+        setattr(namespace, self.dest, sanitized_path)

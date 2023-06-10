@@ -1,4 +1,3 @@
-import logging
 import shutil
 import unittest
 from unittest.mock import patch
@@ -26,8 +25,6 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.assert_in("Starting repository check", output)
         self.assert_in("Starting archive consistency check", output)
         self.assert_in("Checking segments", output)
-        # reset logging to new process default to avoid need for fork=True on next check
-        logging.getLogger("borg.output.progress").setLevel(logging.NOTSET)
         output = self.cmd(f"--repo={self.repository_location}", "check", "-v", "--repository-only", exit_code=0)
         self.assert_in("Starting repository check", output)
         self.assert_not_in("Starting archive consistency check", output)
@@ -91,6 +88,13 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.assert_in("archive1", output)
         self.assert_in("archive2", output)
         self.assert_not_in("archive3", output)
+
+        # check for output when timespan older than earliest archive is given. Issue #1711
+        output = self.cmd(
+            f"--repo={self.repository_location}", "check", "-v", "--archives-only", "--older=9999m", exit_code=0
+        )
+        for archive in ("archive1", "archive2", "archive3"):
+            self.assert_not_in(archive, output)
 
     def test_missing_file_chunk(self):
         archive, repository = self.open_archive("archive1")

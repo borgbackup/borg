@@ -66,6 +66,16 @@ def check(path, pattern):
         ("foo3", ["foo[!12]"]),
         ("foo^", ["foo[^!]"]),
         ("foo!", ["foo[^!]"]),
+        # Group
+        ("foo1", ["{foo1,foo2}"]),
+        ("foo2", ["foo{1,2}"]),
+        ("foo", ["foo{,1,2}"]),
+        ("foo1", ["{foo{1,2},bar}"]),
+        ("bar", ["{foo{1,2},bar}"]),
+        ("{foo", ["{foo{,bar}"]),
+        ("{foobar", ["{foo{,bar}"]),
+        ("{foo},bar}", ["{foo},bar}"]),
+        ("bar/foobar", ["**/foo{ba[!z]*,[0-9]}"]),
     ],
 )
 def test_match(path, patterns):
@@ -99,6 +109,11 @@ def test_match(path, patterns):
         # Inverted set
         ("foo1", ["foo[!12]"]),
         ("foo2", ["foo[!12]"]),
+        # Group
+        ("foo", ["{foo1,foo2}"]),
+        ("foo", ["foo{1,2}"]),
+        ("foo{1,2}", ["foo{1,2}"]),
+        ("bar/foobaz", ["**/foo{ba[!z]*,[0-9]}"]),
     ],
 )
 def test_mismatch(path, patterns):

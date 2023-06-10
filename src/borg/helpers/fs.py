@@ -85,12 +85,41 @@ def get_security_dir(repository_id=None, *, legacy=False):
     """Determine where to store local security information."""
     security_dir = os.environ.get("BORG_SECURITY_DIR")
     if security_dir is None:
+        get_dir = get_config_dir if legacy else get_data_dir
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        security_dir = os.path.join(get_config_dir(legacy=legacy), "security")
+        security_dir = os.path.join(get_dir(legacy=legacy), "security")
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
     ensure_dir(security_dir)
     return security_dir
+
+
+def get_data_dir(*, legacy=False):
+    """Determine where to store borg changing data on the client"""
+    assert legacy is False, "there is no legacy variant of the borg data dir"
+    data_dir = os.environ.get(
+        "BORG_DATA_DIR", join_base_dir(".local", "share", "borg", legacy=legacy) or platformdirs.user_data_dir("borg")
+    )
+
+    # Create path if it doesn't exist yet
+    ensure_dir(data_dir)
+    return data_dir
+
+
+def get_runtime_dir(*, legacy=False):
+    """Determine where to store runtime files, like sockets, PID files, ..."""
+    assert legacy is False, "there is no legacy variant of the borg runtime dir"
+    runtime_dir = os.environ.get(
+        "BORG_RUNTIME_DIR", join_base_dir(".cache", "borg", legacy=legacy) or platformdirs.user_runtime_dir("borg")
+    )
+
+    # Create path if it doesn't exist yet
+    ensure_dir(runtime_dir)
+    return runtime_dir
+
+
+def get_socket_filename():
+    return os.path.join(get_runtime_dir(), "borg.sock")
 
 
 def get_cache_dir(*, legacy=False):
@@ -188,12 +217,66 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
     return tag_names
 
 
-_safe_re = re.compile(r"^((\.\.)?/+)+")
-
-
 def make_path_safe(path):
-    """Make path safe by making it relative and local"""
-    return _safe_re.sub("", path) or "."
+    """
+    Make path safe by making it relative and normalized.
+
+    `path` is sanitized by making it relative, removing
+    consecutive slashes (e.g. '//'), removing '.' elements,
+    and removing trailing slashes.
+
+    For reasons of security, a ValueError is raised should
+    `path` contain any '..' elements.
+    """
+    path = path.lstrip("/")
+    if "\\" in path:  # borg always wants slashes, never backslashes.
+        raise ValueError(f"unexpected backslash(es) in path {path!r}")
+    if path.startswith("../") or "/../" in path or path.endswith("/..") or path == "..":
+        raise ValueError(f"unexpected '..' element in path {path!r}")
+    path = os.path.normpath(path)
+    return path
+
+
+_dotdot_re = re.compile(r"^(\.\./)+")
+
+
+def remove_dotdot_prefixes(path):
+    """
+    Remove '../'s at the beginning of `path`. Additionally,
+    the path is made relative.
+
+    `path` is expected to be normalized already (e.g. via `os.path.normpath()`).
+    """
+    path = path.lstrip("/")
+    path = _dotdot_re.sub("", path)
+    if path in ["", ".."]:
+        return "."
+    return path
+
+
+def assert_sanitized_path(path):
+    assert isinstance(path, str)
+    # `path` should have been sanitized earlier. Some features,
+    # like pattern matching rely on a sanitized path. As a
+    # precaution we check here again.
+    if make_path_safe(path) != path:
+        raise ValueError(f"path {path!r} is not sanitized")
+    return path
+
+
+def to_sanitized_path(path):
+    assert isinstance(path, str)
+    # Legacy versions of Borg still allowed non-sanitized paths
+    # to be stored. So, we sanitize them when reading.
+    #
+    # Borg 2 ensures paths are safe before storing them. Thus, when
+    # support for reading Borg 1 archives is dropped, this should be
+    # changed to a simple check to verify paths aren't malicious.
+    # Namely, absolute paths and paths containing '..' elements must
+    # be rejected.
+    #
+    # Also checks for '..' elements in `path` for reasons of security.
+    return make_path_safe(path)
 
 
 class HardLinkManager:

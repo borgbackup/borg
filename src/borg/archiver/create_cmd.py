@@ -27,6 +27,7 @@ from ..helpers import basic_json_data, json_print
 from ..helpers import flags_root, flags_dir, flags_special_follow, flags_special
 from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
+from ..helpers import MakePathSafeAction
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -766,7 +767,7 @@ class CreateMixIn:
             metavar="NAME",
             dest="stdin_name",
             default="stdin",
-            action=Highlander,
+            action=MakePathSafeAction,
             help="use NAME in archive for stdin data (default: %(default)r)",
         )
         subparser.add_argument(
@@ -802,7 +803,8 @@ class CreateMixIn:
         subparser.add_argument(
             "--paths-from-stdin",
             action="store_true",
-            help="read DELIM-separated list of paths to back up from stdin. Will not " "recurse into directories.",
+            help="read DELIM-separated list of paths to back up from stdin. All control is external: it will back"
+            " up all files given - no more, no less.",
         )
         subparser.add_argument(
             "--paths-from-command",
@@ -813,7 +815,7 @@ class CreateMixIn:
             "--paths-delimiter",
             action=Highlander,
             metavar="DELIM",
-            help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \\n) ",
+            help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\\n``) ",
         )
 
         exclude_group = define_exclusion_group(subparser, tag_files=True)

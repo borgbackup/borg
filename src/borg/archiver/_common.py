@@ -9,6 +9,7 @@ from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
 from ..helpers import SortBySpec, positive_int_validator, location_validator, Location, relative_time_marker_validator
+from ..helpers import Highlander
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
@@ -244,20 +245,6 @@ def with_archive(method):
         return method(self, args, repository=repository, manifest=manifest, archive=archive, **kwargs)
 
     return wrapper
-
-
-class Highlander(argparse.Action):
-    """make sure some option is only given once"""
-
-    def __init__(self, *args, **kwargs):
-        self.__called = False
-        super().__init__(*args, **kwargs)
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        if self.__called:
-            raise argparse.ArgumentError(self, "There can be only one.")
-        self.__called = True
-        setattr(namespace, self.dest, values)
 
 
 # You can use :ref:`xyz` in the following usage pages. However, for plain-text view,

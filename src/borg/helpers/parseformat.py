@@ -1149,7 +1149,21 @@ def prepare_dump_dict(d):
     return decode(d)
 
 
-class MakePathSafeAction(argparse.Action):
+class Highlander(argparse.Action):
+    """make sure some option is only given once"""
+
+    def __init__(self, *args, **kwargs):
+        self.__called = False
+        super().__init__(*args, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if self.__called:
+            raise argparse.ArgumentError(self, "There can be only one.")
+        self.__called = True
+        setattr(namespace, self.dest, values)
+
+
+class MakePathSafeAction(Highlander):
     def __call__(self, parser, namespace, path, option_string=None):
         try:
             sanitized_path = make_path_safe(path)

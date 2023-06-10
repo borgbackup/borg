@@ -767,7 +767,7 @@ class CreateMixIn:
             metavar="NAME",
             dest="stdin_name",
             default="stdin",
-            action=MakePathSafeAction,  # MakePathSafeAction maybe should subclass from Highlander.
+            action=MakePathSafeAction,
             help="use NAME in archive for stdin data (default: %(default)r)",
         )
         subparser.add_argument(

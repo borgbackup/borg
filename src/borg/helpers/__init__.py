@@ -31,7 +31,7 @@ from .parseformat import location_validator, archivename_validator, comment_vali
 from .parseformat import BaseFormatter, ArchiveFormatter, ItemFormatter, file_status
 from .parseformat import swidth_slice, ellipsis_truncate
 from .parseformat import BorgJsonEncoder, basic_json_data, json_print, json_dump, prepare_dump_dict
-from .parseformat import MakePathSafeAction
+from .parseformat import Highlander, MakePathSafeAction
 from .process import daemonize, daemonizing
 from .process import signal_handler, raising_signal_handler, sig_int, ignore_sigint, SigHup, SigTerm
 from .process import popen_with_error_handling, is_terminal, prepare_subprocess_env, create_filter_process

@@ -229,6 +229,8 @@ def make_path_safe(path):
     `path` contain any '..' elements.
     """
     path = path.lstrip("/")
+    if "\\" in path:  # borg always wants slashes, never backslashes.
+        raise ValueError(f"unexpected backslash(es) in path {path!r}")
     if path.startswith("../") or "/../" in path or path.endswith("/..") or path == "..":
         raise ValueError(f"unexpected '..' element in path {path!r}")
     path = os.path.normpath(path)

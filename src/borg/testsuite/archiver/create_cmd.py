@@ -279,6 +279,33 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "input/file2" not in out  # it skipped file2
         assert "input/file3" in out
 
+    def test_sanitized_stdin_name(self):
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        self.cmd(f"--repo={self.repository_location}", "create", "--stdin-name", "./a//path", "test", "-", input=b"")
+        item = json.loads(self.cmd(f"--repo={self.repository_location}", "list", "test", "--json-lines"))
+        assert item["path"] == "a/path"
+
+    def test_dotdot_stdin_name(self):
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        output = self.cmd(
+            f"--repo={self.repository_location}",
+            "create",
+            "--stdin-name",
+            "foo/../bar",
+            "test",
+            "-",
+            input=b"",
+            exit_code=2,
+        )
+        assert output.endswith("'..' element in path 'foo/../bar'" + os.linesep)
+
+    def test_dot_stdin_name(self):
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        output = self.cmd(
+            f"--repo={self.repository_location}", "create", "--stdin-name", "./", "test", "-", input=b"", exit_code=2
+        )
+        assert output.endswith("'./' is not a valid file name" + os.linesep)
+
     def test_create_content_from_command(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         input_data = "some test content"
@@ -586,7 +613,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         )
         self._assert_test_keep_tagged()
 
-    def test_path_normalization(self):
+    def test_path_sanitation(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         self.create_regular_file("dir1/dir2/file", size=1024 * 80)
         with changedir("input/dir1/dir2"):
@@ -595,7 +622,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.assert_not_in("..", output)
         self.assert_in(" input/dir1/dir2/file", output)
 
-    def test_exclude_normalization(self):
+    def test_exclude_sanitation(self):
         self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
         self.create_regular_file("file1", size=1024 * 80)
         self.create_regular_file("file2", size=1024 * 80)

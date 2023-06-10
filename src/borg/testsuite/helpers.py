@@ -25,7 +25,7 @@ from ..helpers import (
     PlaceholderError,
     replace_placeholders,
 )
-from ..helpers import make_path_safe, clean_lines
+from ..helpers import remove_dotdot_prefixes, make_path_safe, clean_lines
 from ..helpers import interval
 from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir, get_runtime_dir
 from ..helpers import is_slow_msgpack
@@ -48,6 +48,7 @@ from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 from ..platform import is_cygwin, is_win32, is_darwin, swidth
 
 from . import BaseTestCase, FakeInputs, are_hardlinks_supported
+from . import rejected_dotdot_paths
 
 
 def test_bin_to_hex():
@@ -393,16 +394,37 @@ def test_chunkerparams():
         ChunkerParams("fixed,%d,%d" % (4096, MAX_DATA_SIZE + 1))  # too big header size
 
 
+class RemoveDotdotPrefixesTestCase(BaseTestCase):
+    def test(self):
+        self.assert_equal(remove_dotdot_prefixes("."), ".")
+        self.assert_equal(remove_dotdot_prefixes(".."), ".")
+        self.assert_equal(remove_dotdot_prefixes("/"), ".")
+        self.assert_equal(remove_dotdot_prefixes("//"), ".")
+        self.assert_equal(remove_dotdot_prefixes("foo"), "foo")
+        self.assert_equal(remove_dotdot_prefixes("foo/bar"), "foo/bar")
+        self.assert_equal(remove_dotdot_prefixes("/foo/bar"), "foo/bar")
+        self.assert_equal(remove_dotdot_prefixes("../foo/bar"), "foo/bar")
+
+
 class MakePathSafeTestCase(BaseTestCase):
     def test(self):
+        self.assert_equal(make_path_safe("."), ".")
+        self.assert_equal(make_path_safe("./"), ".")
+        self.assert_equal(make_path_safe("./foo"), "foo")
+        self.assert_equal(make_path_safe(".//foo"), "foo")
+        self.assert_equal(make_path_safe(".//foo//bar//"), "foo/bar")
         self.assert_equal(make_path_safe("/foo/bar"), "foo/bar")
-        self.assert_equal(make_path_safe("/foo/bar"), "foo/bar")
-        self.assert_equal(make_path_safe("/f/bar"), "f/bar")
-        self.assert_equal(make_path_safe("fo/bar"), "fo/bar")
-        self.assert_equal(make_path_safe("../foo/bar"), "foo/bar")
-        self.assert_equal(make_path_safe("../../foo/bar"), "foo/bar")
-        self.assert_equal(make_path_safe("/"), ".")
-        self.assert_equal(make_path_safe("/"), ".")
+        self.assert_equal(make_path_safe("//foo/bar"), "foo/bar")
+        self.assert_equal(make_path_safe("//foo/./bar"), "foo/bar")
+        self.assert_equal(make_path_safe(".test"), ".test")
+        self.assert_equal(make_path_safe(".test."), ".test.")
+        self.assert_equal(make_path_safe("..test.."), "..test..")
+        self.assert_equal(make_path_safe("/te..st/foo/bar"), "te..st/foo/bar")
+        self.assert_equal(make_path_safe("/..test../abc//"), "..test../abc")
+
+        for path in rejected_dotdot_paths:
+            with pytest.raises(ValueError, match="unexpected '..' element in path"):
+                make_path_safe(path)
 
 
 class MockArchive:

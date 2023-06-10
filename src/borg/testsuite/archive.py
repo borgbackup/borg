@@ -8,6 +8,7 @@ from unittest.mock import Mock
 import pytest
 
 from . import BaseTestCase
+from . import rejected_dotdot_paths
 from ..crypto.key import PlaintextKey
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
 from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
@@ -394,3 +395,9 @@ def test_get_item_uid_gid():
     # as there is nothing, it'll fall back to uid_default/gid_default.
     assert uid == 0
     assert gid == 16
+
+
+def test_reject_non_sanitized_item():
+    for path in rejected_dotdot_paths:
+        with pytest.raises(ValueError, match="unexpected '..' element in path"):
+            Item(path=path, user="root", group="root")

@@ -235,3 +235,8 @@ class RemoteArchiverTestCase(RemoteArchiverTestCaseBase, ArchiverTestCase):
 @unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
 class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
     """runs the same tests, but via the borg binary"""
+
+    @unittest.skip("does not work with binaries")
+    def test_import_tar_with_dotdot(self):
+        # the test checks for a raised exception. that can't work if the code runs in a separate process.
+        pass

@@ -762,7 +762,8 @@ class ItemDiff:
             mode1 = stat.filemode(self._item1.mode)
             mode2 = stat.filemode(self._item2.mode)
             self._changes['mode'] = DiffChange("changed mode", {"item1": mode1, "item2": mode2})
-            self._changes['type'] = DiffChange("changed type", {"item1": mode1[0], "item2": mode2[0]})
+            if mode1[0] != mode2[0]:
+                self._changes['type'] = DiffChange("changed type", {"item1": mode1[0], "item2": mode2[0]})
 
     def _time_diffs(self):
         attrs = ["ctime", "mtime"]

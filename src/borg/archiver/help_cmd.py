@@ -28,15 +28,13 @@ class HelpMixIn:
 
         Starting with Borg 1.2, paths that are matched against patterns always
         appear relative. If you give ``/absolute/`` as root, the paths going
-        into the matcher will look relative like ``absolute/.../file.ext``.
-        If you give ``../some/path`` as root, the paths will look like
-        ``some/path/.../file.ext``.
+        into the matcher will start with ``absolute/``.
+        If you give ``../../relative`` as root, the paths will be normalized
+        as ``relative/``.
 
-        File patterns support five different styles. If followed by a colon ':',
-        the first two characters of a pattern are used as a style selector.
-        Explicit style selection is necessary if a non-default style is desired
-        or when the desired pattern starts with two alphanumeric characters
-        followed by a colon (i.e. ``aa:something/*``).
+        Borg supports different pattern styles. To define a non-default
+        style for a specific pattern, prefix it with two characters followed
+        by a colon ':' (i.e. ``fm:path/*``, ``sh:path/**``).
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector ``fm:``
             This is the default style for ``--exclude`` and ``--exclude-from``.
@@ -179,6 +177,25 @@ class HelpMixIn:
         before an exclude pattern, the file is backed up. Note that a no-recurse
         exclude stops examination of subdirectories so that potential includes
         will not match - use normal excludes for such use cases.
+
+        Example::
+
+            # Define the recursion root
+            R /
+            # Exclude all iso files in any directory
+            - **/*.iso
+            # Explicitly include all inside etc and root
+            + etc/**
+            + root/**
+            # Exclude a specific directory under each user's home directories
+            - home/*/.cache
+            # Explicitly include everything in /home
+            + home/**
+            # Explicitly exclude some directories without recursing into them
+            ! re:^(dev|proc|run|sys|tmp)
+            # Exclude all other files and directories
+            # that are not specifically included earlier.
+            - **
 
         **Tip: You can easily test your patterns with --dry-run and  --list**::
 

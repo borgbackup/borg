@@ -1536,7 +1536,7 @@ class LoggedIO:
         else:
             # we only have fresh enough stuff here.
             # update the timestamp of the lru cache entry.
-            self.fds.upd(segment, (now, fd))
+            self.fds.replace(segment, (now, fd))
         return fd
 
     def close_segment(self):

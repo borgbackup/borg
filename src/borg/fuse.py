@@ -115,7 +115,7 @@ class ItemCache:
         # tend to re-read the same chunks over and over.
         # The capacity is kept low because increasing it does not provide any significant advantage,
         # but makes LRUCache's square behaviour noticeable and consumes more memory.
-        self.chunks = LRUCache(capacity=10, dispose=lambda _: None)
+        self.chunks = LRUCache(capacity=10)
 
         # Instrumentation
         # Count of indirect items, i.e. data is cached in the object cache, not directly in this cache
@@ -252,7 +252,7 @@ class FuseBackend:
         # not contained in archives.
         self._items = {}
         # cache up to <FILES> Items
-        self._inode_cache = LRUCache(capacity=FILES, dispose=lambda _: None)
+        self._inode_cache = LRUCache(capacity=FILES)
         # _inode_count is the current count of synthetic inodes, i.e. those in self._items
         self.inode_count = 0
         # Maps inode numbers to the inode number of the parent
@@ -445,8 +445,8 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         self.decrypted_repository = decrypted_repository
         data_cache_capacity = int(os.environ.get("BORG_MOUNT_DATA_CACHE_ENTRIES", os.cpu_count() or 1))
         logger.debug("mount data cache capacity: %d chunks", data_cache_capacity)
-        self.data_cache = LRUCache(capacity=data_cache_capacity, dispose=lambda _: None)
-        self._last_pos = LRUCache(capacity=FILES, dispose=lambda _: None)
+        self.data_cache = LRUCache(capacity=data_cache_capacity)
+        self._last_pos = LRUCache(capacity=FILES)
 
     def sig_info_handler(self, sig_no, stack):
         logger.debug(
@@ -689,7 +689,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             size -= n
             if not size:
                 if fh in self._last_pos:
-                    self._last_pos.upd(fh, (chunk_no, chunk_offset))
+                    self._last_pos.replace(fh, (chunk_no, chunk_offset))
                 else:
                     self._last_pos[fh] = (chunk_no, chunk_offset)
                 break

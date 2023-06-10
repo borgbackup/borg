@@ -1,57 +1,71 @@
+from collections import OrderedDict
+from collections.abc import Callable, ItemsView, Iterator, KeysView, MutableMapping, ValuesView
+from typing import TypeVar
+
 sentinel = object()
+K = TypeVar("K")
+V = TypeVar("V")
 
 
-class LRUCache:
-    def __init__(self, capacity, dispose):
-        self._cache = {}
-        self._lru = []
+class LRUCache(MutableMapping[K, V]):
+    """
+    Mapping which maintains a maximum size by dropping the least recently used value.
+    Items are passed to dispose before being removed and replacing an item without
+    removing it first is forbidden.
+    """
+
+    _cache: OrderedDict[K, V]
+
+    _capacity: int
+
+    _dispose: Callable[[V], None]
+
+    def __init__(self, capacity: int, dispose: Callable[[V], None] = lambda _: None):
+        self._cache = OrderedDict()
         self._capacity = capacity
         self._dispose = dispose
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: K, value: V) -> None:
         assert key not in self._cache, (
             "Unexpected attempt to replace a cached item," " without first deleting the old item."
         )
-        self._lru.append(key)
-        while len(self._lru) > self._capacity:
-            del self[self._lru[0]]
+        while len(self._cache) >= self._capacity:
+            self._dispose(self._cache.popitem(last=False)[1])
         self._cache[key] = value
+        self._cache.move_to_end(key)
 
-    def __getitem__(self, key):
-        value = self._cache[key]  # raise KeyError if not found
-        self._lru.remove(key)
-        self._lru.append(key)
-        return value
+    def __getitem__(self, key: K) -> V:
+        self._cache.move_to_end(key)  # raise KeyError if not found
+        return self._cache[key]
 
-    def __delitem__(self, key):
-        value = self._cache.pop(key)  # raise KeyError if not found
-        self._dispose(value)
-        self._lru.remove(key)
+    def __delitem__(self, key: K) -> None:
+        self._dispose(self._cache.pop(key))
 
-    def __contains__(self, key):
+    def __contains__(self, key: object) -> bool:
         return key in self._cache
 
-    def get(self, key, default=None):
-        value = self._cache.get(key, sentinel)
-        if value is sentinel:
-            return default
-        self._lru.remove(key)
-        self._lru.append(key)
-        return value
+    def __len__(self) -> int:
+        return len(self._cache)
 
-    def upd(self, key, value):
-        # special use only: update the value for an existing key without having to dispose it first
+    def replace(self, key: K, value: V) -> None:
+        """Replace an item which is already present, not disposing it in the process"""
         # this method complements __setitem__ which should be used for the normal use case.
         assert key in self._cache, "Unexpected attempt to update a non-existing item."
         self._cache[key] = value
 
-    def clear(self):
+    def clear(self) -> None:
         for value in self._cache.values():
             self._dispose(value)
         self._cache.clear()
 
-    def items(self):
-        return self._cache.items()
+    def __iter__(self) -> Iterator[K]:
+        return iter(self._cache)
 
-    def __len__(self):
-        return len(self._cache)
+    def keys(self) -> KeysView[K]:
+        return self._cache.keys()
+
+    def values(self) -> ValuesView[V]:
+        return self._cache.values()
+
+    def items(self) -> ItemsView[K, V]:
+        return self._cache.items()

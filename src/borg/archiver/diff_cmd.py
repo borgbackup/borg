@@ -153,7 +153,7 @@ class DiffMixIn:
             metavar="FORMAT",
             dest="format",
             action=Highlander,
-            help="specify format for differences between archives (default: \"{change} {path}{NL}\")",
+            help='specify format for differences between archives (default: "{change} {path}{NL}")',
         )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")
         subparser.add_argument(

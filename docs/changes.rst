@@ -152,6 +152,8 @@ Fixes:
 - put security infos into data dir, add BORG_DATA_DIR env var, #5760
 - setup.cfg: remove setup_requires (we have a pyproject.toml for that), #7574
 - do not crash for empty archives list in borg rlist date based matching, #7522
+- sanitize paths during archive creation and extraction, #7108 #7099
+- make sure we do not get backslashes into item paths
 
 Other changes:
 
@@ -186,6 +188,8 @@ Other changes:
   - incl./excl. options header, clarify --path-from-stdin exclusive control
   - add note about MAX_DATA_SIZE
   - update security support docs
+  - improve patterns help
+
 - CI / tests / vagrant:
 
   - added pre-commit for linting purposes, #7476

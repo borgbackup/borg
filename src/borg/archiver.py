@@ -2434,12 +2434,35 @@ class Archiver:
             EOF
             $ borg create --exclude-from exclude.txt backup /
 
-        A more general and easier to use way to define filename matching patterns exists
-        with the ``--pattern`` and ``--patterns-from`` options. Using these, you may
-        specify the backup roots (starting points) and patterns for inclusion/exclusion.
-        A root path starts with the prefix `R`, followed by a path (a plain path, not a
-        file pattern). An include rule starts with the prefix +, an exclude rule starts
-        with the prefix -, an exclude-norecurse rule starts with !, all followed by a pattern.
+        A more general and easier to use way to define filename matching patterns
+        exists with the ``--pattern`` and ``--patterns-from`` options. Using
+        these, you may specify the backup roots, default pattern styles and
+        patterns for inclusion and exclusion.
+
+        Root path prefix ``R``
+            A recursion root path starts with the prefix ``R``, followed by a path
+            (a plain path, not a file pattern). Use this prefix to have the root
+            paths in the patterns file rather than as command line arguments.
+
+        Pattern style prefix ``P``
+            To change the default pattern style, use the ``P`` prefix, followed by
+            the pattern style abbreviation (``fm``, ``pf``, ``pp``, ``re``, ``sh``).
+            All patterns following this line will use this style until another style
+            is specified.
+
+        Exclude pattern prefix ``-``
+            Use the prefix ``-``, followed by a pattern, to define an exclusion.
+            This has the same effect as the ``--exclude`` option.
+
+        Exclude no-recurse pattern prefix ``!``
+            Use the prefix ``!``, followed by a pattern, to define an exclusion
+            that does not recurse into subdirectories. This saves time, but
+            prevents include patterns to match any files in subdirectories.
+
+        Include pattern prefix ``+``
+            Use the prefix ``+``, followed by a pattern, to define inclusions.
+            This is useful to include paths that are covered in an exclude
+            pattern and would otherwise not be backed up.
 
         .. note::
 

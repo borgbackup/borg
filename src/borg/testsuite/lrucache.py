@@ -7,7 +7,7 @@ from ..helpers.lrucache import LRUCache
 
 class TestLRUCache:
     def test_lrucache(self):
-        c = LRUCache(2, dispose=lambda _: None)
+        c = LRUCache(2)
         assert len(c) == 0
         assert c.items() == set()
         for i, x in enumerate("abc"):

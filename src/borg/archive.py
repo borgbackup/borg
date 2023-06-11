@@ -1234,7 +1234,7 @@ class MetadataCollector:
 # (hash_func, chunk_length) -> chunk_hash
 # we play safe and have the hash_func in the mapping key, in case we
 # have different hash_funcs within the same borg run.
-zero_chunk_ids = LRUCache(10, dispose=lambda _: None)
+zero_chunk_ids = LRUCache(10)  # type: ignore[var-annotated]
 
 
 def cached_hash(chunk, id_hash):

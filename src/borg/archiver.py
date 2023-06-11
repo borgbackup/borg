@@ -2470,11 +2470,29 @@ class Archiver:
             of files using pattern prefixes ``+`` and ``-``. With ``--exclude`` and
             ``--exclude-from`` ONLY excludes are defined.
 
-        Inclusion patterns are useful to include paths that are contained in an excluded
-        path. The first matching pattern is used so if an include pattern matches before
-        an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
-        a directory, it won't recurse into it and won't discover any potential matches for
-        include rules below that directory.
+        The first matching pattern is used, so if an include pattern matches
+        before an exclude pattern, the file is backed up. Note that a no-recurse
+        exclude stops examination of subdirectories so that potential includes
+        will not match - use normal excludes for such use cases.
+
+        Example::
+
+            # Define the recursion root
+            R /
+            # Exclude all iso files in any directory
+            - **/*.iso
+            # Explicitly include all inside etc and root
+            + etc/**
+            + root/**
+            # Exclude a specific directory under each user's home directories
+            - home/*/.cache
+            # Explicitly include everything in /home
+            + home/**
+            # Explicitly exclude some directories without recursing into them
+            ! re:^(dev|proc|run|sys|tmp)
+            # Exclude all other files and directories
+            # that are not specifically included earlier.
+            - **
 
         .. note::
 

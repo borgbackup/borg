@@ -2311,12 +2311,11 @@ class Archiver:
         currently active recursion root. You usually give the recursion root(s)
         when invoking borg and these can be either relative or absolute paths.
 
-        If you give `/absolute/` as root, the paths going into the matcher will
-        look relative like `absolute/.../file.ext`, because file paths in Borg
-        archives are always stored normalized and relative. This means that e.g.
-        ``borg create /path/to/repo ../some/path`` will store all files as
-        `some/path/.../file.ext` and ``borg create /path/to/repo /home/user``
-        will store all files as `home/user/.../file.ext`.
+        Starting with Borg 1.2, paths that are matched against patterns always
+        appear relative. If you give ``/absolute/`` as root, the paths going
+        into the matcher will start with ``absolute/``.
+        If you give ``../../relative`` as root, the paths will be normalized
+        as ``relative/``.
 
         A directory exclusion pattern can end either with or without a slash ('/').
         If it ends with a slash, such as `some/path/`, the directory will be
@@ -2328,12 +2327,6 @@ class Archiver:
         ``--exclude`` patterns and shell-style is used for the ``--pattern``
         option. For commands that support patterns in their ``PATH`` argument
         like (``borg list``), the default pattern is path prefix.
-
-        Starting with Borg 1.2, discovered fs paths are normalised, have leading
-        slashes removed and then are matched against your patterns.
-        Note: You need to review your include / exclude patterns and make
-        sure they do not expect leading slashes. Borg can only deal with this
-        for some very simple patterns by removing leading slashes there also.
 
         If followed by a colon (':') the first two characters of a pattern are
         used as a style selector. Explicit style selection is necessary when a

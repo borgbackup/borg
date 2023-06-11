@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-TRANSFER" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-TRANSFER" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
@@ -37,6 +37,14 @@ borg [common options] transfer [options]
 .sp
 This command transfers archives from one repository to another repository.
 Optionally, it can also upgrade the transferred data.
+Optionally, it can also recompress the transferred data.
+.sp
+It is easiest (and fastest) to give \fB\-\-compression=COMPRESSION \-\-recompress=never\fP using
+the same COMPRESSION mode as in the SRC_REPO \- borg will use that COMPRESSION for metadata (in
+any case) and keep data compressed \(dqas is\(dq (saves time as no data compression is needed).
+.sp
+If you want to globally change compression while transferring archives to the DST_REPO,
+give \fB\-\-compress=WANTED_COMPRESSION \-\-recompress=always\fP\&.
 .sp
 Suggested use for general purpose archive transfer (not repo upgrades):
 .INDENT 0.0
@@ -60,7 +68,7 @@ borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-dry\-run  # check! 
 The default is to transfer all archives, including checkpoint archives.
 .sp
 You could use the misc. archive filter options to limit which archives it will
-transfer, e.g. using the \-a option. This is recommended for big
+transfer, e.g. using the \fB\-a\fP option. This is recommended for big
 repositories with multiple data sets to keep the runtime per invocation lower.
 .sp
 For repository upgrades (e.g. from a borg 1.2 repo to a related borg 2.0 repo), usage is
@@ -70,7 +78,13 @@ quite similar to the above:
 .sp
 .nf
 .ft C
-borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-upgrader=From12To20
+# fast: compress metadata with zstd,3, but keep data chunks compressed as they are:
+borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-upgrader=From12To20 \e
+     \-\-compress=zstd,3 \-\-recompress=never
+
+# compress metadata and recompress data with zstd,3
+borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-upgrader=From12To20 \e
+     \-\-compress=zstd,3 \-\-recompress=always
 .ft P
 .fi
 .UNINDENT
@@ -89,6 +103,12 @@ transfer archives from the other repository
 .TP
 .BI \-\-upgrader \ UPGRADER
 use the upgrader to convert transferred data (default: no conversion)
+.TP
+.BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
+select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
+.TP
+.BI \-\-recompress \ MODE
+recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIalways\fP: recompress unconditionally; and \fInever\fP: do not recompress (faster: re\-uses compressed data chunks w/o change).If no MODE is given, \fIalways\fP will be used. Not passing \-\-recompress is equivalent to \(dq\-\-recompress never\(dq.
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0

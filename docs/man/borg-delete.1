@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-DELETE" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete archives
 .SH SYNOPSIS
@@ -69,9 +69,6 @@ consider checkpoint archives for deletion (default: not considered).
 .TP
 .B  \-s\fP,\fB  \-\-stats
 print statistics for the deleted archive
-.TP
-.B  \-\-cache\-only
-delete only the local cache for the given repository
 .TP
 .B  \-\-force
 force deletion of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-\-force\fP does not work.
@@ -118,13 +115,13 @@ $ borg delete Monday
 $ borg compact
 
 # delete all archives whose names begin with the machine\(aqs hostname followed by \(dq\-\(dq
-$ borg delete \-a \(aq{hostname}\-*\(aq
+$ borg delete \-a \(aqsh:{hostname}\-*\(aq
 
 # delete all archives whose names contain \(dq\-2012\-\(dq
-$ borg delete \-a \(aq*\-2012\-*\(aq
+$ borg delete \-a \(aqsh:*\-2012\-*\(aq
 
 # see what would be deleted if delete was run without \-\-dry\-run
-$ borg delete \-\-list \-\-dry\-run \-a \(aq*\-May\-*\(aq
+$ borg delete \-\-list \-\-dry\-run \-a \(aqsh:*\-May\-*\(aq
 .ft P
 .fi
 .UNINDENT

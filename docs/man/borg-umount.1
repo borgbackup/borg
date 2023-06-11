@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UMOUNT" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-UMOUNT" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-umount \- un-mount the FUSE filesystem
 .SH SYNOPSIS
@@ -74,7 +74,7 @@ $ borg umount /tmp/mymountpoint
 # Archive filters are supported.
 # These are especially handy for the \(dqversions view\(dq,
 # which does not support lazy processing of archives.
-$ borg mount \-o versions \-\-glob\-archives \(aq*\-my\-home\(aq \-\-last 10 /tmp/mymountpoint
+$ borg mount \-o versions \-\-match\-archives \(aqsh:*\-my\-home\(aq \-\-last 10 /tmp/mymountpoint
 
 # Exclusion options are supported.
 # These can speed up mounting and lower memory needs significantly.

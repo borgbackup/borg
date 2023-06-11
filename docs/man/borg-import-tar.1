@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-IMPORT-TAR" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-IMPORT-TAR" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -80,6 +80,10 @@ UNIX V7 tar
 .IP \(bu 2
 SunOS tar with extended attributes
 .UNINDENT
+.sp
+To import multiple tarballs into a single archive, they can be simply
+concatenated (e.g. using \(dqcat\(dq) into a single file, and imported with an
+\fB\-\-ignore\-zeros\fP option to skip through the stop markers between them.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -109,6 +113,9 @@ only display items with the given status characters
 .TP
 .B  \-\-json
 output stats as JSON (implies \-\-stats)
+.TP
+.B  \-\-ignore\-zeros
+ignore zero\-filled blocks in the input tarball
 .UNINDENT
 .SS Archive options
 .INDENT 0.0

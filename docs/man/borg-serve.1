@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-SERVE" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-SERVE" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -35,7 +35,19 @@ borg-serve \- Start in server mode. This command is usually not used manually.
 borg [common options] serve [options]
 .SH DESCRIPTION
 .sp
-This command starts a repository server process. This command is usually not used manually.
+This command starts a repository server process.
+.sp
+borg serve can currently support:
+.INDENT 0.0
+.IP \(bu 2
+Getting automatically started via ssh when the borg client uses a \fI\%ssh://\fP\&...
+remote repository. In this mode, \fIborg serve\fP will live until that ssh connection
+gets terminated.
+.IP \(bu 2
+Getting started by some other means (not by the borg client) as a long\-running socket
+server to be used for borg clients using a socket://... repository (see the \fI\-\-socket\fP
+option if you do not want to use the default path for the socket and pid file).
+.UNINDENT
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

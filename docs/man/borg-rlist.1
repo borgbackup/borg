@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RLIST" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-RLIST" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-rlist \- List the archives contained in a repository
 .SH SYNOPSIS
@@ -133,13 +133,13 @@ NL: alias of NEWLINE
 .IP \(bu 2
 NUL: NUL character for creating print0 / xargs \-0 like output
 .IP \(bu 2
-SPACE
+SPACE: space character
 .IP \(bu 2
-TAB
+TAB: tab character
 .IP \(bu 2
-CR
+CR: carriage return character
 .IP \(bu 2
-LF
+LF: line feed character
 .UNINDENT
 .sp
 Keys available only when listing archives in a repository:
@@ -164,6 +164,10 @@ command_line: command line which was used to create the archive
 hostname: hostname of host on which this archive was created
 .IP \(bu 2
 username: username of user who created this archive
+.IP \(bu 2
+size: size of this archive (data plus metadata, not considering compression and deduplication)
+.IP \(bu 2
+nfiles: count of files in this archive
 .UNINDENT
 .SH SEE ALSO
 .sp

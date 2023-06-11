@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -169,15 +169,15 @@ set mode to M in archive for stdin data (default: 0660)
 interpret PATH as command and store its stdout. See also section Reading from stdin below.
 .TP
 .B  \-\-paths\-from\-stdin
-read DELIM\-separated list of paths to back up from stdin. Will not recurse into directories.
+read DELIM\-separated list of paths to back up from stdin. All control is external: it will back up all files given \- no more, no less.
 .TP
 .B  \-\-paths\-from\-command
 interpret PATH as command and treat its output as \fB\-\-paths\-from\-stdin\fP
 .TP
 .BI \-\-paths\-delimiter \ DELIM
-set path delimiter for \fB\-\-paths\-from\-stdin\fP and \fB\-\-paths\-from\-command\fP (default: n)
+set path delimiter for \fB\-\-paths\-from\-stdin\fP and \fB\-\-paths\-from\-command\fP (default: \fB\en\fP)
 .UNINDENT
-.SS Exclusion options
+.SS Include/Exclude options
 .INDENT 0.0
 .TP
 .BI \-e \ PATTERN\fR,\fB \ \-\-exclude \ PATTERN
@@ -208,7 +208,7 @@ exclude files flagged NODUMP
 .INDENT 0.0
 .TP
 .B  \-x\fP,\fB  \-\-one\-file\-system
-stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.
+stay in the same file system and do not store mount points of other file systems \- this might behave different from your expectations, see the description below.
 .TP
 .B  \-\-numeric\-ids
 only store numeric user and group identifiers
@@ -368,13 +368,13 @@ through using the \fB\-\-keep\-exclude\-tags\fP option.
 The \fB\-x\fP or \fB\-\-one\-file\-system\fP option excludes directories, that are mountpoints (and everything in them).
 It detects mountpoints by comparing the device number from the output of \fBstat()\fP of the directory and its
 parent directory. Specifically, it excludes directories for which \fBstat()\fP reports a device number different
-from the device number of their parent. Be aware that in Linux (and possibly elsewhere) there are directories
-with device number different from their parent, which the kernel does not consider a mountpoint and also the
-other way around. Examples are bind mounts (possibly same device number, but always a mountpoint) and ALL
-subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint). Therefore when
-using \fB\-\-one\-file\-system\fP, one should make doubly sure that the backup works as intended especially when using
-btrfs. This is even more important, if the btrfs layout was created by someone else, e.g. a distribution
-installer.
+from the device number of their parent.
+In general: be aware that there are directories with device number different from their parent, which the kernel
+does not consider a mountpoint and also the other way around.
+Linux examples for this are bind mounts (possibly same device number, but always a mountpoint) and ALL
+subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint).
+macOS examples are the apfs mounts of a typical macOS installation.
+Therefore, when using \fB\-\-one\-file\-system\fP, you should double\-check that the backup works as intended.
 .SS Item flags
 .sp
 \fB\-\-list\fP outputs a list of all files, directories and other

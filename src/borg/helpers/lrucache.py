@@ -2,16 +2,15 @@ from collections import OrderedDict
 from collections.abc import Callable, ItemsView, Iterator, KeysView, MutableMapping, ValuesView
 from typing import TypeVar
 
-sentinel = object()
 K = TypeVar("K")
 V = TypeVar("V")
 
 
 class LRUCache(MutableMapping[K, V]):
     """
-    Mapping which maintains a maximum size by dropping the least recently used value.
-    Items are passed to dispose before being removed and replacing an item without
-    removing it first is forbidden.
+    Mapping which maintains a maximum size by removing the least recently used value.
+    Items are passed to dispose before being removed and setting an item which is
+    already in the cache has to be done using the replace method.
     """
 
     _cache: OrderedDict[K, V]

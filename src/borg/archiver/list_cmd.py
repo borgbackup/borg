@@ -29,10 +29,9 @@ class ListMixIn:
 
         def _list_inner(cache):
             archive = Archive(manifest, args.name, cache=cache)
-
-            formatter = ItemFormatter(archive, format, json_lines=args.json_lines)
+            formatter = ItemFormatter(archive, format)
             for item in archive.iter_items(lambda item: matcher.match(item.path)):
-                sys.stdout.write(formatter.format_item(item))
+                sys.stdout.write(formatter.format_item(item, args.json_lines, sort=True))
 
         # Only load the cache if it will be used
         if ItemFormatter.format_needs_cache(format):

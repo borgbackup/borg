@@ -11,6 +11,7 @@ from functools import partial
 from getpass import getuser
 from io import BytesIO
 from itertools import groupby, zip_longest
+from typing import Iterator
 from shutil import get_terminal_size
 
 from .platformflags import is_win32
@@ -297,31 +298,24 @@ class DownloadPipeline:
         unpacker = msgpack.Unpacker(use_list=False)
         for data in self.fetch_many(ids):
             unpacker.feed(data)
-            items = [Item(internal_dict=item) for item in unpacker]
-            for item in items:
+            for _item in unpacker:
+                item = Item(internal_dict=_item)
                 if "chunks" in item:
                     item.chunks = [ChunkListEntry(*e) for e in item.chunks]
-
-            if filter:
-                items = [item for item in items if filter(item)]
-
-            if preload:
-                for item in items:
-                    if "chunks" in item:
-                        hlid = item.get("hlid", None)
-                        if hlid is None:
-                            preload_chunks = True
-                        else:
-                            if hlid in hlids_preloaded:
-                                preload_chunks = False
-                            else:
-                                # not having the hardlink's chunks already preloaded for other hardlink to same inode
-                                preload_chunks = True
-                                hlids_preloaded.add(hlid)
-                        if preload_chunks:
-                            self.repository.preload([c.id for c in item.chunks])
-
-            for item in items:
+                if filter and not filter(item):
+                    continue
+                if preload and "chunks" in item:
+                    hlid = item.get("hlid", None)
+                    if hlid is None:
+                        preload_chunks = True
+                    elif hlid in hlids_preloaded:
+                        preload_chunks = False
+                    else:
+                        # not having the hardlink's chunks already preloaded for other hardlink to same inode
+                        preload_chunks = True
+                        hlids_preloaded.add(hlid)
+                    if preload_chunks:
+                        self.repository.preload([c.id for c in item.chunks])
                 yield item
 
     def fetch_many(self, ids, is_preloaded=False):
@@ -631,10 +625,9 @@ Duration: {0.duration}
     def iter_items(self, filter=None, preload=False):
         # note: when calling this with preload=True, later fetch_many() must be called with
         # is_preloaded=True or the RemoteRepository code will leak memory!
-        for item in self.pipeline.unpack_many(
+        yield from self.pipeline.unpack_many(
             self.metadata.items, preload=preload, filter=lambda item: self.item_filter(item, filter)
-        ):
-            yield item
+        )
 
     def add_item(self, item, show_progress=True, stats=None):
         if show_progress and self.show_progress:
@@ -1123,55 +1116,59 @@ Duration: {0.duration}
             logger.warning("borg check --repair is required to free all space.")
 
     @staticmethod
-    def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False, content_only=False):
+    def compare_archives_iter(
+        archive1: "Archive", archive2: "Archive", matcher=None, can_compare_chunk_ids=False
+    ) -> Iterator[ItemDiff]:
         """
-        Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
+        Yields an ItemDiff instance describing changes/indicating equality.
 
         :param matcher: PatternMatcher class to restrict results to only matching paths.
         :param can_compare_chunk_ids: Whether --chunker-params are the same for both archives.
         """
 
-        def compare_items(item1, item2):
+        def compare_items(path: str, item1: Item, item2: Item):
             return ItemDiff(
+                path,
                 item1,
                 item2,
                 archive1.pipeline.fetch_many([c.id for c in item1.get("chunks", [])]),
                 archive2.pipeline.fetch_many([c.id for c in item2.get("chunks", [])]),
                 can_compare_chunk_ids=can_compare_chunk_ids,
-                content_only=content_only,
             )
 
-        orphans_archive1 = OrderedDict()
-        orphans_archive2 = OrderedDict()
+        orphans_archive1: OrderedDict[str, Item] = OrderedDict()
+        orphans_archive2: OrderedDict[str, Item] = OrderedDict()
+
+        assert matcher is not None, "matcher must be set"
 
         for item1, item2 in zip_longest(
             archive1.iter_items(lambda item: matcher.match(item.path)),
             archive2.iter_items(lambda item: matcher.match(item.path)),
         ):
             if item1 and item2 and item1.path == item2.path:
-                yield (item1.path, compare_items(item1, item2))
+                yield compare_items(item1.path, item1, item2)
                 continue
             if item1:
                 matching_orphan = orphans_archive2.pop(item1.path, None)
                 if matching_orphan:
-                    yield (item1.path, compare_items(item1, matching_orphan))
+                    yield compare_items(item1.path, item1, matching_orphan)
                 else:
                     orphans_archive1[item1.path] = item1
             if item2:
                 matching_orphan = orphans_archive1.pop(item2.path, None)
                 if matching_orphan:
-                    yield (matching_orphan.path, compare_items(matching_orphan, item2))
+                    yield compare_items(matching_orphan.path, matching_orphan, item2)
                 else:
                     orphans_archive2[item2.path] = item2
         # At this point orphans_* contain items that had no matching partner in the other archive
         for added in orphans_archive2.values():
             path = added.path
             deleted_item = Item.create_deleted(path)
-            yield (path, compare_items(deleted_item, added))
+            yield compare_items(path, deleted_item, added)
         for deleted in orphans_archive1.values():
             path = deleted.path
             deleted_item = Item.create_deleted(path)
-            yield (path, compare_items(deleted, deleted_item))
+            yield compare_items(path, deleted, deleted_item)
 
 
 class MetadataCollector:

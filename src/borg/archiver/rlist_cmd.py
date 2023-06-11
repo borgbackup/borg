@@ -23,15 +23,15 @@ class RListMixIn:
             format = "{archive}{NL}"
         else:
             format = os.environ.get("BORG_RLIST_FORMAT", "{archive:<36} {time} [{id}]{NL}")
-        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, json=args.json, iec=args.iec)
+        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
         output_data = []
 
         for archive_info in manifest.archives.list_considering(args):
             if args.json:
-                output_data.append(formatter.get_item_data(archive_info))
+                output_data.append(formatter.get_item_data(archive_info, args.json))
             else:
-                sys.stdout.write(formatter.format_item(archive_info))
+                sys.stdout.write(formatter.format_item(archive_info, args.json))
 
         if args.json:
             json_print(basic_json_data(manifest, extra={"archives": output_data}))

@@ -1,3 +1,4 @@
+import abc
 import argparse
 import base64
 import hashlib
@@ -8,6 +9,7 @@ import re
 import shlex
 import stat
 import uuid
+from typing import List, Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING, Literal
 from binascii import hexlify
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
@@ -26,6 +28,9 @@ from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
 from ..platformflags import is_win32
+
+if TYPE_CHECKING:
+    from ..item import ItemDiff
 
 
 def bin_to_hex(binary):
@@ -649,8 +654,10 @@ def archivename_validator(text):
     return validate_text(text)
 
 
-class BaseFormatter:
-    FIXED_KEYS = {
+class BaseFormatter(metaclass=abc.ABCMeta):
+    format: str
+    static_data: Dict[str, Any]
+    FIXED_KEYS: ClassVar[Dict[str, str]] = {
         # Formatting aids
         "LF": "\n",
         "SPACE": " ",
@@ -660,24 +667,48 @@ class BaseFormatter:
         "NEWLINE": "\n",
         "NL": "\n",  # \n is automatically converted to os.linesep on write
     }
+    KEY_DESCRIPTIONS: ClassVar[Dict[str, str]] = {
+        "NEWLINE": "OS dependent line separator",
+        "NL": "alias of NEWLINE",
+        "NUL": "NUL character for creating print0 / xargs -0 like output",
+        "SPACE": "space character",
+        "TAB": "tab character",
+        "CR": "carriage return character",
+        "LF": "line feed character",
+    }
+    KEY_GROUPS: ClassVar[Tuple[Tuple[str, ...], ...]] = (("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),)
 
-    def get_item_data(self, item):
+    def __init__(self, format: str, static: Dict[str, Any]) -> None:
+        self.format = partial_format(format, static)
+        self.static_data = static
+
+    @abc.abstractmethod
+    def get_item_data(self, item, jsonline=False) -> dict:
         raise NotImplementedError
 
-    def format_item(self, item):
-        return self.format.format_map(self.get_item_data(item))
-
-    @staticmethod
-    def keys_help():
+    def format_item(self, item, jsonline=False, sort=False):
+        data = self.get_item_data(item, jsonline)
         return (
-            "- NEWLINE: OS dependent line separator\n"
-            "- NL: alias of NEWLINE\n"
-            "- NUL: NUL character for creating print0 / xargs -0 like output\n"
-            "- SPACE\n"
-            "- TAB\n"
-            "- CR\n"
-            "- LF"
+            f"{json.dumps(data, cls=BorgJsonEncoder, sort_keys=sort)}\n" if jsonline else self.format.format_map(data)
         )
+
+    @classmethod
+    def keys_help(cls):
+        help = []
+        keys: Set[str] = set()
+        keys.update(cls.KEY_DESCRIPTIONS.keys())
+        keys.update(key for group in cls.KEY_GROUPS for key in group)
+
+        for group in cls.KEY_GROUPS:
+            for key in group:
+                keys.remove(key)
+                text = "- " + key
+                if key in cls.KEY_DESCRIPTIONS:
+                    text += ": " + cls.KEY_DESCRIPTIONS[key]
+                help.append(text)
+            help.append("")
+        assert not keys, str(keys)
+        return "\n".join(help)
 
 
 class ArchiveFormatter(BaseFormatter):
@@ -703,47 +734,17 @@ class ArchiveFormatter(BaseFormatter):
         ("size", "nfiles"),
     )
 
-    @classmethod
-    def available_keys(cls):
-        from ..manifest import ArchiveInfo
-
-        fake_archive_info = ArchiveInfo("archivename", b"\1" * 32, datetime(1970, 1, 1, tzinfo=timezone.utc))
-        formatter = cls("", None, None, None)
-        keys = []
-        keys.extend(formatter.call_keys.keys())
-        keys.extend(formatter.get_item_data(fake_archive_info).keys())
-        return keys
-
-    @classmethod
-    def keys_help(cls):
-        help = []
-        keys = cls.available_keys()
-        for key in cls.FIXED_KEYS:
-            keys.remove(key)
-
-        for group in cls.KEY_GROUPS:
-            for key in group:
-                keys.remove(key)
-                text = "- " + key
-                if key in cls.KEY_DESCRIPTIONS:
-                    text += ": " + cls.KEY_DESCRIPTIONS[key]
-                help.append(text)
-            help.append("")
-        assert not keys, str(keys)
-        return "\n".join(help)
-
-    def __init__(self, format, repository, manifest, key, *, json=False, iec=False):
+    def __init__(self, format, repository, manifest, key, *, iec=False):
+        static_data = {}  # here could be stuff on repo level, above archive level
+        static_data.update(self.FIXED_KEYS)
+        super().__init__(format, static_data)
         self.repository = repository
         self.manifest = manifest
         self.key = key
         self.name = None
         self.id = None
         self._archive = None
-        self.json = json
         self.iec = iec
-        static_keys = {}  # here could be stuff on repo level, above archive level
-        static_keys.update(self.FIXED_KEYS)
-        self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             "hostname": partial(self.get_meta, "hostname", ""),
@@ -755,20 +756,12 @@ class ArchiveFormatter(BaseFormatter):
             "end": self.get_ts_end,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
-        if self.json:
-            self.item_data = {}
-            self.format_item = self.format_item_json
-        else:
-            self.item_data = static_keys
 
-    def format_item_json(self, item):
-        return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder) + "\n"
-
-    def get_item_data(self, archive_info):
+    def get_item_data(self, archive_info, jsonline=False):
         self.name = archive_info.name
         self.id = archive_info.id
         item_data = {}
-        item_data.update(self.item_data)
+        item_data.update({} if jsonline else self.static_data)
         item_data.update(
             {
                 "name": archive_info.name,
@@ -812,15 +805,31 @@ class ItemFormatter(BaseFormatter):
     # shake_* is not provided because it uses an incompatible .digest() method to support variable length.
     hash_algorithms = set(hashlib.algorithms_guaranteed).union({"xxh64"}).difference({"shake_128", "shake_256"})
     KEY_DESCRIPTIONS = {
+        "type": "file type (file, dir, symlink, ...)",
+        "mode": "file mode (as in stat)",
+        "uid": "user id of file owner",
+        "gid": "group id of file owner",
+        "user": "user name of file owner",
+        "group": "group name of file owner",
         "path": "file path",
         "target": "link target for symlinks",
         "hlid": "hard link identity (same if hardlinking same fs object)",
+        "flags": "file flags",
         "extra": 'prepends {target} with " -> " for soft links and " link to " for hard links',
+        "size": "file size",
         "dsize": "deduplicated size",
         "num_chunks": "number of chunks in this file",
         "unique_chunks": "number of unique chunks in this file",
+        "mtime": "file modification time",
+        "ctime": "file change time",
+        "atime": "file access time",
+        "isomtime": "file modification time (ISO 8601 format)",
+        "isoctime": "file change time (ISO 8601 format)",
+        "isoatime": "file access time (ISO 8601 format)",
         "xxh64": "XXH64 checksum of this file (note: this is NOT a cryptographic hash!)",
         "health": 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
+        "archiveid": "internal ID of the archive",
+        "archivename": "name of the archive",
     }
     KEY_GROUPS = (
         ("type", "mode", "uid", "gid", "user", "group", "path", "target", "hlid", "flags"),
@@ -834,56 +843,18 @@ class ItemFormatter(BaseFormatter):
     KEYS_REQUIRING_CACHE = ("dsize", "unique_chunks")
 
     @classmethod
-    def available_keys(cls):
-        class FakeArchive:
-            fpr = name = ""
-
-        from ..item import Item
-
-        fake_item = Item(mode=0, path="foo", user="", group="", mtime=0, uid=0, gid=0)
-        formatter = cls(FakeArchive, "")
-        keys = []
-        keys.extend(formatter.call_keys.keys())
-        keys.extend(formatter.get_item_data(fake_item).keys())
-        return keys
-
-    @classmethod
-    def keys_help(cls):
-        help = []
-        keys = cls.available_keys()
-        for key in cls.FIXED_KEYS:
-            keys.remove(key)
-
-        for group in cls.KEY_GROUPS:
-            for key in group:
-                keys.remove(key)
-                text = "- " + key
-                if key in cls.KEY_DESCRIPTIONS:
-                    text += ": " + cls.KEY_DESCRIPTIONS[key]
-                help.append(text)
-            help.append("")
-        assert not keys, str(keys)
-        return "\n".join(help)
-
-    @classmethod
     def format_needs_cache(cls, format):
         format_keys = {f[1] for f in Formatter().parse(format)}
         return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
-    def __init__(self, archive, format, *, json_lines=False):
+    def __init__(self, archive, format):
         from ..checksums import StreamingXXH64
 
+        static_data = {"archivename": archive.name, "archiveid": archive.fpr}
+        static_data.update(self.FIXED_KEYS)
+        super().__init__(format, static_data)
         self.xxh64 = StreamingXXH64
         self.archive = archive
-        self.json_lines = json_lines
-        static_keys = {"archivename": archive.name, "archiveid": archive.fpr}
-        static_keys.update(self.FIXED_KEYS)
-        if self.json_lines:
-            self.item_data = {}
-            self.format_item = self.format_item_json
-        else:
-            self.item_data = static_keys
-        self.format = partial_format(format, static_keys)
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             "size": self.calculate_size,
@@ -901,17 +872,14 @@ class ItemFormatter(BaseFormatter):
             self.call_keys[hash_function] = partial(self.hash_item, hash_function)
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
-    def format_item_json(self, item):
-        return json.dumps(self.get_item_data(item), cls=BorgJsonEncoder, sort_keys=True) + "\n"
-
-    def get_item_data(self, item):
+    def get_item_data(self, item, jsonline=False):
         item_data = {}
-        item_data.update(self.item_data)
+        item_data.update({} if jsonline else self.static_data)
 
         item_data.update(text_to_json("path", item.path))
         target = item.get("target", "")
         item_data.update(text_to_json("target", target))
-        if not self.json_lines:
+        if not jsonline:
             item_data["extra"] = "" if not target else f" -> {item_data['target']}"
 
         hlid = item.get("hlid")
@@ -928,7 +896,7 @@ class ItemFormatter(BaseFormatter):
         item_data.update(text_to_json("user", item.get("user", str(item_data["uid"]))))
         item_data.update(text_to_json("group", item.get("group", str(item_data["gid"]))))
 
-        if self.json_lines:
+        if jsonline:
             item_data["healthy"] = "chunks_healthy" not in item
         else:
             item_data["health"] = "broken" if "chunks_healthy" in item else "healthy"
@@ -944,7 +912,7 @@ class ItemFormatter(BaseFormatter):
 
         item: The item to sum its unique chunks' metadata
         metadata_func: A function that takes a parameter of type ChunkIndexEntry and returns a number, used to return
-                       the metadata needed from the chunk
+        the metadata needed from the chunk
         """
         chunk_index = self.archive.cache.chunks
         chunks = item.get("chunks", [])
@@ -974,6 +942,134 @@ class ItemFormatter(BaseFormatter):
 
     def format_iso_time(self, key, item):
         return self.format_time(key, item).isoformat()
+
+
+class DiffFormatter(BaseFormatter):
+    KEY_DESCRIPTIONS = {
+        "path": "archived file path",
+        "change": "all available changes",
+        "content": "file content change",
+        "mode": "file mode change",
+        "type": "file type change",
+        "owner": "file owner (user/group) change",
+        "user": "file user change",
+        "group": "file group change",
+        "link": "file link change",
+        "directory": "file directory change",
+        "blkdev": "file block device change",
+        "chrdev": "file character device change",
+        "fifo": "file fifo change",
+        "mtime": "file modification time change",
+        "ctime": "file change time change",
+        "isomtime": "file modification time change (ISO 8601)",
+        "isoctime": "file creation time change (ISO 8601)",
+    }
+    KEY_GROUPS = (
+        ("path", "change"),
+        ("content", "mode", "type", "owner", "group", "user"),
+        ("link", "directory", "blkdev", "chrdev", "fifo"),
+        ("mtime", "ctime", "isomtime", "isoctime"),
+    )
+    METADATA = ("mode", "type", "owner", "group", "user", "mtime", "ctime")
+
+    def __init__(self, format, content_only=False):
+        static_data = {}
+        static_data.update(self.FIXED_KEYS)
+        super().__init__(format or "{content}{link}{directory}{blkdev}{chrdev}{fifo} {path}{NL}", static_data)
+        self.content_only = content_only
+        self.format_keys = {f[1] for f in Formatter().parse(format)}
+        self.call_keys = {
+            "content": self.format_content,
+            "mode": self.format_mode,
+            "type": partial(self.format_mode, filetype=True),
+            "owner": partial(self.format_owner),
+            "group": partial(self.format_owner, spec="group"),
+            "user": partial(self.format_owner, spec="user"),
+            "link": partial(self.format_other, "link"),
+            "directory": partial(self.format_other, "directory"),
+            "blkdev": partial(self.format_other, "blkdev"),
+            "chrdev": partial(self.format_other, "chrdev"),
+            "fifo": partial(self.format_other, "fifo"),
+            "mtime": partial(self.format_time, "mtime"),
+            "ctime": partial(self.format_time, "ctime"),
+            "isomtime": partial(self.format_iso_time, "mtime"),
+            "isoctime": partial(self.format_iso_time, "ctime"),
+        }
+        self.used_call_keys = set(self.call_keys) & self.format_keys
+        if self.content_only:
+            self.used_call_keys -= set(self.METADATA)
+
+    def get_item_data(self, item: "ItemDiff", jsonline=False) -> dict:
+        diff_data = {}
+        for key in self.used_call_keys:
+            diff_data[key] = self.call_keys[key](item)
+
+        change = []
+        for key in self.call_keys:
+            if key in ("isomtime", "isoctime"):
+                continue
+            if self.content_only and key in self.METADATA:
+                continue
+            change.append(self.call_keys[key](item))
+        diff_data["change"] = " ".join([v for v in change if v])
+        diff_data["path"] = item.path
+        diff_data.update({} if jsonline else self.static_data)
+        return diff_data
+
+    def format_other(self, key, diff: "ItemDiff"):
+        change = diff.changes().get(key)
+        return f"{change.diff_type}".ljust(27) if change else ""  # 27 is the length of the content change
+
+    def format_mode(self, diff: "ItemDiff", filetype=False):
+        change = diff.type() if filetype else diff.mode()
+        return f"[{change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
+
+    def format_owner(self, diff: "ItemDiff", spec: Literal["owner", "user", "group"] = "owner"):
+        if spec == "user":
+            change = diff.user()
+            return f"[{change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
+        if spec == "group":
+            change = diff.group()
+            return f"[{change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
+        if spec != "owner":
+            raise ValueError(f"Invalid owner spec: {spec}")
+        change = diff.owner()
+        if change:
+            return "[{}:{} -> {}:{}]".format(
+                change.diff_data["item1"][0],
+                change.diff_data["item1"][1],
+                change.diff_data["item2"][0],
+                change.diff_data["item2"][1],
+            )
+        return ""
+
+    def format_content(self, diff: "ItemDiff"):
+        change = diff.content()
+        if change:
+            if change.diff_type == "added":
+                return "{}: {:>20}".format(change.diff_type, format_file_size(change.diff_data["added"]))
+            if change.diff_type == "removed":
+                return "{}: {:>18}".format(change.diff_type, format_file_size(change.diff_data["removed"]))
+            if "added" not in change.diff_data and "removed" not in change.diff_data:
+                return "modified:  (can't get size)"
+            return "{}: {:>8} {:>8}".format(
+                change.diff_type,
+                format_file_size(change.diff_data["added"], precision=1, sign=True),
+                format_file_size(-change.diff_data["removed"], precision=1, sign=True),
+            )
+        return ""
+
+    def format_time(self, key, diff: "ItemDiff"):
+        change = diff.changes().get(key)
+        return f"[{key}: {change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
+
+    def format_iso_time(self, key, diff: "ItemDiff"):
+        change = diff.changes().get(key)
+        return (
+            f"[{key}: {change.diff_data['item1'].isoformat()} -> {change.diff_data['item2'].isoformat()}]"
+            if change
+            else ""
+        )
 
 
 def file_status(mode):

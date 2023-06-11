@@ -2322,16 +2322,9 @@ class Archiver:
         included but not its content. If it does not end with a slash, such as
         `some/path`, both the directory and content will be excluded.
 
-        File patterns support these styles: fnmatch, shell, regular expressions,
-        path prefixes and path full-matches. By default, fnmatch is used for
-        ``--exclude`` patterns and shell-style is used for the ``--pattern``
-        option. For commands that support patterns in their ``PATH`` argument
-        like (``borg list``), the default pattern is path prefix.
-
-        If followed by a colon (':') the first two characters of a pattern are
-        used as a style selector. Explicit style selection is necessary when a
-        non-default style is desired or when the desired pattern starts with
-        two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
+        Borg supports different pattern styles. To define a non-default
+        style for a specific pattern, prefix it with two characters followed
+        by a colon ':' (i.e. ``fm:path/*``, ``sh:path/**``).
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
             This is the default style for ``--exclude`` and ``--exclude-from``.

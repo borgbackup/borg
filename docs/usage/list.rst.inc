@@ -31,7 +31,7 @@ borg list
     |                                                                                                                                                                                                                                                                                       |
     | :ref:`common_options`                                                                                                                                                                                                                                                                 |
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **Exclusion options**                                                                                                                                                                                                                                                                 |
+    | **Include/Exclude options**                                                                                                                                                                                                                                                           |
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-e PATTERN``, ``--exclude PATTERN`` | exclude paths matching PATTERN                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -67,7 +67,7 @@ borg list
     :ref:`common_options`
         |
 
-    Exclusion options
+    Include/Exclude options
         -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
         --pattern PATTERN                 include/exclude paths matching PATTERN
@@ -107,35 +107,36 @@ The following keys are always available:
 - NEWLINE: OS dependent line separator
 - NL: alias of NEWLINE
 - NUL: NUL character for creating print0 / xargs -0 like output
-- SPACE
-- TAB
-- CR
-- LF
+- SPACE: space character
+- TAB: tab character
+- CR: carriage return character
+- LF: line feed character
+
 
 Keys available only when listing files in an archive:
 
-- type
-- mode
-- uid
-- gid
-- user
-- group
+- type: file type (file, dir, symlink, ...)
+- mode: file mode (as in stat)
+- uid: user id of file owner
+- gid: group id of file owner
+- user: user name of file owner
+- group: group name of file owner
 - path: file path
 - target: link target for symlinks
 - hlid: hard link identity (same if hardlinking same fs object)
-- flags
+- flags: file flags
 
-- size
+- size: file size
 - dsize: deduplicated size
 - num_chunks: number of chunks in this file
 - unique_chunks: number of unique chunks in this file
 
-- mtime
-- ctime
-- atime
-- isomtime
-- isoctime
-- isoatime
+- mtime: file modification time
+- ctime: file change time
+- atime: file access time
+- isomtime: file modification time (ISO 8601 format)
+- isoctime: file change time (ISO 8601 format)
+- isoatime: file access time (ISO 8601 format)
 
 - blake2b
 - blake2s
@@ -151,8 +152,8 @@ Keys available only when listing files in an archive:
 - sha512
 - xxh64: XXH64 checksum of this file (note: this is NOT a cryptographic hash!)
 
-- archiveid
-- archivename
+- archiveid: internal ID of the archive
+- archivename: name of the archive
 - extra: prepends {target} with " -> " for soft links and " link to " for hard links
 
 - health: either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)

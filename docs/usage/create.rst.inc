@@ -43,17 +43,17 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--content-from-command``                        | interpret PATH as command and store its stdout. See also section Reading from stdin below.                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--paths-from-stdin``                            | read DELIM-separated list of paths to back up from stdin. Will not recurse into directories.                                                                                                      |
+    |                                                       | ``--paths-from-stdin``                            | read DELIM-separated list of paths to back up from stdin. All control is external: it will back up all files given - no more, no less.                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--paths-from-command``                          | interpret PATH as command and treat its output as ``--paths-from-stdin``                                                                                                                          |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--paths-delimiter DELIM``                       | set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \n)                                                                                                          |
+    |                                                       | ``--paths-delimiter DELIM``                       | set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\n``)                                                                                                      |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                |
     |                                                                                                                                                                                                                                                                                                               |
     | :ref:`common_options`                                                                                                                                                                                                                                                                                         |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **Exclusion options**                                                                                                                                                                                                                                                                                         |
+    | **Include/Exclude options**                                                                                                                                                                                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-e PATTERN``, ``--exclude PATTERN``             | exclude paths matching PATTERN                                                                                                                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -73,7 +73,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Filesystem options**                                                                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``-x``, ``--one-file-system``                     | stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.                                              |
+    |                                                       | ``-x``, ``--one-file-system``                     | stay in the same file system and do not store mount points of other file systems - this might behave different from your expectations, see the description below.                                 |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--numeric-ids``                                 | only store numeric user and group identifiers                                                                                                                                                     |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -138,15 +138,15 @@ borg create
         --stdin-group GROUP    set group GROUP in archive for stdin data (default: do not store group/gid)
         --stdin-mode M    set mode to M in archive for stdin data (default: 0660)
         --content-from-command    interpret PATH as command and store its stdout. See also section Reading from stdin below.
-        --paths-from-stdin    read DELIM-separated list of paths to back up from stdin. Will not recurse into directories.
+        --paths-from-stdin    read DELIM-separated list of paths to back up from stdin. All control is external: it will back up all files given - no more, no less.
         --paths-from-command    interpret PATH as command and treat its output as ``--paths-from-stdin``
-        --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: \n) 
+        --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\n``) 
 
 
     :ref:`common_options`
         |
 
-    Exclusion options
+    Include/Exclude options
         -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
         --pattern PATTERN                 include/exclude paths matching PATTERN
@@ -158,7 +158,7 @@ borg create
 
 
     Filesystem options
-        -x, --one-file-system     stay in the same file system and do not store mount points of other file systems.  This might behave different from your expectations, see the docs.
+        -x, --one-file-system     stay in the same file system and do not store mount points of other file systems - this might behave different from your expectations, see the description below.
         --numeric-ids             only store numeric user and group identifiers
         --atime                   do store atime into archive
         --noctime                 do not store ctime into archive
@@ -276,13 +276,13 @@ through using the ``--keep-exclude-tags`` option.
 The ``-x`` or ``--one-file-system`` option excludes directories, that are mountpoints (and everything in them).
 It detects mountpoints by comparing the device number from the output of ``stat()`` of the directory and its
 parent directory. Specifically, it excludes directories for which ``stat()`` reports a device number different
-from the device number of their parent. Be aware that in Linux (and possibly elsewhere) there are directories
-with device number different from their parent, which the kernel does not consider a mountpoint and also the
-other way around. Examples are bind mounts (possibly same device number, but always a mountpoint) and ALL
-subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint). Therefore when
-using ``--one-file-system``, one should make doubly sure that the backup works as intended especially when using
-btrfs. This is even more important, if the btrfs layout was created by someone else, e.g. a distribution
-installer.
+from the device number of their parent.
+In general: be aware that there are directories with device number different from their parent, which the kernel
+does not consider a mountpoint and also the other way around.
+Linux examples for this are bind mounts (possibly same device number, but always a mountpoint) and ALL
+subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint).
+macOS examples are the apfs mounts of a typical macOS installation.
+Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
 
 
 .. _list_item_flags:

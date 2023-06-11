@@ -112,10 +112,11 @@ The following keys are always available:
 - NEWLINE: OS dependent line separator
 - NL: alias of NEWLINE
 - NUL: NUL character for creating print0 / xargs -0 like output
-- SPACE
-- TAB
-- CR
-- LF
+- SPACE: space character
+- TAB: tab character
+- CR: carriage return character
+- LF: line feed character
+
 
 Keys available only when listing archives in a repository:
 
@@ -131,3 +132,6 @@ Keys available only when listing archives in a repository:
 
 - hostname: hostname of host on which this archive was created
 - username: username of user who created this archive
+
+- size: size of this archive (data plus metadata, not considering compression and deduplication)
+- nfiles: count of files in this archive

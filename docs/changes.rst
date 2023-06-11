@@ -12,8 +12,8 @@ This section provides information about security and corruption issues.
 Change Log 2.x
 ==============
 
-Version 2.0.0b6 (not released yet)
-----------------------------------
+Version 2.0.0b6 (2023-06-11)
+----------------------------
 
 Please note:
 
@@ -118,6 +118,7 @@ New features:
 - diff: include changes in ctime and mtime, #7248
 - diff: sort JSON output alphabetically
 - diff --content-only: option added to ignore metadata changes
+- diff: add --format option, #4634
 - import-tar --ignore-zeros: new option to support importing concatenated tars, #7432
 - debug id-hash / parse-obj / format-obj: new debug commands, #7406
 - transfer --compression=C --recompress=M: recompress while transferring, #7529
@@ -173,6 +174,7 @@ Other changes:
 - borg.logger: add logging debugging functionality
 - add function to clear empty directories at end of compact process
 - unify scanning and listing of segment dirs / segment files, #7597
+- replace `LRUCache` internals with `OrderedDict`
 - docs:
 
   - add installation instructions for Windows
@@ -202,6 +204,7 @@ Other changes:
   - tox: package = editable-legacy, #7580
   - tox under fakeroot: fix finding setup_docs, #7391
   - check buzhash chunksize distribution, #7586
+  - use debian/bookworm64 box
 
 
 Version 2.0.0b5 (2023-02-27)

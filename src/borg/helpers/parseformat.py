@@ -1066,7 +1066,7 @@ class DiffFormatter(BaseFormatter):
     def format_iso_time(self, key, diff: "ItemDiff"):
         change = diff.changes().get(key)
         return (
-            f"[iso{key}: {change.diff_data['item1'].isoformat()} -> {change.diff_data['item2'].isoformat()}]"
+            f"[{key}: {change.diff_data['item1'].isoformat()} -> {change.diff_data['item2'].isoformat()}]"
             if change
             else ""
         )

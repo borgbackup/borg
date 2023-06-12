@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-LIST" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-LIST" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive contents
 .SH SYNOPSIS
@@ -62,7 +62,7 @@ specify format for file listing (default: \(dq{mode} {user:6} {group:6} {size:8}
 .B  \-\-json\-lines
 Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
 .UNINDENT
-.SS Exclusion options
+.SS Include/Exclude options
 .INDENT 0.0
 .TP
 .BI \-e \ PATTERN\fR,\fB \ \-\-exclude \ PATTERN
@@ -152,29 +152,29 @@ NL: alias of NEWLINE
 .IP \(bu 2
 NUL: NUL character for creating print0 / xargs \-0 like output
 .IP \(bu 2
-SPACE
+SPACE: space character
 .IP \(bu 2
-TAB
+TAB: tab character
 .IP \(bu 2
-CR
+CR: carriage return character
 .IP \(bu 2
-LF
+LF: line feed character
 .UNINDENT
 .sp
 Keys available only when listing files in an archive:
 .INDENT 0.0
 .IP \(bu 2
-type
+type: file type (file, dir, symlink, ...)
 .IP \(bu 2
-mode
+mode: file mode (as in stat)
 .IP \(bu 2
-uid
+uid: user id of file owner
 .IP \(bu 2
-gid
+gid: group id of file owner
 .IP \(bu 2
-user
+user: user name of file owner
 .IP \(bu 2
-group
+group: group name of file owner
 .IP \(bu 2
 path: file path
 .IP \(bu 2
@@ -182,9 +182,9 @@ target: link target for symlinks
 .IP \(bu 2
 hlid: hard link identity (same if hardlinking same fs object)
 .IP \(bu 2
-flags
+flags: file flags
 .IP \(bu 2
-size
+size: file size
 .IP \(bu 2
 dsize: deduplicated size
 .IP \(bu 2
@@ -192,17 +192,17 @@ num_chunks: number of chunks in this file
 .IP \(bu 2
 unique_chunks: number of unique chunks in this file
 .IP \(bu 2
-mtime
+mtime: file modification time
 .IP \(bu 2
-ctime
+ctime: file change time
 .IP \(bu 2
-atime
+atime: file access time
 .IP \(bu 2
-isomtime
+isomtime: file modification time (ISO 8601 format)
 .IP \(bu 2
-isoctime
+isoctime: file change time (ISO 8601 format)
 .IP \(bu 2
-isoatime
+isoatime: file access time (ISO 8601 format)
 .IP \(bu 2
 blake2b
 .IP \(bu 2
@@ -230,9 +230,9 @@ sha512
 .IP \(bu 2
 xxh64: XXH64 checksum of this file (note: this is NOT a cryptographic hash!)
 .IP \(bu 2
-archiveid
+archiveid: internal ID of the archive
 .IP \(bu 2
-archivename
+archivename: name of the archive
 .IP \(bu 2
 extra: prepends {target} with \(dq \-> \(dq for soft links and \(dq link to \(dq for hard links
 .IP \(bu 2

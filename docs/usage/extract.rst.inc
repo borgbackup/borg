@@ -37,11 +37,13 @@ borg extract
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--sparse``                          | create holes in output sparse file from all-zero chunks                                                   |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--continue``                        | continue a previously interrupted extraction of same archive                                              |
+    +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                            |
     |                                                                                                                                                                                                           |
     | :ref:`common_options`                                                                                                                                                                                     |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    | **Exclusion options**                                                                                                                                                                                     |
+    | **Include/Exclude options**                                                                                                                                                                               |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``-e PATTERN``, ``--exclude PATTERN`` | exclude paths matching PATTERN                                                                            |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
@@ -79,12 +81,13 @@ borg extract
         --noxattrs        do not extract/set xattrs
         --stdout          write all extracted data to stdout
         --sparse          create holes in output sparse file from all-zero chunks
+        --continue        continue a previously interrupted extraction of same archive
 
 
     :ref:`common_options`
         |
 
-    Exclusion options
+    Include/Exclude options
         -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
         --pattern PATTERN                 include/exclude paths matching PATTERN

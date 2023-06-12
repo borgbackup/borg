@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-PRUNE" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -89,6 +89,10 @@ When using \fB\-\-stats\fP, you will get some statistics about how much data was
 deleted \- the \(dqDeleted data\(dq deduplicated size there is most interesting as
 that is how much your repository will shrink.
 Please note that the \(dqAll archives\(dq stats refer to the state after pruning.
+.sp
+You can influence how the \fB\-\-list\fP output is formatted by using the \fB\-\-short\fP
+option (less wide output) or by giving a custom format using \fB\-\-format\fP (see
+the \fBborg rlist\fP description for more details about the format string).
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -106,6 +110,18 @@ print statistics for the deleted archive
 .TP
 .B  \-\-list
 output verbose list of archives it keeps/prunes
+.TP
+.B  \-\-short
+use a less wide archive part format
+.TP
+.B  \-\-list\-pruned
+output verbose list of archives it prunes
+.TP
+.B  \-\-list\-kept
+output verbose list of archives it keeps
+.TP
+.BI \-\-format \ FORMAT
+specify format for the archive part (default: \(dq{archive:<36} {time} [{id}]\(dq)
 .TP
 .BI \-\-keep\-within \ INTERVAL
 keep all archives within this time interval
@@ -158,7 +174,7 @@ Be careful, prune is a potentially dangerous command, it will remove backup
 archives.
 .sp
 The default of prune is to apply to \fBall archives in the repository\fP unless
-you restrict its operation to a subset of the archives using \fB\-a\fP / \fB\-\-glob\-archives\fP\&.
+you restrict its operation to a subset of the archives using \fB\-a\fP / \fB\-\-match\-archives\fP\&.
 When using \fB\-a\fP, be careful to choose a good pattern \- e.g. do not use a
 prefix \(dqfoo\(dq if you do not also want to match \(dqfoobar\(dq.
 .sp
@@ -175,7 +191,7 @@ $ borg prune \-v \-\-list \-\-dry\-run \-\-keep\-daily=7 \-\-keep\-weekly=4
 
 # Same as above but only apply to archive names starting with the hostname
 # of the machine followed by a \(dq\-\(dq character:
-$ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-a \(aq{hostname}\-*\(aq
+$ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-a \(aqsh:{hostname}\-*\(aq
 # actually free disk space:
 $ borg compact
 

@@ -1,5 +1,6 @@
 .. include:: ../global.rst.inc
 .. highlight:: none
+.. _central-backup-server:
 
 Central repository server with Ansible or Salt
 ==============================================

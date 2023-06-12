@@ -470,13 +470,13 @@ Make sure to use port ``8022`` and ``localhost`` for the repository as this inst
 remote forwarded ssh connection.
 
 SSH Keys
-~~~~~~~~
+--------
 
 If you want to automate backups when using this method, the ssh ``known_hosts`` and ``authorized_keys`` need to be set up
 to allow connections.
 
 Security Considerations
-~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
 Opening up SSH access this way can pose a security risk as it effectively opens remote access to your
 backup server on the client even if it is located outside of your company network.
@@ -496,7 +496,7 @@ All the additional security considerations for borg should be applied, see :ref:
 hints.
 
 More information
-~~~~~~~~~~~~~~~~
+----------------
 
 See `remote forwarding`_ and the `ssh man page`_ for more information about remote forwarding.
 

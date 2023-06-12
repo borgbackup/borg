@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -168,8 +168,8 @@ $ borg \-r /path/to/repo delete \-a Monday
 .UNINDENT
 .UNINDENT
 .sp
-Please note the \fB\-a\fP option here (short for \fB\-\-glob\-archives\fP) which enables you
-to give a globbing pattern to delete multiple archives, like \fB\-a \(aqoldcrap\-*\(aq\fP\&.
+Please note the \fB\-a\fP option here (short for \fB\-\-match\-archives\fP) which enables you
+to give a pattern to delete multiple archives, like \fB\-a \(aqsh:oldcrap\-*\(aq\fP\&.
 You can also combine this with \fB\-\-first\fP, \fB\-\-last\fP and \fB\-\-sort\-by\fP\&.
 Be careful, always first use with \fB\-\-dry\-run\fP and \fB\-\-list\fP!
 .IP 8. 3
@@ -496,6 +496,19 @@ in WSL1 (Windows Subsystem for Linux 1).
 .UNINDENT
 .UNINDENT
 .TP
+.B Output formatting:
+.INDENT 7.0
+.TP
+.B BORG_LIST_FORMAT
+Giving the default value for \fBborg list \-\-format=X\fP\&.
+.TP
+.B BORG_RLIST_FORMAT
+Giving the default value for \fBborg rlist \-\-format=X\fP\&.
+.TP
+.B BORG_PRUNE_FORMAT
+Giving the default value for \fBborg prune \-\-format=X\fP\&.
+.UNINDENT
+.TP
 .B Some automatic \(dqanswerers\(dq (if set, they automatically answer confirmation questions):
 .INDENT 7.0
 .TP
@@ -540,17 +553,44 @@ Defaults to \fB$BORG_BASE_DIR/.config/borg\fP\&. If \fBBORG_BASE_DIR\fP is not e
 This directory contains all borg configuration directories, see the FAQ
 for a security advisory about the data in this directory: \fIhome_config_borg\fP
 .TP
+.B BORG_DATA_DIR
+Defaults to \fB$BORG_BASE_DIR/.local/share/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
+\fI\%XDG env var\fP \fBXDG_DATA_HOME\fP is set, then \fB$XDG_DATA_HOME/borg\fP is being used instead.
+This directory contains all borg data directories, see the FAQ
+for a security advisory about the data in this directory: \fIhome_data_borg\fP
+.TP
+.B BORG_RUNTIME_DIR
+Defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
+\fI\%XDG env var\fP \fBXDG_RUNTIME_DIR\fP is set, then \fB$XDG_RUNTIME_DIR/borg\fP is being used instead.
+This directory contains borg runtime files, like e.g. the socket file.
+.TP
 .B BORG_SECURITY_DIR
-Defaults to \fB$BORG_CONFIG_DIR/security\fP\&.
-This directory contains information borg uses to track its usage of NONCES (\(dqnumbers used
-once\(dq \- usually in encryption context) and other security relevant data.
+Defaults to \fB$BORG_DATA_DIR/security\fP\&.
+This directory contains security relevant data.
 .TP
 .B BORG_KEYS_DIR
 Defaults to \fB$BORG_CONFIG_DIR/keys\fP\&.
 This directory contains keys for encrypted repositories.
 .TP
 .B BORG_KEY_FILE
-When set, use the given filename as repository key file.
+When set, use the given path as repository key file. Please note that this is only
+for rather special applications that externally fully manage the key files:
+.INDENT 7.0
+.IP \(bu 2
+this setting only applies to the keyfile modes (not to the repokey modes).
+.IP \(bu 2
+using a full, absolute path to the key file is recommended.
+.IP \(bu 2
+all directories in the given path must exist.
+.IP \(bu 2
+this setting forces borg to use the key file at the given location.
+.IP \(bu 2
+the key file must either exist (for most commands) or will be created (\fBborg rcreate\fP).
+.IP \(bu 2
+you need to give a different path for different repositories.
+.IP \(bu 2
+you need to point to the correct key file matching the repository the command will operate on.
+.UNINDENT
 .TP
 .B TMPDIR
 This is where temporary files are stored (might need a lot of temporary space for some

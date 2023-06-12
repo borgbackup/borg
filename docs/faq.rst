@@ -25,7 +25,7 @@ running on the remote side, so *every* operation needs to go over the network,
 which is slower.
 
 Can I back up from multiple servers into a single repository?
-------------------------------------------------------------
+-------------------------------------------------------------
 
 In order for the deduplication used by Borg to work, it
 needs to keep a local cache containing checksums of all file
@@ -162,7 +162,7 @@ file is being processed.
 
 
 How can I back up huge file(s) over a unstable connection?
----------------------------------------------------------
+----------------------------------------------------------
 
 Yes. For more details, see :ref:`checkpoints_parts`.
 
@@ -744,7 +744,7 @@ This has some pros and cons, though:
 The long term plan to improve this is called "borgception", see :issue:`474`.
 
 Can I back up my root partition (/) with Borg?
----------------------------------------------
+----------------------------------------------
 
 Backing up your entire root partition works just fine, but remember to
 exclude directories that make no sense to back up, such as /dev, /proc,

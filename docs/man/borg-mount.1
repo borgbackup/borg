@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-MOUNT" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-MOUNT" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-mount \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
@@ -72,16 +72,16 @@ manually. Unlike the \fBuid\fP and \fBgid\fP mount options which affect all file
 Additional mount options supported by borg:
 .INDENT 0.0
 .IP \(bu 2
-versions: when used with a repository mount, this gives a merged, versioned
+\fBversions\fP: when used with a repository mount, this gives a merged, versioned
 view of the files in the archives. EXPERIMENTAL, layout may change in future.
 .IP \(bu 2
-allow_damaged_files: by default damaged files (where missing chunks were
-replaced with runs of zeros by borg check \fB\-\-repair\fP) are not readable and
+\fBallow_damaged_files\fP: by default damaged files (where missing chunks were
+replaced with runs of zeros by \fBborg check \-\-repair\fP) are not readable and
 return EIO (I/O error). Set this option to read such files.
 .IP \(bu 2
-ignore_permissions: for security reasons the \(dqdefault_permissions\(dq mount
-option is internally enforced by borg. \(dqignore_permissions\(dq can be given to
-not enforce \(dqdefault_permissions\(dq.
+\fBignore_permissions\fP: for security reasons the \fBdefault_permissions\fP mount
+option is internally enforced by borg. \fBignore_permissions\fP can be given to
+not enforce \fBdefault_permissions\fP\&.
 .UNINDENT
 .sp
 The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
@@ -149,7 +149,7 @@ consider archives older than (now \- TIMESPAN), e.g. 7d oder 12m.
 .BI \-\-newer \ TIMESPAN
 consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
 .UNINDENT
-.SS Exclusion options
+.SS Include/Exclude options
 .INDENT 0.0
 .TP
 .BI \-e \ PATTERN\fR,\fB \ \-\-exclude \ PATTERN

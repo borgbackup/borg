@@ -1,8 +1,6 @@
 import logging
 import os
-import shutil
 import sys
-from contextlib import contextmanager
 from unittest.mock import patch
 
 import pytest
@@ -20,24 +18,16 @@ from .hashindex import H
 
 @pytest.fixture()
 def repository(tmpdir):
-    # setup
     repository_location = os.path.join(str(tmpdir), "repository")
     repository = Repository(repository_location, exclusive=True, create=True)
-    yield repository.__enter__()
-
-    # teardown
-    repository.__exit__(None, None, None)
-    # shutil.rmtree(str(tmpdir))
+    yield repository
 
 
-@contextmanager
 def reopen(repository, exclusive=True):
-    try:
-        repository.__exit__(None, None, None)
-        repo = Repository(repository.path, exclusive=exclusive, create=False)
-        yield repo.__enter__()
-    finally:
-        repository.__exit__(None, None, None)
+    repository.__exit__(None, None, None)
+    repository = Repository(repository.path, exclusive=exclusive, create=False)
+    repository.__enter__()
+    return repository
 
 
 def fchunk(data, meta=b""):
@@ -84,10 +74,8 @@ def repo_dump(repository, label=None):
     print()
 
 
-""" REPOSITORY TESTS """
-
-
 def test_basic_operations(repository):
+    repository.__enter__()
     for x in range(100):
         repository.put(H(x), fchunk(b"SOMEDATA"))
     key50 = H(50)
@@ -96,17 +84,18 @@ def test_basic_operations(repository):
     with pytest.raises(Repository.ObjectNotFound):
         repository.get(key50)
     repository.commit(compact=False)
-    with reopen(repository) as repository:
-        with pytest.raises(Repository.ObjectNotFound):
-            repository.get(key50)
-        for x in range(100):
-            if x == 50:
-                continue
-            assert pdchunk(repository.get(H(x))) == b"SOMEDATA"
+    repository = reopen(repository)
+    with pytest.raises(Repository.ObjectNotFound):
+        repository.get(key50)
+    for x in range(100):
+        if x == 50:
+            continue
+        assert pdchunk(repository.get(H(x))) == b"SOMEDATA"
+    repository.__exit__(None, None, None)
 
 
 def test_multiple_transactions(repository):
-    """Test multiple sequential transactions"""
+    repository.__enter__()
     repository.put(H(0), fchunk(b"foo"))
     repository.put(H(1), fchunk(b"foo"))
     repository.commit(compact=False)
@@ -114,9 +103,11 @@ def test_multiple_transactions(repository):
     repository.put(H(1), fchunk(b"bar"))
     repository.commit(compact=False)
     assert pdchunk(repository.get(H(1))) == b"bar"
+    repository.__exit__(None, None, None)
 
 
 def test_read_data(repository):
+    repository.__enter__()
     meta, data = b"meta", b"data"
     meta_len = RepoObj.meta_len_hdr.pack(len(meta))
     chunk_complete = meta_len + meta + data
@@ -126,9 +117,11 @@ def test_read_data(repository):
     assert repository.get(H(0)) == chunk_complete
     assert repository.get(H(0), read_data=True) == chunk_complete
     assert repository.get(H(0), read_data=False) == chunk_short
+    repository.__exit__(None, None, None)
 
 
 def test_consistency(repository):
+    repository.__enter__()
     repository.put(H(0), fchunk(b"foo"))
     assert pdchunk(repository.get(H(0))) == b"foo"
     repository.put(H(0), fchunk(b"foo2"))
@@ -138,9 +131,11 @@ def test_consistency(repository):
     repository.delete(H(0))
     with pytest.raises(Repository.ObjectNotFound):
         repository.get(H(0))
+    repository.__exit__(None, None, None)
 
 
 def test_consistency2(repository):
+    repository.__enter__()
     repository.put(H(0), fchunk(b"foo"))
     assert pdchunk(repository.get(H(0))) == b"foo"
     repository.commit(compact=False)
@@ -148,30 +143,36 @@ def test_consistency2(repository):
     assert pdchunk(repository.get(H(0))) == b"foo2"
     repository.rollback()
     assert pdchunk(repository.get(H(0))) == b"foo"
+    repository.__exit__(None, None, None)
 
 
 def test_overwrite_in_same_transaction(repository):
+    repository.__enter__()
     repository.put(H(0), fchunk(b"foo"))
     repository.put(H(0), fchunk(b"foo2"))
     repository.commit(compact=False)
     assert pdchunk(repository.get(H(0))) == b"foo2"
+    repository.__exit__(None, None, None)
 
 
 def test_single_kind_transactions(repository):
+    repository.__enter__()
     # put
     repository.put(H(0), fchunk(b"foo"))
     repository.commit(compact=False)
     # replace
-    with reopen(repository) as repository:
-        repository.put(H(0), fchunk(b"bar"))
-        repository.commit(compact=False)
+    repository = reopen(repository)
+    repository.put(H(0), fchunk(b"bar"))
+    repository.commit(compact=False)
     # delete
-    with reopen(repository) as repository:
-        repository.delete(H(0))
-        repository.commit(compact=False)
+    repository = reopen(repository)
+    repository.delete(H(0))
+    repository.commit(compact=False)
+    repository.__exit__(None, None, None)
 
 
 def test_list(repository):
+    repository.__enter__()
     for x in range(100):
         repository.put(H(x), fchunk(b"SOMEDATA"))
     repository.commit(compact=False)
@@ -184,9 +185,11 @@ def test_list(repository):
     assert len(second_half) == 50
     assert second_half == repo_list[50:]
     assert len(repository.list(limit=50)) == 50
+    repository.__exit__(None, None, None)
 
 
 def test_scan(repository):
+    repository.__enter__()
     for x in range(100):
         repository.put(H(x), fchunk(b"SOMEDATA"))
     repository.commit(compact=False)
@@ -201,9 +204,11 @@ def test_scan(repository):
     # check result order == on-disk order (which is hash order)
     for x in range(100):
         assert ids[x] == H(x)
+    repository.__exit__(None, None, None)
 
 
 def test_scan_modify(repository):
+    repository.__enter__()
     for x in range(100):
         repository.put(H(x), fchunk(b"ORIGINAL"))
     repository.commit(compact=False)
@@ -232,17 +237,21 @@ def test_scan_modify(repository):
         assert pdchunk(chunk) == b"MODIFIED"
         count += 1
     assert count == 100
+    repository.__exit__(None, None, None)
 
 
 def test_max_data_size(repository):
+    repository.__enter__()
     max_data = b"x" * (MAX_DATA_SIZE - RepoObj.meta_len_hdr.size)
     repository.put(H(0), fchunk(max_data))
     assert pdchunk(repository.get(H(0))) == max_data
     with pytest.raises(IntegrityError):
         repository.put(H(1), fchunk(max_data + b"x"))
+    repository.__exit__(None, None, None)
 
 
 def test_set_flags(repository):
+    repository.__enter__()
     id = H(0)
     repository.put(id, fchunk(b""))
     assert repository.flags(id) == 0x00000000  # init == all zero
@@ -254,9 +263,11 @@ def test_set_flags(repository):
     assert repository.flags(id) == 0x00000002
     repository.flags(id, mask=0x00000002, value=0x00000000)
     assert repository.flags(id) == 0x00000000
+    repository.__exit__(None, None, None)
 
 
 def test_get_flags(repository):
+    repository.__enter__()
     id = H(0)
     repository.put(id, fchunk(b""))
     assert repository.flags(id) == 0x00000000  # init == all zero
@@ -265,9 +276,11 @@ def test_get_flags(repository):
     assert repository.flags(id, mask=0x00000002) == 0x00000000
     assert repository.flags(id, mask=0x40000008) == 0x00000000
     assert repository.flags(id, mask=0x80000000) == 0x80000000
+    repository.__exit__(None, None, None)
 
 
 def test_flags_many(repository):
+    repository.__enter__()
     ids_flagged = [H(0), H(1)]
     ids_default_flags = [H(2), H(3)]
     [repository.put(id, fchunk(b"")) for id in ids_flagged + ids_default_flags]
@@ -276,27 +289,27 @@ def test_flags_many(repository):
     assert list(repository.flags_many(ids_flagged)) == [0xDEADBEEF, 0xDEADBEEF]
     assert list(repository.flags_many(ids_flagged, mask=0xFFFF0000)) == [0xDEAD0000, 0xDEAD0000]
     assert list(repository.flags_many(ids_flagged, mask=0x0000FFFF)) == [0x0000BEEF, 0x0000BEEF]
+    repository.__exit__(None, None, None)
 
 
 def test_flags_persistence(repository):
+    repository.__enter__()
     repository.put(H(0), fchunk(b"default"))
     repository.put(H(1), fchunk(b"one one zero"))
     # we do not set flags for H(0), so we can later check their default state.
     repository.flags(H(1), mask=0x00000007, value=0x00000006)
     repository.commit(compact=False)
-    with reopen(repository) as repository:
-        # we query all flags to check if the initial flags were all zero and
-        # only the ones we explicitly set to one are as expected.
-        assert repository.flags(H(0), mask=0xFFFFFFFF) == 0x00000000
-        assert repository.flags(H(1), mask=0xFFFFFFFF) == 0x00000006
-        # test case that doesn't work with remote repositories
+    repository = reopen(repository)
+    # we query all flags to check if the initial flags were all zero and
+    # only the ones we explicitly set to one are as expected.
+    assert repository.flags(H(0), mask=0xFFFFFFFF) == 0x00000000
+    assert repository.flags(H(1), mask=0xFFFFFFFF) == 0x00000006
+    # test case that doesn't work with remote repositories
+    repository.__exit__(None, None, None)
 
 
-""" LOCAL REPOSITORY TESTS """
-
-
-# test case that doesn't work with remote repositories
 def _assert_sparse(repository):
+    repository.__enter__()
     # The superseded 123456... PUT
     assert repository.compact[0] == 41 + 8 + len(fchunk(b"123456789"))
     # a COMMIT
@@ -305,25 +318,31 @@ def _assert_sparse(repository):
     assert repository.compact[2] == 41
     repository._rebuild_sparse(0)
     assert repository.compact[0] == 41 + 8 + len(fchunk(b"123456789"))  # 9 is chunk or commit?
+    repository.__exit__(None, None, None)
 
 
 def test_sparse1(repository):
+    repository.__enter__()
     repository.put(H(0), fchunk(b"foo"))
     repository.put(H(1), fchunk(b"123456789"))
     repository.commit(compact=False)
     repository.put(H(1), fchunk(b"bar"))
     _assert_sparse(repository)
+    repository.__exit__(None, None, None)
 
 
 def test_sparse2(repository):
+    repository.__enter__()
     repository.put(H(0), fchunk(b"foo"))
     repository.put(H(1), fchunk(b"123456789"))
     repository.commit(compact=False)
     repository.delete(H(1))
     _assert_sparse(repository)
+    repository.__exit__(None, None, None)
 
 
 def test_sparse_delete(repository):
+    repository.__enter__()
     chunk0 = fchunk(b"1245")
     repository.put(H(0), chunk0)
     repository.delete(H(0))
@@ -335,9 +354,11 @@ def test_sparse_delete(repository):
     assert repository.compact[0] == 41 + 8 + 41 + len(chunk0) + len(MAGIC)
     repository.commit(compact=True)
     assert 0 not in [segment for segment, _ in repository.io.segment_iterator()]
+    repository.__exit__(None, None, None)
 
 
 def test_uncommitted_garbage(repository):
+    repository.__enter__()
     # uncommitted garbage should be no problem, it is cleaned up automatically.
     # we just have to be careful with invalidation of cached FDs in LoggedIO.
     repository.put(H(0), fchunk(b"foo"))
@@ -346,86 +367,97 @@ def test_uncommitted_garbage(repository):
     last_segment = repository.io.get_latest_segment()
     with open(repository.io.segment_filename(last_segment + 1), "wb") as f:
         f.write(MAGIC + b"crapcrapcrap")
-    with reopen(repository) as repository:
-        # usually, opening the repo and starting a transaction should trigger a cleanup.
-        repository.put(H(0), fchunk(b"bar"))  # this may trigger compact_segments()
-        repository.commit(compact=True)
-        # the point here is that nothing blows up with an exception.
-
-
-""" COMMIT TESTS """
+    repository = reopen(repository)
+    # usually, opening the repo and starting a transaction should trigger a cleanup.
+    repository.put(H(0), fchunk(b"bar"))  # this may trigger compact_segments()
+    repository.commit(compact=True)
+    # the point here is that nothing blows up with an exception.
+    repository.__exit__(None, None, None)
 
 
 def test_replay_of_missing_index(repository):
+    repository.__enter__()
     add_keys(repository)
     for name in os.listdir(repository.path):
         if name.startswith("index."):
             os.unlink(os.path.join(repository.path, name))
-    with reopen(repository) as repository:
-        assert len(repository) == 3
-        assert repository.check() is True
+    repository = reopen(repository)
+    assert len(repository) == 3
+    assert repository.check() is True
+    repository.__exit__(None, None, None)
 
 
 def test_crash_before_compact_segments(repository):
+    repository.__enter__()
     add_keys(repository)
     repository.compact_segments = None
     try:
         repository.commit(compact=True)
     except TypeError:
         pass
-    with reopen(repository) as repository:
-        assert len(repository) == 3
-        assert repository.check() is True
+    repository = reopen(repository)
+    assert len(repository) == 3
+    assert repository.check() is True
+    repository.__exit__(None, None, None)
 
 
 def test_crash_before_write_index(repository):
+    repository.__enter__()
     add_keys(repository)
     repository.write_index = None
     try:
         repository.commit(compact=False)
     except TypeError:
         pass
-    with reopen(repository) as repository:
-        assert len(repository) == 3
-        assert repository.check() is True
+    repository = reopen(repository)
+    assert len(repository) == 3
+    assert repository.check() is True
+    repository.__exit__(None, None, None)
 
 
 def test_replay_lock_upgrade(repository):
+    repository.__enter__()
     add_keys(repository)
     for name in os.listdir(repository.path):
         if name.startswith("index."):
             os.unlink(os.path.join(repository.path, name))
     with patch.object(Lock, "upgrade", side_effect=LockFailed) as upgrade:
-        with reopen(repository, exclusive=False) as repository:
-            # current client usually does not do lock upgrade, except for replay
-            # the repo is only locked by a shared read lock, but to replay segments,
-            # we need an exclusive write lock - check if the lock gets upgraded.
-            with pytest.raises(LockFailed):
-                len(repository)
-            upgrade.assert_called_once_with()
+        repository = reopen(repository, exclusive=False)
+        # current client usually does not do lock upgrade, except for replay
+        # the repo is only locked by a shared read lock, but to replay segments,
+        # we need an exclusive write lock - check if the lock gets upgraded.
+        with pytest.raises(LockFailed):
+            len(repository)
+        upgrade.assert_called_once_with()
+    repository.__exit__(None, None, None)
 
 
 def test_crash_before_deleting_compacted_segments(repository):
+    repository.__enter__()
     add_keys(repository)
     repository.io.delete_segment = None
     try:
         repository.commit(compact=False)
     except TypeError:
         pass
-    with reopen(repository) as repository:
-        assert len(repository) == 3
-        assert repository.check() is True
-        assert len(repository) == 3
+    repository = reopen(repository)
+    assert len(repository) == 3
+    assert repository.check() is True
+    assert len(repository) == 3
+    repository.__exit__(None, None, None)
 
 
 def test_ignores_commit_tag_in_data(repository):
+    repository.__enter__()
     repository.put(H(0), LoggedIO.COMMIT)
-    with reopen(repository) as repository:
-        io = repository.io
-        assert not io.is_committed_segment(io.get_latest_segment())
+    repository = reopen(repository)
+    io = repository.io
+    assert not io.is_committed_segment(io.get_latest_segment())
+    repository.__exit__(None, None, None)
 
 
 def test_moved_deletes_are_tracked(repository):
+    repository.__enter__()
     repository.put(H(1), fchunk(b"1"))
     repository.put(H(2), fchunk(b"2"))
     repository.commit(compact=False)
@@ -453,9 +485,11 @@ def test_moved_deletes_are_tracked(repository):
     # after compaction, there should be no empty shadowed_segments lists left over.
     # we have no put or del anymore for H(1), so we lost knowledge about H(1).
     assert H(1) not in repository.shadow_index
+    repository.__exit__(None, None, None)
 
 
 def test_shadowed_entries_are_preserved(repository):
+    repository.__enter__()
     get_latest_segment = repository.io.get_latest_segment
     repository.put(H(1), fchunk(b"1"))
     # This is the segment with our original PUT of interest
@@ -488,9 +522,11 @@ def test_shadowed_entries_are_preserved(repository):
     os.unlink(os.path.join(repository.path, "index.%d" % get_latest_segment()))
     # Must not reappear
     assert H(1) not in repository
+    repository.__exit__(None, None, None)
 
 
 def test_shadow_index_rollback(repository):
+    repository.__enter__()
     repository.put(H(1), fchunk(b"1"))
     repository.delete(H(1))
     assert repository.shadow_index[H(1)] == [0]
@@ -508,23 +544,24 @@ def test_shadow_index_rollback(repository):
     repository.put(H(2), fchunk(b"1"))
     # After the rollback segment 4 shouldn't be considered anymore
     assert repository.shadow_index[H(1)] == []  # because the delete is considered unstable
-
-
-""" APPEND-ONLY TESTS """
+    repository.__exit__(None, None, None)
 
 
 def test_destroy_append_only(repository):
+    repository.__enter__()
     # Can't destroy append only repo (via the API)
     repository.append_only = True
     with pytest.raises(ValueError):
         repository.destroy()
     assert repository.append_only
+    repository.__exit__(None, None, None)
 
 
 def test_append_only(repository):
     def segments_in_repository(repo):
         return len(list(repo.io.segment_iterator()))
 
+    repository.__enter__()
     repository.append_only = True
     repository.put(H(0), fchunk(b"foo"))
     repository.commit(compact=False)
@@ -542,33 +579,33 @@ def test_append_only(repository):
     repository.commit(compact=False)
     # append only: does not compact, only new segments written
     assert segments_in_repository(repository) == 4
-
-
-""" Free Space Tests """
+    repository.__exit__(None, None, None)
 
 
 def test_additional_free_space(repository):
+    repository.__enter__()
     add_keys(repository)
     repository.config.set("repository", "additional_free_space", "1000T")
     repository.save_key(b"shortcut to save_config")
-    with reopen(repository) as repository:
-        repository.put(H(0), fchunk(b"foobar"))
-        with pytest.raises(Repository.InsufficientFreeSpaceError):
-            repository.commit(compact=False)
-        assert os.path.exists(repository.path)
+    repository = reopen(repository)
+    repository.put(H(0), fchunk(b"foobar"))
+    with pytest.raises(Repository.InsufficientFreeSpaceError):
+        repository.commit(compact=False)
+    assert os.path.exists(repository.path)
+    repository.__exit__(None, None, None)
 
 
 def test_create_free_space(repository):
+    repository.__enter__()
     repository.additional_free_space = 1e20
     with pytest.raises(Repository.InsufficientFreeSpaceError):
         add_keys(repository)
     assert not os.path.exists(repository.path)
-
-
-""" QUOTA TESTS """
+    repository.__exit__(None, None, None)
 
 
 def test_tracking(repository):
+    repository.__enter__()
     assert repository.storage_quota_use == 0
     ch1 = fchunk(bytes(1234))
     repository.put(H(1), ch1)
@@ -580,19 +617,19 @@ def test_tracking(repository):
     assert repository.storage_quota_use == len(ch1) + len(ch2) + 2 * (41 + 8)  # we have not compacted yet
     repository.commit(compact=False)
     assert repository.storage_quota_use == len(ch1) + len(ch2) + 2 * (41 + 8)  # we have not compacted yet
-    with reopen(repository) as repository:
-        # Open new transaction; hints and thus quota data is not loaded unless needed.
-        ch3 = fchunk(b"")
-        repository.put(H(3), ch3)
-        repository.delete(H(3))
-        assert repository.storage_quota_use == len(ch1) + len(ch2) + len(ch3) + 3 * (
-            41 + 8
-        )  # we have not compacted yet
-        repository.commit(compact=True)
-        assert repository.storage_quota_use == len(ch2) + 41 + 8
+    repository = reopen(repository)
+    # Open new transaction; hints and thus quota data is not loaded unless needed.
+    ch3 = fchunk(b"")
+    repository.put(H(3), ch3)
+    repository.delete(H(3))
+    assert repository.storage_quota_use == len(ch1) + len(ch2) + len(ch3) + 3 * (41 + 8)  # we have not compacted yet
+    repository.commit(compact=True)
+    assert repository.storage_quota_use == len(ch2) + 41 + 8
+    repository.__exit__(None, None, None)
 
 
 def test_exceed_quota(repository):
+    repository.__enter__()
     assert repository.storage_quota_use == 0
     repository.storage_quota = 80
     ch1 = fchunk(b"x" * 7)
@@ -606,26 +643,23 @@ def test_exceed_quota(repository):
     with pytest.raises(Repository.StorageQuotaExceeded):
         repository.commit(compact=False)
     assert repository.storage_quota_use == len(ch1) + len(ch2) + (41 + 8) * 2  # check ch2!?
-    with reopen(repository) as repository:
-        repository.storage_quota = 150
-        # Open new transaction; hints and thus quota data is not loaded unless needed.
-        repository.put(H(1), ch1)
-        assert (
-            repository.storage_quota_use == len(ch1) * 2 + (41 + 8) * 2
-        )  # we have 2 puts for H(1) here and not yet compacted.
-        repository.commit(compact=True)
-        assert repository.storage_quota_use == len(ch1) + 41 + 8  # now we have compacted.
+    repository = reopen(repository)
+    repository.storage_quota = 150
+    # Open new transaction; hints and thus quota data is not loaded unless needed.
+    repository.put(H(1), ch1)
+    assert (
+        repository.storage_quota_use == len(ch1) * 2 + (41 + 8) * 2
+    )  # we have 2 puts for H(1) here and not yet compacted.
+    repository.commit(compact=True)
+    assert repository.storage_quota_use == len(ch1) + 41 + 8  # now we have compacted.
+    repository.__exit__(None, None, None)
 
 
-""" AUXILIARY CORRUPTION TESTS """
-
-
-@pytest.fixture()
-def auxiliary_repository(repository):
+def make_auxiliary(repository):
+    repository.__enter__()
     repository.put(H(0), fchunk(b"foo"))
     repository.commit(compact=False)
     repository.close()
-    yield repository
 
 
 def do_commit(repository):
@@ -634,47 +668,53 @@ def do_commit(repository):
         repository.commit(compact=False)
 
 
-def test_corrupted_hints(auxiliary_repository):
-    with auxiliary_repository as repository:
-        with open(os.path.join(repository.path, "hints.1"), "ab") as fd:
-            fd.write(b"123456789")
+def test_corrupted_hints(repository):
+    make_auxiliary(repository)
+    with open(os.path.join(repository.path, "hints.1"), "ab") as fd:
+        fd.write(b"123456789")
+    do_commit(repository)
+    repository.__exit__(None, None, None)
+
+
+def test_deleted_hints(repository):
+    make_auxiliary(repository)
+    os.unlink(os.path.join(repository.path, "hints.1"))
+    do_commit(repository)
+    repository.__exit__(None, None, None)
+
+
+def test_deleted_index(repository):
+    make_auxiliary(repository)
+    os.unlink(os.path.join(repository.path, "index.1"))
+    do_commit(repository)
+    repository.__exit__(None, None, None)
+
+
+def test_unreadable_hints(repository):
+    make_auxiliary(repository)
+    hints = os.path.join(repository.path, "hints.1")
+    os.unlink(hints)
+    os.mkdir(hints)
+    with pytest.raises(OSError):
         do_commit(repository)
+    repository.__exit__(None, None, None)
 
 
-def test_deleted_hints(auxiliary_repository):
-    with auxiliary_repository as repository:
-        os.unlink(os.path.join(repository.path, "hints.1"))
-        do_commit(repository)
+def test_index(repository):
+    make_auxiliary(repository)
+    with open(os.path.join(repository.path, "index.1"), "wb") as fd:
+        fd.write(b"123456789")
+    do_commit(repository)
+    repository.__exit__(None, None, None)
 
 
-def test_deleted_index(auxiliary_repository):
-    with auxiliary_repository as repository:
-        os.unlink(os.path.join(repository.path, "index.1"))
-        do_commit(repository)
-
-
-def test_unreadable_hints(auxiliary_repository):
-    with auxiliary_repository as repository:
-        hints = os.path.join(repository.path, "hints.1")
-        os.unlink(hints)
-        os.mkdir(hints)
-        with pytest.raises(OSError):
-            do_commit(repository)
-
-
-def test_index(auxiliary_repository):
-    with auxiliary_repository as repository:
-        with open(os.path.join(repository.path, "index.1"), "wb") as fd:
-            fd.write(b"123456789")
-        do_commit(repository)
-
-
-def test_index_outside_transaction(auxiliary_repository):
-    with auxiliary_repository as repository:
-        with open(os.path.join(repository.path, "index.1"), "wb") as fd:
-            fd.write(b"123456789")
-        with repository:
-            assert len(repository) == 1
+def test_index_outside_transaction(repository):
+    make_auxiliary(repository)
+    with open(os.path.join(repository.path, "index.1"), "wb") as fd:
+        fd.write(b"123456789")
+    with repository:
+        assert len(repository) == 1
+    repository.__exit__(None, None, None)
 
 
 def _corrupt_index(repository):
@@ -692,58 +732,62 @@ def _corrupt_index(repository):
         fd.write(corrupted_index_data)
 
 
-def test_index_corrupted(auxiliary_repository):
+def test_index_corrupted(repository):
     # HashIndex is able to detect incorrect headers and file lengths,
     # but on its own it can't tell if the data itself is correct.
-    with auxiliary_repository as repository:
-        _corrupt_index(repository)
-        with repository:
-            # Data corruption is detected due to mismatching checksums
-            # and fixed by rebuilding the index.
-            assert len(repository) == 1
-            assert pdchunk(repository.get(H(0))) == b"foo"
+    make_auxiliary(repository)
+    _corrupt_index(repository)
+    with repository:
+        # Data corruption is detected due to mismatching checksums
+        # and fixed by rebuilding the index.
+        assert len(repository) == 1
+        assert pdchunk(repository.get(H(0))) == b"foo"
+    repository.__exit__(None, None, None)
 
 
-def test_index_corrupted_without_integrity(auxiliary_repository):
-    with auxiliary_repository as repository:
-        _corrupt_index(repository)
-        integrity_path = os.path.join(repository.path, "integrity.1")
-        os.unlink(integrity_path)
-        with repository:
-            # Since the corrupted key is not noticed, the repository still thinks
-            # it contains one key...
-            assert len(repository) == 1
-            with pytest.raises(Repository.ObjectNotFound):
-                # ... but the real, uncorrupted key is not found in the corrupted index.
-                repository.get(H(0))
+def test_index_corrupted_without_integrity(repository):
+    make_auxiliary(repository)
+    _corrupt_index(repository)
+    integrity_path = os.path.join(repository.path, "integrity.1")
+    os.unlink(integrity_path)
+    with repository:
+        # Since the corrupted key is not noticed, the repository still thinks
+        # it contains one key...
+        assert len(repository) == 1
+        with pytest.raises(Repository.ObjectNotFound):
+            # ... but the real, uncorrupted key is not found in the corrupted index.
+            repository.get(H(0))
+    repository.__exit__(None, None, None)
 
 
-def test_unreadable_index(auxiliary_repository):
-    with auxiliary_repository as repository:
-        index = os.path.join(repository.path, "index.1")
-        os.unlink(index)
-        os.mkdir(index)
-        with pytest.raises(OSError):
-            do_commit(repository)
+def test_unreadable_index(repository):
+    make_auxiliary(repository)
+    index = os.path.join(repository.path, "index.1")
+    os.unlink(index)
+    os.mkdir(index)
+    with pytest.raises(OSError):
+        do_commit(repository)
+    repository.__exit__(None, None, None)
 
 
-def test_unknown_integrity_version(auxiliary_repository):
+def test_unknown_integrity_version(repository):
     # For now an unknown integrity data version is ignored and not an error.
-    with auxiliary_repository as repository:
-        integrity_path = os.path.join(repository.path, "integrity.1")
-        with open(integrity_path, "r+b") as fd:
-            msgpack.pack(
-                {
-                    # Borg only understands version 2
-                    b"version": 4.7
-                },
-                fd,
-            )
-            fd.truncate()
-        with repository:
-            # No issues accessing the repository
-            assert len(repository) == 1
-            assert pdchunk(repository.get(H(0))) == b"foo"
+    make_auxiliary(repository)
+    integrity_path = os.path.join(repository.path, "integrity.1")
+    with open(integrity_path, "r+b") as fd:
+        msgpack.pack(
+            {
+                # Borg only understands version 2
+                b"version": 4.7
+            },
+            fd,
+        )
+        fd.truncate()
+    with repository:
+        # No issues accessing the repository
+        assert len(repository) == 1
+        assert pdchunk(repository.get(H(0))) == b"foo"
+    repository.__exit__(None, None, None)
 
 
 def _subtly_corrupted_hints_setup(repository):
@@ -768,56 +812,55 @@ def _subtly_corrupted_hints_setup(repository):
             fd.truncate()
 
 
-def test_subtly_corrupted_hints(auxiliary_repository):
-    with auxiliary_repository as repository:
-        _subtly_corrupted_hints_setup(repository)
-        with repository:
-            repository.append_only = False
-            repository.put(H(3), fchunk(b"1234"))
-            # Do a compaction run. Succeeds, since the failed checksum prompted a rebuild of the index+hints.
+def test_subtly_corrupted_hints(repository):
+    make_auxiliary(repository)
+    _subtly_corrupted_hints_setup(repository)
+    with repository:
+        repository.append_only = False
+        repository.put(H(3), fchunk(b"1234"))
+        # Do a compaction run. Succeeds, since the failed checksum prompted a rebuild of the index+hints.
+        repository.commit(compact=True)
+
+        assert len(repository) == 4
+        assert pdchunk(repository.get(H(0))) == b"foo"
+        assert pdchunk(repository.get(H(1))) == b"bar"
+        assert pdchunk(repository.get(H(2))) == b"bazz"
+    repository.__exit__(None, None, None)
+
+
+def test_subtly_corrupted_hints_without_integrity(repository):
+    make_auxiliary(repository)
+    _subtly_corrupted_hints_setup(repository)
+    integrity_path = os.path.join(repository.path, "integrity.5")
+    os.unlink(integrity_path)
+    with repository:
+        repository.append_only = False
+        repository.put(H(3), fchunk(b"1234"))
+        # Do a compaction run.
+        # Fails, since the corrupted refcount was not detected and leads to an assertion failure.
+        with pytest.raises(AssertionError) as exc_info:
             repository.commit(compact=True)
-
-            assert len(repository) == 4
-            assert pdchunk(repository.get(H(0))) == b"foo"
-            assert pdchunk(repository.get(H(1))) == b"bar"
-            assert pdchunk(repository.get(H(2))) == b"bazz"
-
-
-def test_subtly_corrupted_hints_without_integrity(auxiliary_repository):
-    with auxiliary_repository as repository:
-        _subtly_corrupted_hints_setup(repository)
-        integrity_path = os.path.join(repository.path, "integrity.5")
-        os.unlink(integrity_path)
-        with repository:
-            repository.append_only = False
-            repository.put(H(3), fchunk(b"1234"))
-            # Do a compaction run.
-            # Fails, since the corrupted refcount was not detected and leads to an assertion failure.
-            with pytest.raises(AssertionError) as exc_info:
-                repository.commit(compact=True)
-            assert "Corrupted segment reference count" in str(exc_info.value)
-
-
-""" REPOSITORY CHECK TESTS """
+        assert "Corrupted segment reference count" in str(exc_info.value)
+    repository.__exit__(None, None, None)
 
 
 def list_indices(repo_path):
     return [name for name in os.listdir(repo_path) if name.startswith("index.")]
 
 
-def check(repository: Repository, repair=False, status=True):
+def check(repository, repair=False, status=True):
     assert repository.check(repair=repair) == status
     # Make sure no tmp files are left behind
     tmp_files = [name for name in os.listdir(repository.path) if "tmp" in name]
     assert tmp_files == [], "Found tmp files"
 
 
-def get_objects(repository: Repository, *ids):
+def get_objects(repository, *ids):
     for id_ in ids:
         pdchunk(repository.get(H(id_)))
 
 
-def add_objects(repository: Repository, segments):
+def add_objects(repository, segments):
     for ids in segments:
         for id_ in ids:
             repository.put(H(id_), fchunk(b"data"))
@@ -840,7 +883,7 @@ def corrupt_object(repo_path, id_):
         fd.write(b"BOOM")
 
 
-def delete_segment(repository: Repository, segment):
+def delete_segment(repository, segment):
     repository.io.delete_segment(segment)
 
 
@@ -852,11 +895,12 @@ def rename_index(repo_path, new_name):
     os.replace(os.path.join(repo_path, f"index.{get_head(repo_path)}"), os.path.join(repo_path, new_name))
 
 
-def list_objects(repository: Repository):
+def list_objects(repository):
     return {int(key) for key in repository.list()}
 
 
 def test_repair_corrupted_segment(repository):
+    repository.__enter__()
     add_objects(repository, [[1, 2, 3], [4, 5], [6]])
     assert {1, 2, 3, 4, 5, 6} == list_objects(repository)
     check(repository, status=True)
@@ -872,9 +916,11 @@ def test_repair_corrupted_segment(repository):
     get_objects(repository, 4)
     check(repository, status=True)
     assert {1, 2, 3, 4, 6} == list_objects(repository)
+    repository.__exit__(None, None, None)
 
 
 def test_repair_missing_segment(repository):
+    repository.__enter__()
     add_objects(repository, [[1, 2, 3], [4, 5, 6]])
     assert {1, 2, 3, 4, 5, 6} == list_objects(repository)
     check(repository, status=True)
@@ -882,17 +928,21 @@ def test_repair_missing_segment(repository):
     repository.rollback()
     check(repository, repair=True, status=True)
     assert {1, 2, 3} == list_objects(repository)
+    repository.__exit__(None, None, None)
 
 
 def test_repair_missing_commit_segment(repository):
+    repository.__enter__()
     add_objects(repository, [[1, 2, 3], [4, 5, 6]])
     delete_segment(repository, 3)
     with pytest.raises(Repository.ObjectNotFound):
         get_objects(repository, 4)
     assert {1, 2, 3} == list_objects(repository)
+    repository.__exit__(None, None, None)
 
 
 def test_repair_corrupted_commit_segment(repository):
+    repository.__enter__()
     add_objects(repository, [[1, 2, 3], [4, 5, 6]])
     with open(os.path.join(repository.path, "data", "0", "3"), "r+b") as fd:
         fd.seek(-1, os.SEEK_END)
@@ -902,9 +952,11 @@ def test_repair_corrupted_commit_segment(repository):
     check(repository, status=True)
     get_objects(repository, 3)
     assert {1, 2, 3} == list_objects(repository)
+    repository.__exit__(None, None, None)
 
 
 def test_repair_no_commits(repository):
+    repository.__enter__()
     add_objects(repository, [[1, 2, 3]])
     with open(os.path.join(repository.path, "data", "0", "1"), "r+b") as fd:
         fd.seek(-1, os.SEEK_END)
@@ -919,17 +971,21 @@ def test_repair_no_commits(repository):
     check(repository, status=True)
     get_objects(repository, 3)
     assert {1, 2, 3} == list_objects(repository)
+    repository.__exit__(None, None, None)
 
 
 def test_repair_missing_index(repository):
+    repository.__enter__()
     add_objects(repository, [[1, 2, 3], [4, 5, 6]])
     delete_index(repository.path)
     check(repository, status=True)
     get_objects(repository, 4)
     assert {1, 2, 3, 4, 5, 6} == list_objects(repository)
+    repository.__exit__(None, None, None)
 
 
 def test_repair_index_too_new(repository):
+    repository.__enter__()
     add_objects(repository, [[1, 2, 3], [4, 5, 6]])
     assert list_indices(repository.path) == ["index.3"]
     rename_index(repository.path, "index.100")
@@ -937,24 +993,25 @@ def test_repair_index_too_new(repository):
     assert list_indices(repository.path) == ["index.3"]
     get_objects(repository, 4)
     assert {1, 2, 3, 4, 5, 6} == list_objects(repository)
+    repository.__exit__(None, None, None)
 
 
 def test_crash_before_compact(repository):
+    repository.__enter__()
     repository.put(H(0), fchunk(b"data"))
     repository.put(H(0), fchunk(b"data2"))
     # Simulate a crash before compact
     with patch.object(Repository, "compact_segments") as compact:
         repository.commit(compact=True)
         compact.assert_called_once_with(0.1)
-    with reopen(repository) as repository:
-        check(repository, repair=True)
-        assert pdchunk(repository.get(H(0))) == b"data2"
-
-
-"""REPOSITORY HINTS TESTS """
+    repository = reopen(repository)
+    check(repository, repair=True)
+    assert pdchunk(repository.get(H(0))) == b"data2"
+    repository.__exit__(None, None, None)
 
 
 def test_hints_persistence(repository):
+    repository.__enter__()
     repository.put(H(0), fchunk(b"data"))
     repository.delete(H(0))
     repository.commit(compact=False)
@@ -963,17 +1020,19 @@ def test_hints_persistence(repository):
     segments_expected = repository.segments
     # close and re-open the repository (create fresh Repository instance) to
     # check whether hints were persisted to / reloaded from disk
-    with reopen(repository) as repository:
-        # see also do_compact()
-        repository.put(H(42), fchunk(b"foobar"))  # this will call prepare_txn() and load the hints data
-        # check if hints persistence worked:
-        assert shadow_index_expected == repository.shadow_index
-        assert compact_expected == repository.compact
-        del repository.segments[2]  # ignore the segment created by put(H(42), ...)
-        assert segments_expected == repository.segments
+    repository = reopen(repository)
+    # see also do_compact()
+    repository.put(H(42), fchunk(b"foobar"))  # this will call prepare_txn() and load the hints data
+    # check if hints persistence worked:
+    assert shadow_index_expected == repository.shadow_index
+    assert compact_expected == repository.compact
+    del repository.segments[2]  # ignore the segment created by put(H(42), ...)
+    assert segments_expected == repository.segments
+    repository.__exit__(None, None, None)
 
 
 def test_hints_behaviour(repository):
+    repository.__enter__()
     repository.put(H(0), fchunk(b"data"))
     assert repository.shadow_index == {}
     assert len(repository.compact) == 0
@@ -990,20 +1049,14 @@ def test_hints_behaviour(repository):
     # segment 0 was compacted away, no info about it left:
     assert 0 not in repository.compact
     assert 0 not in repository.segments
-
-
-"""REMOTE REPOSITORY TESTS"""
+    repository.__exit__(None, None, None)
 
 
 @pytest.fixture()
 def remote_repository(tmpdir):
     repository_location = Location("ssh://__testsuite__" + os.path.join(str(tmpdir), "repository"))
-    repository = RemoteRepository(repository_location, exclusive=True, create=True)
-
-    yield repository.__enter__()
-
-    repository.__exit__(None, None, None)
-    shutil.rmtree(str(tmpdir))
+    with RemoteRepository(repository_location, exclusive=True, create=True) as remote_repository:
+        yield remote_repository
 
 
 def _get_mock_args():
@@ -1119,9 +1172,6 @@ def test_borg_cmd(remote_repository):
     args.rsh = "ssh -i foo"
     remote_repository._args = args
     assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]
-
-
-""" REMOTE REPOSITORY CHECK TESTS"""
 
 
 def test_crash_before_compact_remote(remote_repository):

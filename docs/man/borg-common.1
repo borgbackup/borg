@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-COMMON" 1 "2023-02-26" "" "borg backup tool"
+.TH "BORG-COMMON" 1 "2023-06-11" "" "borg backup tool"
 .SH NAME
 borg-common \- Common options of Borg commands
 .SH SYNOPSIS
@@ -92,6 +92,9 @@ Write execution profile in Borg format into FILE. For local use a Python\-compat
 .TP
 .BI \-\-rsh \ RSH
 Use this command to connect to the \(aqborg serve\(aq process (default: \(aqssh\(aq)
+.TP
+.BI \-\-socket \ PATH
+Use UNIX DOMAIN (IPC) socket at PATH for client/server communication with socket: protocol.
 .TP
 .BI \-r \ REPO\fR,\fB \ \-\-repo \ REPO
 repository to use

@@ -23,6 +23,14 @@ borg prune
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``--list``                                        | output verbose list of archives it keeps/prunes                                                   |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--short``                                       | use a less wide archive part format                                                               |
+    +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--list-pruned``                                 | output verbose list of archives it prunes                                                         |
+    +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--list-kept``                                   | output verbose list of archives it keeps                                                          |
+    +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--format FORMAT``                               | specify format for the archive part (default: "{archive:<36} {time} [{id}]")                      |
+    +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``--keep-within INTERVAL``                        | keep all archives within this time interval                                                       |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``--keep-last``, ``--keep-secondly``              | number of secondly archives to keep                                                               |
@@ -75,6 +83,10 @@ borg prune
         --force               force pruning of corrupted archives, use ``--force --force`` in case ``--force`` does not work.
         -s, --stats           print statistics for the deleted archive
         --list                output verbose list of archives it keeps/prunes
+        --short               use a less wide archive part format
+        --list-pruned         output verbose list of archives it prunes
+        --list-kept           output verbose list of archives it keeps
+        --format FORMAT       specify format for the archive part (default: "{archive:<36} {time} [{id}]")
         --keep-within INTERVAL    keep all archives within this time interval
         --keep-last, --keep-secondly    number of secondly archives to keep
         --keep-minutely       number of minutely archives to keep
@@ -154,3 +166,7 @@ When using ``--stats``, you will get some statistics about how much data was
 deleted - the "Deleted data" deduplicated size there is most interesting as
 that is how much your repository will shrink.
 Please note that the "All archives" stats refer to the state after pruning.
+
+You can influence how the ``--list`` output is formatted by using the ``--short``
+option (less wide output) or by giving a custom format using ``--format`` (see
+the ``borg rlist`` description for more details about the format string).

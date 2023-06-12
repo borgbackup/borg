@@ -217,12 +217,66 @@ def dir_is_tagged(path, exclude_caches, exclude_if_present):
     return tag_names
 
 
-_safe_re = re.compile(r"^((\.\.)?/+)+")
-
-
 def make_path_safe(path):
-    """Make path safe by making it relative and local"""
-    return _safe_re.sub("", path) or "."
+    """
+    Make path safe by making it relative and normalized.
+
+    `path` is sanitized by making it relative, removing
+    consecutive slashes (e.g. '//'), removing '.' elements,
+    and removing trailing slashes.
+
+    For reasons of security, a ValueError is raised should
+    `path` contain any '..' elements.
+    """
+    path = path.lstrip("/")
+    if "\\" in path:  # borg always wants slashes, never backslashes.
+        raise ValueError(f"unexpected backslash(es) in path {path!r}")
+    if path.startswith("../") or "/../" in path or path.endswith("/..") or path == "..":
+        raise ValueError(f"unexpected '..' element in path {path!r}")
+    path = os.path.normpath(path)
+    return path
+
+
+_dotdot_re = re.compile(r"^(\.\./)+")
+
+
+def remove_dotdot_prefixes(path):
+    """
+    Remove '../'s at the beginning of `path`. Additionally,
+    the path is made relative.
+
+    `path` is expected to be normalized already (e.g. via `os.path.normpath()`).
+    """
+    path = path.lstrip("/")
+    path = _dotdot_re.sub("", path)
+    if path in ["", ".."]:
+        return "."
+    return path
+
+
+def assert_sanitized_path(path):
+    assert isinstance(path, str)
+    # `path` should have been sanitized earlier. Some features,
+    # like pattern matching rely on a sanitized path. As a
+    # precaution we check here again.
+    if make_path_safe(path) != path:
+        raise ValueError(f"path {path!r} is not sanitized")
+    return path
+
+
+def to_sanitized_path(path):
+    assert isinstance(path, str)
+    # Legacy versions of Borg still allowed non-sanitized paths
+    # to be stored. So, we sanitize them when reading.
+    #
+    # Borg 2 ensures paths are safe before storing them. Thus, when
+    # support for reading Borg 1 archives is dropped, this should be
+    # changed to a simple check to verify paths aren't malicious.
+    # Namely, absolute paths and paths containing '..' elements must
+    # be rejected.
+    #
+    # Also checks for '..' elements in `path` for reasons of security.
+    return make_path_safe(path)
 
 
 class HardLinkManager:

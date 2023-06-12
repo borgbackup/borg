@@ -23,8 +23,6 @@ borg delete
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``-s``, ``--stats``                               | print statistics for the deleted archive                                                          |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--cache-only``                                  | delete only the local cache for the given repository                                              |
-    +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``--force``                                       | force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work.  |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``-c SECONDS``, ``--checkpoint-interval SECONDS`` | write checkpoint every SECONDS seconds (Default: 1800)                                            |
@@ -69,7 +67,6 @@ borg delete
         --list          output verbose list of archives
         --consider-checkpoints    consider checkpoint archives for deletion (default: not considered).
         -s, --stats     print statistics for the deleted archive
-        --cache-only    delete only the local cache for the given repository
         --force         force deletion of corrupted archives, use ``--force --force`` in case ``--force`` does not work.
         -c SECONDS, --checkpoint-interval SECONDS    write checkpoint every SECONDS seconds (Default: 1800)
 

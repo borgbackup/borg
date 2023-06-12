@@ -27,6 +27,7 @@ from ..helpers import basic_json_data, json_print
 from ..helpers import flags_root, flags_dir, flags_special_follow, flags_special
 from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
+from ..helpers import MakePathSafeAction
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -766,7 +767,7 @@ class CreateMixIn:
             metavar="NAME",
             dest="stdin_name",
             default="stdin",
-            action=Highlander,
+            action=MakePathSafeAction,
             help="use NAME in archive for stdin data (default: %(default)r)",
         )
         subparser.add_argument(

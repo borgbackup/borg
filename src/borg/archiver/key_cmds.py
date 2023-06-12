@@ -63,7 +63,7 @@ class KeysMixIn:
                 print("Change not needed or not supported.")
                 return EXIT_WARNING
 
-        for name in ("repository_id", "crypt_key", "id_key", "chunk_seed", "tam_required", "sessionid", "cipher"):
+        for name in ("repository_id", "crypt_key", "id_key", "chunk_seed", "sessionid", "cipher"):
             value = getattr(key, name)
             setattr(key_new, name, value)
 

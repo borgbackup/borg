@@ -1,6 +1,4 @@
 import enum
-import os
-import os.path
 import re
 from collections import abc, namedtuple
 from datetime import datetime, timedelta, timezone
@@ -229,7 +227,6 @@ class Manifest:
         self.repo_objs = ro_cls(key)
         self.repository = repository
         self.item_keys = frozenset(item_keys) if item_keys is not None else ITEM_KEYS
-        self.tam_verified = False
         self.timestamp = None
 
     @property
@@ -241,9 +238,9 @@ class Manifest:
         return parse_timestamp(self.timestamp)
 
     @classmethod
-    def load(cls, repository, operations, key=None, force_tam_not_required=False, *, ro_cls=RepoObj):
+    def load(cls, repository, operations, key=None, *, ro_cls=RepoObj):
         from .item import ManifestItem
-        from .crypto.key import key_factory, tam_required_file, tam_required
+        from .crypto.key import key_factory
         from .repository import Repository
 
         try:
@@ -254,9 +251,7 @@ class Manifest:
             key = key_factory(repository, cdata, ro_cls=ro_cls)
         manifest = cls(key, repository, ro_cls=ro_cls)
         _, data = manifest.repo_objs.parse(cls.MANIFEST_ID, cdata)
-        manifest_dict, manifest.tam_verified = key.unpack_and_verify_manifest(
-            data, force_tam_not_required=force_tam_not_required
-        )
+        manifest_dict = key.unpack_and_verify_manifest(data)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = manifest.repo_objs.id_hash(data)
         if m.get("version") not in (1, 2):
@@ -268,17 +263,6 @@ class Manifest:
         manifest.item_keys = ITEM_KEYS
         manifest.item_keys |= frozenset(m.config.get("item_keys", []))  # new location of item_keys since borg2
         manifest.item_keys |= frozenset(m.get("item_keys", []))  # legacy: borg 1.x: item_keys not in config yet
-
-        if manifest.tam_verified:
-            manifest_required = manifest.config.get("tam_required", False)
-            security_required = tam_required(repository)
-            if manifest_required and not security_required:
-                logger.debug("Manifest is TAM verified and says TAM is required, updating security database...")
-                file = tam_required_file(repository)
-                open(file, "w").close()
-            if not manifest_required and security_required:
-                logger.debug("Manifest is TAM verified and says TAM is *not* required, updating security database...")
-                os.unlink(tam_required_file(repository))
         manifest.check_repository_compatibility(operations)
         return manifest
 
@@ -310,8 +294,6 @@ class Manifest:
     def write(self):
         from .item import ManifestItem
 
-        if self.key.tam_required:
-            self.config["tam_required"] = True
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
             self.timestamp = datetime.now(tz=timezone.utc).isoformat(timespec="microseconds")
@@ -331,7 +313,6 @@ class Manifest:
             timestamp=self.timestamp,
             config=StableDict(self.config),
         )
-        self.tam_verified = True
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.repo_objs.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.repo_objs.format(self.MANIFEST_ID, {}, data))

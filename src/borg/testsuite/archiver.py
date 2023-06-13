@@ -3417,7 +3417,7 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
             corrupted_manifest = manifest + b'corrupted!'
             repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
 
-            archive = msgpack.packb({
+            archive_dict = {
                 'cmdline': [],
                 'items': [],
                 'hostname': 'foo',
@@ -3425,7 +3425,8 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
                 'name': 'archive1',
                 'time': '2016-12-15T18:49:51.849711',
                 'version': 1,
-            })
+            }
+            archive = key.pack_and_authenticate_metadata(archive_dict, context=b'archive')
             archive_id = key.id_hash(archive)
             repository.put(archive_id, key.encrypt(archive))
             repository.commit()

@@ -1992,6 +1992,19 @@ class ArchiveChecker:
             except msgpack.UnpackException:
                 continue
             if valid_archive(archive):
+                # **after** doing the low-level checks and having a strong indication that we
+                # are likely looking at an archive item here, also check the TAM authentication:
+                try:
+                    archive, verified = self.key.unpack_and_verify_archive(data, force_tam_not_required=False)
+                except IntegrityError:
+                    # TAM issues - do not accept this archive!
+                    # either somebody is trying to attack us with a fake archive data or
+                    # we have an ancient archive made before TAM was a thing (borg < 1.0.9) **and** this repo
+                    # was not correctly upgraded to borg 1.2.5 (see advisory at top of the changelog).
+                    # borg can't tell the difference, so it has to assume this archive might be an attack
+                    # and drops this archive.
+                    continue
+                # note: if we get here and verified is False, a TAM is not required.
                 archive = ArchiveItem(internal_dict=archive)
                 name = archive.name
                 logger.info("Found archive %s", name)

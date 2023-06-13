@@ -6,7 +6,6 @@ import pytest
 from ...archive import ChunkBuffer
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex
-from ...helpers import msgpack
 from ...manifest import Manifest
 from ...repository import Repository
 from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
@@ -233,17 +232,16 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
         manifest = repository.get(Manifest.MANIFEST_ID)
         corrupted_manifest = manifest + b"corrupted!"
         repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
-        archive = msgpack.packb(
-            {
-                "command_line": "",
-                "item_ptrs": [],
-                "hostname": "foo",
-                "username": "bar",
-                "name": "archive1",
-                "time": "2016-12-15T18:49:51.849711",
-                "version": 2,
-            }
-        )
+        archive_dict = {
+            "command_line": "",
+            "item_ptrs": [],
+            "hostname": "foo",
+            "username": "bar",
+            "name": "archive1",
+            "time": "2016-12-15T18:49:51.849711",
+            "version": 2,
+        }
+        archive = repo_objs.key.pack_and_authenticate_metadata(archive_dict, context=b"archive")
         archive_id = repo_objs.id_hash(archive)
         repository.put(archive_id, repo_objs.format(archive_id, {}, archive))
         repository.commit(compact=False)

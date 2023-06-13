@@ -219,10 +219,10 @@ def get_limited_unpacker(kind):
     args = dict(use_list=False, max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE))  # return tuples, not lists
     if kind in ("server", "client"):
         pass  # nothing special
-    elif kind in ("manifest", "key"):
+    elif kind in ("manifest", "archive", "key"):
         args.update(dict(use_list=True, object_hook=StableDict))  # default value
     else:
-        raise ValueError('kind must be "server", "client", "manifest" or "key"')
+        raise ValueError('kind must be "server", "client", "manifest", "archive" or "key"')
     return Unpacker(**args)
 
 

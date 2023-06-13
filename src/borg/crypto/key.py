@@ -72,6 +72,15 @@ class TAMRequiredError(IntegrityError):
     traceback = False
 
 
+class ArchiveTAMRequiredError(TAMRequiredError):
+    __doc__ = textwrap.dedent(
+        """
+    Archive '{}' is unauthenticated, but it is required for this repository.
+    """
+    ).strip()
+    traceback = False
+
+
 class TAMInvalid(IntegrityError):
     __doc__ = IntegrityError.__doc__
     traceback = False
@@ -79,6 +88,15 @@ class TAMInvalid(IntegrityError):
     def __init__(self):
         # Error message becomes: "Data integrity error: Manifest authentication did not verify"
         super().__init__("Manifest authentication did not verify")
+
+
+class ArchiveTAMInvalid(IntegrityError):
+    __doc__ = IntegrityError.__doc__
+    traceback = False
+
+    def __init__(self):
+        # Error message becomes: "Data integrity error: Archive authentication did not verify"
+        super().__init__("Archive authentication did not verify")
 
 
 class TAMUnsupportedSuiteError(IntegrityError):
@@ -277,6 +295,46 @@ class KeyBase:
         if not hmac.compare_digest(calculated_hmac, tam_hmac):
             raise TAMInvalid()
         logger.debug("TAM-verified manifest")
+        return unpacked, True
+
+    def unpack_and_verify_archive(self, data, force_tam_not_required=False):
+        """Unpack msgpacked *data* and return (object, did_verify)."""
+        tam_required = self.tam_required
+        if force_tam_not_required and tam_required:
+            logger.warning("Archive authentication DISABLED.")
+            tam_required = False
+        data = bytearray(data)
+        unpacker = get_limited_unpacker("archive")
+        unpacker.feed(data)
+        unpacked = unpacker.unpack()
+        if b"tam" not in unpacked:
+            if tam_required:
+                archive_name = unpacked.get(b"name", b"<unknown>").decode("ascii", "replace")
+                raise ArchiveTAMRequiredError(archive_name)
+            else:
+                logger.debug("TAM not found and not required")
+                return unpacked, False
+        tam = unpacked.pop(b"tam", None)
+        if not isinstance(tam, dict):
+            raise ArchiveTAMInvalid()
+        tam_type = tam.get(b"type", b"<none>").decode("ascii", "replace")
+        if tam_type != "HKDF_HMAC_SHA512":
+            if tam_required:
+                raise TAMUnsupportedSuiteError(repr(tam_type))
+            else:
+                logger.debug("Ignoring TAM made with unsupported suite, since TAM is not required: %r", tam_type)
+                return unpacked, False
+        tam_hmac = tam.get(b"hmac")
+        tam_salt = tam.get(b"salt")
+        if not isinstance(tam_salt, bytes) or not isinstance(tam_hmac, bytes):
+            raise ArchiveTAMInvalid()
+        offset = data.index(tam_hmac)
+        data[offset : offset + 64] = bytes(64)
+        tam_key = self._tam_key(tam_salt, context=b"archive")
+        calculated_hmac = hmac.digest(tam_key, data, "sha512")
+        if not hmac.compare_digest(calculated_hmac, tam_hmac):
+            raise ArchiveTAMInvalid()
+        logger.debug("TAM-verified archive")
         return unpacked, True
 
 

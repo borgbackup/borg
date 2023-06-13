@@ -209,6 +209,12 @@ def get_limited_unpacker(kind):
                          max_str_len=255,  # archive name
                          object_hook=StableDict,
                          ))
+    elif kind == 'archive':
+        args.update(dict(use_list=True,  # default value
+                         max_map_len=100,  # ARCHIVE_KEYS ~= 20
+                         max_str_len=10000,  # comment
+                         object_hook=StableDict,
+                         ))
     elif kind == 'key':
         args.update(dict(use_list=True,  # default value
                          max_array_len=0,  # not used

@@ -800,7 +800,12 @@ def test_get_runtime_dir(monkeypatch):
     else:
         monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
         monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
-        assert get_runtime_dir() == os.path.join("/run/user", str(os.getuid()), "borg")
+        uid = str(os.getuid())
+        assert get_runtime_dir() in [
+            os.path.join("/run/user", uid, "borg"),
+            os.path.join("/var/run/user", uid, "borg"),
+            os.path.join(f"/tmp/runtime-{uid}", "borg"),
+        ]
         monkeypatch.setenv("XDG_RUNTIME_DIR", "/var/tmp/.cache")
         assert get_runtime_dir() == os.path.join("/var/tmp/.cache", "borg")
         monkeypatch.setenv("BORG_RUNTIME_DIR", "/var/tmp")

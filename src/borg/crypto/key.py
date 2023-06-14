@@ -301,7 +301,9 @@ class KeyBase:
         """Unpack msgpacked *data* and return (object, did_verify)."""
         tam_required = self.tam_required
         if force_tam_not_required and tam_required:
-            logger.warning("Archive authentication DISABLED.")
+            # for a long time, borg only checked manifest for "tam_required" and
+            # people might have archives without TAM, so don't be too annoyingly loud here:
+            logger.debug("Archive authentication DISABLED.")
             tam_required = False
         data = bytearray(data)
         unpacker = get_limited_unpacker("archive")

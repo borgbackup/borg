@@ -493,6 +493,7 @@ class Archive:
         self.name = name  # overwritten later with name from archive metadata
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
         self.comment = None
+        self.tam_verified = False
         self.numeric_ids = numeric_ids
         self.noatime = noatime
         self.noctime = noctime
@@ -532,7 +533,9 @@ class Archive:
     def _load_meta(self, id):
         cdata = self.repository.get(id)
         _, data = self.repo_objs.parse(id, cdata)
-        metadata = ArchiveItem(internal_dict=msgpack.unpackb(data))
+        # we do not require TAM for archives, otherwise we can not even borg list a repo with old archives.
+        archive, self.tam_verified = self.key.unpack_and_verify_archive(data, force_tam_not_required=True)
+        metadata = ArchiveItem(internal_dict=archive)
         if metadata.version not in (1, 2):  # legacy: still need to read v1 archives
             raise Exception("Unknown archive metadata version")
         # note: metadata.items must not get written to disk!

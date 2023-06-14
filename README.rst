@@ -167,6 +167,12 @@ Links
 * `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
 * `Security contact <https://borgbackup.readthedocs.io/en/latest/support.html#security-contact>`_
 
+Development
+-------------------
+Borg is written in Python. To get started with Borg development (including guidance for 
+contributions), please see development.rst: 
+https://github.com/borgbackup/borg/blob/master/docs/development.rst
+
 Compatibility notes
 -------------------
 

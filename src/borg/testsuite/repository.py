@@ -1,7 +1,8 @@
 import logging
 import os
 import sys
-from contextlib import contextmanager
+import tempfile
+from contextlib import ExitStack
 from unittest.mock import patch
 
 import pytest
@@ -17,6 +18,27 @@ from ..repoobj import RepoObj
 from .hashindex import H
 
 
+class SingularRepositoryMaker:
+    # For now, this class is not used. Just a placeholder until I am sure if/how to incorporate it into project.
+    def __init__(self, exclusive=True, create=True):
+        self.current_repo = None
+        self.path = os.path.join(tempfile.mkdtemp(), "repository")
+        self.exclusive = exclusive
+        self.create = create
+        self.exit_stack = ExitStack()
+
+    def __enter__(self):
+        if self.current_repo is not None:
+            raise RuntimeError("Cannot re-enter a disposed repository.")
+        self.current_repo = self.exit_stack.enter_context(Repository(self.path, self.exclusive, self.create))
+        return self.current_repo
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Decide what needs to be done here.
+        # self.context_stack.undo()  # perhaps pass over args here
+        self.current_repo = None
+
+
 @pytest.fixture()
 def repository(tmpdir):
     repository_location = os.path.join(str(tmpdir), "repository")
@@ -24,14 +46,8 @@ def repository(tmpdir):
     yield repository
 
 
-@contextmanager
-def reopen(repository, exclusive=True):
-    repo = Repository(repository.path, exclusive=exclusive, create=False)
-    repo.__enter__()
-    try:
-        yield repo
-    finally:
-        repo.__exit__(None, None, None)
+def reopen(repository, exclusive=True, create=False):
+    return Repository(repository.path, exclusive=exclusive, create=create)
 
 
 def fchunk(data, meta=b""):
@@ -1028,8 +1044,8 @@ def test_hints_behaviour(repository):
 @pytest.fixture()
 def remote_repository(tmpdir):
     repository_location = Location("ssh://__testsuite__" + os.path.join(str(tmpdir), "repository"))
-    with RemoteRepository(repository_location, exclusive=True, create=True) as remote_repository:
-        yield remote_repository
+    remote_repository = RemoteRepository(repository_location, exclusive=True, create=True)
+    return remote_repository
 
 
 def _get_mock_args():
@@ -1046,117 +1062,112 @@ def _get_mock_args():
     return MockArgs()
 
 
-def test_invalid_rpc(remote_repository):
-    with pytest.raises(InvalidRPCMethod):
-        remote_repository.call("__init__", {})
+# @pytest.mark.skipif(is_win32, reason="skip remote tests on windows")
+def test_remote_invalid_rpc(remote_repository):
+    with remote_repository:
+        with pytest.raises(InvalidRPCMethod):
+            remote_repository.call("__init__", {})
 
 
-def test_rpc_exception_transport(remote_repository):
-    s1 = "test string"
+def test_remote_rpc_exception_transport(remote_repository):
+    with remote_repository:
+        s1 = "test string"
 
-    try:
-        remote_repository.call("inject_exception", {"kind": "DoesNotExist"})
-    except Repository.DoesNotExist as e:
-        assert len(e.args) == 1
-        assert e.args[0] == remote_repository.location.processed
+        try:
+            remote_repository.call("inject_exception", {"kind": "DoesNotExist"})
+        except Repository.DoesNotExist as e:
+            assert len(e.args) == 1
+            assert e.args[0] == remote_repository.location.processed
 
-    try:
-        remote_repository.call("inject_exception", {"kind": "AlreadyExists"})
-    except Repository.AlreadyExists as e:
-        assert len(e.args) == 1
-        assert e.args[0] == remote_repository.location.processed
+        try:
+            remote_repository.call("inject_exception", {"kind": "AlreadyExists"})
+        except Repository.AlreadyExists as e:
+            assert len(e.args) == 1
+            assert e.args[0] == remote_repository.location.processed
 
-    try:
-        remote_repository.call("inject_exception", {"kind": "CheckNeeded"})
-    except Repository.CheckNeeded as e:
-        assert len(e.args) == 1
-        assert e.args[0] == remote_repository.location.processed
+        try:
+            remote_repository.call("inject_exception", {"kind": "CheckNeeded"})
+        except Repository.CheckNeeded as e:
+            assert len(e.args) == 1
+            assert e.args[0] == remote_repository.location.processed
 
-    try:
-        remote_repository.call("inject_exception", {"kind": "IntegrityError"})
-    except IntegrityError as e:
-        assert len(e.args) == 1
-        assert e.args[0] == s1
+        try:
+            remote_repository.call("inject_exception", {"kind": "IntegrityError"})
+        except IntegrityError as e:
+            assert len(e.args) == 1
+            assert e.args[0] == s1
 
-    try:
-        remote_repository.call("inject_exception", {"kind": "PathNotAllowed"})
-    except PathNotAllowed as e:
-        assert len(e.args) == 1
-        assert e.args[0] == "foo"
+        try:
+            remote_repository.call("inject_exception", {"kind": "PathNotAllowed"})
+        except PathNotAllowed as e:
+            assert len(e.args) == 1
+            assert e.args[0] == "foo"
 
-    try:
-        remote_repository.call("inject_exception", {"kind": "ObjectNotFound"})
-    except Repository.ObjectNotFound as e:
-        assert len(e.args) == 2
-        assert e.args[0] == s1
-        assert e.args[1] == remote_repository.location.processed
+        try:
+            remote_repository.call("inject_exception", {"kind": "ObjectNotFound"})
+        except Repository.ObjectNotFound as e:
+            assert len(e.args) == 2
+            assert e.args[0] == s1
+            assert e.args[1] == remote_repository.location.processed
 
-    try:
-        remote_repository.call("inject_exception", {"kind": "InvalidRPCMethod"})
-    except InvalidRPCMethod as e:
-        assert len(e.args) == 1
-        assert e.args[0] == s1
+        try:
+            remote_repository.call("inject_exception", {"kind": "InvalidRPCMethod"})
+        except InvalidRPCMethod as e:
+            assert len(e.args) == 1
+            assert e.args[0] == s1
 
-    try:
-        remote_repository.call("inject_exception", {"kind": "divide"})
-    except RemoteRepository.RPCError as e:
-        assert e.unpacked
-        assert e.get_message() == "ZeroDivisionError: integer division or modulo by zero\n"
-        assert e.exception_class == "ZeroDivisionError"
-        assert len(e.exception_full) > 0
-
-
-def test_ssh_cmd(remote_repository):
-    args = _get_mock_args()
-    remote_repository._args = args
-    assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "example.com"]
-    assert remote_repository.ssh_cmd(Location("ssh://user@example.com/foo")) == ["ssh", "user@example.com"]
-    assert remote_repository.ssh_cmd(Location("ssh://user@example.com:1234/foo")) == [
-        "ssh",
-        "-p",
-        "1234",
-        "user@example.com",
-    ]
-    os.environ["BORG_RSH"] = "ssh --foo"
-    assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "--foo", "example.com"]
+        try:
+            remote_repository.call("inject_exception", {"kind": "divide"})
+        except RemoteRepository.RPCError as e:
+            assert e.unpacked
+            assert e.get_message() == "ZeroDivisionError: integer division or modulo by zero\n"
+            assert e.exception_class == "ZeroDivisionError"
+            assert len(e.exception_full) > 0
 
 
-def test_borg_cmd(remote_repository):
-    assert remote_repository.borg_cmd(None, testing=True) == [sys.executable, "-m", "borg", "serve"]
-    args = _get_mock_args()
-    # XXX without next line we get spurious test fails when using pytest-xdist, root cause unknown:
-    logging.getLogger().setLevel(logging.INFO)
-    # note: test logger is on info log level, so --info gets added automagically
-    assert remote_repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
-    args.remote_path = "borg-0.28.2"
-    assert remote_repository.borg_cmd(args, testing=False) == ["borg-0.28.2", "serve", "--info"]
-    args.debug_topics = ["something_client_side", "repository_compaction"]
-    assert remote_repository.borg_cmd(args, testing=False) == [
-        "borg-0.28.2",
-        "serve",
-        "--info",
-        "--debug-topic=borg.debug.repository_compaction",
-    ]
-    args = _get_mock_args()
-    args.storage_quota = 0
-    assert remote_repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
-    args.storage_quota = 314159265
-    assert remote_repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info", "--storage-quota=314159265"]
-    args.rsh = "ssh -i foo"
-    remote_repository._args = args
-    assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]
+def test_remote_ssh_cmd(remote_repository):
+    with remote_repository:
+        args = _get_mock_args()
+        remote_repository._args = args
+        assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "example.com"]
+        assert remote_repository.ssh_cmd(Location("ssh://user@example.com/foo")) == ["ssh", "user@example.com"]
+        assert remote_repository.ssh_cmd(Location("ssh://user@example.com:1234/foo")) == [
+            "ssh",
+            "-p",
+            "1234",
+            "user@example.com",
+        ]
+        os.environ["BORG_RSH"] = "ssh --foo"
+        assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "--foo", "example.com"]
 
 
-def test_crash_before_compact_remote(remote_repository):
-    # skip this test, we can't mock-patch a Repository class in another process!
-    pass
-
-
-def test_repair_missing_commit_segment_remote(remote_repository):
-    # skip this test, files in RemoteRepository cannot be deleted
-    pass
-
-
-def test_repair_missing_segment_remote(remote_repository):
-    # skip this test, files in RemoteRepository cannot be deleted
-    pass
+def test_remote_borg_cmd(remote_repository):
+    with remote_repository:
+        assert remote_repository.borg_cmd(None, testing=True) == [sys.executable, "-m", "borg", "serve"]
+        args = _get_mock_args()
+        # XXX without next line we get spurious test fails when using pytest-xdist, root cause unknown:
+        logging.getLogger().setLevel(logging.INFO)
+        # note: test logger is on info log level, so --info gets added automagically
+        assert remote_repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
+        args.remote_path = "borg-0.28.2"
+        assert remote_repository.borg_cmd(args, testing=False) == ["borg-0.28.2", "serve", "--info"]
+        args.debug_topics = ["something_client_side", "repository_compaction"]
+        assert remote_repository.borg_cmd(args, testing=False) == [
+            "borg-0.28.2",
+            "serve",
+            "--info",
+            "--debug-topic=borg.debug.repository_compaction",
+        ]
+        args = _get_mock_args()
+        args.storage_quota = 0
+        assert remote_repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
+        args.storage_quota = 314159265
+        assert remote_repository.borg_cmd(args, testing=False) == [
+            "borg",
+            "serve",
+            "--info",
+            "--storage-quota=314159265",
+        ]
+        args.rsh = "ssh -i foo"
+        remote_repository._args = args
+        assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]

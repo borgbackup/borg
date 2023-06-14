@@ -1815,9 +1815,10 @@ class ArchiveFormatter(BaseFormatter):
         'id': 'internal ID of the archive',
         'hostname': 'hostname of host on which this archive was created',
         'username': 'username of user who created this archive',
+        'tam': 'TAM authentication state of this archive',
     }
     KEY_GROUPS = (
-        ('archive', 'name', 'barchive', 'comment', 'bcomment', 'id'),
+        ('archive', 'name', 'barchive', 'comment', 'bcomment', 'id', 'tam'),
         ('start', 'time', 'end', 'command_line'),
         ('hostname', 'username'),
     )
@@ -1868,6 +1869,7 @@ class ArchiveFormatter(BaseFormatter):
             'bcomment': partial(self.get_meta, 'comment', rs=False),
             'end': self.get_ts_end,
             'command_line': self.get_cmdline,
+            'tam': self.get_tam,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
         if self.json:
@@ -1917,6 +1919,9 @@ class ArchiveFormatter(BaseFormatter):
 
     def get_ts_end(self):
         return self.format_time(self.archive.ts_end)
+
+    def get_tam(self):
+        return 'verified' if self.archive.tam_verified else 'none'
 
     def format_time(self, ts):
         return OutputTimestamp(ts)

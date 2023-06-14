@@ -336,6 +336,7 @@ class Archive:
         self.name = name  # overwritten later with name from archive metadata
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
         self.comment = None
+        self.tam_verified = False
         self.checkpoint_interval = checkpoint_interval
         self.numeric_owner = numeric_owner
         self.noatime = noatime
@@ -378,7 +379,9 @@ class Archive:
 
     def _load_meta(self, id):
         data = self.key.decrypt(id, self.repository.get(id))
-        metadata = ArchiveItem(internal_dict=msgpack.unpackb(data, unicode_errors='surrogateescape'))
+        # we do not require TAM for archives, otherwise we can not even borg list a repo with old archives.
+        archive, self.tam_verified = self.key.unpack_and_verify_archive(data, force_tam_not_required=True)
+        metadata = ArchiveItem(internal_dict=archive)
         if metadata.version != 1:
             raise Exception('Unknown archive metadata version')
         return metadata

@@ -19,24 +19,28 @@ from .hashindex import H
 
 
 @pytest.fixture()
-def repository(tmpdir):
-    repository_location = os.path.join(str(tmpdir), "repository")
+def repository(tmp_path):
+    repository_location = os.fspath(tmp_path / "repository")
     repository = Repository(repository_location, exclusive=True, create=True)
     yield repository
 
 
 @pytest.fixture()
-def remote_repository(tmpdir):
+def remote_repository(tmp_path):
     if is_win32:
         pytest.skip("On Windows, we skip the remote tests.")
-    repo_location = Location("ssh://__testsuite__" + os.path.join(str(tmpdir), "repository"))
+    repo_location = Location("ssh://__testsuite__" + os.fspath(tmp_path / "repository"))
     return RemoteRepository(repo_location, exclusive=True, create=True)
 
 
 def reopen(repository, exclusive: Optional[bool] = True, create=False):
     if isinstance(repository, Repository):
+        if repository.io or repository.lock is not None:  # The repo should be closed before reopening
+            raise RuntimeError("Cannot support nested repository contexts.")
         return Repository(repository.path, exclusive=exclusive, create=create)
     elif isinstance(repository, RemoteRepository):
+        if repository.p or repository.sock is not None:  # The remote repo should be closed before reopening
+            raise RuntimeError("Cannot support nested repository contexts.")
         return RemoteRepository(repository.location, exclusive=exclusive, create=create)
 
 
@@ -91,10 +95,9 @@ def repo_dump(repository, label=None):
     print()
 
 
-@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
-def test_basic_operations(fixture, request):
-    repo = request.getfixturevalue(fixture)
-    with repo as repository:
+@pytest.mark.parametrize("fixture", [pytest.lazy_fixture("repository"), pytest.lazy_fixture("remote_repository")])
+def test_basic_operations(fixture):
+    with fixture as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"SOMEDATA"))
         key50 = H(50)
@@ -544,17 +547,17 @@ def test_shadowed_entries_are_preserved(repository):
         # if it's not sparse enough (symbolized by H(2) here).
         repository.delete(H(1))
         repository.put(H(2), fchunk(b"1"))
-        delete_segment = get_latest_segment()
+        del_segment = get_latest_segment()
         # We pretend these are mostly dense (not sparse) and won't be compacted
         del repository.compact[put_segment]
-        del repository.compact[delete_segment]
+        del repository.compact[del_segment]
         repository.commit(compact=True)
         # Now we perform an unrelated operation on the segment containing the DELETE,
         # causing it to be compacted.
         repository.delete(H(2))
         repository.commit(compact=True)
         assert repository.io.segment_exists(put_segment)
-        assert not repository.io.segment_exists(delete_segment)
+        assert not repository.io.segment_exists(del_segment)
         # Basic case, since the index survived this must be ok
         assert H(1) not in repository
         # Nuke index, force replay
@@ -698,7 +701,7 @@ def make_auxiliary(repository):
 
 
 def do_commit(repository):
-    with reopen(repository) as repository:
+    with repository:
         repository.put(H(0), fchunk(b"fox"))
         repository.commit(compact=False)
 
@@ -708,7 +711,6 @@ def test_corrupted_hints(repository):
         make_auxiliary(repository)
         with open(os.path.join(repository.path, "hints.1"), "ab") as fd:
             fd.write(b"123456789")
-
     do_commit(repository)
 
 
@@ -716,7 +718,6 @@ def test_deleted_hints(repository):
     with repository:
         make_auxiliary(repository)
         os.unlink(os.path.join(repository.path, "hints.1"))
-
     do_commit(repository)
 
 
@@ -724,7 +725,6 @@ def test_deleted_index(repository):
     with repository:
         make_auxiliary(repository)
         os.unlink(os.path.join(repository.path, "index.1"))
-
     do_commit(repository)
 
 
@@ -744,7 +744,6 @@ def test_index(repository):
         make_auxiliary(repository)
         with open(os.path.join(repository.path, "index.1"), "wb") as fd:
             fd.write(b"123456789")
-
     do_commit(repository)
 
 

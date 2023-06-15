@@ -1,8 +1,7 @@
 import logging
 import os
 import sys
-import tempfile
-from contextlib import ExitStack
+from typing import Optional
 from unittest.mock import patch
 
 import pytest
@@ -12,31 +11,11 @@ from ..helpers import Location
 from ..helpers import IntegrityError
 from ..helpers import msgpack
 from ..locking import Lock, LockFailed
+from ..platformflags import is_win32
 from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed
 from ..repository import Repository, LoggedIO, MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
 from ..repoobj import RepoObj
 from .hashindex import H
-
-
-class SingularRepositoryMaker:
-    # For now, this class is not used. Just a placeholder until I am sure if/how to incorporate it into project.
-    def __init__(self, exclusive=True, create=True):
-        self.current_repo = None
-        self.path = os.path.join(tempfile.mkdtemp(), "repository")
-        self.exclusive = exclusive
-        self.create = create
-        self.exit_stack = ExitStack()
-
-    def __enter__(self):
-        if self.current_repo is not None:
-            raise RuntimeError("Cannot re-enter a disposed repository.")
-        self.current_repo = self.exit_stack.enter_context(Repository(self.path, self.exclusive, self.create))
-        return self.current_repo
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        # Decide what needs to be done here.
-        # self.context_stack.undo()  # perhaps pass over args here
-        self.current_repo = None
 
 
 @pytest.fixture()
@@ -46,8 +25,26 @@ def repository(tmpdir):
     yield repository
 
 
-def reopen(repository, exclusive=True, create=False):
-    return Repository(repository.path, exclusive=exclusive, create=create)
+@pytest.fixture()
+def remote_repository(tmpdir):
+    if is_win32:
+        pytest.skip("On Windows, we skip the remote tests.")
+    repo_location = Location("ssh://__testsuite__" + os.path.join(str(tmpdir), "repository"))
+    return RemoteRepository(repo_location, exclusive=True, create=True)
+
+
+def reopen(repository, exclusive: Optional[bool] = True, create=False):
+    if isinstance(repository, Repository):
+        return Repository(repository.path, exclusive=exclusive, create=create)
+    elif isinstance(repository, RemoteRepository):
+        return RemoteRepository(repository.location, exclusive=exclusive, create=create)
+
+
+def get_path(repository):
+    if isinstance(repository, Repository):
+        return repository.path
+    elif isinstance(repository, RemoteRepository):
+        return repository.location.path
 
 
 def fchunk(data, meta=b""):
@@ -94,8 +91,10 @@ def repo_dump(repository, label=None):
     print()
 
 
-def test_basic_operations(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_basic_operations(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"SOMEDATA"))
         key50 = H(50)
@@ -114,8 +113,10 @@ def test_basic_operations(repository):
             assert pdchunk(repository.get(H(x))) == b"SOMEDATA"
 
 
-def test_multiple_transactions(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_multiple_transactions(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         repository.put(H(0), fchunk(b"foo"))
         repository.put(H(1), fchunk(b"foo"))
         repository.commit(compact=False)
@@ -125,8 +126,10 @@ def test_multiple_transactions(repository):
         assert pdchunk(repository.get(H(1))) == b"bar"
 
 
-def test_read_data(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_read_data(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         meta, data = b"meta", b"data"
         meta_len = RepoObj.meta_len_hdr.pack(len(meta))
         chunk_complete = meta_len + meta + data
@@ -138,8 +141,10 @@ def test_read_data(repository):
         assert repository.get(H(0), read_data=False) == chunk_short
 
 
-def test_consistency(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_consistency(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         repository.put(H(0), fchunk(b"foo"))
         assert pdchunk(repository.get(H(0))) == b"foo"
         repository.put(H(0), fchunk(b"foo2"))
@@ -151,8 +156,10 @@ def test_consistency(repository):
             repository.get(H(0))
 
 
-def test_consistency2(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_consistency2(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         repository.put(H(0), fchunk(b"foo"))
         assert pdchunk(repository.get(H(0))) == b"foo"
         repository.commit(compact=False)
@@ -162,17 +169,21 @@ def test_consistency2(repository):
         assert pdchunk(repository.get(H(0))) == b"foo"
 
 
-def test_overwrite_in_same_transaction(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_overwrite_in_same_transaction(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         repository.put(H(0), fchunk(b"foo"))
         repository.put(H(0), fchunk(b"foo2"))
         repository.commit(compact=False)
         assert pdchunk(repository.get(H(0))) == b"foo2"
 
 
-def test_single_kind_transactions(repository):
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_single_kind_transactions(fixture, request):
     # put
-    with repository:
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         repository.put(H(0), fchunk(b"foo"))
         repository.commit(compact=False)
 
@@ -187,8 +198,10 @@ def test_single_kind_transactions(repository):
         repository.commit(compact=False)
 
 
-def test_list(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_list(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"SOMEDATA"))
         repository.commit(compact=False)
@@ -203,8 +216,10 @@ def test_list(repository):
         assert len(repository.list(limit=50)) == 50
 
 
-def test_scan(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_scan(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"SOMEDATA"))
         repository.commit(compact=False)
@@ -221,8 +236,10 @@ def test_scan(repository):
             assert ids[x] == H(x)
 
 
-def test_scan_modify(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_scan_modify(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"ORIGINAL"))
         repository.commit(compact=False)
@@ -253,8 +270,10 @@ def test_scan_modify(repository):
         assert count == 100
 
 
-def test_max_data_size(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_max_data_size(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         max_data = b"x" * (MAX_DATA_SIZE - RepoObj.meta_len_hdr.size)
         repository.put(H(0), fchunk(max_data))
         assert pdchunk(repository.get(H(0))) == max_data
@@ -262,8 +281,10 @@ def test_max_data_size(repository):
             repository.put(H(1), fchunk(max_data + b"x"))
 
 
-def test_set_flags(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_set_flags(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         id = H(0)
         repository.put(id, fchunk(b""))
         assert repository.flags(id) == 0x00000000  # init == all zero
@@ -277,8 +298,10 @@ def test_set_flags(repository):
         assert repository.flags(id) == 0x00000000
 
 
-def test_get_flags(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_get_flags(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         id = H(0)
         repository.put(id, fchunk(b""))
         assert repository.flags(id) == 0x00000000  # init == all zero
@@ -289,8 +312,10 @@ def test_get_flags(repository):
         assert repository.flags(id, mask=0x80000000) == 0x80000000
 
 
-def test_flags_many(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_flags_many(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         ids_flagged = [H(0), H(1)]
         ids_default_flags = [H(2), H(3)]
         [repository.put(id, fchunk(b"")) for id in ids_flagged + ids_default_flags]
@@ -301,8 +326,10 @@ def test_flags_many(repository):
         assert list(repository.flags_many(ids_flagged, mask=0x0000FFFF)) == [0x0000BEEF, 0x0000BEEF]
 
 
-def test_flags_persistence(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_flags_persistence(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
         repository.put(H(0), fchunk(b"default"))
         repository.put(H(1), fchunk(b"one one zero"))
         # we do not set flags for H(0), so we can later check their default state.
@@ -416,6 +443,22 @@ def test_crash_before_write_index(repository):
     with reopen(repository) as repository:
         assert len(repository) == 3
         assert repository.check() is True
+
+
+def test_replay_lock_upgrade_old(repository):
+    with repository:
+        add_keys(repository)
+        for name in os.listdir(repository.path):
+            if name.startswith("index."):
+                os.unlink(os.path.join(repository.path, name))
+    with patch.object(Lock, "upgrade", side_effect=LockFailed) as upgrade:
+        with reopen(repository, exclusive=None) as repository:
+            # simulate old client that always does lock upgrades
+            # the repo is only locked by a shared read lock, but to replay segments,
+            # we need an exclusive write lock - check if the lock gets upgraded.
+            with pytest.raises(LockFailed):
+                len(repository)
+            upgrade.assert_called_once_with()
 
 
 def test_replay_lock_upgrade(repository):
@@ -655,7 +698,7 @@ def make_auxiliary(repository):
 
 
 def do_commit(repository):
-    with repository:
+    with reopen(repository) as repository:
         repository.put(H(0), fchunk(b"fox"))
         repository.commit(compact=False)
 
@@ -665,6 +708,7 @@ def test_corrupted_hints(repository):
         make_auxiliary(repository)
         with open(os.path.join(repository.path, "hints.1"), "ab") as fd:
             fd.write(b"123456789")
+
     do_commit(repository)
 
 
@@ -672,6 +716,7 @@ def test_deleted_hints(repository):
     with repository:
         make_auxiliary(repository)
         os.unlink(os.path.join(repository.path, "hints.1"))
+
     do_commit(repository)
 
 
@@ -679,6 +724,7 @@ def test_deleted_index(repository):
     with repository:
         make_auxiliary(repository)
         os.unlink(os.path.join(repository.path, "index.1"))
+
     do_commit(repository)
 
 
@@ -698,6 +744,7 @@ def test_index(repository):
         make_auxiliary(repository)
         with open(os.path.join(repository.path, "index.1"), "wb") as fd:
             fd.write(b"123456789")
+
     do_commit(repository)
 
 
@@ -707,7 +754,7 @@ def test_index_outside_transaction(repository):
         with open(os.path.join(repository.path, "index.1"), "wb") as fd:
             fd.write(b"123456789")
 
-    with repository:
+    with reopen(repository) as repository:
         assert len(repository) == 1
 
 
@@ -733,7 +780,7 @@ def test_index_corrupted(repository):
         make_auxiliary(repository)
         _corrupt_index(repository)
 
-    with repository:
+    with reopen(repository) as repository:
         # Data corruption is detected due to mismatching checksums
         # and fixed by rebuilding the index.
         assert len(repository) == 1
@@ -747,14 +794,13 @@ def test_index_corrupted_without_integrity(repository):
         integrity_path = os.path.join(repository.path, "integrity.1")
         os.unlink(integrity_path)
 
-    with repository:
+    with reopen(repository) as repository:
         # Since the corrupted key is not noticed, the repository still thinks
         # it contains one key...
         assert len(repository) == 1
-
-    with pytest.raises(Repository.ObjectNotFound):
-        # ... but the real, uncorrupted key is not found in the corrupted index.
-        repository.get(H(0))
+        with pytest.raises(Repository.ObjectNotFound):
+            # ... but the real, uncorrupted key is not found in the corrupted index.
+            repository.get(H(0))
 
 
 def test_unreadable_index(repository):
@@ -763,9 +809,8 @@ def test_unreadable_index(repository):
         index = os.path.join(repository.path, "index.1")
         os.unlink(index)
         os.mkdir(index)
-
-    with pytest.raises(OSError):
-        do_commit(repository)
+        with pytest.raises(OSError):
+            do_commit(repository)
 
 
 def test_unknown_integrity_version(repository):
@@ -774,23 +819,17 @@ def test_unknown_integrity_version(repository):
         make_auxiliary(repository)
         integrity_path = os.path.join(repository.path, "integrity.1")
         with open(integrity_path, "r+b") as fd:
-            msgpack.pack(
-                {
-                    # Borg only understands version 2
-                    b"version": 4.7
-                },
-                fd,
-            )
+            msgpack.pack({b"version": 4.7}, fd)  # Borg only understands version 2
             fd.truncate()
 
-    with repository:
+    with reopen(repository) as repository:
         # No issues accessing the repository
         assert len(repository) == 1
         assert pdchunk(repository.get(H(0))) == b"foo"
 
 
 def _subtly_corrupted_hints_setup(repository):
-    with repository:
+    with reopen(repository) as repository:
         repository.append_only = True
         assert len(repository) == 1
         assert pdchunk(repository.get(H(0))) == b"foo"
@@ -799,23 +838,25 @@ def _subtly_corrupted_hints_setup(repository):
         repository.commit(compact=False)
         repository.put(H(2), fchunk(b"bazz"))
         repository.commit(compact=False)
-        hints_path = os.path.join(repository.path, "hints.5")
-        with open(hints_path, "r+b") as fd:
-            hints = msgpack.unpack(fd)
-            fd.seek(0)
-            # Corrupt segment refcount
-            assert hints["segments"][2] == 1
-            hints["segments"][2] = 0
-            msgpack.pack(hints, fd)
-            fd.truncate()
+
+    hints_path = os.path.join(repository.path, "hints.5")
+    with open(hints_path, "r+b") as fd:
+        hints = msgpack.unpack(fd)
+        fd.seek(0)
+        # Corrupt segment refcount
+        assert hints["segments"][2] == 1
+        hints["segments"][2] = 0
+        msgpack.pack(hints, fd)
+        fd.truncate()
 
 
 def test_subtly_corrupted_hints(repository):
     with repository:
         make_auxiliary(repository)
+
     _subtly_corrupted_hints_setup(repository)
 
-    with repository:
+    with reopen(repository) as repository:
         repository.append_only = False
         repository.put(H(3), fchunk(b"1234"))
         # Do a compaction run. Succeeds, since the failed checksum prompted a rebuild of the index+hints.
@@ -829,10 +870,12 @@ def test_subtly_corrupted_hints(repository):
 def test_subtly_corrupted_hints_without_integrity(repository):
     with repository:
         make_auxiliary(repository)
+
     _subtly_corrupted_hints_setup(repository)
     integrity_path = os.path.join(repository.path, "integrity.5")
     os.unlink(integrity_path)
-    with repository:
+
+    with reopen(repository) as repository:
         repository.append_only = False
         repository.put(H(3), fchunk(b"1234"))
         # Do a compaction run.
@@ -846,10 +889,10 @@ def list_indices(repo_path):
     return [name for name in os.listdir(repo_path) if name.startswith("index.")]
 
 
-def check(repository, repair=False, status=True):
+def check(repository, repo_path, repair=False, status=True):
     assert repository.check(repair=repair) == status
     # Make sure no tmp files are left behind
-    tmp_files = [name for name in os.listdir(repository.path) if "tmp" in name]
+    tmp_files = [name for name in os.listdir(repo_path) if "tmp" in name]
     assert tmp_files == [], "Found tmp files"
 
 
@@ -897,22 +940,25 @@ def list_objects(repository):
     return {int(key) for key in repository.list()}
 
 
-def test_repair_corrupted_segment(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_repair_corrupted_segment(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
+        repo_path = get_path(repository)
         add_objects(repository, [[1, 2, 3], [4, 5], [6]])
         assert {1, 2, 3, 4, 5, 6} == list_objects(repository)
-        check(repository, status=True)
-        corrupt_object(repository.path, 5)
+        check(repository, repo_path, status=True)
+        corrupt_object(repo_path, 5)
         with pytest.raises(IntegrityError):
             get_objects(repository, 5)
         repository.rollback()
         # Make sure a regular check does not repair anything
-        check(repository, status=False)
-        check(repository, status=False)
+        check(repository, repo_path, status=False)
+        check(repository, repo_path, status=False)
         # Make sure a repair actually repairs the repo
-        check(repository, repair=True, status=True)
+        check(repository, repo_path, repair=True, status=True)
         get_objects(repository, 4)
-        check(repository, status=True)
+        check(repository, repo_path, status=True)
         assert {1, 2, 3, 4, 6} == list_objects(repository)
 
 
@@ -920,10 +966,10 @@ def test_repair_missing_segment(repository):
     with repository:
         add_objects(repository, [[1, 2, 3], [4, 5, 6]])
         assert {1, 2, 3, 4, 5, 6} == list_objects(repository)
-        check(repository, status=True)
+        check(repository, repository.path, status=True)
         delete_segment(repository, 2)
         repository.rollback()
-        check(repository, repair=True, status=True)
+        check(repository, repository.path, repair=True, status=True)
         assert {1, 2, 3} == list_objects(repository)
 
 
@@ -936,53 +982,65 @@ def test_repair_missing_commit_segment(repository):
         assert {1, 2, 3} == list_objects(repository)
 
 
-def test_repair_corrupted_commit_segment(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_repair_corrupted_commit_segment(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
+        repo_path = get_path(repository)
         add_objects(repository, [[1, 2, 3], [4, 5, 6]])
-        with open(os.path.join(repository.path, "data", "0", "3"), "r+b") as fd:
+        with open(os.path.join(repo_path, "data", "0", "3"), "r+b") as fd:
             fd.seek(-1, os.SEEK_END)
             fd.write(b"X")
         with pytest.raises(Repository.ObjectNotFound):
             get_objects(repository, 4)
-        check(repository, status=True)
+        check(repository, repo_path, status=True)
         get_objects(repository, 3)
         assert {1, 2, 3} == list_objects(repository)
 
 
-def test_repair_no_commits(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_repair_no_commits(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
+        repo_path = get_path(repository)
         add_objects(repository, [[1, 2, 3]])
-        with open(os.path.join(repository.path, "data", "0", "1"), "r+b") as fd:
+        with open(os.path.join(repo_path, "data", "0", "1"), "r+b") as fd:
             fd.seek(-1, os.SEEK_END)
             fd.write(b"X")
         with pytest.raises(Repository.CheckNeeded):
             get_objects(repository, 4)
-        check(repository, status=False)
-        check(repository, status=False)
-        assert list_indices(repository.path) == ["index.1"]
-        check(repository, repair=True, status=True)
-        assert list_indices(repository.path) == ["index.2"]
-        check(repository, status=True)
+        check(repository, repo_path, status=False)
+        check(repository, repo_path, status=False)
+        assert list_indices(repo_path) == ["index.1"]
+        check(repository, repo_path, repair=True, status=True)
+        assert list_indices(repo_path) == ["index.2"]
+        check(repository, repo_path, status=True)
         get_objects(repository, 3)
         assert {1, 2, 3} == list_objects(repository)
 
 
-def test_repair_missing_index(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_repair_missing_index(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
+        repo_path = get_path(repository)
         add_objects(repository, [[1, 2, 3], [4, 5, 6]])
-        delete_index(repository.path)
-        check(repository, status=True)
+        delete_index(repo_path)
+        check(repository, repo_path, status=True)
         get_objects(repository, 4)
         assert {1, 2, 3, 4, 5, 6} == list_objects(repository)
 
 
-def test_repair_index_too_new(repository):
-    with repository:
+@pytest.mark.parametrize("fixture", ["repository", "remote_repository"])
+def test_repair_index_too_new(fixture, request):
+    repo = request.getfixturevalue(fixture)
+    with repo as repository:
+        repo_path = get_path(repository)
         add_objects(repository, [[1, 2, 3], [4, 5, 6]])
-        assert list_indices(repository.path) == ["index.3"]
-        rename_index(repository.path, "index.100")
-        check(repository, status=True)
-        assert list_indices(repository.path) == ["index.3"]
+        assert list_indices(repo_path) == ["index.3"]
+        rename_index(repo_path, "index.100")
+        check(repository, repo_path, status=True)
+        assert list_indices(repo_path) == ["index.3"]
         get_objects(repository, 4)
         assert {1, 2, 3, 4, 5, 6} == list_objects(repository)
 
@@ -997,7 +1055,7 @@ def test_crash_before_compact(repository):
             compact.assert_called_once_with(0.1)
 
     with reopen(repository) as repository:
-        check(repository, repair=True)
+        check(repository, repository.path, repair=True)
         assert pdchunk(repository.get(H(0))) == b"data2"
 
 
@@ -1041,13 +1099,6 @@ def test_hints_behaviour(repository):
         assert 0 not in repository.segments
 
 
-@pytest.fixture()
-def remote_repository(tmpdir):
-    repository_location = Location("ssh://__testsuite__" + os.path.join(str(tmpdir), "repository"))
-    remote_repository = RemoteRepository(repository_location, exclusive=True, create=True)
-    return remote_repository
-
-
 def _get_mock_args():
     class MockArgs:
         remote_path = "borg"
@@ -1062,7 +1113,6 @@ def _get_mock_args():
     return MockArgs()
 
 
-# @pytest.mark.skipif(is_win32, reason="skip remote tests on windows")
 def test_remote_invalid_rpc(remote_repository):
     with remote_repository:
         with pytest.raises(InvalidRPCMethod):
@@ -1171,3 +1221,18 @@ def test_remote_borg_cmd(remote_repository):
         args.rsh = "ssh -i foo"
         remote_repository._args = args
         assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]
+
+
+def test_remote_crash_before_compact():
+    # skip this test, we can't mock-patch a Repository class in another process!
+    pass
+
+
+def test_remote_repair_missing_commit_segment():
+    # skip this test, files in RemoteRepository cannot be deleted
+    pass
+
+
+def test_remote_repair_missing_segment():
+    # skip this test, files in RemoteRepository cannot be deleted
+    pass

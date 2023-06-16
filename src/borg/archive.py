@@ -959,7 +959,7 @@ Utilization of max. archive size: {csize_max:.0%}
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)
         setattr(metadata, key, value)
-        data = msgpack.packb(metadata.as_dict())
+        data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, data, self.stats)
         self.manifest.archives[self.name] = (new_id, metadata.time)
@@ -2061,7 +2061,17 @@ class ArchiveChecker:
                     self.error_found = True
                     del self.manifest.archives[info.name]
                     continue
-                archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
+                try:
+                    archive, verified = self.key.unpack_and_verify_archive(data, force_tam_not_required=False)
+                except IntegrityError as integrity_error:
+                    # looks like there is a TAM issue with this archive, this might be an attack!
+                    # when upgrading to borg 1.2.5, users are expected to TAM-authenticate all archives they
+                    # trust, so there shouldn't be any without TAM.
+                    logger.error('Archive TAM authentication issue for archive %s: %s', info.name, integrity_error)
+                    self.error_found = True
+                    del self.manifest.archives[info.name]
+                    continue
+                archive = ArchiveItem(internal_dict=archive)
                 if archive.version != 1:
                     raise Exception('Unknown archive metadata version')
                 archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
@@ -2075,7 +2085,7 @@ class ArchiveChecker:
                 for previous_item_id in archive.items:
                     mark_as_possibly_superseded(previous_item_id)
                 archive.items = items_buffer.chunks
-                data = msgpack.packb(archive.as_dict())
+                data = self.key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive')
                 new_archive_id = self.key.id_hash(data)
                 cdata = self.key.encrypt(data)
                 add_reference(new_archive_id, len(data), len(cdata), cdata)

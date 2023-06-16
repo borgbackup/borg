@@ -1190,7 +1190,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('delete', '--cache-only', self.repository_location)
         create_json = json.loads(self.cmd('create', '--no-cache-sync', self.repository_location + '::test', 'input',
                                           '--json', '--error'))  # ignore experimental warning
-        info_json = json.loads(self.cmd('info', self.repository_location + '::test', '--json'))
+        info_json = json.loads(self.cmd('info', self.repository_location + '::test', '--json', '--error'))  # ign warn
         create_stats = create_json['cache']['stats']
         info_stats = info_json['cache']['stats']
         assert create_stats == info_stats

@@ -29,7 +29,7 @@ Configuring the system
 First, create the ``/etc/backups`` directory (as root).
 All configuration goes into this directory.
 
-Find out the UUID of the (GPT) partition table of your backup disk (here assumed to be /dev/sdz):
+Find out the ID of the partition table of your backup disk (here assumed to be /dev/sdz):
     lsblk --fs -o +PTUUID /dev/sdz
 
 Then, create ``/etc/backups/40-backup.rules`` with the following content (all on one line)::

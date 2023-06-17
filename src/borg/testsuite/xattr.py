@@ -7,9 +7,10 @@ from ..xattr import is_enabled, getxattr, setxattr, listxattr
 from ..platformflags import is_linux
 
 
-@pytest.mark.skipif(not is_enabled(), reason="xattr is not enabled on filesystem")
 @pytest.fixture()
 def tempfile_symlink(tmp_path):
+    if not is_enabled():
+        pytest.skip("xattr not enabled on filesystem")
     temp_file = open(os.fspath(tmp_path / "xattr"), "w")
     symlink = temp_file.name + ".symlink"
     os.symlink(temp_file.name, symlink)

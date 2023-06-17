@@ -1,5 +1,4 @@
 import os
-import tempfile
 
 import pytest
 
@@ -8,10 +7,10 @@ from ..xattr import is_enabled, getxattr, setxattr, listxattr
 from ..platformflags import is_linux
 
 
-@pytest.mark.skipif(not is_enabled(), "xattr not enabled on filesystem")
+@pytest.mark.skipif(not is_enabled(), reason="xattr is not enabled on filesystem")
 @pytest.fixture()
-def temp_symlink():
-    temp_file = tempfile.NamedTemporaryFile()
+def tempfile_symlink(tmp_path):
+    temp_file = open(os.fspath(tmp_path / "xattr"), "w")
     symlink = temp_file.name + ".symlink"
     os.symlink(temp_file.name, symlink)
     yield temp_file, symlink
@@ -25,8 +24,8 @@ def assert_equal_se(is_x, want_x):
     assert is_x == want_x
 
 
-def test(temp_symlink):
-    temp_file, symlink = temp_symlink
+def test(tempfile_symlink):
+    temp_file, symlink = tempfile_symlink
     tmp_fn = os.fsencode(temp_file.name)
     tmp_lfn = os.fsencode(symlink)
     tmp_fd = temp_file.fileno()
@@ -52,8 +51,8 @@ def test(temp_symlink):
     assert getxattr(tmp_fn, b"user.empty") == b""
 
 
-def test_listxattr_buffer_growth(temp_symlink):
-    temp_file, symlink = temp_symlink
+def test_listxattr_buffer_growth(tempfile_symlink):
+    temp_file, symlink = tempfile_symlink
     tmp_fn = os.fsencode(temp_file.name)
     # make it work even with ext4, which imposes rather low limits
     buffer.resize(size=64, init=True)
@@ -66,8 +65,8 @@ def test_listxattr_buffer_growth(temp_symlink):
     assert len(buffer) > 64
 
 
-def test_getxattr_buffer_growth(temp_symlink):
-    temp_file, symlink = temp_symlink
+def test_getxattr_buffer_growth(tempfile_symlink):
+    temp_file, symlink = tempfile_symlink
     tmp_fn = os.fsencode(temp_file.name)
     # make it work even with ext4, which imposes rather low limits
     buffer.resize(size=64, init=True)

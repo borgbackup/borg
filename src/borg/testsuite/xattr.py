@@ -10,7 +10,7 @@ from ..platformflags import is_linux
 @pytest.fixture()
 def tempfile_symlink(tmp_path):
     if not is_enabled(tmp_path):
-        pytest.skip("Extended attributes are not enabled on filesystem")
+        pytest.skip("xattr not enabled on filesystem")
     with open(os.fspath(tmp_path / "xattr"), "w") as temp_file:
         symlink = temp_file.name + ".symlink"
         os.symlink(temp_file.name, symlink)

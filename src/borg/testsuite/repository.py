@@ -39,6 +39,11 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("repo_fixtures", ["repository", "remote_repository"])
 
 
+def get_repository_from_fixture(repo_fixtures, request):
+    # Returns the repository object from the fixture
+    return request.getfixturevalue(repo_fixtures)
+
+
 def reopen(repository, exclusive: Optional[bool] = True, create=False):
     # reopening a local repo
     if isinstance(repository, Repository):
@@ -105,8 +110,7 @@ def repo_dump(repository, label=None):
 
 
 def test_basic_operations(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"SOMEDATA"))
         key50 = H(50)
@@ -125,8 +129,7 @@ def test_basic_operations(repo_fixtures, request):
 
 
 def test_multiple_transactions(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository.put(H(0), fchunk(b"foo"))
         repository.put(H(1), fchunk(b"foo"))
         repository.commit(compact=False)
@@ -137,8 +140,7 @@ def test_multiple_transactions(repo_fixtures, request):
 
 
 def test_read_data(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         meta, data = b"meta", b"data"
         meta_len = RepoObj.meta_len_hdr.pack(len(meta))
         chunk_complete = meta_len + meta + data
@@ -151,8 +153,7 @@ def test_read_data(repo_fixtures, request):
 
 
 def test_consistency(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository.put(H(0), fchunk(b"foo"))
         assert pdchunk(repository.get(H(0))) == b"foo"
         repository.put(H(0), fchunk(b"foo2"))
@@ -165,8 +166,7 @@ def test_consistency(repo_fixtures, request):
 
 
 def test_consistency2(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository.put(H(0), fchunk(b"foo"))
         assert pdchunk(repository.get(H(0))) == b"foo"
         repository.commit(compact=False)
@@ -177,8 +177,7 @@ def test_consistency2(repo_fixtures, request):
 
 
 def test_overwrite_in_same_transaction(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository.put(H(0), fchunk(b"foo"))
         repository.put(H(0), fchunk(b"foo2"))
         repository.commit(compact=False)
@@ -187,8 +186,7 @@ def test_overwrite_in_same_transaction(repo_fixtures, request):
 
 def test_single_kind_transactions(repo_fixtures, request):
     # put
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository.put(H(0), fchunk(b"foo"))
         repository.commit(compact=False)
     # replace
@@ -202,8 +200,7 @@ def test_single_kind_transactions(repo_fixtures, request):
 
 
 def test_list(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"SOMEDATA"))
         repository.commit(compact=False)
@@ -219,8 +216,7 @@ def test_list(repo_fixtures, request):
 
 
 def test_scan(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"SOMEDATA"))
         repository.commit(compact=False)
@@ -238,8 +234,7 @@ def test_scan(repo_fixtures, request):
 
 
 def test_scan_modify(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
             repository.put(H(x), fchunk(b"ORIGINAL"))
         repository.commit(compact=False)
@@ -271,8 +266,7 @@ def test_scan_modify(repo_fixtures, request):
 
 
 def test_max_data_size(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         max_data = b"x" * (MAX_DATA_SIZE - RepoObj.meta_len_hdr.size)
         repository.put(H(0), fchunk(max_data))
         assert pdchunk(repository.get(H(0))) == max_data
@@ -281,8 +275,7 @@ def test_max_data_size(repo_fixtures, request):
 
 
 def test_set_flags(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         id = H(0)
         repository.put(id, fchunk(b""))
         assert repository.flags(id) == 0x00000000  # init == all zero
@@ -297,8 +290,7 @@ def test_set_flags(repo_fixtures, request):
 
 
 def test_get_flags(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         id = H(0)
         repository.put(id, fchunk(b""))
         assert repository.flags(id) == 0x00000000  # init == all zero
@@ -310,8 +302,7 @@ def test_get_flags(repo_fixtures, request):
 
 
 def test_flags_many(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         ids_flagged = [H(0), H(1)]
         ids_default_flags = [H(2), H(3)]
         [repository.put(id, fchunk(b"")) for id in ids_flagged + ids_default_flags]
@@ -323,8 +314,7 @@ def test_flags_many(repo_fixtures, request):
 
 
 def test_flags_persistence(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repository.put(H(0), fchunk(b"default"))
         repository.put(H(1), fchunk(b"one one zero"))
         # we do not set flags for H(0), so we can later check their default state.
@@ -391,7 +381,6 @@ def test_uncommitted_garbage(repository):
         last_segment = repository.io.get_latest_segment()
         with open(repository.io.segment_filename(last_segment + 1), "wb") as f:
             f.write(MAGIC + b"crapcrapcrap")
-
     with reopen(repository) as repository:
         # usually, opening the repo and starting a transaction should trigger a cleanup.
         repository.put(H(0), fchunk(b"bar"))  # this may trigger compact_segments()
@@ -405,7 +394,6 @@ def test_replay_of_missing_index(repository):
         for name in os.listdir(repository.path):
             if name.startswith("index."):
                 os.unlink(os.path.join(repository.path, name))
-
     with reopen(repository) as repository:
         assert len(repository) == 3
         assert repository.check() is True
@@ -419,7 +407,6 @@ def test_crash_before_compact_segments(repository):
             repository.commit(compact=True)
         except TypeError:
             pass
-
     with reopen(repository) as repository:
         assert len(repository) == 3
         assert repository.check() is True
@@ -433,7 +420,6 @@ def test_crash_before_write_index(repository):
             repository.commit(compact=False)
         except TypeError:
             pass
-
     with reopen(repository) as repository:
         assert len(repository) == 3
         assert repository.check() is True
@@ -461,7 +447,6 @@ def test_replay_lock_upgrade(repository):
         for name in os.listdir(repository.path):
             if name.startswith("index."):
                 os.unlink(os.path.join(repository.path, name))
-
     with patch.object(Lock, "upgrade", side_effect=LockFailed) as upgrade:
         with reopen(repository, exclusive=False) as repository:
             # current client usually does not do lock upgrade, except for replay
@@ -480,7 +465,6 @@ def test_crash_before_deleting_compacted_segments(repository):
             repository.commit(compact=False)
         except TypeError:
             pass
-
     with reopen(repository) as repository:
         assert len(repository) == 3
         assert repository.check() is True
@@ -490,7 +474,6 @@ def test_crash_before_deleting_compacted_segments(repository):
 def test_ignores_commit_tag_in_data(repository):
     with repository:
         repository.put(H(0), LoggedIO.COMMIT)
-
     with reopen(repository) as repository:
         io = repository.io
         assert not io.is_committed_segment(io.get_latest_segment())
@@ -574,7 +557,7 @@ def test_shadow_index_rollback(repository):
         repository.rollback()
         repo_dump(repository, "r")
         repository.put(H(2), fchunk(b"1"))
-        # After the rollback segment 4 shouldn't be considered anymore
+        # After the rollback, segment 4 shouldn't be considered anymore
         assert repository.shadow_index[H(1)] == []  # because the delete is considered unstable
 
 
@@ -616,7 +599,6 @@ def test_additional_free_space(repository):
         add_keys(repository)
         repository.config.set("repository", "additional_free_space", "1000T")
         repository.save_key(b"shortcut to save_config")
-
     with reopen(repository) as repository:
         repository.put(H(0), fchunk(b"foobar"))
         with pytest.raises(Repository.InsufficientFreeSpaceError):
@@ -645,7 +627,6 @@ def test_tracking(repository):
         assert repository.storage_quota_use == len(ch1) + len(ch2) + 2 * (41 + 8)  # we have not compacted yet
         repository.commit(compact=False)
         assert repository.storage_quota_use == len(ch1) + len(ch2) + 2 * (41 + 8)  # we have not compacted yet
-
     with reopen(repository) as repository:
         # Open new transaction; hints and thus quota data is not loaded unless needed.
         ch3 = fchunk(b"")
@@ -673,7 +654,6 @@ def test_exceed_quota(repository):
         with pytest.raises(Repository.StorageQuotaExceeded):
             repository.commit(compact=False)
         assert repository.storage_quota_use == len(ch1) + len(ch2) + (41 + 8) * 2  # check ch2!?
-
     with reopen(repository) as repository:
         repository.storage_quota = 150
         # Open new transaction; hints and thus quota data is not loaded unless needed.
@@ -811,7 +791,6 @@ def _subtly_corrupted_hints_setup(repository):
         repository.commit(compact=False)
         repository.put(H(2), fchunk(b"bazz"))
         repository.commit(compact=False)
-
     hints_path = os.path.join(repository.path, "hints.5")
     with open(hints_path, "r+b") as fd:
         hints = msgpack.unpack(fd)
@@ -831,7 +810,6 @@ def test_subtly_corrupted_hints(repository):
         repository.put(H(3), fchunk(b"1234"))
         # Do a compaction run. Succeeds, since the failed checksum prompted a rebuild of the index+hints.
         repository.commit(compact=True)
-
         assert len(repository) == 4
         assert pdchunk(repository.get(H(0))) == b"foo"
         assert pdchunk(repository.get(H(1))) == b"bar"
@@ -909,8 +887,7 @@ def list_objects(repository):
 
 
 def test_repair_corrupted_segment(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repo_path = get_path(repository)
         add_objects(repository, [[1, 2, 3], [4, 5], [6]])
         assert {1, 2, 3, 4, 5, 6} == list_objects(repository)
@@ -950,8 +927,7 @@ def test_repair_missing_commit_segment(repository):
 
 
 def test_repair_corrupted_commit_segment(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repo_path = get_path(repository)
         add_objects(repository, [[1, 2, 3], [4, 5, 6]])
         with open(os.path.join(repo_path, "data", "0", "3"), "r+b") as fd:
@@ -965,8 +941,7 @@ def test_repair_corrupted_commit_segment(repo_fixtures, request):
 
 
 def test_repair_no_commits(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repo_path = get_path(repository)
         add_objects(repository, [[1, 2, 3]])
         with open(os.path.join(repo_path, "data", "0", "1"), "r+b") as fd:
@@ -985,8 +960,7 @@ def test_repair_no_commits(repo_fixtures, request):
 
 
 def test_repair_missing_index(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repo_path = get_path(repository)
         add_objects(repository, [[1, 2, 3], [4, 5, 6]])
         delete_index(repo_path)
@@ -996,8 +970,7 @@ def test_repair_missing_index(repo_fixtures, request):
 
 
 def test_repair_index_too_new(repo_fixtures, request):
-    repo = request.getfixturevalue(repo_fixtures)
-    with repo as repository:
+    with get_repository_from_fixture(repo_fixtures, request) as repository:
         repo_path = get_path(repository)
         add_objects(repository, [[1, 2, 3], [4, 5, 6]])
         assert list_indices(repo_path) == ["index.3"]
@@ -1016,7 +989,6 @@ def test_crash_before_compact(repository):
         with patch.object(Repository, "compact_segments") as compact:
             repository.commit(compact=True)
             compact.assert_called_once_with(0.1)
-
     with reopen(repository) as repository:
         check(repository, repository.path, repair=True)
         assert pdchunk(repository.get(H(0))) == b"data2"
@@ -1030,7 +1002,6 @@ def test_hints_persistence(repository):
         shadow_index_expected = repository.shadow_index
         compact_expected = repository.compact
         segments_expected = repository.segments
-
     # close and re-open the repository (create fresh Repository instance) to
     # check whether hints were persisted to / reloaded from disk
     with reopen(repository) as repository:
@@ -1055,7 +1026,7 @@ def test_hints_behaviour(repository):
         assert 0 in repository.compact  # segment 0 can be compacted
         repository.put(H(42), fchunk(b"foobar"))  # see also do_compact()
         repository.commit(compact=True, threshold=0.0)  # compact completely!
-        # nothing to compact anymore! no info left about stuff that does not exist any more:
+        # nothing to compact anymore! no info left about stuff that does not exist anymore:
         assert H(0) not in repository.shadow_index
         # segment 0 was compacted away, no info about it left:
         assert 0 not in repository.compact

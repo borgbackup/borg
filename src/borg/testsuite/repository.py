@@ -33,26 +33,24 @@ def remote_repository(tmp_path):
 
 
 def pytest_generate_tests(metafunc):
-    # some tests are run on both local and remote repos
+    # parameterizes tests that run on both local and remote repos
     if "repo_fixtures" in metafunc.fixturenames:
         metafunc.parametrize("repo_fixtures", ["repository", "remote_repository"])
 
 
 def get_repository_from_fixture(repo_fixtures, request):
-    # for tests that run on both local and remote repos, this gets the repo object from the fixture
+    # returns the repo object from the fixture for tests that run on both local and remote repos
     return request.getfixturevalue(repo_fixtures)
 
 
 def reopen(repository, exclusive: Optional[bool] = True, create=False):
-    # reopening a closed local repo
     if isinstance(repository, Repository):
-        if repository.io is not None and repository.lock is not None:  # this ensures the repo is closed
+        if repository.io is not None or repository.lock is not None:
             raise RuntimeError("Repo must be closed before a reopen. Cannot support nested repository contexts.")
         return Repository(repository.path, exclusive=exclusive, create=create)
 
-    # reopening a closed remote repo
     elif isinstance(repository, RemoteRepository):
-        if repository.p is not None and repository.sock is not None:  # this ensures remote repo is closed
+        if repository.p is not None or repository.sock is not None:
             raise RuntimeError("Remote repo must be closed before a reopen. Cannot support nested repository contexts.")
         return RemoteRepository(repository.location, exclusive=exclusive, create=create)
 

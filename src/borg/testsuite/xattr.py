@@ -9,13 +9,12 @@ from ..platformflags import is_linux
 
 @pytest.fixture()
 def tempfile_symlink(tmp_path):
-    if not is_enabled():
+    if not is_enabled(tmp_path):
         pytest.skip("xattr not enabled on filesystem")
-    temp_file = open(os.fspath(tmp_path / "xattr"), "w")
-    symlink = temp_file.name + ".symlink"
-    os.symlink(temp_file.name, symlink)
-    yield temp_file, symlink
-    os.unlink(symlink)
+    with open(os.fspath(tmp_path / "xattr"), "w") as temp_file:
+        symlink = temp_file.name + ".symlink"
+        os.symlink(temp_file.name, symlink)
+        yield temp_file, symlink
 
 
 def assert_equal_se(is_x, want_x):

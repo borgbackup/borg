@@ -33,7 +33,7 @@ def remote_repository(tmp_path):
 
 
 def pytest_generate_tests(metafunc):
-    # parameterizes tests that run on both local and remote repos
+    # Generates tests that run on both local and remote repos
     if "repo_fixtures" in metafunc.fixturenames:
         metafunc.parametrize("repo_fixtures", ["repository", "remote_repository"])
 

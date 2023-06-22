@@ -296,7 +296,7 @@ def test_backup_io_iter():
         assert False, "StopIteration handled incorrectly"
 
 
-def test_get_item_uid_gid_old():
+def test_get_item_uid_gid():
     # test requires that:
     # - a user/group name for the current process' real uid/gid exists.
     # - a system user/group udoesnotexist:gdoesnotexist does NOT exist.

@@ -900,6 +900,7 @@ def test_repair_corrupted_segment(repo_fixtures, request):
 
 
 def test_repair_missing_segment(repository):
+    # only test on local repo - files in RemoteRepository cannot be deleted
     with repository:
         add_objects(repository, [[1, 2, 3], [4, 5, 6]])
         assert {1, 2, 3, 4, 5, 6} == list_objects(repository)
@@ -911,6 +912,7 @@ def test_repair_missing_segment(repository):
 
 
 def test_repair_missing_commit_segment(repository):
+    # only test on local repo - files in RemoteRepository cannot be deleted
     with repository:
         add_objects(repository, [[1, 2, 3], [4, 5, 6]])
         delete_segment(repository, 3)
@@ -975,6 +977,7 @@ def test_repair_index_too_new(repo_fixtures, request):
 
 
 def test_crash_before_compact(repository):
+    # only test on local repo - we can't mock-patch a RemoteRepository class in another process!
     with repository:
         repository.put(H(0), fchunk(b"data"))
         repository.put(H(0), fchunk(b"data2"))
@@ -1148,18 +1151,3 @@ def test_remote_borg_cmd(remote_repository):
         args.rsh = "ssh -i foo"
         remote_repository._args = args
         assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]
-
-
-def test_remote_crash_before_compact():
-    # skip this test, we can't mock-patch a Repository class in another process!
-    pass
-
-
-def test_remote_repair_missing_commit_segment():
-    # skip this test, files in RemoteRepository cannot be deleted
-    pass
-
-
-def test_remote_repair_missing_segment():
-    # skip this test, files in RemoteRepository cannot be deleted
-    pass

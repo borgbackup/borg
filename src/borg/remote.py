@@ -358,6 +358,7 @@ class RepositoryServer:  # pragma: no cover
             storage_quota=self.storage_quota,
             exclusive=exclusive,
             make_parent_dirs=make_parent_dirs,
+            send_log_cb=self.send_queued_log,
         )
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id

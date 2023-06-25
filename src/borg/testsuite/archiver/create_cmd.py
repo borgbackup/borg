@@ -103,7 +103,6 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
 
-    @pytest.mark.skipif(is_win32, reason="still broken on windows")
     def test_archived_paths(self):
         # As borg comes from the POSIX (Linux, UNIX) world, a lot of stuff assumes path separators
         # to be slashes "/", e.g.: in archived items, for pattern matching.

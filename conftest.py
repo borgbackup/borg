@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from configparser import ConfigParser
+from datetime import datetime
 from io import StringIO, BytesIO
 
 import pytest
@@ -14,7 +15,7 @@ import pytest
 from borg import helpers, platform, xattr
 from borg.archive import Archive
 from borg.cache import Cache
-from borg.constants import EXIT_SUCCESS, CACHE_TAG_NAME, CACHE_TAG_CONTENTS
+from borg.constants import EXIT_SUCCESS, CACHE_TAG_NAME, CACHE_TAG_CONTENTS, ISO_FORMAT
 from borg.helpers import bin_to_hex
 from borg.manifest import Manifest
 from borg.platformflags import is_win32
@@ -113,6 +114,7 @@ class ArchiverSetup:
     PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
 
     src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "src", "borg", "archiver"))
+    src_file = "archiver/__init__.py"  # relative path of one file in src_dir
 
     EXE: str = None  # python source based
     FORK_DEFAULT = False
@@ -514,3 +516,12 @@ def remote_prefix(archiver_setup):
 def archiver_binary_base(archiver_setup):
     archiver_setup.EXE = "borg.exe"
     archiver_setup.FORK_DEFAULT = True
+
+
+@pytest.fixture()
+def checkts(ts):
+    def check_ts():
+        # check if the timestamp is in the expected format
+        assert datetime.strptime(ts, ISO_FORMAT + "%z")  # must not raise
+
+    return check_ts()

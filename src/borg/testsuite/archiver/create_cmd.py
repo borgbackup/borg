@@ -110,8 +110,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # To make our lives easier and to support cross-platform extraction we always use slashes.
         # Similarly, archived paths are expected to be full, but relative (have no leading slash).
         full_path = os.path.abspath(os.path.join(self.input_path, "test"))
-        # remove windows drive letter, if any:
-        posix_path = full_path[2:] if full_path[1] == ":" else full_path
+        # remove colon from windows drive letter, if any:
+        posix_path = full_path.replace(":", "") if full_path[1] == ":" else full_path
         # only needed on windows in case there are backslashes:
         posix_path = posix_path.replace("\\", "/")
         # no leading slash in borg archives:

@@ -4095,7 +4095,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             repository.commit(compact=False)
         output = self.cmd('list', '--debug', self.repository_location)
         assert 'archive1234' in output
-        assert 'TAM not found and not required' in output
+        assert 'Manifest TAM not found and not required' in output
         # Run upgrade
         self.cmd('upgrade', '--tam', self.repository_location)
         # Manifest must be authenticated now

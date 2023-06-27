@@ -1,3 +1,4 @@
+import contextlib
 import errno
 import io
 import os
@@ -6,7 +7,7 @@ import subprocess
 import sys
 import time
 from configparser import ConfigParser
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from io import StringIO, BytesIO
 
 import pytest
@@ -16,7 +17,7 @@ from borg import helpers, platform, xattr
 from borg.archive import Archive
 from borg.cache import Cache
 from borg.constants import EXIT_SUCCESS, CACHE_TAG_NAME, CACHE_TAG_CONTENTS, ISO_FORMAT
-from borg.helpers import bin_to_hex
+from borg.helpers import bin_to_hex, msgpack
 from borg.manifest import Manifest
 from borg.platformflags import is_win32
 from borg.repository import Repository
@@ -267,9 +268,9 @@ def open_archive(archiver_setup):
 
 
 @pytest.fixture()
-def open_repository(self):
+def open_repository(archiver_setup):
     def repo():
-        return Repository(self.repository_path, exclusive=True)
+        return Repository(archiver_setup.repository_path, exclusive=True)
 
     return repo
 
@@ -486,30 +487,59 @@ def _assert_test_keep_tagged(archiver_setup, cmd_fixture):
 
 @pytest.fixture()
 def check_cache(archiver_setup, cmd_fixture, open_repository):
-    # First run a regular borg check
-    cmd_fixture(f"--repo={archiver_setup.repository_location}", "check")
-    # Then check that the cache on disk matches exactly what's in the repo.
-    with open_repository() as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-        with Cache(repository, manifest, sync=False) as cache:
-            original_chunks = cache.chunks
-        Cache.destroy(repository)
-        with Cache(repository, manifest) as cache:
-            correct_chunks = cache.chunks
-    assert original_chunks is not correct_chunks
-    seen = set()
-    for id, (refcount, size) in correct_chunks.iteritems():
-        o_refcount, o_size = original_chunks[id]
-        assert refcount == o_refcount
-        assert size == o_size
-        seen.add(id)
-    for id, (refcount, size) in original_chunks.iteritems():
-        assert id in seen
+    def check_the_cache():
+        # First run a regular borg check
+        cmd_fixture(f"--repo={archiver_setup.repository_location}", "check")
+        # Then check that the cache on disk matches exactly what's in the repo.
+        with open_repository() as repository:
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            with Cache(repository, manifest, sync=False) as cache:
+                original_chunks = cache.chunks
+            Cache.destroy(repository)
+            with Cache(repository, manifest) as cache:
+                correct_chunks = cache.chunks
+        assert original_chunks is not correct_chunks
+        seen = set()
+        for id, (refcount, size) in correct_chunks.iteritems():
+            o_refcount, o_size = original_chunks[id]
+            assert refcount == o_refcount
+            assert size == o_size
+            seen.add(id)
+        for id, (refcount, size) in original_chunks.iteritems():
+            assert id in seen
+
+    return check_the_cache
+
+
+@pytest.fixture()
+def spoof_manifest():
+    def _spoof_manifest(repository):
+        with repository:
+            manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+            cdata = manifest.repo_objs.format(
+                Manifest.MANIFEST_ID,
+                {},
+                msgpack.packb(
+                    {
+                        "version": 1,
+                        "archives": {},
+                        "config": {},
+                        "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(
+                            timespec="microseconds"
+                        ),
+                    }
+                ),
+            )
+            repository.put(Manifest.MANIFEST_ID, cdata)
+            repository.commit(compact=False)
+
+    return _spoof_manifest
 
 
 @pytest.fixture()
 def remote_prefix(archiver_setup):
     archiver_setup.prefix = "ssh://__testsuite__"
+    archiver_setup.repository_location = archiver_setup.prefix + str(archiver_setup.repository_path)
 
 
 @pytest.fixture()
@@ -524,4 +554,15 @@ def checkts(ts):
         # check if the timestamp is in the expected format
         assert datetime.strptime(ts, ISO_FORMAT + "%z")  # must not raise
 
-    return check_ts()
+    return check_ts
+
+
+@pytest.fixture()
+def assert_creates_file(archiver_setup, cmd_fixture):
+    @contextlib.contextmanager
+    def test_extract_file(path):
+        assert not os.path.exists(path), f"{path} should not exist"
+        yield
+        assert os.path.exists(path), f"{path} should exist"
+
+    return test_extract_file

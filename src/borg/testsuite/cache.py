@@ -117,7 +117,7 @@ class TestCacheSynchronizer:
         (True, 'Unexpected object: true'),
         (False, 'Unexpected object: false'),
         (None, 'Unexpected object: nil'),
-    ))
+    ), ids=["map", "bytes", "int", "double", "true", "false", "none"])
     @pytest.mark.parametrize('structure', (
         lambda elem: {'chunks': elem},
         lambda elem: {'chunks': [elem]},

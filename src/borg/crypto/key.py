@@ -1,3 +1,4 @@
+import binascii
 import hmac
 import os
 import textwrap
@@ -615,7 +616,31 @@ class FlexiKey:
                 raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
             if fd.read(len(repo_id)) != repo_id:
                 raise KeyfileMismatchError(self.repository._location.canonical_path(), filename)
-            return filename
+        # we get here if it really looks like a borg key for this repo,
+        # do some more checks that are close to how borg reads/parses the key.
+        with open(filename, "r") as fd:
+            lines = fd.readlines()
+            if len(lines) < 2:
+                logger.warning(f"borg key sanity check: expected 2+ lines total. [{filename}]")
+                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
+            if len(lines[0].rstrip()) > len(file_id) + len(repo_id):
+                logger.warning(f"borg key sanity check: key line 1 seems too long. [{filename}]")
+                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
+            key_b64 = "".join(lines[1:])
+            try:
+                key = a2b_base64(key_b64)
+            except binascii.Error:
+                logger.warning(f"borg key sanity check: key line 2+ does not look like base64. [{filename}]")
+                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
+            if len(key) < 20:
+                # this is in no way a precise check, usually we have about 400b key data.
+                logger.warning(
+                    f"borg key sanity check: binary encrypted key data from key line 2+ suspiciously short."
+                    f" [{filename}]"
+                )
+                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
+        # looks good!
+        return filename
 
     def find_key(self):
         if self.STORAGE == KeyBlobStorage.KEYFILE:

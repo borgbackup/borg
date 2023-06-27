@@ -270,7 +270,7 @@ class KeyBase:
             if tam_required:
                 raise TAMRequiredError(self.repository._location.canonical_path())
             else:
-                logger.debug("TAM not found and not required")
+                logger.debug("Manifest TAM not found and not required")
                 return unpacked, False
         tam = unpacked.pop("tam", None)
         if not isinstance(tam, dict):
@@ -280,7 +280,9 @@ class KeyBase:
             if tam_required:
                 raise TAMUnsupportedSuiteError(repr(tam_type))
             else:
-                logger.debug("Ignoring TAM made with unsupported suite, since TAM is not required: %r", tam_type)
+                logger.debug(
+                    "Ignoring manifest TAM made with unsupported suite, since TAM is not required: %r", tam_type
+                )
                 return unpacked, False
         tam_hmac = tam.get("hmac")
         tam_salt = tam.get("salt")
@@ -314,7 +316,7 @@ class KeyBase:
                 archive_name = unpacked.get("name", "<unknown>")
                 raise ArchiveTAMRequiredError(archive_name)
             else:
-                logger.debug("TAM not found and not required")
+                logger.debug("Archive TAM not found and not required")
                 return unpacked, False
         tam = unpacked.pop("tam", None)
         if not isinstance(tam, dict):
@@ -324,7 +326,9 @@ class KeyBase:
             if tam_required:
                 raise TAMUnsupportedSuiteError(repr(tam_type))
             else:
-                logger.debug("Ignoring TAM made with unsupported suite, since TAM is not required: %r", tam_type)
+                logger.debug(
+                    "Ignoring archive TAM made with unsupported suite, since TAM is not required: %r", tam_type
+                )
                 return unpacked, False
         tam_hmac = tam.get("hmac")
         tam_salt = tam.get("salt")

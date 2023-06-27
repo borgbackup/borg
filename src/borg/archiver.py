@@ -1741,11 +1741,6 @@ class Archiver:
                 cache.commit()
         elif args.tam:
             manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
-
-            if not hasattr(key, 'change_passphrase'):
-                print('This repository is not encrypted, cannot enable TAM.')
-                return EXIT_ERROR
-
             if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):
                 print('Manifest contents:')
                 for archive_info in manifest.archives.list(sort_by=['ts']):
@@ -1753,7 +1748,7 @@ class Archiver:
                 manifest.config[b'tam_required'] = True
                 manifest.write()
                 repository.commit()
-            if not key.tam_required:
+            if not key.tam_required and hasattr(key, 'change_passphrase'):
                 key.tam_required = True
                 key.change_passphrase(key._passphrase)
                 print('Key updated')
@@ -1767,7 +1762,7 @@ class Archiver:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK, force_tam_not_required=True)
             if tam_required(repository):
                 os.unlink(tam_required_file(repository))
-            if key.tam_required:
+            if key.tam_required and hasattr(key, 'change_passphrase'):
                 key.tam_required = False
                 key.change_passphrase(key._passphrase)
                 print('Key updated')

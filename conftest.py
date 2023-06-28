@@ -2,6 +2,7 @@ import contextlib
 import errno
 import io
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -17,9 +18,10 @@ from borg import helpers, platform, xattr
 from borg.archive import Archive
 from borg.cache import Cache
 from borg.constants import EXIT_SUCCESS, CACHE_TAG_NAME, CACHE_TAG_CONTENTS, ISO_FORMAT
-from borg.helpers import bin_to_hex, msgpack
+from borg.helpers import bin_to_hex, msgpack, Location
 from borg.manifest import Manifest
 from borg.platformflags import is_win32
+from borg.remote import RemoteRepository
 from borg.repository import Repository
 
 if hasattr(pytest, "register_assert_rewrite"):
@@ -120,6 +122,7 @@ class ArchiverSetup:
     EXE: str = None  # python source based
     FORK_DEFAULT = False
     prefix = ""
+    BORG_EXES = []
 
     def __init__(self):
         self.archiver = None
@@ -166,7 +169,7 @@ def archiver_setup(tmp_path):
 
 
 @pytest.fixture
-def cmd_fixture(archiver_setup):
+def cmd_fixture(archiver_setup, exec_cmd):
     msgpack_warning = archiver_setup.PURE_PYTHON_MSGPACK_WARNING
 
     def cmd(*args, **kw):
@@ -186,7 +189,12 @@ def cmd_fixture(archiver_setup):
         output = empty.join(line for line in output.splitlines(keepends=True) if pp_msg not in line)
         return output
 
-    def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_output=False, **kw):
+    return cmd
+
+
+@pytest.fixture()
+def exec_cmd():
+    def execute(*args, archiver=None, fork=False, exe=None, input=b"", binary_output=False, **kw):
         if fork:
             try:
                 if exe is None:
@@ -231,13 +239,13 @@ def cmd_fixture(archiver_setup):
                 try:
                     ret = archiver.run(args)  # calls setup_logging internally
                 finally:
-                    flush_logging()  # usually done via at exit, but we do not exit here
+                    flush_logging()  # usually done at exit, but we do not exit here
                 output_text.flush()
                 return ret, output.getvalue() if binary_output else output.getvalue().decode()
             finally:
                 sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
 
-    return cmd
+    return execute
 
 
 @pytest.fixture()
@@ -270,7 +278,10 @@ def open_archive(archiver_setup):
 @pytest.fixture()
 def open_repository(archiver_setup):
     def repo():
-        return Repository(archiver_setup.repository_path, exclusive=True)
+        if archiver_setup.prefix:
+            return RemoteRepository(Location(archiver_setup.repository_location))
+        else:
+            return Repository(archiver_setup.repository_path, exclusive=True)
 
     return repo
 
@@ -537,15 +548,28 @@ def spoof_manifest():
 
 
 @pytest.fixture()
-def remote_prefix(archiver_setup):
+def remote_archiver(archiver_setup):
     archiver_setup.prefix = "ssh://__testsuite__"
     archiver_setup.repository_location = archiver_setup.prefix + str(archiver_setup.repository_path)
+    yield archiver_setup
+
+
+@pytest.fixture(autouse=True)
+def check_binary_availability(archiver_setup, exec_cmd):
+    try:
+        exec_cmd("help", exe="borg.exe", fork=True)
+        archiver_setup.BORG_EXES = ["python", "binary"]
+    except FileNotFoundError:
+        archiver_setup.BORG_EXES = ["python"]
 
 
 @pytest.fixture()
-def archiver_binary_base(archiver_setup):
+def binary_archiver(archiver_setup):
+    if "binary" not in archiver_setup.BORG_EXES:
+        pytest.skip("Binary not available")
     archiver_setup.EXE = "borg.exe"
     archiver_setup.FORK_DEFAULT = True
+    yield archiver_setup
 
 
 @pytest.fixture()
@@ -566,3 +590,11 @@ def assert_creates_file(archiver_setup, cmd_fixture):
         assert os.path.exists(path), f"{path} should exist"
 
     return test_extract_file
+
+
+@pytest.fixture()
+def assert_line_exists():
+    def line_exists(lines, expected_regexpr):
+        assert any(re.search(expected_regexpr, line) for line in lines), f"no match for {expected_regexpr} in {lines}"
+
+    return line_exists

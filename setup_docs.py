@@ -53,8 +53,7 @@ class build_usage(Command):
         import borg
 
         borg.doc_mode = "build_man"
-        if not os.path.exists("docs/usage"):
-            os.mkdir("docs/usage")
+        os.makedirs("docs/usage", exist_ok=True)
         # allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
 

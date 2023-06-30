@@ -299,11 +299,52 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.2.4 (2023-03-24)
---------------------------
+Version 1.2.5 (not released yet)
+--------------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Fixes:
+
+- extract: fix false warning about pattern never matching, #4110
+- diff: remove surrogates before output, #7535
+- compact: clear empty directories at end of compact process, #6823
+- create --files-cache=size: fix crash, #7658
+- keyfiles: improve key sanity check, #7561
+- only warn about "invalid" chunker params, #7590
+- ProgressIndicatorPercent: fix space computation for wide chars, #3027
+- improve argparse validator error messages
+
+New features:
+
+- mount: make up volname if not given (macOS), #7690.
+  macFUSE supports a volname mount option to give what finder displays on the
+  desktop / in the directory view. if the user did not specify it, we make
+  something up, because otherwise it would be "macFUSE Volume 0 (Python)" and
+  hide the mountpoint directory name.
+
+Other changes:
+
+- docs:
+
+  - move upgrade notes to own section, see #7546
+  - mount -olocal: how to show mount in finder's sidebar, #5321
+  - list: fix --pattern examples, #7611
+  - improve patterns help
+  - incl./excl. options, path-from-stdin exclusiveness
+  - obfuscation docs: markup fix, note about MAX_DATA_SIZE
+  - --one-file-system: add macOS apfs notes, #4876
+  - improve --one-file-system help string, #5618
+- tests:
+
+  - fix repo reopen
+  - avoid long ids in pytest output
+  - check buzhash chunksize distribution, see #7586
+
+
+Version 1.2.4 (2023-03-24)
+--------------------------
 
 New features:
 

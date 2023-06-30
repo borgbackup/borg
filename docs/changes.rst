@@ -212,15 +212,13 @@ The best check that everything is ok is to run a dry-run extraction::
 
     borg extract -v --dry-run REPO::ARCHIVE
 
-.. _changelog:
+.. _upgradenotes:
 
-Change Log
-==========
+Upgrade Notes
+=============
 
-Version 1.2.4 (2023-03-24)
---------------------------
-
-Upgrade notes:
+borg 1.1.x to 1.2.x
+-------------------
 
 Some things can be recommended for the upgrade process from borg 1.1.x
 (please also read the important compatibility notes below):
@@ -295,6 +293,17 @@ Compatibility notes:
   if you have scripts expecting rc == 2 for a signal exit, you need to update
   them to check for >= 128.
 
+
+.. _changelog:
+
+Change Log
+==========
+
+Version 1.2.4 (2023-03-24)
+--------------------------
+
+For upgrade and compatibility hints, please also read the section "Upgrade Notes"
+above.
 
 New features:
 

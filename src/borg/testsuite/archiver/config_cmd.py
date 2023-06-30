@@ -1,48 +1,48 @@
 import os
+import unittest
 
 from ...constants import *  # NOQA
+from . import ArchiverTestCaseBase, ArchiverTestCaseBinaryBase, RK_ENCRYPTION, BORG_EXES
 
 
-def pytest_generate_tests(metafunc):
-    # Generates tests that run on both local and remote repos
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver_setup", "archiver_binary"])
+class ArchiverTestCase(ArchiverTestCaseBase):
+    def test_config(self):
+        self.create_test_files()
+        os.unlink("input/flagfile")
+        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
+        output = self.cmd(f"--repo={self.repository_location}", "config", "--list")
+        self.assert_in("[repository]", output)
+        self.assert_in("version", output)
+        self.assert_in("segments_per_dir", output)
+        self.assert_in("storage_quota", output)
+        self.assert_in("append_only", output)
+        self.assert_in("additional_free_space", output)
+        self.assert_in("id", output)
+        self.assert_not_in("last_segment_checked", output)
+
+        output = self.cmd(f"--repo={self.repository_location}", "config", "last_segment_checked", exit_code=1)
+        self.assert_in("No option ", output)
+        self.cmd(f"--repo={self.repository_location}", "config", "last_segment_checked", "123")
+        output = self.cmd(f"--repo={self.repository_location}", "config", "last_segment_checked")
+        assert output == "123" + os.linesep
+        output = self.cmd(f"--repo={self.repository_location}", "config", "--list")
+        self.assert_in("last_segment_checked", output)
+        self.cmd(f"--repo={self.repository_location}", "config", "--delete", "last_segment_checked")
+
+        for cfg_key, cfg_value in [("additional_free_space", "2G"), ("repository.append_only", "1")]:
+            output = self.cmd(f"--repo={self.repository_location}", "config", cfg_key)
+            assert output == "0" + os.linesep
+            self.cmd(f"--repo={self.repository_location}", "config", cfg_key, cfg_value)
+            output = self.cmd(f"--repo={self.repository_location}", "config", cfg_key)
+            assert output == cfg_value + os.linesep
+            self.cmd(f"--repo={self.repository_location}", "config", "--delete", cfg_key)
+            self.cmd(f"--repo={self.repository_location}", "config", cfg_key, exit_code=1)
+
+        self.cmd(f"--repo={self.repository_location}", "config", "--list", "--delete", exit_code=2)
+        self.cmd(f"--repo={self.repository_location}", "config", exit_code=2)
+        self.cmd(f"--repo={self.repository_location}", "config", "invalid-option", exit_code=1)
 
 
-def test_config(archivers, request, create_test_files, cmd_fixture):
-    archiver_setup = request.getfixturevalue(archivers)
-    repo_location = archiver_setup.repository_location
-    create_test_files()
-    os.unlink("input/flagfile")
-    cmd_fixture(f"--repo={repo_location}", "rcreate", archiver_setup.RK_ENCRYPTION)
-    output = cmd_fixture(f"--repo={repo_location}", "config", "--list")
-    assert "[repository]" in output
-    assert "version" in output
-    assert "segments_per_dir" in output
-    assert "storage_quota" in output
-    assert "append_only" in output
-    assert "additional_free_space" in output
-    assert "id" in output
-    assert "last_segment_checked" not in output
-
-    output = cmd_fixture(f"--repo={repo_location}", "config", "last_segment_checked", exit_code=1)
-    assert "No option " in output
-    cmd_fixture(f"--repo={repo_location}", "config", "last_segment_checked", "123")
-    output = cmd_fixture(f"--repo={repo_location}", "config", "last_segment_checked")
-    assert output == "123" + os.linesep
-    output = cmd_fixture(f"--repo={repo_location}", "config", "--list")
-    assert "last_segment_checked" in output
-    cmd_fixture(f"--repo={repo_location}", "config", "--delete", "last_segment_checked")
-
-    for cfg_key, cfg_value in [("additional_free_space", "2G"), ("repository.append_only", "1")]:
-        output = cmd_fixture(f"--repo={repo_location}", "config", cfg_key)
-        assert output == "0" + os.linesep
-        cmd_fixture(f"--repo={repo_location}", "config", cfg_key, cfg_value)
-        output = cmd_fixture(f"--repo={repo_location}", "config", cfg_key)
-        assert output == cfg_value + os.linesep
-        cmd_fixture(f"--repo={repo_location}", "config", "--delete", cfg_key)
-        cmd_fixture(f"--repo={repo_location}", "config", cfg_key, exit_code=1)
-
-    cmd_fixture(f"--repo={repo_location}", "config", "--list", "--delete", exit_code=2)
-    cmd_fixture(f"--repo={repo_location}", "config", exit_code=2)
-    cmd_fixture(f"--repo={repo_location}", "config", "invalid-option", exit_code=1)
+@unittest.skipUnless("binary" in BORG_EXES, "no borg.exe available")
+class ArchiverTestCaseBinary(ArchiverTestCaseBinaryBase, ArchiverTestCase):
+    """runs the same tests, but via the borg binary"""

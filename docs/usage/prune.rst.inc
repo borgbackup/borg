@@ -139,12 +139,6 @@ from different machines) in one shared repository, use one prune call per
 data set that matches only the respective archives using the --match-archives
 (-a) option.
 
-The ``--keep-within`` option takes an argument of the form "<int><char>",
-where char is "H", "d", "w", "m", "y". For example, ``--keep-within 2d`` means
-to keep all archives that were created within the past 48 hours.
-"1m" is taken to mean "31d". The archives kept with this option do not
-count towards the totals specified by any other options.
-
 A good procedure is to thin out more and more the older your backups get.
 As an example, ``--keep-daily 7`` means to keep the latest backup on each day,
 up to 7 most recent days with backups (days without backups do not count).
@@ -157,6 +151,13 @@ As of borg 1.2.0, borg will retain the oldest archive if any of the secondly,
 minutely, hourly, daily, weekly, monthly, or yearly rules was not otherwise able to
 meet its retention target. This enables the first chronological archive to continue
 aging until it is replaced by a newer archive that meets the retention criteria.
+
+The ``--keep-within`` option takes an argument of the form "<int><char>",
+where char is "H", "d", "w", "m", "y". For example, ``--keep-within 2d`` means
+to keep all archives that were created within the past 48 hours.
+"1m" is taken to mean "31d". This option is applied before the secondly option
+and like the other options any archives kept by this option do not count towards
+the later rules.
 
 The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
 keep the last N archives under the assumption that you do not create more than one

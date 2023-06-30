@@ -1175,6 +1175,16 @@ space.
 Miscellaneous
 #############
 
+macOS: borg mounts not shown in Finder's side bar
+-------------------------------------------------
+
+https://github.com/osxfuse/osxfuse/wiki/Mount-options#local
+
+Read the above first and use this on your own risk::
+
+    borg mount -olocal REPO MOUNTPOINT
+
+
 Requirements for the borg single-file binary, esp. (g)libc?
 -----------------------------------------------------------
 

@@ -1,32 +1,33 @@
 import argparse
 import pytest
 
+from .utils import cmd
 from ...helpers import parse_storage_quota
 from . import Archiver, RK_ENCRYPTION
 
 
-def test_bad_filters(archiver_setup, cmd_fixture):
-    cmd_fixture(f"--repo={archiver_setup.repository_location}", "rcreate", archiver_setup.RK_ENCRYPTION)
-    cmd_fixture(f"--repo={archiver_setup.repository_location}", "create", "test", "input")
-    cmd_fixture(
-        f"--repo={archiver_setup.repository_location}", "delete", "--first", "1", "--last", "1", fork=True, exit_code=2
-    )
+def test_bad_filters(archiver):
+    repo_location = archiver.repository_location
+    cmd(archiver, f"--repo={repo_location}", "rcreate", archiver.RK_ENCRYPTION)
+    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
+    cmd(archiver, f"--repo={repo_location}", "delete", "--first", "1", "--last", "1", fork=True, exit_code=2)
 
 
-def test_highlander(archiver_setup, cmd_fixture):
-    cmd_fixture(f"--repo={archiver_setup.repository_location}", "rcreate", archiver_setup.RK_ENCRYPTION)
-    cmd_fixture(f"--repo={archiver_setup.repository_location}", "create", "--comment", "comment 1", "test-1", __file__)
+def test_highlander(archiver):
+    repo_location = archiver.repository_location
+    cmd(archiver, f"--repo={repo_location}", "rcreate", archiver.RK_ENCRYPTION)
+    cmd(archiver, f"--repo={repo_location}", "create", "--comment", "comment 1", "test-1", __file__)
     error_msg = "There can be only one"
     # Default umask value is 0077
     # Test that it works with a one time specified default or custom value
-    output_default = cmd_fixture(f"--repo={archiver_setup.repository_location}", "--umask", "0077", "rlist")
+    output_default = cmd(archiver, f"--repo={repo_location}", "--umask", "0077", "rlist")
     assert error_msg not in output_default
-    output_custom = cmd_fixture(f"--repo={archiver_setup.repository_location}", "--umask", "0007", "rlist")
+    output_custom = cmd(archiver, f"--repo={repo_location}", "--umask", "0007", "rlist")
     assert error_msg not in output_custom
     # Test that all combinations of custom and default values fail
     for first, second in [("0007", "0007"), ("0007", "0077"), ("0077", "0007"), ("0077", "0077")]:
-        output_custom = cmd_fixture(
-            f"--repo={archiver_setup.repository_location}", "--umask", first, "--umask", second, "rlist", exit_code=2
+        output_custom = cmd(
+            archiver, f"--repo={repo_location}", "--umask", first, "--umask", second, "rlist", exit_code=2
         )
         assert error_msg in output_custom
 

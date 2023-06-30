@@ -178,10 +178,16 @@ class Repository:
         append_only=False,
         storage_quota=None,
         make_parent_dirs=False,
+        send_log_cb=None,
     ):
         self.path = os.path.abspath(path)
         self._location = Location("file://%s" % self.path)
         self.version = None
+        # long-running repository methods which emit log or progress output are responsible for calling
+        # the ._send_log method periodically to get log and progress output transferred to the borg client
+        # in a timely manner, in case we have a RemoteRepository.
+        # for local repositories ._send_log can be called also (it will just do nothing in that case).
+        self._send_log = send_log_cb or (lambda: None)
         self.io = None  # type: LoggedIO
         self.lock = None
         self.index = None
@@ -785,6 +791,7 @@ class Repository:
                 logger.warning("Segment %d not found, but listed in compaction data", segment)
                 del self.compact[segment]
                 pi.show()
+                self._send_log()
                 continue
             segment_size = self.io.segment_size(segment)
             freeable_ratio = 1.0 * freeable_space / segment_size
@@ -798,6 +805,7 @@ class Repository:
                     freeable_space,
                 )
                 pi.show()
+                self._send_log()
                 continue
             segments.setdefault(segment, 0)
             logger.debug(
@@ -905,7 +913,9 @@ class Repository:
             assert segments[segment] == 0, "Corrupted segment reference count - corrupted index or hints"
             unused.append(segment)
             pi.show()
+            self._send_log()
         pi.finish()
+        self._send_log()
         complete_xfer(intermediate=False)
         self.io.clear_empty_dirs()
         quota_use_after = self.storage_quota_use
@@ -924,6 +934,7 @@ class Repository:
             )
             for i, (segment, filename) in enumerate(self.io.segment_iterator()):
                 pi.show(i)
+                self._send_log()
                 if index_transaction_id is not None and segment <= index_transaction_id:
                     continue
                 if segment > segments_transaction_id:
@@ -931,6 +942,7 @@ class Repository:
                 objects = self.io.iter_objects(segment)
                 self._update_index(segment, objects)
             pi.finish()
+            self._send_log()
             self.write_index()
         finally:
             self.exclusive = remember_exclusive
@@ -1061,6 +1073,7 @@ class Repository:
         segment = -1  # avoid uninitialized variable if there are no segment files at all
         for i, (segment, filename) in enumerate(self.io.segment_iterator()):
             pi.show(i)
+            self._send_log()
             if segment <= last_segment_checked:
                 continue
             if segment > transaction_id:
@@ -1087,6 +1100,7 @@ class Repository:
             self.save_config(self.path, self.config)
 
         pi.finish()
+        self._send_log()
         # self.index, self.segments, self.compact now reflect the state of the segment files up to <transaction_id>.
         # We might need to add a commit tag if no committed segment is found.
         if repair and segments_transaction_id is None:
@@ -1110,12 +1124,14 @@ class Repository:
                     current_value = current_index.get(key, not_found)
                     if current_value != value:
                         logger.warning(line_format, bin_to_hex(key), value, current_value)
+                self._send_log()
                 for key, current_value in current_index.iteritems():
                     if key in self.index:
                         continue
                     value = self.index.get(key, not_found)
                     if current_value != value:
                         logger.warning(line_format, bin_to_hex(key), value, current_value)
+                self._send_log()
             if repair:
                 self.write_index()
         self.rollback()

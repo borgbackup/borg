@@ -1049,6 +1049,9 @@ class LocalCache(CacheStatsMixin):
         elif "m" in cache_mode:
             cmtime_type = "mtime"
             cmtime_ns = safe_ns(st.st_mtime_ns)
+        else:  # neither 'c' nor 'm' in cache_mode, avoid UnboundLocalError
+            cmtime_type = "ctime"
+            cmtime_ns = safe_ns(st.st_ctime_ns)
         entry = FileCacheEntry(
             age=0, inode=st.st_ino, size=st.st_size, cmtime=int_to_timestamp(cmtime_ns), chunk_ids=ids
         )

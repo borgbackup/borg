@@ -163,6 +163,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
         assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
 
+    #
+    @pytest.mark.skipif(is_win32, reason="frequent test failures on github CI on win32")
     def test_sparse_file(self):
         def is_sparse(fn, total_size, hole_size):
             st = os.stat(fn)

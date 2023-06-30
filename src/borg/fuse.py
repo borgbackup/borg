@@ -44,6 +44,7 @@ from .helpers import msgpack
 from .helpers.lrucache import LRUCache
 from .item import Item
 from .platform import uid2user, gid2group
+from .platformflags import is_darwin
 from .remote import RemoteRepository
 
 
@@ -513,6 +514,13 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         options = ["fsname=borgfs", "ro", "default_permissions"]
         if mount_options:
             options.extend(mount_options.split(","))
+        if is_darwin:
+            # macFUSE supports a volname mount option to give what finder displays on desktop / in directory list.
+            volname = pop_option(options, "volname", "", "", str)
+            # if the user did not specify it, we make something up,
+            # because otherwise it would be "macFUSE Volume 0 (Python)", #7690.
+            volname = volname or f"{os.path.basename(mountpoint)} (borgfs)"
+            options.append(f"volname={volname}")
         ignore_permissions = pop_option(options, "ignore_permissions", True, False, bool)
         if ignore_permissions:
             # in case users have a use-case that requires NOT giving "default_permissions",

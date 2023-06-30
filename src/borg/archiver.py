@@ -1154,7 +1154,7 @@ class Archiver:
             diffs = sorted(diffs)
 
         for path, diff in diffs:
-            print_output(diff, path)
+            print_output(diff, remove_surrogates(path))
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning("Include pattern '%s' never matched.", pattern)

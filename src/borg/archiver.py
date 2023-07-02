@@ -4227,6 +4227,8 @@ class Archiver:
 
         If you do **not** want to encrypt the contents of your backups, but still
         want to detect malicious tampering use ``--encryption authenticated``.
+        To normally work with ``authenticated`` repos, you will need the passphrase, but
+        there is an emergency workaround, see ``BORG_WORKAROUNDS=authenticated_no_key`` docs.
 
         If ``BLAKE2b`` is faster than ``SHA-256`` on your hardware, use ``--encryption authenticated-blake2``,
         ``--encryption repokey-blake2`` or ``--encryption keyfile-blake2``. Note: for remote backups

@@ -217,26 +217,6 @@ Important notes:
 - When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
 
 
-Running more checks using coala
--------------------------------
-
-First install coala and some checkers ("bears"):
-
-::
-
-  pip install -r requirements.d/coala.txt
-
-You can now run coala from the toplevel directory; it will read its settings
-from ``.coafile`` there:
-
-::
-
-  coala
-
-Some bears have additional requirements and they usually tell you about
-them in case they are missing.
-
-
 Adding a compression algorithm
 ------------------------------
 

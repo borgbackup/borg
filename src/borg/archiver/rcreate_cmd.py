@@ -152,6 +152,8 @@ class RCreateMixIn:
 
         If you do **not** want to encrypt the contents of your backups, but still want to detect
         malicious tampering use an `authenticated` mode. It's like `repokey` minus encryption.
+        To normally work with ``authenticated`` repos, you will need the passphrase, but
+        there is an emergency workaround, see ``BORG_WORKAROUNDS=authenticated_no_key`` docs.
 
         Creating a related repository
         +++++++++++++++++++++++++++++

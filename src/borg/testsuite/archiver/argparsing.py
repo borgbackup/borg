@@ -1,21 +1,20 @@
 import argparse
 import pytest
 
-from .utils import cmd
 from ...helpers import parse_storage_quota
-from . import Archiver, RK_ENCRYPTION
+from . import Archiver, RK_ENCRYPTION, cmd
 
 
 def test_bad_filters(archiver):
     repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", archiver.RK_ENCRYPTION)
+    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
     cmd(archiver, f"--repo={repo_location}", "delete", "--first", "1", "--last", "1", fork=True, exit_code=2)
 
 
 def test_highlander(archiver):
     repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", archiver.RK_ENCRYPTION)
+    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     cmd(archiver, f"--repo={repo_location}", "create", "--comment", "comment 1", "test-1", __file__)
     error_msg = "There can be only one"
     # Default umask value is 0077

@@ -10,12 +10,12 @@ from ...helpers import msgpack
 from ...manifest import Manifest
 from ...repository import Repository
 from . import src_file
-from .utils import cmd, create_src_archive, open_archive
+from . import cmd, create_src_archive, open_archive, RK_ENCRYPTION
 
 
 def check_cmd_setUp(archiver):
     with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):
-        cmd(archiver, f"--repo={archiver.repository_location}", "rcreate", archiver.RK_ENCRYPTION)
+        cmd(archiver, f"--repo={archiver.repository_location}", "rcreate", RK_ENCRYPTION)
         create_src_archive(archiver, "archive1")
         create_src_archive(archiver, "archive2")
 
@@ -65,7 +65,7 @@ def test_date_matching(archivers, request):
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
 
     shutil.rmtree(repo_path)
-    cmd(archiver, f"--repo={repo_location}", "rcreate", archiver.RK_ENCRYPTION)
+    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     earliest_ts = "2022-11-20T23:59:59"
     ts_in_between = "2022-12-18T23:59:59"
     create_src_archive(archiver, "archive1", ts=earliest_ts)

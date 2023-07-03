@@ -226,15 +226,17 @@ class KeyBase:
             output_length=64
         )
 
-    def pack_and_authenticate_metadata(self, metadata_dict, context=b'manifest'):
+    def pack_and_authenticate_metadata(self, metadata_dict, context=b'manifest', salt=None):
+        if salt is None:
+            salt = os.urandom(64)
         metadata_dict = StableDict(metadata_dict)
         tam = metadata_dict['tam'] = StableDict({
             'type': 'HKDF_HMAC_SHA512',
             'hmac': bytes(64),
-            'salt': os.urandom(64),
+            'salt': salt,
         })
         packed = msgpack.packb(metadata_dict)
-        tam_key = self._tam_key(tam['salt'], context)
+        tam_key = self._tam_key(salt, context)
         tam['hmac'] = hmac.digest(tam_key, packed, 'sha512')
         return msgpack.packb(metadata_dict)
 
@@ -300,7 +302,7 @@ class KeyBase:
                 raise ArchiveTAMRequiredError(archive_name)
             else:
                 logger.debug('Archive TAM not found and not required')
-                return unpacked, False
+                return unpacked, False, None
         tam = unpacked.pop(b'tam', None)
         if not isinstance(tam, dict):
             raise ArchiveTAMInvalid()
@@ -310,7 +312,7 @@ class KeyBase:
                 raise TAMUnsupportedSuiteError(repr(tam_type))
             else:
                 logger.debug('Ignoring archive TAM made with unsupported suite, since TAM is not required: %r', tam_type)
-                return unpacked, False
+                return unpacked, False, None
         tam_hmac = tam.get(b'hmac')
         tam_salt = tam.get(b'salt')
         if not isinstance(tam_salt, bytes) or not isinstance(tam_hmac, bytes):
@@ -322,7 +324,7 @@ class KeyBase:
         if not hmac.compare_digest(calculated_hmac, tam_hmac):
             raise ArchiveTAMInvalid()
         logger.debug('TAM-verified archive')
-        return unpacked, True
+        return unpacked, True, tam_salt
 
 
 class PlaintextKey(KeyBase):

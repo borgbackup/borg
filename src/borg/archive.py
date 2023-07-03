@@ -380,7 +380,7 @@ class Archive:
     def _load_meta(self, id):
         data = self.key.decrypt(id, self.repository.get(id))
         # we do not require TAM for archives, otherwise we can not even borg list a repo with old archives.
-        archive, self.tam_verified = self.key.unpack_and_verify_archive(data, force_tam_not_required=True)
+        archive, self.tam_verified, _ = self.key.unpack_and_verify_archive(data, force_tam_not_required=True)
         metadata = ArchiveItem(internal_dict=archive)
         if metadata.version != 1:
             raise Exception('Unknown archive metadata version')
@@ -1441,7 +1441,7 @@ class ArchiveChecker:
                 # **after** doing the low-level checks and having a strong indication that we
                 # are likely looking at an archive item here, also check the TAM authentication:
                 try:
-                    archive, verified = self.key.unpack_and_verify_archive(data, force_tam_not_required=False)
+                    archive, verified, _ = self.key.unpack_and_verify_archive(data, force_tam_not_required=False)
                 except IntegrityError:
                     # TAM issues - do not accept this archive!
                     # either somebody is trying to attack us with a fake archive data or
@@ -1687,7 +1687,7 @@ class ArchiveChecker:
                     del self.manifest.archives[info.name]
                     continue
                 try:
-                    archive, verified = self.key.unpack_and_verify_archive(data, force_tam_not_required=False)
+                    archive, verified, salt = self.key.unpack_and_verify_archive(data, force_tam_not_required=False)
                 except IntegrityError as integrity_error:
                     # looks like there is a TAM issue with this archive, this might be an attack!
                     # when upgrading to borg 1.2.5, users are expected to TAM-authenticate all archives they
@@ -1710,7 +1710,7 @@ class ArchiveChecker:
                 for previous_item_id in archive.items:
                     mark_as_possibly_superseded(previous_item_id)
                 archive.items = items_buffer.chunks
-                data = self.key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive')
+                data = self.key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive', salt=salt)
                 new_archive_id = self.key.id_hash(data)
                 cdata = self.key.encrypt(data)
                 add_reference(new_archive_id, len(data), len(cdata), cdata)

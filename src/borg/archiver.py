@@ -1724,7 +1724,7 @@ class Archiver:
                     archive_formatted = format_archive(info)
                     cdata = repository.get(archive_id)
                     data = key.decrypt(archive_id, cdata)
-                    archive, verified = key.unpack_and_verify_archive(data, force_tam_not_required=True)
+                    archive, verified, _ = key.unpack_and_verify_archive(data, force_tam_not_required=True)
                     if not verified:  # we do not have an archive TAM yet -> add TAM now!
                         archive = ArchiveItem(internal_dict=archive)
                         archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]

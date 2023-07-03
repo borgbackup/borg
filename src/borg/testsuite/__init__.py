@@ -20,7 +20,7 @@ from ..xattr import get_all
 from ..platform import get_flags
 from ..platformflags import is_win32
 from ..helpers import umount
-from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from ..helpers import EXIT_SUCCESS, EXIT_ERROR
 from .. import platform
 
 

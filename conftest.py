@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from borg.testsuite.archiver.utils import exec_cmd
+from borg.testsuite.archiver import exec_cmd
 
 if hasattr(pytest, "register_assert_rewrite"):
     pytest.register_assert_rewrite("borg.testsuite")
@@ -86,13 +86,6 @@ def set_env_variables():
 
 
 class ArchiverSetup:
-    RK_ENCRYPTION = "--encryption=repokey-aes-ocb"
-    KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"
-    PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
-
-    src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "src", "borg", "archiver"))
-    src_file = "archiver/__init__.py"  # relative path of one file in src_dir
-
     EXE: str = None  # python source based
     FORK_DEFAULT = False
     prefix = ""

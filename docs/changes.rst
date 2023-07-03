@@ -7,17 +7,13 @@ This section provides information about security and corruption issues.
 
 (nothing to see here yet)
 
-.. _changelog:
+.. _upgradenotes2:
 
-Change Log 2.x
-==============
+Upgrade Notes
+=============
 
-Version 2.0.0b6 (2023-06-11)
-----------------------------
-
-Please note:
-
-This is a beta release, only for testing - do not use for production repos.
+borg 1.2.x to borg 2.0
+----------------------
 
 Compatibility notes:
 
@@ -112,6 +108,38 @@ Compatibility notes:
   if that makes no sense. Highlander options, see #6269. That might make scripts
   fail now that somehow "worked" before (but maybe didn't work as intended due to
   the contradicting options).
+
+
+.. _changelog:
+
+Change Log 2.x
+==============
+
+Version 2.0.0b7 (not released yet)
+----------------------------------
+
+Please note:
+
+This is a beta release, only for testing - do not use for production repos.
+
+For upgrade and compatibility hints, please also read the section "Upgrade Notes"
+above.
+
+Fixes:
+
+- remote logging/progress: use callback to send queued records, #7662
+- make_path_safe: remove test for backslashes, #7651
+- benchmark cpu: use sanitized path, #7654
+
+Other changes:
+
+- docs:
+
+  - move upgrade / compat. notes to own section, see #7546
+
+
+Version 2.0.0b6 (2023-06-11)
+----------------------------
 
 New features:
 

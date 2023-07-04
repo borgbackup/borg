@@ -384,8 +384,7 @@ The *tam* key is part of the :ref:`tertiary authentication mechanism <tam_descri
 the manifest, since an ID check is not possible.
 
 *config* is a general-purpose location for additional metadata. All versions
-of Borg preserve its contents (it may have been a better place for *item_keys*,
-which is not preserved by unaware Borg versions, releases predating 1.0.4).
+of Borg preserve its contents.
 
 Feature flags
 +++++++++++++

@@ -562,7 +562,7 @@ cdef class ManifestItem(PropDict):
     archives = PropDictProperty(dict, 'dict of str -> dict')  # name -> dict
     timestamp = PropDictProperty(str)
     config = PropDictProperty(dict)
-    item_keys = PropDictProperty(tuple, 'tuple of str')
+    item_keys = PropDictProperty(tuple, 'tuple of str')  # legacy. new location is inside config.
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
@@ -650,7 +650,7 @@ class ItemDiff:
         self._can_compare_chunk_ids = can_compare_chunk_ids
         self._chunk_1 = chunk_1
         self._chunk_2 = chunk_2
-        
+
         self._changes = {}
 
         if self._item1.is_link() or self._item2.is_link():

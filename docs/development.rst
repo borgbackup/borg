@@ -372,7 +372,7 @@ Checklist:
   * pypi dist package and signature
   * Standalone binaries (see above for how to create them).
 
-    + For OS X, document the OS X Fuse version in the README of the binaries.
-      OS X FUSE uses a kernel extension that needs to be compatible with the
+    + For macOS, document the macFUSE version in the README of the binaries.
+      macFUSE uses a kernel extension that needs to be compatible with the
       code contained in the binary.
   * A link to ``CHANGES.rst``.

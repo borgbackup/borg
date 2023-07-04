@@ -333,6 +333,9 @@ Checklist:
     scripts/sdist-sign X.Y.Z
     scripts/upload-pypi X.Y.Z test
     scripts/upload-pypi X.Y.Z
+
+  Note: the signature is not uploaded to PyPi any more, but we upload it to
+  github releases.
 - Put binaries into dist/borg-OSNAME and sign them:
 
   ::
@@ -350,6 +353,7 @@ Checklist:
 
 - Create a GitHub release, include:
 
+  * pypi dist package and signature
   * Standalone binaries (see above for how to create them).
 
     + For OS X, document the OS X Fuse version in the README of the binaries.

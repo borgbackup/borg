@@ -6,6 +6,7 @@ import re
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 from configparser import ConfigParser
 from contextlib import contextmanager
@@ -119,11 +120,11 @@ def cmd(archiver, *args, **kw):
 
 
 def create_src_archive(archiver, name, ts=None):
-    repo_location, source_dir = archiver.repository_location, src_dir
+    repo_location = archiver.repository_location
     if ts:
-        cmd(archiver, f"--repo={repo_location}", "create", "--compression=lz4", f"--timestamp={ts}", name, source_dir)
+        cmd(archiver, f"--repo={repo_location}", "create", "--compression=lz4", f"--timestamp={ts}", name, src_dir)
     else:
-        cmd(archiver, f"--repo={repo_location}", "create", "--compression=lz4", name, source_dir)
+        cmd(archiver, f"--repo={repo_location}", "create", "--compression=lz4", name, src_dir)
 
 
 def open_archive(repo_path, name):
@@ -140,8 +141,8 @@ def open_repository(archiver):
     elif archiver.prefix == "ssh://__testsuite__":
         return RemoteRepository(Location(archiver.repository_location))
     else:
-        print(f"Archiver prefix '{archiver.prefix}' is not a valid prefix! Cannot open repo.")
-        return
+        error_message = f"Archiver prefix '{archiver.prefix}' is not a valid prefix! Cannot open repo."
+        raise ValueError(error_message)
 
 
 def create_regular_file(input_path, name, size=0, contents=None):

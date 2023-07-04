@@ -793,7 +793,7 @@ For small hash tables, we start with a growth factor of 2, which comes down to
 
 E.g. backing up a total count of 1 Mi (IEC binary prefix i.e. 2^20) files with a total size of 1TiB.
 
-a) with ``create --chunker-params buzhash,10,23,16,4095`` (custom, like borg < 1.0):
+a) with ``create --chunker-params buzhash,10,23,16,4095`` (custom):
 
   mem_usage  =  2.8GiB
 

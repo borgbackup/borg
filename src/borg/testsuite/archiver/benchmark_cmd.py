@@ -1,9 +1,9 @@
 from ...constants import *  # NOQA
-from . import ArchiverTestCaseBase, RK_ENCRYPTION, environment_variable
+from .. import environment_variable
+from . import cmd, RK_ENCRYPTION
 
 
-class ArchiverTestCase(ArchiverTestCaseBase):
-    def test_benchmark_crud(self):
-        self.cmd(f"--repo={self.repository_location}", "rcreate", RK_ENCRYPTION)
-        with environment_variable(_BORG_BENCHMARK_CRUD_TEST="YES"):
-            self.cmd(f"--repo={self.repository_location}", "benchmark", "crud", self.input_path)
+def test_benchmark_crud(archiver):
+    cmd(archiver, f"--repo={archiver.repository_location}", "rcreate", RK_ENCRYPTION)
+    with environment_variable(_BORG_BENCHMARK_CRUD_TEST="YES"):
+        cmd(archiver, f"--repo={archiver.repository_location}", "benchmark", "crud", archiver.input_path)

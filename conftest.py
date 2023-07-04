@@ -138,8 +138,8 @@ def archiver(tmp_path):
 @pytest.fixture()
 def remote_archiver(archiver):
     archiver.prefix = "ssh://__testsuite__"
-    archiver.repository_location = archiver.prefix + archiver.repository_path
-    return archiver
+    archiver.repository_location = archiver.prefix + str(archiver.repository_path)
+    yield archiver
 
 
 @pytest.fixture(autouse=True)

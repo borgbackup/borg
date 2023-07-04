@@ -20,13 +20,14 @@ import shutil
 import pytest
 
 from ...constants import *  # NOQA
-from . import cmd, environment_variable
+from .. import environment_variable
+from . import cmd_fixture
 
 DF_MOUNT = "/tmp/borg-mount"
 
 
 @pytest.mark.skipif(not os.path.exists(DF_MOUNT), reason="needs a 16MB fs mounted on %s" % DF_MOUNT)
-def test_disk_full(cmd):
+def test_disk_full(cmd_fixture):
     def make_files(dir, count, size, rnd=True):
         shutil.rmtree(dir, ignore_errors=True)
         os.mkdir(dir)
@@ -51,7 +52,7 @@ def test_disk_full(cmd):
             shutil.rmtree(input, ignore_errors=True)
             # keep some space and some inodes in reserve that we can free up later:
             make_files(reserve, 80, 100000, rnd=False)
-            rc, out = cmd(f"--repo={repo}", "rcreate")
+            rc, out = cmd_fixture(f"--repo={repo}", "rcreate")
             if rc != EXIT_SUCCESS:
                 print("rcreate", rc, out)
             assert rc == EXIT_SUCCESS
@@ -67,7 +68,7 @@ def test_disk_full(cmd):
                             break
                         raise
                     try:
-                        rc, out = cmd("--repo=%s" % repo, "create", "test%03d" % i, input)
+                        rc, out = cmd_fixture("--repo=%s" % repo, "create", "test%03d" % i, input)
                         success = rc == EXIT_SUCCESS
                         if not success:
                             print("create", rc, out)
@@ -77,12 +78,12 @@ def test_disk_full(cmd):
                         os.remove(os.path.join(repo, "lock.roster"))
             finally:
                 # now some error happened, likely we are out of disk space.
-                # free some space so we can expect borg to be able to work normally:
+                # free some space such that we can expect borg to be able to work normally:
                 shutil.rmtree(reserve, ignore_errors=True)
-            rc, out = cmd(f"--repo={repo}", "rlist")
+            rc, out = cmd_fixture(f"--repo={repo}", "rlist")
             if rc != EXIT_SUCCESS:
                 print("rlist", rc, out)
-            rc, out = cmd(f"--repo={repo}", "check", "--repair")
+            rc, out = cmd_fixture(f"--repo={repo}", "check", "--repair")
             if rc != EXIT_SUCCESS:
                 print("check", rc, out)
             assert rc == EXIT_SUCCESS

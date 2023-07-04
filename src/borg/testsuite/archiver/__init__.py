@@ -6,6 +6,7 @@ import re
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 from configparser import ConfigParser
 from contextlib import contextmanager
@@ -93,6 +94,29 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             return ret, output.getvalue() if binary_output else output.getvalue().decode()
         finally:
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
+
+
+# check if the binary "borg.exe" is available (for local testing a symlink to virtualenv/bin/borg should do)
+try:
+    exec_cmd("help", exe="borg.exe", fork=True)
+    BORG_EXES = ["python", "binary"]
+except FileNotFoundError:
+    BORG_EXES = ["python"]
+
+
+@pytest.fixture(params=BORG_EXES)
+def cmd_fixture(request):
+    if request.param == "python":
+        exe = None
+    elif request.param == "binary":
+        exe = "borg.exe"
+    else:
+        raise ValueError("param must be 'python' or 'binary'")
+
+    def exec_fn(*args, **kw):
+        return exec_cmd(*args, exe=exe, fork=True, **kw)
+
+    return exec_fn
 
 
 def checkts(ts):

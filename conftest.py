@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from borg.testsuite.archiver import exec_cmd
+from borg.testsuite.archiver import BORG_EXES
 
 if hasattr(pytest, "register_assert_rewrite"):
     pytest.register_assert_rewrite("borg.testsuite")
@@ -102,7 +102,7 @@ class ArchiverSetup:
         self.cache_path = str
         self.exclude_file_path = str
         self.patterns_file_path = str
-        self._old_wd = str
+        self.old_wd = str
 
 
 @pytest.fixture()
@@ -129,31 +129,22 @@ def archiver(tmp_path, set_env_variables):
         fd.write(b"input/file2\n# A comment line, then a blank line\n\n")
     with open(archiver.patterns_file_path, "wb") as fd:
         fd.write(b"+input/file_important\n- input/file*\n# A comment line, then a blank line\n\n")
-    archiver._old_wd = os.getcwd()
+    archiver.old_wd = os.getcwd()
     os.chdir(archiver.tmpdir)
     yield archiver
-    os.chdir(archiver._old_wd)
+    os.chdir(archiver.old_wd)
 
 
 @pytest.fixture()
 def remote_archiver(archiver):
     archiver.prefix = "ssh://__testsuite__"
-    archiver.repository_location = archiver.prefix + archiver.repository_path
-    return archiver
+    archiver.repository_location = archiver.prefix + str(archiver.repository_path)
+    yield archiver
 
 
 @pytest.fixture()
-def check_binary_availability(archiver):
-    try:
-        exec_cmd("help", exe="borg.exe", fork=True)
-        archiver.BORG_EXES = ["python", "binary"]
-    except FileNotFoundError:
-        archiver.BORG_EXES = ["python"]
-
-
-@pytest.fixture()
-def binary_archiver(archiver, check_binary_availability):
-    if "binary" not in archiver.BORG_EXES:
+def binary_archiver(archiver):
+    if "binary" not in BORG_EXES:
         pytest.skip("No borg.exe binary available")
     archiver.EXE = "borg.exe"
     archiver.FORK_DEFAULT = True

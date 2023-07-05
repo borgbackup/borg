@@ -103,15 +103,17 @@ class CheckMixIn:
         would take 7 hours, then running a daily check with ``--max-duration=3600``
         (1 hour) would result in one full repository check per week. Doing a full
         repository check aborts any previous partial check; the next partial check will
-        restart from the beginning. You can use ``--max-duration`` with neither
-        ``--repair``, nor ``--archives-only``.
+        restart from the beginning. With partial repository checks you can run neither
+        archive checks, nor enable repair mode. Consequently, if you want to use
+        ``--max-duration`` you must also pass ``--repository-only``, and must pass
+        neither ``--archives-only``, nor ``--repair``.
 
         **Warning:** Please note that partial repository checks (i.e. running it with
         ``--max-duration``) can only perform non-cryptographic checksum checks on the
         segment files. A full repository check (i.e. without ``--max-duration``) can
-        also do a repository index check. Even though this is often no issue, partial
-        checks may therefore be useful only with very large repositories where a full
-        check would take too long.
+        also do a repository index check. Enabling partial repository checks excepts
+        archive checks for the same reason. Therefore partial checks may be useful with
+        very large repositories only where a full check would take too long.
 
         The ``--verify-data`` option will perform a full integrity verification (as
         opposed to checking the CRC32 of the segment) of data, which means reading the

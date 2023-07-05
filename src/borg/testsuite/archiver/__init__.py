@@ -256,19 +256,21 @@ def _set_repository_id(repo_path, id):
 
 
 def _extract_hardlinks_setup(archiver):
-    os.mkdir(os.path.join(archiver.input_path, "dir1"))
-    os.mkdir(os.path.join(archiver.input_path, "dir1/subdir"))
+    repo_location, input_path = archiver.repository_location, archiver.input_path
 
-    archiver.create_regular_file("source", contents=b"123456")
-    os.link(os.path.join(archiver.input_path, "source"), os.path.join(archiver.input_path, "abba"))
-    os.link(os.path.join(archiver.input_path, "source"), os.path.join(archiver.input_path, "dir1/hardlink"))
-    os.link(os.path.join(archiver.input_path, "source"), os.path.join(archiver.input_path, "dir1/subdir/hardlink"))
+    os.mkdir(os.path.join(input_path, "dir1"))
+    os.mkdir(os.path.join(input_path, "dir1/subdir"))
 
-    create_regular_file(archiver.input_path, "dir1/source2")
-    os.link(os.path.join(archiver.input_path, "dir1/source2"), os.path.join(archiver.input_path, "dir1/aaaa"))
+    create_regular_file(input_path, "source", contents=b"123456")
+    os.link(os.path.join(input_path, "source"), os.path.join(input_path, "abba"))
+    os.link(os.path.join(input_path, "source"), os.path.join(input_path, "dir1/hardlink"))
+    os.link(os.path.join(input_path, "source"), os.path.join(input_path, "dir1/subdir/hardlink"))
 
-    cmd(archiver, f"--repo={archiver.repository_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={archiver.repository_location}", "create", "test", "input")
+    create_regular_file(input_path, "dir1/source2")
+    os.link(os.path.join(input_path, "dir1/source2"), os.path.join(input_path, "dir1/aaaa"))
+
+    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
 
 
 def _create_test_caches(archiver):

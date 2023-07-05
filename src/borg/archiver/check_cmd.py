@@ -177,49 +177,6 @@ class CheckMixIn:
         lost data. However, this "healing process" can only happen in repair mode.
         Thus it is advised to run ``--repair`` a second time after creating some new
         backups.
-
-        Technical description
-        +++++++++++++++++++++
-
-        First, the underlying repository data files are checked:
-
-        - For all segments, the segment magic header is checked.
-        - For all objects stored in the segments, all metadata (e.g. CRC and size) and
-          all data is read. The read data is checked by size and CRC. Bit rot and other
-          types of accidental damage can be detected this way.
-        - In repair mode, if an integrity error is detected in a segment, try to recover
-          as many objects from the segment as possible.
-        - In repair mode, make sure that the index is consistent with the data stored in
-          the segments.
-        - If checking a remote repo via ``ssh:``, the repo check is executed on the server
-          without causing significant network traffic.
-        - The repository check can be skipped using the ``--archives-only`` option.
-        - A repository check can be time consuming. Partial checks are possible with the
-          ``--max-duration`` option.
-
-        Second, the consistency and correctness of the archive metadata is verified:
-
-        - Is the repo manifest present? If not, it is rebuilt from archive metadata
-          chunks (this requires reading and decrypting of all metadata and data).
-        - Check if archive metadata chunk is present; if not, remove archive from manifest.
-        - For all files (items) in the archive, for all chunks referenced by these
-          files, check if chunk is present. In repair mode, if a chunk is not present,
-          replace it with a same-size replacement chunk of zeroes. If a previously lost
-          chunk reappears (e.g. via a later backup), in repair mode the all-zero replacement
-          chunk will be replaced by the correct chunk. This requires reading of archive and
-          file metadata, but not data.
-        - In repair mode, when all the archives were checked, orphaned chunks are deleted
-          from the repo. One cause of orphaned chunks are input file related errors (like
-          read errors) in the archive creation process.
-        - In verify-data mode, a complete cryptographic verification of the archive data
-          integrity is performed. This conflicts with ``--repository-only`` as this mode
-          only makes sense if the archive checks are enabled. The full details of this mode
-          are documented above.
-        - If checking a remote repo via ``ssh:``, the archive check is executed on the
-          client machine because it requires decryption, and this is always done client-side
-          as key access is needed.
-        - The archive checks can be time consuming; they can be skipped using the
-          ``--repository-only`` option.
         """
         )
         subparser = subparsers.add_parser(

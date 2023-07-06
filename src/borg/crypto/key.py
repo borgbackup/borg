@@ -24,12 +24,17 @@ from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers import prepare_subprocess_env
 from ..helpers import msgpack
+from ..helpers import workarounds
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
 
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_long, long_to_bytes, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b
+
+
+# workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
+AUTHENTICATED_NO_KEY = 'authenticated_no_key' in workarounds
 
 
 class NoPassphraseFailure(Error):
@@ -253,6 +258,8 @@ class KeyBase:
         offset = data.index(tam_hmac)
         data[offset:offset + 64] = bytes(64)
         tam_key = self._tam_key(tam_salt, context=b'manifest')
+        if AUTHENTICATED_NO_KEY:
+            return unpacked, True  # True is a lie.
         calculated_hmac = hmac.digest(tam_key, data, 'sha512')
         if not hmac.compare_digest(calculated_hmac, tam_hmac):
             raise TAMInvalid()
@@ -874,6 +881,19 @@ class AuthenticatedKeyBase(RepoKey):
     # It's only authenticated, not encrypted.
     logically_encrypted = False
 
+    def _load(self, key_data, passphrase):
+        if AUTHENTICATED_NO_KEY:
+            # fake _load if we have no key or passphrase
+            NOPE = bytes(32)  # 256 bit all-zero
+            self.repository_id = NOPE
+            self.enc_key = NOPE
+            self.enc_hmac_key = NOPE
+            self.id_key = NOPE
+            self.chunk_seed = 0
+            self.tam_required = False
+            return True
+        return super()._load(key_data, passphrase)
+
     def load(self, target, passphrase):
         success = super().load(target, passphrase)
         self.logically_encrypted = False
@@ -899,6 +919,8 @@ class AuthenticatedKeyBase(RepoKey):
         if not decompress:
             return payload
         data = self.decompress(payload)
+        if AUTHENTICATED_NO_KEY:
+            return data
         self.assert_id(id, data)
         return data
 

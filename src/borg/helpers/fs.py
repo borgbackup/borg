@@ -1,7 +1,7 @@
 import errno
 import hashlib
 import os
-import os.path
+import posixpath
 import re
 import stat
 import subprocess
@@ -231,7 +231,7 @@ def make_path_safe(path):
     path = path.lstrip("/")
     if path.startswith("../") or "/../" in path or path.endswith("/..") or path == "..":
         raise ValueError(f"unexpected '..' element in path {path!r}")
-    path = os.path.normpath(path)
+    path = posixpath.normpath(path)
     return path
 
 
@@ -245,6 +245,11 @@ def remove_dotdot_prefixes(path):
 
     `path` is expected to be normalized already (e.g. via `os.path.normpath()`).
     """
+    if is_win32:
+        if len(path) > 1 and path[1] == ":":
+            path = path.replace(":", "", 1)
+        path = path.replace("\\", "/")
+
     path = path.lstrip("/")
     path = _dotdot_re.sub("", path)
     if path in ["", ".."]:

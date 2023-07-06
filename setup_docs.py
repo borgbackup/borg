@@ -6,7 +6,7 @@ import re
 import sys
 import textwrap
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timezone
 import time
 
 from setuptools import Command
@@ -470,10 +470,8 @@ class build_man(Command):
         self.write_heading(write, description, double_sided=True)
         # man page metadata
         write(":Author: The Borg Collective")
-        write(
-            ":Date:",
-            datetime.utcfromtimestamp(int(os.environ.get("SOURCE_DATE_EPOCH", time.time()))).date().isoformat(),
-        )
+        source_date_epoch = int(os.environ.get("SOURCE_DATE_EPOCH", time.time()))
+        write(":Date:", datetime.fromtimestamp(source_date_epoch, timezone.utc).date().isoformat())
         write(":Manual section: 1")
         write(":Manual group: borg backup tool")
         write()

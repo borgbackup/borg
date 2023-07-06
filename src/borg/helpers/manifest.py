@@ -13,7 +13,7 @@ logger = create_logger()
 
 from .datastruct import StableDict
 from .parseformat import bin_to_hex, safe_encode, safe_decode
-from .time import parse_timestamp
+from .time import parse_timestamp, utcnow
 from .. import shellpattern
 from ..constants import *  # NOQA
 
@@ -242,11 +242,11 @@ class Manifest:
             self.config[b'tam_required'] = True
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow().strftime(ISO_FORMAT)
+            self.timestamp = utcnow().strftime(ISO_FORMAT)
         else:
             prev_ts = self.last_timestamp
             incremented = (prev_ts + timedelta(microseconds=1)).strftime(ISO_FORMAT)
-            self.timestamp = max(incremented, datetime.utcnow().strftime(ISO_FORMAT))
+            self.timestamp = max(incremented, utcnow().strftime(ISO_FORMAT))
         # include checks for limits as enforced by limited unpacker (used by load())
         assert len(self.archives) <= MAX_ARCHIVES
         assert all(len(name) <= 255 for name in self.archives)

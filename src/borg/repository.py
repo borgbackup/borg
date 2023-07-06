@@ -8,7 +8,6 @@ import time
 from binascii import hexlify, unhexlify
 from collections import defaultdict
 from configparser import ConfigParser
-from datetime import datetime
 from functools import partial
 from itertools import islice
 
@@ -21,6 +20,7 @@ from .helpers import bin_to_hex
 from .helpers import secure_erase, safe_unlink
 from .helpers import Manifest
 from .helpers import msgpack
+from .helpers import utcnow
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
 from .lrucache import LRUCache
@@ -634,7 +634,7 @@ class Repository:
         if self.append_only:
             with open(os.path.join(self.path, 'transactions'), 'a') as log:
                 print('transaction %d, UTC time %s' % (
-                      transaction_id, datetime.utcnow().strftime(ISO_FORMAT)), file=log)
+                      transaction_id, utcnow().strftime(ISO_FORMAT)), file=log)
 
         # Write hints file
         hints_name = 'hints.%d' % transaction_id

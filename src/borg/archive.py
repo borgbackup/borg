@@ -6,7 +6,7 @@ import sys
 import time
 from collections import OrderedDict
 from contextlib import contextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import timezone, timedelta
 from functools import partial
 from getpass import getuser
 from io import BytesIO
@@ -42,6 +42,7 @@ from .helpers import os_open, flags_normal, flags_dir
 from .helpers import os_stat
 from .helpers import msgpack
 from .helpers import sig_int
+from .helpers import utcnow
 from .lrucache import LRUCache
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
@@ -458,13 +459,13 @@ class Archive:
         self.noxattrs = noxattrs
         assert (start is None) == (start_monotonic is None), 'Logic error: if start is given, start_monotonic must be given as well and vice versa.'
         if start is None:
-            start = datetime.utcnow()
+            start = utcnow()
             start_monotonic = time.monotonic()
         self.chunker_params = chunker_params
         self.start = start
         self.start_monotonic = start_monotonic
         if end is None:
-            end = datetime.utcnow()
+            end = utcnow()
         self.end = end
         self.consider_part_files = consider_part_files
         self.pipeline = DownloadPipeline(self.repository, self.key)
@@ -613,7 +614,7 @@ Utilization of max. archive size: {csize_max:.0%}
         self.items_buffer.flush(flush=True)
         duration = timedelta(seconds=time.monotonic() - self.start_monotonic)
         if timestamp is None:
-            end = datetime.utcnow()
+            end = utcnow()
             start = end - duration
         else:
             end = timestamp + duration
@@ -2266,7 +2267,7 @@ class ArchiveRecreater:
             target.rename(archive.name)
         if self.stats:
             target.start = _start
-            target.end = datetime.utcnow()
+            target.end = utcnow()
             log_multi(DASHES,
                       str(target),
                       DASHES,

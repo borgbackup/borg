@@ -53,7 +53,7 @@ try:
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
     from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
     from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
-    from .helpers import timestamp
+    from .helpers import timestamp, utcnow
     from .helpers import get_cache_dir, os_stat
     from .helpers import Manifest, AI_HUMAN_SORT_KEYS
     from .helpers import hardlinkable
@@ -649,7 +649,7 @@ class Archiver:
         self.noxattrs = args.noxattrs
         self.exclude_nodump = args.exclude_nodump
         dry_run = args.dry_run
-        t0 = datetime.utcnow()
+        t0 = utcnow()
         t0_monotonic = time.monotonic()
         logger.info('Creating archive at "%s"' % args.location.processed)
         if not dry_run:
@@ -1746,7 +1746,7 @@ class Archiver:
         return self.exit_code
 
     def _import_tar(self, args, repository, manifest, key, cache, tarstream):
-        t0 = datetime.utcnow()
+        t0 = utcnow()
         t0_monotonic = time.monotonic()
 
         archive = Archive(repository, key, manifest, args.location.archive, cache=cache,

@@ -46,6 +46,7 @@ from ..helpers import bin_to_hex
 from ..helpers import MAX_S
 from ..helpers import msgpack
 from ..helpers import flags_noatime, flags_normal
+from ..helpers import utcnow
 from ..nanorst import RstToTextLazy, rst_to_terminal
 from ..patterns import IECommand, PatternMatcher, parse_pattern
 from ..item import Item, ItemDiff, chunks_contents_equal
@@ -4048,7 +4049,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
                 'version': 1,
                 'archives': {},
                 'config': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
+                'timestamp': (utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
             repository.commit(compact=False)
 
@@ -4060,7 +4061,7 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
             repository.put(Manifest.MANIFEST_ID, key.encrypt(msgpack.packb({
                 'version': 1,
                 'archives': {},
-                'timestamp': (datetime.utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
+                'timestamp': (utcnow() + timedelta(days=1)).strftime(ISO_FORMAT),
             })))
             repository.commit(compact=False)
 

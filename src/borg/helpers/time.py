@@ -10,6 +10,11 @@ def to_localtime(ts):
     return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
+def utcnow():
+    """Returns a naive datetime instance representing the time in the UTC timezone"""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
     """Parse a ISO 8601 timestamp string"""
     fmt = ISO_FORMAT if '.' in timestamp else ISO_FORMAT_NO_USECS

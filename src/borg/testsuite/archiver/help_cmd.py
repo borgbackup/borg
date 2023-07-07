@@ -2,26 +2,11 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...helpers.nanorst import RstToTextLazy, rst_to_terminal
-from . import ArchiverTestCaseBase, Archiver
-
-
-class ArchiverTestCase(ArchiverTestCaseBase):
-    def test_usage(self):
-        self.cmd()
-        self.cmd("-h")
-
-    def test_help(self):
-        assert "Borg" in self.cmd("help")
-        assert "patterns" in self.cmd("help", "patterns")
-        assert "creates a new, empty repository" in self.cmd("help", "rcreate")
-        assert "positional arguments" not in self.cmd("help", "rcreate", "--epilog-only")
-        assert "creates a new, empty repository" not in self.cmd("help", "rcreate", "--usage-only")
+from . import Archiver, cmd
 
 
 def get_all_parsers():
-    """
-    Return dict mapping command to parser.
-    """
+    # Return dict mapping command to parser.
     parser = Archiver(prog="borg").build_parser()
     borgfs_parser = Archiver(prog="borgfs").build_parser()
     parsers = {}
@@ -30,8 +15,8 @@ def get_all_parsers():
         choices = {}
         for action in parser._actions:
             if action.choices is not None and "SubParsersAction" in str(action.__class__):
-                for cmd, parser in action.choices.items():
-                    choices[prefix + cmd] = parser
+                for command, parser in action.choices.items():
+                    choices[prefix + command] = parser
         if extra_choices is not None:
             choices.update(extra_choices)
         if prefix and not choices:
@@ -43,6 +28,19 @@ def get_all_parsers():
 
     discover_level("", parser, Archiver, {"borgfs": borgfs_parser})
     return parsers
+
+
+def test_usage(archiver):
+    cmd(archiver)
+    cmd(archiver, "-h")
+
+
+def test_help(archiver):
+    assert "Borg" in cmd(archiver, "help")
+    assert "patterns" in cmd(archiver, "help", "patterns")
+    assert "creates a new, empty repository" in cmd(archiver, "help", "rcreate")
+    assert "positional arguments" not in cmd(archiver, "help", "rcreate", "--epilog-only")
+    assert "creates a new, empty repository" not in cmd(archiver, "help", "rcreate", "--usage-only")
 
 
 @pytest.mark.parametrize("command, parser", list(get_all_parsers().items()))

@@ -117,7 +117,6 @@ def test_basic_functionality(archivers, request):
     assert filter(info_output) == filter(info_output2)
 
 
-@pytest.mark.skipif(is_win32, reason="still broken on windows")
 def test_archived_paths(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location = archiver.repository_location

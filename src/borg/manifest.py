@@ -264,7 +264,9 @@ class Manifest:
         manifest.timestamp = m.get("timestamp")
         manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
-        manifest.item_keys = ITEM_KEYS | frozenset(m.get("item_keys", []))
+        manifest.item_keys = ITEM_KEYS
+        manifest.item_keys |= frozenset(m.config.get("item_keys", []))  # new location of item_keys since borg2
+        manifest.item_keys |= frozenset(m.get("item_keys", []))  # legacy: borg 1.x: item_keys not in config yet
 
         if manifest.tam_verified:
             manifest_required = manifest.config.get("tam_required", False)
@@ -321,12 +323,12 @@ class Manifest:
         assert len(self.archives) <= MAX_ARCHIVES
         assert all(len(name) <= 255 for name in self.archives)
         assert len(self.item_keys) <= 100
+        self.config["item_keys"] = tuple(sorted(self.item_keys))
         manifest = ManifestItem(
-            version=1,
+            version=2,
             archives=StableDict(self.archives.get_raw_dict()),
             timestamp=self.timestamp,
             config=StableDict(self.config),
-            item_keys=tuple(sorted(self.item_keys)),
         )
         self.tam_verified = True
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())

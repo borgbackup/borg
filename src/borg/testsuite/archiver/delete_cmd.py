@@ -6,7 +6,7 @@ from . import cmd, create_regular_file, RK_ENCRYPTION, src_file, create_src_arch
 
 
 def pytest_generate_tests(metafunc):
-    # Generates tests that run on local and remote repos, as well as with a binary base.
+    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
     if "archivers" in metafunc.fixturenames:
         metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
 

@@ -1,6 +1,7 @@
 import errno
 import json
 import os
+import tempfile
 from random import randbytes
 import shutil
 import socket
@@ -8,10 +9,12 @@ import stat
 import subprocess
 import time
 
+import platformdirs
 import pytest
 
 from ... import platform
 from ...constants import *  # NOQA
+from ...helpers import get_runtime_dir
 from ...manifest import Manifest
 from ...platform import is_cygwin, is_win32, is_darwin
 from ...repository import Repository
@@ -133,9 +136,9 @@ def test_archived_paths(archivers, request):
     archived_path = posix_path.lstrip("/")
     create_regular_file(archiver.input_path, "test")
     cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input", full_path)
+    cmd(archiver, f"--repo={repo_location}", "create", "test", "input", posix_path)
     # "input" directory is recursed into, "input/test" is discovered and joined by borg's recursion.
-    # full_path was directly given as a cli argument and should end up as archive_path in the borg archive.
+    # posix_path was directly given as a cli argument and should end up as archive_path in the borg archive.
     expected_paths = sorted(["input", "input/test", archived_path])
     # check path in archived items:
     archive_list = cmd(archiver, f"--repo={repo_location}", "list", "test", "--short")
@@ -168,13 +171,20 @@ def test_create_duplicate_root(archivers, request):
 
 
 @pytest.mark.skipif(is_win32, reason="unix sockets not available on windows")
-def test_unix_socket(archivers, request, tmp_path):
+def test_unix_socket(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     repo_location = archiver.repository_location
+
+    # under pytest, we use BORG_BASE_DIR to keep stuff away from the user's normal borg dirs.
+    # this leads to a very long get_runtime_dir() path - too long for a socket file!
+    # thus, we override that again via BORG_RUNTIME_DIR to get a shorter path.
+    monkeypatch.setenv("BORG_RUNTIME_DIR", os.path.join(platformdirs.user_runtime_dir(), "pytest"))
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     try:
+        socket_file = tempfile.mktemp(suffix="unix-socket", prefix="borg-", dir=get_runtime_dir())
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(os.path.join(archiver.input_path, "unix-socket"))
+        sock.bind(socket_file)
     except PermissionError as err:
         if err.errno == errno.EPERM:
             pytest.skip("unix sockets disabled or not supported")

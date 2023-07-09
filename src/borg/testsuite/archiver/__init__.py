@@ -423,13 +423,6 @@ def _assert_dirs_equal_cmp(diff, ignore_flags=False, ignore_xattrs=False, ignore
 
 
 @contextmanager
-def test_extract_file(path):
-    assert not os.path.exists(path), f"{path} should not exist"
-    yield
-    assert os.path.exists(path), f"{path} should exist"
-
-
-@contextmanager
 def read_only(path):
     """Some paths need to be made read-only for testing
 

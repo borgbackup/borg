@@ -59,7 +59,7 @@ def test_prune_repository(archivers, request):
     cmd(archiver, f"--repo={repo_location}", "prune", "--keep-daily=2")
     output = cmd(archiver, f"--repo={repo_location}", "rlist", "--consider-checkpoints")
     # all checkpoints should be gone now:
-    assert "checkpoint" not in output  # might be in
+    assert "checkpoint" not in output
     # the latest archive must be still there
     assert "test5" in output
 

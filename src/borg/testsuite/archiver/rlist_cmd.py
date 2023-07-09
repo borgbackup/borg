@@ -19,6 +19,7 @@ def test_rlist_glob(archivers, request):
     cmd(archiver, f"--repo={repo_location}", "create", "test-1", src_dir)
     cmd(archiver, f"--repo={repo_location}", "create", "something-else-than-test-1", src_dir)
     cmd(archiver, f"--repo={repo_location}", "create", "test-2", src_dir)
+
     output = cmd(archiver, f"--repo={repo_location}", "rlist", "--match-archives=sh:test-*")
     assert "test-1" in output
     assert "test-2" in output

@@ -34,11 +34,14 @@ def serve_socket(monkeypatch):
 def test_with_socket(serve_socket, tmpdir, monkeypatch):
     have_a_short_runtime_dir(monkeypatch)
     repo_path = str(tmpdir.join("repo"))
+
     ret, output = exec_cmd(f"--socket={serve_socket}", f"--repo=socket://{repo_path}", "rcreate", "--encryption=none")
     assert ret == 0
+
     ret, output = exec_cmd(f"--socket={serve_socket}", f"--repo=socket://{repo_path}", "rinfo")
     assert ret == 0
     assert "Repository ID: " in output
+
     monkeypatch.setenv("BORG_DELETE_I_KNOW_WHAT_I_AM_DOING", "YES")
     ret, output = exec_cmd(f"--socket={serve_socket}", f"--repo=socket://{repo_path}", "rdelete")
     assert ret == 0

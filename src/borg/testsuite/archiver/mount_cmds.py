@@ -2,7 +2,6 @@ import errno
 import os
 import stat
 import sys
-import unittest
 
 import pytest
 
@@ -25,7 +24,7 @@ def pytest_generate_tests(metafunc):
 
 
 @requires_hardlinks
-@unittest.skipUnless(llfuse, "llfuse not installed")
+@pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_mount_hardlinks(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location = archiver.repository_location
@@ -64,7 +63,7 @@ def test_fuse_mount_hardlinks(archivers, request):
         assert open("input/dir1/subdir/hardlink", "rb").read() == b"123456"
 
 
-@unittest.skipUnless(llfuse, "llfuse not installed")
+@pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.EXE and fakeroot_detected():
@@ -173,7 +172,7 @@ def test_fuse(archivers, request):
                 raise
 
 
-@unittest.skipUnless(llfuse, "llfuse not installed")
+@pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_versions_view(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
@@ -208,7 +207,7 @@ def test_fuse_versions_view(archivers, request):
             assert open(hl3, "rb").read() == b"123456"
 
 
-@unittest.skipUnless(llfuse, "llfuse not installed")
+@pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_allow_damaged_files(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
@@ -236,7 +235,7 @@ def test_fuse_allow_damaged_files(archivers, request):
         open(os.path.join(mountpoint, "archive", path)).close()
 
 
-@unittest.skipUnless(llfuse, "llfuse not installed")
+@pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_mount_options(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location = archiver.repository_location
@@ -261,7 +260,7 @@ def test_fuse_mount_options(archivers, request):
         assert sorted(os.listdir(os.path.join(mountpoint))) == []
 
 
-@unittest.skipUnless(llfuse, "llfuse not installed")
+@pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_migrate_lock_alive(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.prefix == "ssh://__testsuite__":

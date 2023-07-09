@@ -1,5 +1,3 @@
-import unittest
-
 import pytest
 
 from ...constants import *  # NOQA
@@ -110,7 +108,7 @@ def test_readonly_list(archiver):
         cmd(archiver, f"--repo={archiver.repository_location}", "rlist", "--bypass-lock")
 
 
-@unittest.skipUnless(llfuse, "llfuse not installed")
+@pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_readonly_mount(archiver):
     cmd(archiver, f"--repo={archiver.repository_location}", "rcreate", RK_ENCRYPTION)
     create_src_archive(archiver, "test")

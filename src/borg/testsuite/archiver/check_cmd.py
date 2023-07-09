@@ -21,7 +21,7 @@ def check_cmd_setUp(archiver):
 
 
 def pytest_generate_tests(metafunc):
-    # Generates tests that run on both local and remote repos
+    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
     if "archivers" in metafunc.fixturenames:
         metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
 

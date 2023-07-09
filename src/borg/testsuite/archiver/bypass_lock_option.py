@@ -115,15 +115,15 @@ def test_readonly_mount(archiver):
     with read_only(archiver.repository_path):
         # verify that command normally doesn't work with read-only repo
         if archiver.FORK_DEFAULT:
-            with fuse_mount(archiver.repository_location, exit_code=EXIT_ERROR):
+            with fuse_mount(archiver, archiver.repository_location, exit_code=EXIT_ERROR):
                 pass
         else:
             with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
                 # self.fuse_mount always assumes fork=True, so for this test we have to set fork=False manually
-                with fuse_mount(archiver.repository_location, fork=False):
+                with fuse_mount(archiver, archiver.repository_location, fork=False):
                     pass
             if isinstance(excinfo.value, RemoteRepository.RPCError):
                 assert excinfo.value.exception_class == "LockFailed"
         # verify that command works with read-only repo when using --bypass-lock
-        with fuse_mount(archiver.repository_location, None, "--bypass-lock"):
+        with fuse_mount(archiver, archiver.repository_location, None, "--bypass-lock"):
             pass

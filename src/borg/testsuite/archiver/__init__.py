@@ -469,7 +469,7 @@ def wait_for_mountstate(mountpoint, *, mounted, timeout=5):
 
 
 @contextmanager
-def fuse_mount(location, mountpoint=None, *options, fork=True, os_fork=False, **kwargs):
+def fuse_mount(archiver, location, mountpoint=None, *options, fork=True, os_fork=False, **kwargs):
     # For a successful mount, `fork = True` is required for
     # the borg mount daemon to work properly or the tests
     # will just freeze. Therefore, if argument `fork` is not
@@ -500,7 +500,7 @@ def fuse_mount(location, mountpoint=None, *options, fork=True, os_fork=False, **
                 os._exit(0)
             # The grandchild process.
             try:
-                cmd(*args, fork=False, **kwargs)  # borg mount not spawning.
+                cmd(archiver, *args, fork=False, **kwargs)  # borg mount not spawning.
             finally:
                 # This should never be reached, since it daemonizes,
                 # and the grandchild process exits before cmd() returns.
@@ -508,7 +508,7 @@ def fuse_mount(location, mountpoint=None, *options, fork=True, os_fork=False, **
                 print("Fatal: borg mount did not daemonize properly. Force exiting.", file=sys.stderr, flush=True)
                 os._exit(0)
     else:
-        cmd(*args, fork=fork, **kwargs)
+        cmd(archiver, *args, fork=fork, **kwargs)
         if kwargs.get("exit_code", EXIT_SUCCESS) == EXIT_ERROR:
             # If argument `exit_code = EXIT_ERROR`, then this call
             # is testing the behavior of an unsuccessful mount, and

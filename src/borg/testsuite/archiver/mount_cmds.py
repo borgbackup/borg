@@ -37,15 +37,15 @@ def test_fuse_mount_hardlinks(archivers, request):
         ignore_perms = ["-o", "ignore_permissions,defer_permissions"]
     else:
         ignore_perms = ["-o", "ignore_permissions"]
-    with fuse_mount(repo_location, mountpoint, "-a", "test", "--strip-components=2", *ignore_perms), changedir(
-        os.path.join(mountpoint, "test")
-    ):
+    with fuse_mount(
+        archiver, repo_location, mountpoint, "-a", "test", "--strip-components=2", *ignore_perms
+    ), changedir(os.path.join(mountpoint, "test")):
         assert os.stat("hardlink").st_nlink == 2
         assert os.stat("subdir/hardlink").st_nlink == 2
         assert open("subdir/hardlink", "rb").read() == b"123456"
         assert os.stat("aaaa").st_nlink == 2
         assert os.stat("source2").st_nlink == 2
-    with fuse_mount(repo_location, mountpoint, "input/dir1", "-a", "test", *ignore_perms), changedir(
+    with fuse_mount(archiver, repo_location, mountpoint, "input/dir1", "-a", "test", *ignore_perms), changedir(
         os.path.join(mountpoint, "test")
     ):
         assert os.stat("input/dir1/hardlink").st_nlink == 2
@@ -53,7 +53,7 @@ def test_fuse_mount_hardlinks(archivers, request):
         assert open("input/dir1/subdir/hardlink", "rb").read() == b"123456"
         assert os.stat("input/dir1/aaaa").st_nlink == 2
         assert os.stat("input/dir1/source2").st_nlink == 2
-    with fuse_mount(repo_location, mountpoint, "-a", "test", *ignore_perms), changedir(
+    with fuse_mount(archiver, repo_location, mountpoint, "-a", "test", *ignore_perms), changedir(
         os.path.join(mountpoint, "test")
     ):
         assert os.stat("input/source").st_nlink == 4
@@ -91,7 +91,7 @@ def test_fuse(archivers, request):
         os.remove(os.path.join("input", "flagfile"))
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     # mount the whole repository, archive contents shall show up in archivename subdirectories of mountpoint:
-    with fuse_mount(repo_location, mountpoint):
+    with fuse_mount(archiver, repo_location, mountpoint):
         # flags are not supported by the FUSE mount
         # we also ignore xattrs here, they are tested separately
         assert_dirs_equal(
@@ -100,7 +100,7 @@ def test_fuse(archivers, request):
         assert_dirs_equal(
             input_path, os.path.join(mountpoint, "archive2", "input"), ignore_flags=True, ignore_xattrs=True
         )
-    with fuse_mount(repo_location, mountpoint, "-a", "archive"):
+    with fuse_mount(archiver, repo_location, mountpoint, "-a", "archive"):
         assert_dirs_equal(
             input_path, os.path.join(mountpoint, "archive", "input"), ignore_flags=True, ignore_xattrs=True
         )
@@ -187,7 +187,7 @@ def test_fuse_versions_view(archivers, request):
     cmd(archiver, f"--repo={repo_location}", "create", "archive2", "input")
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     # mount the whole repository, archive contents shall show up in versioned view:
-    with fuse_mount(repo_location, mountpoint, "-o", "versions"):
+    with fuse_mount(archiver, repo_location, mountpoint, "-o", "versions"):
         path = os.path.join(mountpoint, "input", "test")  # filename shows up as directory ...
         files = os.listdir(path)
         assert all(f.startswith("test.") for f in files)  # ... with files test.xxxxx in there
@@ -199,7 +199,7 @@ def test_fuse_versions_view(archivers, request):
             assert os.stat(hl1).st_ino == os.stat(hl2).st_ino == os.stat(hl3).st_ino
             assert open(hl3, "rb").read() == b"123456"
     # similar again, but exclude the 1st hardlink:
-    with fuse_mount(repo_location, mountpoint, "-o", "versions", "-e", "input/hardlink1"):
+    with fuse_mount(archiver, repo_location, mountpoint, "-o", "versions", "-e", "input/hardlink1"):
         if are_hardlinks_supported():
             hl2 = os.path.join(mountpoint, "input", "hardlink2", "hardlink2.00001")
             hl3 = os.path.join(mountpoint, "input", "hardlink3", "hardlink3.00001")
@@ -227,11 +227,11 @@ def test_fuse_allow_damaged_files(archivers, request):
     cmd(archiver, f"--repo={repo_location}", "check", "--repair", exit_code=0)
 
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
-    with fuse_mount(repo_location, mountpoint, "-a", "archive"):
+    with fuse_mount(archiver, repo_location, mountpoint, "-a", "archive"):
         with pytest.raises(OSError) as excinfo:
             open(os.path.join(mountpoint, "archive", path))
         assert excinfo.value.errno == errno.EIO
-    with fuse_mount(repo_location, mountpoint, "-a", "archive", "-o", "allow_damaged_files"):
+    with fuse_mount(archiver, repo_location, mountpoint, "-a", "archive", "-o", "allow_damaged_files"):
         open(os.path.join(mountpoint, "archive", path)).close()
 
 
@@ -246,17 +246,17 @@ def test_fuse_mount_options(archivers, request):
     create_src_archive(archiver, "arch22")
 
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
-    with fuse_mount(repo_location, mountpoint, "--first=2", "--sort=name"):
+    with fuse_mount(archiver, repo_location, mountpoint, "--first=2", "--sort=name"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch11", "arch12"]
-    with fuse_mount(repo_location, mountpoint, "--last=2", "--sort=name"):
+    with fuse_mount(archiver, repo_location, mountpoint, "--last=2", "--sort=name"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch21", "arch22"]
-    with fuse_mount(repo_location, mountpoint, "--match-archives=sh:arch1*"):
+    with fuse_mount(archiver, repo_location, mountpoint, "--match-archives=sh:arch1*"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch11", "arch12"]
-    with fuse_mount(repo_location, mountpoint, "--match-archives=sh:arch2*"):
+    with fuse_mount(archiver, repo_location, mountpoint, "--match-archives=sh:arch2*"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch21", "arch22"]
-    with fuse_mount(repo_location, mountpoint, "--match-archives=sh:arch*"):
+    with fuse_mount(archiver, repo_location, mountpoint, "--match-archives=sh:arch*"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch11", "arch12", "arch21", "arch22"]
-    with fuse_mount(repo_location, mountpoint, "--match-archives=nope"):
+    with fuse_mount(archiver, repo_location, mountpoint, "--match-archives=nope"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == []
 
 
@@ -324,7 +324,7 @@ def test_migrate_lock_alive(archivers, request):
         mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
         # In order that the decoration is kept for the borg mount process, we must not spawn, but actually fork;
         # not to be confused with the forking in borg.helpers.daemonize() which is done as well.
-        with fuse_mount(repo_location, mountpoint, os_fork=True):
+        with fuse_mount(archiver, repo_location, mountpoint, os_fork=True):
             pass
         with open(assert_data_file, "rb") as _in:
             assert_data = pickle.load(_in)

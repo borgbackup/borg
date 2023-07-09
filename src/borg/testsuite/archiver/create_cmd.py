@@ -1,6 +1,7 @@
 import errno
 import json
 import os
+import tempfile
 from random import randbytes
 import shutil
 import socket
@@ -167,17 +168,15 @@ def test_create_duplicate_root(archivers, request):
     assert sorted(paths) == ["input", "input/a", "input/a/hardlink", "input/b", "input/b/hardlink"]
 
 
-# FAILS: > sock.bind(os.path.join(input_path, "unix-socket"))
-# E           OSError: AF_UNIX path too long
 @pytest.mark.skipif(is_win32, reason="unix sockets not available on windows")
 def test_unix_socket(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
+    repo_location = archiver.repository_location
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     try:
-        print(f"\nINPUT PATH: {input_path}")
+        name = tempfile.mktemp(prefix="test_sock", suffix=".sock")  # short path needed for socket.bind
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(os.path.join(input_path, "unix-socket"))
+        sock.bind(name)
     except PermissionError as err:
         if err.errno == errno.EPERM:
             pytest.skip("unix sockets disabled or not supported")

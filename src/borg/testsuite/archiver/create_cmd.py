@@ -1,7 +1,6 @@
 import errno
 import json
 import os
-import tempfile
 from random import randbytes
 import shutil
 import socket
@@ -169,14 +168,13 @@ def test_create_duplicate_root(archivers, request):
 
 
 @pytest.mark.skipif(is_win32, reason="unix sockets not available on windows")
-def test_unix_socket(archivers, request):
+def test_unix_socket(archivers, request, tmp_path):
     archiver = request.getfixturevalue(archivers)
     repo_location = archiver.repository_location
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     try:
-        name = tempfile.mktemp(prefix="test_sock", suffix=".sock")  # short path needed for socket.bind
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(name)
+        sock.bind(os.path.join(archiver.input_path, "unix-socket"))
     except PermissionError as err:
         if err.errno == errno.EPERM:
             pytest.skip("unix sockets disabled or not supported")

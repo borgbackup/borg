@@ -83,14 +83,15 @@ class CheckMixIn:
            server and do not cause significant network traffic.
 
         2. Checking consistency and correctness of the archive metadata and optionally
-           archive data (requires ``--verify-data`). This includes ensuring that the
+           archive data (requires ``--verify-data``). This includes ensuring that the
            repository manifest exists, the archive metadata chunk is present, and that
            all chunks referencing files (items) in the archive exist. This requires
-           reading archive and file metadata, but not data. To verify the cryptographic
-           archive data integrity pass ``--verify-data`, but keep in mind that this
-           requires reading all data and is hence very time consuming. When checking
-           archives of a remote repository, archive checks run on the client machine
-           because they require decrypting data and therefore the encryption key.
+           reading archive and file metadata, but not data. To cryptographically verify
+           the file (content) data integrity pass ``--verify-data``, but keep in mind
+           that this requires reading all data and is hence very time consuming. When
+           checking archives of a remote repository, archive checks run on the client
+           machine because they require decrypting data and therefore the encryption
+           key.
 
         Both steps can also be run independently. Pass ``--repository-only`` to run the
         repository checks only, or pass ``--archives-only`` to run the archive checks
@@ -105,8 +106,8 @@ class CheckMixIn:
         repository check aborts any previous partial check; the next partial check will
         restart from the beginning. With partial repository checks you can run neither
         archive checks, nor enable repair mode. Consequently, if you want to use
-        ``--max-duration`` you must also pass ``--repository-only``, and must pass
-        neither ``--archives-only``, nor ``--repair``.
+        ``--max-duration`` you must also pass ``--repository-only``, and must not pass
+        ``--archives-only``, nor ``--repair``.
 
         **Warning:** Please note that partial repository checks (i.e. running it with
         ``--max-duration``) can only perform non-cryptographic checksum checks on the
@@ -119,7 +120,7 @@ class CheckMixIn:
         opposed to checking the CRC32 of the segment) of data, which means reading the
         data from the repository, decrypting and decompressing it. It is a complete
         cryptographic verification and hence very time consuming, but will detect any
-        accidental and malicious corruption. Tamper-resistance is only gauranteed for
+        accidental and malicious corruption. Tamper-resistance is only guaranteed for
         encrypted repositories against attackers without access to the keys. You can
         not use ``--verify-data`` with ``--repository-only``.
 
@@ -149,7 +150,7 @@ class CheckMixIn:
         not mean recovering lost data: Borg can not magically restore data lost due to
         e.g. a hardware failure. Repairing a repository means sacrificing some data
         for the sake of the repository as a whole and the remaining data. Hence it is,
-        by definition, a lossy task.
+        by definition, a potentially lossy task.
 
         In practice, repair mode hooks into both the repository and archive checks:
 
@@ -165,20 +166,23 @@ class CheckMixIn:
            this lost chunk using the new chunk. Lastly, repair mode will also delete
            orphaned chunks (e.g. caused by read errors while creating the archive).
 
-        Most steps taken by repair mode have an onetime effect on the repository, like
+        Most steps taken by repair mode have a one-time effect on the repository, like
         removing a lost archive from the repository. However, replacing a corrupt or
-        lost chunk with a same-size all-zero replacement will have an ongoing effect on
-        the repository: When attempting to extract a file referencing an all-zero
-        chunk, the ``extract`` command will distinctly warn about it. The ``mount``
-        command will reject reading such a "zero-patched" file unless a special mount
-        option is given.
+        lost chunk with an all-zero replacement will have an ongoing effect on the
+        repository: When attempting to extract a file referencing an all-zero chunk,
+        the ``extract`` command will distinctly warn about it. The FUSE filesystem
+        created by the ``mount`` command will reject reading such a "zero-patched"
+        file unless a special mount option is given.
 
-        This ongoing effect of all-zero replacement chunks has a big advantage: If a
-        previously lost chunk reappears (e.g. via a later backup), repair mode might
-        "heal" some of these "zero-patched" files and restore some of the previously
-        lost data. However, this "healing process" can only happen in repair mode.
-        Thus it is advised to run ``--repair`` a second time after creating some new
-        backups.
+        As mentioned earlier, Borg might be able to "heal" a "zero-patched" file in
+        repair mode, if all its previously lost chunks reappear (e.g. via a later
+        backup). This is achieved by Borg not only keeping track of the all-zero
+        replacement chunks, but also by keeping metadata about the lost chunks. In
+        repair mode Borg will check whether a previously lost chunk reappeared and will
+        replace the all-zero replacement chunk by the reappeared chunk. If all lost
+        chunks of a "zero-patched" file reappear, this effectively "heals" the file.
+        Consequently, if lost chunks were repaired earlier, it is advised to run
+        ``--repair`` a second time after creating some new backups.
         """
         )
         subparser = subparsers.add_parser(

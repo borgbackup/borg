@@ -39,8 +39,9 @@ def test_stats_basic(stats):
     [
         ("", 0, "20 B O 20 B U 1 N "),  # test unchanged 'stats' fixture
         ("foo", 10**3, "1.02 kB O 20 B U 1 N foo"),  # test updated original size and set item path
+        # test long item path which exceeds 80 characters
         ("foo" * 40, 10**3, "1.02 kB O 20 B U 1 N foofoofoofoofoofoofoofoofo...foofoofoofoofoofoofoofoofoofoo"),
-    ],  # test long item path which exceeds 80 characters
+    ],
 )
 def test_stats_progress(item_path, update_size, expected_output, stats, monkeypatch, columns=80):
     monkeypatch.setenv("COLUMNS", str(columns))

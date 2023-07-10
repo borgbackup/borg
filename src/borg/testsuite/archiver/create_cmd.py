@@ -9,12 +9,10 @@ import stat
 import subprocess
 import time
 
-import platformdirs
 import pytest
 
 from ... import platform
 from ...constants import *  # NOQA
-from ...helpers import get_runtime_dir
 from ...manifest import Manifest
 from ...platform import is_cygwin, is_win32, is_darwin
 from ...repository import Repository
@@ -175,16 +173,10 @@ def test_unix_socket(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     repo_location = archiver.repository_location
 
-    # under pytest, we use BORG_BASE_DIR to keep stuff away from the user's normal borg dirs.
-    # this leads to a very long get_runtime_dir() path - too long for a socket file!
-    # thus, we override that again via BORG_RUNTIME_DIR to get a shorter path.
-    monkeypatch.setenv("BORG_RUNTIME_DIR", os.path.join(platformdirs.user_runtime_dir(), "pytest"))
-
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     try:
-        socket_file = tempfile.mktemp(suffix="unix-socket", prefix="borg-", dir=get_runtime_dir())
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(socket_file)
+        sock.bind(tempfile.mktemp(suffix="unix-socket", prefix="input"))
     except PermissionError as err:
         if err.errno == errno.EPERM:
             pytest.skip("unix sockets disabled or not supported")

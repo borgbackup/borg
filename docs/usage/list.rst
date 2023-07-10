@@ -27,11 +27,11 @@ Examples
     -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.text
     ...
 
-    $ borg list archiveA --pattern 're:\.ext$'
+    $ borg list archiveA --pattern '+ re:\.ext$' --pattern '- re:^.*$'
     -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.ext
     ...
 
-    $ borg list archiveA --pattern 're:.ext$'
+    $ borg list archiveA --pattern '+ re:.ext$' --pattern '- re:^.*$'
     -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.ext
     -rw-rw-r-- user   user    1416192 Sun, 2015-02-01 11:00:00 code/myproject/file.text
     ...

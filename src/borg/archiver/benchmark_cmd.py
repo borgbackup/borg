@@ -204,7 +204,7 @@ class BenchmarkMixIn:
             print(f"{spec:<12} {size:<10} {timeit(lambda: compressor.compress({}, random_10M), number=10):.3f}s")
 
         print("msgpack ========================================================")
-        item = Item(path="/foo/bar/baz", mode=660, mtime=1234567)
+        item = Item(path="foo/bar/baz", mode=660, mtime=1234567)
         items = [item.as_dict()] * 1000
         size = "100k Items"
         spec = "msgpack"

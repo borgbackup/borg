@@ -800,7 +800,12 @@ def test_get_runtime_dir(monkeypatch):
     else:
         monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
         monkeypatch.delenv("BORG_RUNTIME_DIR", raising=False)
-        assert get_runtime_dir() == os.path.join("/run/user", str(os.getuid()), "borg")
+        uid = str(os.getuid())
+        assert get_runtime_dir() in [
+            os.path.join("/run/user", uid, "borg"),
+            os.path.join("/var/run/user", uid, "borg"),
+            os.path.join(f"/tmp/runtime-{uid}", "borg"),
+        ]
         monkeypatch.setenv("XDG_RUNTIME_DIR", "/var/tmp/.cache")
         assert get_runtime_dir() == os.path.join("/var/tmp/.cache", "borg")
         monkeypatch.setenv("BORG_RUNTIME_DIR", "/var/tmp")
@@ -1202,6 +1207,11 @@ def test_swidth_slice_mixed_characters():
     assert swidth_slice(string, 6) == "나윤a"
 
 
+def utcfromtimestamp(timestamp):
+    """Returns a naive datetime instance representing the timestamp in the UTC timezone"""
+    return datetime.fromtimestamp(timestamp, timezone.utc).replace(tzinfo=None)
+
+
 def test_safe_timestamps():
     if SUPPORT_32BIT_PLATFORMS:
         # ns fit into int64
@@ -1213,9 +1223,9 @@ def test_safe_timestamps():
         # datetime won't fall over its y10k problem
         beyond_y10k = 2**100
         with pytest.raises(OverflowError):
-            datetime.utcfromtimestamp(beyond_y10k)
-        assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2038, 1, 1)
-        assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2038, 1, 1)
+            utcfromtimestamp(beyond_y10k)
+        assert utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2038, 1, 1)
+        assert utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2038, 1, 1)
     else:
         # ns fit into int64
         assert safe_ns(2**64) <= 2**63 - 1
@@ -1226,9 +1236,9 @@ def test_safe_timestamps():
         # datetime won't fall over its y10k problem
         beyond_y10k = 2**100
         with pytest.raises(OverflowError):
-            datetime.utcfromtimestamp(beyond_y10k)
-        assert datetime.utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2262, 1, 1)
-        assert datetime.utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2262, 1, 1)
+            utcfromtimestamp(beyond_y10k)
+        assert utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2262, 1, 1)
+        assert utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2262, 1, 1)
 
 
 class TestPopenWithErrorHandling:

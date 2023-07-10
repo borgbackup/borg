@@ -161,7 +161,7 @@ class PlatformLinuxTestCase(BaseTestCase):
         self.assert_equal(acl_use_local_uid_gid(b"group:root:rw-:0"), b"group:0:rw-")
 
 
-@unittest.skipUnless(sys.platform.startswith("darwin"), "OS X only test")
+@unittest.skipUnless(sys.platform.startswith("darwin"), "macOS only test")
 @unittest.skipIf(fakeroot_detected(), "not compatible with fakeroot")
 class PlatformDarwinTestCase(BaseTestCase):
     def setUp(self):

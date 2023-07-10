@@ -264,7 +264,7 @@ the installed ``openssl`` formula, point pkg-config to the correct path::
 
     PKG_CONFIG_PATH="/usr/local/opt/openssl@1.1/lib/pkgconfig" pip install borgbackup[llfuse]
 
-For OS X Catalina and later, be aware that you must authorize full disk access.
+Be aware that for all recent macOS releases you must authorize full disk access.
 It is no longer sufficient to run borg backups as root. If you have not yet
 granted full disk access, and you run Borg backup from cron, you will see
 messages such as::

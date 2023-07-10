@@ -175,9 +175,7 @@ Separate compaction
 ~~~~~~~~~~~~~~~~~~~
 
 Borg does not auto-compact the segment files in the repository at commit time
-(at the end of each repository-writing command) any more.
-
-This is new since borg 1.2.0 and requires borg >= 1.2.0 on client and server.
+(at the end of each repository-writing command) any more (since borg 1.2.0).
 
 This causes a similar behaviour of the repository as if it was in append-only
 mode (see below) most of the time (until ``borg compact`` is invoked or an
@@ -236,7 +234,7 @@ in ``.ssh/authorized_keys``:
     command="borg serve --append-only ..." ssh-rsa <key used for not-always-trustable backup clients>
     command="borg serve ..." ssh-rsa <key used for backup management>
 
-Running ``borg init`` via a ``borg serve --append-only`` server will *not* create
+Running ``borg rcreate`` via a ``borg serve --append-only`` server will *not* create
 an append-only repository. Running ``borg rcreate --append-only`` creates an append-only
 repository regardless of server settings.
 
@@ -276,7 +274,7 @@ with file 6::
 
 That's all to do in the repository.
 
-If you want to access this rollbacked repository from a client that already has
+If you want to access this rolled back repository from a client that already has
 a cache for this repository, the cache will reflect a newer repository state
 than what you actually have in the repository now, after the rollback.
 

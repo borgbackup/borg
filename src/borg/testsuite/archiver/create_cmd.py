@@ -175,8 +175,9 @@ def test_unix_socket(archivers, request, monkeypatch):
 
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     try:
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.bind(tempfile.mktemp(suffix="unix-socket", prefix="input"))
+        with tempfile.TemporaryDirectory(prefix="input") as temp_dir:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.bind(os.path.join(temp_dir, "unix-socket"))
     except PermissionError as err:
         if err.errno == errno.EPERM:
             pytest.skip("unix sockets disabled or not supported")

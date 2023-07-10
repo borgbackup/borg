@@ -49,17 +49,26 @@ def reopen(repository, exclusive: Optional[bool] = True, create=False):
             raise RuntimeError("Repo must be closed before a reopen. Cannot support nested repository contexts.")
         return Repository(repository.path, exclusive=exclusive, create=create)
 
-    elif isinstance(repository, RemoteRepository):
+    if isinstance(repository, RemoteRepository):
         if repository.p is not None or repository.sock is not None:
             raise RuntimeError("Remote repo must be closed before a reopen. Cannot support nested repository contexts.")
         return RemoteRepository(repository.location, exclusive=exclusive, create=create)
+
+    raise TypeError(
+        f"Invalid argument type. Expected 'Repository' or 'RemoteRepository', received '{type(repository).__name__}'."
+    )
 
 
 def get_path(repository):
     if isinstance(repository, Repository):
         return repository.path
-    elif isinstance(repository, RemoteRepository):
+
+    if isinstance(repository, RemoteRepository):
         return repository.location.path
+
+    raise TypeError(
+        f"Invalid argument type. Expected 'Repository' or 'RemoteRepository', received '{type(repository).__name__}'."
+    )
 
 
 def fchunk(data, meta=b""):

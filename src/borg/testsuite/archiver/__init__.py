@@ -164,8 +164,7 @@ def open_repository(archiver):
     elif archiver.prefix == "ssh://__testsuite__":
         return RemoteRepository(Location(archiver.repository_location))
     else:
-        print(f"Archiver prefix '{archiver.prefix}' is not a valid prefix! Cannot open repo.")
-        return
+        raise ValueError(f"Archiver prefix '{archiver.prefix}' is not a valid prefix.")
 
 
 def create_regular_file(input_path, name, size=0, contents=None):

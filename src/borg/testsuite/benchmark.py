@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from .archiver import changedir, cmd
+from .archiver import changedir, cmd_fixture
 from .item import Item
 from ..constants import zeros
 
@@ -28,8 +28,8 @@ def repo_url(request, tmpdir, monkeypatch):
 
 
 @pytest.fixture(params=["none", "repokey-aes-ocb"])
-def repo(request, cmd, repo_url):
-    cmd(f"--repo={repo_url}", "rcreate", "--encryption", request.param)
+def repo(request, cmd_fixture, repo_url):
+    cmd_fixture(f"--repo={repo_url}", "rcreate", "--encryption", request.param)
     return repo_url
 
 
@@ -59,55 +59,59 @@ def testdata(request, tmpdir_factory):
 
 
 @pytest.fixture(params=["none", "lz4"])
-def repo_archive(request, cmd, repo, testdata):
+def repo_archive(request, cmd_fixture, repo, testdata):
     archive = "test"
-    cmd(f"--repo={repo}", "create", "--compression", request.param, archive, testdata)
+    cmd_fixture(f"--repo={repo}", "create", "--compression", request.param, archive, testdata)
     return repo, archive
 
 
-def test_create_none(benchmark, cmd, repo, testdata):
-    result, out = benchmark.pedantic(cmd, (f"--repo={repo}", "create", "--compression", "none", "test", testdata))
+def test_create_none(benchmark, cmd_fixture, repo, testdata):
+    result, out = benchmark.pedantic(
+        cmd_fixture, (f"--repo={repo}", "create", "--compression", "none", "test", testdata)
+    )
     assert result == 0
 
 
-def test_create_lz4(benchmark, cmd, repo, testdata):
-    result, out = benchmark.pedantic(cmd, (f"--repo={repo}", "create", "--compression", "lz4", "test", testdata))
+def test_create_lz4(benchmark, cmd_fixture, repo, testdata):
+    result, out = benchmark.pedantic(
+        cmd_fixture, (f"--repo={repo}", "create", "--compression", "lz4", "test", testdata)
+    )
     assert result == 0
 
 
-def test_extract(benchmark, cmd, repo_archive, tmpdir):
+def test_extract(benchmark, cmd_fixture, repo_archive, tmpdir):
     repo, archive = repo_archive
     with changedir(str(tmpdir)):
-        result, out = benchmark.pedantic(cmd, (f"--repo={repo}", "extract", archive))
+        result, out = benchmark.pedantic(cmd_fixture, (f"--repo={repo}", "extract", archive))
     assert result == 0
 
 
-def test_delete(benchmark, cmd, repo_archive):
+def test_delete(benchmark, cmd_fixture, repo_archive):
     repo, archive = repo_archive
-    result, out = benchmark.pedantic(cmd, (f"--repo={repo}", "delete", "-a", archive))
+    result, out = benchmark.pedantic(cmd_fixture, (f"--repo={repo}", "delete", "-a", archive))
     assert result == 0
 
 
-def test_list(benchmark, cmd, repo_archive):
+def test_list(benchmark, cmd_fixture, repo_archive):
     repo, archive = repo_archive
-    result, out = benchmark(cmd, f"--repo={repo}", "list", archive)
+    result, out = benchmark(cmd_fixture, f"--repo={repo}", "list", archive)
     assert result == 0
 
 
-def test_info(benchmark, cmd, repo_archive):
+def test_info(benchmark, cmd_fixture, repo_archive):
     repo, archive = repo_archive
-    result, out = benchmark(cmd, f"--repo={repo}", "info", "-a", archive)
+    result, out = benchmark(cmd_fixture, f"--repo={repo}", "info", "-a", archive)
     assert result == 0
 
 
-def test_check(benchmark, cmd, repo_archive):
+def test_check(benchmark, cmd_fixture, repo_archive):
     repo, archive = repo_archive
-    result, out = benchmark(cmd, f"--repo={repo}", "check")
+    result, out = benchmark(cmd_fixture, f"--repo={repo}", "check")
     assert result == 0
 
 
-def test_help(benchmark, cmd):
-    result, out = benchmark(cmd, "help")
+def test_help(benchmark, cmd_fixture):
+    result, out = benchmark(cmd_fixture, "help")
     assert result == 0
 
 

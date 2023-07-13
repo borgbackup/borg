@@ -16,6 +16,7 @@ def test_delete(archivers, request):
     repo_location, repo_path, input_path = archiver.repository_location, archiver.repository_path, archiver.input_path
     create_regular_file(input_path, "file1", size=1024 * 80)
     create_regular_file(input_path, "dir2/file2", size=1024 * 80)
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
     cmd(archiver, f"--repo={repo_location}", "create", "test.2", "input")
@@ -39,6 +40,7 @@ def test_delete_multiple(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
     create_regular_file(input_path, "file1", size=1024 * 80)
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     cmd(archiver, f"--repo={repo_location}", "create", "test1", "input")
     cmd(archiver, f"--repo={repo_location}", "create", "test2", "input")
@@ -55,6 +57,7 @@ def test_delete_force(archivers, request):
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
     cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
     create_src_archive(archiver, "test")
+
     with Repository(repo_path, exclusive=True) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         archive = Archive(manifest, "test")
@@ -65,6 +68,7 @@ def test_delete_force(archivers, request):
         else:
             assert False  # missed the file
         repository.commit(compact=False)
+
     output = cmd(archiver, f"--repo={repo_location}", "delete", "-a", "test", "--force")
     assert "deleted archive was corrupted" in output
     cmd(archiver, f"--repo={repo_location}", "check", "--repair")
@@ -77,12 +81,14 @@ def test_delete_double_force(archivers, request):
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
     cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
     create_src_archive(archiver, "test")
+
     with Repository(repo_path, exclusive=True) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         archive = Archive(manifest, "test")
         id = archive.metadata.items[0]
         repository.put(id, b"corrupted items metadata stream chunk")
         repository.commit(compact=False)
+
     cmd(archiver, f"--repo={repo_location}", "delete", "-a", "test", "--force", "--force")
     cmd(archiver, f"--repo={repo_location}", "check", "--repair")
     output = cmd(archiver, f"--repo={repo_location}", "rlist")

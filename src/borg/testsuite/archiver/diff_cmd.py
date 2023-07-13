@@ -39,12 +39,9 @@ def test_basic_functionality(archivers, request):
         os.link("input/empty", "input/hardlink_contents_changed")
         os.link("input/file_removed", "input/hardlink_removed")
         os.link("input/file_removed2", "input/hardlink_target_removed")
-
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-
     # Create the first snapshot
     cmd(archiver, f"--repo={repo_location}", "create", "test0", "input")
-
     # Setup files for the second snapshot
     create_regular_file(input_path, "file_added", size=2048)
     create_regular_file(input_path, "file_empty_added", size=0)
@@ -69,10 +66,8 @@ def test_basic_functionality(archivers, request):
     if are_hardlinks_supported():
         os.unlink("input/hardlink_removed")
         os.link("input/file_added", "input/hardlink_added")
-
     with open("input/empty", "ab") as fd:
         fd.write(b"appended_data")
-
     # Create the second snapshot
     cmd(archiver, f"--repo={repo_location}", "create", "test1a", "input")
     cmd(archiver, f"--repo={repo_location}", "create", "test1b", "input", "--chunker-params", "16,18,17,4095")
@@ -229,6 +224,7 @@ def test_basic_functionality(archivers, request):
 
     output = cmd(archiver, f"--repo={repo_location}", "diff", "test0", "test1a")
     do_asserts(output, True)
+
     # We expect exit_code=1 due to the chunker params warning
     output = cmd(archiver, f"--repo={repo_location}", "diff", "test0", "test1b", "--content-only", exit_code=1)
     do_asserts(output, False, content_only=True)
@@ -243,6 +239,7 @@ def test_basic_functionality(archivers, request):
 def test_time_diffs(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "test_file", size=10)
     cmd(archiver, f"--repo={repo_location}", "create", "archive1", "input")
@@ -260,6 +257,7 @@ def test_time_diffs(archivers, request):
     )
     assert "mtime" in output
     assert "ctime" in output  # Should show up on Windows as well since it is a new file.
+
     if is_darwin:
         time.sleep(1)  # HFS has a 1s timestamp granularity
     os.chmod("input/test_file", 0o777)

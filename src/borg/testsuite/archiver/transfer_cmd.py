@@ -88,11 +88,13 @@ def test_transfer_upgrade(archivers, request):
     got = json.loads(rlist_json)
     with open(os.path.join(dst_dir, "test_meta", "repo_list.json")) as f:
         expected = json.load(f)
+
     for key in "encryption", "repository":
         # some stuff obviously needs to be different, remove that!
         del got[key]
         del expected[key]
     assert len(got["archives"]) == len(expected["archives"])
+
     for got_archive, expected_archive in zip(got["archives"], expected["archives"]):
         del got_archive["id"]
         del expected_archive["id"]
@@ -118,8 +120,6 @@ def test_transfer_upgrade(archivers, request):
         expected = [json.loads(line) for line in lines.splitlines()]
         hardlinks = {}
         for g, e in zip(got, expected):
-            # print(f"exp: {e}\ngot: {g}\n")
-
             # borg 1.2 parseformat uses .get("bsdflags", 0) so the json has 0 even
             # if there were no bsdflags stored in the item.
             # borg 2 parseformat uses .get("bsdflags"), so the json has either an int
@@ -183,13 +183,11 @@ def test_transfer_upgrade(archivers, request):
             # hardlinks referring to same inode have same hlid
             assert hardlinks["tmp/borgtest/hardlink1"] == hardlinks["tmp/borgtest/hardlink2"]
 
-    archiver.repository_path = f"{repo_location}2"
+    repo_path = f"{repo_location}2"
     for archive_name in ("archive1", "archive2"):
-        archive, repository = open_archive(archiver.repository_path, archive_name)
+        archive, repository = open_archive(repo_path, archive_name)
         with repository:
             for item in archive.iter_items():
-                print(item)
-
                 # borg1 used to store some stuff with None values
                 # borg2 does just not have the key if the value is not known.
                 item_dict = item.as_dict()

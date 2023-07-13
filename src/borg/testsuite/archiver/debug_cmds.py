@@ -18,6 +18,7 @@ def test_debug_profile(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
     create_test_files(input_path)
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input", "--debug-profile=create.prof")
     cmd(archiver, "debug", "convert-profile", "create.prof", "create.pyprof")
@@ -34,6 +35,7 @@ def test_debug_dump_archive_items(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
     create_test_files(input_path)
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
     with changedir("output"):
@@ -47,6 +49,7 @@ def test_debug_dump_repo_objs(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
     create_test_files(input_path)
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
     with changedir("output"):

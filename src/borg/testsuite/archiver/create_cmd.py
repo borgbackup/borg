@@ -56,20 +56,25 @@ def test_basic_functionality(archivers, request):
         pytest.skip("test_basic_functionality seems incompatible with fakeroot and/or the binary.")
     repo_location, input_path = archiver.repository_location, archiver.input_path
     have_root = create_test_files(input_path)
+
     # fork required to test show-rc output
     output = cmd(
         archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION, "--show-version", "--show-rc", fork=True
     )
     assert "borgbackup version" in output
     assert "terminating with success status, rc 0" in output
+
     cmd(archiver, f"--repo={repo_location}", "create", "--exclude-nodump", "test", "input")
     output = cmd(archiver, f"--repo={repo_location}", "create", "--exclude-nodump", "--stats", "test.2", "input")
     assert "Archive name: test.2" in output
+
     with changedir("output"):
         cmd(archiver, f"--repo={repo_location}", "extract", "test")
+
     list_output = cmd(archiver, f"--repo={repo_location}", "rlist", "--short")
     assert "test" in list_output
     assert "test.2" in list_output
+
     expected = [
         "input",
         "input/bdev",
@@ -94,10 +99,12 @@ def test_basic_functionality(archivers, request):
         # remove the file we did not back up, so input and output become equal
         expected.remove("input/flagfile")  # this file is UF_NODUMP
         os.remove(os.path.join("input", "flagfile"))
+
     list_output = cmd(archiver, f"--repo={repo_location}", "list", "test", "--short")
     for name in expected:
         assert name in list_output
     assert_dirs_equal("input", "output/input")
+
     info_output = cmd(archiver, f"--repo={repo_location}", "info", "-a", "test")
     item_count = 5 if has_lchflags else 6  # one file is UF_NODUMP
     assert "Number of files: %d" % item_count in info_output
@@ -121,6 +128,7 @@ def test_basic_functionality(archivers, request):
 def test_archived_paths(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location = archiver.repository_location
+
     # As borg comes from the POSIX (Linux, UNIX) world, a lot of stuff assumes path separators
     # to be slashes "/", e.g.: in archived items, for pattern matching.
     # To make our lives easier and to support cross-platform extraction we always use slashes.
@@ -138,9 +146,11 @@ def test_archived_paths(archivers, request):
     # "input" directory is recursed into, "input/test" is discovered and joined by borg's recursion.
     # posix_path was directly given as a cli argument and should end up as archive_path in the borg archive.
     expected_paths = sorted(["input", "input/test", archived_path])
+
     # check path in archived items:
     archive_list = cmd(archiver, f"--repo={repo_location}", "list", "test", "--short")
     assert expected_paths == sorted([path for path in archive_list.splitlines() if path])
+
     # check path in archived items (json):
     archive_list = cmd(archiver, f"--repo={repo_location}", "list", "test", "--json-lines")
     assert expected_paths == sorted([json.loads(line)["path"] for line in archive_list.splitlines() if line])
@@ -175,7 +185,7 @@ def test_unix_socket(archivers, request, monkeypatch):
 
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     try:
-        with tempfile.TemporaryDirectory(prefix="input") as temp_dir:
+        with tempfile.TemporaryDirectory() as temp_dir:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.bind(os.path.join(temp_dir, "unix-socket"))
     except PermissionError as err:
@@ -187,13 +197,12 @@ def test_unix_socket(archivers, request, monkeypatch):
     sock.close()
     with changedir("output"):
         cmd(archiver, f"--repo={repo_location}", "extract", "test")
-        assert not os.path.exists("input/unix-socket")
+        print(f"{temp_dir}/unix-socket")
+        assert not os.path.exists(f"{temp_dir}/unix-socket")
 
 
-@pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
-@pytest.mark.skipif(
-    not is_birthtime_fully_supported(), reason="cannot properly setup and execute test without birth time"
-)
+@pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot setup and execute test without utime")
+@pytest.mark.skipif(not is_birthtime_fully_supported(), reason="cannot setup and execute test without birth time")
 def test_nobirthtime(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
@@ -201,6 +210,7 @@ def test_nobirthtime(archivers, request):
     birthtime, mtime, atime = 946598400, 946684800, 946771200
     os.utime("input/file1", (atime, birthtime))
     os.utime("input/file1", (atime, mtime))
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input", "--nobirthtime")
     with changedir("output"):

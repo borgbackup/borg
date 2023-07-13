@@ -26,13 +26,12 @@ def test_check_corrupted_repository(archiver):
     cmd(archiver, f"--repo={repo_location}", "check", exit_code=1)
 
 
-@pytest.fixture()
-def corrupted_archiver(archiver):
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-    create_test_files(input_path)
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    archiver.cache_path = json.loads(cmd(archiver, f"--repo={repo_location}", "rinfo", "--json"))["cache"]["path"]
-    yield archiver
+def corrupt_archiver(archiver):
+    create_test_files(archiver.input_path)
+    cmd(archiver, f"--repo={archiver.repository_location}", "rcreate", RK_ENCRYPTION)
+    archiver.cache_path = json.loads(cmd(archiver, f"--repo={archiver.repository_location}", "rinfo", "--json"))[
+        "cache"
+    ]["path"]
 
 
 def corrupt(file, amount=1):
@@ -43,36 +42,39 @@ def corrupt(file, amount=1):
         fd.write(corrupted)
 
 
-def test_cache_chunks(corrupted_archiver):
-    repo_location, cache_path = corrupted_archiver.repository_location, corrupted_archiver.cache_path
+def test_cache_chunks(archiver):
+    corrupt_archiver(archiver)
+    repo_location, cache_path = archiver.repository_location, archiver.cache_path
     corrupt(os.path.join(cache_path, "chunks"))
-    if corrupted_archiver.FORK_DEFAULT:
-        out = cmd(corrupted_archiver, f"--repo={repo_location}", "rinfo", exit_code=2)
+    if archiver.FORK_DEFAULT:
+        out = cmd(archiver, f"--repo={repo_location}", "rinfo", exit_code=2)
         assert "failed integrity check" in out
     else:
         with pytest.raises(FileIntegrityError):
-            cmd(corrupted_archiver, f"--repo={repo_location}", "rinfo")
+            cmd(archiver, f"--repo={repo_location}", "rinfo")
 
 
-def test_cache_files(corrupted_archiver):
-    repo_location, cache_path = corrupted_archiver.repository_location, corrupted_archiver.cache_path
-    cmd(corrupted_archiver, f"--repo={repo_location}", "create", "test", "input")
+def test_cache_files(archiver):
+    corrupt_archiver(archiver)
+    repo_location, cache_path = archiver.repository_location, archiver.cache_path
+    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
     corrupt(os.path.join(cache_path, "files"))
-    out = cmd(corrupted_archiver, f"--repo={repo_location}", "create", "test1", "input")
+    out = cmd(archiver, f"--repo={repo_location}", "create", "test1", "input")
     # borg warns about the corrupt files cache, but then continues without files cache.
     assert "files cache is corrupted" in out
 
 
-def test_chunks_archive(corrupted_archiver):
-    repo_location, cache_path = corrupted_archiver.repository_location, corrupted_archiver.cache_path
-    cmd(corrupted_archiver, f"--repo={repo_location}", "create", "test1", "input")
+def test_chunks_archive(archiver):
+    corrupt_archiver(archiver)
+    repo_location, cache_path = archiver.repository_location, archiver.cache_path
+    cmd(archiver, f"--repo={repo_location}", "create", "test1", "input")
     # Find ID of test1, so we can corrupt it later :)
-    target_id = cmd(corrupted_archiver, f"--repo={repo_location}", "rlist", "--format={id}{NL}").strip()
-    cmd(corrupted_archiver, f"--repo={repo_location}", "create", "test2", "input")
+    target_id = cmd(archiver, f"--repo={repo_location}", "rlist", "--format={id}{NL}").strip()
+    cmd(archiver, f"--repo={repo_location}", "create", "test2", "input")
 
     # Force cache sync, creating archive chunks of test1 and test2 in chunks.archive.d
-    cmd(corrupted_archiver, f"--repo={repo_location}", "rdelete", "--cache-only")
-    cmd(corrupted_archiver, f"--repo={repo_location}", "rinfo", "--json")
+    cmd(archiver, f"--repo={repo_location}", "rdelete", "--cache-only")
+    cmd(archiver, f"--repo={repo_location}", "rinfo", "--json")
 
     chunks_archive = os.path.join(cache_path, "chunks.archive.d")
     assert len(os.listdir(chunks_archive)) == 4  # two archives, one chunks cache and one .integrity file each
@@ -88,21 +90,22 @@ def test_chunks_archive(corrupted_archiver):
         config.write(fd)
 
     # Cache sync notices corrupted archive chunks, but automatically recovers.
-    out = cmd(corrupted_archiver, f"--repo={repo_location}", "create", "-v", "test3", "input", exit_code=1)
+    out = cmd(archiver, f"--repo={repo_location}", "create", "-v", "test3", "input", exit_code=1)
     assert "Reading cached archive chunk index for test1" in out
     assert "Cached archive chunk index of test1 is corrupted" in out
     assert "Fetching and building archive index for test1" in out
 
 
-def test_old_version_interfered(corrupted_archiver):
+def test_old_version_interfered(archiver):
+    corrupt_archiver(archiver)
     # Modify the main manifest ID without touching the manifest ID in the integrity section.
     # This happens if a version without integrity checking modifies the cache.
-    repo_location, cache_path = corrupted_archiver.repository_location, corrupted_archiver.cache_path
+    repo_location, cache_path = archiver.repository_location, archiver.cache_path
     config_path = os.path.join(cache_path, "config")
     config = ConfigParser(interpolation=None)
     config.read(config_path)
     config.set("cache", "manifest", bin_to_hex(bytes(32)))
     with open(config_path, "w") as fd:
         config.write(fd)
-    out = cmd(corrupted_archiver, f"--repo={repo_location}", "rinfo")
+    out = cmd(archiver, f"--repo={repo_location}", "rinfo")
     assert "Cache integrity data not available: old Borg version modified the cache." in out

@@ -36,6 +36,7 @@ def pytest_generate_tests(metafunc):
 def test_symlink_extract(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     create_test_files(input_path)
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
@@ -51,6 +52,7 @@ def test_symlink_extract(archivers, request):
 def test_hardlinked_symlinks_extract(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     create_regular_file(input_path, "target", size=1024)
     with changedir("input"):
         os.symlink("target", "symlink1")
@@ -76,9 +78,9 @@ def test_hardlinked_symlinks_extract(archivers, request):
 def test_directory_timestamps1(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     create_test_files(input_path)
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-
     # default file archiving order (internal recursion)
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
     with changedir("output"):
@@ -95,9 +97,9 @@ def test_directory_timestamps1(archivers, request):
 def test_directory_timestamps2(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     create_test_files(input_path)
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-
     # given order, dir first, file second
     flist_dir_first = b"input/dir2\ninput/dir2/file2\n"
     cmd(archiver, f"--repo={repo_location}", "create", "--paths-from-stdin", "test", input=flist_dir_first)
@@ -115,9 +117,9 @@ def test_directory_timestamps2(archivers, request):
 def test_directory_timestamps3(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     create_test_files(input_path)
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-
     # given order, file first, dir second
     flist_file_first = b"input/dir2/file2\ninput/dir2\n"
     cmd(archiver, f"--repo={repo_location}", "create", "--paths-from-stdin", "test", input=flist_file_first)
@@ -168,13 +170,12 @@ def test_atime(archivers, request):
         assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
 
 
-@pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
-@pytest.mark.skipif(
-    not is_birthtime_fully_supported(), reason="cannot properly setup and execute test without birthtime"
-)
+@pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot setup and execute test without utime")
+@pytest.mark.skipif(not is_birthtime_fully_supported(), reason="cannot setup and execute test without birthtime")
 def test_birthtime(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     create_test_files(input_path)
     birthtime, mtime, atime = 946598400, 946684800, 946771200
     os.utime("input/file1", (atime, birthtime))
@@ -249,10 +250,11 @@ def test_sparse_file(archivers, request):
 
 def test_unusual_filenames(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
+    repo_location, input_path = archiver.repository_location, archiver.input_path
     filenames = ["normal", "with some blanks", "(with_parens)"]
+
     for filename in filenames:
-        filename = os.path.join(archiver.input_path, filename)
+        filename = os.path.join(input_path, filename)
         with open(filename, "wb"):
             pass
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
@@ -266,6 +268,7 @@ def test_unusual_filenames(archivers, request):
 def test_strip_components(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "dir/file")
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
@@ -299,6 +302,7 @@ def test_extract_hardlinks2(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location = archiver.repository_location
     _extract_hardlinks_setup(archiver)
+
     with changedir("output"):
         cmd(archiver, f"--repo={repo_location}", "extract", "test", "--strip-components", "2")
         assert os.stat("hardlink").st_nlink == 2
@@ -306,6 +310,7 @@ def test_extract_hardlinks2(archivers, request):
         assert open("subdir/hardlink", "rb").read() == b"123456"
         assert os.stat("aaaa").st_nlink == 2
         assert os.stat("source2").st_nlink == 2
+
     with changedir("output"):
         cmd(archiver, f"--repo={repo_location}", "extract", "test", "input/dir1")
         assert os.stat("input/dir1/hardlink").st_nlink == 2
@@ -319,6 +324,7 @@ def test_extract_hardlinks2(archivers, request):
 def test_extract_hardlinks_twice(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     # setup for #5603
     path_a = os.path.join(archiver.input_path, "a")
     path_b = os.path.join(archiver.input_path, "b")
@@ -344,6 +350,7 @@ def test_extract_hardlinks_twice(archivers, request):
 def test_extract_include_exclude(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "file1", size=1024 * 80)
     create_regular_file(input_path, "file2", size=1024 * 80)
@@ -353,9 +360,11 @@ def test_extract_include_exclude(archivers, request):
     with changedir("output"):
         cmd(archiver, f"--repo={repo_location}", "extract", "test", "input/file1")
     assert sorted(os.listdir("output/input")) == ["file1"]
+
     with changedir("output"):
         cmd(archiver, f"--repo={repo_location}", "extract", "test", "--exclude=input/file2")
     assert sorted(os.listdir("output/input")) == ["file1", "file3"]
+
     with changedir("output"):
         cmd(archiver, f"--repo={repo_location}", "extract", "test", "--exclude-from=" + archiver.exclude_file_path)
     assert sorted(os.listdir("output/input")) == ["file1", "file3"]
@@ -364,6 +373,7 @@ def test_extract_include_exclude(archivers, request):
 def test_extract_include_exclude_regex(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "file1", size=1024 * 80)
     create_regular_file(input_path, "file2", size=1024 * 80)
@@ -407,13 +417,13 @@ def test_extract_include_exclude_regex(archivers, request):
 def test_extract_include_exclude_regex_from_file(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "file1", size=1024 * 80)
     create_regular_file(input_path, "file2", size=1024 * 80)
     create_regular_file(input_path, "file3", size=1024 * 80)
     create_regular_file(input_path, "file4", size=1024 * 80)
     create_regular_file(input_path, "file333", size=1024 * 80)
-
     # Create while excluding using mixed pattern styles
     with open(archiver.exclude_file_path, "wb") as fd:
         fd.write(b"re:input/file4$\n")
@@ -449,13 +459,13 @@ def test_extract_include_exclude_regex_from_file(archivers, request):
 def test_extract_with_pattern(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "file1", size=1024 * 80)
     create_regular_file(input_path, "file2", size=1024 * 80)
     create_regular_file(input_path, "file3", size=1024 * 80)
     create_regular_file(input_path, "file4", size=1024 * 80)
     create_regular_file(input_path, "file333", size=1024 * 80)
-
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
 
     # Extract everything with regular expression
@@ -485,9 +495,9 @@ def test_extract_with_pattern(archivers, request):
 def test_extract_list_output(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "file", size=1024 * 80)
-
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
 
     with changedir("output"):
@@ -547,7 +557,7 @@ def test_extract_pattern_opt(archivers, request):
 @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason="Linux capabilities test, requires fakeroot >= 1.20.2")
 def test_extract_capabilities(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    if archiver.EXE == "borg.exe":
+    if archiver.EXE:
         pytest.skip("Skipping binary test due to patch objects")
     repo_location, input_path = archiver.repository_location, archiver.input_path
     fchown = os.fchown
@@ -573,7 +583,7 @@ def test_extract_capabilities(archivers, request):
 @pytest.mark.skipif(not xattr.XATTR_FAKEROOT, reason="xattr not supported on this system, or this version of fakeroot")
 def test_extract_xattrs_errors(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    if archiver.EXE == "borg.exe":
+    if archiver.EXE:
         pytest.skip("Skipping binary test due to patch objects")
     repo_location, input_path = archiver.repository_location, archiver.input_path
 
@@ -597,11 +607,13 @@ def test_extract_xattrs_errors(archivers, request):
             assert "too big for this filesystem" in out
             assert "when setting extended attribute user.attribute" in out
         os.remove(input_abspath)
+
         with patch.object(xattr, "setxattr", patched_setxattr_ENOTSUP):
             out = cmd(archiver, f"--repo={repo_location}", "extract", "test", exit_code=EXIT_WARNING)
             assert "ENOTSUP" in out
             assert "when setting extended attribute user.attribute" in out
         os.remove(input_abspath)
+
         with patch.object(xattr, "setxattr", patched_setxattr_EACCES):
             out = cmd(archiver, f"--repo={repo_location}", "extract", "test", exit_code=EXIT_WARNING)
             assert "EACCES" in out
@@ -639,7 +651,7 @@ def test_extract_xattrs_resourcefork(archivers, request):
 
 def test_overwrite(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    if archiver.EXE == "borg.exe":
+    if archiver.EXE:
         pytest.skip("Test_overwrite seems incompatible with fakeroot and/or the binary.")
     repo_location, input_path = archiver.repository_location, archiver.input_path
 
@@ -647,6 +659,7 @@ def test_overwrite(archivers, request):
     create_regular_file(input_path, "dir2/file2", size=1024 * 80)
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
+
     # Overwriting regular files and directories should be supported
     os.mkdir("output/input")
     os.mkdir("output/input/file1")
@@ -654,6 +667,7 @@ def test_overwrite(archivers, request):
     with changedir("output"):
         cmd(archiver, f"--repo={repo_location}", "extract", "test")
     assert_dirs_equal("input", "output/input")
+
     # But non-empty dirs should fail
     os.unlink("output/input/file1")
     os.mkdir("output/input/file1")
@@ -667,7 +681,7 @@ def test_overwrite(archivers, request):
 def test_do_not_fail_when_percent_is_in_xattr_name(archivers, request):
     """https://github.com/borgbackup/borg/issues/6063"""
     archiver = request.getfixturevalue(archivers)
-    if archiver.EXE == "borg.exe":
+    if archiver.EXE:
         pytest.skip("Skipping binary test due to patch objects")
     repo_location, input_path = archiver.repository_location, archiver.input_path
 
@@ -688,7 +702,7 @@ def test_do_not_fail_when_percent_is_in_xattr_name(archivers, request):
 def test_do_not_fail_when_percent_is_in_file_name(archivers, request):
     """https://github.com/borgbackup/borg/issues/6063"""
     archiver = request.getfixturevalue(archivers)
-    if archiver.EXE == "borg.exe":
+    if archiver.EXE:
         pytest.skip("Skipping binary test due to patch objects")
     repo_location = archiver.repository_location
 
@@ -707,8 +721,8 @@ def test_do_not_fail_when_percent_is_in_file_name(archivers, request):
 def test_extract_continue(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
-
     CONTENTS1, CONTENTS2, CONTENTS3 = b"contents1" * 100, b"contents2" * 200, b"contents3" * 300
+
     cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "file1", contents=CONTENTS1)
     create_regular_file(input_path, "file2", contents=CONTENTS2)
@@ -730,6 +744,7 @@ def test_extract_continue(archivers, request):
         os.link("input/file3", "hardlink-to-keep-inode-f3")
         os.remove("input/file3")
     time.sleep(1)  # needed due to timestamp granularity of apple hfs+
+
     with changedir("output"):
         # now try to continue extracting, using the same archive, same output dir:
         cmd(archiver, f"--repo={repo_location}", "extract", "arch", "--continue")

@@ -279,7 +279,7 @@ def test_unknown_feature_on_mount(archivers, request):
 def test_unknown_mandatory_feature_in_cache(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    remote_repo = bool(archiver.prefix)
+    remote_repo = True if archiver.prefix == "ssh://__testsuite__" else False
     print(cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION))
 
     with Repository(repo_path, exclusive=True) as repository:

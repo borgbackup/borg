@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import pytest
 
@@ -92,16 +93,16 @@ class ArchiverSetup:
 
     def __init__(self):
         self.archiver = None
-        self.tmpdir: str
         self.prefix = ""
-        self.repository_path: str
-        self.repository_location: str
-        self.input_path: str
-        self.output_path: str
-        self.keys_path: str
-        self.cache_path: str
-        self.exclude_file_path: str
-        self.patterns_file_path: str
+        self.tmpdir: Optional[str] = None
+        self.repository_path: Optional[str] = None
+        self.repository_location: Optional[str] = None
+        self.input_path: Optional[str] = None
+        self.output_path: Optional[str] = None
+        self.keys_path: Optional[str] = None
+        self.cache_path: Optional[str] = None
+        self.exclude_file_path: Optional[str] = None
+        self.patterns_file_path: Optional[str] = None
 
 
 @pytest.fixture()

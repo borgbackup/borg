@@ -13,14 +13,9 @@ from .. import has_lchflags, llfuse
 from .. import changedir, no_selinux, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform import fakeroot_detected
-from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive
-from . import src_file, requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
+from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
+from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files
+from . import pytest_generate_tests  # NOQA
 
 
 @requires_hardlinks

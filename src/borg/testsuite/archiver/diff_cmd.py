@@ -7,12 +7,7 @@ from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported
 from ..platform import is_win32, is_darwin
 from . import cmd, create_regular_file, RK_ENCRYPTION, assert_line_exists
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
+from . import pytest_generate_tests  # NOQA
 
 
 def test_basic_functionality(archivers, request):

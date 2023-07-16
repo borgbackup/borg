@@ -3,12 +3,7 @@ from datetime import datetime
 
 from ...constants import *  # NOQA
 from . import cmd, RK_ENCRYPTION, src_dir
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
+from . import pytest_generate_tests  # NOQA
 
 
 def _create_archive_ts(archiver, name, y, m, d, H=0, M=0, S=0):

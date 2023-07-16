@@ -9,12 +9,7 @@ from ...constants import *  # NOQA
 from ...helpers.time import parse_timestamp
 from ..platform import is_win32
 from . import cmd, create_test_files, RK_ENCRYPTION, open_archive
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
+from . import pytest_generate_tests  # NOQA
 
 
 def test_transfer(archivers, request):

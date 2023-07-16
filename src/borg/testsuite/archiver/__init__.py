@@ -89,7 +89,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             try:
                 ret = archiver.run(args)  # calls setup_logging internally
             finally:
-                flush_logging()  # usually done at exit, but we do not exit here
+                flush_logging()  # usually done via atexit, but we do not exit here
             output_text.flush()
             return ret, output.getvalue() if binary_output else output.getvalue().decode()
         finally:
@@ -117,6 +117,12 @@ def cmd_fixture(request):
         return exec_cmd(*args, exe=exe, fork=True, **kw)
 
     return exec_fn
+
+
+def pytest_generate_tests(metafunc):
+    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
+    if "archivers" in metafunc.fixturenames:
+        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
 
 
 def checkts(ts):
@@ -159,12 +165,10 @@ def open_archive(repo_path, name):
 
 
 def open_repository(archiver):
-    if archiver.prefix == "":
-        return Repository(archiver.repository_path, exclusive=True)
-    elif archiver.prefix == "ssh://__testsuite__":
+    if archiver.repository_location.startswith("ssh://__testsuite__"):
         return RemoteRepository(Location(archiver.repository_location))
     else:
-        raise ValueError(f"Archiver prefix '{archiver.prefix}' is not a valid prefix.")
+        return Repository(archiver.repository_path, exclusive=True)
 
 
 def create_regular_file(input_path, name, size=0, contents=None):

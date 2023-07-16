@@ -13,12 +13,7 @@ from ...repository import Repository
 from .. import environment_variable
 from .. import key
 from . import RK_ENCRYPTION, KF_ENCRYPTION, cmd, _extract_repository_id, _set_repository_id
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
+from . import pytest_generate_tests  # NOQA
 
 
 def test_change_passphrase(archivers, request):

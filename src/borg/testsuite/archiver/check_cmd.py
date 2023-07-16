@@ -9,26 +9,20 @@ from ...helpers import bin_to_hex
 from ...helpers import msgpack
 from ...manifest import Manifest
 from ...repository import Repository
-from . import src_file
-from . import cmd, create_src_archive, open_archive, RK_ENCRYPTION
+from . import pytest_generate_tests  # NOQA
+from . import cmd, src_file, create_src_archive, open_archive, RK_ENCRYPTION
 
 
-def check_cmd_setUp(archiver):
+def check_cmd_setup(archiver):
     with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):
         cmd(archiver, f"--repo={archiver.repository_location}", "rcreate", RK_ENCRYPTION)
         create_src_archive(archiver, "archive1")
         create_src_archive(archiver, "archive2")
 
 
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
-
-
 def test_check_usage(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
     repo_location = archiver.repository_location
 
     output = cmd(archiver, f"--repo={repo_location}", "check", "-v", "--progress", exit_code=0)
@@ -61,7 +55,7 @@ def test_check_usage(archivers, request):
 
 def test_date_matching(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
 
     shutil.rmtree(repo_path)
@@ -102,7 +96,7 @@ def test_date_matching(archivers, request):
 def test_missing_file_chunk(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
 
     archive, repository = open_archive(repo_path, "archive1")
 
@@ -165,7 +159,7 @@ def test_missing_file_chunk(archivers, request):
 def test_missing_archive_item_chunk(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
     archive, repository = open_archive(repo_path, "archive1")
 
     with repository:
@@ -180,7 +174,7 @@ def test_missing_archive_item_chunk(archivers, request):
 def test_missing_archive_metadata(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
     archive, repository = open_archive(repo_path, "archive1")
 
     with repository:
@@ -195,7 +189,7 @@ def test_missing_archive_metadata(archivers, request):
 def test_missing_manifest(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
     archive, repository = open_archive(repo_path, "archive1")
 
     with repository:
@@ -212,7 +206,7 @@ def test_missing_manifest(archivers, request):
 def test_corrupted_manifest(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
     archive, repository = open_archive(repo_path, "archive1")
 
     with repository:
@@ -231,7 +225,7 @@ def test_corrupted_manifest(archivers, request):
 def test_manifest_rebuild_corrupted_chunk(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
     archive, repository = open_archive(repo_path, "archive1")
 
     with repository:
@@ -252,7 +246,7 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
 def test_manifest_rebuild_duplicate_archive(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
     archive, repository = open_archive(repo_path, "archive1")
     repo_objs = archive.repo_objs
 
@@ -288,7 +282,7 @@ def test_extra_chunks(archivers, request):
     if archiver.prefix:
         pytest.skip("only works locally")
     repo_location = archiver.repository_location
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
     cmd(archiver, f"--repo={repo_location}", "check", exit_code=0)
 
     with Repository(repo_location, exclusive=True) as repository:
@@ -306,7 +300,7 @@ def test_extra_chunks(archivers, request):
 def test_verify_data(archivers, request, init_args):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
     shutil.rmtree(repo_path)
     cmd(archiver, f"--repo={repo_location}", "rcreate", *init_args)
     create_src_archive(archiver, "archive1")
@@ -337,7 +331,7 @@ def test_empty_repository(archivers, request):
     if archiver.prefix:
         pytest.skip("only works locally")
     repo_location = archiver.repository_location
-    check_cmd_setUp(archiver)
+    check_cmd_setup(archiver)
 
     with Repository(repo_location, exclusive=True) as repository:
         for id_ in repository.list():

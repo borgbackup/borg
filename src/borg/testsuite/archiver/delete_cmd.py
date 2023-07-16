@@ -2,13 +2,8 @@ from ...archive import Archive
 from ...constants import *  # NOQA
 from ...manifest import Manifest
 from ...repository import Repository
-from . import cmd, create_regular_file, RK_ENCRYPTION, src_file, create_src_archive
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
+from . import cmd, create_regular_file, src_file, create_src_archive, RK_ENCRYPTION
+from . import pytest_generate_tests  # NOQA
 
 
 def test_delete(archivers, request):

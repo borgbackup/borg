@@ -6,6 +6,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from .. import changedir, are_hardlinks_supported
+from . import pytest_generate_tests  # NOQA
 from . import (
     _create_test_caches,
     _create_test_tagged,
@@ -20,12 +21,6 @@ from . import (
     create_test_files,
     RK_ENCRYPTION,
 )
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
 
 
 def test_recreate_exclude_caches(archivers, request):

@@ -88,21 +88,20 @@ def set_env_variables():
 class ArchiverSetup:
     EXE: str = None  # python source based
     FORK_DEFAULT = False
-    prefix = ""
     BORG_EXES = []
 
     def __init__(self):
         self.archiver = None
-        self.tmpdir = str
-        self.repository_path = str
-        self.repository_location = str
-        self.input_path = str
-        self.output_path = str
-        self.keys_path = str
-        self.cache_path = str
-        self.exclude_file_path = str
-        self.patterns_file_path = str
-        self.old_wd = str
+        self.tmpdir: str
+        self.prefix = ""
+        self.repository_path: str
+        self.repository_location: str
+        self.input_path: str
+        self.output_path: str
+        self.keys_path: str
+        self.cache_path: str
+        self.exclude_file_path: str
+        self.patterns_file_path: str
 
 
 @pytest.fixture()
@@ -129,10 +128,10 @@ def archiver(tmp_path, set_env_variables):
         fd.write(b"input/file2\n# A comment line, then a blank line\n\n")
     with open(archiver.patterns_file_path, "wb") as fd:
         fd.write(b"+input/file_important\n- input/file*\n# A comment line, then a blank line\n\n")
-    archiver.old_wd = os.getcwd()
+    old_wd = os.getcwd()
     os.chdir(archiver.tmpdir)
     yield archiver
-    os.chdir(archiver.old_wd)
+    os.chdir(old_wd)
 
 
 @pytest.fixture()

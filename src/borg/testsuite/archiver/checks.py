@@ -43,7 +43,7 @@ def cmd_raises_unknown_feature(archiver, args):
 
 
 def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
+    # Generate tests for local and remote archivers
     if "archivers" in metafunc.fixturenames:
         metafunc.parametrize("archivers", ["archiver", "remote_archiver"])
 

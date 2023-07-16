@@ -3,12 +3,7 @@ from random import randbytes
 
 from ...constants import *  # NOQA
 from . import checkts, cmd, create_regular_file, RK_ENCRYPTION
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
+from . import pytest_generate_tests  # NOQA
 
 
 def test_info(archivers, request):

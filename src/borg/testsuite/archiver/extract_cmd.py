@@ -14,6 +14,7 @@ from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from ..platform import is_darwin, is_win32
+from . import pytest_generate_tests  # NOQA
 from . import (
     RK_ENCRYPTION,
     requires_hardlinks,
@@ -24,12 +25,6 @@ from . import (
     _extract_hardlinks_setup,
     assert_creates_file,
 )
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
 
 
 @pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")

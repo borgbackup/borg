@@ -27,7 +27,7 @@ from .. import (
     same_ts_ns,
     is_root,
 )
-
+from . import pytest_generate_tests  # NOQA
 from . import (
     cmd,
     create_test_files,
@@ -42,12 +42,6 @@ from . import (
     _assert_test_keep_tagged,
     RK_ENCRYPTION,
 )
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
 
 
 def test_basic_functionality(archivers, request):

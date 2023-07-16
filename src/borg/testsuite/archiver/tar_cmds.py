@@ -7,6 +7,7 @@ import pytest
 from ...constants import *  # NOQA
 from .. import changedir
 from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, create_test_files, requires_hardlinks, RK_ENCRYPTION
+from . import pytest_generate_tests  # NOQA
 
 
 def have_gnutar():
@@ -19,12 +20,6 @@ def have_gnutar():
 
 requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason="GNU tar must be installed for this test.")
 requires_gzip = pytest.mark.skipif(not shutil.which("gzip"), reason="gzip must be installed for this test.")
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
 
 
 @requires_gnutar

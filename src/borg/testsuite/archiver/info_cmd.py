@@ -2,13 +2,8 @@ import json
 import os
 
 from ...constants import *  # NOQA
-from . import cmd, RK_ENCRYPTION, checkts, create_regular_file
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
+from . import cmd, checkts, create_regular_file, RK_ENCRYPTION
+from . import pytest_generate_tests  # NOQA
 
 
 def test_info(archivers, request):

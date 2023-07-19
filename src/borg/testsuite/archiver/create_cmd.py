@@ -27,9 +27,9 @@ from .. import (
     same_ts_ns,
     is_root,
 )
-from . import pytest_generate_tests  # NOQA
 from . import (
     cmd,
+    generate_archiver_tests,
     create_test_files,
     assert_dirs_equal,
     create_regular_file,
@@ -42,6 +42,9 @@ from . import (
     _assert_test_keep_tagged,
     RK_ENCRYPTION,
 )
+
+# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
 def test_basic_functionality(archivers, request):

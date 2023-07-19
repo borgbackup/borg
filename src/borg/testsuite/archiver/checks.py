@@ -17,7 +17,9 @@ from ...repository import Repository
 from .. import llfuse
 from .. import changedir, environment_variable
 from . import cmd, _extract_repository_id, open_repository, check_cache, create_test_files, create_src_archive
-from . import _set_repository_id, create_regular_file, assert_creates_file, RK_ENCRYPTION
+from . import _set_repository_id, create_regular_file, assert_creates_file, generate_archiver_tests, RK_ENCRYPTION
+
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote")  # NOQA
 
 
 def get_security_directory(repo_path):
@@ -40,12 +42,6 @@ def cmd_raises_unknown_feature(archiver, args):
         with pytest.raises(MandatoryFeatureUnsupported) as excinfo:
             cmd(archiver, *args)
         assert excinfo.value.args == (["unknown-feature"],)
-
-
-def pytest_generate_tests(metafunc):
-    # Generate tests for local and remote archivers
-    if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver"])
 
 
 def test_repository_swap_detection(archivers, request):

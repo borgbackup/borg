@@ -8,8 +8,10 @@ import pytest
 from ...constants import *  # NOQA
 from ...helpers.time import parse_timestamp
 from ..platform import is_win32
-from . import cmd, create_test_files, RK_ENCRYPTION, open_archive
-from . import pytest_generate_tests  # NOQA
+from . import cmd, create_test_files, RK_ENCRYPTION, open_archive, generate_archiver_tests
+
+# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
 def test_transfer(archivers, request):

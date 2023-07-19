@@ -1,8 +1,10 @@
 import os
 
 from ...constants import *  # NOQA
-from . import cmd, RK_ENCRYPTION
-from . import pytest_generate_tests  # NOQA
+from . import cmd, generate_archiver_tests, RK_ENCRYPTION
+
+# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
 def test_break_lock(archivers, request):

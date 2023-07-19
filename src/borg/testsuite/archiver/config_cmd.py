@@ -1,12 +1,12 @@
 import os
 
-import pytest
-
 from ...constants import *  # NOQA
-from . import RK_ENCRYPTION, create_test_files, cmd
+from . import RK_ENCRYPTION, create_test_files, cmd, generate_archiver_tests
+
+# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
 
-@pytest.mark.parametrize("archivers", ["archiver", "binary_archiver"])
 def test_config(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location = archiver.repository_location

@@ -119,10 +119,21 @@ def cmd_fixture(request):
     return exec_fn
 
 
-def pytest_generate_tests(metafunc):
+def generate_archiver_tests(metafunc, kinds: str):
     # Generate tests for different scenarios: local repository, remote repository, and using the borg binary.
+    archivers = []
+    for kind in kinds.split(","):
+        if kind == "local":
+            archivers.append("archiver")
+        elif kind == "remote":
+            archivers.append("remote_archiver")
+        elif kind == "binary":
+            archivers.append("binary_archiver")
+        else:
+            raise ValueError(f"Invalid archiver: Expected local, remote, or binary, received {kind}.")
+
     if "archivers" in metafunc.fixturenames:
-        metafunc.parametrize("archivers", ["archiver", "remote_archiver", "binary_archiver"])
+        metafunc.parametrize("archivers", archivers)
 
 
 def checkts(ts):

@@ -6,7 +6,6 @@ import pytest
 
 from ...constants import *  # NOQA
 from .. import changedir, are_hardlinks_supported
-from . import pytest_generate_tests  # NOQA
 from . import (
     _create_test_caches,
     _create_test_tagged,
@@ -15,12 +14,16 @@ from . import (
     _assert_test_tagged,
     _assert_test_keep_tagged,
     _extract_hardlinks_setup,
+    generate_archiver_tests,
     check_cache,
     cmd,
     create_regular_file,
     create_test_files,
     RK_ENCRYPTION,
 )
+
+# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
 def test_recreate_exclude_caches(archivers, request):

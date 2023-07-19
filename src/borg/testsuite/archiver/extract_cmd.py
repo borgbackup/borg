@@ -14,7 +14,6 @@ from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from ..platform import is_darwin, is_win32
-from . import pytest_generate_tests  # NOQA
 from . import (
     RK_ENCRYPTION,
     requires_hardlinks,
@@ -24,7 +23,11 @@ from . import (
     assert_dirs_equal,
     _extract_hardlinks_setup,
     assert_creates_file,
+    generate_archiver_tests,
 )
+
+# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
 @pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")

@@ -9,8 +9,10 @@ from ...helpers import bin_to_hex
 from ...helpers import msgpack
 from ...manifest import Manifest
 from ...repository import Repository
-from . import pytest_generate_tests  # NOQA
-from . import cmd, src_file, create_src_archive, open_archive, RK_ENCRYPTION
+from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
+
+# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
 def check_cmd_setup(archiver):

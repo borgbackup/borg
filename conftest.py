@@ -93,7 +93,6 @@ class ArchiverSetup:
 
     def __init__(self):
         self.archiver = None
-        self.prefix = ""
         self.tmpdir: Optional[str] = None
         self.repository_path: Optional[str] = None
         self.repository_location: Optional[str] = None
@@ -111,7 +110,7 @@ def archiver(tmp_path, set_env_variables):
     archiver.archiver = not archiver.FORK_DEFAULT and Archiver() or None
     archiver.tmpdir = tmp_path
     archiver.repository_path = os.fspath(tmp_path / "repository")
-    archiver.repository_location = archiver.prefix + archiver.repository_path
+    archiver.repository_location = archiver.repository_path
     archiver.input_path = os.fspath(tmp_path / "input")
     archiver.output_path = os.fspath(tmp_path / "output")
     archiver.keys_path = os.fspath(tmp_path / "keys")
@@ -137,8 +136,7 @@ def archiver(tmp_path, set_env_variables):
 
 @pytest.fixture()
 def remote_archiver(archiver):
-    archiver.prefix = "ssh://__testsuite__"
-    archiver.repository_location = archiver.prefix + str(archiver.repository_path)
+    archiver.repository_location = "ssh://__testsuite__" + str(archiver.repository_path)
     yield archiver
 
 

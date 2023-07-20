@@ -46,7 +46,7 @@ def test_transfer(archivers, request):
 
 def test_transfer_upgrade(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    if archiver.prefix == "ssh://__testsuite__" or archiver.EXE == "borg.exe":
+    if archiver.repository_location.startswith("ssh://__testsuite__") or archiver.EXE == "borg.exe":
         pytest.skip("only works locally")
     repo_location = archiver.repository_location
 

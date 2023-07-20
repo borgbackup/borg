@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-INIT" 1 "2023-03-22" "" "borg backup tool"
+.TH "BORG-INIT" 1 "2023-07-20" "" "borg backup tool"
 .SH NAME
 borg-init \- Initialize an empty repository
 .SH SYNOPSIS
@@ -124,6 +124,8 @@ The key will be stored in your home directory (in \fB~/.config/borg/keys\fP).
 .sp
 If you do \fBnot\fP want to encrypt the contents of your backups, but still
 want to detect malicious tampering use \fB\-\-encryption authenticated\fP\&.
+To normally work with \fBauthenticated\fP repos, you will need the passphrase, but
+there is an emergency workaround, see \fBBORG_WORKAROUNDS=authenticated_no_key\fP docs.
 .sp
 If \fBBLAKE2b\fP is faster than \fBSHA\-256\fP on your hardware, use \fB\-\-encryption authenticated\-blake2\fP,
 \fB\-\-encryption repokey\-blake2\fP or \fB\-\-encryption keyfile\-blake2\fP\&. Note: for remote backups

@@ -235,6 +235,8 @@ class KeyBase:
         unpacker = get_limited_unpacker('manifest')
         unpacker.feed(data)
         unpacked = unpacker.unpack()
+        if AUTHENTICATED_NO_KEY:
+            return unpacked, True  # True is a lie.
         if b'tam' not in unpacked:
             if tam_required:
                 raise TAMRequiredError(self.repository._location.canonical_path())
@@ -258,8 +260,6 @@ class KeyBase:
         offset = data.index(tam_hmac)
         data[offset:offset + 64] = bytes(64)
         tam_key = self._tam_key(tam_salt, context=b'manifest')
-        if AUTHENTICATED_NO_KEY:
-            return unpacked, True  # True is a lie.
         calculated_hmac = hmac.digest(tam_key, data, 'sha512')
         if not hmac.compare_digest(calculated_hmac, tam_hmac):
             raise TAMInvalid()

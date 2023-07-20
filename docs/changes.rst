@@ -323,9 +323,13 @@ New features:
   desktop / in the directory view. if the user did not specify it, we make
   something up, because otherwise it would be "macFUSE Volume 0 (Python)" and
   hide the mountpoint directory name.
+- BORG_WORKAROUNDS=authenticated_no_key to extract from authenticated repos
+  without key, #7700
+
 
 Other changes:
 
+- add `utcnow()` helper function to avoid deprecated `datetime.utcnow()`
 - docs:
 
   - move upgrade notes to own section, see #7546
@@ -336,6 +340,9 @@ Other changes:
   - obfuscation docs: markup fix, note about MAX_DATA_SIZE
   - --one-file-system: add macOS apfs notes, #4876
   - improve --one-file-system help string, #5618
+  - rewrite borg check docs
+  - improve the docs for --keep-within, #7687
+
 - tests:
 
   - fix repo reopen

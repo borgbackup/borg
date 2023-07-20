@@ -1,7 +1,10 @@
 from struct import Struct
 
-from .helpers import msgpack
+from .helpers import msgpack, workarounds
 from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
+
+# workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
+AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 
 class RepoObj:
@@ -110,7 +113,8 @@ class RepoObj:
             compressor_cls, compression_level = Compressor.detect(compr_hdr)
             compressor = compressor_cls(level=compression_level)
             meta, data = compressor.decompress(dict(meta_compressed), data_compressed[:psize])
-            self.key.assert_id(id, data)
+            if not AUTHENTICATED_NO_KEY:
+                self.key.assert_id(id, data)
         else:
             meta, data = None, None
         return meta_compressed if want_compressed else meta, data_compressed if want_compressed else data
@@ -170,7 +174,8 @@ class RepoObj1:  # legacy
         meta_compressed["csize"] = len(data_compressed)
         if decompress:
             meta, data = compressor.decompress(None, data_compressed)
-            self.key.assert_id(id, data)
+            if not AUTHENTICATED_NO_KEY:
+                self.key.assert_id(id, data)
         else:
             meta, data = None, None
         return meta_compressed if want_compressed else meta, data_compressed if want_compressed else data

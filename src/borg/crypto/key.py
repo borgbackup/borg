@@ -20,6 +20,7 @@ from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, PassphraseWrong
 from ..helpers import msgpack
+from ..helpers import workarounds
 from ..item import Key, EncryptedKey, want_bytes
 from ..manifest import Manifest
 from ..platform import SaveFile
@@ -29,6 +30,9 @@ from ..repoobj import RepoObj
 from .low_level import AES, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, AES256_OCB, CHACHA20_POLY1305
 from . import low_level
+
+# workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
+AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 
 class UnsupportedPayloadError(Error):
@@ -242,6 +246,8 @@ class KeyBase:
         unpacker = get_limited_unpacker("manifest")
         unpacker.feed(data)
         unpacked = unpacker.unpack()
+        if AUTHENTICATED_NO_KEY:
+            return unpacked, True  # True is a lie.
         if "tam" not in unpacked:
             if tam_required:
                 raise TAMRequiredError(self.repository._location.canonical_path())
@@ -799,6 +805,19 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
 
     # It's only authenticated, not encrypted.
     logically_encrypted = False
+
+    def _load(self, key_data, passphrase):
+        if AUTHENTICATED_NO_KEY:
+            # fake _load if we have no key or passphrase
+            NOPE = bytes(32)  # 256 bit all-zero
+            self.repository_id = NOPE
+            self.enc_key = NOPE
+            self.enc_hmac_key = NOPE
+            self.id_key = NOPE
+            self.chunk_seed = 0
+            self.tam_required = False
+            return True
+        return super()._load(key_data, passphrase)
 
     def load(self, target, passphrase):
         success = super().load(target, passphrase)

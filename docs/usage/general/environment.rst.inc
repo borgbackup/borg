@@ -104,6 +104,22 @@ General:
             caused EROFS. You will need this to make archives from volume shadow copies
             in WSL1 (Windows Subsystem for Linux 1).
 
+        authenticated_no_key
+            Work around a lost passphrase or key for an ``authenticated`` mode repository
+            (these are only authenticated, but not encrypted).
+            If the key is missing in the repository config, add ``key = anything`` there.
+
+            This workaround is **only** for emergencies and **only** to extract data
+            from an affected repository (read-only access)::
+
+                BORG_WORKAROUNDS=authenticated_no_key borg extract repo::archive
+
+            After you have extracted all data you need, you MUST delete the repository::
+
+                BORG_WORKAROUNDS=authenticated_no_key borg delete repo
+
+            Now you can init a fresh repo. Make sure you do not use the workaround any more.
+
 Output formatting:
     BORG_LIST_FORMAT
         Giving the default value for ``borg list --format=X``.

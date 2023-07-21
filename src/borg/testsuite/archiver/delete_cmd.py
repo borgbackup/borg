@@ -4,7 +4,6 @@ from ...manifest import Manifest
 from ...repository import Repository
 from . import cmd, create_regular_file, src_file, create_src_archive, generate_archiver_tests, RK_ENCRYPTION
 
-# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 

@@ -9,7 +9,6 @@ from .. import changedir
 from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, create_test_files, requires_hardlinks, RK_ENCRYPTION
 from . import generate_archiver_tests
 
-# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 

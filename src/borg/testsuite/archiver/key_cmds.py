@@ -14,7 +14,6 @@ from .. import environment_variable
 from .. import key
 from . import RK_ENCRYPTION, KF_ENCRYPTION, cmd, _extract_repository_id, _set_repository_id, generate_archiver_tests
 
-# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 

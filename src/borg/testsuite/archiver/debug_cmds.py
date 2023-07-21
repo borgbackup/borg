@@ -7,7 +7,6 @@ from .. import changedir
 from ..compress import Compressor
 from . import cmd, create_test_files, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 
-# Tests that include the 'archivers' argument will generate a tests for each kind of archivers specified.
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 

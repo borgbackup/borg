@@ -176,7 +176,7 @@ def open_archive(repo_path, name):
 
 
 def open_repository(archiver):
-    if archiver.repository_location.startswith("ssh://__testsuite__"):
+    if archiver.get_kind() == "remote":
         return RemoteRepository(Location(archiver.repository_location))
     else:
         return Repository(archiver.repository_path, exclusive=True)

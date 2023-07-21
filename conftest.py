@@ -103,6 +103,14 @@ class ArchiverSetup:
         self.exclude_file_path: Optional[str] = None
         self.patterns_file_path: Optional[str] = None
 
+    def get_kind(self) -> str:
+        if self.repository_location.startswith("ssh://__testsuite__"):
+            return "remote"
+        elif self.EXE == "borg.exe":
+            return "binary"
+        else:
+            return "local"
+
 
 @pytest.fixture()
 def archiver(tmp_path, set_env_variables):

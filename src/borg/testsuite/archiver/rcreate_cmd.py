@@ -17,7 +17,7 @@ def test_rcreate_parent_dirs(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.EXE:
         pytest.skip("does not raise Exception, but sets rc==2")
-    remote_repo = True if archiver.repository_location.startswith("ssh://__testsuite__") else False
+    remote_repo = True if archiver.get_kind() == "remote" else False
     parent_path = os.path.join(archiver.tmpdir, "parent1", "parent2")
     repository_path = os.path.join(parent_path, "repository")
     repository_location = ("ssh://__testsuite__" + repository_path) if remote_repo else repository_path

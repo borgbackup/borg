@@ -259,7 +259,7 @@ def test_fuse_mount_options(archivers, request):
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_migrate_lock_alive(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    if archiver.repository_location.startswith("ssh://__testsuite__"):
+    if archiver.get_kind() == "remote":
         pytest.skip("only works locally")
     repo_location = archiver.repository_location
     """Both old_id and new_id must not be stale during lock migration / daemonization."""

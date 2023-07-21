@@ -280,7 +280,7 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
 
 def test_extra_chunks(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    if archiver.repository_location.startswith("ssh://__testsuite__"):
+    if archiver.get_kind() == "remote":
         pytest.skip("only works locally")
     repo_location = archiver.repository_location
     check_cmd_setup(archiver)
@@ -329,7 +329,7 @@ def test_verify_data(archivers, request, init_args):
 
 def test_empty_repository(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    if archiver.repository_location.startswith("ssh://__testsuite__"):
+    if archiver.get_kind() == "remote":
         pytest.skip("only works locally")
     repo_location = archiver.repository_location
     check_cmd_setup(archiver)

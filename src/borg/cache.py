@@ -514,6 +514,15 @@ class LocalCache(CacheStatsMixin):
         self.txn_active = False
 
         self.path = cache_dir(self.repository, path)
+        if os.path.exists(self.path) and not self.check_cache_integrity():
+            logger.warning("Rebuilding cache as some cache-files have gone missing")
+            if not os.path.exists(os.path.join(self.path, "chunks")):
+                self.recreate_cache_config(delete_existing=True)  # recreating to remove integrity data stored in config
+                self.chunks = ChunkIndex()
+                self.chunks.write(os.path.join(self.path, "chunks"))
+            elif not os.path.exists(os.path.join(self.path, "config")):
+                self.recreate_cache_config()
+
         self.security_manager = SecurityManager(self.repository)
         self.cache_config = CacheConfig(self.repository, self.path, lock_wait)
 
@@ -900,6 +909,13 @@ class LocalCache(CacheStatsMixin):
             self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
 
+    def check_cache_integrity(self):
+        cache_files = ["chunks", "config"]
+        for file in cache_files:
+            if not os.path.exists(os.path.join(self.path, file)):
+                return False
+        return True
+
     def check_cache_compatibility(self):
         my_features = Manifest.SUPPORTED_REPO_FEATURES
         if self.cache_config.ignored_features & my_features:
@@ -921,6 +937,15 @@ class LocalCache(CacheStatsMixin):
         self.chunks = ChunkIndex()
         with SaveFile(os.path.join(self.path, files_cache_name()), binary=True):
             pass  # empty file
+        self.recreate_cache_config()
+
+    def recreate_cache_config(self, delete_existing=False):
+        if delete_existing and os.path.exists(os.path.join(self.path, "config")):
+            os.unlink(os.path.join(self.path, "config"))
+        if not os.path.exists(os.path.join(self.path, "config")):
+            self.cache_config = CacheConfig(self.repository, self.path)
+            self.cache_config.create()
+            self.cache_config.load()  # loading config here to initialize property `_config`
         self.cache_config.manifest_id = ""
         self.cache_config._config.set("cache", "manifest", "")
 

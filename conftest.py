@@ -1,13 +1,16 @@
 import os
+from typing import Optional
 
 import pytest
 
-# needed to get pretty assertion failures in unit tests:
+from borg.testsuite.archiver import BORG_EXES
+
 if hasattr(pytest, "register_assert_rewrite"):
     pytest.register_assert_rewrite("borg.testsuite")
 
 
 import borg.cache  # noqa: E402
+from borg.archiver import Archiver
 from borg.logger import setup_logging  # noqa: E402
 
 # Ensure that the loggers exist for all tests
@@ -73,3 +76,82 @@ class DefaultPatches:
 @pytest.fixture(autouse=True)
 def default_patches(request):
     return DefaultPatches(request)
+
+
+@pytest.fixture()
+def set_env_variables():
+    os.environ["BORG_CHECK_I_KNOW_WHAT_I_AM_DOING"] = "YES"
+    os.environ["BORG_DELETE_I_KNOW_WHAT_I_AM_DOING"] = "YES"
+    os.environ["BORG_PASSPHRASE"] = "waytooeasyonlyfortests"
+    os.environ["BORG_SELFTEST"] = "disabled"
+
+
+class ArchiverSetup:
+    EXE: str = None  # python source based
+    FORK_DEFAULT = False
+    BORG_EXES = []
+
+    def __init__(self):
+        self.archiver = None
+        self.tmpdir: Optional[str] = None
+        self.repository_path: Optional[str] = None
+        self.repository_location: Optional[str] = None
+        self.input_path: Optional[str] = None
+        self.output_path: Optional[str] = None
+        self.keys_path: Optional[str] = None
+        self.cache_path: Optional[str] = None
+        self.exclude_file_path: Optional[str] = None
+        self.patterns_file_path: Optional[str] = None
+
+    def get_kind(self) -> str:
+        if self.repository_location.startswith("ssh://__testsuite__"):
+            return "remote"
+        elif self.EXE == "borg.exe":
+            return "binary"
+        else:
+            return "local"
+
+
+@pytest.fixture()
+def archiver(tmp_path, set_env_variables):
+    archiver = ArchiverSetup()
+    archiver.archiver = not archiver.FORK_DEFAULT and Archiver() or None
+    archiver.tmpdir = tmp_path
+    archiver.repository_path = os.fspath(tmp_path / "repository")
+    archiver.repository_location = archiver.repository_path
+    archiver.input_path = os.fspath(tmp_path / "input")
+    archiver.output_path = os.fspath(tmp_path / "output")
+    archiver.keys_path = os.fspath(tmp_path / "keys")
+    archiver.cache_path = os.fspath(tmp_path / "cache")
+    archiver.exclude_file_path = os.fspath(tmp_path / "excludes")
+    archiver.patterns_file_path = os.fspath(tmp_path / "patterns")
+    os.environ["BORG_KEYS_DIR"] = archiver.keys_path
+    os.environ["BORG_CACHE_DIR"] = archiver.cache_path
+    os.mkdir(archiver.input_path)
+    os.chmod(archiver.input_path, 0o777)  # avoid troubles with fakeroot / FUSE
+    os.mkdir(archiver.output_path)
+    os.mkdir(archiver.keys_path)
+    os.mkdir(archiver.cache_path)
+    with open(archiver.exclude_file_path, "wb") as fd:
+        fd.write(b"input/file2\n# A comment line, then a blank line\n\n")
+    with open(archiver.patterns_file_path, "wb") as fd:
+        fd.write(b"+input/file_important\n- input/file*\n# A comment line, then a blank line\n\n")
+    old_wd = os.getcwd()
+    os.chdir(archiver.tmpdir)
+    yield archiver
+    os.chdir(old_wd)
+
+
+@pytest.fixture()
+def remote_archiver(archiver):
+    archiver.repository_location = "ssh://__testsuite__" + str(archiver.repository_path)
+    yield archiver
+
+
+@pytest.fixture()
+def binary_archiver(archiver):
+    if "binary" not in BORG_EXES:
+        pytest.skip("No borg.exe binary available")
+    archiver.EXE = "borg.exe"
+    archiver.FORK_DEFAULT = True
+    yield archiver

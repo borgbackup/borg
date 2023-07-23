@@ -39,7 +39,7 @@ borg diff
     |                                                                                                                                                                       |
     | :ref:`common_options`                                                                                                                                                 |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
-    | **Exclusion options**                                                                                                                                                 |
+    | **Include/Exclude options**                                                                                                                                           |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     |                                                       | ``-e PATTERN``, ``--exclude PATTERN`` | exclude paths matching PATTERN                                        |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
@@ -80,7 +80,7 @@ borg diff
     :ref:`common_options`
         |
 
-    Exclusion options
+    Include/Exclude options
         -e PATTERN, --exclude PATTERN     exclude paths matching PATTERN
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
         --pattern PATTERN                 include/exclude paths matching PATTERN

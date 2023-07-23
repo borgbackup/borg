@@ -10,34 +10,20 @@ The path/filenames used as input for the pattern matching start from the
 currently active recursion root. You usually give the recursion root(s)
 when invoking borg and these can be either relative or absolute paths.
 
-If you give `/absolute/` as root, the paths going into the matcher will
-look relative like `absolute/.../file.ext`, because file paths in Borg
-archives are always stored normalized and relative. This means that e.g.
-``borg create /path/to/repo ../some/path`` will store all files as
-`some/path/.../file.ext` and ``borg create /path/to/repo /home/user``
-will store all files as `home/user/.../file.ext`.
+Starting with Borg 1.2, paths that are matched against patterns always
+appear relative. If you give ``/absolute/`` as root, the paths going
+into the matcher will start with ``absolute/``.
+If you give ``../../relative`` as root, the paths will be normalized
+as ``relative/``.
 
 A directory exclusion pattern can end either with or without a slash ('/').
 If it ends with a slash, such as `some/path/`, the directory will be
 included but not its content. If it does not end with a slash, such as
 `some/path`, both the directory and content will be excluded.
 
-File patterns support these styles: fnmatch, shell, regular expressions,
-path prefixes and path full-matches. By default, fnmatch is used for
-``--exclude`` patterns and shell-style is used for the ``--pattern``
-option. For commands that support patterns in their ``PATH`` argument
-like (``borg list``), the default pattern is path prefix.
-
-Starting with Borg 1.2, discovered fs paths are normalised, have leading
-slashes removed and then are matched against your patterns.
-Note: You need to review your include / exclude patterns and make
-sure they do not expect leading slashes. Borg can only deal with this
-for some very simple patterns by removing leading slashes there also.
-
-If followed by a colon (':') the first two characters of a pattern are
-used as a style selector. Explicit style selection is necessary when a
-non-default style is desired or when the desired pattern starts with
-two alphanumeric characters followed by a colon (i.e. `aa:something/*`).
+Borg supports different pattern styles. To define a non-default
+style for a specific pattern, prefix it with two characters followed
+by a colon ':' (i.e. ``fm:path/*``, ``sh:path/**``).
 
 `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector `fm:`
     This is the default style for ``--exclude`` and ``--exclude-from``.
@@ -147,12 +133,35 @@ Examples::
     EOF
     $ borg create --exclude-from exclude.txt backup /
 
-A more general and easier to use way to define filename matching patterns exists
-with the ``--pattern`` and ``--patterns-from`` options. Using these, you may
-specify the backup roots (starting points) and patterns for inclusion/exclusion.
-A root path starts with the prefix `R`, followed by a path (a plain path, not a
-file pattern). An include rule starts with the prefix +, an exclude rule starts
-with the prefix -, an exclude-norecurse rule starts with !, all followed by a pattern.
+A more general and easier to use way to define filename matching patterns
+exists with the ``--pattern`` and ``--patterns-from`` options. Using
+these, you may specify the backup roots, default pattern styles and
+patterns for inclusion and exclusion.
+
+Root path prefix ``R``
+    A recursion root path starts with the prefix ``R``, followed by a path
+    (a plain path, not a file pattern). Use this prefix to have the root
+    paths in the patterns file rather than as command line arguments.
+
+Pattern style prefix ``P``
+    To change the default pattern style, use the ``P`` prefix, followed by
+    the pattern style abbreviation (``fm``, ``pf``, ``pp``, ``re``, ``sh``).
+    All patterns following this line will use this style until another style
+    is specified.
+
+Exclude pattern prefix ``-``
+    Use the prefix ``-``, followed by a pattern, to define an exclusion.
+    This has the same effect as the ``--exclude`` option.
+
+Exclude no-recurse pattern prefix ``!``
+    Use the prefix ``!``, followed by a pattern, to define an exclusion
+    that does not recurse into subdirectories. This saves time, but
+    prevents include patterns to match any files in subdirectories.
+
+Include pattern prefix ``+``
+    Use the prefix ``+``, followed by a pattern, to define inclusions.
+    This is useful to include paths that are covered in an exclude
+    pattern and would otherwise not be backed up.
 
 .. note::
 
@@ -160,11 +169,29 @@ with the prefix -, an exclude-norecurse rule starts with !, all followed by a pa
     of files using pattern prefixes ``+`` and ``-``. With ``--exclude`` and
     ``--exclude-from`` ONLY excludes are defined.
 
-Inclusion patterns are useful to include paths that are contained in an excluded
-path. The first matching pattern is used so if an include pattern matches before
-an exclude pattern, the file is backed up. If an exclude-norecurse pattern matches
-a directory, it won't recurse into it and won't discover any potential matches for
-include rules below that directory.
+The first matching pattern is used, so if an include pattern matches
+before an exclude pattern, the file is backed up. Note that a no-recurse
+exclude stops examination of subdirectories so that potential includes
+will not match - use normal excludes for such use cases.
+
+Example::
+
+    # Define the recursion root
+    R /
+    # Exclude all iso files in any directory
+    - **/*.iso
+    # Explicitly include all inside etc and root
+    + etc/**
+    + root/**
+    # Exclude a specific directory under each user's home directories
+    - home/*/.cache
+    # Explicitly include everything in /home
+    + home/**
+    # Explicitly exclude some directories without recursing into them
+    ! re:^(dev|proc|run|sys|tmp)
+    # Exclude all other files and directories
+    # that are not specifically included earlier.
+    - **
 
 .. note::
 
@@ -346,29 +373,44 @@ auto,C[,L]
 
 obfuscate,SPEC,C[,L]
     Use compressed-size obfuscation to make fingerprinting attacks based on
-    the observable stored chunk size more difficult.
-    Note:
-    - you must combine this with encryption or it won't make any sense.
-    - your repo size will be bigger, of course.
+    the observable stored chunk size more difficult. Note:
 
-    The SPEC value will determine how the size obfuscation will work:
+    - You must combine this with encryption, or it won't make any sense.
+    - Your repo size will be bigger, of course.
+    - A chunk is limited by the constant ``MAX_DATA_SIZE`` (cur. ~20MiB).
 
-    Relative random reciprocal size variation:
+    The SPEC value determines how the size obfuscation works:
+
+    *Relative random reciprocal size variation* (multiplicative)
+
     Size will increase by a factor, relative to the compressed data size.
-    Smaller factors are often used, larger factors rarely.
-    1: factor 0.01 .. 100.0
-    2: factor 0.1 .. 1000.0
-    3: factor 1.0 .. 10000.0
-    4: factor 10.0 .. 100000.0
-    5: factor 100.0 .. 1000000.0
-    6: factor 1000.0 .. 10000000.0
+    Smaller factors are used often, larger factors rarely.
 
-    Add a randomly sized padding up to the given size:
-    110: 1kiB
-    ...
-    120: 1MiB
-    ...
-    123: 8MiB (max.)
+    Available factors::
+
+      1:     0.01 ..        100
+      2:     0.1  ..      1,000
+      3:     1    ..     10,000
+      4:    10    ..    100,000
+      5:   100    ..  1,000,000
+      6: 1,000    .. 10,000,000
+
+    Example probabilities for SPEC ``1``::
+
+      90   %  0.01 ..   0.1
+       9   %  0.1  ..   1
+       0.9 %  1    ..  10
+       0.09% 10    .. 100
+
+    *Randomly sized padding up to the given size* (additive)
+
+    ::
+
+      110: 1kiB (2 ^ (SPEC - 100))
+      ...
+      120: 1MiB
+      ...
+      123: 8MiB (max.)
 
 Examples::
 
@@ -379,7 +421,7 @@ Examples::
     borg create --compression zlib,1 REPO::ARCHIVE data
     borg create --compression auto,lzma,6 REPO::ARCHIVE data
     borg create --compression auto,lzma ...
-    borg create --compression obfuscate,3,none ...
+    borg create --compression obfuscate,110,none ...
     borg create --compression obfuscate,3,auto,zstd,10 ...
     borg create --compression obfuscate,2,zstd,6 ...
 

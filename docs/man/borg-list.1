@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-LIST" 1 "2023-03-22" "" "borg backup tool"
+.TH "BORG-LIST" 1 "2023-07-20" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .SH SYNOPSIS
@@ -86,7 +86,7 @@ consider first N archives after other filters were applied
 .BI \-\-last \ N
 consider last N archives after other filters were applied
 .UNINDENT
-.SS Exclusion options
+.SS Include/Exclude options
 .INDENT 0.0
 .TP
 .BI \-e \ PATTERN\fR,\fB \ \-\-exclude \ PATTERN
@@ -137,11 +137,11 @@ drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.text
 \&...
 
-$ borg list /path/to/repo/::archiveA \-\-pattern \(aqre:\e.ext$\(aq
+$ borg list /path/to/repo/::archiveA \-\-pattern \(aq+ re:\e.ext$\(aq \-\-pattern \(aq\- re:^.*$\(aq
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
 \&...
 
-$ borg list /path/to/repo/::archiveA \-\-pattern \(aqre:.ext$\(aq
+$ borg list /path/to/repo/::archiveA \-\-pattern \(aq+ re:.ext$\(aq \-\-pattern \(aq\- re:^.*$\(aq
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.text
 \&...

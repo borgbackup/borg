@@ -323,9 +323,13 @@ New features:
   desktop / in the directory view. if the user did not specify it, we make
   something up, because otherwise it would be "macFUSE Volume 0 (Python)" and
   hide the mountpoint directory name.
+- BORG_WORKAROUNDS=authenticated_no_key to extract from authenticated repos
+  without key, #7700
+
 
 Other changes:
 
+- add `utcnow()` helper function to avoid deprecated `datetime.utcnow()`
 - docs:
 
   - move upgrade notes to own section, see #7546
@@ -336,6 +340,9 @@ Other changes:
   - obfuscation docs: markup fix, note about MAX_DATA_SIZE
   - --one-file-system: add macOS apfs notes, #4876
   - improve --one-file-system help string, #5618
+  - rewrite borg check docs
+  - improve the docs for --keep-within, #7687
+
 - tests:
 
   - fix repo reopen
@@ -1311,6 +1318,9 @@ Compatibility notes:
 
   - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
   - borg upgrade: you do not need to and you also should not run it.
+    There is one exception though:
+    If you upgrade from an unpatched borg < 1.0.9, please read that section
+    above: "Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)"
   - borg might ask some security-related questions once after upgrading.
     You can answer them either manually or via environment variable.
     One known case is if you use unencrypted repositories, then it will ask
@@ -1458,6 +1468,9 @@ Compatibility notes:
 
   - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
   - borg upgrade: you do not need to and you also should not run it.
+    There is one exception though:
+    If you upgrade from an unpatched borg < 1.0.9, please read that section
+    above: "Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)"
   - borg might ask some security-related questions once after upgrading.
     You can answer them either manually or via environment variable.
     One known case is if you use unencrypted repositories, then it will ask
@@ -1728,6 +1741,9 @@ Compatibility notes:
 
   - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
   - borg upgrade: you do not need to and you also should not run it.
+    There is one exception though:
+    If you upgrade from an unpatched borg < 1.0.9, please read that section
+    above: "Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)"
   - borg might ask some security-related questions once after upgrading.
     You can answer them either manually or via environment variable.
     One known case is if you use unencrypted repositories, then it will ask
@@ -1800,6 +1816,9 @@ Compatibility notes:
 
   - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
   - borg upgrade: you do not need to and you also should not run it.
+    There is one exception though:
+    If you upgrade from an unpatched borg < 1.0.9, please read that section
+    above: "Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)"
   - borg might ask some security-related questions once after upgrading.
     You can answer them either manually or via environment variable.
     One known case is if you use unencrypted repositories, then it will ask
@@ -1983,6 +2002,9 @@ Compatibility notes:
 
   - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
   - borg upgrade: you do not need to and you also should not run it.
+    There is one exception though:
+    If you upgrade from an unpatched borg < 1.0.9, please read that section
+    above: "Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)"
   - borg might ask some security-related questions once after upgrading.
     You can answer them either manually or via environment variable.
     One known case is if you use unencrypted repositories, then it will ask
@@ -2276,6 +2298,9 @@ Compatibility notes:
 
   - read all the compatibility notes for 1.1.0*, starting from 1.1.0b1.
   - borg upgrade: you do not need to and you also should not run it.
+    There is one exception though:
+    If you upgrade from an unpatched borg < 1.0.9, please read that section
+    above: "Pre-1.0.9 manifest spoofing vulnerability (CVE-2016-10099)"
   - borg might ask some security-related questions once after upgrading.
     You can answer them either manually or via environment variable.
     One known case is if you use unencrypted repositories, then it will ask

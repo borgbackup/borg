@@ -147,7 +147,9 @@ def cmd(archiver, *args, **kw):
     binary_output = kw.get("binary_output", False)
     if fork is None:
         fork = archiver.FORK_DEFAULT
-    ret, output = exec_cmd(*args, archiver=archiver.archiver, fork=fork, exe=archiver.EXE, **kw)
+    ret, output = exec_cmd(
+        f"--repo={archiver.repository_location}", *args, archiver=archiver.archiver, fork=fork, exe=archiver.EXE, **kw
+    )
     if ret != exit_code:
         print(output)
     assert ret == exit_code
@@ -160,11 +162,10 @@ def cmd(archiver, *args, **kw):
 
 
 def create_src_archive(archiver, name, ts=None):
-    repo_location, source_dir = archiver.repository_location, src_dir
     if ts:
-        cmd(archiver, f"--repo={repo_location}", "create", "--compression=lz4", f"--timestamp={ts}", name, source_dir)
+        cmd(archiver, "create", "--compression=lz4", f"--timestamp={ts}", name, src_dir)
     else:
-        cmd(archiver, f"--repo={repo_location}", "create", "--compression=lz4", name, source_dir)
+        cmd(archiver, "create", "--compression=lz4", name, src_dir)
 
 
 def open_archive(repo_path, name):
@@ -270,8 +271,7 @@ def _set_repository_id(repo_path, id):
 
 
 def _extract_hardlinks_setup(archiver):
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-
+    input_path = archiver.input_path
     os.mkdir(os.path.join(input_path, "dir1"))
     os.mkdir(os.path.join(input_path, "dir1/subdir"))
 
@@ -283,13 +283,13 @@ def _extract_hardlinks_setup(archiver):
     create_regular_file(input_path, "dir1/source2")
     os.link(os.path.join(input_path, "dir1/source2"), os.path.join(input_path, "dir1/aaaa"))
 
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
 
 
 def _create_test_caches(archiver):
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    input_path = archiver.input_path
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "file1", size=1024 * 80)
     create_regular_file(input_path, "cache1/%s" % CACHE_TAG_NAME, contents=CACHE_TAG_CONTENTS + b" extra stuff")
     create_regular_file(input_path, "cache2/%s" % CACHE_TAG_NAME, contents=b"invalid signature")
@@ -297,35 +297,34 @@ def _create_test_caches(archiver):
     if are_hardlinks_supported():
         os.link("input/cache1/%s" % CACHE_TAG_NAME, "input/cache3/%s" % CACHE_TAG_NAME)
     else:
-        create_regular_file(
-            archiver.input_path, "cache3/%s" % CACHE_TAG_NAME, contents=CACHE_TAG_CONTENTS + b" extra stuff"
-        )
+        create_regular_file(input_path, "cache3/%s" % CACHE_TAG_NAME, contents=CACHE_TAG_CONTENTS + b" extra stuff")
 
 
 def _assert_test_caches(archiver):
     with changedir("output"):
-        cmd(archiver, f"--repo={archiver.repository_location}", "extract", "test")
+        cmd(archiver, "extract", "test")
     assert sorted(os.listdir("output/input")) == ["cache2", "file1"]
     assert sorted(os.listdir("output/input/cache2")) == [CACHE_TAG_NAME]
 
 
 def _create_test_tagged(archiver):
-    cmd(archiver, f"--repo={archiver.repository_location}", "rcreate", RK_ENCRYPTION)
-    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
-    create_regular_file(archiver.input_path, "tagged1/.NOBACKUP")
-    create_regular_file(archiver.input_path, "tagged2/00-NOBACKUP")
-    create_regular_file(archiver.input_path, "tagged3/.NOBACKUP/file2", size=1024)
+    input_path = archiver.input_path
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    create_regular_file(input_path, "file1", size=1024 * 80)
+    create_regular_file(input_path, "tagged1/.NOBACKUP")
+    create_regular_file(input_path, "tagged2/00-NOBACKUP")
+    create_regular_file(input_path, "tagged3/.NOBACKUP/file2", size=1024)
 
 
 def _assert_test_tagged(archiver):
     with changedir("output"):
-        cmd(archiver, f"--repo={archiver.repository_location}", "extract", "test")
+        cmd(archiver, "extract", "test")
     assert sorted(os.listdir("output/input")) == ["file1"]
 
 
 def _create_test_keep_tagged(archiver):
     input_path = archiver.input_path
-    cmd(archiver, f"--repo={archiver.repository_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "file0", size=1024)
     create_regular_file(input_path, "tagged1/.NOBACKUP1")
     create_regular_file(input_path, "tagged1/file1", size=1024)
@@ -341,7 +340,7 @@ def _create_test_keep_tagged(archiver):
 
 def _assert_test_keep_tagged(archiver):
     with changedir("output"):
-        cmd(archiver, f"--repo={archiver.repository_location}", "extract", "test")
+        cmd(archiver, "extract", "test")
     assert sorted(os.listdir("output/input")), ["file0", "tagged1", "tagged2", "tagged3", "taggedall"]
     assert os.listdir("output/input/tagged1"), [".NOBACKUP1"]
     assert os.listdir("output/input/tagged2"), [".NOBACKUP2"]
@@ -351,7 +350,7 @@ def _assert_test_keep_tagged(archiver):
 
 def check_cache(archiver):
     # First run a regular borg check
-    cmd(archiver, f"--repo={archiver.repository_location}", "check")
+    cmd(archiver, "check")
     # Then check that the cache on disk matches exactly what's in the repo.
     with open_repository(archiver) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -483,7 +482,7 @@ def wait_for_mountstate(mountpoint, *, mounted, timeout=5):
 
 
 @contextmanager
-def fuse_mount(archiver, location, mountpoint=None, *options, fork=True, os_fork=False, **kwargs):
+def fuse_mount(archiver, mountpoint=None, *options, fork=True, os_fork=False, **kwargs):
     # For a successful mount, `fork = True` is required for
     # the borg mount daemon to work properly or the tests
     # will just freeze. Therefore, if argument `fork` is not
@@ -502,7 +501,7 @@ def fuse_mount(archiver, location, mountpoint=None, *options, fork=True, os_fork
         mountpoint = tempfile.mkdtemp()
     else:
         os.mkdir(mountpoint)
-    args = [f"--repo={location}", "mount", mountpoint] + list(options)
+    args = ["mount", mountpoint] + list(options)
     if os_fork:
         # Do not spawn, but actually (OS) fork.
         if os.fork() == 0:

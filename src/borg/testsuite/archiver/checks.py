@@ -46,241 +46,235 @@ def cmd_raises_unknown_feature(archiver, args):
 
 def test_repository_swap_detection(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path, input_path = archiver.repository_location, archiver.repository_path, archiver.input_path
-    create_test_files(input_path)
+    create_test_files(archiver.input_path)
     os.environ["BORG_PASSPHRASE"] = "passphrase"
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    repository_id = _extract_repository_id(repo_path)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
-    shutil.rmtree(repo_path)
-    cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
-    _set_repository_id(repo_path, repository_id)
-    assert repository_id == _extract_repository_id(repo_path)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    repository_id = _extract_repository_id(archiver.repository_path)
+    cmd(archiver, "create", "test", "input")
+    shutil.rmtree(archiver.repository_path)
+    cmd(archiver, "rcreate", "--encryption=none")
+    _set_repository_id(archiver.repository_path, repository_id)
+    assert repository_id == _extract_repository_id(archiver.repository_path)
     if archiver.FORK_DEFAULT:
-        cmd(archiver, f"--repo={repo_location}", "create", "test.2", "input", exit_code=EXIT_ERROR)
+        cmd(archiver, "create", "test.2", "input", exit_code=EXIT_ERROR)
     else:
         with pytest.raises(Cache.EncryptionMethodMismatch):
-            cmd(archiver, f"--repo={repo_location}", "create", "test.2", "input")
+            cmd(archiver, "create", "test.2", "input")
 
 
 def test_repository_swap_detection2(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path, input_path = archiver.repository_location, archiver.repository_path, archiver.input_path
-    create_test_files(input_path)
-    cmd(archiver, f"--repo={repo_location}_unencrypted", "rcreate", "--encryption=none")
+    create_test_files(archiver.input_path)
+    original_location = archiver.repository_location
+    archiver.repository_location = original_location + "_unencrypted"
+    cmd(archiver, "rcreate", "--encryption=none")
     os.environ["BORG_PASSPHRASE"] = "passphrase"
-    cmd(archiver, f"--repo={repo_location}_encrypted", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}_encrypted", "create", "test", "input")
-    shutil.rmtree(repo_path + "_encrypted")
-    os.replace(repo_path + "_unencrypted", repo_path + "_encrypted")
+    archiver.repository_location = original_location + "_encrypted"
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    shutil.rmtree(archiver.repository_path + "_encrypted")
+    os.replace(archiver.repository_path + "_unencrypted", archiver.repository_path + "_encrypted")
     if archiver.FORK_DEFAULT:
-        cmd(archiver, f"--repo={repo_location}_encrypted", "create", "test.2", "input", exit_code=EXIT_ERROR)
+        cmd(archiver, "create", "test.2", "input", exit_code=EXIT_ERROR)
     else:
         with pytest.raises(Cache.RepositoryAccessAborted):
-            cmd(archiver, f"--repo={repo_location}_encrypted", "create", "test.2", "input")
+            cmd(archiver, "create", "test.2", "input")
 
 
 def test_repository_swap_detection_no_cache(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path, input_path = archiver.repository_location, archiver.repository_path, archiver.input_path
-    create_test_files(input_path)
+    create_test_files(archiver.input_path)
     os.environ["BORG_PASSPHRASE"] = "passphrase"
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    repository_id = _extract_repository_id(repo_path)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
-    shutil.rmtree(repo_path)
-    cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
-    _set_repository_id(repo_path, repository_id)
-    assert repository_id == _extract_repository_id(repo_path)
-    cmd(archiver, f"--repo={repo_location}", "rdelete", "--cache-only")
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    repository_id = _extract_repository_id(archiver.repository_path)
+    cmd(archiver, "create", "test", "input")
+    shutil.rmtree(archiver.repository_path)
+    cmd(archiver, "rcreate", "--encryption=none")
+    _set_repository_id(archiver.repository_path, repository_id)
+    assert repository_id == _extract_repository_id(archiver.repository_path)
+    cmd(archiver, "rdelete", "--cache-only")
     if archiver.FORK_DEFAULT:
-        cmd(archiver, f"--repo={repo_location}", "create", "test.2", "input", exit_code=EXIT_ERROR)
+        cmd(archiver, "create", "test.2", "input", exit_code=EXIT_ERROR)
     else:
         with pytest.raises(Cache.EncryptionMethodMismatch):
-            cmd(archiver, f"--repo={repo_location}", "create", "test.2", "input")
+            cmd(archiver, "create", "test.2", "input")
 
 
 def test_repository_swap_detection2_no_cache(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path, input_path = archiver.repository_location, archiver.repository_path, archiver.input_path
-    create_test_files(input_path)
-    cmd(archiver, f"--repo={repo_location}_unencrypted", "rcreate", "--encryption=none")
+    original_location = archiver.repository_location
+    create_test_files(archiver.input_path)
+    archiver.repository_location = original_location + "_unencrypted"
+    cmd(archiver, "rcreate", "--encryption=none")
     os.environ["BORG_PASSPHRASE"] = "passphrase"
-    cmd(archiver, f"--repo={repo_location}_encrypted", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}_encrypted", "create", "test", "input")
-    cmd(archiver, f"--repo={repo_location}_unencrypted", "rdelete", "--cache-only")
-    cmd(archiver, f"--repo={repo_location}_encrypted", "rdelete", "--cache-only")
-    shutil.rmtree(repo_path + "_encrypted")
-    os.replace(repo_path + "_unencrypted", repo_path + "_encrypted")
+    archiver.repository_location = original_location + "_encrypted"
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    archiver.repository_location = original_location + "_unencrypted"
+    cmd(archiver, "rdelete", "--cache-only")
+    archiver.repository_location = original_location + "_encrypted"
+    cmd(archiver, "rdelete", "--cache-only")
+    shutil.rmtree(archiver.repository_path + "_encrypted")
+    os.replace(archiver.repository_path + "_unencrypted", archiver.repository_path + "_encrypted")
     if archiver.FORK_DEFAULT:
-        cmd(archiver, f"--repo={repo_location}_encrypted", "create", "test.2", "input", exit_code=EXIT_ERROR)
+        cmd(archiver, "create", "test.2", "input", exit_code=EXIT_ERROR)
     else:
         with pytest.raises(Cache.RepositoryAccessAborted):
-            cmd(archiver, f"--repo={repo_location}_encrypted", "create", "test.2", "input")
+            cmd(archiver, "create", "test.2", "input")
 
 
 def test_repository_swap_detection_repokey_blank_passphrase(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path, input_path = archiver.repository_location, archiver.repository_path, archiver.input_path
     # Check that a repokey repo with a blank passphrase is considered like a plaintext repo.
-    create_test_files(input_path)
+    create_test_files(archiver.input_path)
     # User initializes her repository with her passphrase
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
     # Attacker replaces it with her own repository, which is encrypted but has no passphrase set
-    shutil.rmtree(repo_path)
+    shutil.rmtree(archiver.repository_path)
     with environment_variable(BORG_PASSPHRASE=""):
-        cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+        cmd(archiver, "rcreate", RK_ENCRYPTION)
         # Delete cache & security database, AKA switch to user perspective
-        cmd(archiver, f"--repo={repo_location}", "rdelete", "--cache-only")
-        shutil.rmtree(get_security_directory(repo_path))
+        cmd(archiver, "rdelete", "--cache-only")
+        shutil.rmtree(get_security_directory(archiver.repository_path))
     with environment_variable(BORG_PASSPHRASE=None):
         # This is the part were the user would be tricked, e.g. she assumes that BORG_PASSPHRASE
         # is set, while it isn't. Previously this raised no warning,
         # since the repository is, technically, encrypted.
         if archiver.FORK_DEFAULT:
-            cmd(archiver, f"--repo={repo_location}", "create", "test.2", "input", exit_code=EXIT_ERROR)
+            cmd(archiver, "create", "test.2", "input", exit_code=EXIT_ERROR)
         else:
             with pytest.raises(Cache.CacheInitAbortedError):
-                cmd(archiver, f"--repo={repo_location}", "create", "test.2", "input")
+                cmd(archiver, "create", "test.2", "input")
 
 
 def test_repository_move(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    security_dir = get_security_directory(repo_path)
-    os.replace(repo_path, repo_path + "_new")
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    security_dir = get_security_directory(archiver.repository_path)
+    os.replace(archiver.repository_path, archiver.repository_path + "_new")
+    archiver.repository_location += "_new"
     with environment_variable(BORG_RELOCATED_REPO_ACCESS_IS_OK="yes"):
-        cmd(archiver, f"--repo={repo_location}_new", "rinfo")
+        cmd(archiver, "rinfo")
     with open(os.path.join(security_dir, "location")) as fd:
         location = fd.read()
-        assert location == Location(repo_location + "_new").canonical_path()
+        assert location == Location(archiver.repository_location).canonical_path()
     # Needs no confirmation anymore
-    cmd(archiver, f"--repo={repo_location}_new", "rinfo")
+    cmd(archiver, "rinfo")
     shutil.rmtree(archiver.cache_path)
-    cmd(archiver, f"--repo={repo_location}_new", "rinfo")
+    cmd(archiver, "rinfo")
     shutil.rmtree(security_dir)
-    cmd(archiver, f"--repo={repo_location}_new", "rinfo")
+    cmd(archiver, "rinfo")
     for file in ("location", "key-type", "manifest-timestamp"):
         assert os.path.exists(os.path.join(security_dir, file))
 
 
 def test_security_dir_compat(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    with open(os.path.join(get_security_directory(repo_path), "location"), "w") as fd:
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    with open(os.path.join(get_security_directory(archiver.repository_path), "location"), "w") as fd:
         fd.write("something outdated")
     # This is fine, because the cache still has the correct information. security_dir and cache can disagree
     # if older versions are used to confirm a renamed repository.
-    cmd(archiver, f"--repo={repo_location}", "rinfo")
+    cmd(archiver, "rinfo")
 
 
 def test_unknown_unencrypted(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path, cache_path = archiver.repository_location, archiver.repository_path, archiver.cache_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
+    cmd(archiver, "rcreate", "--encryption=none")
     # Ok: repository is known
-    cmd(archiver, f"--repo={repo_location}", "rinfo")
+    cmd(archiver, "rinfo")
 
     # Ok: repository is still known (through security_dir)
-    shutil.rmtree(cache_path)
-    cmd(archiver, f"--repo={repo_location}", "rinfo")
+    shutil.rmtree(archiver.cache_path)
+    cmd(archiver, "rinfo")
 
     # Needs confirmation: cache and security dir both gone (e.g. another host or rm -rf ~)
-    shutil.rmtree(get_security_directory(repo_path))
+    shutil.rmtree(get_security_directory(archiver.repository_path))
     if archiver.FORK_DEFAULT:
-        cmd(archiver, f"--repo={repo_location}", "rinfo", exit_code=EXIT_ERROR)
+        cmd(archiver, "rinfo", exit_code=EXIT_ERROR)
     else:
         with pytest.raises(Cache.CacheInitAbortedError):
-            cmd(archiver, f"--repo={repo_location}", "rinfo")
+            cmd(archiver, "rinfo")
     with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK="yes"):
-        cmd(archiver, f"--repo={repo_location}", "rinfo")
+        cmd(archiver, "rinfo")
 
 
 def test_unknown_feature_on_create(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    print(cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION))
-    add_unknown_feature(repo_path, Manifest.Operation.WRITE)
-    cmd_raises_unknown_feature(archiver, [f"--repo={repo_location}", "create", "test", "input"])
+    print(cmd(archiver, "rcreate", RK_ENCRYPTION))
+    add_unknown_feature(archiver.repository_path, Manifest.Operation.WRITE)
+    cmd_raises_unknown_feature(archiver, ["create", "test", "input"])
 
 
 def test_unknown_feature_on_cache_sync(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "rdelete", "--cache-only")
-    add_unknown_feature(repo_path, Manifest.Operation.READ)
-    cmd_raises_unknown_feature(archiver, [f"--repo={repo_location}", "create", "test", "input"])
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rdelete", "--cache-only")
+    add_unknown_feature(archiver.repository_path, Manifest.Operation.READ)
+    cmd_raises_unknown_feature(archiver, ["create", "test", "input"])
 
 
 def test_unknown_feature_on_change_passphrase(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    print(cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION))
-    add_unknown_feature(repo_path, Manifest.Operation.CHECK)
-    cmd_raises_unknown_feature(archiver, [f"--repo={repo_location}", "key", "change-passphrase"])
+    print(cmd(archiver, "rcreate", RK_ENCRYPTION))
+    add_unknown_feature(archiver.repository_path, Manifest.Operation.CHECK)
+    cmd_raises_unknown_feature(archiver, ["key", "change-passphrase"])
 
 
 def test_unknown_feature_on_read(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    print(cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION))
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
-    add_unknown_feature(repo_path, Manifest.Operation.READ)
+    print(cmd(archiver, "rcreate", RK_ENCRYPTION))
+    cmd(archiver, "create", "test", "input")
+    add_unknown_feature(archiver.repository_path, Manifest.Operation.READ)
     with changedir("output"):
-        cmd_raises_unknown_feature(archiver, [f"--repo={repo_location}", "extract", "test"])
-    cmd_raises_unknown_feature(archiver, [f"--repo={repo_location}", "rlist"])
-    cmd_raises_unknown_feature(archiver, [f"--repo={repo_location}", "info", "-a", "test"])
+        cmd_raises_unknown_feature(archiver, ["extract", "test"])
+    cmd_raises_unknown_feature(archiver, ["rlist"])
+    cmd_raises_unknown_feature(archiver, ["info", "-a", "test"])
 
 
 def test_unknown_feature_on_rename(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    print(cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION))
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
-    add_unknown_feature(repo_path, Manifest.Operation.CHECK)
-    cmd_raises_unknown_feature(archiver, [f"--repo={repo_location}", "rename", "test", "other"])
+    print(cmd(archiver, "rcreate", RK_ENCRYPTION))
+    cmd(archiver, "create", "test", "input")
+    add_unknown_feature(archiver.repository_path, Manifest.Operation.CHECK)
+    cmd_raises_unknown_feature(archiver, ["rename", "test", "other"])
 
 
 def test_unknown_feature_on_delete(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    print(cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION))
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
-    add_unknown_feature(repo_path, Manifest.Operation.DELETE)
+    print(cmd(archiver, "rcreate", RK_ENCRYPTION))
+    cmd(archiver, "create", "test", "input")
+    add_unknown_feature(archiver.repository_path, Manifest.Operation.DELETE)
     # delete of an archive raises
-    cmd_raises_unknown_feature(archiver, [f"--repo={repo_location}", "delete", "-a", "test"])
-    cmd_raises_unknown_feature(archiver, [f"--repo={repo_location}", "prune", "--keep-daily=3"])
+    cmd_raises_unknown_feature(archiver, ["delete", "-a", "test"])
+    cmd_raises_unknown_feature(archiver, ["prune", "--keep-daily=3"])
     # delete of the whole repository ignores features
-    cmd(archiver, f"--repo={repo_location}", "rdelete")
+    cmd(archiver, "rdelete")
 
 
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_unknown_feature_on_mount(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
-    add_unknown_feature(repo_path, Manifest.Operation.READ)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    add_unknown_feature(archiver.repository_path, Manifest.Operation.READ)
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     os.mkdir(mountpoint)
     # XXX this might hang if it doesn't raise an error
-    cmd_raises_unknown_feature(archiver, [f"--repo={repo_location}::test", "mount", mountpoint])
+    archiver.repository_location += "::test"
+    cmd_raises_unknown_feature(archiver, ["mount", mountpoint])
 
 
 @pytest.mark.allow_cache_wipe
 def test_unknown_mandatory_feature_in_cache(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    remote_repo = True if archiver.get_kind() == "remote" else False
-    print(cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION))
+    remote_repo = archiver.get_kind() == "remote"
+    print(cmd(archiver, "rcreate", RK_ENCRYPTION))
 
-    with Repository(repo_path, exclusive=True) as repository:
+    with Repository(archiver.repository_path, exclusive=True) as repository:
         if remote_repo:
-            repository._location = Location(repo_location)
+            repository._location = Location(archiver.repository_location)
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         with Cache(repository, manifest) as cache:
             cache.begin_txn()
@@ -288,7 +282,7 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
             cache.commit()
 
     if archiver.FORK_DEFAULT:
-        cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
+        cmd(archiver, "create", "test", "input")
     else:
         called = False
         wipe_cache_safe = LocalCache.wipe_cache
@@ -299,13 +293,13 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
             wipe_cache_safe(*args)
 
         with patch.object(LocalCache, "wipe_cache", wipe_wrapper):
-            cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
+            cmd(archiver, "create", "test", "input")
 
         assert called
 
-    with Repository(repo_path, exclusive=True) as repository:
+    with Repository(archiver.repository_path, exclusive=True) as repository:
         if remote_repo:
-            repository._location = Location(repo_location)
+            repository._location = Location(archiver.repository_location)
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         with Cache(repository, manifest) as cache:
             assert cache.cache_config.mandatory_features == set()
@@ -313,9 +307,8 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
 
 def test_check_cache(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
     with open_repository(archiver) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         with Cache(repository, manifest, sync=False) as cache:
@@ -347,9 +340,8 @@ def spoof_manifest(repository):
 
 
 def test_fresh_init_tam_required(archiver):
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    repository = Repository(repo_path, exclusive=True)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    repository = Repository(archiver.repository_path, exclusive=True)
     with repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         cdata = manifest.repo_objs.format(
@@ -367,86 +359,82 @@ def test_fresh_init_tam_required(archiver):
         repository.commit(compact=False)
 
     with pytest.raises(TAMRequiredError):
-        cmd(archiver, f"--repo={repo_location}", "rlist")
+        cmd(archiver, "rlist")
 
 
 def test_not_required(archiver):
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_src_archive(archiver, "archive1234")
-    repository = Repository(repo_path, exclusive=True)
+    repository = Repository(archiver.repository_path, exclusive=True)
     # Manifest must be authenticated now
-    output = cmd(archiver, f"--repo={repo_location}", "rlist", "--debug")
+    output = cmd(archiver, "rlist", "--debug")
     assert "archive1234" in output
     assert "TAM-verified manifest" in output
     # Try to spoof / modify pre-1.0.9
     spoof_manifest(repository)
     # Fails
     with pytest.raises(TAMRequiredError):
-        cmd(archiver, f"--repo={repo_location}", "rlist")
+        cmd(archiver, "rlist")
 
 
 # Begin Remote Tests
 def test_remote_repo_restrict_to_path(remote_archiver):
-    repo_location, repo_path = remote_archiver.repository_location, remote_archiver.repository_path
+    original_location, repo_path = remote_archiver.repository_location, remote_archiver.repository_path
     # restricted to repo directory itself:
     with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", repo_path]):
-        cmd(remote_archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+        cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
     # restricted to repo directory itself, fail for other directories with same prefix:
     with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", repo_path]):
         with pytest.raises(PathNotAllowed):
-            cmd(remote_archiver, f"--repo={repo_location}_0", "rcreate", RK_ENCRYPTION)
+            remote_archiver.repository_location = original_location + "_0"
+            cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
     # restricted to a completely different path:
     with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", "/foo"]):
         with pytest.raises(PathNotAllowed):
-            cmd(remote_archiver, f"--repo={repo_location}_1", "rcreate", RK_ENCRYPTION)
+            remote_archiver.repository_location = original_location + "_1"
+            cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
     path_prefix = os.path.dirname(repo_path)
     # restrict to repo directory's parent directory:
     with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", path_prefix]):
-        cmd(remote_archiver, f"--repo={repo_location}_2", "rcreate", RK_ENCRYPTION)
+        remote_archiver.repository_location = original_location + "_2"
+        cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
     # restrict to repo directory's parent directory and another directory:
     with patch.object(
         RemoteRepository, "extra_test_args", ["--restrict-to-path", "/foo", "--restrict-to-path", path_prefix]
     ):
-        cmd(remote_archiver, f"--repo={repo_location}_3", "rcreate", RK_ENCRYPTION)
+        remote_archiver.repository_location = original_location + "_3"
+        cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
 
 
 def test_remote_repo_restrict_to_repository(remote_archiver):
-    repo_location, repo_path = remote_archiver.repository_location, remote_archiver.repository_path
+    repo_path = remote_archiver.repository_path
     # restricted to repo directory itself:
     with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-repository", repo_path]):
-        cmd(remote_archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+        cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
     parent_path = os.path.join(repo_path, "..")
     with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-repository", parent_path]):
         with pytest.raises(PathNotAllowed):
-            cmd(remote_archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+            cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
 
 
 def test_remote_repo_strip_components_doesnt_leak(remote_archiver):
-    repo_location, input_path = remote_archiver.repository_location, remote_archiver.input_path
-    cmd(remote_archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    create_regular_file(input_path, "dir/file", contents=b"test file contents 1")
-    create_regular_file(input_path, "dir/file2", contents=b"test file contents 2")
-    create_regular_file(input_path, "skipped-file1", contents=b"test file contents 3")
-    create_regular_file(input_path, "skipped-file2", contents=b"test file contents 4")
-    create_regular_file(input_path, "skipped-file3", contents=b"test file contents 5")
-    cmd(remote_archiver, f"--repo={repo_location}", "create", "test", "input")
+    cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
+    create_regular_file(remote_archiver.input_path, "dir/file", contents=b"test file contents 1")
+    create_regular_file(remote_archiver.input_path, "dir/file2", contents=b"test file contents 2")
+    create_regular_file(remote_archiver.input_path, "skipped-file1", contents=b"test file contents 3")
+    create_regular_file(remote_archiver.input_path, "skipped-file2", contents=b"test file contents 4")
+    create_regular_file(remote_archiver.input_path, "skipped-file3", contents=b"test file contents 5")
+    cmd(remote_archiver, "create", "test", "input")
     marker = "cached responses left in RemoteRepository"
     with changedir("output"):
-        res = cmd(remote_archiver, f"--repo={repo_location}", "extract", "test", "--debug", "--strip-components", "3")
+        res = cmd(remote_archiver, "extract", "test", "--debug", "--strip-components", "3")
         assert marker not in res
         with assert_creates_file("file"):
-            res = cmd(
-                remote_archiver, f"--repo={repo_location}", "extract", "test", "--debug", "--strip-components", "2"
-            )
+            res = cmd(remote_archiver, "extract", "test", "--debug", "--strip-components", "2")
             assert marker not in res
         with assert_creates_file("dir/file"):
-            res = cmd(
-                remote_archiver, f"--repo={repo_location}", "extract", "test", "--debug", "--strip-components", "1"
-            )
+            res = cmd(remote_archiver, "extract", "test", "--debug", "--strip-components", "1")
             assert marker not in res
         with assert_creates_file("input/dir/file"):
-            res = cmd(
-                remote_archiver, f"--repo={repo_location}", "extract", "test", "--debug", "--strip-components", "0"
-            )
+            res = cmd(remote_archiver, "extract", "test", "--debug", "--strip-components", "0")
             assert marker not in res

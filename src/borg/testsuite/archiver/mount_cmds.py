@@ -23,7 +23,6 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_mount_hardlinks(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
     _extract_hardlinks_setup(archiver)
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     # we need to get rid of permissions checking because fakeroot causes issues with it.
@@ -33,15 +32,15 @@ def test_fuse_mount_hardlinks(archivers, request):
         ignore_perms = ["-o", "ignore_permissions,defer_permissions"]
     else:
         ignore_perms = ["-o", "ignore_permissions"]
-    with fuse_mount(
-        archiver, repo_location, mountpoint, "-a", "test", "--strip-components=2", *ignore_perms
-    ), changedir(os.path.join(mountpoint, "test")):
+    with fuse_mount(archiver, mountpoint, "-a", "test", "--strip-components=2", *ignore_perms), changedir(
+        os.path.join(mountpoint, "test")
+    ):
         assert os.stat("hardlink").st_nlink == 2
         assert os.stat("subdir/hardlink").st_nlink == 2
         assert open("subdir/hardlink", "rb").read() == b"123456"
         assert os.stat("aaaa").st_nlink == 2
         assert os.stat("source2").st_nlink == 2
-    with fuse_mount(archiver, repo_location, mountpoint, "input/dir1", "-a", "test", *ignore_perms), changedir(
+    with fuse_mount(archiver, mountpoint, "input/dir1", "-a", "test", *ignore_perms), changedir(
         os.path.join(mountpoint, "test")
     ):
         assert os.stat("input/dir1/hardlink").st_nlink == 2
@@ -49,9 +48,7 @@ def test_fuse_mount_hardlinks(archivers, request):
         assert open("input/dir1/subdir/hardlink", "rb").read() == b"123456"
         assert os.stat("input/dir1/aaaa").st_nlink == 2
         assert os.stat("input/dir1/source2").st_nlink == 2
-    with fuse_mount(archiver, repo_location, mountpoint, "-a", "test", *ignore_perms), changedir(
-        os.path.join(mountpoint, "test")
-    ):
+    with fuse_mount(archiver, mountpoint, "-a", "test", *ignore_perms), changedir(os.path.join(mountpoint, "test")):
         assert os.stat("input/source").st_nlink == 4
         assert os.stat("input/abba").st_nlink == 4
         assert os.stat("input/dir1/hardlink").st_nlink == 4
@@ -64,7 +61,6 @@ def test_fuse(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.EXE and fakeroot_detected():
         pytest.skip("test_fuse with the binary is not compatible with fakeroot")
-    repo_location, input_path = archiver.repository_location, archiver.input_path
 
     def has_noatime(some_file):
         atime_before = os.stat(some_file).st_atime_ns
@@ -77,28 +73,28 @@ def test_fuse(archivers, request):
             noatime_used = flags_noatime != flags_normal
             return noatime_used and atime_before == atime_after
 
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    create_test_files(input_path)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    create_test_files(archiver.input_path)
     have_noatime = has_noatime("input/file1")
-    cmd(archiver, f"--repo={repo_location}", "create", "--exclude-nodump", "--atime", "archive", "input")
-    cmd(archiver, f"--repo={repo_location}", "create", "--exclude-nodump", "--atime", "archive2", "input")
+    cmd(archiver, "create", "--exclude-nodump", "--atime", "archive", "input")
+    cmd(archiver, "create", "--exclude-nodump", "--atime", "archive2", "input")
     if has_lchflags:
         # remove the file that we did not back up, so input and output become equal
         os.remove(os.path.join("input", "flagfile"))
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     # mount the whole repository, archive contents shall show up in archivename subdirectories of mountpoint:
-    with fuse_mount(archiver, repo_location, mountpoint):
+    with fuse_mount(archiver, mountpoint):
         # flags are not supported by the FUSE mount
         # we also ignore xattrs here, they are tested separately
         assert_dirs_equal(
-            input_path, os.path.join(mountpoint, "archive", "input"), ignore_flags=True, ignore_xattrs=True
+            archiver.input_path, os.path.join(mountpoint, "archive", "input"), ignore_flags=True, ignore_xattrs=True
         )
         assert_dirs_equal(
-            input_path, os.path.join(mountpoint, "archive2", "input"), ignore_flags=True, ignore_xattrs=True
+            archiver.input_path, os.path.join(mountpoint, "archive2", "input"), ignore_flags=True, ignore_xattrs=True
         )
-    with fuse_mount(archiver, repo_location, mountpoint, "-a", "archive"):
+    with fuse_mount(archiver, mountpoint, "-a", "archive"):
         assert_dirs_equal(
-            input_path, os.path.join(mountpoint, "archive", "input"), ignore_flags=True, ignore_xattrs=True
+            archiver.input_path, os.path.join(mountpoint, "archive", "input"), ignore_flags=True, ignore_xattrs=True
         )
         # regular file
         in_fn = "input/file1"
@@ -148,7 +144,7 @@ def test_fuse(archivers, request):
         try:
             in_fn = "input/fusexattr"
             out_fn = os.fsencode(os.path.join(mountpoint, "archive", "input", "fusexattr"))
-            if not xattr.XATTR_FAKEROOT and xattr.is_enabled(input_path):
+            if not xattr.XATTR_FAKEROOT and xattr.is_enabled(archiver.input_path):
                 assert sorted(no_selinux(xattr.listxattr(out_fn))) == [b"user.empty", b"user.foo"]
                 assert xattr.getxattr(out_fn, b"user.foo") == b"bar"
                 assert xattr.getxattr(out_fn, b"user.empty") == b""
@@ -171,19 +167,18 @@ def test_fuse(archivers, request):
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_versions_view(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    create_regular_file(input_path, "test", contents=b"first")
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "test", contents=b"first")
     if are_hardlinks_supported():
-        create_regular_file(input_path, "hardlink1", contents=b"123456")
+        create_regular_file(archiver.input_path, "hardlink1", contents=b"123456")
         os.link("input/hardlink1", "input/hardlink2")
         os.link("input/hardlink1", "input/hardlink3")
-    cmd(archiver, f"--repo={repo_location}", "create", "archive1", "input")
-    create_regular_file(input_path, "test", contents=b"second")
-    cmd(archiver, f"--repo={repo_location}", "create", "archive2", "input")
+    cmd(archiver, "create", "archive1", "input")
+    create_regular_file(archiver.input_path, "test", contents=b"second")
+    cmd(archiver, "create", "archive2", "input")
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     # mount the whole repository, archive contents shall show up in versioned view:
-    with fuse_mount(archiver, repo_location, mountpoint, "-o", "versions"):
+    with fuse_mount(archiver, mountpoint, "-o", "versions"):
         path = os.path.join(mountpoint, "input", "test")  # filename shows up as directory ...
         files = os.listdir(path)
         assert all(f.startswith("test.") for f in files)  # ... with files test.xxxxx in there
@@ -195,7 +190,7 @@ def test_fuse_versions_view(archivers, request):
             assert os.stat(hl1).st_ino == os.stat(hl2).st_ino == os.stat(hl3).st_ino
             assert open(hl3, "rb").read() == b"123456"
     # similar again, but exclude the 1st hardlink:
-    with fuse_mount(archiver, repo_location, mountpoint, "-o", "versions", "-e", "input/hardlink1"):
+    with fuse_mount(archiver, mountpoint, "-o", "versions", "-e", "input/hardlink1"):
         if are_hardlinks_supported():
             hl2 = os.path.join(mountpoint, "input", "hardlink2", "hardlink2.00001")
             hl3 = os.path.join(mountpoint, "input", "hardlink3", "hardlink3.00001")
@@ -206,11 +201,10 @@ def test_fuse_versions_view(archivers, request):
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_allow_damaged_files(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_src_archive(archiver, "archive")
     # Get rid of a chunk and repair it
-    archive, repository = open_archive(repo_path, "archive")
+    archive, repository = open_archive(archiver.repository_path, "archive")
     with repository:
         for item in archive.iter_items():
             if item.path.endswith(src_file):
@@ -220,49 +214,46 @@ def test_fuse_allow_damaged_files(archivers, request):
         else:
             assert False  # missed the file
         repository.commit(compact=False)
-    cmd(archiver, f"--repo={repo_location}", "check", "--repair", exit_code=0)
+    cmd(archiver, "check", "--repair", exit_code=0)
 
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
-    with fuse_mount(archiver, repo_location, mountpoint, "-a", "archive"):
+    with fuse_mount(archiver, mountpoint, "-a", "archive"):
         with pytest.raises(OSError) as excinfo:
             open(os.path.join(mountpoint, "archive", path))
         assert excinfo.value.errno == errno.EIO
-    with fuse_mount(archiver, repo_location, mountpoint, "-a", "archive", "-o", "allow_damaged_files"):
+    with fuse_mount(archiver, mountpoint, "-a", "archive", "-o", "allow_damaged_files"):
         open(os.path.join(mountpoint, "archive", path)).close()
 
 
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_mount_options(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_src_archive(archiver, "arch11")
     create_src_archive(archiver, "arch12")
     create_src_archive(archiver, "arch21")
     create_src_archive(archiver, "arch22")
-
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
-    with fuse_mount(archiver, repo_location, mountpoint, "--first=2", "--sort=name"):
+    with fuse_mount(archiver, mountpoint, "--first=2", "--sort=name"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch11", "arch12"]
-    with fuse_mount(archiver, repo_location, mountpoint, "--last=2", "--sort=name"):
+    with fuse_mount(archiver, mountpoint, "--last=2", "--sort=name"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch21", "arch22"]
-    with fuse_mount(archiver, repo_location, mountpoint, "--match-archives=sh:arch1*"):
+    with fuse_mount(archiver, mountpoint, "--match-archives=sh:arch1*"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch11", "arch12"]
-    with fuse_mount(archiver, repo_location, mountpoint, "--match-archives=sh:arch2*"):
+    with fuse_mount(archiver, mountpoint, "--match-archives=sh:arch2*"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch21", "arch22"]
-    with fuse_mount(archiver, repo_location, mountpoint, "--match-archives=sh:arch*"):
+    with fuse_mount(archiver, mountpoint, "--match-archives=sh:arch*"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch11", "arch12", "arch21", "arch22"]
-    with fuse_mount(archiver, repo_location, mountpoint, "--match-archives=nope"):
+    with fuse_mount(archiver, mountpoint, "--match-archives=nope"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == []
 
 
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_migrate_lock_alive(archivers, request):
+    """Both old_id and new_id must not be stale during lock migration / daemonization."""
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() == "remote":
         pytest.skip("only works locally")
-    repo_location = archiver.repository_location
-    """Both old_id and new_id must not be stale during lock migration / daemonization."""
     from functools import wraps
     import pickle
     import traceback
@@ -315,12 +306,12 @@ def test_migrate_lock_alive(archivers, request):
     # Decorate
     Lock.migrate_lock = write_assert_data(Lock.migrate_lock)
     try:
-        cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
+        cmd(archiver, "rcreate", "--encryption=none")
         create_src_archive(archiver, "arch")
         mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
         # In order that the decoration is kept for the borg mount process, we must not spawn, but actually fork;
         # not to be confused with the forking in borg.helpers.daemonize() which is done as well.
-        with fuse_mount(archiver, repo_location, mountpoint, os_fork=True):
+        with fuse_mount(archiver, mountpoint, os_fork=True):
             pass
         with open(assert_data_file, "rb") as _in:
             assert_data = pickle.load(_in)

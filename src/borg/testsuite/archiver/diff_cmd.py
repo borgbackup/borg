@@ -13,13 +13,12 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 def test_basic_functionality(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
     # Setup files for the first snapshot
-    create_regular_file(input_path, "empty", size=0)
-    create_regular_file(input_path, "file_unchanged", size=128)
-    create_regular_file(input_path, "file_removed", size=256)
-    create_regular_file(input_path, "file_removed2", size=512)
-    create_regular_file(input_path, "file_replaced", size=1024)
+    create_regular_file(archiver.input_path, "empty", size=0)
+    create_regular_file(archiver.input_path, "file_unchanged", size=128)
+    create_regular_file(archiver.input_path, "file_removed", size=256)
+    create_regular_file(archiver.input_path, "file_removed2", size=512)
+    create_regular_file(archiver.input_path, "file_replaced", size=1024)
     os.mkdir("input/dir_replaced_with_file")
     os.chmod("input/dir_replaced_with_file", stat.S_IFDIR | 0o755)
     os.mkdir("input/dir_removed")
@@ -35,18 +34,18 @@ def test_basic_functionality(archivers, request):
         os.link("input/empty", "input/hardlink_contents_changed")
         os.link("input/file_removed", "input/hardlink_removed")
         os.link("input/file_removed2", "input/hardlink_target_removed")
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     # Create the first snapshot
-    cmd(archiver, f"--repo={repo_location}", "create", "test0", "input")
+    cmd(archiver, "create", "test0", "input")
     # Setup files for the second snapshot
-    create_regular_file(input_path, "file_added", size=2048)
-    create_regular_file(input_path, "file_empty_added", size=0)
+    create_regular_file(archiver.input_path, "file_added", size=2048)
+    create_regular_file(archiver.input_path, "file_empty_added", size=0)
     os.unlink("input/file_replaced")
-    create_regular_file(input_path, "file_replaced", contents=b"0" * 4096)
+    create_regular_file(archiver.input_path, "file_replaced", contents=b"0" * 4096)
     os.unlink("input/file_removed")
     os.unlink("input/file_removed2")
     os.rmdir("input/dir_replaced_with_file")
-    create_regular_file(input_path, "dir_replaced_with_file", size=8192)
+    create_regular_file(archiver.input_path, "dir_replaced_with_file", size=8192)
     os.chmod("input/dir_replaced_with_file", stat.S_IFREG | 0o755)
     os.mkdir("input/dir_added")
     os.rmdir("input/dir_removed")
@@ -57,7 +56,7 @@ def test_basic_functionality(archivers, request):
         os.symlink("input/dir_added", "input/link_changed")
         os.symlink("input/dir_added", "input/link_added")
         os.unlink("input/link_replaced_by_file")
-        create_regular_file(input_path, "link_replaced_by_file", size=16384)
+        create_regular_file(archiver.input_path, "link_replaced_by_file", size=16384)
         os.unlink("input/link_removed")
     if are_hardlinks_supported():
         os.unlink("input/hardlink_removed")
@@ -65,8 +64,8 @@ def test_basic_functionality(archivers, request):
     with open("input/empty", "ab") as fd:
         fd.write(b"appended_data")
     # Create the second snapshot
-    cmd(archiver, f"--repo={repo_location}", "create", "test1a", "input")
-    cmd(archiver, f"--repo={repo_location}", "create", "test1b", "input", "--chunker-params", "16,18,17,4095")
+    cmd(archiver, "create", "test1a", "input")
+    cmd(archiver, "create", "test1b", "input", "--chunker-params", "16,18,17,4095")
 
     def do_asserts(output, can_compare_ids, content_only=False):
         lines: list = output.splitlines()
@@ -218,27 +217,25 @@ def test_basic_functionality(archivers, request):
             # its ctime. This should not be reflected in the output if content-only is set
             assert not any(get_changes("input/hardlink_target_replaced", joutput))
 
-    output = cmd(archiver, f"--repo={repo_location}", "diff", "test0", "test1a")
+    output = cmd(archiver, "diff", "test0", "test1a")
     do_asserts(output, True)
 
     # We expect exit_code=1 due to the chunker params warning
-    output = cmd(archiver, f"--repo={repo_location}", "diff", "test0", "test1b", "--content-only", exit_code=1)
+    output = cmd(archiver, "diff", "test0", "test1b", "--content-only", exit_code=1)
     do_asserts(output, False, content_only=True)
 
-    output = cmd(archiver, f"--repo={repo_location}", "diff", "test0", "test1a", "--json-lines")
+    output = cmd(archiver, "diff", "test0", "test1a", "--json-lines")
     do_json_asserts(output, True)
 
-    output = cmd(archiver, f"--repo={repo_location}", "diff", "test0", "test1a", "--json-lines", "--content-only")
+    output = cmd(archiver, "diff", "test0", "test1a", "--json-lines", "--content-only")
     do_json_asserts(output, True, content_only=True)
 
 
 def test_time_diffs(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    create_regular_file(input_path, "test_file", size=10)
-    cmd(archiver, f"--repo={repo_location}", "create", "archive1", "input")
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "test_file", size=10)
+    cmd(archiver, "create", "archive1", "input")
     time.sleep(0.1)
     os.unlink("input/test_file")
     if is_win32:
@@ -246,21 +243,17 @@ def test_time_diffs(archivers, request):
         time.sleep(15)
     elif is_darwin:
         time.sleep(1)  # HFS has a 1s timestamp granularity
-    create_regular_file(input_path, "test_file", size=15)
-    cmd(archiver, f"--repo={repo_location}", "create", "archive2", "input")
-    output = cmd(
-        archiver, f"--repo={repo_location}", "diff", "archive1", "archive2", "--format", "'{mtime}{ctime} {path}{NL}'"
-    )
+    create_regular_file(archiver.input_path, "test_file", size=15)
+    cmd(archiver, "create", "archive2", "input")
+    output = cmd(archiver, "diff", "archive1", "archive2", "--format", "'{mtime}{ctime} {path}{NL}'")
     assert "mtime" in output
     assert "ctime" in output  # Should show up on Windows as well since it is a new file.
 
     if is_darwin:
         time.sleep(1)  # HFS has a 1s timestamp granularity
     os.chmod("input/test_file", 0o777)
-    cmd(archiver, f"--repo={repo_location}", "create", "archive3", "input")
-    output = cmd(
-        archiver, f"--repo={repo_location}", "diff", "archive2", "archive3", "--format", "'{mtime}{ctime} {path}{NL}'"
-    )
+    cmd(archiver, "create", "archive3", "input")
+    output = cmd(archiver, "diff", "archive2", "archive3", "--format", "'{mtime}{ctime} {path}{NL}'")
     assert "mtime" not in output
     # Checking platform because ctime should not be shown on Windows since it wasn't recreated.
     if not is_win32:
@@ -271,26 +264,25 @@ def test_time_diffs(archivers, request):
 
 def test_sort_option(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
 
-    create_regular_file(input_path, "a_file_removed", size=8)
-    create_regular_file(input_path, "f_file_removed", size=16)
-    create_regular_file(input_path, "c_file_changed", size=32)
-    create_regular_file(input_path, "e_file_changed", size=64)
-    cmd(archiver, f"--repo={repo_location}", "create", "test0", "input")
+    create_regular_file(archiver.input_path, "a_file_removed", size=8)
+    create_regular_file(archiver.input_path, "f_file_removed", size=16)
+    create_regular_file(archiver.input_path, "c_file_changed", size=32)
+    create_regular_file(archiver.input_path, "e_file_changed", size=64)
+    cmd(archiver, "create", "test0", "input")
 
     os.unlink("input/a_file_removed")
     os.unlink("input/f_file_removed")
     os.unlink("input/c_file_changed")
     os.unlink("input/e_file_changed")
-    create_regular_file(input_path, "c_file_changed", size=512)
-    create_regular_file(input_path, "e_file_changed", size=1024)
-    create_regular_file(input_path, "b_file_added", size=128)
-    create_regular_file(input_path, "d_file_added", size=256)
-    cmd(archiver, f"--repo={repo_location}", "create", "test1", "input")
+    create_regular_file(archiver.input_path, "c_file_changed", size=512)
+    create_regular_file(archiver.input_path, "e_file_changed", size=1024)
+    create_regular_file(archiver.input_path, "b_file_added", size=128)
+    create_regular_file(archiver.input_path, "d_file_added", size=256)
+    cmd(archiver, "create", "test1", "input")
 
-    output = cmd(archiver, f"--repo={repo_location}", "diff", "test0", "test1", "--sort", "--content-only")
+    output = cmd(archiver, "diff", "test0", "test1", "--sort", "--content-only")
     expected = ["a_file_removed", "b_file_added", "c_file_changed", "d_file_added", "e_file_changed", "f_file_removed"]
     assert isinstance(output, str)
     outputs = output.splitlines()

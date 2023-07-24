@@ -80,7 +80,6 @@ def test_readonly_extract(archiver):
 def test_readonly_info(archiver):
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_src_archive(archiver, "test")
-
     with read_only(archiver.repository_path):
         # verify that command normally doesn't work with read-only repo
         if archiver.FORK_DEFAULT:
@@ -97,7 +96,6 @@ def test_readonly_info(archiver):
 def test_readonly_list(archiver):
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_src_archive(archiver, "test")
-
     with read_only(archiver.repository_path):
         # verify that command normally doesn't work with read-only repo
         if archiver.FORK_DEFAULT:
@@ -115,19 +113,18 @@ def test_readonly_list(archiver):
 def test_readonly_mount(archiver):
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_src_archive(archiver, "test")
-
     with read_only(archiver.repository_path):
         # verify that command normally doesn't work with read-only repo
         if archiver.FORK_DEFAULT:
-            with fuse_mount(archiver, archiver.repository_location, exit_code=EXIT_ERROR):
+            with fuse_mount(archiver, exit_code=EXIT_ERROR):
                 pass
         else:
             with pytest.raises((LockFailed, RemoteRepository.RPCError)) as excinfo:
                 # self.fuse_mount always assumes fork=True, so for this test we have to set fork=False manually
-                with fuse_mount(archiver, archiver.repository_location, fork=False):
+                with fuse_mount(archiver, fork=False):
                     pass
             if isinstance(excinfo.value, RemoteRepository.RPCError):
                 assert excinfo.value.exception_class == "LockFailed"
         # verify that command works with read-only repo when using --bypass-lock
-        with fuse_mount(archiver, archiver.repository_location, None, "--bypass-lock"):
+        with fuse_mount(archiver, None, "--bypass-lock"):
             pass

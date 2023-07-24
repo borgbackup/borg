@@ -483,7 +483,7 @@ def wait_for_mountstate(mountpoint, *, mounted, timeout=5):
 
 
 @contextmanager
-def fuse_mount(archiver, location, mountpoint=None, *options, fork=True, os_fork=False, **kwargs):
+def fuse_mount(archiver, mountpoint=None, *options, fork=True, os_fork=False, **kwargs):
     # For a successful mount, `fork = True` is required for
     # the borg mount daemon to work properly or the tests
     # will just freeze. Therefore, if argument `fork` is not
@@ -502,7 +502,7 @@ def fuse_mount(archiver, location, mountpoint=None, *options, fork=True, os_fork
         mountpoint = tempfile.mkdtemp()
     else:
         os.mkdir(mountpoint)
-    args = [f"--repo={location}", "mount", mountpoint] + list(options)
+    args = ["mount", mountpoint] + list(options)
     if os_fork:
         # Do not spawn, but actually (OS) fork.
         if os.fork() == 0:

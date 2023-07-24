@@ -15,39 +15,38 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 def test_transfer(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
+    original_location, input_path = archiver.repository_location, archiver.input_path
 
-    def check_repo(repo_option):
-        listing = cmd(archiver, repo_option, "rlist", "--short")
+    def check_repo():
+        listing = cmd(archiver, "rlist", "--short")
         assert "arch1" in listing
         assert "arch2" in listing
-        listing = cmd(archiver, repo_option, "list", "--short", "arch1")
+        listing = cmd(archiver, "list", "--short", "arch1")
         assert "file1" in listing
         assert "dir2/file2" in listing
-        cmd(archiver, repo_option, "check")
+        cmd(archiver, "check")
 
     create_test_files(input_path)
-    repo1 = f"--repo={repo_location}1"
-    repo2 = f"--repo={repo_location}2"
-    other_repo1 = f"--other-repo={repo_location}1"
+    archiver.repository_location = original_location + "1"
 
-    cmd(archiver, repo1, "rcreate", RK_ENCRYPTION)
-    cmd(archiver, repo1, "create", "arch1", "input")
-    cmd(archiver, repo1, "create", "arch2", "input")
-    check_repo(repo1)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "arch1", "input")
+    cmd(archiver, "create", "arch2", "input")
+    check_repo()
 
-    cmd(archiver, repo2, "rcreate", RK_ENCRYPTION, other_repo1)
-    cmd(archiver, repo2, "transfer", other_repo1, "--dry-run")
-    cmd(archiver, repo2, "transfer", other_repo1)
-    cmd(archiver, repo2, "transfer", other_repo1, "--dry-run")
-    check_repo(repo2)
+    archiver.repository_location = original_location + "2"
+    other_repo1 = f"--other-repo={original_location}1"
+    cmd(archiver, "rcreate", RK_ENCRYPTION, other_repo1)
+    cmd(archiver, "transfer", other_repo1, "--dry-run")
+    cmd(archiver, "transfer", other_repo1)
+    cmd(archiver, "transfer", other_repo1, "--dry-run")
+    check_repo()
 
 
 def test_transfer_upgrade(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() in ["remote", "binary"]:
         pytest.skip("only works locally")
-    repo_location = archiver.repository_location
 
     # test upgrading a borg 1.2 repo to borg 2
     # testing using json is a bit problematic because parseformat (used for json dumping)
@@ -64,23 +63,24 @@ def test_transfer_upgrade(archivers, request):
         ts = parse_timestamp(local_naive + tzoffset)
         return ts.astimezone(tzinfo).isoformat(timespec="microseconds")
 
-    dst_dir = f"{repo_location}1"
+    original_location = archiver.repository_location
+    dst_dir = f"{original_location}1"
     os.makedirs(dst_dir)
     with tarfile.open(repo12_tar) as tf:
         tf.extractall(dst_dir)
 
-    other_repo1 = f"--other-repo={repo_location}1"
-    repo2 = f"--repo={repo_location}2"
+    other_repo1 = f"--other-repo={original_location}1"
+    archiver.repository_location = original_location + "2"
 
     assert os.environ.get("BORG_PASSPHRASE") == "waytooeasyonlyfortests"
     os.environ["BORG_TESTONLY_WEAKEN_KDF"] = "0"  # must use the strong kdf here or it can't decrypt the key
 
-    cmd(archiver, repo2, "rcreate", RK_ENCRYPTION, other_repo1)
-    cmd(archiver, repo2, "transfer", other_repo1, "--upgrader=From12To20")
-    cmd(archiver, repo2, "check")
+    cmd(archiver, "rcreate", RK_ENCRYPTION, other_repo1)
+    cmd(archiver, "transfer", other_repo1, "--upgrader=From12To20")
+    cmd(archiver, "check")
 
     # check list of archives / manifest
-    rlist_json = cmd(archiver, repo2, "rlist", "--json")
+    rlist_json = cmd(archiver, "rlist", "--json")
     got = json.loads(rlist_json)
     with open(os.path.join(dst_dir, "test_meta", "repo_list.json")) as f:
         expected = json.load(f)
@@ -109,7 +109,7 @@ def test_transfer_upgrade(archivers, request):
     for archive in got["archives"]:
         name = archive["name"]
         # check archive contents
-        list_json = cmd(archiver, repo2, "list", "--json-lines", name)
+        list_json = cmd(archiver, "list", "--json-lines", name)
         got = [json.loads(line) for line in list_json.splitlines()]
         with open(os.path.join(dst_dir, "test_meta", f"{name}_list.json")) as f:
             lines = f.read()
@@ -179,7 +179,7 @@ def test_transfer_upgrade(archivers, request):
             # hardlinks referring to same inode have same hlid
             assert hardlinks["tmp/borgtest/hardlink1"] == hardlinks["tmp/borgtest/hardlink2"]
 
-    repo_path = f"{repo_location}2"
+    repo_path = f"{original_location}2"
     for archive_name in ("archive1", "archive2"):
         archive, repository = open_archive(repo_path, archive_name)
         with repository:

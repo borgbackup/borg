@@ -10,8 +10,6 @@ from . import create_regular_file, cmd, RK_ENCRYPTION
 
 
 def test_rcompress(archiver):
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-
     def check_compression(ctype, clevel, olevel):
         """check if all the chunks in the repo are compressed/obfuscated like expected"""
         repository = Repository(archiver.repository_path, exclusive=True)
@@ -47,38 +45,38 @@ def test_rcompress(archiver):
                         assert "psize" not in meta
                         assert "olevel" not in meta
 
-    create_regular_file(input_path, "file1", size=1024 * 10)
-    create_regular_file(input_path, "file2", contents=os.urandom(1024 * 10))
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 10)
+    create_regular_file(archiver.input_path, "file2", contents=os.urandom(1024 * 10))
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
 
     cname, ctype, clevel, olevel = ZLIB.name, ZLIB.ID, 3, -1
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input", "-C", f"{cname},{clevel}")
+    cmd(archiver, "create", "test", "input", "-C", f"{cname},{clevel}")
     check_compression(ctype, clevel, olevel)
 
     cname, ctype, clevel, olevel = ZSTD.name, ZSTD.ID, 1, -1  # change compressor (and level)
-    cmd(archiver, f"--repo={repo_location}", "rcompress", "-C", f"{cname},{clevel}")
+    cmd(archiver, "rcompress", "-C", f"{cname},{clevel}")
     check_compression(ctype, clevel, olevel)
 
     cname, ctype, clevel, olevel = ZSTD.name, ZSTD.ID, 3, -1  # only change level
-    cmd(archiver, f"--repo={repo_location}", "rcompress", "-C", f"{cname},{clevel}")
+    cmd(archiver, "rcompress", "-C", f"{cname},{clevel}")
     check_compression(ctype, clevel, olevel)
 
     cname, ctype, clevel, olevel = ZSTD.name, ZSTD.ID, 3, 110  # only change to obfuscated
-    cmd(archiver, f"--repo={repo_location}", "rcompress", "-C", f"obfuscate,{olevel},{cname},{clevel}")
+    cmd(archiver, "rcompress", "-C", f"obfuscate,{olevel},{cname},{clevel}")
     check_compression(ctype, clevel, olevel)
 
     cname, ctype, clevel, olevel = ZSTD.name, ZSTD.ID, 3, 112  # only change obfuscation level
-    cmd(archiver, f"--repo={repo_location}", "rcompress", "-C", f"obfuscate,{olevel},{cname},{clevel}")
+    cmd(archiver, "rcompress", "-C", f"obfuscate,{olevel},{cname},{clevel}")
     check_compression(ctype, clevel, olevel)
 
     cname, ctype, clevel, olevel = ZSTD.name, ZSTD.ID, 3, -1  # change to not obfuscated
-    cmd(archiver, f"--repo={repo_location}", "rcompress", "-C", f"{cname},{clevel}")
+    cmd(archiver, "rcompress", "-C", f"{cname},{clevel}")
     check_compression(ctype, clevel, olevel)
 
     cname, ctype, clevel, olevel = ZLIB.name, ZLIB.ID, 1, -1
-    cmd(archiver, f"--repo={repo_location}", "rcompress", "-C", f"auto,{cname},{clevel}")
+    cmd(archiver, "rcompress", "-C", f"auto,{cname},{clevel}")
     check_compression(ctype, clevel, olevel)
 
     cname, ctype, clevel, olevel = ZLIB.name, ZLIB.ID, 2, 111
-    cmd(archiver, f"--repo={repo_location}", "rcompress", "-C", f"obfuscate,{olevel},auto,{cname},{clevel}")
+    cmd(archiver, "rcompress", "-C", f"obfuscate,{olevel},auto,{cname},{clevel}")
     check_compression(ctype, clevel, olevel)

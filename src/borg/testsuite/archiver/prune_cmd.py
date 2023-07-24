@@ -10,7 +10,6 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 def _create_archive_ts(archiver, name, y, m, d, H=0, M=0, S=0):
     cmd(
         archiver,
-        f"--repo={archiver.repository_location}",
         "create",
         "--timestamp",
         datetime(y, m, d, H, M, S, 0).strftime(ISO_FORMAT_NO_USECS),  # naive == local time / local tz
@@ -21,28 +20,27 @@ def _create_archive_ts(archiver, name, y, m, d, H=0, M=0, S=0):
 
 def test_prune_repository(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "test1", src_dir)
-    cmd(archiver, f"--repo={repo_location}", "create", "test2", src_dir)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", src_dir)
+    cmd(archiver, "create", "test2", src_dir)
     # these are not really a checkpoints, but they look like some:
-    cmd(archiver, f"--repo={repo_location}", "create", "test3.checkpoint", src_dir)
-    cmd(archiver, f"--repo={repo_location}", "create", "test3.checkpoint.1", src_dir)
-    cmd(archiver, f"--repo={repo_location}", "create", "test4.checkpoint", src_dir)
-    output = cmd(archiver, f"--repo={repo_location}", "prune", "--list", "--dry-run", "--keep-daily=1")
+    cmd(archiver, "create", "test3.checkpoint", src_dir)
+    cmd(archiver, "create", "test3.checkpoint.1", src_dir)
+    cmd(archiver, "create", "test4.checkpoint", src_dir)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1")
     assert re.search(r"Would prune:\s+test1", output)
     # must keep the latest non-checkpoint archive:
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+test2", output)
     # must keep the latest checkpoint archive:
     assert re.search(r"Keeping checkpoint archive:\s+test4.checkpoint", output)
-    output = cmd(archiver, f"--repo={repo_location}", "rlist", "--consider-checkpoints")
+    output = cmd(archiver, "rlist", "--consider-checkpoints")
     assert "test1" in output
     assert "test2" in output
     assert "test3.checkpoint" in output
     assert "test3.checkpoint.1" in output
     assert "test4.checkpoint" in output
-    cmd(archiver, f"--repo={repo_location}", "prune", "--keep-daily=1")
-    output = cmd(archiver, f"--repo={repo_location}", "rlist", "--consider-checkpoints")
+    cmd(archiver, "prune", "--keep-daily=1")
+    output = cmd(archiver, "rlist", "--consider-checkpoints")
     assert "test1" not in output
     # the latest non-checkpoint archive must be still there:
     assert "test2" in output
@@ -51,9 +49,9 @@ def test_prune_repository(archivers, request):
     assert "test3.checkpoint.1" not in output
     assert "test4.checkpoint" in output
     # now we supersede the latest checkpoint by a successful backup:
-    cmd(archiver, f"--repo={repo_location}", "create", "test5", src_dir)
-    cmd(archiver, f"--repo={repo_location}", "prune", "--keep-daily=2")
-    output = cmd(archiver, f"--repo={repo_location}", "rlist", "--consider-checkpoints")
+    cmd(archiver, "create", "test5", src_dir)
+    cmd(archiver, "prune", "--keep-daily=2")
+    output = cmd(archiver, "rlist", "--consider-checkpoints")
     # all checkpoints should be gone now:
     assert "checkpoint" not in output
     # the latest archive must be still there
@@ -63,8 +61,7 @@ def test_prune_repository(archivers, request):
 # This test must match docs/misc/prune-example.txt
 def test_prune_repository_example(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     # Archives that will be kept, per the example
     # Oldest archive
     _create_archive_ts(archiver, "test01", 2015, 1, 1)
@@ -97,16 +94,7 @@ def test_prune_repository_example(archivers, request):
     _create_archive_ts(archiver, "test23", 2015, 5, 31)
     # The next older daily backup
     _create_archive_ts(archiver, "test24", 2015, 12, 16)
-    output = cmd(
-        archiver,
-        f"--repo={repo_location}",
-        "prune",
-        "--list",
-        "--dry-run",
-        "--keep-daily=14",
-        "--keep-monthly=6",
-        "--keep-yearly=1",
-    )
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=14", "--keep-monthly=6", "--keep-yearly=1")
     # Prune second backup of the year
     assert re.search(r"Would prune:\s+test22", output)
     # Prune next older monthly and daily backups
@@ -119,12 +107,12 @@ def test_prune_repository_example(archivers, request):
         assert re.search(r"Keeping archive \(rule: monthly #" + str(i) + r"\):\s+test" + ("%02d" % (8 - i)), output)
     for i in range(1, 15):
         assert re.search(r"Keeping archive \(rule: daily #" + str(i) + r"\):\s+test" + ("%02d" % (22 - i)), output)
-    output = cmd(archiver, f"--repo={repo_location}", "rlist")
+    output = cmd(archiver, "rlist")
     # Nothing pruned after dry run
     for i in range(1, 25):
         assert "test%02d" % i in output
-    cmd(archiver, f"--repo={repo_location}", "prune", "--keep-daily=14", "--keep-monthly=6", "--keep-yearly=1")
-    output = cmd(archiver, f"--repo={repo_location}", "rlist")
+    cmd(archiver, "prune", "--keep-daily=14", "--keep-monthly=6", "--keep-yearly=1")
+    output = cmd(archiver, "rlist")
     # All matching backups plus oldest kept
     for i in range(1, 22):
         assert "test%02d" % i in output
@@ -136,60 +124,46 @@ def test_prune_repository_example(archivers, request):
 # With an initial and daily backup, prune daily until oldest is replaced by a monthly backup
 def test_prune_retain_and_expire_oldest(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     # Initial backup
     _create_archive_ts(archiver, "original_archive", 2020, 9, 1, 11, 15)
     # Archive and prune daily for 30 days
     for i in range(1, 31):
         _create_archive_ts(archiver, "september%02d" % i, 2020, 9, i, 12)
-        cmd(archiver, f"--repo={repo_location}", "prune", "--keep-daily=7", "--keep-monthly=1")
+        cmd(archiver, "prune", "--keep-daily=7", "--keep-monthly=1")
     # Archive and prune 6 days into the next month
     for i in range(1, 7):
         _create_archive_ts(archiver, "october%02d" % i, 2020, 10, i, 12)
-        cmd(archiver, f"--repo={repo_location}", "prune", "--keep-daily=7", "--keep-monthly=1")
+        cmd(archiver, "prune", "--keep-daily=7", "--keep-monthly=1")
     # Oldest backup is still retained
-    output = cmd(
-        archiver, f"--repo={repo_location}", "prune", "--list", "--dry-run", "--keep-daily=7", "--keep-monthly=1"
-    )
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=7", "--keep-monthly=1")
     assert re.search(r"Keeping archive \(rule: monthly\[oldest\] #1" + r"\):\s+original_archive", output)
     # Archive one more day and prune.
     _create_archive_ts(archiver, "october07", 2020, 10, 7, 12)
-    cmd(archiver, f"--repo={repo_location}", "prune", "--keep-daily=7", "--keep-monthly=1")
+    cmd(archiver, "prune", "--keep-daily=7", "--keep-monthly=1")
     # Last day of previous month is retained as monthly, and oldest is expired.
-    output = cmd(
-        archiver, f"--repo={repo_location}", "prune", "--list", "--dry-run", "--keep-daily=7", "--keep-monthly=1"
-    )
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=7", "--keep-monthly=1")
     assert re.search(r"Keeping archive \(rule: monthly #1\):\s+september30", output)
     assert "original_archive" not in output
 
 
 def test_prune_repository_prefix(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "foo-2015-08-12-10:00", src_dir)
-    cmd(archiver, f"--repo={repo_location}", "create", "foo-2015-08-12-20:00", src_dir)
-    cmd(archiver, f"--repo={repo_location}", "create", "bar-2015-08-12-10:00", src_dir)
-    cmd(archiver, f"--repo={repo_location}", "create", "bar-2015-08-12-20:00", src_dir)
-    output = cmd(
-        archiver,
-        f"--repo={repo_location}",
-        "prune",
-        "--list",
-        "--dry-run",
-        "--keep-daily=1",
-        "--match-archives=sh:foo-*",
-    )
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "foo-2015-08-12-10:00", src_dir)
+    cmd(archiver, "create", "foo-2015-08-12-20:00", src_dir)
+    cmd(archiver, "create", "bar-2015-08-12-10:00", src_dir)
+    cmd(archiver, "create", "bar-2015-08-12-20:00", src_dir)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1", "--match-archives=sh:foo-*")
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+foo-2015-08-12-20:00", output)
     assert re.search(r"Would prune:\s+foo-2015-08-12-10:00", output)
-    output = cmd(archiver, f"--repo={repo_location}", "rlist")
+    output = cmd(archiver, "rlist")
     assert "foo-2015-08-12-10:00" in output
     assert "foo-2015-08-12-20:00" in output
     assert "bar-2015-08-12-10:00" in output
     assert "bar-2015-08-12-20:00" in output
-    cmd(archiver, f"--repo={repo_location}", "prune", "--keep-daily=1", "--match-archives=sh:foo-*")
-    output = cmd(archiver, f"--repo={repo_location}", "rlist")
+    cmd(archiver, "prune", "--keep-daily=1", "--match-archives=sh:foo-*")
+    output = cmd(archiver, "rlist")
     assert "foo-2015-08-12-10:00" not in output
     assert "foo-2015-08-12-20:00" in output
     assert "bar-2015-08-12-10:00" in output
@@ -198,30 +172,21 @@ def test_prune_repository_prefix(archivers, request):
 
 def test_prune_repository_glob(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "2015-08-12-10:00-foo", src_dir)
-    cmd(archiver, f"--repo={repo_location}", "create", "2015-08-12-20:00-foo", src_dir)
-    cmd(archiver, f"--repo={repo_location}", "create", "2015-08-12-10:00-bar", src_dir)
-    cmd(archiver, f"--repo={repo_location}", "create", "2015-08-12-20:00-bar", src_dir)
-    output = cmd(
-        archiver,
-        f"--repo={repo_location}",
-        "prune",
-        "--list",
-        "--dry-run",
-        "--keep-daily=1",
-        "--match-archives=sh:2015-*-foo",
-    )
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "2015-08-12-10:00-foo", src_dir)
+    cmd(archiver, "create", "2015-08-12-20:00-foo", src_dir)
+    cmd(archiver, "create", "2015-08-12-10:00-bar", src_dir)
+    cmd(archiver, "create", "2015-08-12-20:00-bar", src_dir)
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1", "--match-archives=sh:2015-*-foo")
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+2015-08-12-20:00-foo", output)
     assert re.search(r"Would prune:\s+2015-08-12-10:00-foo", output)
-    output = cmd(archiver, f"--repo={repo_location}", "rlist")
+    output = cmd(archiver, "rlist")
     assert "2015-08-12-10:00-foo" in output
     assert "2015-08-12-20:00-foo" in output
     assert "2015-08-12-10:00-bar" in output
     assert "2015-08-12-20:00-bar" in output
-    cmd(archiver, f"--repo={repo_location}", "prune", "--keep-daily=1", "--match-archives=sh:2015-*-foo")
-    output = cmd(archiver, f"--repo={repo_location}", "rlist")
+    cmd(archiver, "prune", "--keep-daily=1", "--match-archives=sh:2015-*-foo")
+    output = cmd(archiver, "rlist")
     assert "2015-08-12-10:00-foo" not in output
     assert "2015-08-12-20:00-foo" in output
     assert "2015-08-12-10:00-bar" in output

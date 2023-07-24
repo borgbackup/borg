@@ -27,13 +27,11 @@ requires_gzip = pytest.mark.skipif(not shutil.which("gzip"), reason="gzip must b
 @requires_gnutar
 def test_export_tar(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-    create_test_files(input_path)
+    create_test_files(archiver.input_path)
     os.unlink("input/flagfile")
-
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
-    cmd(archiver, f"--repo={repo_location}", "export-tar", "test", "simple.tar", "--progress", "--tar-format=GNU")
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    cmd(archiver, "export-tar", "test", "simple.tar", "--progress", "--tar-format=GNU")
     with changedir("output"):
         # This probably assumes GNU tar. Note -p switch to extract permissions regardless of umask.
         subprocess.check_call(["tar", "xpf", "../simple.tar", "--warning=no-timestamp"])
@@ -44,18 +42,13 @@ def test_export_tar(archivers, request):
 @requires_gzip
 def test_export_tar_gz(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-    create_test_files(input_path)
+    create_test_files(archiver.input_path)
     os.unlink("input/flagfile")
-
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
-    test_list = cmd(
-        archiver, f"--repo={repo_location}", "export-tar", "test", "simple.tar.gz", "--list", "--tar-format=GNU"
-    )
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    test_list = cmd(archiver, "export-tar", "test", "simple.tar.gz", "--list", "--tar-format=GNU")
     assert "input/file1\n" in test_list
     assert "input/dir2\n" in test_list
-
     with changedir("output"):
         subprocess.check_call(["tar", "xpf", "../simple.tar.gz", "--warning=no-timestamp"])
     assert_dirs_equal("input", "output/input", ignore_flags=True, ignore_xattrs=True, ignore_ns=True)
@@ -65,26 +58,14 @@ def test_export_tar_gz(archivers, request):
 @requires_gzip
 def test_export_tar_strip_components(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-    create_test_files(input_path)
+    create_test_files(archiver.input_path)
     os.unlink("input/flagfile")
-
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
-    test_list = cmd(
-        archiver,
-        f"--repo={repo_location}",
-        "export-tar",
-        "test",
-        "simple.tar",
-        "--strip-components=1",
-        "--list",
-        "--tar-format=GNU",
-    )
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    test_list = cmd(archiver, "export-tar", "test", "simple.tar", "--strip-components=1", "--list", "--tar-format=GNU")
     # --list's path are those before processing with --strip-components
     assert "input/file1\n" in test_list
     assert "input/dir2\n" in test_list
-
     with changedir("output"):
         subprocess.check_call(["tar", "xpf", "../simple.tar", "--warning=no-timestamp"])
     assert_dirs_equal("input", "output/", ignore_flags=True, ignore_xattrs=True, ignore_ns=True)
@@ -94,19 +75,8 @@ def test_export_tar_strip_components(archivers, request):
 @requires_gnutar
 def test_export_tar_strip_components_links(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
     _extract_hardlinks_setup(archiver)
-
-    cmd(
-        archiver,
-        f"--repo={repo_location}",
-        "export-tar",
-        "test",
-        "output.tar",
-        "--strip-components=2",
-        "--tar-format=GNU",
-    )
-
+    cmd(archiver, "export-tar", "test", "output.tar", "--strip-components=2", "--tar-format=GNU")
     with changedir("output"):
         subprocess.check_call(["tar", "xpf", "../output.tar", "--warning=no-timestamp"])
         assert os.stat("hardlink").st_nlink == 2
@@ -119,11 +89,8 @@ def test_export_tar_strip_components_links(archivers, request):
 @requires_gnutar
 def test_extract_hardlinks_tar(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
     _extract_hardlinks_setup(archiver)
-
-    cmd(archiver, f"--repo={repo_location}", "export-tar", "test", "output.tar", "input/dir1", "--tar-format=GNU")
-
+    cmd(archiver, "export-tar", "test", "output.tar", "input/dir1", "--tar-format=GNU")
     with changedir("output"):
         subprocess.check_call(["tar", "xpf", "../output.tar", "--warning=no-timestamp"])
         assert os.stat("input/dir1/hardlink").st_nlink == 2
@@ -134,23 +101,19 @@ def test_extract_hardlinks_tar(archivers, request):
 
 def test_import_tar(archivers, request, tar_format="PAX"):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path, output_path = archiver.repository_location, archiver.input_path, archiver.output_path
-    create_test_files(input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
     os.unlink("input/flagfile")
-
-    cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
-    cmd(archiver, f"--repo={repo_location}", "create", "src", "input")
-    cmd(archiver, f"--repo={repo_location}", "export-tar", "src", "simple.tar", f"--tar-format={tar_format}")
-    cmd(archiver, f"--repo={repo_location}", "import-tar", "dst", "simple.tar")
-
-    with changedir(output_path):
-        cmd(archiver, f"--repo={repo_location}", "extract", "dst")
+    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "export-tar", "src", "simple.tar", f"--tar-format={tar_format}")
+    cmd(archiver, "import-tar", "dst", "simple.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
     assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
 
 
 def test_import_unusual_tar(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
 
     # Contains these, unusual entries:
     # /foobar
@@ -159,51 +122,44 @@ def test_import_unusual_tar(archivers, request):
     # ./foo//bar
     # ./
     tar_archive = os.path.join(os.path.dirname(__file__), "unusual_paths.tar")
-
-    cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
-    cmd(archiver, f"--repo={repo_location}", "import-tar", "dst", tar_archive)
-    files = cmd(archiver, f"--repo={repo_location}", "list", "dst", "--format", "{path}{NL}").splitlines()
+    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "import-tar", "dst", tar_archive)
+    files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
     assert set(files) == {"foobar", "bar", "foo2", "foo/bar", "."}
 
 
 def test_import_tar_with_dotdot(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
     if archiver.EXE:  # the test checks for a raised exception. that can't work if the code runs in a separate process.
         pytest.skip("does not work with binaries")
 
     # Contains this file:
     # ../../../../etc/shadow
     tar_archive = os.path.join(os.path.dirname(__file__), "dotdot_path.tar")
-    cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
+    cmd(archiver, "rcreate", "--encryption=none")
     with pytest.raises(ValueError, match="unexpected '..' element in path '../../../../etc/shadow'"):
-        cmd(archiver, f"--repo={repo_location}", "import-tar", "dst", tar_archive, exit_code=2)
+        cmd(archiver, "import-tar", "dst", tar_archive, exit_code=2)
 
 
 @requires_gzip
 def test_import_tar_gz(archivers, request, tar_format="GNU"):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path, output_path = archiver.repository_location, archiver.input_path, archiver.output_path
-    create_test_files(input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
     os.unlink("input/flagfile")
-
-    cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
-    cmd(archiver, f"--repo={repo_location}", "create", "src", "input")
-    cmd(archiver, f"--repo={repo_location}", "export-tar", "src", "simple.tgz", f"--tar-format={tar_format}")
-    cmd(archiver, f"--repo={repo_location}", "import-tar", "dst", "simple.tgz")
-
-    with changedir(output_path):
-        cmd(archiver, f"--repo={repo_location}", "extract", "dst")
+    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "export-tar", "src", "simple.tgz", f"--tar-format={tar_format}")
+    cmd(archiver, "import-tar", "dst", "simple.tgz")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
     assert_dirs_equal("input", "output/input", ignore_ns=True, ignore_xattrs=True)
 
 
 @requires_gnutar
 def test_import_concatenated_tar_with_ignore_zeros(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path, output_path = archiver.repository_location, archiver.input_path, archiver.output_path
-    create_test_files(input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
     os.unlink("input/flagfile")
-
     with changedir("input"):
         subprocess.check_call(["tar", "cf", "file1.tar", "file1"])
         subprocess.check_call(["tar", "cf", "the_rest.tar", "--exclude", "file1*", "."])
@@ -218,21 +174,20 @@ def test_import_concatenated_tar_with_ignore_zeros(archivers, request):
             # Clean up for assert_dirs_equal.
             os.unlink("the_rest.tar")
 
-    cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
-    cmd(archiver, f"--repo={repo_location}", "import-tar", "--ignore-zeros", "dst", "input/concatenated.tar")
+    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "import-tar", "--ignore-zeros", "dst", "input/concatenated.tar")
     # Clean up for assert_dirs_equal.
     os.unlink("input/concatenated.tar")
 
-    with changedir(output_path):
-        cmd(archiver, f"--repo={repo_location}", "extract", "dst")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
     assert_dirs_equal("input", "output", ignore_ns=True, ignore_xattrs=True)
 
 
 @requires_gnutar
 def test_import_concatenated_tar_without_ignore_zeros(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path, output_path = archiver.repository_location, archiver.input_path, archiver.output_path
-    create_test_files(input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
     os.unlink("input/flagfile")
 
     with changedir("input"):
@@ -244,13 +199,11 @@ def test_import_concatenated_tar_without_ignore_zeros(archivers, request):
             with open("the_rest.tar", "rb") as the_rest:
                 concatenated.write(the_rest.read())
             os.unlink("the_rest.tar")
+    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "import-tar", "dst", "input/concatenated.tar")
 
-    cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
-    cmd(archiver, f"--repo={repo_location}", "import-tar", "dst", "input/concatenated.tar")
-
-    with changedir(output_path):
-        cmd(archiver, f"--repo={repo_location}", "extract", "dst")
-
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
     # Negative test -- assert that only file1 has been extracted, and the_rest has been ignored
     # due to zero-filled block marker.
     assert os.listdir("output") == ["file1"]
@@ -258,14 +211,11 @@ def test_import_concatenated_tar_without_ignore_zeros(archivers, request):
 
 def test_roundtrip_pax_borg(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path, output_path = archiver.repository_location, archiver.input_path, archiver.output_path
-    create_test_files(input_path)
-
-    cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
-    cmd(archiver, f"--repo={repo_location}", "create", "src", "input")
-    cmd(archiver, f"--repo={repo_location}", "export-tar", "src", "simple.tar", "--tar-format=BORG")
-    cmd(archiver, f"--repo={repo_location}", "import-tar", "dst", "simple.tar")
-
-    with changedir(output_path):
-        cmd(archiver, f"--repo={repo_location}", "extract", "dst")
+    create_test_files(archiver.input_path)
+    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "export-tar", "src", "simple.tar", "--tar-format=BORG")
+    cmd(archiver, "import-tar", "dst", "simple.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
     assert_dirs_equal("input", "output/input")

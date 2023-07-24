@@ -9,24 +9,22 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 def test_info(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-    create_regular_file(input_path, "file1", size=1024 * 80)
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
-    info_archive = cmd(archiver, f"--repo={repo_location}", "info", "-a", "test")
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    info_archive = cmd(archiver, "info", "-a", "test")
     assert "Archive name: test" + os.linesep in info_archive
-    info_archive = cmd(archiver, f"--repo={repo_location}", "info", "--first", "1")
+    info_archive = cmd(archiver, "info", "--first", "1")
     assert "Archive name: test" + os.linesep in info_archive
 
 
 def test_info_json(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    repo_location, input_path = archiver.repository_location, archiver.input_path
-    create_regular_file(input_path, "file1", size=1024 * 80)
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    cmd(archiver, f"--repo={repo_location}", "create", "test", "input")
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
 
-    info_archive = json.loads(cmd(archiver, f"--repo={repo_location}", "info", "-a", "test", "--json"))
+    info_archive = json.loads(cmd(archiver, "info", "-a", "test", "--json"))
     archives = info_archive["archives"]
     assert len(archives) == 1
     archive = archives[0]
@@ -42,9 +40,8 @@ def test_info_json(archivers, request):
 def test_info_json_of_empty_archive(archivers, request):
     """See https://github.com/borgbackup/borg/issues/6120"""
     archiver = request.getfixturevalue(archivers)
-    repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
-    info_repo = json.loads(cmd(archiver, f"--repo={repo_location}", "info", "--json", "--first=1"))
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    info_repo = json.loads(cmd(archiver, "info", "--json", "--first=1"))
     assert info_repo["archives"] == []
-    info_repo = json.loads(cmd(archiver, f"--repo={repo_location}", "info", "--json", "--last=1"))
+    info_repo = json.loads(cmd(archiver, "info", "--json", "--last=1"))
     assert info_repo["archives"] == []

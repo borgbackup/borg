@@ -77,11 +77,11 @@ def test_fuse(archivers, request):
             noatime_used = flags_noatime != flags_normal
             return noatime_used and atime_before == atime_after
 
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_test_files(input_path)
     have_noatime = has_noatime("input/file1")
-    cmd(archiver, f"--repo={repo_location}", "create", "--exclude-nodump", "--atime", "archive", "input")
-    cmd(archiver, f"--repo={repo_location}", "create", "--exclude-nodump", "--atime", "archive2", "input")
+    cmd(archiver, "create", "--exclude-nodump", "--atime", "archive", "input")
+    cmd(archiver, "create", "--exclude-nodump", "--atime", "archive2", "input")
     if has_lchflags:
         # remove the file that we did not back up, so input and output become equal
         os.remove(os.path.join("input", "flagfile"))
@@ -172,15 +172,15 @@ def test_fuse(archivers, request):
 def test_fuse_versions_view(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, input_path = archiver.repository_location, archiver.input_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_regular_file(input_path, "test", contents=b"first")
     if are_hardlinks_supported():
         create_regular_file(input_path, "hardlink1", contents=b"123456")
         os.link("input/hardlink1", "input/hardlink2")
         os.link("input/hardlink1", "input/hardlink3")
-    cmd(archiver, f"--repo={repo_location}", "create", "archive1", "input")
+    cmd(archiver, "create", "archive1", "input")
     create_regular_file(input_path, "test", contents=b"second")
-    cmd(archiver, f"--repo={repo_location}", "create", "archive2", "input")
+    cmd(archiver, "create", "archive2", "input")
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     # mount the whole repository, archive contents shall show up in versioned view:
     with fuse_mount(archiver, repo_location, mountpoint, "-o", "versions"):
@@ -207,7 +207,7 @@ def test_fuse_versions_view(archivers, request):
 def test_fuse_allow_damaged_files(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location, repo_path = archiver.repository_location, archiver.repository_path
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_src_archive(archiver, "archive")
     # Get rid of a chunk and repair it
     archive, repository = open_archive(repo_path, "archive")
@@ -220,7 +220,7 @@ def test_fuse_allow_damaged_files(archivers, request):
         else:
             assert False  # missed the file
         repository.commit(compact=False)
-    cmd(archiver, f"--repo={repo_location}", "check", "--repair", exit_code=0)
+    cmd(archiver, "check", "--repair", exit_code=0)
 
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     with fuse_mount(archiver, repo_location, mountpoint, "-a", "archive"):
@@ -235,7 +235,7 @@ def test_fuse_allow_damaged_files(archivers, request):
 def test_fuse_mount_options(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_location = archiver.repository_location
-    cmd(archiver, f"--repo={repo_location}", "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_src_archive(archiver, "arch11")
     create_src_archive(archiver, "arch12")
     create_src_archive(archiver, "arch21")
@@ -261,7 +261,6 @@ def test_migrate_lock_alive(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() == "remote":
         pytest.skip("only works locally")
-    repo_location = archiver.repository_location
     """Both old_id and new_id must not be stale during lock migration / daemonization."""
     from functools import wraps
     import pickle
@@ -315,12 +314,12 @@ def test_migrate_lock_alive(archivers, request):
     # Decorate
     Lock.migrate_lock = write_assert_data(Lock.migrate_lock)
     try:
-        cmd(archiver, f"--repo={repo_location}", "rcreate", "--encryption=none")
+        cmd(archiver, "rcreate", "--encryption=none")
         create_src_archive(archiver, "arch")
         mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
         # In order that the decoration is kept for the borg mount process, we must not spawn, but actually fork;
         # not to be confused with the forking in borg.helpers.daemonize() which is done as well.
-        with fuse_mount(archiver, repo_location, mountpoint, os_fork=True):
+        with fuse_mount(archiver, archiver.repository_location, mountpoint, os_fork=True):
             pass
         with open(assert_data_file, "rb") as _in:
             assert_data = pickle.load(_in)

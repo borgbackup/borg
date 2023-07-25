@@ -186,7 +186,9 @@ class PlatformDarwinTestCase(BaseTestCase):
         self.assert_equal(self.get_acl(file.name), {})
         self.set_acl(
             file.name,
-            b"!#acl 1\ngroup:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000:staff:0:allow:read\nuser:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n",
+            b"!#acl 1\n"
+            b"group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000:staff:0:allow:read\n"
+            b"user:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n",
             numeric_ids=False,
         )
         self.assert_in(
@@ -197,7 +199,9 @@ class PlatformDarwinTestCase(BaseTestCase):
         )
         self.set_acl(
             file2.name,
-            b"!#acl 1\ngroup:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000:staff:0:allow:read\nuser:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n",
+            b"!#acl 1\n"
+            b"group:ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000000:staff:0:allow:read\n"
+            b"user:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n",
             numeric_ids=True,
         )
         self.assert_in(

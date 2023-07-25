@@ -164,7 +164,8 @@ class Archives(abc.MutableMapping):
         consider_checkpoints = getattr(args, "consider_checkpoints", None)
         if name is not None:
             raise Error(
-                "Giving a specific name is incompatible with options --first, --last, -a / --match-archives, and --consider-checkpoints."
+                "Giving a specific name is incompatible with options --first, --last, "
+                "-a / --match-archives, and --consider-checkpoints."
             )
         return self.list(
             sort_by=args.sort_by.split(","),

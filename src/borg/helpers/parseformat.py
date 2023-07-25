@@ -456,7 +456,7 @@ class Location:
         (?:file://)?                                        # optional file protocol
         (?P<path>
             (?:[a-zA-Z]:)?                                  # Drive letter followed by a colon (optional)
-            (?:[^:]+)                                       # Anything which does not contain a :, at least one character
+            (?:[^:]+)                                       # Anything which does not contain a :, at least one char
         )
         """,
         re.VERBOSE,

@@ -66,7 +66,7 @@ class RListMixIn:
             # Strings are left-aligned, numbers are right-aligned.
             # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
             $ borg rlist --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
-            ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9a312bef3f2f6e2d0fc110c196827786c15eba0188738e81697a7fa3b274]
+            ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9...3b274]
             ...
 
         The following keys are always available:

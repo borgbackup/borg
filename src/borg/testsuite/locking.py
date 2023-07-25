@@ -148,19 +148,19 @@ class TestExclusiveLock:
             while not timer.timed_out():
                 cycle += 1
                 try:
-                    with ExclusiveLock(
-                        lockpath, id=id, timeout=timeout / 20, sleep=-1
-                    ):  # This timeout is only for not exceeding the given timeout by more than 5%. With sleep<0 it's constantly polling anyway.
+                    # This timeout is only for not exceeding the given timeout by more than 5%.
+                    # With sleep<0 it's constantly polling anyway.
+                    with ExclusiveLock(lockpath, id=id, timeout=timeout / 20, sleep=-1):
                         lock_owner_count = lock_owner_counter.incr()
                         print_locked(
-                            "Thread %2d: Acquired the lock. It's my %d. loop cycle. I am the %d. who has the lock concurrently."
-                            % (thread_id, cycle, lock_owner_count)
+                            "Thread %2d: Acquired the lock. It's my %d. loop cycle. "
+                            "I am the %d. who has the lock concurrently." % (thread_id, cycle, lock_owner_count)
                         )
                         time.sleep(0.005)
                         lock_owner_count = lock_owner_counter.decr()
                         print_locked(
-                            "Thread %2d: Releasing the lock, finishing my %d. loop cycle. Currently, %d colleagues still have the lock."
-                            % (thread_id, cycle, lock_owner_count)
+                            "Thread %2d: Releasing the lock, finishing my %d. loop cycle. "
+                            "Currently, %d colleagues still have the lock." % (thread_id, cycle, lock_owner_count)
                         )
                 except LockTimeout:
                     print_locked("Thread %2d: Got LockTimeout, finishing my %d. loop cycle." % (thread_id, cycle))
@@ -168,8 +168,8 @@ class TestExclusiveLock:
                     exception_count = exception_counter.incr()
                     e = format_exc()
                     print_locked(
-                        "Thread %2d: Exception thrown, finishing my %d. loop cycle. It's the %d. exception seen until now: %s"
-                        % (thread_id, cycle, exception_count, e)
+                        "Thread %2d: Exception thrown, finishing my %d. loop cycle. "
+                        "It's the %d. exception seen until now: %s" % (thread_id, cycle, exception_count, e)
                     )
 
             print_locked("Thread %2d: Loop timed out--terminating after %d loop cycles." % (thread_id, cycle))

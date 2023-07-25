@@ -158,7 +158,7 @@ class KeyManager:
     def import_paperkey(self, args):
         try:
             # imported here because it has global side effects
-            import readline
+            import readline  # noqa
         except ImportError:
             print("Note: No line editing available due to missing readline support")
 

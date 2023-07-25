@@ -1,5 +1,5 @@
 from ...constants import *  # NOQA
-from . import cmd_fixture, changedir
+from . import cmd_fixture, changedir  # NOQA
 
 
 def test_return_codes(cmd_fixture, tmpdir):

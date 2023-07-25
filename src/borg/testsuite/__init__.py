@@ -196,11 +196,7 @@ class BaseTestCase(unittest.TestCase):
     assert_not_in = unittest.TestCase.assertNotIn
     assert_equal = unittest.TestCase.assertEqual
     assert_not_equal = unittest.TestCase.assertNotEqual
-
-    if raises:
-        assert_raises = staticmethod(raises)
-    else:
-        assert_raises = unittest.TestCase.assertRaises  # type: ignore
+    assert_raises = staticmethod(raises) if raises else unittest.TestCase.assertRaises  # type: ignore
 
 
 class FakeInputs:

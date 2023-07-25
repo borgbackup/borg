@@ -23,7 +23,8 @@ recursion root, but (since 1.2) with any leading / or ../ removed. If you give
 ``absolute/path``. If you wanted to exclude e.g.
 ``/absolute/path/logs/*.log``, the pattern ``logs/*.log`` would not match; you
 must use ``absolute/path/logs/*.log`` or ``**/logs/*.log`` (using ``sh``
-patterns). 
+patterns). Since the leading path separator is stripped in patterns,
+``/absolute/path/logs/*.log`` will also match (and is clearest).
 
 The recursion root is also named ``PATH`` in Borg commands like `borg create`
 that do a file discovery, so do not confuse the root with the ``PATH``

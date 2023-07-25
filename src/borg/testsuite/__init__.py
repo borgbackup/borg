@@ -76,6 +76,14 @@ def unopened_tempfile():
         yield os.path.join(tempdir, "file")
 
 
+@contextmanager
+def changedir(dir):
+    cwd = os.getcwd()
+    os.chdir(dir)
+    yield
+    os.chdir(cwd)
+
+
 def is_root():
     """return True if running with high privileges, like as root"""
     if is_win32:
@@ -193,18 +201,6 @@ class BaseTestCase(unittest.TestCase):
         assert_raises = staticmethod(raises)
     else:
         assert_raises = unittest.TestCase.assertRaises  # type: ignore
-
-
-class changedir:
-    def __init__(self, dir):
-        self.dir = dir
-
-    def __enter__(self):
-        self.old = os.getcwd()
-        os.chdir(self.dir)
-
-    def __exit__(self, *args, **kw):
-        os.chdir(self.old)
 
 
 class FakeInputs:

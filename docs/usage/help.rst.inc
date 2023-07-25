@@ -18,13 +18,13 @@ unwanted ones. Patterns can be used
 - for ``PATH`` arguments that explicitly support them.
 
 Borg always stores all file paths normalized and relative to the
-current recursion root. The recursion root is also named ``PATH`` in
-Borg commands like `borg create` that do a file discovery, so do not
-confuse the root with the ``PATH`` argument of e.g. `borg extract`.
+first directory of the current recursion root. The recursion root is also named
+``PATH`` in Borg commands like `borg create` that do a file discovery, so do
+not confuse the root with the ``PATH`` argument of e.g. `borg extract`.
 
 Starting with Borg 1.2, paths that are matched against patterns always
-appear relative. If you give ``/absolute/`` as root, the paths going
-into the matcher will start with ``absolute/``.
+appear relative. If you give ``/opt/app/`` as root, the paths going
+into the matcher will start with ``opt/``.
 If you give ``../../relative`` as root, the paths will be normalized
 as ``relative/``.
 

@@ -315,7 +315,8 @@ def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
     This is a regression test for a bug I introduced and fixed:
 
     Traceback (most recent call last):
-      File "/home/user/borg-master/src/borg/testsuite/crypto.py", line 384, in test_repo_key_detect_does_not_raise_integrity_error
+      File "/home/user/borg-master/src/borg/testsuite/crypto.py", line 384,
+                                                                  in test_repo_key_detect_does_not_raise_integrity_error
         RepoKey.detect(repository, manifest_data=None)
       File "/home/user/borg-master/src/borg/crypto/key.py", line 402, in detect
         if not key.load(target, passphrase):
@@ -335,7 +336,8 @@ def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
 
     1. FlexiKey.decrypt_key_file() is supposed to signal the decryption failure by returning None
     2. FlexiKey.detect() relies on that interface - it tries an empty passphrase before prompting the user
-    3. my initial implementation of decrypt_key_file_argon2() was simply passing through the IntegrityError() from AES256_CTR_BASE.decrypt()
+    3. my initial implementation of decrypt_key_file_argon2() was simply passing through the IntegrityError()
+       from AES256_CTR_BASE.decrypt()
     """
     repository = MagicMock(id=b"repository_id")
     getpass.return_value = "hello, pass phrase"

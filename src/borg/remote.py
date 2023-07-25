@@ -108,7 +108,7 @@ class UnexpectedRPCDataFormatFromServer(Error):
 # All method calls on the remote repository object must be allowlisted in RepositoryServer.rpc_methods and have api
 # stubs in RemoteRepository. The @api decorator on these stubs is used to set server version requirements.
 #
-# Method parameters are identified only by name and never by position. Unknown parameters are ignored by the server side.
+# Method parameters are identified only by name and never by position. Unknown parameters are ignored by the server.
 # If a new parameter is important and may not be ignored, on the client a parameter specific version requirement needs
 # to be added.
 # When parameters are removed, they need to be preserved as defaulted parameters on the client stubs so that older

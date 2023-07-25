@@ -85,7 +85,8 @@ def with_repository(
     :param manifest: load manifest and repo_objs (key), pass them as keyword arguments
     :param cache: open cache, pass it as keyword argument (implies manifest)
     :param secure: do assert_secure after loading manifest
-    :param compatibility: mandatory if not create and (manifest or cache), specifies mandatory feature categories to check
+    :param compatibility: mandatory if not create and (manifest or cache), specifies mandatory
+           feature categories to check
     """
     # Note: with_repository decorator does not have a "key" argument (yet?)
     compatibility = compat_check(

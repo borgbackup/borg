@@ -974,8 +974,8 @@ Duration: {0.duration}
             if not self.noacls:
                 acl_set(path, item, self.numeric_ids, fd=fd)
             if not self.noxattrs and "xattrs" in item:
-                # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
-                # the Linux capabilities in the "security.capability" attribute.
+                # chown removes Linux capabilities, so set the extended attributes at the end, after chown,
+                # since they include the Linux capabilities in the "security.capability" attribute.
                 warning = xattr.set_all(fd or path, item.xattrs, follow_symlinks=False)
                 if warning:
                     set_ec(EXIT_WARNING)

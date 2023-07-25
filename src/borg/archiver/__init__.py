@@ -570,8 +570,8 @@ def format_tb(exc):
     remote = isinstance(exc, RemoteRepository.RPCError)
     if remote:
         prefix = "Borg server: "
-        trace_back = "\n".join(prefix + l for l in exc.exception_full.splitlines())
-        sys_info = "\n".join(prefix + l for l in exc.sysinfo.splitlines())
+        trace_back = "\n".join(prefix + line for line in exc.exception_full.splitlines())
+        sys_info = "\n".join(prefix + line for line in exc.sysinfo.splitlines())
     else:
         trace_back = traceback.format_exc()
         sys_info = sysinfo()

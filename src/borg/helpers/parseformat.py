@@ -373,8 +373,8 @@ def format_archive(archive):
 
 
 def parse_stringified_list(s):
-    l = re.split(" *, *", s)
-    return [item for item in l if item != ""]
+    items = re.split(" *, *", s)
+    return [item for item in items if item != ""]
 
 
 class Location:

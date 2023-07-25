@@ -23,8 +23,8 @@ first directory of the current recursion root. The recursion root is also named
 not confuse the root with the ``PATH`` argument of e.g. `borg extract`.
 
 Starting with Borg 1.2, paths that are matched against patterns always
-appear relative. If you give ``/opt/app/`` as root, the paths going
-into the matcher will start with ``opt/``.
+appear relative. If you give ``/absolute/path/`` as root, the paths going
+into the matcher will start with ``absolute/``.
 If you give ``../../relative`` as root, the paths will be normalized
 as ``relative/``.
 

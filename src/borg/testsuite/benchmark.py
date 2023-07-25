@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from .archiver import changedir, cmd_fixture
+from .archiver import changedir, cmd_fixture  # NOQA
 from .item import Item
 from ..constants import zeros
 

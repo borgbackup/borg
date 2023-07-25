@@ -5,7 +5,7 @@ import time
 
 from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported
-from ..platform import is_win32, is_darwin
+from ...platformflags import is_win32, is_darwin
 from . import cmd, create_regular_file, RK_ENCRYPTION, assert_line_exists, generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA

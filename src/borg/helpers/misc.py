@@ -13,7 +13,6 @@ logger = create_logger()
 
 from . import msgpack
 from .. import __version__ as borg_version
-from .. import chunker
 
 
 def sysinfo():

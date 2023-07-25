@@ -1,4 +1,3 @@
-import re
 import tempfile
 from binascii import hexlify, unhexlify, a2b_base64
 from unittest.mock import MagicMock

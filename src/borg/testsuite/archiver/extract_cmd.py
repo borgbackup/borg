@@ -13,7 +13,7 @@ from ...helpers import EXIT_WARNING
 from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from ..platform import is_darwin, is_win32
+from ...platformflags import is_darwin, is_win32
 from . import (
     RK_ENCRYPTION,
     requires_hardlinks,

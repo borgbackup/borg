@@ -383,27 +383,6 @@ class changedir:
         os.chdir(self.old)
 
 
-class environment_variable:
-    def __init__(self, **values):
-        self.values = values
-        self.old_values = {}
-
-    def __enter__(self):
-        for k, v in self.values.items():
-            self.old_values[k] = os.environ.get(k)
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
-
-    def __exit__(self, *args, **kw):
-        for k, v in self.old_values.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
-
-
 class FakeInputs:
     """Simulate multiple user inputs, can be used as input() replacement"""
 

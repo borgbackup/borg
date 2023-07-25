@@ -10,7 +10,6 @@ from ...helpers import EXIT_ERROR
 from ...helpers import bin_to_hex
 from ...helpers import msgpack
 from ...repository import Repository
-from .. import environment_variable
 from .. import key
 from . import RK_ENCRYPTION, KF_ENCRYPTION, cmd, _extract_repository_id, _set_repository_id, generate_archiver_tests
 
@@ -96,7 +95,7 @@ def test_key_export_keyfile(archivers, request):
     assert key_contents2 == key_contents
 
 
-def test_key_import_keyfile_with_borg_key_file(archivers, request):
+def test_key_import_keyfile_with_borg_key_file(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", KF_ENCRYPTION)
 
@@ -109,8 +108,8 @@ def test_key_import_keyfile_with_borg_key_file(archivers, request):
     os.unlink(key_file)
 
     imported_key_file = os.path.join(archiver.output_path, "imported")
-    with environment_variable(BORG_KEY_FILE=imported_key_file):
-        cmd(archiver, "key", "import", exported_key_file)
+    monkeypatch.setenv("BORG_KEY_FILE", imported_key_file)
+    cmd(archiver, "key", "import", exported_key_file)
     assert not os.path.isfile(key_file), '"borg key import" should respect BORG_KEY_FILE'
 
     with open(imported_key_file) as fd:

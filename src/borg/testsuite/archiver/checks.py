@@ -15,7 +15,7 @@ from ...manifest import Manifest, MandatoryFeatureUnsupported
 from ...remote import RemoteRepository, PathNotAllowed
 from ...repository import Repository
 from .. import llfuse
-from .. import changedir, environment_variable
+from .. import changedir
 from . import cmd, _extract_repository_id, open_repository, check_cache, create_test_files, create_src_archive
 from . import _set_repository_id, create_regular_file, assert_creates_file, generate_archiver_tests, RK_ENCRYPTION
 
@@ -123,7 +123,7 @@ def test_repository_swap_detection2_no_cache(archivers, request):
             cmd(archiver, "create", "test.2", "input")
 
 
-def test_repository_swap_detection_repokey_blank_passphrase(archivers, request):
+def test_repository_swap_detection_repokey_blank_passphrase(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     # Check that a repokey repo with a blank passphrase is considered like a plaintext repo.
     create_test_files(archiver.input_path)
@@ -132,30 +132,33 @@ def test_repository_swap_detection_repokey_blank_passphrase(archivers, request):
     cmd(archiver, "create", "test", "input")
     # Attacker replaces it with her own repository, which is encrypted but has no passphrase set
     shutil.rmtree(archiver.repository_path)
-    with environment_variable(BORG_PASSPHRASE=""):
-        cmd(archiver, "rcreate", RK_ENCRYPTION)
-        # Delete cache & security database, AKA switch to user perspective
-        cmd(archiver, "rdelete", "--cache-only")
-        shutil.rmtree(get_security_directory(archiver.repository_path))
-    with environment_variable(BORG_PASSPHRASE=None):
-        # This is the part were the user would be tricked, e.g. she assumes that BORG_PASSPHRASE
-        # is set, while it isn't. Previously this raised no warning,
-        # since the repository is, technically, encrypted.
-        if archiver.FORK_DEFAULT:
-            cmd(archiver, "create", "test.2", "input", exit_code=EXIT_ERROR)
-        else:
-            with pytest.raises(Cache.CacheInitAbortedError):
-                cmd(archiver, "create", "test.2", "input")
+
+    monkeypatch.setenv("BORG_PASSPHRASE", "")
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    # Delete cache & security database, AKA switch to user perspective
+    cmd(archiver, "rdelete", "--cache-only")
+    shutil.rmtree(get_security_directory(archiver.repository_path))
+
+    monkeypatch.delenv("BORG_PASSPHRASE")
+    # This is the part were the user would be tricked, e.g. she assumes that BORG_PASSPHRASE
+    # is set, while it isn't. Previously this raised no warning,
+    # since the repository is, technically, encrypted.
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "create", "test.2", "input", exit_code=EXIT_ERROR)
+    else:
+        with pytest.raises(Cache.CacheInitAbortedError):
+            cmd(archiver, "create", "test.2", "input")
 
 
-def test_repository_move(archivers, request):
+def test_repository_move(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     security_dir = get_security_directory(archiver.repository_path)
     os.replace(archiver.repository_path, archiver.repository_path + "_new")
     archiver.repository_location += "_new"
-    with environment_variable(BORG_RELOCATED_REPO_ACCESS_IS_OK="yes"):
-        cmd(archiver, "rinfo")
+    monkeypatch.setenv("BORG_RELOCATED_REPO_ACCESS_IS_OK", "yes")
+    cmd(archiver, "rinfo")
+    monkeypatch.delenv("BORG_RELOCATED_REPO_ACCESS_IS_OK")
     with open(os.path.join(security_dir, "location")) as fd:
         location = fd.read()
         assert location == Location(archiver.repository_location).canonical_path()
@@ -179,7 +182,7 @@ def test_security_dir_compat(archivers, request):
     cmd(archiver, "rinfo")
 
 
-def test_unknown_unencrypted(archivers, request):
+def test_unknown_unencrypted(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", "--encryption=none")
     # Ok: repository is known
@@ -196,8 +199,8 @@ def test_unknown_unencrypted(archivers, request):
     else:
         with pytest.raises(Cache.CacheInitAbortedError):
             cmd(archiver, "rinfo")
-    with environment_variable(BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK="yes"):
-        cmd(archiver, "rinfo")
+    monkeypatch.setenv("BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK", "yes")
+    cmd(archiver, "rinfo")
 
 
 def test_unknown_feature_on_create(archivers, request):

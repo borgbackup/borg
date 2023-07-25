@@ -19,7 +19,7 @@ unwanted ones. Patterns can be used
 
 Borg always stores all file paths normalized, with the first part equal to the
 recursion root, but (since 1.2) with any leading / or ../ removed. If you give
-``/absolute/path`` as root, the paths going into the matches will start with
+``/absolute/path`` as root, the paths going into the matcher will start with
 ``absolute/path``. If you wanted to exclude e.g.
 ``/absolute/path/logs/*.log``, the pattern ``logs/*.log`` would not match; you
 must use ``absolute/path/logs/*.log`` or (using ``sh`` patterns)

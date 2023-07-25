@@ -52,7 +52,7 @@ def fuse_main():
     if has_pyfuse3:
         try:
             trio.run(llfuse.main)
-        except:
+        except:  # noqa
             return 1  # TODO return signal number if it was killed by signal
         else:
             return None

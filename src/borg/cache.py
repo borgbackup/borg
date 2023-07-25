@@ -534,7 +534,7 @@ class LocalCache(CacheStatsMixin):
             if sync and self.manifest.id != self.cache_config.manifest_id:
                 self.sync()
                 self.commit()
-        except:
+        except:  # noqa
             self.close()
             raise
 

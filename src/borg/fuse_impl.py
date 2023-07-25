@@ -31,6 +31,6 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
     else:
         raise RuntimeError("unknown fuse implementation in BORG_FUSE_IMPL: '%s'" % BORG_FUSE_IMPL)
 else:
-    llfuse = None
+    llfuse = None  # noqa
     has_llfuse = False
     has_pyfuse3 = False

@@ -164,7 +164,7 @@ class TestExclusiveLock:
                         )
                 except LockTimeout:
                     print_locked("Thread %2d: Got LockTimeout, finishing my %d. loop cycle." % (thread_id, cycle))
-                except:
+                except:  # noqa
                     exception_count = exception_counter.incr()
                     e = format_exc()
                     print_locked(

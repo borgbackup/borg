@@ -7,7 +7,6 @@ from ...helpers.errors import Error
 from ...constants import *  # NOQA
 from ...crypto.key import FlexiKey
 from ...repository import Repository
-from .. import environment_variable
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION, KF_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -58,24 +57,24 @@ def test_rcreate_nested_repositories(archivers, request):
             cmd(archiver, "rcreate", RK_ENCRYPTION)
 
 
-def test_rcreate_refuse_to_overwrite_keyfile(archivers, request):
+def test_rcreate_refuse_to_overwrite_keyfile(archivers, request, monkeypatch):
     #  BORG_KEY_FILE=something borg rcreate should quit if "something" already exists.
     #  See: https://github.com/borgbackup/borg/pull/6046
     archiver = request.getfixturevalue(archivers)
     keyfile = os.path.join(archiver.tmpdir, "keyfile")
+    monkeypatch.setenv("BORG_KEY_FILE", keyfile)
     original_location = archiver.repository_location
-    with environment_variable(BORG_KEY_FILE=keyfile):
-        archiver.repository_location = original_location + "0"
-        cmd(archiver, "rcreate", KF_ENCRYPTION)
-        with open(keyfile) as file:
-            before = file.read()
-        archiver.repository_location = original_location + "1"
-        arg = ("rcreate", KF_ENCRYPTION)
-        if archiver.FORK_DEFAULT:
-            cmd(archiver, *arg, exit_code=2)
-        else:
-            with pytest.raises(Error):
-                cmd(archiver, *arg)
-        with open(keyfile) as file:
-            after = file.read()
-        assert before == after
+    archiver.repository_location = original_location + "0"
+    cmd(archiver, "rcreate", KF_ENCRYPTION)
+    with open(keyfile) as file:
+        before = file.read()
+    archiver.repository_location = original_location + "1"
+    arg = ("rcreate", KF_ENCRYPTION)
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, *arg, exit_code=2)
+    else:
+        with pytest.raises(Error):
+            cmd(archiver, *arg)
+    with open(keyfile) as file:
+        after = file.read()
+    assert before == after

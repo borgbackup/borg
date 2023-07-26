@@ -1,7 +1,6 @@
 import contextlib
 import os
 import os.path
-import re
 import shlex
 import signal
 import subprocess
@@ -11,7 +10,7 @@ import traceback
 
 from .. import __version__
 
-from ..platformflags import is_win32, is_linux, is_freebsd, is_darwin
+from ..platformflags import is_win32
 from ..logger import create_logger
 
 logger = create_logger()

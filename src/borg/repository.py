@@ -881,13 +881,15 @@ class Repository:
                         #
                         # Now we crash. But only segment 2 gets deleted, while segment 1 is still around. Now key 1
                         # is suddenly undeleted (because the delete in segment 2 is now missing).
-                        # Again, note the requirement here. We delete these in the correct order that this doesn't happen,
-                        # and only if the FS materialization of these deletes is reordered or parts dropped this can happen.
-                        # In this case it doesn't cause outright corruption, 'just' an index count mismatch, which will be
-                        # fixed by borg-check --repair.
+                        # Again, note the requirement here. We delete these in the correct order that this doesn't
+                        # happen, and only if the FS materialization of these deletes is reordered or parts dropped
+                        # this can happen.
+                        # In this case it doesn't cause outright corruption, 'just' an index count mismatch, which
+                        # will be fixed by borg-check --repair.
                         #
-                        # Note that in this check the index state is the proxy for a "most definitely settled" repository state,
-                        # i.e. the assumption is that *all* operations on segments <= index state are completed and stable.
+                        # Note that in this check the index state is the proxy for a "most definitely settled"
+                        # repository state, i.e. the assumption is that *all* operations on segments <= index state
+                        # are completed and stable.
                         try:
                             new_segment, size = self.io.write_delete(key, raise_full=True)
                         except LoggedIO.SegmentFull:

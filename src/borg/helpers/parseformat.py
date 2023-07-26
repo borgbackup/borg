@@ -9,7 +9,7 @@ import re
 import shlex
 import stat
 import uuid
-from typing import List, Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING, Literal
+from typing import Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING, Literal
 from binascii import hexlify
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
@@ -27,7 +27,6 @@ from .time import OutputTimestamp, format_time, safe_timestamp
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
-from ..platformflags import is_win32
 
 if TYPE_CHECKING:
     from ..item import ItemDiff
@@ -374,8 +373,8 @@ def format_archive(archive):
 
 
 def parse_stringified_list(s):
-    l = re.split(" *, *", s)
-    return [item for item in l if item != ""]
+    items = re.split(" *, *", s)
+    return [item for item in items if item != ""]
 
 
 class Location:
@@ -457,7 +456,7 @@ class Location:
         (?:file://)?                                        # optional file protocol
         (?P<path>
             (?:[a-zA-Z]:)?                                  # Drive letter followed by a colon (optional)
-            (?:[^:]+)                                       # Anything which does not contain a :, at least one character
+            (?:[^:]+)                                       # Anything which does not contain a :, at least one char
         )
         """,
         re.VERBOSE,

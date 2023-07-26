@@ -283,7 +283,7 @@ def test_migrate_lock_alive(archivers, request):
             try:
                 with open(assert_data_file, "wb") as _out:
                     pickle.dump(assert_data, _out)
-            except:
+            except:  # noqa
                 pass
             try:
                 return migrate_lock(self, old_id, new_id)
@@ -297,7 +297,7 @@ def test_migrate_lock_alive(archivers, request):
                 try:
                     with open(assert_data_file, "wb") as _out:
                         pickle.dump(assert_data, _out)
-                except:
+                except:  # noqa
                     pass
 
         wrapper.num_calls = 0

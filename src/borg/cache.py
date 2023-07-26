@@ -534,7 +534,7 @@ class LocalCache(CacheStatsMixin):
             if sync and self.manifest.id != self.cache_config.manifest_id:
                 self.sync()
                 self.commit()
-        except:
+        except:  # noqa
             self.close()
             raise
 
@@ -895,8 +895,9 @@ class LocalCache(CacheStatsMixin):
 
         self.begin_txn()
         with cache_if_remote(self.repository, decrypted_cache=self.repo_objs) as decrypted_repository:
-            # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
-            # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
+            # TEMPORARY HACK:
+            # to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
+            # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local).
             self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
 

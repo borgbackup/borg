@@ -50,7 +50,7 @@ class ConfigMixIn:
                 if check_value:
                     try:
                         bin_id = unhexlify(value)
-                    except:
+                    except:  # noqa
                         raise ValueError("Invalid value, must be 64 hex digits") from None
                     if len(bin_id) != 32:
                         raise ValueError("Invalid value, must be 64 hex digits")

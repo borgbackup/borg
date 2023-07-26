@@ -19,7 +19,7 @@ try:
 except:  # noqa
     raises = None
 
-from ..fuse_impl import llfuse, has_llfuse, has_pyfuse3
+from ..fuse_impl import llfuse, has_llfuse, has_pyfuse3  # NOQA
 from .. import platform
 from ..platformflags import is_win32
 

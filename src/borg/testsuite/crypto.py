@@ -202,9 +202,9 @@ class CryptoTestCase(BaseTestCase):
         ikm = b"\x0b" * 22
         salt = bytes.fromhex("000102030405060708090a0b0c")
         info = bytes.fromhex("f0f1f2f3f4f5f6f7f8f9")
-        l = 42
+        length = 42
 
-        okm = hkdf_hmac_sha512(ikm, salt, info, l)
+        okm = hkdf_hmac_sha512(ikm, salt, info, length)
         assert okm == bytes.fromhex(
             "832390086cda71fb47625bb5ceb168e4c8e26a1a16ed34d9fc7fe92c1481579338da362cb8d9f925d7cb"
         )
@@ -222,9 +222,9 @@ class CryptoTestCase(BaseTestCase):
             "b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7"
             "d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
         )
-        l = 82
+        length = 82
 
-        okm = hkdf_hmac_sha512(ikm, salt, info, l)
+        okm = hkdf_hmac_sha512(ikm, salt, info, length)
         assert okm == bytes.fromhex(
             "ce6c97192805b346e6161e821ed165673b84f400a2b514b2fe23d84cd189ddf1b695b48cbd1c838844"
             "1137b3ce28f16aa64ba33ba466b24df6cfcb021ecff235f6a2056ce3af1de44d572097a8505d9e7a93"
@@ -234,9 +234,9 @@ class CryptoTestCase(BaseTestCase):
         ikm = bytes.fromhex("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b")
         salt = None
         info = b""
-        l = 42
+        length = 42
 
-        okm = hkdf_hmac_sha512(ikm, salt, info, l)
+        okm = hkdf_hmac_sha512(ikm, salt, info, length)
         assert okm == bytes.fromhex(
             "f5fa02b18298a72a8c23898a8703472c6eb179dc204c03425c970e3b164bf90fff22d04836d0e2343bac"
         )
@@ -245,9 +245,9 @@ class CryptoTestCase(BaseTestCase):
         ikm = bytes.fromhex("0b0b0b0b0b0b0b0b0b0b0b")
         salt = bytes.fromhex("000102030405060708090a0b0c")
         info = bytes.fromhex("f0f1f2f3f4f5f6f7f8f9")
-        l = 42
+        length = 42
 
-        okm = hkdf_hmac_sha512(ikm, salt, info, l)
+        okm = hkdf_hmac_sha512(ikm, salt, info, length)
         assert okm == bytes.fromhex(
             "7413e8997e020610fbf6823f2ce14bff01875db1ca55f68cfcf3954dc8aff53559bd5e3028b080f7c068"
         )
@@ -256,9 +256,9 @@ class CryptoTestCase(BaseTestCase):
         ikm = bytes.fromhex("0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c")
         salt = None
         info = b""
-        l = 42
+        length = 42
 
-        okm = hkdf_hmac_sha512(ikm, salt, info, l)
+        okm = hkdf_hmac_sha512(ikm, salt, info, length)
         assert okm == bytes.fromhex(
             "1407d46013d98bc6decefcfee55f0f90b0c7f63d68eb1a80eaf07e953cfc0a3a5240a155d6e4daa965bb"
         )
@@ -315,7 +315,8 @@ def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
     This is a regression test for a bug I introduced and fixed:
 
     Traceback (most recent call last):
-      File "/home/user/borg-master/src/borg/testsuite/crypto.py", line 384, in test_repo_key_detect_does_not_raise_integrity_error
+      File "/home/user/borg-master/src/borg/testsuite/crypto.py", line 384,
+                                                                  in test_repo_key_detect_does_not_raise_integrity_error
         RepoKey.detect(repository, manifest_data=None)
       File "/home/user/borg-master/src/borg/crypto/key.py", line 402, in detect
         if not key.load(target, passphrase):
@@ -335,7 +336,8 @@ def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
 
     1. FlexiKey.decrypt_key_file() is supposed to signal the decryption failure by returning None
     2. FlexiKey.detect() relies on that interface - it tries an empty passphrase before prompting the user
-    3. my initial implementation of decrypt_key_file_argon2() was simply passing through the IntegrityError() from AES256_CTR_BASE.decrypt()
+    3. my initial implementation of decrypt_key_file_argon2() was simply passing through the IntegrityError()
+       from AES256_CTR_BASE.decrypt()
     """
     repository = MagicMock(id=b"repository_id")
     getpass.return_value = "hello, pass phrase"

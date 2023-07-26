@@ -45,7 +45,7 @@ from ..helpers import eval_escapes
 from ..helpers import safe_unlink
 from ..helpers import text_to_json, binary_to_json
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
-from ..platform import is_cygwin, is_win32, is_darwin, swidth
+from ..platform import is_cygwin, is_win32, is_darwin
 
 from . import BaseTestCase, FakeInputs, are_hardlinks_supported
 from . import rejected_dotdot_paths
@@ -178,11 +178,13 @@ class TestLocationWithoutEnv:
         )
         assert (
             repr(Location("ssh://user@[2a02:0001:0002:0003:0004:0005:0006:0007]/some/path"))
-            == "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=None, path='/some/path')"
+            == "Location(proto='ssh', user='user', "
+            "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=None, path='/some/path')"
         )
         assert (
             repr(Location("ssh://user@[2a02:0001:0002:0003:0004:0005:0006:0007]:1234/some/path"))
-            == "Location(proto='ssh', user='user', host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='/some/path')"
+            == "Location(proto='ssh', user='user', "
+            "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='/some/path')"
         )
 
     def test_socket(self, monkeypatch, keys_dir):

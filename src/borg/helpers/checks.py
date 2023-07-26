@@ -1,7 +1,7 @@
 import os
 
 from .errors import Error
-from ..platformflags import is_win32, is_linux, is_freebsd, is_darwin
+from ..platformflags import is_win32
 
 
 class PythonLibcTooOld(Error):

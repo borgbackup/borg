@@ -6,10 +6,9 @@ from queue import LifoQueue
 def translate(pat, match_end=r"\Z"):
     """Translate a shell-style pattern to a regular expression.
 
-    The pattern may include ``**<sep>`` (<sep> stands for the platform-specific path separator; "/" on POSIX systems) for
-    matching zero or more directory levels and "*" for matching zero or more arbitrary characters with the exception of
-    any path separator. Wrap meta-characters in brackets for a literal match (i.e. "[?]" to match the literal character
-    "?").
+    The pattern may include ``**<sep>`` (<sep> stands for the platform-specific path separator; "/" on POSIX systems)
+    for matching zero or more directory levels and "*" for matching zero or more arbitrary characters except any path
+    separator. Wrap meta-characters in brackets for a literal match (i.e. "[?]" to match the literal character "?").
 
     Using match_end=regex one can give a regular expression that is used to match after the regex that is generated from
     the pattern. The default is to match the end of the string.

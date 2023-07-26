@@ -13,7 +13,6 @@ logger = create_logger()
 
 from . import msgpack
 from .. import __version__ as borg_version
-from .. import chunker
 
 
 def sysinfo():
@@ -35,7 +34,7 @@ def sysinfo():
         linux_distribution = None
     try:
         msgpack_version = ".".join(str(v) for v in msgpack.version)
-    except:
+    except:  # noqa
         msgpack_version = "unknown"
     from ..fuse_impl import llfuse, BORG_FUSE_IMPL
 

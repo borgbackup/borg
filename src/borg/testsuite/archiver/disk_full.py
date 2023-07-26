@@ -22,7 +22,7 @@ import shutil
 import pytest
 
 from ...constants import *  # NOQA
-from . import cmd_fixture
+from . import cmd_fixture  # NOQA
 
 DF_MOUNT = "/tmp/borg-mount"
 

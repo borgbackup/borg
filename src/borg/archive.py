@@ -6,7 +6,7 @@ import sys
 import time
 from collections import OrderedDict, defaultdict
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import partial
 from getpass import getuser
 from io import BytesIO
@@ -22,7 +22,7 @@ logger = create_logger()
 from . import xattr
 from .chunker import get_chunker, Chunk
 from .cache import ChunkListEntry
-from .crypto.key import key_factory, UnsupportedPayloadError, AEADKeyBase
+from .crypto.key import key_factory, UnsupportedPayloadError
 from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -974,8 +974,8 @@ Duration: {0.duration}
             if not self.noacls:
                 acl_set(path, item, self.numeric_ids, fd=fd)
             if not self.noxattrs and "xattrs" in item:
-                # chown removes Linux capabilities, so set the extended attributes at the end, after chown, since they include
-                # the Linux capabilities in the "security.capability" attribute.
+                # chown removes Linux capabilities, so set the extended attributes at the end, after chown,
+                # since they include the Linux capabilities in the "security.capability" attribute.
                 warning = xattr.set_all(fd or path, item.xattrs, follow_symlinks=False)
                 if warning:
                     set_ec(EXIT_WARNING)

@@ -157,11 +157,11 @@ class ExclusiveLock:
                 # should be cleaned up anyway. Try to clean up, but don't crash.
                 try:
                     os.unlink(temp_unique_name)
-                except:
+                except:  # noqa
                     pass
                 try:
                     os.rmdir(temp_path)
-                except:
+                except:  # noqa
                     pass
 
     def release(self):
@@ -417,7 +417,7 @@ class Lock:
                 # restore the roster state as before (undo the roster change):
                 if remove is not None:
                     self._roster.modify(remove, ADD)
-            except:
+            except:  # noqa
                 # avoid orphan lock when an exception happens here, e.g. Ctrl-C!
                 self._lock.release()
                 raise

@@ -47,7 +47,7 @@ from ..helpers import text_to_json, binary_to_json
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 from ..platform import is_cygwin, is_win32, is_darwin
 
-from . import BaseTestCase, FakeInputs, are_hardlinks_supported
+from . import FakeInputs, are_hardlinks_supported
 from . import rejected_dotdot_paths
 
 
@@ -365,11 +365,10 @@ def test_text_invalid(text):
         tv(text)
 
 
-class FormatTimedeltaTestCase(BaseTestCase):
-    def test(self):
-        t0 = datetime(2001, 1, 1, 10, 20, 3, 0)
-        t1 = datetime(2001, 1, 1, 12, 20, 4, 100000)
-        self.assert_equal(format_timedelta(t1 - t0), "2 hours 1.10 seconds")
+def test_format_timedelta():
+    t0 = datetime(2001, 1, 1, 10, 20, 3, 0)
+    t1 = datetime(2001, 1, 1, 12, 20, 4, 100000)
+    assert format_timedelta(t1 - t0) == "2 hours 1.10 seconds"
 
 
 def test_chunkerparams():
@@ -396,37 +395,35 @@ def test_chunkerparams():
         ChunkerParams("fixed,%d,%d" % (4096, MAX_DATA_SIZE + 1))  # too big header size
 
 
-class RemoveDotdotPrefixesTestCase(BaseTestCase):
-    def test(self):
-        self.assert_equal(remove_dotdot_prefixes("."), ".")
-        self.assert_equal(remove_dotdot_prefixes(".."), ".")
-        self.assert_equal(remove_dotdot_prefixes("/"), ".")
-        self.assert_equal(remove_dotdot_prefixes("//"), ".")
-        self.assert_equal(remove_dotdot_prefixes("foo"), "foo")
-        self.assert_equal(remove_dotdot_prefixes("foo/bar"), "foo/bar")
-        self.assert_equal(remove_dotdot_prefixes("/foo/bar"), "foo/bar")
-        self.assert_equal(remove_dotdot_prefixes("../foo/bar"), "foo/bar")
+def test_remove_dot_prefixes():
+    assert remove_dotdot_prefixes(".") == "."
+    assert remove_dotdot_prefixes("..") == "."
+    assert remove_dotdot_prefixes("/") == "."
+    assert remove_dotdot_prefixes("//") == "."
+    assert remove_dotdot_prefixes("foo") == "foo"
+    assert remove_dotdot_prefixes("foo/bar") == "foo/bar"
+    assert remove_dotdot_prefixes("/foo/bar") == "foo/bar"
+    assert remove_dotdot_prefixes("../foo/bar") == "foo/bar"
 
 
-class MakePathSafeTestCase(BaseTestCase):
-    def test(self):
-        self.assert_equal(make_path_safe("."), ".")
-        self.assert_equal(make_path_safe("./"), ".")
-        self.assert_equal(make_path_safe("./foo"), "foo")
-        self.assert_equal(make_path_safe(".//foo"), "foo")
-        self.assert_equal(make_path_safe(".//foo//bar//"), "foo/bar")
-        self.assert_equal(make_path_safe("/foo/bar"), "foo/bar")
-        self.assert_equal(make_path_safe("//foo/bar"), "foo/bar")
-        self.assert_equal(make_path_safe("//foo/./bar"), "foo/bar")
-        self.assert_equal(make_path_safe(".test"), ".test")
-        self.assert_equal(make_path_safe(".test."), ".test.")
-        self.assert_equal(make_path_safe("..test.."), "..test..")
-        self.assert_equal(make_path_safe("/te..st/foo/bar"), "te..st/foo/bar")
-        self.assert_equal(make_path_safe("/..test../abc//"), "..test../abc")
+def test_make_path_safe():
+    assert make_path_safe(".") == "."
+    assert make_path_safe("./") == "."
+    assert make_path_safe("./foo") == "foo"
+    assert make_path_safe(".//foo") == "foo"
+    assert make_path_safe(".//foo//bar//") == "foo/bar"
+    assert make_path_safe("/foo/bar") == "foo/bar"
+    assert make_path_safe("//foo/bar") == "foo/bar"
+    assert make_path_safe("//foo/./bar") == "foo/bar"
+    assert make_path_safe(".test") == ".test"
+    assert make_path_safe(".test.") == ".test."
+    assert make_path_safe("..test..") == "..test.."
+    assert make_path_safe("/te..st/foo/bar") == "te..st/foo/bar"
+    assert make_path_safe("/..test../abc//") == "..test../abc"
 
-        for path in rejected_dotdot_paths:
-            with pytest.raises(ValueError, match="unexpected '..' element in path"):
-                make_path_safe(path)
+    for path in rejected_dotdot_paths:
+        with pytest.raises(ValueError, match="unexpected '..' element in path"):
+            make_path_safe(path)
 
 
 class MockArchive:
@@ -503,7 +500,7 @@ def test_prune_split_keep_oldest():
         MockArchive(datetime(2018, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
         # an interim backup
         MockArchive(datetime(2018, 12, 30, 10, 0, 0, tzinfo=local_tz), 2),
-        # year end backups
+        # year-end backups
         MockArchive(datetime(2018, 12, 31, 10, 0, 0, tzinfo=local_tz), 3),
         MockArchive(datetime(2019, 12, 31, 10, 0, 0, tzinfo=local_tz), 4),
     ]
@@ -527,9 +524,6 @@ def test_prune_split_keep_oldest():
 
 
 def test_prune_split_no_archives():
-    def subset(lst, ids):
-        return {i for i in lst if i.id in ids}
-
     archives = []
 
     kept_because = {}
@@ -539,77 +533,73 @@ def test_prune_split_no_archives():
     assert kept_because == {}
 
 
-class IntervalTestCase(BaseTestCase):
-    def test_interval(self):
-        self.assert_equal(interval("1H"), 1)
-        self.assert_equal(interval("1d"), 24)
-        self.assert_equal(interval("1w"), 168)
-        self.assert_equal(interval("1m"), 744)
-        self.assert_equal(interval("1y"), 8760)
-
-    def test_interval_time_unit(self):
-        with pytest.raises(ArgumentTypeError) as exc:
-            interval("H")
-        self.assert_equal(exc.value.args, ('Unexpected interval number "": expected an integer greater than 0',))
-        with pytest.raises(ArgumentTypeError) as exc:
-            interval("-1d")
-        self.assert_equal(exc.value.args, ('Unexpected interval number "-1": expected an integer greater than 0',))
-        with pytest.raises(ArgumentTypeError) as exc:
-            interval("food")
-        self.assert_equal(exc.value.args, ('Unexpected interval number "foo": expected an integer greater than 0',))
-
-    def test_interval_number(self):
-        with pytest.raises(ArgumentTypeError) as exc:
-            interval("5")
-        self.assert_equal(
-            exc.value.args, ("Unexpected interval time unit \"5\": expected one of ['H', 'd', 'w', 'm', 'y']",)
-        )
+def test_interval():
+    assert interval("1H") == 1
+    assert interval("1d") == 24
+    assert interval("1w") == 168
+    assert interval("1m") == 744
+    assert interval("1y") == 8760
 
 
-class PruneWithinTestCase(BaseTestCase):
-    def test_prune_within(self):
-        def subset(lst, indices):
-            return {lst[i] for i in indices}
-
-        def dotest(test_archives, within, indices):
-            for ta in test_archives, reversed(test_archives):
-                kept_because = {}
-                keep = prune_within(ta, interval(within), kept_because)
-                self.assert_equal(set(keep), subset(test_archives, indices))
-                assert all("within" == kept_because[a.id][0] for a in keep)
-
-        # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours
-        test_offsets = [60, 90 * 60, 150 * 60, 210 * 60, 25 * 60 * 60, 49 * 60 * 60]
-        now = datetime.now(timezone.utc)
-        test_dates = [now - timedelta(seconds=s) for s in test_offsets]
-        test_archives = [MockArchive(date, i) for i, date in enumerate(test_dates)]
-
-        dotest(test_archives, "1H", [0])
-        dotest(test_archives, "2H", [0, 1])
-        dotest(test_archives, "3H", [0, 1, 2])
-        dotest(test_archives, "24H", [0, 1, 2, 3])
-        dotest(test_archives, "26H", [0, 1, 2, 3, 4])
-        dotest(test_archives, "2d", [0, 1, 2, 3, 4])
-        dotest(test_archives, "50H", [0, 1, 2, 3, 4, 5])
-        dotest(test_archives, "3d", [0, 1, 2, 3, 4, 5])
-        dotest(test_archives, "1w", [0, 1, 2, 3, 4, 5])
-        dotest(test_archives, "1m", [0, 1, 2, 3, 4, 5])
-        dotest(test_archives, "1y", [0, 1, 2, 3, 4, 5])
+@pytest.mark.parametrize(
+    "invalid_interval, error_tuple",
+    [
+        ("H", ('Unexpected interval number "": expected an integer greater than 0',)),
+        ("-1d", ('Unexpected interval number "-1": expected an integer greater than 0',)),
+        ("food", ('Unexpected interval number "foo": expected an integer greater than 0',)),
+    ],
+)
+def test_interval_time_unit(invalid_interval, error_tuple):
+    with pytest.raises(ArgumentTypeError) as exc:
+        interval(invalid_interval)
+    assert exc.value.args == error_tuple
 
 
-class StableDictTestCase(BaseTestCase):
-    def test(self):
-        d = StableDict(foo=1, bar=2, boo=3, baz=4)
-        self.assert_equal(list(d.items()), [("bar", 2), ("baz", 4), ("boo", 3), ("foo", 1)])
-        self.assert_equal(hashlib.md5(msgpack.packb(d)).hexdigest(), "fc78df42cd60691b3ac3dd2a2b39903f")
+def test_interval_number():
+    with pytest.raises(ArgumentTypeError) as exc:
+        interval("5")
+    assert exc.value.args == ("Unexpected interval time unit \"5\": expected one of ['H', 'd', 'w', 'm', 'y']",)
 
 
-class TestParseTimestamp(BaseTestCase):
-    def test(self):
-        self.assert_equal(
-            parse_timestamp("2015-04-19T20:25:00.226410"), datetime(2015, 4, 19, 20, 25, 0, 226410, timezone.utc)
-        )
-        self.assert_equal(parse_timestamp("2015-04-19T20:25:00"), datetime(2015, 4, 19, 20, 25, 0, 0, timezone.utc))
+def test_prune_within():
+    def subset(lst, indices):
+        return {lst[i] for i in indices}
+
+    def dotest(test_archives, within, indices):
+        for ta in test_archives, reversed(test_archives):
+            kept_because = {}
+            keep = prune_within(ta, interval(within), kept_because)
+            assert set(keep) == subset(test_archives, indices)
+            assert all("within" == kept_because[a.id][0] for a in keep)
+
+    # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours
+    test_offsets = [60, 90 * 60, 150 * 60, 210 * 60, 25 * 60 * 60, 49 * 60 * 60]
+    now = datetime.now(timezone.utc)
+    test_dates = [now - timedelta(seconds=s) for s in test_offsets]
+    test_archives = [MockArchive(date, i) for i, date in enumerate(test_dates)]
+
+    dotest(test_archives, "1H", [0])
+    dotest(test_archives, "2H", [0, 1])
+    dotest(test_archives, "3H", [0, 1, 2])
+    dotest(test_archives, "24H", [0, 1, 2, 3])
+    dotest(test_archives, "26H", [0, 1, 2, 3, 4])
+    dotest(test_archives, "2d", [0, 1, 2, 3, 4])
+    dotest(test_archives, "50H", [0, 1, 2, 3, 4, 5])
+    dotest(test_archives, "3d", [0, 1, 2, 3, 4, 5])
+    dotest(test_archives, "1w", [0, 1, 2, 3, 4, 5])
+    dotest(test_archives, "1m", [0, 1, 2, 3, 4, 5])
+    dotest(test_archives, "1y", [0, 1, 2, 3, 4, 5])
+
+
+def test_stable_dict():
+    d = StableDict(foo=1, bar=2, boo=3, baz=4)
+    assert list(d.items()) == [("bar", 2), ("baz", 4), ("boo", 3), ("foo", 1)]
+    assert hashlib.md5(msgpack.packb(d)).hexdigest() == "fc78df42cd60691b3ac3dd2a2b39903f"
+
+
+def test_parse_timestamp():
+    assert parse_timestamp("2015-04-19T20:25:00.226410") == datetime(2015, 4, 19, 20, 25, 0, 226410, timezone.utc)
+    assert parse_timestamp("2015-04-19T20:25:00") == datetime(2015, 4, 19, 20, 25, 0, 0, timezone.utc)
 
 
 def test_get_base_dir(monkeypatch):

@@ -14,39 +14,54 @@ import pytest
 from ..archiver.prune_cmd import prune_within, prune_split
 from .. import platform
 from ..constants import MAX_DATA_SIZE
-from ..helpers import Location
-from ..helpers import Buffer
+from ..helpers import DEFAULTISH, FALSISH, SUPPORT_32BIT_PLATFORMS, TRUISH
 from ..helpers import (
-    partial_format,
-    format_file_size,
-    parse_file_size,
-    format_timedelta,
-    format_line,
+    Buffer,
+    ChunkerParams,
+    ChunkIteratorFileWrapper,
+    Location,
     PlaceholderError,
-    replace_placeholders,
+    ProgressIndicatorPercent,
+    StableDict,
 )
-from ..helpers import remove_dotdot_prefixes, make_path_safe, clean_lines
-from ..helpers import interval
-from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir, get_runtime_dir
-from ..helpers import is_slow_msgpack
-from ..helpers import msgpack
-from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
-from ..helpers import StableDict, bin_to_hex
-from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
-from ..helpers import archivename_validator, text_validator
-from ..helpers import ProgressIndicatorPercent
-from ..helpers import swidth_slice
-from ..helpers import chunkit
-from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
-from ..helpers import popen_with_error_handling
-from ..helpers import dash_open
-from ..helpers import iter_separated
-from ..helpers import eval_escapes
-from ..helpers import safe_unlink
-from ..helpers import text_to_json, binary_to_json
+from ..helpers import (
+    archivename_validator,
+    bin_to_hex,
+    binary_to_json,
+    chunkit,
+    clean_lines,
+    dash_open,
+    eval_escapes,
+    format_file_size,
+    format_line,
+    format_timedelta,
+    get_base_dir,
+    get_cache_dir,
+    get_config_dir,
+    get_keys_dir,
+    get_runtime_dir,
+    get_security_dir,
+    interval,
+    is_slow_msgpack,
+    iter_separated,
+    make_path_safe,
+    msgpack,
+    parse_file_size,
+    parse_timestamp,
+    partial_format,
+    popen_with_error_handling,
+    remove_dotdot_prefixes,
+    replace_placeholders,
+    safe_ns,
+    safe_s,
+    safe_unlink,
+    swidth_slice,
+    text_to_json,
+    text_validator,
+    yes,
+)
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 from ..platform import is_cygwin, is_win32, is_darwin
-
 from . import FakeInputs, are_hardlinks_supported
 from . import rejected_dotdot_paths
 
@@ -371,59 +386,81 @@ def test_format_timedelta():
     assert format_timedelta(t1 - t0) == "2 hours 1.10 seconds"
 
 
-def test_chunkerparams():
-    assert ChunkerParams("default") == ("buzhash", 19, 23, 21, 4095)
-    assert ChunkerParams("19,23,21,4095") == ("buzhash", 19, 23, 21, 4095)
-    assert ChunkerParams("buzhash,19,23,21,4095") == ("buzhash", 19, 23, 21, 4095)
-    assert ChunkerParams("10,23,16,4095") == ("buzhash", 10, 23, 16, 4095)
-    assert ChunkerParams("fixed,4096") == ("fixed", 4096, 0)
-    assert ChunkerParams("fixed,4096,200") == ("fixed", 4096, 200)
-    # invalid values checking
-    with pytest.raises(ArgumentTypeError):
-        ChunkerParams("crap,1,2,3,4")  # invalid algo
-    with pytest.raises(ArgumentTypeError):
-        ChunkerParams("buzhash,5,7,6,4095")  # too small min. size
-    with pytest.raises(ArgumentTypeError):
-        ChunkerParams("buzhash,19,24,21,4095")  # too big max. size
-    with pytest.raises(ArgumentTypeError):
-        ChunkerParams("buzhash,23,19,21,4095")  # violates min <= mask <= max
-    with pytest.raises(ArgumentTypeError):
-        ChunkerParams("fixed,63")  # too small block size
-    with pytest.raises(ArgumentTypeError):
-        ChunkerParams("fixed,%d,%d" % (MAX_DATA_SIZE + 1, 4096))  # too big block size
-    with pytest.raises(ArgumentTypeError):
-        ChunkerParams("fixed,%d,%d" % (4096, MAX_DATA_SIZE + 1))  # too big header size
+@pytest.mark.parametrize(
+    "chunker_params, expected_return",
+    [
+        ("default", ("buzhash", 19, 23, 21, 4095)),
+        ("19,23,21,4095", ("buzhash", 19, 23, 21, 4095)),
+        ("buzhash,19,23,21,4095", ("buzhash", 19, 23, 21, 4095)),
+        ("10,23,16,4095", ("buzhash", 10, 23, 16, 4095)),
+        ("fixed,4096", ("fixed", 4096, 0)),
+        ("fixed,4096,200", ("fixed", 4096, 200)),
+    ],
+)
+def test_valid_chunkerparams(chunker_params, expected_return):
+    assert ChunkerParams(chunker_params) == expected_return
 
 
-def test_remove_dot_prefixes():
-    assert remove_dotdot_prefixes(".") == "."
-    assert remove_dotdot_prefixes("..") == "."
-    assert remove_dotdot_prefixes("/") == "."
-    assert remove_dotdot_prefixes("//") == "."
-    assert remove_dotdot_prefixes("foo") == "foo"
-    assert remove_dotdot_prefixes("foo/bar") == "foo/bar"
-    assert remove_dotdot_prefixes("/foo/bar") == "foo/bar"
-    assert remove_dotdot_prefixes("../foo/bar") == "foo/bar"
+@pytest.mark.parametrize(
+    "invalid_chunker_params",
+    [
+        "crap,1,2,3,4",  # invalid algo
+        "buzhash,5,7,6,4095",  # too small min. size
+        "buzhash,19,24,21,4095",  # too big max. size
+        "buzhash,23,19,21,4095",  # violates min <= mask <= max
+        "fixed,63",  # too small block size
+        "fixed,%d,%d" % (MAX_DATA_SIZE + 1, 4096),  # too big block size
+        "fixed,%d,%d" % (4096, MAX_DATA_SIZE + 1),  # too big header size
+    ],
+)
+def test_invalid_chunkerparams(invalid_chunker_params):
+    with pytest.raises(ArgumentTypeError):
+        ChunkerParams(invalid_chunker_params)
 
 
-def test_make_path_safe():
-    assert make_path_safe(".") == "."
-    assert make_path_safe("./") == "."
-    assert make_path_safe("./foo") == "foo"
-    assert make_path_safe(".//foo") == "foo"
-    assert make_path_safe(".//foo//bar//") == "foo/bar"
-    assert make_path_safe("/foo/bar") == "foo/bar"
-    assert make_path_safe("//foo/bar") == "foo/bar"
-    assert make_path_safe("//foo/./bar") == "foo/bar"
-    assert make_path_safe(".test") == ".test"
-    assert make_path_safe(".test.") == ".test."
-    assert make_path_safe("..test..") == "..test.."
-    assert make_path_safe("/te..st/foo/bar") == "te..st/foo/bar"
-    assert make_path_safe("/..test../abc//") == "..test../abc"
+@pytest.mark.parametrize(
+    "original_path, expected_path",
+    [
+        (".", "."),
+        ("..", "."),
+        ("/", "."),
+        ("//", "."),
+        ("foo", "foo"),
+        ("foo/bar", "foo/bar"),
+        ("/foo/bar", "foo/bar"),
+        ("../foo/bar", "foo/bar"),
+    ],
+)
+def test_remove_dotdot_prefixes(original_path, expected_path):
+    assert remove_dotdot_prefixes(original_path) == expected_path
 
-    for path in rejected_dotdot_paths:
-        with pytest.raises(ValueError, match="unexpected '..' element in path"):
-            make_path_safe(path)
+
+@pytest.mark.parametrize(
+    "original_path, expected_path",
+    [
+        (".", "."),
+        ("./", "."),
+        ("/foo", "foo"),
+        ("//foo", "foo"),
+        (".//foo//bar//", "foo/bar"),
+        ("/foo/bar", "foo/bar"),
+        ("//foo/bar", "foo/bar"),
+        ("//foo/./bar", "foo/bar"),
+        (".test", ".test"),
+        (".test.", ".test."),
+        ("..test..", "..test.."),
+        ("/te..st/foo/bar", "te..st/foo/bar"),
+        ("/..test../abc//", "..test../abc"),
+    ],
+)
+def test_valid_make_path_safe(original_path, expected_path):
+    assert make_path_safe(original_path) == expected_path
+
+
+@pytest.mark.parametrize("path", rejected_dotdot_paths)
+def test_invalid_make_path_safe(path):
+    with pytest.raises(ValueError, match="unexpected '..' element in path"):
+        make_path_safe(path)
 
 
 class MockArchive:
@@ -533,12 +570,9 @@ def test_prune_split_no_archives():
     assert kept_because == {}
 
 
-def test_interval():
-    assert interval("1H") == 1
-    assert interval("1d") == 24
-    assert interval("1w") == 168
-    assert interval("1m") == 744
-    assert interval("1y") == 8760
+@pytest.mark.parametrize("timeframe, num_hours", [("1H", 1), ("1d", 24), ("1w", 168), ("1m", 744), ("1y", 8760)])
+def test_interval(timeframe, num_hours):
+    assert interval(timeframe) == num_hours
 
 
 @pytest.mark.parametrize(
@@ -804,70 +838,79 @@ def test_get_runtime_dir(monkeypatch):
         assert get_runtime_dir() == "/var/tmp"
 
 
-def test_file_size():
+@pytest.mark.parametrize(
+    "size, fmt",
+    [
+        (0, "0 B"),  # no rounding necessary for those
+        (1, "1 B"),
+        (142, "142 B"),
+        (999, "999 B"),
+        (1000, "1.00 kB"),  # rounding starts here
+        (1001, "1.00 kB"),  # should be rounded away
+        (1234, "1.23 kB"),  # should be rounded down
+        (1235, "1.24 kB"),  # should be rounded up
+        (1010, "1.01 kB"),  # rounded down as well
+        (999990000, "999.99 MB"),  # rounded down
+        (999990001, "999.99 MB"),  # rounded down
+        (999995000, "1.00 GB"),  # rounded up to next unit
+        (10**6, "1.00 MB"),  # and all the remaining units, megabytes
+        (10**9, "1.00 GB"),  # gigabytes
+        (10**12, "1.00 TB"),  # terabytes
+        (10**15, "1.00 PB"),  # petabytes
+        (10**18, "1.00 EB"),  # exabytes
+        (10**21, "1.00 ZB"),  # zottabytes
+        (10**24, "1.00 YB"),  # yottabytes
+        (-1, "-1 B"),  # negative value
+        (-1010, "-1.01 kB"),  # negative value with rounding
+    ],
+)
+def test_file_size(size, fmt):
     """test the size formatting routines"""
-    si_size_map = {
-        0: "0 B",  # no rounding necessary for those
-        1: "1 B",
-        142: "142 B",
-        999: "999 B",
-        1000: "1.00 kB",  # rounding starts here
-        1001: "1.00 kB",  # should be rounded away
-        1234: "1.23 kB",  # should be rounded down
-        1235: "1.24 kB",  # should be rounded up
-        1010: "1.01 kB",  # rounded down as well
-        999990000: "999.99 MB",  # rounded down
-        999990001: "999.99 MB",  # rounded down
-        999995000: "1.00 GB",  # rounded up to next unit
-        10**6: "1.00 MB",  # and all the remaining units, megabytes
-        10**9: "1.00 GB",  # gigabytes
-        10**12: "1.00 TB",  # terabytes
-        10**15: "1.00 PB",  # petabytes
-        10**18: "1.00 EB",  # exabytes
-        10**21: "1.00 ZB",  # zottabytes
-        10**24: "1.00 YB",  # yottabytes
-        -1: "-1 B",  # negative value
-        -1010: "-1.01 kB",  # negative value with rounding
-    }
-    for size, fmt in si_size_map.items():
-        assert format_file_size(size) == fmt
-
-
-def test_file_size_iec():
-    """test the size formatting routines"""
-    iec_size_map = {
-        0: "0 B",
-        2**0: "1 B",
-        2**10: "1.00 KiB",
-        2**20: "1.00 MiB",
-        2**30: "1.00 GiB",
-        2**40: "1.00 TiB",
-        2**50: "1.00 PiB",
-        2**60: "1.00 EiB",
-        2**70: "1.00 ZiB",
-        2**80: "1.00 YiB",
-        -(2**0): "-1 B",
-        -(2**10): "-1.00 KiB",
-        -(2**20): "-1.00 MiB",
-    }
-    for size, fmt in iec_size_map.items():
-        assert format_file_size(size, iec=True) == fmt
-
-
-def test_file_size_precision():
-    assert format_file_size(1234, precision=1) == "1.2 kB"  # rounded down
-    assert format_file_size(1254, precision=1) == "1.3 kB"  # rounded up
-    assert format_file_size(999990000, precision=1) == "1.0 GB"  # and not 999.9 MB or 1000.0 MB
-
-
-def test_file_size_sign():
-    si_size_map = {0: "0 B", 1: "+1 B", 1234: "+1.23 kB", -1: "-1 B", -1234: "-1.23 kB"}
-    for size, fmt in si_size_map.items():
-        assert format_file_size(size, sign=True) == fmt
+    assert format_file_size(size) == fmt
 
 
 @pytest.mark.parametrize(
-    "string,value", (("1", 1), ("20", 20), ("5K", 5000), ("1.75M", 1750000), ("1e+9", 1e9), ("-1T", -1e12))
+    "size, fmt",
+    [
+        (0, "0 B"),
+        (2**0, "1 B"),
+        (2**10, "1.00 KiB"),
+        (2**20, "1.00 MiB"),
+        (2**30, "1.00 GiB"),
+        (2**40, "1.00 TiB"),
+        (2**50, "1.00 PiB"),
+        (2**60, "1.00 EiB"),
+        (2**70, "1.00 ZiB"),
+        (2**80, "1.00 YiB"),
+        (-(2**0), "-1 B"),
+        (-(2**10), "-1.00 KiB"),
+        (-(2**20), "-1.00 MiB"),
+    ],
+)
+def test_file_size_iec(size, fmt):
+    """test the size formatting routines"""
+    assert format_file_size(size, iec=True) == fmt
+
+
+@pytest.mark.parametrize(
+    "original_size, formatted_size",
+    [
+        (1234, "1.2 kB"),  # rounded down
+        (1254, "1.3 kB"),  # rounded up
+        (999990000, "1.0 GB"),  # and not 999.9 MB or 1000.0 MB
+    ],
+)
+def test_file_size_precision(original_size, formatted_size):
+    assert format_file_size(original_size, precision=1) == formatted_size
+
+
+@pytest.mark.parametrize("size, fmt", [(0, "0 B"), (1, "+1 B"), (1234, "+1.23 kB"), (-1, "-1 B"), (-1234, "-1.23 kB")])
+def test_file_size_sign(size, fmt):
+    assert format_file_size(size, sign=True) == fmt
+
+
+@pytest.mark.parametrize(
+    "string, value", [("1", 1), ("20", 20), ("5K", 5000), ("1.75M", 1750000), ("1e+9", 1e9), ("-1T", -1e12)]
 )
 def test_parse_file_size(string, value):
     assert parse_file_size(string) == int(value)
@@ -1096,12 +1139,18 @@ def test_progress_percentage_quiet(capfd):
     assert err == ""
 
 
-def test_partial_format():
-    assert partial_format("{space:10}", {"space": " "}) == " " * 10
-    assert partial_format("{foobar}", {"bar": "wrong", "foobar": "correct"}) == "correct"
-    assert partial_format("{unknown_key}", {}) == "{unknown_key}"
-    assert partial_format("{key}{{escaped_key}}", {}) == "{key}{{escaped_key}}"
-    assert partial_format("{{escaped_key}}", {"escaped_key": 1234}) == "{{escaped_key}}"
+@pytest.mark.parametrize(
+    "fmt, items_map, expected_result",
+    [
+        ("{space:10}", {"space": " "}, " " * 10),
+        ("{foobar}", {"bar": "wrong", "foobar": "correct"}, "correct"),
+        ("{unknown_key}", {}, "{unknown_key}"),
+        ("{key}{{escaped_key}}", {}, "{key}{{escaped_key}}"),
+        ("{{escaped_key}}", {"escaped_key": 1234}, "{{escaped_key}}"),
+    ],
+)
+def test_partial_format(fmt, items_map, expected_result):
+    assert partial_format(fmt, items_map) == expected_result
 
 
 def test_chunk_file_wrapper():

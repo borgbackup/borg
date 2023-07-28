@@ -8,7 +8,7 @@ import pytest
 from ...cache import Cache, LocalCache
 from ...constants import *  # NOQA
 from ...crypto.key import TAMRequiredError
-from ...helpers import Location, get_security_dir, bin_to_hex
+from ...helpers import Location, get_security_dir, bin_to_hex, archive_ts_now
 from ...helpers import EXIT_ERROR
 from ...helpers import msgpack
 from ...manifest import Manifest, MandatoryFeatureUnsupported
@@ -322,7 +322,7 @@ def test_check_cache(archivers, request):
         check_cache(archiver)
 
 
-#  Begin manifest tests
+#  Begin manifest TAM tests
 def spoof_manifest(repository):
     with repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -378,6 +378,62 @@ def test_not_required(archiver):
     # Fails
     with pytest.raises(TAMRequiredError):
         cmd(archiver, "rlist")
+
+
+#  Begin archive TAM tests
+def write_archive_without_tam(repository, archive_name):
+    manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+    archive_data = msgpack.packb(
+        {
+            "version": 2,
+            "name": archive_name,
+            "item_ptrs": [],
+            "command_line": "",
+            "hostname": "",
+            "username": "",
+            "time": archive_ts_now().isoformat(timespec="microseconds"),
+            "size": 0,
+            "nfiles": 0,
+        }
+    )
+    archive_id = manifest.repo_objs.id_hash(archive_data)
+    cdata = manifest.repo_objs.format(archive_id, {}, archive_data)
+    repository.put(archive_id, cdata)
+    manifest.archives[archive_name] = (archive_id, datetime.now())
+    manifest.write()
+    repository.commit(compact=False)
+
+
+def test_check_rebuild_manifest(archiver):
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    create_src_archive(archiver, "archive_tam")
+    repository = Repository(archiver.repository_path, exclusive=True)
+    with repository:
+        write_archive_without_tam(repository, "archive_no_tam")
+        repository.delete(Manifest.MANIFEST_ID)  # kill manifest, so check has to rebuild it
+        repository.commit(compact=False)
+    cmd(archiver, "check", "--repair")
+    output = cmd(archiver, "rlist", "--format='{name} tam:{tam}{NL}'")
+    assert "archive_tam tam:verified" in output  # TAM-verified archive is in rebuilt manifest
+    assert "archive_no_tam" not in output  # check got rid of untrusted not TAM-verified archive
+
+
+def test_check_rebuild_refcounts(archiver):
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    create_src_archive(archiver, "archive_tam")
+    archive_id_pre_check = cmd(archiver, "rlist", "--format='{name} {id}{NL}'")
+    repository = Repository(archiver.repository_path, exclusive=True)
+    with repository:
+        write_archive_without_tam(repository, "archive_no_tam")
+    output = cmd(archiver, "rlist", "--format='{name} tam:{tam}{NL}'")
+    assert "archive_tam tam:verified" in output  # good
+    assert "archive_no_tam tam:none" in output  # could be borg < 1.0.9 archive or fake
+    cmd(archiver, "check", "--repair")
+    output = cmd(archiver, "rlist", "--format='{name} tam:{tam}{NL}'")
+    assert "archive_tam tam:verified" in output  # TAM-verified archive still there
+    assert "archive_no_tam" not in output  # check got rid of untrusted not TAM-verified archive
+    archive_id_post_check = cmd(archiver, "rlist", "--format='{name} {id}{NL}'")
+    assert archive_id_post_check == archive_id_pre_check  # rebuild_refcounts didn't change archive_tam archive id
 
 
 # Begin Remote Tests

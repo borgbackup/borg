@@ -1737,7 +1737,7 @@ class Archiver:
                     else:
                         print("Archive TAM present: %s" % archive_formatted)
                 manifest.write()
-                repository.commit(compact=False)
+                repository.commit()
                 cache.commit()
         elif args.tam:
             manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)

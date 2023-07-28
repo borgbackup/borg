@@ -39,11 +39,11 @@ from ..archiver import Archiver, parse_storage_quota, PURE_PYTHON_MSGPACK_WARNIN
 from ..cache import Cache, LocalCache
 from ..constants import *  # NOQA
 from ..crypto.low_level import bytes_to_long, num_aes_blocks
-from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError
+from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError, ArchiveTAMRequiredError
 from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
 from ..helpers import Location, get_security_dir
-from ..helpers import Manifest, MandatoryFeatureUnsupported
+from ..helpers import Manifest, MandatoryFeatureUnsupported, ArchiveInfo
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from ..helpers import bin_to_hex
 from ..helpers import MAX_S
@@ -3586,6 +3586,70 @@ class ManifestAuthenticationTest(ArchiverTestCaseBase):
         self.spoof_manifest(repository)
         self.cmd('upgrade', '--disable-tam', self.repository_location)
         assert not self.cmd('list', self.repository_location)
+
+
+class ArchiveAuthenticationTest(ArchiverTestCaseBase):
+
+    def write_archive_without_tam(self, repository, archive_name):
+        manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+        archive_data = msgpack.packb({
+            'version': 1,
+            'name': archive_name,
+            'items': [],
+            'cmdline': '',
+            'hostname': '',
+            'username': '',
+            'time': datetime.utcnow().strftime(ISO_FORMAT),
+        })
+        archive_id = key.id_hash(archive_data)
+        repository.put(archive_id, key.encrypt(archive_data))
+        manifest.archives[archive_name] = (archive_id, datetime.now())
+        manifest.write()
+        repository.commit()
+
+    def test_upgrade_archives_tam(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('archive_tam')
+        repository = Repository(self.repository_path, exclusive=True)
+        with repository:
+            self.write_archive_without_tam(repository, "archive_no_tam")
+        output = self.cmd('list', '--format="{name} tam:{tam}{NL}"', self.repository_location)
+        assert 'archive_tam tam:verified' in output  # good
+        assert 'archive_no_tam tam:none' in output  # could be borg < 1.0.9 archive or fake
+        self.cmd('upgrade', '--archives-tam', self.repository_location)
+        output = self.cmd('list', '--format="{name} tam:{tam}{NL}"', self.repository_location)
+        assert 'archive_tam tam:verified' in output  # still good
+        assert 'archive_no_tam tam:verified' in output  # previously TAM-less archives got a TAM now
+
+    def test_check_rebuild_manifest(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('archive_tam')
+        repository = Repository(self.repository_path, exclusive=True)
+        with repository:
+            self.write_archive_without_tam(repository, "archive_no_tam")
+            repository.delete(Manifest.MANIFEST_ID)  # kill manifest, so check has to rebuild it
+            repository.commit()
+        self.cmd('check', '--repair', self.repository_location)
+        output = self.cmd('list', '--format="{name} tam:{tam}{NL}"', self.repository_location)
+        assert 'archive_tam tam:verified' in output  # TAM-verified archive is in rebuilt manifest
+        assert 'archive_no_tam' not in output  # check got rid of untrusted not TAM-verified archive
+
+    def test_check_rebuild_refcounts(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_src_archive('archive_tam')
+        archive_id_pre_check = self.cmd('list', '--format="{name} {id}{NL}"', self.repository_location)
+        repository = Repository(self.repository_path, exclusive=True)
+        with repository:
+            self.write_archive_without_tam(repository, "archive_no_tam")
+        output = self.cmd('list', '--format="{name} tam:{tam}{NL}"', self.repository_location)
+        assert 'archive_tam tam:verified' in output  # good
+        assert 'archive_no_tam tam:none' in output  # could be borg < 1.0.9 archive or fake
+        self.cmd('check', '--repair', self.repository_location)
+        output = self.cmd('list', '--format="{name} tam:{tam}{NL}"', self.repository_location)
+        assert 'archive_tam tam:verified' in output  # TAM-verified archive still there
+        assert 'archive_no_tam' not in output  # check got rid of untrusted not TAM-verified archive
+        archive_id_post_check = self.cmd('list', '--format="{name} {id}{NL}"', self.repository_location)
+        assert archive_id_post_check == archive_id_pre_check  # rebuild_refcounts didn't change archive_tam archive id
 
 
 class RemoteArchiverTestCase(ArchiverTestCase):

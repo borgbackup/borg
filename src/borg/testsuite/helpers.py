@@ -14,52 +14,36 @@ import pytest
 from ..archiver.prune_cmd import prune_within, prune_split
 from .. import platform
 from ..constants import MAX_DATA_SIZE
-from ..helpers import DEFAULTISH, FALSISH, SUPPORT_32BIT_PLATFORMS, TRUISH
+from ..helpers import Location
+from ..helpers import Buffer
 from ..helpers import (
-    Buffer,
-    ChunkerParams,
-    ChunkIteratorFileWrapper,
-    Location,
-    PlaceholderError,
-    ProgressIndicatorPercent,
-    StableDict,
-)
-from ..helpers import (
-    archivename_validator,
-    bin_to_hex,
-    binary_to_json,
-    chunkit,
-    clean_lines,
-    dash_open,
-    eval_escapes,
-    format_file_size,
-    format_line,
-    format_timedelta,
-    get_base_dir,
-    get_cache_dir,
-    get_config_dir,
-    get_keys_dir,
-    get_runtime_dir,
-    get_security_dir,
-    interval,
-    is_slow_msgpack,
-    iter_separated,
-    make_path_safe,
-    msgpack,
-    parse_file_size,
-    parse_timestamp,
     partial_format,
-    popen_with_error_handling,
-    remove_dotdot_prefixes,
+    format_file_size,
+    parse_file_size,
+    format_timedelta,
+    format_line,
+    PlaceholderError,
     replace_placeholders,
-    safe_ns,
-    safe_s,
-    safe_unlink,
-    swidth_slice,
-    text_to_json,
-    text_validator,
-    yes,
 )
+from ..helpers import remove_dotdot_prefixes, make_path_safe, clean_lines
+from ..helpers import interval
+from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir, get_runtime_dir
+from ..helpers import is_slow_msgpack
+from ..helpers import msgpack
+from ..helpers import yes, TRUISH, FALSISH, DEFAULTISH
+from ..helpers import StableDict, bin_to_hex
+from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
+from ..helpers import archivename_validator, text_validator
+from ..helpers import ProgressIndicatorPercent
+from ..helpers import swidth_slice
+from ..helpers import chunkit
+from ..helpers import safe_ns, safe_s, SUPPORT_32BIT_PLATFORMS
+from ..helpers import popen_with_error_handling
+from ..helpers import dash_open
+from ..helpers import iter_separated
+from ..helpers import eval_escapes
+from ..helpers import safe_unlink
+from ..helpers import text_to_json, binary_to_json
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded
 from ..platform import is_cygwin, is_win32, is_darwin
 from . import FakeInputs, are_hardlinks_supported

@@ -1,4 +1,4 @@
-""" Dummy file for now, will eventually contain FreeBSD ACL tests """
+"""Dummy file for now, will eventually contain FreeBSD ACL tests."""
 import pytest
 
 from .platform import skipif_not_freebsd

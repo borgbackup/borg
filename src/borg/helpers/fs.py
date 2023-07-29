@@ -450,7 +450,6 @@ flags_special = flags_base | O_("NOFOLLOW")  # BLOCK == wait when reading device
 flags_special_follow = flags_base  # BLOCK == wait when reading symlinked devices or fifos
 flags_normal = flags_base | O_("NONBLOCK", "NOFOLLOW")
 flags_noatime = flags_normal | O_("NOATIME")
-flags_root = O_("RDONLY")
 flags_dir = O_("DIRECTORY", "RDONLY", "NOFOLLOW")
 
 

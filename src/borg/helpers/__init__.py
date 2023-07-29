@@ -15,7 +15,7 @@ from .fs import ensure_dir, join_base_dir, get_socket_filename
 from .fs import get_security_dir, get_keys_dir, get_base_dir, get_cache_dir, get_config_dir, get_runtime_dir
 from .fs import dir_is_tagged, dir_is_cachedir, remove_dotdot_prefixes, make_path_safe, scandir_inorder
 from .fs import secure_erase, safe_unlink, dash_open, os_open, os_stat, umount
-from .fs import O_, flags_root, flags_dir, flags_special_follow, flags_special, flags_base, flags_normal, flags_noatime
+from .fs import O_, flags_dir, flags_special_follow, flags_special, flags_base, flags_normal, flags_noatime
 from .fs import HardLinkManager
 from .misc import sysinfo, log_multi, consume
 from .misc import ChunkIteratorFileWrapper, open_item, chunkit, iter_separated, ErrorIgnoringTextIOWrapper

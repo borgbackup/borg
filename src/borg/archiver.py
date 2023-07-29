@@ -70,7 +70,7 @@ try:
     from .helpers import popen_with_error_handling, prepare_subprocess_env, create_filter_process
     from .helpers import dash_open
     from .helpers import umount
-    from .helpers import flags_root, flags_dir, flags_special_follow, flags_special
+    from .helpers import flags_dir, flags_special_follow, flags_special
     from .helpers import msgpack
     from .helpers import sig_int, ignore_sigint
     from .helpers import iter_separated

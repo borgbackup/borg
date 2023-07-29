@@ -1,4 +1,4 @@
-""" Dummy file for now, will eventually contain freebsd ACL tests """
+""" Dummy file for now, will eventually contain FreeBSD ACL tests """
 import pytest
 
 from .platform import skipif_not_freebsd
@@ -22,4 +22,9 @@ def test_access_acl():
 
 @pytest.mark.skip(reason="not yet implemented")
 def test_default_acl():
+    pass
+
+
+@pytest.mark.skip(reason="not yet implemented")
+def test_nfs4_acl():
     pass

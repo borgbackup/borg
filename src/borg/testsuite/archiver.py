@@ -487,6 +487,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=none', '--make-parent-dirs', repository_location)
         assert os.path.exists(parent_path)
 
+    def test_create_unreadable_parent(self):
+        parent_dir = os.path.join(self.input_path, 'parent')
+        root_dir = os.path.join(self.input_path, 'parent', 'root')
+        os.mkdir(parent_dir)
+        os.mkdir(root_dir)
+        os.chmod(parent_dir, 0o111)  # --x--x--x == parent dir traversable, but not readable
+        self.cmd('init', '--encryption=none', self.repository_location)
+        # issue #7746: we *can* read root_dir and we *can* traverse parent_dir, so this should work:
+        self.cmd('create', self.repository_location + '::test', root_dir)
+
     def test_unix_socket(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         try:

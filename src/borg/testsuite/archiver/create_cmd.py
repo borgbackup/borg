@@ -167,6 +167,17 @@ def test_create_duplicate_root(archivers, request):
     assert sorted(paths) == ["input", "input/a", "input/a/hardlink", "input/b", "input/b/hardlink"]
 
 
+def test_create_unreadable_parent(archiver):
+    parent_dir = os.path.join(archiver.input_path, "parent")
+    root_dir = os.path.join(archiver.input_path, "parent", "root")
+    os.mkdir(parent_dir)
+    os.mkdir(root_dir)
+    os.chmod(parent_dir, 0o111)  # --x--x--x == parent dir traversable, but not readable
+    cmd(archiver, "rcreate", "--encryption=none")
+    # issue #7746: we *can* read root_dir and we *can* traverse parent_dir, so this should work:
+    cmd(archiver, "create", "test", root_dir)
+
+
 @pytest.mark.skipif(is_win32, reason="unix sockets not available on windows")
 def test_unix_socket(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)

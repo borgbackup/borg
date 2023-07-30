@@ -181,8 +181,8 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
         --show-rc                       \
         --compression lz4               \
         --exclude-caches                \
-        --exclude 'home/*/.cache/*'     \
-        --exclude 'var/tmp/*'           \
+        --exclude '/home/*/.cache/*'    \
+        --exclude '/var/tmp/*'          \
                                         \
         '{hostname}-{now}'              \
         /etc                            \

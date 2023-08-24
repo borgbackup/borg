@@ -158,7 +158,8 @@ class RCreateMixIn:
         Creating a related repository
         +++++++++++++++++++++++++++++
 
-        A related repository uses same secret key material as the other/original repository.
+        You can use ``borg rcreate --other-repo ORIG_REPO ...`` to create a related repository
+        that uses the same secret key material as the given other/original repository.
 
         By default, only the ID key and chunker secret will be the same (these are important
         for deduplication) and the AE crypto keys will be newly generated random keys.

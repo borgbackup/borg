@@ -164,7 +164,7 @@ Directories and files:
         - using a full, absolute path to the key file is recommended.
         - all directories in the given path must exist.
         - this setting forces borg to use the key file at the given location.
-        - the key file must either exist (for most commands) or will be created (``borg rcreate``).
+        - the key file must either exist (for most commands) or will be created (``borg init``).
         - you need to give a different path for different repositories.
         - you need to point to the correct key file matching the repository the command will operate on.
     TMPDIR

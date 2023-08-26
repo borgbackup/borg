@@ -5,7 +5,7 @@ Examples
 ::
 
     # delete a single backup archive:
-    $ borg delete Monday
+    $ borg delete -a Monday
     # actually free disk space:
     $ borg compact
 

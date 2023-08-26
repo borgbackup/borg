@@ -286,7 +286,7 @@ def install_pyinstaller()
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    pip install 'pyinstaller==5.6.2'
+    pip install 'pyinstaller==5.13.1'
   EOF
 end
 

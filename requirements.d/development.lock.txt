@@ -8,6 +8,6 @@ pytest==7.2.0
 pytest-xdist==3.1.0
 pytest-cov==4.0.0
 pytest-benchmark==4.0.0
-Cython==0.29.33
+Cython==0.29.36
 twine==4.0.2
 python-dateutil==2.8.2

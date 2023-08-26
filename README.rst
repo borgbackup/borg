@@ -13,8 +13,6 @@ TODO: the screencasts need a remake using borg2, see there:
 
 https://github.com/borgbackup/borg/issues/6303
 
-.. |screencast_basic|
-.. More screencasts: `installation`_, `advanced usage`_
 
 What is BorgBackup?
 -------------------

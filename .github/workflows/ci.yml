@@ -56,6 +56,9 @@ jobs:
               python-version: '3.9'
               toxenv: mypy
             - os: ubuntu-20.04
+              python-version: '3.11'
+              toxenv: docs
+            - os: ubuntu-20.04
               python-version: '3.9'
               toxenv: py39-fuse2
             - os: ubuntu-20.04

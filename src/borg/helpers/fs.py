@@ -71,17 +71,18 @@ def join_base_dir(*paths, **kw):
     return None if base_dir is None else os.path.join(base_dir, *paths)
 
 
-def get_keys_dir(*, legacy=False):
+def get_keys_dir(*, legacy=False, create=True):
     """Determine where to repository keys and cache"""
     keys_dir = os.environ.get("BORG_KEYS_DIR")
     if keys_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
         keys_dir = os.path.join(get_config_dir(legacy=legacy), "keys")
-    ensure_dir(keys_dir)
+    if create:
+        ensure_dir(keys_dir)
     return keys_dir
 
 
-def get_security_dir(repository_id=None, *, legacy=False):
+def get_security_dir(repository_id=None, *, legacy=False, create=True):
     """Determine where to store local security information."""
     security_dir = os.environ.get("BORG_SECURITY_DIR")
     if security_dir is None:
@@ -90,31 +91,30 @@ def get_security_dir(repository_id=None, *, legacy=False):
         security_dir = os.path.join(get_dir(legacy=legacy), "security")
     if repository_id:
         security_dir = os.path.join(security_dir, repository_id)
-    ensure_dir(security_dir)
+    if create:
+        ensure_dir(security_dir)
     return security_dir
 
 
-def get_data_dir(*, legacy=False):
+def get_data_dir(*, legacy=False, create=True):
     """Determine where to store borg changing data on the client"""
     assert legacy is False, "there is no legacy variant of the borg data dir"
     data_dir = os.environ.get(
         "BORG_DATA_DIR", join_base_dir(".local", "share", "borg", legacy=legacy) or platformdirs.user_data_dir("borg")
     )
-
-    # Create path if it doesn't exist yet
-    ensure_dir(data_dir)
+    if create:
+        ensure_dir(data_dir)
     return data_dir
 
 
-def get_runtime_dir(*, legacy=False):
+def get_runtime_dir(*, legacy=False, create=True):
     """Determine where to store runtime files, like sockets, PID files, ..."""
     assert legacy is False, "there is no legacy variant of the borg runtime dir"
     runtime_dir = os.environ.get(
         "BORG_RUNTIME_DIR", join_base_dir(".cache", "borg", legacy=legacy) or platformdirs.user_runtime_dir("borg")
     )
-
-    # Create path if it doesn't exist yet
-    ensure_dir(runtime_dir)
+    if create:
+        ensure_dir(runtime_dir)
     return runtime_dir
 
 
@@ -122,7 +122,7 @@ def get_socket_filename():
     return os.path.join(get_runtime_dir(), "borg.sock")
 
 
-def get_cache_dir(*, legacy=False):
+def get_cache_dir(*, legacy=False, create=True):
     """Determine where to repository keys and cache"""
 
     if legacy:
@@ -137,29 +137,28 @@ def get_cache_dir(*, legacy=False):
         cache_dir = os.environ.get(
             "BORG_CACHE_DIR", join_base_dir(".cache", "borg", legacy=legacy) or platformdirs.user_cache_dir("borg")
         )
+    if create:
+        ensure_dir(cache_dir)
+        cache_tag_fn = os.path.join(cache_dir, CACHE_TAG_NAME)
+        if not os.path.exists(cache_tag_fn):
+            cache_tag_contents = (
+                CACHE_TAG_CONTENTS
+                + textwrap.dedent(
+                    """
+            # This file is a cache directory tag created by Borg.
+            # For information about cache directory tags, see:
+            #       http://www.bford.info/cachedir/spec.html
+            """
+                ).encode("ascii")
+            )
+            from ..platform import SaveFile
 
-    # Create path if it doesn't exist yet
-    ensure_dir(cache_dir)
-    cache_tag_fn = os.path.join(cache_dir, CACHE_TAG_NAME)
-    if not os.path.exists(cache_tag_fn):
-        cache_tag_contents = (
-            CACHE_TAG_CONTENTS
-            + textwrap.dedent(
-                """
-        # This file is a cache directory tag created by Borg.
-        # For information about cache directory tags, see:
-        #       http://www.bford.info/cachedir/spec.html
-        """
-            ).encode("ascii")
-        )
-        from ..platform import SaveFile
-
-        with SaveFile(cache_tag_fn, binary=True) as fd:
-            fd.write(cache_tag_contents)
+            with SaveFile(cache_tag_fn, binary=True) as fd:
+                fd.write(cache_tag_contents)
     return cache_dir
 
 
-def get_config_dir(*, legacy=False):
+def get_config_dir(*, legacy=False, create=True):
     """Determine where to store whole config"""
 
     # Get config home path
@@ -174,9 +173,8 @@ def get_config_dir(*, legacy=False):
         config_dir = os.environ.get(
             "BORG_CONFIG_DIR", join_base_dir(".config", "borg", legacy=legacy) or platformdirs.user_config_dir("borg")
         )
-
-    # Create path if it doesn't exist yet
-    ensure_dir(config_dir)
+    if create:
+        ensure_dir(config_dir)
     return config_dir
 
 

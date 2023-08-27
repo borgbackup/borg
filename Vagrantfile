@@ -66,6 +66,8 @@ def packages_freebsd
     pkg update
     yes | pkg upgrade
     echo 'export BORG_OPENSSL_PREFIX=/usr' >> ~vagrant/.bash_profile
+    # (re)mount / with acls
+    mount -o acls /
   EOF
 end
 

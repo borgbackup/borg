@@ -2,17 +2,37 @@ import os
 import tempfile
 
 from ..platform import acl_get, acl_set
-from .platform import (
-    DEFAULT_ACL,
-    ACCESS_ACL,
-    skipif_not_linux,
-    skipif_fakeroot_detected,
-    skipif_acls_not_working,
-    skipif_no_ubel_user,
-)
+from .platform import skipif_not_linux, skipif_fakeroot_detected, skipif_acls_not_working, skipif_no_ubel_user
 
 # set module-level skips
 pytestmark = [skipif_not_linux, skipif_fakeroot_detected]
+
+
+ACCESS_ACL = """\
+user::rw-
+user:root:rw-:0
+user:9999:r--:9999
+group::r--
+group:root:r--:0
+group:9999:r--:9999
+mask::rw-
+other::r--\
+""".encode(
+    "ascii"
+)
+
+DEFAULT_ACL = """\
+user::rw-
+user:root:r--:0
+user:8888:r--:8888
+group::r--
+group:root:r--:0
+group:8888:r--:8888
+mask::rw-
+other::r--\
+""".encode(
+    "ascii"
+)
 
 
 def get_acl(path, numeric_ids=False):

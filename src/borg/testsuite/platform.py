@@ -9,32 +9,6 @@ from ..platform import get_process_id, process_alive
 from . import unopened_tempfile
 from .locking import free_pid  # NOQA
 
-ACCESS_ACL = """
-user::rw-
-user:root:rw-:0
-user:9999:r--:9999
-group::r--
-group:root:r--:0
-group:9999:r--:9999
-mask::rw-
-other::r--
-""".strip().encode(
-    "ascii"
-)
-
-DEFAULT_ACL = """
-user::rw-
-user:root:r--:0
-user:8888:r--:8888
-group::r--
-group:root:r--:0
-group:8888:r--:8888
-mask::rw-
-other::r--
-""".strip().encode(
-    "ascii"
-)
-
 
 def fakeroot_detected():
     return "FAKEROOTKEY" in os.environ

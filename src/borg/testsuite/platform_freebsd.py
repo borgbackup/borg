@@ -2,7 +2,7 @@ import os
 import tempfile
 
 from ..platform import acl_get, acl_set
-from .platform import skipif_not_freebsd
+from .platform import skipif_not_freebsd, skipif_acls_not_working
 
 # set module-level skips
 pytestmark = [skipif_not_freebsd]
@@ -46,6 +46,7 @@ def set_acl(path, access=None, default=None, nfs4=None, numeric_ids=False):
     acl_set(path, item, numeric_ids=numeric_ids)
 
 
+@skipif_acls_not_working
 def test_access_acl():
     file1 = tempfile.NamedTemporaryFile()
     set_acl(
@@ -82,6 +83,7 @@ def test_access_acl():
     assert b"group:9999:rw-" in acl_access_ids
 
 
+@skipif_acls_not_working
 def test_default_acl():
     tmpdir = tempfile.mkdtemp()
     set_acl(tmpdir, access=ACCESS_ACL, default=DEFAULT_ACL)

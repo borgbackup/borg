@@ -31,13 +31,22 @@ def are_acls_working():
     with unopened_tempfile() as filepath:
         open(filepath, "w").close()
         try:
-            access = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:9999\ngroup:root:rw-:9999\n"
+            if is_freebsd:
+                access = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-\n"
+                contained = b"user:root:rw-"
+            elif is_linux:
+                access = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:0\n"
+                contained = b"user:root:rw-:0"
+            elif is_darwin:
+                return True  # improve?
+            else:
+                return False  # unsupported platform
             acl = {"acl_access": access}
             acl_set(filepath, acl)
             read_acl = {}
             acl_get(filepath, read_acl, os.stat(filepath))
             read_acl_access = read_acl.get("acl_access", None)
-            if read_acl_access and b"user::rw-" in read_acl_access:
+            if read_acl_access and contained in read_acl_access:
                 return True
         except PermissionError:
             pass

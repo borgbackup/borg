@@ -125,17 +125,41 @@ This is a beta release, only for testing - do not use for production repos.
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
 
+New features:
+
+- BORG_WORKAROUNDS=authenticated_no_key to extract from authenticated repos
+  without having the borg key, #7700
+
 Fixes:
 
 - remote logging/progress: use callback to send queued records, #7662
 - make_path_safe: remove test for backslashes, #7651
 - benchmark cpu: use sanitized path, #7654
+- create: do not try to read parent dir of recursion root, #7746
 
 Other changes:
 
-- docs:
+- manifest: move item_keys into config dict (manifest.version == 2 now), #7710
+- replace "datetime.utcfromtimestamp" to avoid deprecation warnings with Python 3.12
+- properly normalise paths on Windows (forward slashes, integrate drive letter into path)
+- Docs:
 
   - move upgrade / compat. notes to own section, see #7546
+  - fix borg delete examples, #7759
+  - improve rcreate / related repos docs
+  - automated-local.rst: use UUID for consistent udev rule
+  - rewrite `borg check` docs, #7578
+  - misc. other docs updates
+- Tests / CI / Vagrant:
+
+  - major testsuite refactoring: a lot more tests now use pytest, #7626
+  - freebsd: add some ACL tests, #7745
+  - fix test_disk_full, #7617
+  - fix failing test_get_runtime_dir test on OpenBSD, #7719
+  - CI: run on ubuntu 22.04
+  - CI: test building the docs
+  - simplify flake8 config, fix some complaints
+  - use pyinstaller 5.13.1 to build the borg binaries
 
 
 Version 2.0.0b6 (2023-06-11)

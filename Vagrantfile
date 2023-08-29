@@ -82,8 +82,7 @@ end
 
 def packages_netbsd
   return <<-EOF
-    # use the latest stuff, some packages in "9.2" are quite broken
-    echo 'http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/9.0_current/All' > /usr/pkg/etc/pkgin/repositories.conf
+    echo 'http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/9.3/All' > /usr/pkg/etc/pkgin/repositories.conf
     pkgin update
     pkgin -y upgrade
     pkg_add zstd lz4 xxhash git
@@ -161,7 +160,7 @@ def install_pythons(boxname)
     . ~/.bash_profile
     pyenv install 3.11.1  # tests, version supporting openssl 1.1
     pyenv install 3.10.2  # tests, version supporting openssl 1.1
-    pyenv install 3.9.16  # tests, version supporting openssl 1.1, binary build
+    pyenv install 3.9.18  # tests, version supporting openssl 1.1, binary build
     pyenv rehash
   EOF
 end
@@ -179,8 +178,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.9 release
-    pyenv global 3.9.16
-    pyenv virtualenv 3.9.16 borg-env
+    pyenv global 3.9.18
+    pyenv virtualenv 3.9.18 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -227,8 +226,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.16 3.10.2 3.11.1
-      pyenv local 3.9.16 3.10.2 3.11.1
+      pyenv global 3.9.18 3.10.2 3.11.1
+      pyenv local 3.9.18 3.10.2 3.11.1
     fi
     # otherwise: just use the system python
     # avoid that git complains about dubious ownership if we use fakeroot:

@@ -307,6 +307,7 @@ above.
 
 Fixes:
 
+- create: do not try to read parent dir of recursion root, #7746
 - extract: fix false warning about pattern never matching, #4110
 - diff: remove surrogates before output, #7535
 - compact: clear empty directories at end of compact process, #6823
@@ -326,10 +327,10 @@ New features:
 - BORG_WORKAROUNDS=authenticated_no_key to extract from authenticated repos
   without key, #7700
 
-
 Other changes:
 
 - add `utcnow()` helper function to avoid deprecated `datetime.utcnow()`
+- stay on latest Cython 0.29 (0.29.36) for borg 1.2.x (do not use Cython 3.0 yet)
 - docs:
 
   - move upgrade notes to own section, see #7546
@@ -342,6 +343,8 @@ Other changes:
   - improve --one-file-system help string, #5618
   - rewrite borg check docs
   - improve the docs for --keep-within, #7687
+  - fix borg init command in environment.rst.inc
+  - 1.1.x upgrade notes: more precise borg upgrade instructions, #3396
 
 - tests:
 

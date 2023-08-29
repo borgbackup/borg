@@ -82,8 +82,7 @@ end
 
 def packages_netbsd
   return <<-EOF
-    # use the latest stuff, some packages in "9.2" are quite broken
-    echo 'http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/9.0_current/All' > /usr/pkg/etc/pkgin/repositories.conf
+    echo 'http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/9.3/All' > /usr/pkg/etc/pkgin/repositories.conf
     pkgin update
     pkgin -y upgrade
     pkg_add zstd lz4 xxhash git

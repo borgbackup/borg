@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UPGRADE" 1 "2023-08-29" "" "borg backup tool"
+.TH "BORG-UPGRADE" 1 "2023-08-30" "" "borg backup tool"
 .SH NAME
 borg-upgrade \- upgrade a repository from a previous version
 .SH SYNOPSIS
@@ -52,6 +52,23 @@ upgrading from 1.0.x to 1.1.x,
 except when noted otherwise in the changelog
 .UNINDENT
 .SS Borg 1.x.y upgrades
+.sp
+Archive TAM authentication:
+.sp
+Use \fBborg upgrade \-\-archives\-tam REPO\fP to add archive TAMs to all
+archives that are not TAM authenticated yet.
+This is a convenient method to just trust all archives present \- if
+an archive does not have TAM authentication yet, a TAM will be added.
+Archives created by old borg versions < 1.0.9 do not have TAMs.
+Archives created by newer borg version should have TAMs already.
+If you have a high risk environment, you should not just run this,
+but first verify that the archives are authentic and not malicious
+(== have good content, have a good timestamp).
+Borg 1.2.5+ needs all archives to be TAM authenticated for safety reasons.
+.sp
+This upgrade needs to be done once per repository.
+.sp
+Manifest TAM authentication:
 .sp
 Use \fBborg upgrade \-\-tam REPO\fP to require manifest authentication
 introduced with Borg 1.0.9 to address security issues. This means
@@ -148,6 +165,9 @@ Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).
 .TP
 .B  \-\-disable\-tam
 Disable manifest authentication (in key and cache).
+.TP
+.B  \-\-archives\-tam
+add TAM authentication for all archives.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

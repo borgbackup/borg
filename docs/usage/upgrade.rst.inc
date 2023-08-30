@@ -29,6 +29,8 @@ borg upgrade
     +-------------------------------------------------------+-----------------------+------------------------------------------------------------------------------------------------+
     |                                                       | ``--disable-tam``     | Disable manifest authentication (in key and cache).                                            |
     +-------------------------------------------------------+-----------------------+------------------------------------------------------------------------------------------------+
+    |                                                       | ``--archives-tam``    | add TAM authentication for all archives.                                                       |
+    +-------------------------------------------------------+-----------------------+------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                 |
     |                                                                                                                                                                                |
     | :ref:`common_options`                                                                                                                                                          |
@@ -54,6 +56,7 @@ borg upgrade
         --force           Force upgrade
         --tam             Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).
         --disable-tam     Disable manifest authentication (in key and cache).
+        --archives-tam    add TAM authentication for all archives.
 
 
     :ref:`common_options`
@@ -79,6 +82,23 @@ You do **not** need to run it when:
 
 Borg 1.x.y upgrades
 +++++++++++++++++++
+
+Archive TAM authentication:
+
+Use ``borg upgrade --archives-tam REPO`` to add archive TAMs to all
+archives that are not TAM authenticated yet.
+This is a convenient method to just trust all archives present - if
+an archive does not have TAM authentication yet, a TAM will be added.
+Archives created by old borg versions < 1.0.9 do not have TAMs.
+Archives created by newer borg version should have TAMs already.
+If you have a high risk environment, you should not just run this,
+but first verify that the archives are authentic and not malicious
+(== have good content, have a good timestamp).
+Borg 1.2.5+ needs all archives to be TAM authenticated for safety reasons.
+
+This upgrade needs to be done once per repository.
+
+Manifest TAM authentication:
 
 Use ``borg upgrade --tam REPO`` to require manifest authentication
 introduced with Borg 1.0.9 to address security issues. This means

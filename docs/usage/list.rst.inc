@@ -156,6 +156,7 @@ Keys available only when listing archives in a repository:
 - comment: archive comment interpreted as text (might be missing non-text characters, see bcomment)
 - bcomment: verbatim archive comment, can contain any character except NUL
 - id: internal ID of the archive
+- tam: TAM authentication state of this archive
 
 - start: time (start) of creation of the archive
 - time: alias of "start"

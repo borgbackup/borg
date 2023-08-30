@@ -116,6 +116,14 @@ General:
 
             Now you can init a fresh repo. Make sure you do not use the workaround any more.
 
+        ignore_invalid_archive_tam
+            Work around invalid archive TAMs created by borg < 1.2.5, see :issue:`7791`.
+
+            This workaround likely needs to get used only once when following the upgrade
+            instructions for CVE-2023-36811, see :ref:`archives_tam_vuln`.
+
+            In normal production operations, this workaround should never be used.
+
 Some automatic "answerers" (if set, they automatically answer confirmation questions):
     BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no (or =yes)
         For "Warning: Attempting to access a previously unknown unencrypted repository"

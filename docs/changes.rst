@@ -308,6 +308,8 @@ Some things can be recommended for the upgrade process from borg 1.1.x
   take significant time, but after that it will be fast) - for more details
   see below.
 - check the compatibility notes (see below) and adapt your scripts, if needed.
+- borg 1.2.5 has a security fix for the pre-1.2.5 archives spoofing vulnerability
+  (CVE-2023-36811), see details and necessary upgrade procedure described above.
 - if you run into any issues, please check the github issue tracker before
   posting new issues there or elsewhere.
 
@@ -365,14 +367,16 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.2.5 (not released yet)
---------------------------------
+Version 1.2.5 (2023-08-30)
+--------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
 
 Fixes:
 
+- Security: fix pre-1.2.5 archives spoofing vulnerability (CVE-2023-36811),
+  see details and necessary upgrade procedure described above.
 - create: do not try to read parent dir of recursion root, #7746
 - extract: fix false warning about pattern never matching, #4110
 - diff: remove surrogates before output, #7535

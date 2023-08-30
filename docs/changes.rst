@@ -42,6 +42,7 @@ Steps you must take to upgrade a repository:
    Do **not** run ``borg check`` with borg 1.2.5 before completing the upgrade steps.
 
 2. Run ``borg info --debug <repository> 2>&1 | grep TAM | grep -i manifest``.
+
    a) If you get "TAM-verified manifest", continue with 3.
    b) If you get "Manifest TAM not found and not required", run
       ``borg upgrade --tam --force <repository>`` *on every client*.

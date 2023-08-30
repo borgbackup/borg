@@ -42,6 +42,7 @@ Steps you must take to upgrade a repository:
    Do **not** run ``borg check`` with borg 1.2.5 before completing the upgrade steps.
 
 2. Run ``borg info --debug <repository> 2>&1 | grep TAM | grep -i manifest``.
+
    a) If you get "TAM-verified manifest", continue with 3.
    b) If you get "Manifest TAM not found and not required", run
       ``borg upgrade --tam --force <repository>`` *on every client*.
@@ -69,7 +70,8 @@ Vulnerability time line:
 * 2023-06-13: Vulnerability discovered during code review by Thomas Waldmann
 * 2023-06-13...: Work on fixing the issue, upgrade procedure, docs.
 * 2023-06-30: CVE was assigned via Github CNA
-* 2023-07-xx: Released fixed version 1.2.5
+* 2023-06-30 .. 2023-08-29: Fixed issue, code review, docs, testing.
+* 2023-08-30: Released fixed version 1.2.5
 
 .. _hashindex_set_bug:
 

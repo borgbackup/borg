@@ -723,11 +723,12 @@ class ArchiveFormatter(BaseFormatter):
         "id": "internal ID of the archive",
         "hostname": "hostname of host on which this archive was created",
         "username": "username of user who created this archive",
+        "tam": "TAM authentication state of this archive",
         "size": "size of this archive (data plus metadata, not considering compression and deduplication)",
         "nfiles": "count of files in this archive",
     }
     KEY_GROUPS = (
-        ("archive", "name", "comment", "id"),
+        ("archive", "name", "comment", "id", "tam"),
         ("start", "time", "end", "command_line"),
         ("hostname", "username"),
         ("size", "nfiles"),
@@ -750,6 +751,7 @@ class ArchiveFormatter(BaseFormatter):
             "username": partial(self.get_meta, "username", ""),
             "comment": partial(self.get_meta, "comment", ""),
             "command_line": partial(self.get_meta, "command_line", ""),
+            "tam": self.get_tam,
             "size": partial(self.get_meta, "size", 0),
             "nfiles": partial(self.get_meta, "nfiles", 0),
             "end": self.get_ts_end,
@@ -794,6 +796,9 @@ class ArchiveFormatter(BaseFormatter):
 
     def get_ts_end(self):
         return self.format_time(self.archive.ts_end)
+
+    def get_tam(self):
+        return "verified" if self.archive.tam_verified else "none"
 
     def format_time(self, ts):
         return OutputTimestamp(ts)

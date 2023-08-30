@@ -72,6 +72,15 @@ class TAMRequiredError(IntegrityError):
     traceback = False
 
 
+class ArchiveTAMRequiredError(TAMRequiredError):
+    __doc__ = textwrap.dedent(
+        """
+    Archive '{}' is unauthenticated, but it is required for this repository.
+    """
+    ).strip()
+    traceback = False
+
+
 class TAMInvalid(IntegrityError):
     __doc__ = IntegrityError.__doc__
     traceback = False
@@ -79,6 +88,15 @@ class TAMInvalid(IntegrityError):
     def __init__(self):
         # Error message becomes: "Data integrity error: Manifest authentication did not verify"
         super().__init__("Manifest authentication did not verify")
+
+
+class ArchiveTAMInvalid(IntegrityError):
+    __doc__ = IntegrityError.__doc__
+    traceback = False
+
+    def __init__(self):
+        # Error message becomes: "Data integrity error: Archive authentication did not verify"
+        super().__init__("Archive authentication did not verify")
 
 
 class TAMUnsupportedSuiteError(IntegrityError):
@@ -225,11 +243,13 @@ class KeyBase:
             output_length=64,
         )
 
-    def pack_and_authenticate_metadata(self, metadata_dict, context=b"manifest"):
+    def pack_and_authenticate_metadata(self, metadata_dict, context=b"manifest", salt=None):
+        if salt is None:
+            salt = os.urandom(64)
         metadata_dict = StableDict(metadata_dict)
-        tam = metadata_dict["tam"] = StableDict({"type": "HKDF_HMAC_SHA512", "hmac": bytes(64), "salt": os.urandom(64)})
+        tam = metadata_dict["tam"] = StableDict({"type": "HKDF_HMAC_SHA512", "hmac": bytes(64), "salt": salt})
         packed = msgpack.packb(metadata_dict)
-        tam_key = self._tam_key(tam["salt"], context)
+        tam_key = self._tam_key(salt, context)
         tam["hmac"] = hmac.digest(tam_key, packed, "sha512")
         return msgpack.packb(metadata_dict)
 
@@ -252,7 +272,7 @@ class KeyBase:
             if tam_required:
                 raise TAMRequiredError(self.repository._location.canonical_path())
             else:
-                logger.debug("TAM not found and not required")
+                logger.debug("Manifest TAM not found and not required")
                 return unpacked, False
         tam = unpacked.pop("tam", None)
         if not isinstance(tam, dict):
@@ -262,7 +282,9 @@ class KeyBase:
             if tam_required:
                 raise TAMUnsupportedSuiteError(repr(tam_type))
             else:
-                logger.debug("Ignoring TAM made with unsupported suite, since TAM is not required: %r", tam_type)
+                logger.debug(
+                    "Ignoring manifest TAM made with unsupported suite, since TAM is not required: %r", tam_type
+                )
                 return unpacked, False
         tam_hmac = tam.get("hmac")
         tam_salt = tam.get("salt")
@@ -278,6 +300,52 @@ class KeyBase:
             raise TAMInvalid()
         logger.debug("TAM-verified manifest")
         return unpacked, True
+
+    def unpack_and_verify_archive(self, data, force_tam_not_required=False):
+        """Unpack msgpacked *data* and return (object, did_verify)."""
+        tam_required = self.tam_required
+        if force_tam_not_required and tam_required:
+            # for a long time, borg only checked manifest for "tam_required" and
+            # people might have archives without TAM, so don't be too annoyingly loud here:
+            logger.debug("Archive authentication DISABLED.")
+            tam_required = False
+        data = bytearray(data)
+        unpacker = get_limited_unpacker("archive")
+        unpacker.feed(data)
+        unpacked = unpacker.unpack()
+        if "tam" not in unpacked:
+            if tam_required:
+                archive_name = unpacked.get("name", "<unknown>")
+                raise ArchiveTAMRequiredError(archive_name)
+            else:
+                logger.debug("Archive TAM not found and not required")
+                return unpacked, False, None
+        tam = unpacked.pop("tam", None)
+        if not isinstance(tam, dict):
+            raise ArchiveTAMInvalid()
+        tam_type = tam.get("type", "<none>")
+        if tam_type != "HKDF_HMAC_SHA512":
+            if tam_required:
+                raise TAMUnsupportedSuiteError(repr(tam_type))
+            else:
+                logger.debug(
+                    "Ignoring archive TAM made with unsupported suite, since TAM is not required: %r", tam_type
+                )
+                return unpacked, False, None
+        tam_hmac = tam.get("hmac")
+        tam_salt = tam.get("salt")
+        if not isinstance(tam_salt, (bytes, str)) or not isinstance(tam_hmac, (bytes, str)):
+            raise ArchiveTAMInvalid()
+        tam_hmac = want_bytes(tam_hmac)  # legacy
+        tam_salt = want_bytes(tam_salt)  # legacy
+        offset = data.index(tam_hmac)
+        data[offset : offset + 64] = bytes(64)
+        tam_key = self._tam_key(tam_salt, context=b"archive")
+        calculated_hmac = hmac.digest(tam_key, data, "sha512")
+        if not hmac.compare_digest(calculated_hmac, tam_hmac):
+            raise ArchiveTAMInvalid()
+        logger.debug("TAM-verified archive")
+        return unpacked, True, tam_salt
 
 
 class PlaintextKey(KeyBase):

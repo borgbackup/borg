@@ -755,7 +755,8 @@ class LocalCache(CacheStatsMixin):
             nonlocal processed_item_metadata_chunks
             csize, data = decrypted_repository.get(archive_id)
             chunk_idx.add(archive_id, 1, len(data))
-            archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
+            archive, verified, _ = self.key.unpack_and_verify_archive(data, force_tam_not_required=True)
+            archive = ArchiveItem(internal_dict=archive)
             if archive.version not in (1, 2):  # legacy
                 raise Exception("Unknown archive metadata version")
             if archive.version == 1:

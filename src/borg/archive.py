@@ -450,6 +450,7 @@ class Archive:
         self.name = name  # overwritten later with name from archive metadata
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
         self.comment = None
+        self.tam_verified = False
         self.checkpoint_interval = checkpoint_interval
         self.numeric_ids = numeric_ids
         self.noatime = noatime
@@ -488,7 +489,9 @@ class Archive:
 
     def _load_meta(self, id):
         data = self.key.decrypt(id, self.repository.get(id))
-        metadata = ArchiveItem(internal_dict=msgpack.unpackb(data))
+        # we do not require TAM for archives, otherwise we can not even borg list a repo with old archives.
+        archive, self.tam_verified, _ = self.key.unpack_and_verify_archive(data, force_tam_not_required=True)
+        metadata = ArchiveItem(internal_dict=archive)
         if metadata.version != 1:
             raise Exception('Unknown archive metadata version')
         return metadata
@@ -959,7 +962,7 @@ Utilization of max. archive size: {csize_max:.0%}
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)
         setattr(metadata, key, value)
-        data = msgpack.packb(metadata.as_dict())
+        data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, data, self.stats)
         self.manifest.archives[self.name] = (new_id, metadata.time)
@@ -1813,6 +1816,19 @@ class ArchiveChecker:
             except msgpack.UnpackException:
                 continue
             if valid_archive(archive):
+                # **after** doing the low-level checks and having a strong indication that we
+                # are likely looking at an archive item here, also check the TAM authentication:
+                try:
+                    archive, verified, _ = self.key.unpack_and_verify_archive(data, force_tam_not_required=False)
+                except IntegrityError:
+                    # TAM issues - do not accept this archive!
+                    # either somebody is trying to attack us with a fake archive data or
+                    # we have an ancient archive made before TAM was a thing (borg < 1.0.9) **and** this repo
+                    # was not correctly upgraded to borg 1.2.5 (see advisory at top of the changelog).
+                    # borg can't tell the difference, so it has to assume this archive might be an attack
+                    # and drops this archive.
+                    continue
+                # note: if we get here and verified is False, a TAM is not required.
                 archive = ArchiveItem(internal_dict=archive)
                 name = archive.name
                 logger.info('Found archive %s', name)
@@ -2048,7 +2064,17 @@ class ArchiveChecker:
                     self.error_found = True
                     del self.manifest.archives[info.name]
                     continue
-                archive = ArchiveItem(internal_dict=msgpack.unpackb(data))
+                try:
+                    archive, verified, salt = self.key.unpack_and_verify_archive(data, force_tam_not_required=False)
+                except IntegrityError as integrity_error:
+                    # looks like there is a TAM issue with this archive, this might be an attack!
+                    # when upgrading to borg 1.2.5, users are expected to TAM-authenticate all archives they
+                    # trust, so there shouldn't be any without TAM.
+                    logger.error('Archive TAM authentication issue for archive %s: %s', info.name, integrity_error)
+                    self.error_found = True
+                    del self.manifest.archives[info.name]
+                    continue
+                archive = ArchiveItem(internal_dict=archive)
                 if archive.version != 1:
                     raise Exception('Unknown archive metadata version')
                 archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
@@ -2062,7 +2088,7 @@ class ArchiveChecker:
                 for previous_item_id in archive.items:
                     mark_as_possibly_superseded(previous_item_id)
                 archive.items = items_buffer.chunks
-                data = msgpack.packb(archive.as_dict())
+                data = self.key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive', salt=salt)
                 new_archive_id = self.key.id_hash(data)
                 cdata = self.key.encrypt(data)
                 add_reference(new_archive_id, len(data), len(cdata), cdata)

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-LIST" 1 "2023-08-29" "" "borg backup tool"
+.TH "BORG-LIST" 1 "2023-08-30" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive or repository contents
 .SH SYNOPSIS
@@ -216,6 +216,8 @@ comment: archive comment interpreted as text (might be missing non\-text charact
 bcomment: verbatim archive comment, can contain any character except NUL
 .IP \(bu 2
 id: internal ID of the archive
+.IP \(bu 2
+tam: TAM authentication state of this archive
 .IP \(bu 2
 start: time (start) of creation of the archive
 .IP \(bu 2

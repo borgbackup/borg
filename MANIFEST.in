@@ -6,5 +6,8 @@ prune .github
 include src/borg/platform/darwin.c src/borg/platform/freebsd.c src/borg/platform/linux.c src/borg/platform/posix.c
 include src/borg/platform/syncfilerange.c
 include src/borg/platform/windows.c
+# stuff we need to copy to successfully run testsuite. setuptool_scm includes all git-committed files, but we don't have .git directory in
+# debian, since we rely on github tarballs.
 include src/borg/testsuite/attic.tar.gz
+# stuff we need on the system required by keymanager.py
 include src/borg/paperkey.html

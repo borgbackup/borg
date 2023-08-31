@@ -7,3 +7,4 @@ include src/borg/platform/darwin.c src/borg/platform/freebsd.c src/borg/platform
 include src/borg/platform/syncfilerange.c
 include src/borg/platform/windows.c
 include src/borg/testsuite/attic.tar.gz
+include src/borg/paperkey.html

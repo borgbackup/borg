@@ -6,3 +6,4 @@ prune .github
 include src/borg/platform/darwin.c src/borg/platform/freebsd.c src/borg/platform/linux.c src/borg/platform/posix.c
 include src/borg/platform/syncfilerange.c
 include src/borg/platform/windows.c
+include src/borg/testsuite/attic.tar.gz

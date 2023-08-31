@@ -8,7 +8,7 @@ pytest
 pytest-xdist
 pytest-cov
 pytest-benchmark
-Cython <3
+Cython
 twine
 python-dateutil
 pre-commit

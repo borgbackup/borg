@@ -285,7 +285,7 @@ class KeyBase:
         return unpacked, True
 
     def unpack_and_verify_archive(self, data, force_tam_not_required=False):
-        """Unpack msgpacked *data* and return (object, did_verify)."""
+        """Unpack msgpacked *data* and return (object, did_verify, salt)."""
         tam_required = self.tam_required
         if force_tam_not_required and tam_required:
             # for a long time, borg only checked manifest for "tam_required" and
@@ -322,7 +322,11 @@ class KeyBase:
         tam_key = self._tam_key(tam_salt, context=b'archive')
         calculated_hmac = hmac.digest(tam_key, data, 'sha512')
         if not hmac.compare_digest(calculated_hmac, tam_hmac):
-            raise ArchiveTAMInvalid()
+            if 'ignore_invalid_archive_tam' in workarounds:
+                logger.debug('ignoring invalid archive TAM due to BORG_WORKAROUNDS')
+                return unpacked, False, None  # same as if no TAM is present
+            else:
+                raise ArchiveTAMInvalid()
         logger.debug('TAM-verified archive')
         return unpacked, True, tam_salt
 

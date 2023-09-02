@@ -377,7 +377,6 @@ class HelpMixIn:
             Use zstd ("zstandard") compression, a modern wide-range algorithm.
             If you do not explicitly give the compression level L (ranging from 1
             to 22), it will use level 3.
-            Archives compressed with zstd are not compatible with borg < 1.1.4.
 
         zlib[,L]
             Use zlib ("gz") compression. Medium speed, medium compression.

@@ -29,7 +29,7 @@ places. Borg now considers archives without TAM as garbage or an attack.
 
 We are not aware of others having discovered, disclosed or exploited this vulnerability.
 
-Below, if we speak of borg 1.2.5, we mean a borg version >= 1.2.5 **or** a
+Below, if we speak of borg 1.2.6, we mean a borg version >= 1.2.6 **or** a
 borg version that has the relevant security patches for this vulnerability applied
 (could be also an older version in that case).
 

@@ -493,7 +493,6 @@ class Archive:
         self.name = name  # overwritten later with name from archive metadata
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
         self.comment = None
-        self.tam_verified = True
         self.numeric_ids = numeric_ids
         self.noatime = noatime
         self.noctime = noctime

@@ -15,7 +15,7 @@ import argon2.low_level
 from ..constants import *  # NOQA
 from ..helpers import StableDict
 from ..helpers import Error, IntegrityError
-from ..helpers import get_keys_dir, get_security_dir
+from ..helpers import get_keys_dir
 from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, PassphraseWrong
@@ -276,37 +276,21 @@ class KeyBase:
         logger.debug("TAM-verified manifest")
         return unpacked
 
-    def unpack_and_verify_archive(self, data, force_tam_not_required=False):
-        """Unpack msgpacked *data* and return (object, did_verify)."""
-        tam_required = self.tam_required
-        if force_tam_not_required and tam_required:
-            # for a long time, borg only checked manifest for "tam_required" and
-            # people might have archives without TAM, so don't be too annoyingly loud here:
-            logger.debug("Archive authentication DISABLED.")
-            tam_required = False
+    def unpack_and_verify_archive(self, data):
+        """Unpack msgpacked *data* and return (object, salt)."""
         data = bytearray(data)
         unpacker = get_limited_unpacker("archive")
         unpacker.feed(data)
         unpacked = unpacker.unpack()
         if "tam" not in unpacked:
-            if tam_required:
-                archive_name = unpacked.get("name", "<unknown>")
-                raise ArchiveTAMRequiredError(archive_name)
-            else:
-                logger.debug("Archive TAM not found and not required")
-                return unpacked, False, None
+            archive_name = unpacked.get("name", "<unknown>")
+            raise ArchiveTAMRequiredError(archive_name)
         tam = unpacked.pop("tam", None)
         if not isinstance(tam, dict):
             raise ArchiveTAMInvalid()
         tam_type = tam.get("type", "<none>")
         if tam_type != "HKDF_HMAC_SHA512":
-            if tam_required:
-                raise TAMUnsupportedSuiteError(repr(tam_type))
-            else:
-                logger.debug(
-                    "Ignoring archive TAM made with unsupported suite, since TAM is not required: %r", tam_type
-                )
-                return unpacked, False, None
+            raise TAMUnsupportedSuiteError(repr(tam_type))
         tam_hmac = tam.get("hmac")
         tam_salt = tam.get("salt")
         if not isinstance(tam_salt, (bytes, str)) or not isinstance(tam_hmac, (bytes, str)):
@@ -320,7 +304,7 @@ class KeyBase:
         if not hmac.compare_digest(calculated_hmac, tam_hmac):
             raise ArchiveTAMInvalid()
         logger.debug("TAM-verified archive")
-        return unpacked, True, tam_salt
+        return unpacked, tam_salt
 
 
 class PlaintextKey(KeyBase):

@@ -425,9 +425,6 @@ def test_check_rebuild_refcounts(archiver):
     repository = Repository(archiver.repository_path, exclusive=True)
     with repository:
         write_archive_without_tam(repository, "archive_no_tam")
-    output = cmd(archiver, "rlist", "--format='{name} tam:{tam}{NL}'")
-    assert "archive_tam tam:verified" in output  # good
-    assert "archive_no_tam tam:none" in output  # could be borg < 1.0.9 archive or fake
     cmd(archiver, "check", "--repair")
     output = cmd(archiver, "rlist", "--format='{name} tam:{tam}{NL}'")
     assert "archive_tam tam:verified" in output  # TAM-verified archive still there

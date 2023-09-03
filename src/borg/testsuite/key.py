@@ -352,8 +352,7 @@ class TestTAM:
         unpacked = msgpack.unpackb(blob)
         assert unpacked["tam"]["type"] == "HKDF_HMAC_SHA512"
 
-        unpacked, verified, _ = key.unpack_and_verify_archive(blob)
-        assert verified
+        unpacked, _ = key.unpack_and_verify_archive(blob)
         assert unpacked["foo"] == "bar"
         assert "tam" not in unpacked
 

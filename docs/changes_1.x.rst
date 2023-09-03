@@ -29,27 +29,29 @@ places. Borg now considers archives without TAM as garbage or an attack.
 
 We are not aware of others having discovered, disclosed or exploited this vulnerability.
 
-Below, if we speak of borg 1.2.5, we mean a borg version >= 1.2.5 **or** a
+Below, if we speak of borg 1.2.6, we mean a borg version >= 1.2.6 **or** a
 borg version that has the relevant security patches for this vulnerability applied
 (could be also an older version in that case).
 
 Steps you must take to upgrade a repository:
 
-1. Upgrade all clients using this repository to borg 1.2.5.
+1. Upgrade all clients using this repository to borg 1.2.6.
    Note: it is not required to upgrade a server, except if the server-side borg
    is also used as a client (and not just for "borg serve").
 
-   Do **not** run ``borg check`` with borg 1.2.5 before completing the upgrade steps.
+   Do **not** run ``borg check`` with borg > 1.2.4 before completing the upgrade steps.
 
-2. Run ``borg info --debug <repository> 2>&1 | grep TAM | grep -i manifest``.
+2. Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg info --debug <repo> 2>&1 | grep TAM | grep -i manifest``.
 
    a) If you get "TAM-verified manifest", continue with 3.
    b) If you get "Manifest TAM not found and not required", run
       ``borg upgrade --tam --force <repository>`` *on every client*.
 
-3. Run ``borg list --format='{name} {time} tam:{tam}{NL}' <repository>``.
+3. Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg list --format='{name} {time} tam:{tam}{NL}' <repo>``.
    "tam:verified" means that the archive has a valid TAM authentication.
    "tam:none" is expected as output for archives created by borg <1.0.9.
+   "tam:none" is also expected for archives resulting from a borg rename
+   or borg recreate operation (see #7791).
    "tam:none" could also come from archives created by an attacker.
    You should verify that "tam:none" archives are authentic and not malicious
    (== have good content, have correct timestamp, can be extracted successfully).
@@ -57,13 +59,15 @@ Steps you must take to upgrade a repository:
    In low-risk, trusted environments, you may decide on your own risk to skip step 3
    and just trust in everything being OK.
 
-4. If there are no tam:non archives left at this point, you can skip this step.
-   Run ``borg upgrade --archives-tam <repository>``.
-   This will make sure all archives are TAM authenticated (an archive TAM will be added
-   for all archives still missing one).
-   ``borg check`` would consider TAM-less archives as garbage or a potential attack.
-   Optionally run the same command as in step 3 to see that all archives now are "tam:verified".
+4. If there are no tam:none archives left at this point, you can skip this step.
+   Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg upgrade --archives-tam <repo>``.
+   This will unconditionally add a correct archive TAM to all archives not having one.
+   ``borg check`` would consider TAM-less or invalid-TAM archives as garbage or a potential attack.
+   To see that all archives now are "tam:verified" run: ``borg list --format='{name} {time} tam:{tam}{NL}' <repo>``
 
+5. Please note that you should never use BORG_WORKAROUNDS=ignore_invalid_archive_tam
+   for normal production operations - it is only needed once to get the archives in a
+   repository into a good state. All archives have a valid TAM now.
 
 Vulnerability time line:
 
@@ -71,7 +75,8 @@ Vulnerability time line:
 * 2023-06-13...: Work on fixing the issue, upgrade procedure, docs.
 * 2023-06-30: CVE was assigned via Github CNA
 * 2023-06-30 .. 2023-08-29: Fixed issue, code review, docs, testing.
-* 2023-08-30: Released fixed version 1.2.5
+* 2023-08-30: Released fixed version 1.2.5 (broken upgrade procedure for some repos)
+* 2023-08-31: Released fixed version 1.2.6 (fixes upgrade procedure)
 
 .. _hashindex_set_bug:
 

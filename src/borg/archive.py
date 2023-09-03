@@ -1999,13 +1999,17 @@ class ArchiveChecker:
                 # are likely looking at an archive item here, also check the TAM authentication:
                 try:
                     archive, verified, _ = self.key.unpack_and_verify_archive(data, force_tam_not_required=False)
-                except IntegrityError:
+                except IntegrityError as integrity_error:
                     # TAM issues - do not accept this archive!
                     # either somebody is trying to attack us with a fake archive data or
                     # we have an ancient archive made before TAM was a thing (borg < 1.0.9) **and** this repo
                     # was not correctly upgraded to borg 1.2.5 (see advisory at top of the changelog).
                     # borg can't tell the difference, so it has to assume this archive might be an attack
                     # and drops this archive.
+                    name = archive.get(b"name", b"<unknown>").decode("ascii", "replace")
+                    logger.error("Archive TAM authentication issue for archive %s: %s", name, integrity_error)
+                    logger.error("This archive will *not* be added to the rebuilt manifest! It will be deleted.")
+                    self.error_found = True
                     continue
                 # note: if we get here and verified is False, a TAM is not required.
                 archive = ArchiveItem(internal_dict=archive)
@@ -2271,6 +2275,7 @@ class ArchiveChecker:
                     # when upgrading to borg 1.2.5, users are expected to TAM-authenticate all archives they
                     # trust, so there shouldn't be any without TAM.
                     logger.error("Archive TAM authentication issue for archive %s: %s", info.name, integrity_error)
+                    logger.error("This archive will be *removed* from the manifest! It will be deleted.")
                     self.error_found = True
                     del self.manifest.archives[info.name]
                     continue

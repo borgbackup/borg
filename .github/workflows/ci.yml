@@ -32,18 +32,11 @@ jobs:
   lint:
 
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    timeout-minutes: 2
 
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.9
-    - name: Lint with flake8
-      run: |
-        pip install flake8
-        flake8 src scripts conftest.py
+    - uses: chartboost/ruff-action@v1
 
   linux:
 

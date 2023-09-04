@@ -751,7 +751,6 @@ class ArchiveFormatter(BaseFormatter):
             "username": partial(self.get_meta, "username", ""),
             "comment": partial(self.get_meta, "comment", ""),
             "command_line": partial(self.get_meta, "command_line", ""),
-            "tam": self.get_tam,
             "size": partial(self.get_meta, "size", 0),
             "nfiles": partial(self.get_meta, "nfiles", 0),
             "end": self.get_ts_end,
@@ -796,9 +795,6 @@ class ArchiveFormatter(BaseFormatter):
 
     def get_ts_end(self):
         return self.format_time(self.archive.ts_end)
-
-    def get_tam(self):
-        return "verified" if self.archive.tam_verified else "none"
 
     def format_time(self, ts):
         return OutputTimestamp(ts)

@@ -15,7 +15,7 @@ import argon2.low_level
 from ..constants import *  # NOQA
 from ..helpers import StableDict
 from ..helpers import Error, IntegrityError
-from ..helpers import get_keys_dir, get_security_dir
+from ..helpers import get_keys_dir
 from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, PassphraseWrong
@@ -136,16 +136,6 @@ def key_factory(repository, manifest_chunk, *, ro_cls=RepoObj):
     return identify_key(manifest_data).detect(repository, manifest_data)
 
 
-def tam_required_file(repository):
-    security_dir = get_security_dir(bin_to_hex(repository.id), legacy=(repository.version == 1))
-    return os.path.join(security_dir, "tam_required")
-
-
-def tam_required(repository):
-    file = tam_required_file(repository)
-    return os.path.isfile(file)
-
-
 def uses_same_chunker_secret(other_key, key):
     """is the chunker secret the same?"""
     # avoid breaking the deduplication by a different chunker secret
@@ -211,7 +201,6 @@ class KeyBase:
         self.TYPE_STR = bytes([self.TYPE])
         self.repository = repository
         self.target = None  # key location file path / repo obj
-        self.tam_required = True
         self.copy_crypt_key = False
 
     def id_hash(self, data):
@@ -253,39 +242,25 @@ class KeyBase:
         tam["hmac"] = hmac.digest(tam_key, packed, "sha512")
         return msgpack.packb(metadata_dict)
 
-    def unpack_and_verify_manifest(self, data, force_tam_not_required=False):
-        """Unpack msgpacked *data* and return (object, did_verify)."""
+    def unpack_and_verify_manifest(self, data):
+        """Unpack msgpacked *data* and return manifest."""
         if data.startswith(b"\xc1" * 4):
             # This is a manifest from the future, we can't read it.
             raise UnsupportedManifestError()
-        tam_required = self.tam_required
-        if force_tam_not_required and tam_required:
-            logger.warning("Manifest authentication DISABLED.")
-            tam_required = False
         data = bytearray(data)
         unpacker = get_limited_unpacker("manifest")
         unpacker.feed(data)
         unpacked = unpacker.unpack()
         if AUTHENTICATED_NO_KEY:
-            return unpacked, True  # True is a lie.
+            return unpacked
         if "tam" not in unpacked:
-            if tam_required:
-                raise TAMRequiredError(self.repository._location.canonical_path())
-            else:
-                logger.debug("Manifest TAM not found and not required")
-                return unpacked, False
+            raise TAMRequiredError(self.repository._location.canonical_path())
         tam = unpacked.pop("tam", None)
         if not isinstance(tam, dict):
             raise TAMInvalid()
         tam_type = tam.get("type", "<none>")
         if tam_type != "HKDF_HMAC_SHA512":
-            if tam_required:
-                raise TAMUnsupportedSuiteError(repr(tam_type))
-            else:
-                logger.debug(
-                    "Ignoring manifest TAM made with unsupported suite, since TAM is not required: %r", tam_type
-                )
-                return unpacked, False
+            raise TAMUnsupportedSuiteError(repr(tam_type))
         tam_hmac = tam.get("hmac")
         tam_salt = tam.get("salt")
         if not isinstance(tam_salt, (bytes, str)) or not isinstance(tam_hmac, (bytes, str)):
@@ -299,39 +274,23 @@ class KeyBase:
         if not hmac.compare_digest(calculated_hmac, tam_hmac):
             raise TAMInvalid()
         logger.debug("TAM-verified manifest")
-        return unpacked, True
+        return unpacked
 
-    def unpack_and_verify_archive(self, data, force_tam_not_required=False):
-        """Unpack msgpacked *data* and return (object, did_verify)."""
-        tam_required = self.tam_required
-        if force_tam_not_required and tam_required:
-            # for a long time, borg only checked manifest for "tam_required" and
-            # people might have archives without TAM, so don't be too annoyingly loud here:
-            logger.debug("Archive authentication DISABLED.")
-            tam_required = False
+    def unpack_and_verify_archive(self, data):
+        """Unpack msgpacked *data* and return (object, salt)."""
         data = bytearray(data)
         unpacker = get_limited_unpacker("archive")
         unpacker.feed(data)
         unpacked = unpacker.unpack()
         if "tam" not in unpacked:
-            if tam_required:
-                archive_name = unpacked.get("name", "<unknown>")
-                raise ArchiveTAMRequiredError(archive_name)
-            else:
-                logger.debug("Archive TAM not found and not required")
-                return unpacked, False, None
+            archive_name = unpacked.get("name", "<unknown>")
+            raise ArchiveTAMRequiredError(archive_name)
         tam = unpacked.pop("tam", None)
         if not isinstance(tam, dict):
             raise ArchiveTAMInvalid()
         tam_type = tam.get("type", "<none>")
         if tam_type != "HKDF_HMAC_SHA512":
-            if tam_required:
-                raise TAMUnsupportedSuiteError(repr(tam_type))
-            else:
-                logger.debug(
-                    "Ignoring archive TAM made with unsupported suite, since TAM is not required: %r", tam_type
-                )
-                return unpacked, False, None
+            raise TAMUnsupportedSuiteError(repr(tam_type))
         tam_hmac = tam.get("hmac")
         tam_salt = tam.get("salt")
         if not isinstance(tam_salt, (bytes, str)) or not isinstance(tam_hmac, (bytes, str)):
@@ -345,7 +304,7 @@ class KeyBase:
         if not hmac.compare_digest(calculated_hmac, tam_hmac):
             raise ArchiveTAMInvalid()
         logger.debug("TAM-verified archive")
-        return unpacked, True, tam_salt
+        return unpacked, tam_salt
 
 
 class PlaintextKey(KeyBase):
@@ -356,10 +315,6 @@ class PlaintextKey(KeyBase):
 
     chunk_seed = 0
     logically_encrypted = False
-
-    def __init__(self, repository):
-        super().__init__(repository)
-        self.tam_required = False
 
     @classmethod
     def create(cls, repository, args, **kw):
@@ -526,7 +481,6 @@ class FlexiKey:
             self.crypt_key = key.crypt_key
             self.id_key = key.id_key
             self.chunk_seed = key.chunk_seed
-            self.tam_required = key.get("tam_required", tam_required(self.repository))
             return True
         return False
 
@@ -639,7 +593,6 @@ class FlexiKey:
             crypt_key=self.crypt_key,
             id_key=self.id_key,
             chunk_seed=self.chunk_seed,
-            tam_required=self.tam_required,
         )
         data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase, algorithm)
         key_data = "\n".join(textwrap.wrap(b2a_base64(data).decode("ascii")))

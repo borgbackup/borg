@@ -3,7 +3,7 @@ import argparse
 from ._common import with_repository, with_other_repository, Highlander
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..crypto.key import key_creator, key_argument_names, tam_required_file
+from ..crypto.key import key_creator, key_argument_names
 from ..helpers import EXIT_WARNING
 from ..helpers import location_validator, Location
 from ..helpers import parse_storage_quota
@@ -35,10 +35,6 @@ class RCreateMixIn:
         repository.commit(compact=False)
         with Cache(repository, manifest, warn_if_unencrypted=False):
             pass
-        if key.tam_required:
-            tam_file = tam_required_file(repository)
-            open(tam_file, "w").close()
-
         if key.NAME != "plaintext":
             logger.warning(
                 "\n"

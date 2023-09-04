@@ -413,8 +413,8 @@ def test_check_rebuild_manifest(archiver):
         repository.delete(Manifest.MANIFEST_ID)  # kill manifest, so check has to rebuild it
         repository.commit(compact=False)
     cmd(archiver, "check", "--repair")
-    output = cmd(archiver, "rlist", "--format='{name} tam:{tam}{NL}'")
-    assert "archive_tam tam:verified" in output  # TAM-verified archive is in rebuilt manifest
+    output = cmd(archiver, "rlist", "--format='{name}{NL}'")
+    assert "archive_tam" in output  # TAM-verified archive is in rebuilt manifest
     assert "archive_no_tam" not in output  # check got rid of untrusted not TAM-verified archive
 
 
@@ -425,12 +425,9 @@ def test_check_rebuild_refcounts(archiver):
     repository = Repository(archiver.repository_path, exclusive=True)
     with repository:
         write_archive_without_tam(repository, "archive_no_tam")
-    output = cmd(archiver, "rlist", "--format='{name} tam:{tam}{NL}'")
-    assert "archive_tam tam:verified" in output  # good
-    assert "archive_no_tam tam:none" in output  # could be borg < 1.0.9 archive or fake
     cmd(archiver, "check", "--repair")
-    output = cmd(archiver, "rlist", "--format='{name} tam:{tam}{NL}'")
-    assert "archive_tam tam:verified" in output  # TAM-verified archive still there
+    output = cmd(archiver, "rlist", "--format='{name}{NL}'")
+    assert "archive_tam" in output  # TAM-verified archive still there
     assert "archive_no_tam" not in output  # check got rid of untrusted not TAM-verified archive
     archive_id_post_check = cmd(archiver, "rlist", "--format='{name} {id}{NL}'")
     assert archive_id_post_check == archive_id_pre_check  # rebuild_refcounts didn't change archive_tam archive id

@@ -272,39 +272,19 @@ class TestTAM:
         with pytest.raises(msgpack.UnpackException):
             key.unpack_and_verify_manifest(blob)
 
-    def test_missing_when_required(self, key):
-        blob = msgpack.packb({})
-        with pytest.raises(TAMRequiredError):
-            key.unpack_and_verify_manifest(blob)
-        with pytest.raises(TAMRequiredError):
-            key.unpack_and_verify_archive(blob)
-
     def test_missing(self, key):
         blob = msgpack.packb({})
-        key.tam_required = False
-        unpacked, verified = key.unpack_and_verify_manifest(blob)
-        assert unpacked == {}
-        assert not verified
-        unpacked, verified, _ = key.unpack_and_verify_archive(blob)
-        assert unpacked == {}
-        assert not verified
-
-    def test_unknown_type_when_required(self, key):
-        blob = msgpack.packb({"tam": {"type": "HMAC_VOLLBIT"}})
-        with pytest.raises(TAMUnsupportedSuiteError):
+        with pytest.raises(TAMRequiredError):
             key.unpack_and_verify_manifest(blob)
-        with pytest.raises(TAMUnsupportedSuiteError):
+        with pytest.raises(TAMRequiredError):
             key.unpack_and_verify_archive(blob)
 
     def test_unknown_type(self, key):
         blob = msgpack.packb({"tam": {"type": "HMAC_VOLLBIT"}})
-        key.tam_required = False
-        unpacked, verified = key.unpack_and_verify_manifest(blob)
-        assert unpacked == {}
-        assert not verified
-        unpacked, verified, _ = key.unpack_and_verify_archive(blob)
-        assert unpacked == {}
-        assert not verified
+        with pytest.raises(TAMUnsupportedSuiteError):
+            key.unpack_and_verify_manifest(blob)
+        with pytest.raises(TAMUnsupportedSuiteError):
+            key.unpack_and_verify_archive(blob)
 
     @pytest.mark.parametrize(
         "tam, exc",
@@ -360,8 +340,7 @@ class TestTAM:
         unpacked = msgpack.unpackb(blob)
         assert unpacked["tam"]["type"] == "HKDF_HMAC_SHA512"
 
-        unpacked, verified = key.unpack_and_verify_manifest(blob)
-        assert verified
+        unpacked = key.unpack_and_verify_manifest(blob)
         assert unpacked["foo"] == "bar"
         assert "tam" not in unpacked
 
@@ -373,8 +352,7 @@ class TestTAM:
         unpacked = msgpack.unpackb(blob)
         assert unpacked["tam"]["type"] == "HKDF_HMAC_SHA512"
 
-        unpacked, verified, _ = key.unpack_and_verify_archive(blob)
-        assert verified
+        unpacked, _ = key.unpack_and_verify_archive(blob)
         assert unpacked["foo"] == "bar"
         assert "tam" not in unpacked
 

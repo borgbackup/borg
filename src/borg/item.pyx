@@ -467,7 +467,7 @@ cdef class Key(PropDict):
     crypt_key = PropDictProperty(bytes)
     id_key = PropDictProperty(bytes)
     chunk_seed = PropDictProperty(int)
-    tam_required = PropDictProperty(bool)
+    tam_required = PropDictProperty(bool)  # legacy. borg now implicitly always requires TAM.
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
@@ -650,7 +650,6 @@ class ItemDiff:
         self._can_compare_chunk_ids = can_compare_chunk_ids
         self._chunk_1 = chunk_1
         self._chunk_2 = chunk_2
-
         self._changes = {}
 
         if self._item1.is_link() or self._item2.is_link():

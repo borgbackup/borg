@@ -67,3 +67,9 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "src/borg/testsuite/archiver/return_codes.py" = ["F811"]
 "src/borg/testsuite/benchmark.py" = ["F811"]
 "src/borg/testsuite/platform.py" = ["F811"]
+
+[tool.pytest.ini_options]
+python_files = "testsuite/*.py"
+markers = [
+    "allow_cache_wipe",
+]

@@ -1,4 +1,4 @@
-from typing import FrozenSet, Set, NamedTuple, Tuple, Mapping, Dict, List, Iterator, Callable, Any, Optional
+from typing import Set, NamedTuple, Tuple, Mapping, Dict, List, Iterator, Callable, Any, Optional
 
 from .helpers import StableDict
 
@@ -96,7 +96,7 @@ class ArchiveItem(PropDict):
     def items(self, val: List) -> None: ...
     @property
     def item_ptrs(self) -> List: ...
-    @items.setter
+    @item_ptrs.setter
     def item_ptrs(self, val: List) -> None: ...
 
 class ChunkListEntry(NamedTuple):

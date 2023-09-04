@@ -73,3 +73,21 @@ python_files = "testsuite/*.py"
 markers = [
     "allow_cache_wipe",
 ]
+
+[tool.mypy]
+python_version = "3.9"
+strict_optional = false
+local_partial_types = true
+show_error_codes = true
+files = "src/borg/**/*.py"
+
+[[tool.mypy.overrides]]
+module = [
+    "msgpack.*",
+    "llfuse",
+    "pyfuse3",
+    "trio",
+    "borg.crypto.low_level",
+    "borg.platform.*",
+]
+ignore_missing_imports = true

@@ -84,7 +84,7 @@ class Packer(mp_Packer):
         use_single_float=False,
         autoreset=True,
         use_bin_type=USE_BIN_TYPE,
-        strict_types=False
+        strict_types=False,
     ):
         assert unicode_errors == UNICODE_ERRORS
         super().__init__(
@@ -133,7 +133,7 @@ class Unpacker(mp_Unpacker):
         unicode_errors=UNICODE_ERRORS,
         max_buffer_size=0,
         ext_hook=ExtType,
-        strict_map_key=False
+        strict_map_key=False,
     ):
         assert raw == RAW
         assert unicode_errors == UNICODE_ERRORS

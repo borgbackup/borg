@@ -28,6 +28,11 @@ Compatibility notes:
   You can use "borg transfer" to transfer archives from borg 1.1/1.2 repos to
   a new borg 2.0 repo, but it will need some time and space.
 
+  Before using "borg transfer", you must have upgraded to borg >= 1.2.6 (or
+  another borg version that was patched to fix CVE-2023-CVE-2023-36811) and
+  you must have followed the upgrade instructions at top of the change log
+  relating to manifest and archive TAMs (borg2 just requires these TAMs now).
+
 - command line syntax was changed, scripts and wrappers will need changes:
 
   - you will usually either export BORG_REPO=<MYREPO> into your environment or
@@ -132,6 +137,7 @@ New features:
 
 Fixes:
 
+- archive tam verify security fix, fixes CVE-2023-36811
 - remote logging/progress: use callback to send queued records, #7662
 - make_path_safe: remove test for backslashes, #7651
 - benchmark cpu: use sanitized path, #7654
@@ -139,6 +145,9 @@ Fixes:
 
 Other changes:
 
+- always implicitly require archive TAMs (all archives have TAMs since borg 1.2.6)
+- always implicitly require manifest TAMs (manifests have TAMs since borg 1.0.9)
+- rlist: remove support for {tam} placeholder, archives are now always TAM-authenticated.
 - manifest: move item_keys into config dict (manifest.version == 2 now), #7710
 - replace "datetime.utcfromtimestamp" to avoid deprecation warnings with Python 3.12
 - properly normalise paths on Windows (forward slashes, integrate drive letter into path)

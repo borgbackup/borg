@@ -1,3 +1,57 @@
+[project]
+name = "borgbackup"
+dynamic = ["version"]
+authors = [{name="The Borg Collective (see AUTHORS file)"}]
+maintainers = [
+    {name="Thomas Waldmann", email="tw@waldmann-edv.de"},
+]
+description = "Deduplicated, encrypted, authenticated and compressed backups"
+readme = "README.rst"
+requires-python = ">=3.9"
+keywords = ["backup", "borgbackup"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: POSIX :: BSD :: FreeBSD",
+    "Operating System :: POSIX :: BSD :: OpenBSD",
+    "Operating System :: POSIX :: BSD :: NetBSD",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Security :: Cryptography",
+    "Topic :: System :: Archiving :: Backup",
+]
+license = {text="BSD"}
+dependencies = [
+  "msgpack >=1.0.3, <=1.0.5",
+  "packaging",
+  "platformdirs >=3.0.0, <4.0.0; sys_platform == 'darwin'",  # for macOS: breaking changes in 3.0.0,
+  "platformdirs >=2.6.0, <4.0.0; sys_platform != 'darwin'",  # for others: 2.6+ works consistently.
+  "argon2-cffi",
+]
+
+[project.optional-dependencies]
+llfuse = ["llfuse >= 1.3.8"]
+pyfuse3 = ["pyfuse3 >= 3.1.1"]
+nofuse = []
+
+[project.urls]
+"Homepage" = "https://borgbackup.org/"
+"Bug Tracker" = "https://github.com/borgbackup/borg/issues"
+"Documentation" = "https://borgbackup.readthedocs.io/"
+"Repository" = "https://github.com/borgbackup/borg"
+"Changelog" = "https://github.com/borgbackup/borg/blob/master/docs/changes.rst"
+
+[project.scripts]
+borg = "borg.archiver:main"
+borgfs = "borg.archiver:main"
+
 [build-system]
 requires = ["setuptools", "pkgconfig", "Cython", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
@@ -67,3 +121,27 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "src/borg/testsuite/archiver/return_codes.py" = ["F811"]
 "src/borg/testsuite/benchmark.py" = ["F811"]
 "src/borg/testsuite/platform.py" = ["F811"]
+
+[tool.pytest.ini_options]
+python_files = "testsuite/*.py"
+markers = [
+    "allow_cache_wipe",
+]
+
+[tool.mypy]
+python_version = "3.9"
+strict_optional = false
+local_partial_types = true
+show_error_codes = true
+files = "src/borg/**/*.py"
+
+[[tool.mypy.overrides]]
+module = [
+    "msgpack.*",
+    "llfuse",
+    "pyfuse3",
+    "trio",
+    "borg.crypto.low_level",
+    "borg.platform.*",
+]
+ignore_missing_imports = true

@@ -113,7 +113,7 @@ class Archives(abc.MutableMapping):
         older=None,
         newer=None,
         oldest=None,
-        newest=None
+        newest=None,
     ):
         """
         Return list of ArchiveInfo instances according to the parameters.

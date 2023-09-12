@@ -9,6 +9,5 @@ pytest-xdist
 pytest-cov
 pytest-benchmark
 Cython
-twine
 python-dateutil
 pre-commit

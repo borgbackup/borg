@@ -10,5 +10,4 @@ pytest-xdist==3.3.1
 pytest-cov==4.1.0
 pytest-benchmark==4.0.0
 Cython==3.0.2
-twine==4.0.2
 pre-commit==3.4.0

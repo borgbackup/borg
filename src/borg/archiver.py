@@ -72,10 +72,11 @@ try:
     from .helpers import umount
     from .helpers import msgpack, msgpack_fallback
     from .helpers import uid2user, gid2group
+    from .helpers import safe_decode
     from .nanorst import rst_to_terminal
     from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
     from .patterns import PatternMatcher
-    from .item import Item
+    from .item import Item, ArchiveItem
     from .platform import get_flags, get_process_id, SyncFile
     from .remote import RepositoryServer, RemoteRepository, cache_if_remote
     from .repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
@@ -1711,25 +1712,43 @@ class Archiver:
                           DASHES, logger=logging.getLogger('borg.output.stats'))
         return self.exit_code
 
-    @with_repository(fake=('tam', 'disable_tam'), invert_fake=True, manifest=False, exclusive=True)
+    @with_repository(fake=('tam', 'disable_tam', 'archives_tam'), invert_fake=True, manifest=False, exclusive=True)
     def do_upgrade(self, args, repository, manifest=None, key=None):
         """upgrade a repository from a previous version"""
-        if args.tam:
+        if args.archives_tam:
             manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
-
-            if not hasattr(key, 'change_passphrase'):
-                print('This repository is not encrypted, cannot enable TAM.')
-                return EXIT_ERROR
-
+            with Cache(repository, key, manifest) as cache:
+                stats = Statistics()
+                for info in manifest.archives.list(sort_by=['ts']):
+                    archive_id = info.id
+                    archive_formatted = format_archive(info)
+                    cdata = repository.get(archive_id)
+                    data = key.decrypt(archive_id, cdata)
+                    archive, verified, _ = key.unpack_and_verify_archive(data, force_tam_not_required=True)
+                    if not verified:  # we do not have an archive TAM yet -> add TAM now!
+                        archive = ArchiveItem(internal_dict=archive)
+                        archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
+                        data = key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive')
+                        new_archive_id = key.id_hash(data)
+                        cache.add_chunk(new_archive_id, data, stats)
+                        cache.chunk_decref(archive_id, stats)
+                        manifest.archives[info.name] = (new_archive_id, info.ts)
+                        print("Added archive TAM:   %s -> [%s]" % (archive_formatted, bin_to_hex(new_archive_id)))
+                    else:
+                        print("Archive TAM present: %s" % archive_formatted)
+                manifest.write()
+                repository.commit()
+                cache.commit()
+        elif args.tam:
+            manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
             if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):
-                # The standard archive listing doesn't include the archive ID like in borg 1.1.x
                 print('Manifest contents:')
                 for archive_info in manifest.archives.list(sort_by=['ts']):
-                    print(format_archive(archive_info), '[%s]' % bin_to_hex(archive_info.id))
+                    print(format_archive(archive_info))
                 manifest.config[b'tam_required'] = True
                 manifest.write()
                 repository.commit()
-            if not key.tam_required:
+            if not key.tam_required and hasattr(key, 'change_passphrase'):
                 key.tam_required = True
                 key.change_passphrase(key._passphrase)
                 print('Key updated')
@@ -1743,7 +1762,7 @@ class Archiver:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK, force_tam_not_required=True)
             if tam_required(repository):
                 os.unlink(tam_required_file(repository))
-            if key.tam_required:
+            if key.tam_required and hasattr(key, 'change_passphrase'):
                 key.tam_required = False
                 key.change_passphrase(key._passphrase)
                 print('Key updated')
@@ -3110,6 +3129,8 @@ class Archiver:
 
         If you do **not** want to encrypt the contents of your backups, but still
         want to detect malicious tampering use ``--encryption authenticated``.
+        To normally work with ``authenticated`` repos, you will need the passphrase, but
+        there is an emergency workaround, see ``BORG_WORKAROUNDS=authenticated_no_key`` docs.
 
         If ``BLAKE2b`` is faster than ``SHA-256`` on your hardware, use ``--encryption authenticated-blake2``,
         ``--encryption repokey-blake2`` or ``--encryption keyfile-blake2``. Note: for remote backups
@@ -4101,6 +4122,23 @@ class Archiver:
         Borg 1.x.y upgrades
         +++++++++++++++++++
 
+        Archive TAM authentication:
+
+        Use ``borg upgrade --archives-tam REPO`` to add archive TAMs to all
+        archives that are not TAM authenticated yet.
+        This is a convenient method to just trust all archives present - if
+        an archive does not have TAM authentication yet, a TAM will be added.
+        Archives created by old borg versions < 1.0.9 do not have TAMs.
+        Archives created by newer borg version should have TAMs already.
+        If you have a high risk environment, you should not just run this,
+        but first verify that the archives are authentic and not malicious
+        (== have good content, have a good timestamp).
+        Borg 1.2.5+ needs all archives to be TAM authenticated for safety reasons.
+
+        This upgrade needs to be done once per repository.
+
+        Manifest TAM authentication:
+
         Use ``borg upgrade --tam REPO`` to require manifest authentication
         introduced with Borg 1.0.9 to address security issues. This means
         that modifying the repository after doing this with a version prior
@@ -4181,6 +4219,8 @@ class Archiver:
                                help='Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).')
         subparser.add_argument('--disable-tam', dest='disable_tam', action='store_true',
                                help='Disable manifest authentication (in key and cache).')
+        subparser.add_argument('--archives-tam', dest='archives_tam', action='store_true',
+                               help='add TAM authentication for all archives.')
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='path to the repository to be upgraded')

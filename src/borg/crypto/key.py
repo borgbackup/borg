@@ -22,12 +22,17 @@ from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers import prepare_subprocess_env
 from ..helpers import msgpack
+from ..helpers import workarounds
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
 from .nonces import NonceManager
 from .low_level import AES, bytes_to_long, bytes_to_int, num_aes_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
 
 PREFIX = b'\0' * 8
+
+
+# workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
+AUTHENTICATED_NO_KEY = 'authenticated_no_key' in workarounds
 
 
 class NoPassphraseFailure(Error):
@@ -82,6 +87,13 @@ class TAMRequiredError(IntegrityError):
     traceback = False
 
 
+class ArchiveTAMRequiredError(TAMRequiredError):
+    __doc__ = textwrap.dedent("""
+    Archive '{}' is unauthenticated, but it is required for this repository.
+    """).strip()
+    traceback = False
+
+
 class TAMInvalid(IntegrityError):
     __doc__ = IntegrityError.__doc__
     traceback = False
@@ -89,6 +101,15 @@ class TAMInvalid(IntegrityError):
     def __init__(self):
         # Error message becomes: "Data integrity error: Manifest authentication did not verify"
         super().__init__('Manifest authentication did not verify')
+
+
+class ArchiveTAMInvalid(IntegrityError):
+    __doc__ = IntegrityError.__doc__
+    traceback = False
+
+    def __init__(self):
+        # Error message becomes: "Data integrity error: Archive authentication did not verify"
+        super().__init__('Archive authentication did not verify')
 
 
 class TAMUnsupportedSuiteError(IntegrityError):
@@ -203,15 +224,17 @@ class KeyBase:
             output_length=64
         )
 
-    def pack_and_authenticate_metadata(self, metadata_dict, context=b'manifest'):
+    def pack_and_authenticate_metadata(self, metadata_dict, context=b'manifest', salt=None):
+        if salt is None:
+            salt = os.urandom(64)
         metadata_dict = StableDict(metadata_dict)
         tam = metadata_dict['tam'] = StableDict({
             'type': 'HKDF_HMAC_SHA512',
             'hmac': bytes(64),
-            'salt': os.urandom(64),
+            'salt': salt,
         })
         packed = msgpack.packb(metadata_dict, unicode_errors='surrogateescape')
-        tam_key = self._tam_key(tam['salt'], context)
+        tam_key = self._tam_key(salt, context)
         tam['hmac'] = HMAC(tam_key, packed, sha512).digest()
         return msgpack.packb(metadata_dict, unicode_errors='surrogateescape')
 
@@ -228,11 +251,13 @@ class KeyBase:
         unpacker = get_limited_unpacker('manifest')
         unpacker.feed(data)
         unpacked = unpacker.unpack()
+        if AUTHENTICATED_NO_KEY:
+            return unpacked, True  # True is a lie.
         if b'tam' not in unpacked:
             if tam_required:
                 raise TAMRequiredError(self.repository._location.canonical_path())
             else:
-                logger.debug('TAM not found and not required')
+                logger.debug('Manifest TAM not found and not required')
                 return unpacked, False
         tam = unpacked.pop(b'tam', None)
         if not isinstance(tam, dict):
@@ -242,7 +267,7 @@ class KeyBase:
             if tam_required:
                 raise TAMUnsupportedSuiteError(repr(tam_type))
             else:
-                logger.debug('Ignoring TAM made with unsupported suite, since TAM is not required: %r', tam_type)
+                logger.debug('Ignoring manifest TAM made with unsupported suite, since TAM is not required: %r', tam_type)
                 return unpacked, False
         tam_hmac = tam.get(b'hmac')
         tam_salt = tam.get(b'salt')
@@ -256,6 +281,52 @@ class KeyBase:
             raise TAMInvalid()
         logger.debug('TAM-verified manifest')
         return unpacked, True
+
+    def unpack_and_verify_archive(self, data, force_tam_not_required=False):
+        """Unpack msgpacked *data* and return (object, did_verify, salt)."""
+        tam_required = self.tam_required
+        if force_tam_not_required and tam_required:
+            # for a long time, borg only checked manifest for "tam_required" and
+            # people might have archives without TAM, so don't be too annoyingly loud here:
+            logger.debug('Archive authentication DISABLED.')
+            tam_required = False
+        data = bytearray(data)
+        unpacker = get_limited_unpacker('archive')
+        unpacker.feed(data)
+        unpacked = unpacker.unpack()
+        if b'tam' not in unpacked:
+            if tam_required:
+                archive_name = unpacked.get(b'name', b'<unknown>').decode('ascii', 'replace')
+                raise ArchiveTAMRequiredError(archive_name)
+            else:
+                logger.debug('Archive TAM not found and not required')
+                return unpacked, False, None
+        tam = unpacked.pop(b'tam', None)
+        if not isinstance(tam, dict):
+            raise ArchiveTAMInvalid()
+        tam_type = tam.get(b'type', b'<none>').decode('ascii', 'replace')
+        if tam_type != 'HKDF_HMAC_SHA512':
+            if tam_required:
+                raise TAMUnsupportedSuiteError(repr(tam_type))
+            else:
+                logger.debug('Ignoring archive TAM made with unsupported suite, since TAM is not required: %r', tam_type)
+                return unpacked, False, None
+        tam_hmac = tam.get(b'hmac')
+        tam_salt = tam.get(b'salt')
+        if not isinstance(tam_salt, bytes) or not isinstance(tam_hmac, bytes):
+            raise ArchiveTAMInvalid()
+        offset = data.index(tam_hmac)
+        data[offset:offset + 64] = bytes(64)
+        tam_key = self._tam_key(tam_salt, context=b'archive')
+        calculated_hmac = HMAC(tam_key, data, sha512).digest()
+        if not compare_digest(calculated_hmac, tam_hmac):
+            if 'ignore_invalid_archive_tam' in workarounds:
+                logger.debug('ignoring invalid archive TAM due to BORG_WORKAROUNDS')
+                return unpacked, False, None  # same as if no TAM is present
+            else:
+                raise ArchiveTAMInvalid()
+        logger.debug('TAM-verified archive')
+        return unpacked, True, tam_salt
 
 
 class PlaintextKey(KeyBase):
@@ -836,6 +907,19 @@ class AuthenticatedKeyBase(RepoKey):
     # It's only authenticated, not encrypted.
     logically_encrypted = False
 
+    def _load(self, key_data, passphrase):
+        if AUTHENTICATED_NO_KEY:
+            # fake _load if we have no key or passphrase
+            NOPE = bytes(32)  # 256 bit all-zero
+            self.repository_id = NOPE
+            self.enc_key = NOPE
+            self.enc_hmac_key = NOPE
+            self.id_key = NOPE
+            self.chunk_seed = 0
+            self.tam_required = False
+            return True
+        return super()._load(key_data, passphrase)
+
     def load(self, target, passphrase):
         success = super().load(target, passphrase)
         self.logically_encrypted = False
@@ -867,6 +951,8 @@ class AuthenticatedKeyBase(RepoKey):
         if not decompress:
             return payload
         data = self.decompress(payload)
+        if AUTHENTICATED_NO_KEY:
+            return data
         self.assert_id(id, data)
         return data
 

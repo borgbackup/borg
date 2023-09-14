@@ -157,11 +157,14 @@ case of malicious activity in the repository.
 
 If you do **not** want to encrypt the contents of your backups, but still want to detect
 malicious tampering use an `authenticated` mode. It's like `repokey` minus encryption.
+To normally work with ``authenticated`` repos, you will need the passphrase, but
+there is an emergency workaround, see ``BORG_WORKAROUNDS=authenticated_no_key`` docs.
 
 Creating a related repository
 +++++++++++++++++++++++++++++
 
-A related repository uses same secret key material as the other/original repository.
+You can use ``borg rcreate --other-repo ORIG_REPO ...`` to create a related repository
+that uses the same secret key material as the given other/original repository.
 
 By default, only the ID key and chunker secret will be the same (these are important
 for deduplication) and the AE crypto keys will be newly generated random keys.

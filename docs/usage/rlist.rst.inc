@@ -104,7 +104,7 @@ Examples:
     # Strings are left-aligned, numbers are right-aligned.
     # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
     $ borg rlist --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
-    ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9a312bef3f2f6e2d0fc110c196827786c15eba0188738e81697a7fa3b274]
+    ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9...3b274]
     ...
 
 The following keys are always available:
@@ -124,6 +124,7 @@ Keys available only when listing archives in a repository:
 - name: alias of "archive"
 - comment: archive comment
 - id: internal ID of the archive
+- tam: TAM authentication state of this archive
 
 - start: time (start) of creation of the archive
 - time: alias of "start"

@@ -176,19 +176,19 @@ def install_source_dependencies(user)
     make -j$(nproc) install PREFIX=${PREFIX}
 
     # libzstd
-    VERSION_LIBZSTD=1.5.4
+    VERSION_LIBZSTD=1.5.5
     git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_LIBZSTD} https://github.com/facebook/zstd.git
     cd ${PREFIX}/src/zstd
     make -j$(nproc) install PREFIX=${PREFIX}
 
     # xxHash
-    VERSION_LIBXXHASH=0.8.1
+    VERSION_LIBXXHASH=0.8.2
     git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_LIBXXHASH} https://github.com/Cyan4973/xxHash.git
     cd ${PREFIX}/src/xxHash
     make -j$(nproc) install PREFIX=${PREFIX}
 
     # openssl
-    VERSION_OPENSSL=1_1_1t
+    VERSION_OPENSSL=1_1_1w
     git -C ${PREFIX}/src clone --depth 1 --branch OpenSSL_${VERSION_OPENSSL} https://github.com/openssl/openssl.git
     cd ${PREFIX}/src/openssl
     ./config --prefix=${PREFIX} --openssldir=${PREFIX}/lib/ssl
@@ -208,7 +208,7 @@ def install_source_dependencies(user)
     ln -s ${PREFIX}/src/meson/meson.py ${PREFIX}/bin/meson
 
     # libfuse3
-    VERSION_LIBFUSE=3.14.0
+    VERSION_LIBFUSE=3.16.1
     git -C ${PREFIX}/src clone --depth 1 --branch fuse-${VERSION_LIBFUSE} https://github.com/libfuse/libfuse.git
     cd ${PREFIX}/src/libfuse
     mkdir build; cd build
@@ -243,7 +243,7 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
-    pyenv install 3.11.2  # tests, binary build
+    pyenv install 3.11.5  # tests, binary build
     pyenv install 3.10.2  # tests
     pyenv install 3.9.10  # tests
     pyenv rehash
@@ -263,8 +263,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.11 release
-    pyenv global 3.11.2
-    pyenv virtualenv 3.11.2 borg-env
+    pyenv global 3.11.5
+    pyenv virtualenv 3.11.5 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -288,7 +288,7 @@ def install_pyinstaller()
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    pip install 'pyinstaller==5.13.1'
+    pip install 'pyinstaller==5.13.2'
   EOF
 end
 
@@ -311,8 +311,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.10 3.10.2 3.11.2
-      pyenv local 3.9.10 3.10.2 3.11.2
+      pyenv global 3.9.10 3.10.2 3.11.5
+      pyenv local 3.9.10 3.10.2 3.11.5
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:

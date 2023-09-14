@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2023-06-11" "" "borg backup tool"
+.TH "BORG" 1 "2023-09-14" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -493,6 +493,38 @@ write to disk behaviour (not continuously streaming to disk).
 Retry opening a file without O_NOATIME if opening a file with O_NOATIME
 caused EROFS. You will need this to make archives from volume shadow copies
 in WSL1 (Windows Subsystem for Linux 1).
+.TP
+.B authenticated_no_key
+Work around a lost passphrase or key for an \fBauthenticated\fP mode repository
+(these are only authenticated, but not encrypted).
+If the key is missing in the repository config, add \fBkey = anything\fP there.
+.sp
+This workaround is \fBonly\fP for emergencies and \fBonly\fP to extract data
+from an affected repository (read\-only access):
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+BORG_WORKAROUNDS=authenticated_no_key borg extract repo::archive
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+After you have extracted all data you need, you MUST delete the repository:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+BORG_WORKAROUNDS=authenticated_no_key borg delete repo
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+Now you can init a fresh repo. Make sure you do not use the workaround any more.
 .UNINDENT
 .UNINDENT
 .TP
@@ -646,7 +678,7 @@ At least three directory levels with short names
 Typically, file sizes up to a few hundred MB.
 Large repositories may require large files (>2 GB).
 .IP \(bu 2
-Up to 1000 files per directory (10000 for repositories initialized with Borg 1.0)
+Up to 1000 files per directory.
 .IP \(bu 2
 rename(2) / MoveFile(Ex) should work as specified, i.e. on the same file system
 it should be a move (not a copy) operation, and in case of a directory
@@ -842,7 +874,7 @@ Yes [1]
 T}
 _
 T{
-Mac OS X
+macOS
 T}	T{
 Yes
 T}	T{

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2023-06-11" "" "borg backup tool"
+.TH "BORG-DELETE" 1 "2023-09-14" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete archives
 .SH SYNOPSIS
@@ -110,7 +110,7 @@ consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
 .nf
 .ft C
 # delete a single backup archive:
-$ borg delete Monday
+$ borg delete \-a Monday
 # actually free disk space:
 $ borg compact
 

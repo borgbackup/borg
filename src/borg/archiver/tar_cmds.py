@@ -29,6 +29,11 @@ from ..logger import create_logger
 
 logger = create_logger(__name__)
 
+# Python 3.12+ gives a deprecation warning if TarFile.extraction_filter is None.
+# https://docs.python.org/3.12/library/tarfile.html#tarfile-extraction-filter
+if hasattr(tarfile, "fully_trusted_filter"):
+    tarfile.TarFile.extraction_filter = staticmethod(tarfile.fully_trusted_filter)  # type: ignore
+
 
 def get_tar_filter(fname, decompress):
     # Note that filter is None if fname is '-'.

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-LIST" 1 "2023-06-11" "" "borg backup tool"
+.TH "BORG-LIST" 1 "2023-09-14" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive contents
 .SH SYNOPSIS
@@ -106,11 +106,11 @@ drwxrwxr\-x user   user          0 Sun, 2015\-02\-01 11:00:00 code/myproject
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.text
 \&...
 
-$ borg list archiveA \-\-pattern \(aqre:\e.ext$\(aq
+$ borg list archiveA \-\-pattern \(aq+ re:\e.ext$\(aq \-\-pattern \(aq\- re:^.*$\(aq
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
 \&...
 
-$ borg list archiveA \-\-pattern \(aqre:.ext$\(aq
+$ borg list archiveA \-\-pattern \(aq+ re:.ext$\(aq \-\-pattern \(aq\- re:^.*$\(aq
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.text
 \&...

@@ -85,75 +85,115 @@ borg check
 Description
 ~~~~~~~~~~~
 
-The check command verifies the consistency of a repository and the corresponding archives.
+The check command verifies the consistency of a repository and its archives.
+It consists of two major steps:
 
-check --repair is a potentially dangerous function and might lead to data loss
-(for kinds of corruption it is not capable of dealing with). BE VERY CAREFUL!
+1. Checking the consistency of the repository itself. This includes checking
+   the segment magic headers, and both the metadata and data of all objects in
+   the segments. The read data is checked by size and CRC. Bit rot and other
+   types of accidental damage can be detected this way. Running the repository
+   check can be split into multiple partial checks using ``--max-duration``.
+   When checking a remote repository, please note that the checks run on the
+   server and do not cause significant network traffic.
+
+2. Checking consistency and correctness of the archive metadata and optionally
+   archive data (requires ``--verify-data``). This includes ensuring that the
+   repository manifest exists, the archive metadata chunk is present, and that
+   all chunks referencing files (items) in the archive exist. This requires
+   reading archive and file metadata, but not data. To cryptographically verify
+   the file (content) data integrity pass ``--verify-data``, but keep in mind
+   that this requires reading all data and is hence very time consuming. When
+   checking archives of a remote repository, archive checks run on the client
+   machine because they require decrypting data and therefore the encryption
+   key.
+
+Both steps can also be run independently. Pass ``--repository-only`` to run the
+repository checks only, or pass ``--archives-only`` to run the archive checks
+only.
+
+The ``--max-duration`` option can be used to split a long-running repository
+check into multiple partial checks. After the given number of seconds the check
+is interrupted. The next partial check will continue where the previous one
+stopped, until the full repository has been checked. Assuming a complete check
+would take 7 hours, then running a daily check with ``--max-duration=3600``
+(1 hour) would result in one full repository check per week. Doing a full
+repository check aborts any previous partial check; the next partial check will
+restart from the beginning. With partial repository checks you can run neither
+archive checks, nor enable repair mode. Consequently, if you want to use
+``--max-duration`` you must also pass ``--repository-only``, and must not pass
+``--archives-only``, nor ``--repair``.
+
+**Warning:** Please note that partial repository checks (i.e. running it with
+``--max-duration``) can only perform non-cryptographic checksum checks on the
+segment files. A full repository check (i.e. without ``--max-duration``) can
+also do a repository index check. Enabling partial repository checks excepts
+archive checks for the same reason. Therefore partial checks may be useful with
+very large repositories only where a full check would take too long.
+
+The ``--verify-data`` option will perform a full integrity verification (as
+opposed to checking the CRC32 of the segment) of data, which means reading the
+data from the repository, decrypting and decompressing it. It is a complete
+cryptographic verification and hence very time consuming, but will detect any
+accidental and malicious corruption. Tamper-resistance is only guaranteed for
+encrypted repositories against attackers without access to the keys. You can
+not use ``--verify-data`` with ``--repository-only``.
+
+About repair mode
++++++++++++++++++
+
+The check command is a readonly task by default. If any corruption is found,
+Borg will report the issue and proceed with checking. To actually repair the
+issues found, pass ``--repair``.
+
+.. note::
+
+    ``--repair`` is a **POTENTIALLY DANGEROUS FEATURE** and might lead to data
+    loss! This does not just include data that was previously lost anyway, but
+    might include more data for kinds of corruption it is not capable of
+    dealing with. **BE VERY CAREFUL!**
 
 Pursuant to the previous warning it is also highly recommended to test the
-reliability of the hardware running this software with stress testing software
-such as memory testers. Unreliable hardware can also lead to data loss especially
-when this command is run in repair mode.
+reliability of the hardware running Borg with stress testing software. This
+especially includes storage and memory testers. Unreliable hardware might lead
+to additional data loss.
 
-First, the underlying repository data files are checked:
+It is highly recommended to create a backup of your repository before running
+in repair mode (i.e. running it with ``--repair``).
 
-- For all segments, the segment magic header is checked.
-- For all objects stored in the segments, all metadata (e.g. CRC and size) and
-  all data is read. The read data is checked by size and CRC. Bit rot and other
-  types of accidental damage can be detected this way.
-- In repair mode, if an integrity error is detected in a segment, try to recover
-  as many objects from the segment as possible.
-- In repair mode, make sure that the index is consistent with the data stored in
-  the segments.
-- If checking a remote repo via ``ssh:``, the repo check is executed on the server
-  without causing significant network traffic.
-- The repository check can be skipped using the ``--archives-only`` option.
-- A repository check can be time consuming. Partial checks are possible with the
-  ``--max-duration`` option.
+Repair mode will attempt to fix any corruptions found. Fixing corruptions does
+not mean recovering lost data: Borg can not magically restore data lost due to
+e.g. a hardware failure. Repairing a repository means sacrificing some data
+for the sake of the repository as a whole and the remaining data. Hence it is,
+by definition, a potentially lossy task.
 
-Second, the consistency and correctness of the archive metadata is verified:
+In practice, repair mode hooks into both the repository and archive checks:
 
-- Is the repo manifest present? If not, it is rebuilt from archive metadata
-  chunks (this requires reading and decrypting of all metadata and data).
-- Check if archive metadata chunk is present; if not, remove archive from manifest.
-- For all files (items) in the archive, for all chunks referenced by these
-  files, check if chunk is present. In repair mode, if a chunk is not present,
-  replace it with a same-size replacement chunk of zeroes. If a previously lost
-  chunk reappears (e.g. via a later backup), in repair mode the all-zero replacement
-  chunk will be replaced by the correct chunk. This requires reading of archive and
-  file metadata, but not data.
-- In repair mode, when all the archives were checked, orphaned chunks are deleted
-  from the repo. One cause of orphaned chunks are input file related errors (like
-  read errors) in the archive creation process.
-- In verify-data mode, a complete cryptographic verification of the archive data
-  integrity is performed. This conflicts with ``--repository-only`` as this mode
-  only makes sense if the archive checks are enabled. The full details of this mode
-  are documented below.
-- If checking a remote repo via ``ssh:``, the archive check is executed on the
-  client machine because it requires decryption, and this is always done client-side
-  as key access is needed.
-- The archive checks can be time consuming; they can be skipped using the
-  ``--repository-only`` option.
+1. When checking the repository's consistency, repair mode will try to recover
+   as many objects from segments with integrity errors as possible, and ensure
+   that the index is consistent with the data stored in the segments.
 
-The ``--max-duration`` option can be used to split a long-running repository check
-into multiple partial checks. After the given number of seconds the check is
-interrupted. The next partial check will continue where the previous one stopped,
-until the complete repository has been checked. Example: Assuming a complete check took 7
-hours, then running a daily check with --max-duration=3600 (1 hour) resulted in one
-completed check per week.
+2. When checking the consistency and correctness of archives, repair mode might
+   remove whole archives from the manifest if their archive metadata chunk is
+   corrupt or lost. On a chunk level (i.e. the contents of files), repair mode
+   will replace corrupt or lost chunks with a same-size replacement chunk of
+   zeroes. If a previously zeroed chunk reappears, repair mode will restore
+   this lost chunk using the new chunk. Lastly, repair mode will also delete
+   orphaned chunks (e.g. caused by read errors while creating the archive).
 
-Attention: A partial --repository-only check can only do way less checking than a full
---repository-only check: only the non-cryptographic checksum checks on segment file
-entries are done, while a full --repository-only check would also do a repo index check.
-A partial check cannot be combined with the ``--repair`` option. Partial checks
-may therefore be useful only with very large repositories where a full check would take
-too long.
-Doing a full repository check aborts a partial check; the next partial check will restart
-from the beginning.
+Most steps taken by repair mode have a one-time effect on the repository, like
+removing a lost archive from the repository. However, replacing a corrupt or
+lost chunk with an all-zero replacement will have an ongoing effect on the
+repository: When attempting to extract a file referencing an all-zero chunk,
+the ``extract`` command will distinctly warn about it. The FUSE filesystem
+created by the ``mount`` command will reject reading such a "zero-patched"
+file unless a special mount option is given.
 
-The ``--verify-data`` option will perform a full integrity verification (as opposed to
-checking the CRC32 of the segment) of data, which means reading the data from the
-repository, decrypting and decompressing it. This is a cryptographic verification,
-which will detect (accidental) corruption. For encrypted repositories it is
-tamper-resistant as well, unless the attacker has access to the keys. It is also very
-slow.
+As mentioned earlier, Borg might be able to "heal" a "zero-patched" file in
+repair mode, if all its previously lost chunks reappear (e.g. via a later
+backup). This is achieved by Borg not only keeping track of the all-zero
+replacement chunks, but also by keeping metadata about the lost chunks. In
+repair mode Borg will check whether a previously lost chunk reappeared and will
+replace the all-zero replacement chunk by the reappeared chunk. If all lost
+chunks of a "zero-patched" file reappear, this effectively "heals" the file.
+Consequently, if lost chunks were repaired earlier, it is advised to run
+``--repair`` a second time after creating some new backups.

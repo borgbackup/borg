@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-COMPRESSION" 1 "2023-06-11" "" "borg backup tool"
+.TH "BORG-COMPRESSION" 1 "2023-09-14" "" "borg backup tool"
 .SH NAME
 borg-compression \- Details regarding compression
 .SH DESCRIPTION
@@ -56,7 +56,6 @@ Use lz4 compression. Very high speed, very low compression. (default)
 Use zstd (\(dqzstandard\(dq) compression, a modern wide\-range algorithm.
 If you do not explicitly give the compression level L (ranging from 1
 to 22), it will use level 3.
-Archives compressed with zstd are not compatible with borg < 1.1.4.
 .TP
 .B zlib[,L]
 Use zlib (\(dqgz\(dq) compression. Medium speed, medium compression.

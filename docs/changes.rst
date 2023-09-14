@@ -120,8 +120,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b7 (not released yet)
-----------------------------------
+Version 2.0.0b7 (2023-09-14)
+----------------------------
 
 Please note:
 
@@ -148,6 +148,8 @@ Other changes:
 - always implicitly require archive TAMs (all archives have TAMs since borg 1.2.6)
 - always implicitly require manifest TAMs (manifests have TAMs since borg 1.0.9)
 - rlist: remove support for {tam} placeholder, archives are now always TAM-authenticated.
+- support / test on Python 3.12
+- allow msgpack 1.0.6 (which has py312 wheels), #7810
 - manifest: move item_keys into config dict (manifest.version == 2 now), #7710
 - replace "datetime.utcfromtimestamp" to avoid deprecation warnings with Python 3.12
 - properly normalise paths on Windows (forward slashes, integrate drive letter into path)

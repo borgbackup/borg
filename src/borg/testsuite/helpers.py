@@ -908,7 +908,22 @@ def test_parse_file_size_invalid(string):
         parse_file_size(string)
 
 
-@pytest.mark.skipif(is_cygwin, reason="ignore slow msgpack on cygwin")
+def expected_py_mp_slow_combination():
+    """do we expect msgpack to be slow in this environment?"""
+    # we need to import upstream msgpack package here, not helpers.msgpack:
+    import msgpack
+
+    # msgpack is slow on cygwin
+    if is_cygwin:
+        return True
+    # msgpack < 1.0.6 did not have py312 wheels
+    if sys.version_info[:2] == (3, 12) and msgpack.version < (1, 0, 6):
+        return True
+    # otherwise we expect msgpack to be fast!
+    return False
+
+
+@pytest.mark.skipif(expected_py_mp_slow_combination(), reason="ignore expected slow msgpack")
 def test_is_slow_msgpack():
     # we need to import upstream msgpack package here, not helpers.msgpack:
     import msgpack

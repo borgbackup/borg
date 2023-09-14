@@ -176,19 +176,19 @@ def install_source_dependencies(user)
     make -j$(nproc) install PREFIX=${PREFIX}
 
     # libzstd
-    VERSION_LIBZSTD=1.5.4
+    VERSION_LIBZSTD=1.5.5
     git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_LIBZSTD} https://github.com/facebook/zstd.git
     cd ${PREFIX}/src/zstd
     make -j$(nproc) install PREFIX=${PREFIX}
 
     # xxHash
-    VERSION_LIBXXHASH=0.8.1
+    VERSION_LIBXXHASH=0.8.2
     git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_LIBXXHASH} https://github.com/Cyan4973/xxHash.git
     cd ${PREFIX}/src/xxHash
     make -j$(nproc) install PREFIX=${PREFIX}
 
     # openssl
-    VERSION_OPENSSL=1_1_1t
+    VERSION_OPENSSL=1_1_1w
     git -C ${PREFIX}/src clone --depth 1 --branch OpenSSL_${VERSION_OPENSSL} https://github.com/openssl/openssl.git
     cd ${PREFIX}/src/openssl
     ./config --prefix=${PREFIX} --openssldir=${PREFIX}/lib/ssl
@@ -208,7 +208,7 @@ def install_source_dependencies(user)
     ln -s ${PREFIX}/src/meson/meson.py ${PREFIX}/bin/meson
 
     # libfuse3
-    VERSION_LIBFUSE=3.14.0
+    VERSION_LIBFUSE=3.16.1
     git -C ${PREFIX}/src clone --depth 1 --branch fuse-${VERSION_LIBFUSE} https://github.com/libfuse/libfuse.git
     cd ${PREFIX}/src/libfuse
     mkdir build; cd build

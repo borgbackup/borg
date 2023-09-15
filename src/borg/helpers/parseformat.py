@@ -723,12 +723,11 @@ class ArchiveFormatter(BaseFormatter):
         "id": "internal ID of the archive",
         "hostname": "hostname of host on which this archive was created",
         "username": "username of user who created this archive",
-        "tam": "TAM authentication state of this archive",
         "size": "size of this archive (data plus metadata, not considering compression and deduplication)",
         "nfiles": "count of files in this archive",
     }
     KEY_GROUPS = (
-        ("archive", "name", "comment", "id", "tam"),
+        ("archive", "name", "comment", "id"),
         ("start", "time", "end", "command_line"),
         ("hostname", "username"),
         ("size", "nfiles"),

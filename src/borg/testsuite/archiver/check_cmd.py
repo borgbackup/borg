@@ -241,7 +241,7 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
             "time": "2016-12-15T18:49:51.849711",
             "version": 2,
         }
-        archive = repo_objs.key.pack_and_authenticate_metadata(archive_dict, context=b"archive")
+        archive = repo_objs.key.pack_metadata(archive_dict)
         archive_id = repo_objs.id_hash(archive)
         repository.put(archive_id, repo_objs.format(archive_id, {}, archive, ro_type=ROBJ_ARCHIVE_META))
         repository.commit(compact=False)

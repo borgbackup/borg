@@ -535,7 +535,7 @@ class Archive:
     def _load_meta(self, id):
         cdata = self.repository.get(id)
         _, data = self.repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
-        archive, _ = self.key.unpack_and_verify_archive(data)
+        archive = self.key.unpack_archive(data)
         metadata = ArchiveItem(internal_dict=archive)
         if metadata.version not in (1, 2):  # legacy: still need to read v1 archives
             raise Exception("Unknown archive metadata version")
@@ -702,7 +702,7 @@ Duration: {0.duration}
         metadata.update({"size": stats.osize, "nfiles": stats.nfiles})
         metadata.update(additional_metadata or {})
         metadata = ArchiveItem(metadata)
-        data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b"archive")
+        data = self.key.pack_metadata(metadata.as_dict())
         self.id = self.repo_objs.id_hash(data)
         try:
             self.cache.add_chunk(self.id, {}, data, stats=self.stats, ro_type=ROBJ_ARCHIVE_META)
@@ -1030,7 +1030,7 @@ Duration: {0.duration}
         setattr(metadata, key, value)
         if "items" in metadata:
             del metadata.items
-        data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b"archive")
+        data = self.key.pack_metadata(metadata.as_dict())
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, {}, data, stats=self.stats, ro_type=ROBJ_ARCHIVE_META)
         self.manifest.archives[self.name] = (new_id, metadata.time)
@@ -1998,23 +1998,7 @@ class ArchiveChecker:
             except msgpack.UnpackException:
                 continue
             if valid_archive(archive):
-                # **after** doing the low-level checks and having a strong indication that we
-                # are likely looking at an archive item here, also check the TAM authentication:
-                try:
-                    archive, _ = self.key.unpack_and_verify_archive(data)
-                except IntegrityError as integrity_error:
-                    # TAM issues - do not accept this archive!
-                    # either somebody is trying to attack us with a fake archive data or
-                    # we have an ancient archive made before TAM was a thing (borg < 1.0.9) **and** this repo
-                    # was not correctly upgraded to borg 1.2.5 (see advisory at top of the changelog).
-                    # borg can't tell the difference, so it has to assume this archive might be an attack
-                    # and drops this archive.
-                    name = archive.get(b"name", b"<unknown>").decode("ascii", "replace")
-                    logger.error("Archive TAM authentication issue for archive %s: %s", name, integrity_error)
-                    logger.error("This archive will *not* be added to the rebuilt manifest! It will be deleted.")
-                    self.error_found = True
-                    continue
-                # note: if we get here and verified is False, a TAM is not required.
+                archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)
                 name = archive.name
                 logger.info("Found archive %s", name)
@@ -2271,17 +2255,7 @@ class ArchiveChecker:
                     self.error_found = True
                     del self.manifest.archives[info.name]
                     continue
-                try:
-                    archive, salt = self.key.unpack_and_verify_archive(data)
-                except IntegrityError as integrity_error:
-                    # looks like there is a TAM issue with this archive, this might be an attack!
-                    # when upgrading to borg 1.2.5, users are expected to TAM-authenticate all archives they
-                    # trust, so there shouldn't be any without TAM.
-                    logger.error("Archive TAM authentication issue for archive %s: %s", info.name, integrity_error)
-                    logger.error("This archive will be *removed* from the manifest! It will be deleted.")
-                    self.error_found = True
-                    del self.manifest.archives[info.name]
-                    continue
+                archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)
                 if archive.version != 2:
                     raise Exception("Unknown archive metadata version")
@@ -2301,7 +2275,7 @@ class ArchiveChecker:
                 archive.item_ptrs = archive_put_items(
                     items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
                 )
-                data = self.key.pack_and_authenticate_metadata(archive.as_dict(), context=b"archive", salt=salt)
+                data = self.key.pack_metadata(archive.as_dict())
                 new_archive_id = self.key.id_hash(data)
                 cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
                 add_reference(new_archive_id, len(data), cdata)

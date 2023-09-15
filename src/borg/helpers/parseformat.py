@@ -933,7 +933,7 @@ class ItemFormatter(BaseFormatter):
             hash = self.xxh64()
         elif hash_function in self.hash_algorithms:
             hash = hashlib.new(hash_function)
-        for data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
+        for data in self.archive.pipeline.fetch_many([c.id for c in item.chunks], ro_type=ROBJ_FILE_STREAM):
             hash.update(data)
         return hash.hexdigest()
 

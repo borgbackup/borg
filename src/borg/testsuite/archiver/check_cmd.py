@@ -243,7 +243,7 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
         }
         archive = repo_objs.key.pack_and_authenticate_metadata(archive_dict, context=b"archive")
         archive_id = repo_objs.id_hash(archive)
-        repository.put(archive_id, repo_objs.format(archive_id, {}, archive))
+        repository.put(archive_id, repo_objs.format(archive_id, {}, archive, ro_type=ROBJ_ARCHIVE_META))
         repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)

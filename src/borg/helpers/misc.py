@@ -13,6 +13,7 @@ logger = create_logger()
 
 from . import msgpack
 from .. import __version__ as borg_version
+from ..constants import ROBJ_FILE_STREAM
 
 
 def sysinfo():
@@ -123,7 +124,7 @@ class ChunkIteratorFileWrapper:
 
 def open_item(archive, item):
     """Return file-like object for archived item (with chunks)."""
-    chunk_iterator = archive.pipeline.fetch_many([c.id for c in item.chunks])
+    chunk_iterator = archive.pipeline.fetch_many([c.id for c in item.chunks], ro_type=ROBJ_FILE_STREAM)
     return ChunkIteratorFileWrapper(chunk_iterator)
 
 

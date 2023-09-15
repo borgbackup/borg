@@ -111,7 +111,11 @@ class TransferMixIn:
                                         # keep compressed payload same, verify via assert_id (that will
                                         # decompress, but avoid needing to compress it again):
                                         meta, data = other_manifest.repo_objs.parse(
-                                            chunk_id, cdata, decompress=True, want_compressed=True
+                                            chunk_id,
+                                            cdata,
+                                            decompress=True,
+                                            want_compressed=True,
+                                            ro_type=ROBJ_FILE_STREAM,
                                         )
                                         meta, data = upgrader.upgrade_compressed_chunk(meta, data)
                                         chunk_entry = cache.add_chunk(
@@ -124,12 +128,20 @@ class TransferMixIn:
                                             size=size,
                                             ctype=meta["ctype"],
                                             clevel=meta["clevel"],
+                                            ro_type=ROBJ_FILE_STREAM,
                                         )
                                     elif args.recompress == "always":
                                         # always decompress and re-compress file data chunks
-                                        meta, data = other_manifest.repo_objs.parse(chunk_id, cdata)
+                                        meta, data = other_manifest.repo_objs.parse(
+                                            chunk_id, cdata, ro_type=ROBJ_FILE_STREAM
+                                        )
                                         chunk_entry = cache.add_chunk(
-                                            chunk_id, meta, data, stats=archive.stats, wait=False
+                                            chunk_id,
+                                            meta,
+                                            data,
+                                            stats=archive.stats,
+                                            wait=False,
+                                            ro_type=ROBJ_FILE_STREAM,
                                         )
                                     else:
                                         raise ValueError(f"unsupported recompress mode: {args.recompress}")

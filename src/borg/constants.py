@@ -33,6 +33,14 @@ UMASK_DEFAULT = 0o077
 # forcing to 0o100XXX later
 STDIN_MODE_DEFAULT = 0o660
 
+# RepoObj types
+ROBJ_MANIFEST = "M"  # Manifest (directory of archives, other metadata) object
+ROBJ_ARCHIVE_META = "A"  # main archive metadata object
+ROBJ_ARCHIVE_CHUNKIDS = "C"  # objects with a list of archive metadata stream chunkids
+ROBJ_ARCHIVE_STREAM = "S"  # archive metadata stream chunk (containing items)
+ROBJ_FILE_STREAM = "F"  # file content stream chunk (containing user data)
+ROBJ_DONTCARE = "*"  # used to parse without type assertion (= accept any type)
+
 # in borg < 1.3, this has been defined like this:
 # 20 MiB minus 41 bytes for a PUT header (because the "size" field in the Repository includes
 # the header, and the total size was set to precisely 20 MiB for borg < 1.3).

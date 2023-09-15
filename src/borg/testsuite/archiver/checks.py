@@ -337,6 +337,7 @@ def spoof_manifest(repository):
                     "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(timespec="microseconds"),
                 }
             ),
+            ro_type=ROBJ_MANIFEST,
         )
         repository.put(Manifest.MANIFEST_ID, cdata)
         repository.commit(compact=False)
@@ -357,6 +358,7 @@ def test_fresh_init_tam_required(archiver):
                     "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(timespec="microseconds"),
                 }
             ),
+            ro_type=ROBJ_MANIFEST,
         )
         repository.put(Manifest.MANIFEST_ID, cdata)
         repository.commit(compact=False)
@@ -397,7 +399,7 @@ def write_archive_without_tam(repository, archive_name):
         }
     )
     archive_id = manifest.repo_objs.id_hash(archive_data)
-    cdata = manifest.repo_objs.format(archive_id, {}, archive_data)
+    cdata = manifest.repo_objs.format(archive_id, {}, archive_data, ro_type=ROBJ_ARCHIVE_META)
     repository.put(archive_id, cdata)
     manifest.archives[archive_name] = (archive_id, datetime.now())
     manifest.write()

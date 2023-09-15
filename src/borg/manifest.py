@@ -250,7 +250,7 @@ class Manifest:
         if not key:
             key = key_factory(repository, cdata, ro_cls=ro_cls)
         manifest = cls(key, repository, ro_cls=ro_cls)
-        _, data = manifest.repo_objs.parse(cls.MANIFEST_ID, cdata)
+        _, data = manifest.repo_objs.parse(cls.MANIFEST_ID, cdata, ro_type=ROBJ_MANIFEST)
         manifest_dict = key.unpack_and_verify_manifest(data)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = manifest.repo_objs.id_hash(data)
@@ -315,4 +315,4 @@ class Manifest:
         )
         data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
         self.id = self.repo_objs.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.repo_objs.format(self.MANIFEST_ID, {}, data))
+        self.repository.put(self.MANIFEST_ID, self.repo_objs.format(self.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST))

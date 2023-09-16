@@ -251,7 +251,7 @@ class Manifest:
             key = key_factory(repository, cdata, ro_cls=ro_cls)
         manifest = cls(key, repository, ro_cls=ro_cls)
         _, data = manifest.repo_objs.parse(cls.MANIFEST_ID, cdata, ro_type=ROBJ_MANIFEST)
-        manifest_dict = key.unpack_and_verify_manifest(data)
+        manifest_dict = key.unpack_manifest(data)
         m = ManifestItem(internal_dict=manifest_dict)
         manifest.id = manifest.repo_objs.id_hash(data)
         if m.get("version") not in (1, 2):
@@ -313,6 +313,6 @@ class Manifest:
             timestamp=self.timestamp,
             config=StableDict(self.config),
         )
-        data = self.key.pack_and_authenticate_metadata(manifest.as_dict())
+        data = self.key.pack_metadata(manifest.as_dict())
         self.id = self.repo_objs.id_hash(data)
         self.repository.put(self.MANIFEST_ID, self.repo_objs.format(self.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST))

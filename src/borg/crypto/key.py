@@ -21,7 +21,7 @@ from ..helpers import bin_to_hex
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, PassphraseWrong
 from ..helpers import msgpack
 from ..helpers import workarounds
-from ..item import Key, EncryptedKey, want_bytes
+from ..item import Key, EncryptedKey
 from ..manifest import Manifest
 from ..platform import SaveFile
 from ..repoobj import RepoObj
@@ -61,30 +61,6 @@ class RepoKeyNotFoundError(Error):
 
 class UnsupportedKeyFormatError(Error):
     """Your borg key is stored in an unsupported format. Try using a newer version of borg."""
-
-
-class TAMRequiredError(IntegrityError):
-    __doc__ = textwrap.dedent(
-        """
-    Manifest is unauthenticated, but it is required for this repository. Is somebody attacking you?
-    """
-    ).strip()
-    traceback = False
-
-
-class TAMInvalid(IntegrityError):
-    __doc__ = IntegrityError.__doc__
-    traceback = False
-
-    def __init__(self):
-        # Error message becomes: "Data integrity error: Manifest authentication did not verify"
-        super().__init__("Manifest authentication did not verify")
-
-
-class TAMUnsupportedSuiteError(IntegrityError):
-    """Could not verify manifest: Unsupported suite {!r}; a newer version is needed."""
-
-    traceback = False
 
 
 def key_creator(repository, args, *, other_key=None):
@@ -214,21 +190,15 @@ class KeyBase:
             output_length=64,
         )
 
-    def pack_and_authenticate_metadata(self, metadata_dict, context=b"manifest", salt=None):
-        if salt is None:
-            salt = os.urandom(64)
-        metadata_dict = StableDict(metadata_dict)
-        tam = metadata_dict["tam"] = StableDict({"type": "HKDF_HMAC_SHA512", "hmac": bytes(64), "salt": salt})
-        packed = msgpack.packb(metadata_dict)
-        tam_key = self._tam_key(salt, context)
-        tam["hmac"] = hmac.digest(tam_key, packed, "sha512")
-        return msgpack.packb(metadata_dict)
-
     def pack_metadata(self, metadata_dict):
         metadata_dict = StableDict(metadata_dict)
         return msgpack.packb(metadata_dict)
 
-    def unpack_and_verify_manifest(self, data):
+    def pack_and_authenticate_metadata(self, metadata_dict, context):  # TODO: remove
+        metadata_dict = StableDict(metadata_dict)
+        return msgpack.packb(metadata_dict)
+
+    def unpack_manifest(self, data):
         """Unpack msgpacked *data* and return manifest."""
         if data.startswith(b"\xc1" * 4):
             # This is a manifest from the future, we can't read it.
@@ -237,29 +207,7 @@ class KeyBase:
         unpacker = get_limited_unpacker("manifest")
         unpacker.feed(data)
         unpacked = unpacker.unpack()
-        if AUTHENTICATED_NO_KEY:
-            return unpacked
-        if "tam" not in unpacked:
-            raise TAMRequiredError(self.repository._location.canonical_path())
-        tam = unpacked.pop("tam", None)
-        if not isinstance(tam, dict):
-            raise TAMInvalid()
-        tam_type = tam.get("type", "<none>")
-        if tam_type != "HKDF_HMAC_SHA512":
-            raise TAMUnsupportedSuiteError(repr(tam_type))
-        tam_hmac = tam.get("hmac")
-        tam_salt = tam.get("salt")
-        if not isinstance(tam_salt, (bytes, str)) or not isinstance(tam_hmac, (bytes, str)):
-            raise TAMInvalid()
-        tam_hmac = want_bytes(tam_hmac)  # legacy
-        tam_salt = want_bytes(tam_salt)  # legacy
-        offset = data.index(tam_hmac)
-        data[offset : offset + 64] = bytes(64)
-        tam_key = self._tam_key(tam_salt, context=b"manifest")
-        calculated_hmac = hmac.digest(tam_key, data, "sha512")
-        if not hmac.compare_digest(calculated_hmac, tam_hmac):
-            raise TAMInvalid()
-        logger.debug("TAM-verified manifest")
+        unpacked.pop("tam", None)  # legacy
         return unpacked
 
     def unpack_archive(self, data):

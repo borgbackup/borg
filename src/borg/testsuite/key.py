@@ -11,13 +11,11 @@ from ..crypto.key import AEADKeyBase
 from ..crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey
 from ..crypto.key import Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey
 from ..crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
-from ..crypto.key import TAMRequiredError, TAMInvalid, TAMUnsupportedSuiteError
 from ..crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
 from ..crypto.key import identify_key
 from ..crypto.low_level import IntegrityError as IntegrityErrorBase
 from ..helpers import IntegrityError
 from ..helpers import Location
-from ..helpers import StableDict
 from ..helpers import msgpack
 from ..constants import KEY_ALGORITHMS
 
@@ -266,63 +264,18 @@ class TestTAM:
     def test_unpack_future(self, key):
         blob = b"\xc1\xc1\xc1\xc1foobar"
         with pytest.raises(UnsupportedManifestError):
-            key.unpack_and_verify_manifest(blob)
+            key.unpack_manifest(blob)
 
         blob = b"\xc1\xc1\xc1"
         with pytest.raises(msgpack.UnpackException):
-            key.unpack_and_verify_manifest(blob)
-
-    def test_missing(self, key):
-        blob = msgpack.packb({})
-        with pytest.raises(TAMRequiredError):
-            key.unpack_and_verify_manifest(blob)
-
-    def test_unknown_type(self, key):
-        blob = msgpack.packb({"tam": {"type": "HMAC_VOLLBIT"}})
-        with pytest.raises(TAMUnsupportedSuiteError):
-            key.unpack_and_verify_manifest(blob)
-
-    @pytest.mark.parametrize(
-        "tam, exc",
-        (
-            ({}, TAMUnsupportedSuiteError),
-            ({"type": b"\xff"}, TAMUnsupportedSuiteError),
-            (None, TAMInvalid),
-            (1234, TAMInvalid),
-        ),
-    )
-    def test_invalid_manifest(self, key, tam, exc):
-        blob = msgpack.packb({"tam": tam})
-        with pytest.raises(exc):
-            key.unpack_and_verify_manifest(blob)
-
-    @pytest.mark.parametrize(
-        "hmac, salt",
-        (({}, bytes(64)), (bytes(64), {}), (None, bytes(64)), (bytes(64), None)),
-        ids=["ed-b64", "b64-ed", "n-b64", "b64-n"],
-    )
-    def test_wrong_types(self, key, hmac, salt):
-        data = {"tam": {"type": "HKDF_HMAC_SHA512", "hmac": hmac, "salt": salt}}
-        tam = data["tam"]
-        if hmac is None:
-            del tam["hmac"]
-        if salt is None:
-            del tam["salt"]
-        blob = msgpack.packb(data)
-        with pytest.raises(TAMInvalid):
-            key.unpack_and_verify_manifest(blob)
+            key.unpack_manifest(blob)
 
     def test_round_trip_manifest(self, key):
         data = {"foo": "bar"}
-        blob = key.pack_and_authenticate_metadata(data, context=b"manifest")
-        assert blob.startswith(b"\x82")
-
-        unpacked = msgpack.unpackb(blob)
-        assert unpacked["tam"]["type"] == "HKDF_HMAC_SHA512"
-
-        unpacked = key.unpack_and_verify_manifest(blob)
+        blob = key.pack_metadata(data)
+        unpacked = key.unpack_manifest(blob)
         assert unpacked["foo"] == "bar"
-        assert "tam" not in unpacked
+        assert "tam" not in unpacked  # legacy
 
     def test_round_trip_archive(self, key):
         data = {"foo": "bar"}
@@ -330,21 +283,6 @@ class TestTAM:
         unpacked = key.unpack_archive(blob)
         assert unpacked["foo"] == "bar"
         assert "tam" not in unpacked  # legacy
-
-    @pytest.mark.parametrize("which", ("hmac", "salt"))
-    def test_tampered_manifest(self, key, which):
-        data = {"foo": "bar"}
-        blob = key.pack_and_authenticate_metadata(data, context=b"manifest")
-        assert blob.startswith(b"\x82")
-
-        unpacked = msgpack.unpackb(blob, object_hook=StableDict)
-        assert len(unpacked["tam"][which]) == 64
-        unpacked["tam"][which] = unpacked["tam"][which][0:32] + bytes(32)
-        assert len(unpacked["tam"][which]) == 64
-        blob = msgpack.packb(unpacked)
-
-        with pytest.raises(TAMInvalid):
-            key.unpack_and_verify_manifest(blob)
 
 
 def test_decrypt_key_file_unsupported_algorithm():

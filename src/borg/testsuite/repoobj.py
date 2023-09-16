@@ -2,6 +2,7 @@ import pytest
 
 from ..constants import ROBJ_FILE_STREAM, ROBJ_MANIFEST, ROBJ_ARCHIVE_META
 from ..crypto.key import PlaintextKey
+from ..helpers.errors import IntegrityError
 from ..repository import Repository
 from ..repoobj import RepoObj, RepoObj1
 from ..compress import LZ4
@@ -113,7 +114,7 @@ def test_spoof_manifest(key):
     cdata = repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM)
     # let's assume an attacker somehow managed to replace the manifest with that repo object.
     # as borg always give the ro_type it wants to read, this should fail:
-    with pytest.raises(AssertionError):
+    with pytest.raises(IntegrityError):
         repo_objs.parse(id, cdata, ro_type=ROBJ_MANIFEST)
 
 
@@ -125,5 +126,5 @@ def test_spoof_archive(key):
     cdata = repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM)
     # let's assume an attacker somehow managed to replace an archive with that repo object.
     # as borg always give the ro_type it wants to read, this should fail:
-    with pytest.raises(AssertionError):
+    with pytest.raises(IntegrityError):
         repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)

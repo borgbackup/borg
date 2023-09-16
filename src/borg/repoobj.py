@@ -2,6 +2,7 @@ from struct import Struct
 
 from .constants import *  # NOQA
 from .helpers import msgpack, workarounds
+from .helpers.errors import IntegrityError
 from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
 
 # workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
@@ -77,7 +78,8 @@ class RepoObj:
         meta_encrypted = obj[offs : offs + len_meta_encrypted]
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta = msgpack.unpackb(meta_packed)
-        assert ro_type == ROBJ_DONTCARE or meta["type"] == ro_type
+        if ro_type != ROBJ_DONTCARE and meta["type"] != ro_type:
+            raise IntegrityError(f"ro_type expected: {ro_type} got: {meta['type']}")
         return meta
 
     def parse(
@@ -106,7 +108,8 @@ class RepoObj:
         offs += len_meta_encrypted
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta_compressed = msgpack.unpackb(meta_packed)  # means: before adding more metadata in decompress block
-        assert ro_type == ROBJ_DONTCARE or meta_compressed["type"] == ro_type
+        if ro_type != ROBJ_DONTCARE and meta_compressed["type"] != ro_type:
+            raise IntegrityError(f"ro_type expected: {ro_type} got: {meta_compressed['type']}")
         data_encrypted = obj[offs:]
         data_compressed = self.key.decrypt(id, data_encrypted)  # does not include the type/level bytes
         if decompress:

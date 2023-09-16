@@ -182,19 +182,7 @@ class KeyBase:
             id_str = bin_to_hex(id) if id is not None else "(unknown)"
             raise IntegrityError(f"Chunk {id_str}: Invalid encryption envelope")
 
-    def _tam_key(self, salt, context):
-        return hkdf_hmac_sha512(
-            ikm=self.id_key + self.crypt_key,
-            salt=salt,
-            info=b"borg-metadata-authentication-" + context,
-            output_length=64,
-        )
-
     def pack_metadata(self, metadata_dict):
-        metadata_dict = StableDict(metadata_dict)
-        return msgpack.packb(metadata_dict)
-
-    def pack_and_authenticate_metadata(self, metadata_dict, context):  # TODO: remove
         metadata_dict = StableDict(metadata_dict)
         return msgpack.packb(metadata_dict)
 
@@ -247,9 +235,6 @@ class PlaintextKey(KeyBase):
     def decrypt(self, id, data):
         self.assert_type(data[0], id)
         return memoryview(data)[1:]
-
-    def _tam_key(self, salt, context):
-        return salt + context
 
 
 def random_blake2b_256_key():
@@ -749,7 +734,6 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
             self.enc_hmac_key = NOPE
             self.id_key = NOPE
             self.chunk_seed = 0
-            self.tam_required = False
             return True
         return super()._load(key_data, passphrase)
 

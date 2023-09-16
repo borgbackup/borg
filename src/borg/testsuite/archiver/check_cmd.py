@@ -288,6 +288,47 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
     assert "archive2" in output
 
 
+def test_spoofed_archive(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    archive, repository = open_archive(archiver.repository_path, "archive1")
+    repo_objs = archive.repo_objs
+    with repository:
+        # attacker would corrupt or delete the manifest to trigger a rebuild of it:
+        manifest = repository.get(Manifest.MANIFEST_ID)
+        corrupted_manifest = manifest + b"corrupted!"
+        repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
+        archive_dict = {
+            "command_line": "",
+            "item_ptrs": [],
+            "hostname": "foo",
+            "username": "bar",
+            "name": "archive_spoofed",
+            "time": "2016-12-15T18:49:51.849711",
+            "version": 2,
+        }
+        archive = repo_objs.key.pack_metadata(archive_dict)
+        archive_id = repo_objs.id_hash(archive)
+        repository.put(
+            archive_id,
+            repo_objs.format(
+                archive_id,
+                {},
+                archive,
+                # we assume that an attacker can put a file into backup src files that contains a fake archive.
+                # but, the attacker can not influence the ro_type borg will use to store user file data:
+                ro_type=ROBJ_FILE_STREAM,  # a real archive is stored with ROBJ_ARCHIVE_META
+            ),
+        )
+        repository.commit(compact=False)
+    cmd(archiver, "check", exit_code=1)
+    cmd(archiver, "check", "--repair", "--debug", exit_code=0)
+    output = cmd(archiver, "rlist")
+    assert "archive1" in output
+    assert "archive2" in output
+    assert "archive_spoofed" not in output
+
+
 def test_extra_chunks(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() == "remote":

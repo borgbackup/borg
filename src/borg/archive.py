@@ -1975,7 +1975,6 @@ class ArchiveChecker:
         # lost manifest on a older borg version than the most recent one that was ever used
         # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
-        archive_keys_serialized = [msgpack.packb(name) for name in ARCHIVE_KEYS]
         pi = ProgressIndicatorPercent(
             total=len(self.chunks), msg="Rebuilding manifest %6.2f%%", step=0.01, msgid="check.rebuild_manifest"
         )
@@ -1983,14 +1982,12 @@ class ArchiveChecker:
             pi.show()
             cdata = self.repository.get(chunk_id)
             try:
-                _, data = self.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
+                meta, data = self.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
             except IntegrityErrorBase as exc:
                 logger.error("Skipping corrupted chunk: %s", exc)
                 self.error_found = True
                 continue
-            if not valid_msgpacked_dict(data, archive_keys_serialized):
-                continue
-            if b"command_line" not in data or b"\xa7version\x02" not in data:
+            if meta["type"] != ROBJ_ARCHIVE_META:
                 continue
             try:
                 archive = msgpack.unpackb(data)

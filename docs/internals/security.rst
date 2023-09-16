@@ -67,43 +67,26 @@ in a particular part of its own data structure assigns this meaning.
 This results in a directed acyclic graph of authentication from the manifest
 to the data chunks of individual files.
 
-.. _tam_description:
+Above used to be all for borg 1.x and was the reason why it needed the
+tertiary authentication mechanism (TAM) for manifest and archives.
 
-.. rubric:: Authenticating the manifest
+borg 2 now stores the ro_type ("meaning") of a repo object's data into that
+object's metadata (like e.g.: manifest vs. archive vs. user file content data).
+When loading data from the repo, borg verifies that the type of object it got
+matches the type it wanted. borg 2 does not use TAMs any more.
 
-Since the manifest has a fixed ID (000...000) the aforementioned authentication
-does not apply to it, indeed, cannot apply to it; it is impossible to authenticate
-the root node of a DAG through its edges, since the root node has no incoming edges.
+As both the object's metadata and data are AEAD encrypted and also bound to
+the object ID (via giving the ID as AAD), there is no way an attacker (without
+access to the borg key) could change the type of the object or move content
+to a different object ID.
 
-With the scheme as described so far an attacker could easily replace the manifest,
-therefore Borg includes a tertiary authentication mechanism (TAM) that is applied
-to the manifest (see :ref:`tam_vuln`).
+This effectively 'anchors' the manifest (and also other metadata, like archives)
+to the key, which is controlled by the client, thereby anchoring the entire DAG,
+making it impossible for an attacker to add, remove or modify any part of the
+DAG without Borg being able to detect the tampering.
 
-TAM works by deriving a separate key through HKDF_ from the other encryption and
-authentication keys and calculating the HMAC of the metadata to authenticate [#]_::
-
-    # RANDOM(n) returns n random bytes
-    salt = RANDOM(64)
-
-    ikm = id_key || crypt_key
-    # *context* depends on the operation, for manifest authentication it is
-    # the ASCII string "borg-metadata-authentication-manifest".
-    tam_key = HKDF-SHA-512(ikm, salt, context)
-
-    # *data* is a dict-like structure
-    data[hmac] = zeroes
-    packed = pack(data)
-    data[hmac] = HMAC(tam_key, packed)
-    packed_authenticated = pack(data)
-
-Since an attacker cannot gain access to this key and also cannot make the
-client authenticate arbitrary data using this mechanism, the attacker is unable
-to forge the authentication.
-
-This effectively 'anchors' the manifest to the key, which is controlled by the
-client, thereby anchoring the entire DAG, making it impossible for an attacker
-to add, remove or modify any part of the DAG without Borg being able to detect
-the tampering.
+Passphrase notes
+----------------
 
 Note that when using BORG_PASSPHRASE the attacker cannot swap the *entire*
 repository against a new repository with e.g. repokey mode and no passphrase,
@@ -112,11 +95,6 @@ because Borg will abort access when BORG_PASSPHRASE is incorrect.
 However, interactively a user might not notice this kind of attack
 immediately, if she assumes that the reason for the absent passphrase
 prompt is a set BORG_PASSPHRASE. See issue :issue:`2169` for details.
-
-.. [#] The reason why the authentication tag is stored in the packed
-       data itself is that older Borg versions can still read the
-       manifest this way, while a changed layout would have broken
-       compatibility.
 
 .. _security_encryption:
 

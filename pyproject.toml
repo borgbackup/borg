@@ -53,6 +53,18 @@ nofuse = []
 borg = "borg.archiver:main"
 borgfs = "borg.archiver:main"
 
+[tool.setuptools]
+# See also the MANIFEST.in file.
+# We want to install all the files in the package directories...
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.exclude-package-data]
+# ...except the source files which have been compiled (C extensions):
+"*" = ["*.c", "*.h", "*.pyx"]
+
 [build-system]
 requires = ["setuptools", "wheel", "pkgconfig", "Cython", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"

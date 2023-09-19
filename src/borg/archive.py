@@ -1552,25 +1552,27 @@ class FilesystemObjectProcessors:
                             started_hashing = time.monotonic()
                             path_hash = self.key.id_hash(hashed_path)
                             self.stats.hashing_time += time.monotonic() - started_hashing
-                            known, ids = cache.file_known_and_unchanged(hashed_path, path_hash, st)
+                            known, chunks = cache.file_known_and_unchanged(hashed_path, path_hash, st)
                         else:
                             # in --read-special mode, we may be called for special files.
                             # there should be no information in the cache about special files processed in
                             # read-special mode, but we better play safe as this was wrong in the past:
                             hashed_path = path_hash = None
-                            known, ids = False, None
-                        if ids is not None:
+                            known, chunks = False, None
+                        if chunks is not None:
                             # Make sure all ids are available
-                            for id_ in ids:
-                                if not cache.seen_chunk(id_):
+                            for chunk in chunks:
+                                if not cache.seen_chunk(chunk.id):
                                     # cache said it is unmodified, but we lost a chunk: process file like modified
                                     status = "M"
                                     break
                             else:
                                 item.chunks = []
-                                for chunk_id in ids:
+                                for chunk in chunks:
                                     # process one-by-one, so we will know in item.chunks how far we got
-                                    chunk_entry = cache.chunk_incref(chunk_id, self.stats)
+                                    chunk_entry = cache.chunk_incref(chunk.id, self.stats)
+                                    # chunk.size is from files cache, chunk_entry.size from index:
+                                    assert chunk == chunk_entry
                                     item.chunks.append(chunk_entry)
                                 status = "U"  # regular file, unchanged
                         else:
@@ -1606,7 +1608,7 @@ class FilesystemObjectProcessors:
                                 # block or char device will change without its mtime/size/inode changing.
                                 # also, we must not memorize a potentially inconsistent/corrupt file that
                                 # changed while we backed it up.
-                                cache.memorize_file(hashed_path, path_hash, st, [c.id for c in item.chunks])
+                                cache.memorize_file(hashed_path, path_hash, st, item.chunks)
                         self.stats.files_stats[status] += 1  # must be done late
                         if not changed_while_backup:
                             status = None  # we already called print_file_status

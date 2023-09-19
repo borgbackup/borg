@@ -35,8 +35,8 @@ from .platform import SaveFile
 from .remote import cache_if_remote
 from .repository import LIST_SCAN_LIMIT
 
-# note: cmtime might me either a ctime or a mtime timestamp
-FileCacheEntry = namedtuple("FileCacheEntry", "age inode size cmtime chunk_ids")
+# note: cmtime might be either a ctime or a mtime timestamp, chunks is a list of ChunkListEntry
+FileCacheEntry = namedtuple("FileCacheEntry", "age inode size cmtime chunks")
 
 
 class SecurityManager:
@@ -1030,8 +1030,8 @@ class LocalCache(CacheStatsMixin):
         :param hashed_path: the file's path as we gave it to hash(hashed_path)
         :param path_hash: hash(hashed_path), to save some memory in the files cache
         :param st: the file's stat() result
-        :return: known, ids (known is True if we have infos about this file in the cache,
-                             ids is the list of chunk ids IF the file has not changed, otherwise None).
+        :return: known, chunks (known is True if we have infos about this file in the cache,
+                               chunks is a list[ChunkListEntry] IF the file has not changed, otherwise None).
         """
         if not stat.S_ISREG(st.st_mode):
             return False, None
@@ -1072,9 +1072,10 @@ class LocalCache(CacheStatsMixin):
         # again at that time), we need to update the inode number in the cache with what
         # we see in the filesystem.
         self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
-        return True, entry.chunk_ids
+        chunks = [ChunkListEntry(*chunk) for chunk in entry.chunks]  # convert to list of namedtuple
+        return True, chunks
 
-    def memorize_file(self, hashed_path, path_hash, st, ids):
+    def memorize_file(self, hashed_path, path_hash, st, chunks):
         if not stat.S_ISREG(st.st_mode):
             return
         cache_mode = self.cache_mode
@@ -1092,13 +1093,13 @@ class LocalCache(CacheStatsMixin):
             cmtime_type = "ctime"
             cmtime_ns = safe_ns(st.st_ctime_ns)
         entry = FileCacheEntry(
-            age=0, inode=st.st_ino, size=st.st_size, cmtime=int_to_timestamp(cmtime_ns), chunk_ids=ids
+            age=0, inode=st.st_ino, size=st.st_size, cmtime=int_to_timestamp(cmtime_ns), chunks=chunks
         )
         self.files[path_hash] = msgpack.packb(entry)
         self._newest_cmtime = max(self._newest_cmtime or 0, cmtime_ns)
         files_cache_logger.debug(
             "FILES-CACHE-UPDATE: put %r [has %s] <- %r",
-            entry._replace(chunk_ids="[%d entries]" % len(entry.chunk_ids)),
+            entry._replace(chunks="[%d entries]" % len(entry.chunks)),
             cmtime_type,
             hashed_path,
         )
@@ -1149,7 +1150,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         files_cache_logger.debug("UNKNOWN: files cache not implemented")
         return False, None
 
-    def memorize_file(self, hashed_path, path_hash, st, ids):
+    def memorize_file(self, hashed_path, path_hash, st, chunks):
         pass
 
     def add_chunk(self, id, meta, data, *, stats, wait=True, compress=True, size=None, ro_type=ROBJ_FILE_STREAM):

@@ -173,9 +173,12 @@ def test_create_unreadable_parent(archiver):
     os.mkdir(parent_dir)
     os.mkdir(root_dir)
     os.chmod(parent_dir, 0o111)  # --x--x--x == parent dir traversable, but not readable
-    cmd(archiver, "rcreate", "--encryption=none")
-    # issue #7746: we *can* read root_dir and we *can* traverse parent_dir, so this should work:
-    cmd(archiver, "create", "test", root_dir)
+    try:
+        cmd(archiver, "rcreate", "--encryption=none")
+        # issue #7746: we *can* read root_dir and we *can* traverse parent_dir, so this should work:
+        cmd(archiver, "create", "test", root_dir)
+    finally:
+        os.chmod(parent_dir, 0o771)  # otherwise cleanup after this test fails
 
 
 @pytest.mark.skipif(is_win32, reason="unix sockets not available on windows")

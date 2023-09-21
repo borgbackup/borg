@@ -225,6 +225,7 @@ class CreateMixIn:
                 progress=args.progress,
                 lock_wait=self.lock_wait,
                 permit_adhoc_cache=args.no_cache_sync,
+                force_adhoc_cache=args.no_cache_sync_forced,
                 cache_mode=args.files_cache_mode,
                 iec=args.iec,
             ) as cache:
@@ -802,6 +803,12 @@ class CreateMixIn:
             dest="no_cache_sync",
             action="store_true",
             help="experimental: do not synchronize the cache. Implies not using the files cache.",
+        )
+        subparser.add_argument(
+            "--no-cache-sync-forced",
+            dest="no_cache_sync_forced",
+            action="store_true",
+            help="experimental: do not synchronize the cache (forced). Implies not using the files cache.",
         )
         subparser.add_argument(
             "--stdin-name",

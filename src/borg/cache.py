@@ -413,6 +413,7 @@ class Cache:
         progress=False,
         lock_wait=None,
         permit_adhoc_cache=False,
+        force_adhoc_cache=False,
         cache_mode=FILES_CACHE_MODE_DISABLED,
         iec=False,
     ):
@@ -430,6 +431,9 @@ class Cache:
 
         def adhoc():
             return AdHocCache(manifest=manifest, lock_wait=lock_wait, iec=iec)
+
+        if force_adhoc_cache:
+            return adhoc()
 
         if not permit_adhoc_cache:
             return local()

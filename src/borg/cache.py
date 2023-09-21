@@ -979,11 +979,14 @@ class LocalCache(CacheStatsMixin):
         assert ro_type is not None
         if not self.txn_active:
             self.begin_txn()
-        if size is None and compress:
-            size = len(data)  # data is still uncompressed
+        if size is None:
+            if compress:
+                size = len(data)  # data is still uncompressed
+            else:
+                raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
         refcount = self.seen_chunk(id, size)
         if refcount:
-            return self.chunk_incref(id, stats)
+            return self.chunk_incref(id, size, stats)
         if size is None:
             raise ValueError("when giving compressed data for a new chunk, the uncompressed size must be given also")
         cdata = self.repo_objs.format(
@@ -1004,17 +1007,21 @@ class LocalCache(CacheStatsMixin):
             )
         return refcount
 
-    def chunk_incref(self, id, stats, size=None):
+    def chunk_incref(self, id, size, stats):
+        assert isinstance(size, int) and size > 0
         if not self.txn_active:
             self.begin_txn()
         count, _size = self.chunks.incref(id)
-        stats.update(_size, False)
-        return ChunkListEntry(id, _size)
+        assert size == _size
+        stats.update(size, False)
+        return ChunkListEntry(id, size)
 
-    def chunk_decref(self, id, stats, wait=True):
+    def chunk_decref(self, id, size, stats, wait=True):
+        assert isinstance(size, int) and size > 0
         if not self.txn_active:
             self.begin_txn()
-        count, size = self.chunks.decref(id)
+        count, _size = self.chunks.decref(id)
+        assert size == 1 or size == _size  # don't check if caller gave fake size 1
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)
@@ -1157,13 +1164,14 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         assert ro_type is not None
         if not self._txn_active:
             self.begin_txn()
-        if size is None and compress:
-            size = len(data)  # data is still uncompressed
         if size is None:
-            raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
+            if compress:
+                size = len(data)  # data is still uncompressed
+            else:
+                raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
         refcount = self.seen_chunk(id, size)
         if refcount:
-            return self.chunk_incref(id, stats, size=size)
+            return self.chunk_incref(id, size, stats)
         cdata = self.repo_objs.format(id, meta, data, compress=compress, ro_type=ro_type)
         self.repository.put(id, cdata, wait=wait)
         self.chunks.add(id, 1, size)
@@ -1181,21 +1189,21 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
             self.chunks[id] = entry._replace(size=size)
         return entry.refcount
 
-    def chunk_incref(self, id, stats, size=None):
+    def chunk_incref(self, id, size, stats):
+        assert isinstance(size, int) and size > 0
         if not self._txn_active:
             self.begin_txn()
         count, _size = self.chunks.incref(id)
-        # When _size is 0 and size is not given, then this chunk has not been locally visited yet (seen_chunk with
-        # size or add_chunk); we can't add references to those (size=0 is invalid) and generally don't try to.
-        size = _size or size
-        assert size
+        assert size == _size
         stats.update(size, False)
         return ChunkListEntry(id, size)
 
-    def chunk_decref(self, id, stats, wait=True):
+    def chunk_decref(self, id, size, stats, wait=True):
+        assert isinstance(size, int) and size > 0
         if not self._txn_active:
             self.begin_txn()
-        count, size = self.chunks.decref(id)
+        count, _size = self.chunks.decref(id)
+        assert size == 1 or size == _size  # don't check if caller gave fake size 1
         if count == 0:
             del self.chunks[id]
             self.repository.delete(id, wait=wait)

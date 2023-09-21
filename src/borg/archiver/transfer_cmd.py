@@ -143,7 +143,7 @@ class TransferMixIn:
                                 transfer_size += size
                             else:
                                 if not dry_run:
-                                    chunk_entry = cache.chunk_incref(chunk_id, archive.stats)
+                                    chunk_entry = cache.chunk_incref(chunk_id, size, archive.stats)
                                     chunks.append(chunk_entry)
                                 present_size += size
                         if not dry_run:

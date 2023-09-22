@@ -191,20 +191,6 @@ def test_recreate_no_rechunkify(archivers, request):
     assert num_chunks == num_chunks_after_recreate
 
 
-def test_recreate_recompress(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    create_regular_file(archiver.input_path, "compressible", size=10000)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    cmd(archiver, "create", "test", "input", "-C", "none")
-    file_list = cmd(archiver, "list", "test", "input/compressible", "--format", "{size} {sha256}")
-    size, sha256_before = file_list.split(" ")
-    cmd(archiver, "recreate", "-C", "lz4", "--recompress")
-    check_cache(archiver)
-    file_list = cmd(archiver, "list", "test", "input/compressible", "--format", "{size} {sha256}")
-    size, sha256_after = file_list.split(" ")
-    assert sha256_before == sha256_after
-
-
 def test_recreate_timestamp(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)

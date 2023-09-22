@@ -23,7 +23,7 @@ from . import xattr
 from .chunker import get_chunker, Chunk
 from .cache import ChunkListEntry
 from .crypto.key import key_factory, UnsupportedPayloadError
-from .compress import Compressor, CompressionSpec
+from .compress import CompressionSpec
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
@@ -2349,8 +2349,6 @@ class ArchiveRecreater:
         keep_exclude_tags=False,
         chunker_params=None,
         compression=None,
-        recompress=False,
-        always_recompress=False,
         dry_run=False,
         stats=False,
         progress=False,
@@ -2374,8 +2372,6 @@ class ArchiveRecreater:
         if self.rechunkify:
             logger.debug("Rechunking archives to %s", chunker_params)
         self.chunker_params = chunker_params or CHUNKER_PARAMS
-        self.recompress = recompress
-        self.always_recompress = always_recompress
         self.compression = compression or CompressionSpec("none")
         self.seen_chunks = set()
 
@@ -2393,13 +2389,7 @@ class ArchiveRecreater:
         target = self.create_target(archive, target_name)
         if self.exclude_if_present or self.exclude_caches:
             self.matcher_add_tagged_dirs(archive)
-        if (
-            self.matcher.empty()
-            and not self.recompress
-            and not target.recreate_rechunkify
-            and comment is None
-            and target_name is None
-        ):
+        if self.matcher.empty() and not target.recreate_rechunkify and comment is None and target_name is None:
             # nothing to do
             return False
         self.process_items(archive, target)
@@ -2432,7 +2422,7 @@ class ArchiveRecreater:
         self.print_file_status(status, item.path)
 
     def process_chunks(self, archive, target, item):
-        if not self.recompress and not target.recreate_rechunkify:
+        if not target.recreate_rechunkify:
             for chunk_id, size in item.chunks:
                 self.cache.chunk_incref(chunk_id, target.stats)
             return item.chunks
@@ -2444,19 +2434,7 @@ class ArchiveRecreater:
         chunk_id, data = cached_hash(chunk, self.key.id_hash)
         if chunk_id in self.seen_chunks:
             return self.cache.chunk_incref(chunk_id, target.stats)
-        overwrite = self.recompress
-        if self.recompress and not self.always_recompress and chunk_id in self.cache.chunks:
-            # Check if this chunk is already compressed the way we want it
-            old_meta = self.repo_objs.parse_meta(chunk_id, self.repository.get(chunk_id, read_data=False))
-            compr_hdr = bytes((old_meta["ctype"], old_meta["clevel"]))
-            compressor_cls, level = Compressor.detect(compr_hdr)
-            if (
-                compressor_cls.name == self.repo_objs.compressor.decide({}, data).name
-                and level == self.repo_objs.compressor.level
-            ):
-                # Stored chunk has the same compression method and level as we wanted
-                overwrite = False
-        chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, overwrite=overwrite, wait=False)
+        chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, wait=False)
         self.cache.repository.async_response(wait=False)
         self.seen_chunks.add(chunk_entry.id)
         return chunk_entry

@@ -1160,7 +1160,20 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     def memorize_file(self, hashed_path, path_hash, st, chunks):
         pass
 
-    def add_chunk(self, id, meta, data, *, stats, wait=True, compress=True, size=None, ro_type=ROBJ_FILE_STREAM):
+    def add_chunk(
+        self,
+        id,
+        meta,
+        data,
+        *,
+        stats,
+        wait=True,
+        compress=True,
+        size=None,
+        ctype=None,
+        clevel=None,
+        ro_type=ROBJ_FILE_STREAM,
+    ):
         assert ro_type is not None
         if not self._txn_active:
             self.begin_txn()
@@ -1172,7 +1185,9 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         refcount = self.seen_chunk(id, size)
         if refcount:
             return self.chunk_incref(id, size, stats)
-        cdata = self.repo_objs.format(id, meta, data, compress=compress, ro_type=ro_type)
+        cdata = self.repo_objs.format(
+            id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
+        )
         self.repository.put(id, cdata, wait=wait)
         self.chunks.add(id, 1, size)
         stats.update(size, not refcount)

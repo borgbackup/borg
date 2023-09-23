@@ -1056,8 +1056,11 @@ Duration: {0.duration}
             try:
                 self.cache.chunk_decref(id, size, stats, wait=False)
             except KeyError:
-                cid = bin_to_hex(id)
-                raise ChunksIndexError(cid)
+                nonlocal error
+                if forced == 0:
+                    cid = bin_to_hex(id)
+                    raise ChunksIndexError(cid)
+                error = True
             else:
                 fetch_async_response(wait=False)
 

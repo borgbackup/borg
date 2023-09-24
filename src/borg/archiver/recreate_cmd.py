@@ -21,8 +21,6 @@ class RecreateMixIn:
         matcher = build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter
-        recompress = args.recompress != "never"
-        always_recompress = args.recompress == "always"
 
         recreater = ArchiveRecreater(
             manifest,
@@ -33,8 +31,6 @@ class RecreateMixIn:
             keep_exclude_tags=args.keep_exclude_tags,
             chunker_params=args.chunker_params,
             compression=args.compression,
-            recompress=recompress,
-            always_recompress=always_recompress,
             progress=args.progress,
             stats=args.stats,
             file_status_printer=self.print_file_status,
@@ -81,11 +77,6 @@ class RecreateMixIn:
         Note that all paths in an archive are relative, therefore absolute patterns/paths
         will *not* match (``--exclude``, ``--exclude-from``, PATHs).
 
-        ``--recompress`` allows one to change the compression of existing data in archives.
-        Due to how Borg stores compressed size information this might display
-        incorrect information for archives that were not recreated at the same time.
-        There is no risk of data loss by this.
-
         ``--chunker-params`` will re-chunk all files in the archive, this can be
         used to have upgraded Borg 0.xx archives deduplicate with Borg 1.x archives.
 
@@ -101,9 +92,9 @@ class RecreateMixIn:
 
         With ``--target`` the original archive is not replaced, instead a new archive is created.
 
-        When rechunking (or recompressing), space usage can be substantial - expect
+        When rechunking, space usage can be substantial - expect
         at least the entire deduplicated size of the archives using the previous
-        chunker (or compression) params.
+        chunker params.
 
         If you recently ran borg check --repair and it had to fix lost chunks with all-zero
         replacement chunks, please first run another backup for the same data and re-run
@@ -200,25 +191,6 @@ class RecreateMixIn:
             default=CompressionSpec("lz4"),
             action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
-        )
-        archive_group.add_argument(
-            "--recompress",
-            metavar="MODE",
-            dest="recompress",
-            nargs="?",
-            default="never",
-            const="if-different",
-            choices=("never", "if-different", "always"),
-            action=Highlander,
-            help="recompress data chunks according to `MODE` and ``--compression``. "
-            "Possible modes are "
-            "`if-different`: recompress if current compression is with a different "
-            "compression algorithm or different level; "
-            "`always`: recompress unconditionally; and "
-            "`never`: do not recompress (use this option explicitly to prevent "
-            "recompression). "
-            "If no MODE is given, `if-different` will be used. "
-            'Not passing --recompress is equivalent to "--recompress never".',
         )
         archive_group.add_argument(
             "--chunker-params",

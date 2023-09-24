@@ -939,15 +939,13 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.ignored_features.update(repo_features - my_features)
         self.cache_config.mandatory_features.update(repo_features & my_features)
 
-    def add_chunk(
-        self, id, meta, data, *, stats, overwrite=False, wait=True, compress=True, size=None, ctype=None, clevel=None
-    ):
+    def add_chunk(self, id, meta, data, *, stats, wait=True, compress=True, size=None, ctype=None, clevel=None):
         if not self.txn_active:
             self.begin_txn()
         if size is None and compress:
             size = len(data)  # data is still uncompressed
         refcount = self.seen_chunk(id, size)
-        if refcount and not overwrite:
+        if refcount:
             return self.chunk_incref(id, stats)
         if size is None:
             raise ValueError("when giving compressed data for a new chunk, the uncompressed size must be given also")
@@ -1115,8 +1113,7 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
     def memorize_file(self, hashed_path, path_hash, st, ids):
         pass
 
-    def add_chunk(self, id, meta, data, *, stats, overwrite=False, wait=True, compress=True, size=None):
-        assert not overwrite, "AdHocCache does not permit overwrites — trying to use it for recreate?"
+    def add_chunk(self, id, meta, data, *, stats, wait=True, compress=True, size=None):
         if not self._txn_active:
             self.begin_txn()
         if size is None and compress:

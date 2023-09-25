@@ -374,11 +374,23 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.2.6 (2023-08-31)
+Version 1.2.7 (2023-10-xx)
 --------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Other changes:
+
+- support and test on Python 3.12
+- allow msgpack 1.0.6
+- TAM issues: show tracebacks, improve borg check logging, #7797
+- readthedocs: also build offline docs (HTMLzip), #7835
+- vagrant: add VM with debian bookworm / test on OpenSSL 3.0.x.
+
+
+Version 1.2.6 (2023-08-31)
+--------------------------
 
 Fixes:
 

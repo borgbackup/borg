@@ -64,6 +64,9 @@ jobs:
             - os: ubuntu-20.04
               python-version: '3.11'
               toxenv: py311-fuse2
+            - os: ubuntu-22.04
+              python-version: '3.12-dev'
+              toxenv: py312-fuse3
             - os: macos-12
               python-version: '3.8'
               toxenv: py38-none  # note: no fuse testing, due to #6099, see also #6196.

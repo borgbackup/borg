@@ -86,19 +86,19 @@ class TAMRequiredError(IntegrityError):
 
     In the latter case, use "borg upgrade --tam --force '{}'" to re-authenticate the manifest.
     """).strip()
-    traceback = False
+    traceback = True
 
 
 class ArchiveTAMRequiredError(TAMRequiredError):
     __doc__ = textwrap.dedent("""
     Archive '{}' is unauthenticated, but it is required for this repository.
     """).strip()
-    traceback = False
+    traceback = True
 
 
 class TAMInvalid(IntegrityError):
     __doc__ = IntegrityError.__doc__
-    traceback = False
+    traceback = True
 
     def __init__(self):
         # Error message becomes: "Data integrity error: Manifest authentication did not verify"
@@ -107,7 +107,7 @@ class TAMInvalid(IntegrityError):
 
 class ArchiveTAMInvalid(IntegrityError):
     __doc__ = IntegrityError.__doc__
-    traceback = False
+    traceback = True
 
     def __init__(self):
         # Error message becomes: "Data integrity error: Archive authentication did not verify"
@@ -116,7 +116,7 @@ class ArchiveTAMInvalid(IntegrityError):
 
 class TAMUnsupportedSuiteError(IntegrityError):
     """Could not verify manifest: Unsupported suite {!r}; a newer version is needed."""
-    traceback = False
+    traceback = True
 
 
 class KeyBlobStorage:

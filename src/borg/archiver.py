@@ -101,6 +101,12 @@ STATS_HEADER = "                       Original size      Compressed size    Ded
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
 
 
+# Python 3.12+ gives a deprecation warning if TarFile.extraction_filter is None.
+# https://docs.python.org/3.12/library/tarfile.html#tarfile-extraction-filter
+if hasattr(tarfile, "fully_trusted_filter"):
+    tarfile.TarFile.extraction_filter = staticmethod(tarfile.fully_trusted_filter)  # type: ignore
+
+
 def argument(args, str_or_bool):
     """If bool is passed, return it. If str is passed, retrieve named attribute from args."""
     if isinstance(str_or_bool, str):

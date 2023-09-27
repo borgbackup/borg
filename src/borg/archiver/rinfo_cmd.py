@@ -59,16 +59,9 @@ class RInfoMixIn:
                 output += f" out of {format_file_size(storage_quota, iec=args.iec)}"
             output += "\n"
 
-            output += (
-                textwrap.dedent(
-                    """
-                    Cache: {cache.path}
-                    Security dir: {security_dir}
-                    """
-                )
-                .strip()
-                .format(**info)
-            )
+            if hasattr(info["cache"], "path"):
+                output += "Cache: {cache.path}\n".format(**info)
+            output += "Security dir: {security_dir}\n".format(**info)
 
             print(output)
             print(str(cache))

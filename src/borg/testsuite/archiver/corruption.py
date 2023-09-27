@@ -34,7 +34,7 @@ def test_check_corrupted_repository(archiver):
 def corrupt_archiver(archiver):
     create_test_files(archiver.input_path)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
-    archiver.cache_path = json.loads(cmd(archiver, "rinfo", "--json"))["cache"]["path"]
+    archiver.cache_path = json.loads(cmd(archiver, "rinfo", "--json"))["cache"].get("path")
 
 
 def corrupt(file, amount=1):
@@ -48,6 +48,9 @@ def corrupt(file, amount=1):
 @pytest.mark.allow_cache_wipe
 def test_cache_chunks(archiver):
     corrupt_archiver(archiver)
+    if archiver.cache_path is None:
+        pytest.skip("no cache path for this kind of Cache implementation")
+
     create_src_archive(archiver, "test")
     chunks_path = os.path.join(archiver.cache_path, "chunks")
     chunks_before_corruption = set(ChunkIndex(path=chunks_path).iteritems())
@@ -74,6 +77,9 @@ def test_cache_chunks(archiver):
 
 def test_cache_files(archiver):
     corrupt_archiver(archiver)
+    if archiver.cache_path is None:
+        pytest.skip("no cache path for this kind of Cache implementation")
+
     cmd(archiver, "create", "test", "input")
     corrupt(os.path.join(archiver.cache_path, "files"))
     out = cmd(archiver, "create", "test1", "input")
@@ -83,6 +89,9 @@ def test_cache_files(archiver):
 
 def test_chunks_archive(archiver):
     corrupt_archiver(archiver)
+    if archiver.cache_path is None:
+        pytest.skip("no cache path for this kind of Cache implementation")
+
     cmd(archiver, "create", "test1", "input")
     # Find ID of test1, so we can corrupt it later :)
     target_id = cmd(archiver, "rlist", "--format={id}{NL}").strip()
@@ -114,6 +123,9 @@ def test_chunks_archive(archiver):
 
 def test_old_version_interfered(archiver):
     corrupt_archiver(archiver)
+    if archiver.cache_path is None:
+        pytest.skip("no cache path for this kind of Cache implementation")
+
     # Modify the main manifest ID without touching the manifest ID in the integrity section.
     # This happens if a version without integrity checking modifies the cache.
     config_path = os.path.join(archiver.cache_path, "config")

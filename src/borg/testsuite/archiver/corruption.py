@@ -54,6 +54,11 @@ def test_cache_chunks(archiver):
     create_src_archive(archiver, "test")
     chunks_path = os.path.join(archiver.cache_path, "chunks")
     chunks_before_corruption = set(ChunkIndex(path=chunks_path).iteritems())
+
+    chunks_index = os.path.join(archiver.cache_path, "chunks")
+    if not os.path.exists(chunks_index):
+        pytest.skip("Only works with LocalCache.")
+
     corrupt(chunks_path)
 
     assert not archiver.FORK_DEFAULT  # test does not support forking
@@ -102,6 +107,8 @@ def test_chunks_archive(archiver):
     cmd(archiver, "rinfo", "--json")
 
     chunks_archive = os.path.join(archiver.cache_path, "chunks.archive.d")
+    if not os.path.exists(chunks_archive):
+        pytest.skip("Only LocalCache has a per-archive chunks index cache.")
     assert len(os.listdir(chunks_archive)) == 4  # two archives, one chunks cache and one .integrity file each
 
     corrupt(os.path.join(chunks_archive, target_id + ".compact"))

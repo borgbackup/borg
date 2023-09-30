@@ -48,7 +48,11 @@ def test_cache_chunks(archiver):
     if archiver.cache_path is None:
         pytest.skip("no cache path for this kind of Cache implementation")
 
-    corrupt(os.path.join(archiver.cache_path, "chunks"))
+    chunks_index = os.path.join(archiver.cache_path, "chunks")
+    if not os.path.exists(chunks_index):
+        pytest.skip("Only works with LocalCache.")
+
+    corrupt(chunks_index)
     if archiver.FORK_DEFAULT:
         out = cmd(archiver, "rinfo", exit_code=2)
         assert "failed integrity check" in out
@@ -84,6 +88,8 @@ def test_chunks_archive(archiver):
     cmd(archiver, "rinfo", "--json")
 
     chunks_archive = os.path.join(archiver.cache_path, "chunks.archive.d")
+    if not os.path.exists(chunks_archive):
+        pytest.skip("Only LocalCache has a per-archive chunks index cache.")
     assert len(os.listdir(chunks_archive)) == 4  # two archives, one chunks cache and one .integrity file each
 
     corrupt(os.path.join(chunks_archive, target_id + ".compact"))

@@ -365,7 +365,6 @@ or modified. It looks like this:
                 'time': '2017-05-05T12:42:22.942864',
             },
         },
-        'tam': ...,
     }
 
 The *version* field can be either 1 or 2. The versions differ in the
@@ -378,10 +377,6 @@ the server just resets the repository to a previous state.
 the repository. It is used by *borg check*, which verifies that all keys
 in all items are a subset of these keys. Thus, an older version of *borg check*
 supporting this mechanism can correctly detect keys introduced in later versions.
-
-The *tam* key is part of the :ref:`tertiary authentication mechanism <tam_description>`
-(formerly known as "tertiary authentication for metadata") and authenticates
-the manifest, since an ID check is not possible.
 
 *config* is a general-purpose location for additional metadata. All versions
 of Borg preserve its contents.

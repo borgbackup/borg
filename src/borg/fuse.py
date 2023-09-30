@@ -10,6 +10,7 @@ import time
 from collections import defaultdict
 from signal import SIGINT
 
+from .constants import ROBJ_FILE_STREAM
 from .fuse_impl import llfuse, has_pyfuse3
 
 
@@ -688,7 +689,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                     # evict fully read chunk from cache
                     del self.data_cache[id]
             else:
-                _, data = self.repo_objs.parse(id, self.repository_uncached.get(id))
+                _, data = self.repo_objs.parse(id, self.repository_uncached.get(id), ro_type=ROBJ_FILE_STREAM)
                 if offset + n < len(data):
                     # chunk was only partially read, cache it
                     self.data_cache[id] = data

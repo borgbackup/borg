@@ -127,7 +127,8 @@ class MockCache:
         self.objects = {}
         self.repository = self.MockRepo()
 
-    def add_chunk(self, id, meta, data, stats=None, wait=True):
+    def add_chunk(self, id, meta, data, stats=None, wait=True, ro_type=None):
+        assert ro_type is not None
         self.objects[id] = data
         return id, len(data)
 

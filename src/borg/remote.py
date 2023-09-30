@@ -1204,7 +1204,7 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
             return csize, decrypted
 
         def transform(id_, data):
-            meta, decrypted = repo_objs.parse(id_, data)
+            meta, decrypted = repo_objs.parse(id_, data, ro_type=ROBJ_DONTCARE)
             csize = meta.get("csize", len(data))
             return csize, decrypted
 

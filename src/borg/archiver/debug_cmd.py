@@ -35,7 +35,7 @@ class DebugMixIn:
         repo_objs = manifest.repo_objs
         archive = Archive(manifest, args.name)
         for i, item_id in enumerate(archive.metadata.items):
-            _, data = repo_objs.parse(item_id, repository.get(item_id))
+            _, data = repo_objs.parse(item_id, repository.get(item_id), ro_type=ROBJ_ARCHIVE_STREAM)
             filename = "%06d_%s.items" % (i, bin_to_hex(item_id))
             print("Dumping", filename)
             with open(filename, "wb") as fd:
@@ -65,7 +65,8 @@ class DebugMixIn:
             fd.write(do_indent(prepare_dump_dict(archive_meta_orig)))
             fd.write(",\n")
 
-            _, data = repo_objs.parse(archive_meta_orig["id"], repository.get(archive_meta_orig["id"]))
+            archive_id = archive_meta_orig["id"]
+            _, data = repo_objs.parse(archive_id, repository.get(archive_id), ro_type=ROBJ_ARCHIVE_META)
             archive_org_dict = msgpack.unpackb(data, object_hook=StableDict)
 
             fd.write('    "_meta":\n')
@@ -77,10 +78,10 @@ class DebugMixIn:
             first = True
             items = []
             for chunk_id in archive_org_dict["item_ptrs"]:
-                _, data = repo_objs.parse(chunk_id, repository.get(chunk_id))
+                _, data = repo_objs.parse(chunk_id, repository.get(chunk_id), ro_type=ROBJ_ARCHIVE_CHUNKIDS)
                 items.extend(msgpack.unpackb(data))
             for item_id in items:
-                _, data = repo_objs.parse(item_id, repository.get(item_id))
+                _, data = repo_objs.parse(item_id, repository.get(item_id), ro_type=ROBJ_ARCHIVE_STREAM)
                 unpacker.feed(data)
                 for item in unpacker:
                     item = prepare_dump_dict(item)
@@ -101,7 +102,7 @@ class DebugMixIn:
     def do_debug_dump_manifest(self, args, repository, manifest):
         """dump decoded repository manifest"""
         repo_objs = manifest.repo_objs
-        _, data = repo_objs.parse(manifest.MANIFEST_ID, repository.get(manifest.MANIFEST_ID))
+        _, data = repo_objs.parse(manifest.MANIFEST_ID, repository.get(manifest.MANIFEST_ID), ro_type=ROBJ_MANIFEST)
 
         meta = prepare_dump_dict(msgpack.unpackb(data, object_hook=StableDict))
 
@@ -116,7 +117,7 @@ class DebugMixIn:
 
         def decrypt_dump(i, id, cdata, tag=None, segment=None, offset=None):
             if cdata is not None:
-                _, data = repo_objs.parse(id, cdata)
+                _, data = repo_objs.parse(id, cdata, ro_type=ROBJ_DONTCARE)
             else:
                 _, data = {}, b""
             tag_str = "" if tag is None else "_" + tag
@@ -211,7 +212,7 @@ class DebugMixIn:
                 break
             for id in ids:
                 cdata = repository.get(id)
-                _, data = repo_objs.parse(id, cdata)
+                _, data = repo_objs.parse(id, cdata, ro_type=ROBJ_DONTCARE)
 
                 # try to locate wanted sequence crossing the border of last_data and data
                 boundary_data = last_data[-(len(wanted) - 1) :] + data[: len(wanted) - 1]
@@ -284,7 +285,7 @@ class DebugMixIn:
             cdata = f.read()
 
         repo_objs = manifest.repo_objs
-        meta, data = repo_objs.parse(id=id, cdata=cdata)
+        meta, data = repo_objs.parse(id=id, cdata=cdata, ro_type=ROBJ_DONTCARE)
 
         with open(args.json_path, "w") as f:
             json.dump(meta, f)
@@ -315,7 +316,8 @@ class DebugMixIn:
             meta = json.load(f)
 
         repo_objs = manifest.repo_objs
-        data_encrypted = repo_objs.format(id=id, meta=meta, data=data)
+        # TODO: support misc repo object types other than ROBJ_FILE_STREAM
+        data_encrypted = repo_objs.format(id=id, meta=meta, data=data, ro_type=ROBJ_FILE_STREAM)
 
         with open(args.object_path, "wb") as f:
             f.write(data_encrypted)

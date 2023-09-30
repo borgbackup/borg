@@ -723,12 +723,11 @@ class ArchiveFormatter(BaseFormatter):
         "id": "internal ID of the archive",
         "hostname": "hostname of host on which this archive was created",
         "username": "username of user who created this archive",
-        "tam": "TAM authentication state of this archive",
         "size": "size of this archive (data plus metadata, not considering compression and deduplication)",
         "nfiles": "count of files in this archive",
     }
     KEY_GROUPS = (
-        ("archive", "name", "comment", "id", "tam"),
+        ("archive", "name", "comment", "id"),
         ("start", "time", "end", "command_line"),
         ("hostname", "username"),
         ("size", "nfiles"),
@@ -933,7 +932,7 @@ class ItemFormatter(BaseFormatter):
             hash = self.xxh64()
         elif hash_function in self.hash_algorithms:
             hash = hashlib.new(hash_function)
-        for data in self.archive.pipeline.fetch_many([c.id for c in item.chunks]):
+        for data in self.archive.pipeline.fetch_many([c.id for c in item.chunks], ro_type=ROBJ_FILE_STREAM):
             hash.update(data)
         return hash.hexdigest()
 

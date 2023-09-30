@@ -37,7 +37,7 @@ def find_chunks(repository, repo_objs, stats, ctype, clevel, olevel):
         if not chunk_ids:
             break
         for id, chunk_no_data in zip(chunk_ids, repository.get_many(chunk_ids, read_data=False)):
-            meta = repo_objs.parse_meta(id, chunk_no_data)
+            meta = repo_objs.parse_meta(id, chunk_no_data, ro_type=ROBJ_DONTCARE)
             compr_found = meta["ctype"], meta["clevel"], meta.get("olevel", -1)
             if compr_found != compr_wanted:
                 recompress_ids.append(id)
@@ -57,13 +57,14 @@ def process_chunks(repository, repo_objs, stats, recompress_ids, olevel):
     for id, chunk in zip(recompress_ids, repository.get_many(recompress_ids, read_data=True)):
         old_size = len(chunk)
         stats["old_size"] += old_size
-        meta, data = repo_objs.parse(id, chunk)
+        meta, data = repo_objs.parse(id, chunk, ro_type=ROBJ_DONTCARE)
+        ro_type = meta.pop("type", None)
         compr_old = meta["ctype"], meta["clevel"], meta.get("olevel", -1)
         if olevel == -1:
             # if the chunk was obfuscated, but should not be in future, remove related metadata
             meta.pop("olevel", None)
             meta.pop("psize", None)
-        chunk = repo_objs.format(id, meta, data)
+        chunk = repo_objs.format(id, meta, data, ro_type=ro_type)
         compr_done = meta["ctype"], meta["clevel"], meta.get("olevel", -1)
         if compr_done != compr_old:
             # we actually changed something

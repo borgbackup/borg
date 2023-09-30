@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from ..constants import ROBJ_FILE_STREAM
 from ..remote import SleepingBandwidthLimiter, RepositoryCache, cache_if_remote
 from ..repository import Repository
 from ..crypto.key import PlaintextKey
@@ -205,7 +206,7 @@ class TestRepositoryCache:
 
     def _put_encrypted_object(self, repo_objs, repository, data):
         id_ = repo_objs.id_hash(data)
-        repository.put(id_, repo_objs.format(id_, {}, data))
+        repository.put(id_, repo_objs.format(id_, {}, data, ro_type=ROBJ_FILE_STREAM))
         return id_
 
     @pytest.fixture

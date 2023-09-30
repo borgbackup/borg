@@ -1,22 +1,19 @@
 import os
 import shutil
-from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
 import pytest
 
 from ...cache import Cache, LocalCache
 from ...constants import *  # NOQA
-from ...crypto.key import TAMRequiredError
-from ...helpers import Location, get_security_dir, bin_to_hex, archive_ts_now
+from ...helpers import Location, get_security_dir, bin_to_hex
 from ...helpers import EXIT_ERROR
-from ...helpers import msgpack
 from ...manifest import Manifest, MandatoryFeatureUnsupported
 from ...remote import RemoteRepository, PathNotAllowed
 from ...repository import Repository
 from .. import llfuse
 from .. import changedir
-from . import cmd, _extract_repository_id, open_repository, check_cache, create_test_files, create_src_archive
+from . import cmd, _extract_repository_id, open_repository, check_cache, create_test_files
 from . import _set_repository_id, create_regular_file, assert_creates_file, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote")  # NOQA
@@ -320,117 +317,6 @@ def test_check_cache(archivers, request):
             cache.commit()
     with pytest.raises(AssertionError):
         check_cache(archiver)
-
-
-#  Begin manifest TAM tests
-def spoof_manifest(repository):
-    with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-        cdata = manifest.repo_objs.format(
-            Manifest.MANIFEST_ID,
-            {},
-            msgpack.packb(
-                {
-                    "version": 1,
-                    "archives": {},
-                    "config": {},
-                    "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(timespec="microseconds"),
-                }
-            ),
-        )
-        repository.put(Manifest.MANIFEST_ID, cdata)
-        repository.commit(compact=False)
-
-
-def test_fresh_init_tam_required(archiver):
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    repository = Repository(archiver.repository_path, exclusive=True)
-    with repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-        cdata = manifest.repo_objs.format(
-            Manifest.MANIFEST_ID,
-            {},
-            msgpack.packb(
-                {
-                    "version": 1,
-                    "archives": {},
-                    "timestamp": (datetime.now(tz=timezone.utc) + timedelta(days=1)).isoformat(timespec="microseconds"),
-                }
-            ),
-        )
-        repository.put(Manifest.MANIFEST_ID, cdata)
-        repository.commit(compact=False)
-
-    with pytest.raises(TAMRequiredError):
-        cmd(archiver, "rlist")
-
-
-def test_not_required(archiver):
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    create_src_archive(archiver, "archive1234")
-    repository = Repository(archiver.repository_path, exclusive=True)
-    # Manifest must be authenticated now
-    output = cmd(archiver, "rlist", "--debug")
-    assert "archive1234" in output
-    assert "TAM-verified manifest" in output
-    # Try to spoof / modify pre-1.0.9
-    spoof_manifest(repository)
-    # Fails
-    with pytest.raises(TAMRequiredError):
-        cmd(archiver, "rlist")
-
-
-#  Begin archive TAM tests
-def write_archive_without_tam(repository, archive_name):
-    manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-    archive_data = msgpack.packb(
-        {
-            "version": 2,
-            "name": archive_name,
-            "item_ptrs": [],
-            "command_line": "",
-            "hostname": "",
-            "username": "",
-            "time": archive_ts_now().isoformat(timespec="microseconds"),
-            "size": 0,
-            "nfiles": 0,
-        }
-    )
-    archive_id = manifest.repo_objs.id_hash(archive_data)
-    cdata = manifest.repo_objs.format(archive_id, {}, archive_data)
-    repository.put(archive_id, cdata)
-    manifest.archives[archive_name] = (archive_id, datetime.now())
-    manifest.write()
-    repository.commit(compact=False)
-
-
-def test_check_rebuild_manifest(archiver):
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    create_src_archive(archiver, "archive_tam")
-    repository = Repository(archiver.repository_path, exclusive=True)
-    with repository:
-        write_archive_without_tam(repository, "archive_no_tam")
-        repository.delete(Manifest.MANIFEST_ID)  # kill manifest, so check has to rebuild it
-        repository.commit(compact=False)
-    cmd(archiver, "check", "--repair")
-    output = cmd(archiver, "rlist", "--format='{name}{NL}'")
-    assert "archive_tam" in output  # TAM-verified archive is in rebuilt manifest
-    assert "archive_no_tam" not in output  # check got rid of untrusted not TAM-verified archive
-
-
-def test_check_rebuild_refcounts(archiver):
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    create_src_archive(archiver, "archive_tam")
-    archive_id_pre_check = cmd(archiver, "rlist", "--format='{name} {id}{NL}'")
-    repository = Repository(archiver.repository_path, exclusive=True)
-    with repository:
-        write_archive_without_tam(repository, "archive_no_tam")
-    cmd(archiver, "check", "--repair")
-    output = cmd(archiver, "rlist", "--format='{name}{NL}'")
-    assert "archive_tam" in output  # TAM-verified archive still there
-    assert "archive_no_tam" not in output  # check got rid of untrusted not TAM-verified archive
-    archive_id_post_check = cmd(archiver, "rlist", "--format='{name} {id}{NL}'")
-    assert archive_id_post_check == archive_id_pre_check  # rebuild_refcounts didn't change archive_tam archive id
 
 
 # Begin Remote Tests

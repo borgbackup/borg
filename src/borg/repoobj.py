@@ -1,6 +1,8 @@
 from struct import Struct
 
+from .constants import *  # NOQA
 from .helpers import msgpack, workarounds
+from .helpers.errors import IntegrityError
 from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
 
 # workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
@@ -35,7 +37,11 @@ class RepoObj:
         size: int = None,
         ctype: int = None,
         clevel: int = None,
+        ro_type: str = None,
     ) -> bytes:
+        assert isinstance(ro_type, str)
+        assert ro_type != ROBJ_DONTCARE
+        meta["type"] = ro_type
         assert isinstance(id, bytes)
         assert isinstance(meta, dict)
         assert isinstance(data, (bytes, memoryview))
@@ -58,11 +64,12 @@ class RepoObj:
         hdr = self.meta_len_hdr.pack(len(meta_encrypted))
         return hdr + meta_encrypted + data_encrypted
 
-    def parse_meta(self, id: bytes, cdata: bytes) -> dict:
+    def parse_meta(self, id: bytes, cdata: bytes, ro_type: str) -> dict:
         # when calling parse_meta, enough cdata needs to be supplied to contain completely the
         # meta_len_hdr and the encrypted, packed metadata. it is allowed to provide more cdata.
         assert isinstance(id, bytes)
         assert isinstance(cdata, bytes)
+        assert isinstance(ro_type, str)
         obj = memoryview(cdata)
         offs = self.meta_len_hdr.size
         hdr = obj[:offs]
@@ -71,10 +78,12 @@ class RepoObj:
         meta_encrypted = obj[offs : offs + len_meta_encrypted]
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta = msgpack.unpackb(meta_packed)
+        if ro_type != ROBJ_DONTCARE and meta["type"] != ro_type:
+            raise IntegrityError(f"ro_type expected: {ro_type} got: {meta['type']}")
         return meta
 
     def parse(
-        self, id: bytes, cdata: bytes, decompress: bool = True, want_compressed: bool = False
+        self, id: bytes, cdata: bytes, decompress: bool = True, want_compressed: bool = False, ro_type: str = None
     ) -> tuple[dict, bytes]:
         """
         Parse a repo object into metadata and data (decrypt it, maybe decompress, maybe verify if the chunk plaintext
@@ -86,6 +95,7 @@ class RepoObj:
         - decompress=False, want_compressed=True: quick, not verifying. returns compressed data (caller wants to reuse).
         - decompress=False, want_compressed=False: invalid
         """
+        assert isinstance(ro_type, str)
         assert not (not decompress and not want_compressed), "invalid parameter combination!"
         assert isinstance(id, bytes)
         assert isinstance(cdata, bytes)
@@ -98,6 +108,8 @@ class RepoObj:
         offs += len_meta_encrypted
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta_compressed = msgpack.unpackb(meta_packed)  # means: before adding more metadata in decompress block
+        if ro_type != ROBJ_DONTCARE and meta_compressed["type"] != ro_type:
+            raise IntegrityError(f"ro_type expected: {ro_type} got: {meta_compressed['type']}")
         data_encrypted = obj[offs:]
         data_compressed = self.key.decrypt(id, data_encrypted)  # does not include the type/level bytes
         if decompress:
@@ -142,10 +154,12 @@ class RepoObj1:  # legacy
         size: int = None,
         ctype: int = None,
         clevel: int = None,
+        ro_type: str = None,
     ) -> bytes:
         assert isinstance(id, bytes)
         assert meta == {}
         assert isinstance(data, (bytes, memoryview))
+        assert ro_type is not None
         assert compress or size is not None and ctype is not None and clevel is not None
         if compress:
             assert size is None or size == len(data)
@@ -160,11 +174,12 @@ class RepoObj1:  # legacy
         raise NotImplementedError("parse_meta is not available for RepoObj1")
 
     def parse(
-        self, id: bytes, cdata: bytes, decompress: bool = True, want_compressed: bool = False
+        self, id: bytes, cdata: bytes, decompress: bool = True, want_compressed: bool = False, ro_type: str = None
     ) -> tuple[dict, bytes]:
         assert not (not decompress and not want_compressed), "invalid parameter combination!"
         assert isinstance(id, bytes)
         assert isinstance(cdata, bytes)
+        assert ro_type is not None
         data_compressed = self.key.decrypt(id, cdata)
         compressor_cls, compression_level = Compressor.detect(data_compressed[:2])
         compressor = compressor_cls(level=compression_level, legacy_mode=True)

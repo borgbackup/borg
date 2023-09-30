@@ -22,7 +22,9 @@ def test_rcompress(archiver):
                     break
                 for id in ids:
                     chunk = repository.get(id, read_data=True)
-                    meta, data = manifest.repo_objs.parse(id, chunk)  # will also decompress according to metadata
+                    meta, data = manifest.repo_objs.parse(
+                        id, chunk, ro_type=ROBJ_DONTCARE
+                    )  # will also decompress according to metadata
                     m_olevel = meta.get("olevel", -1)
                     m_psize = meta.get("psize", -1)
                     print(

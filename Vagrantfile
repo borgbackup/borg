@@ -243,6 +243,7 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
+    pyenv install 3.12.0  # tests
     pyenv install 3.11.5  # tests, binary build
     pyenv install 3.10.2  # tests
     pyenv install 3.9.10  # tests
@@ -311,8 +312,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.10 3.10.2 3.11.5
-      pyenv local 3.9.10 3.10.2 3.11.5
+      pyenv global 3.9.10 3.10.2 3.11.5 3.12.0
+      pyenv local 3.9.10 3.10.2 3.11.5 3.12.0
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:

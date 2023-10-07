@@ -1,5 +1,5 @@
 setuptools==65.6.3
-setuptools-scm==7.1.0
+setuptools-scm==8.0.4
 pip==22.3.1
 virtualenv==20.17.1
 pkgconfig==1.5.5

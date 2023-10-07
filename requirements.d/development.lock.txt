@@ -1,5 +1,5 @@
 setuptools==68.1.2
-setuptools-scm==7.1.0
+setuptools-scm==8.0.4
 pip==23.2.1
 wheel==0.41.2
 virtualenv==20.24.4

@@ -12,7 +12,6 @@ import subprocess
 import sys
 
 verbose = True
-objdump = "objdump -T %s"
 glibc_re = re.compile(r"GLIBC_([0-9]\.[0-9]+)")
 
 
@@ -32,7 +31,7 @@ def main():
     overall_versions = set()
     for filename in filenames:
         try:
-            output = subprocess.check_output(objdump % filename, shell=True, stderr=subprocess.STDOUT)
+            output = subprocess.check_output(["objdump", "-T", filename], stderr=subprocess.STDOUT)
             output = output.decode()
             versions = {parse_version(match.group(1)) for match in glibc_re.finditer(output)}
             requires_glibc = max(versions)

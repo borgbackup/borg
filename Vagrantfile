@@ -158,6 +158,7 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
+    pyenv install 3.12.0  # tests, version supporting openssl 1.1
     pyenv install 3.11.1  # tests, version supporting openssl 1.1
     pyenv install 3.10.2  # tests, version supporting openssl 1.1
     pyenv install 3.9.18  # tests, version supporting openssl 1.1, binary build
@@ -226,8 +227,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.18 3.10.2 3.11.1
-      pyenv local 3.9.18 3.10.2 3.11.1
+      pyenv global 3.9.18 3.10.2 3.11.1 3.12.0
+      pyenv local 3.9.18 3.10.2 3.11.1 3.12.0
     fi
     # otherwise: just use the system python
     # avoid that git complains about dubious ownership if we use fakeroot:
@@ -343,7 +344,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "stretch64" do |b|
-    b.vm.box = "debian/stretch64"
+    b.vm.box = "generic/debian9"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

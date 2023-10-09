@@ -332,6 +332,7 @@ Use the Cygwin installer to install the dependencies::
     libssl-devel libxxhash-devel liblz4-devel libzstd-devel
     binutils gcc-g++ git make openssh
 
+Make sure to use a virtual environment to avoid confusions with any Python installed on Windows.
 
 .. _windows-binary:
 

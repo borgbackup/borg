@@ -633,14 +633,20 @@ def main():  # pragma: no cover
             msgid = type(e).__name__
             tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
             tb = format_tb(e)
-            exit_code = e.exit_code
+            if type(e).__name__ in ("LockTimeout",) and args.lock_rc is not None:
+                exit_code = args.lock_rc
+            else:
+                exit_code = e.exit_code
         except RemoteRepository.RPCError as e:
             important = e.exception_class not in ("LockTimeout",) and e.traceback
             msg = e.exception_full if important else e.get_message()
             msgid = e.exception_class
             tb_log_level = logging.ERROR if important else logging.DEBUG
             tb = format_tb(e)
-            exit_code = EXIT_ERROR
+            if e.exception_class in ("LockTimeout",) and args.lock_rc is not None:
+                exit_code = args.lock_rc
+            else:
+                exit_code = EXIT_ERROR
         except Exception as e:
             msg = "Local Exception"
             msgid = "Exception"
@@ -675,7 +681,7 @@ def main():  # pragma: no cover
                 rc_logger.info(exit_msg % ("success", exit_code))
             elif exit_code == EXIT_WARNING:
                 rc_logger.warning(exit_msg % ("warning", exit_code))
-            elif exit_code == EXIT_ERROR:
+            elif exit_code in (EXIT_ERROR, args.lock_rc):
                 rc_logger.error(exit_msg % ("error", exit_code))
             elif exit_code >= EXIT_SIGNAL_BASE:
                 rc_logger.error(exit_msg % ("signal", exit_code))

@@ -9,6 +9,7 @@
 --iec                    format using IEC units (1KiB = 1024B)
 --log-json               Output one JSON object per log line instead of formatted text.
 --lock-wait SECONDS      wait at most SECONDS for acquiring a repository/cache lock (default: 1).
+--lock-rc CODE           use CODE as a discrete return code if the repository/cache lock could not be acquired
 --bypass-lock            Bypass locking mechanism
 --show-version           show/log the borg version
 --show-rc                show/log the return code (rc)

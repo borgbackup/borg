@@ -505,6 +505,15 @@ def define_common_options(add_common_option):
         help="wait at most SECONDS for acquiring a repository/cache lock (default: %(default)d).",
     )
     add_common_option(
+        "--lock-rc",
+        metavar="CODE",
+        dest="lock_rc",
+        type=int,
+        default=(lambda x: int(x) if x is not None else None)(os.environ.get("BORG_LOCK_RC")),
+        action=Highlander,
+        help="use CODE as a discrete return code if the repository/cache lock could not be acquired",
+    )
+    add_common_option(
         "--bypass-lock",
         dest="lock",
         action="store_false",

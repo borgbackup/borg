@@ -630,7 +630,7 @@ def main():  # pragma: no cover
                 exit_code = archiver.run(args)
         except Error as e:
             msg = e.get_message()
-            msgid = type(e).__qualname__
+            msgid = type(e).__name__
             tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
             tb = format_tb(e)
             exit_code = e.exit_code

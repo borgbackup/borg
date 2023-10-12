@@ -3025,10 +3025,7 @@ class Archiver:
             group.add_argument('-a', '--glob-archives', metavar='GLOB', dest='glob_archives',
                                type=GlobSpec, action=Highlander,
                                help='only consider archive names matching the glob. '
-                               'sh: rules apply (without actually using the sh: prefix), see "borg help patterns".\n'
-                               'Warning: In borg v2 the option -a will accept general patterns like sh:, re:, etc.'
-                               'This has the sideffect that patterns with a wildcard (*) will not be expanded but matched exactly.'
-                               'See borg v2 documentation for borg prune.')
+                                    'sh: rules apply (without actually using the sh: prefix), see "borg help patterns".')
 
             if sort_by:
                 sort_by_default = 'timestamp'

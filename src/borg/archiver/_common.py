@@ -355,7 +355,9 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
         metavar="PATTERN",
         dest="match_archives",
         action=Highlander,
-        help='only consider archive names matching the pattern. see "borg help match-archives".',
+        help='only consider archive names matching the pattern. see "borg help match-archives".\n'
+            'INFO: Changed from borg v1.2.2. Without a prefix this pattern is now interpreted as '
+            'id: style pattern whereas it used to be a glob pattern (sh: style).',
     )
 
     if sort_by:

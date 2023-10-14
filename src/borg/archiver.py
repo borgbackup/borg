@@ -3025,7 +3025,7 @@ class Archiver:
             group.add_argument('-a', '--glob-archives', metavar='GLOB', dest='glob_archives',
                                type=GlobSpec, action=Highlander,
                                help='only consider archive names matching the glob. '
-                                    'sh: rules apply, see "borg help patterns".')
+                                    'sh: rules apply (without actually using the sh: prefix), see "borg help patterns".')
 
             if sort_by:
                 sort_by_default = 'timestamp'

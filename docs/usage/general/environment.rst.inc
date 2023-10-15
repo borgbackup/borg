@@ -194,6 +194,9 @@ Directories and files:
 Building:
     BORG_OPENSSL_PREFIX
         Adds given OpenSSL header file directory to the default locations (setup.py).
+    BORG_LIBACL_PREFIX
+        Adds given prefix directory to the default locations. If an 'include/acl/libacl.h' is found
+        Borg will be linked against the system libacl instead of a bundled implementation. (setup.py)
     BORG_LIBLZ4_PREFIX
         Adds given prefix directory to the default locations. If a 'include/lz4.h' is found Borg
         will be linked against the system liblz4 instead of a bundled implementation. (setup.py)

@@ -186,6 +186,17 @@ if not on_rtd:
         dict(extra_compile_args=cflags),
     )
 
+    if sys.platform == "linux":
+        linux_ext_kwargs = members_appended(
+            dict(sources=[platform_linux_source]),
+            lib_ext_kwargs(pc, "BORG_LIBACL_PREFIX", "acl", "libacl", ">=2.3.1"),
+            dict(extra_compile_args=cflags),
+        )
+    else:
+        linux_ext_kwargs = members_appended(
+            dict(sources=[platform_linux_source], libraries=["acl"], extra_compile_args=cflags),
+        )
+
     # note: _chunker.c and _hashindex.c are relatively complex/large pieces of handwritten C code,
     # thus we undef NDEBUG for them, so the compiled code will contain and execute assert().
     ext_modules += [
@@ -198,7 +209,8 @@ if not on_rtd:
     ]
 
     posix_ext = Extension("borg.platform.posix", [platform_posix_source], extra_compile_args=cflags)
-    linux_ext = Extension("borg.platform.linux", [platform_linux_source], libraries=["acl"], extra_compile_args=cflags)
+    linux_ext = Extension("borg.platform.linux", **linux_ext_kwargs)
+
     syncfilerange_ext = Extension(
         "borg.platform.syncfilerange", [platform_syncfilerange_source], extra_compile_args=cflags
     )

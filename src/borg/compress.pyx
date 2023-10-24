@@ -438,6 +438,12 @@ class ZLIB_legacy(CompressorBase):
 
     def decompress(self, meta, data):
         # note: for compatibility no super call, do not strip ID bytes
+        assert self.legacy_mode  # only borg 1.x repos have the legacy ZLIB format
+        assert meta is None
+        meta = {}
+        meta["ctype"] = ZLIB.ID  # change to non-legacy ZLIB id
+        meta["clevel"] = 255  # we do not know the compression level
+        meta["csize"] = len(data)
         try:
             return meta, zlib.decompress(data)
         except zlib.error as e:

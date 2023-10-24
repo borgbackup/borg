@@ -50,7 +50,7 @@ def test_lz4_buffer_allocation(monkeypatch):
 @pytest.mark.parametrize("invalid_cdata", [b"\xff\xfftotalcrap", b"\x08\x00notreallyzlib"])
 def test_autodetect_invalid(invalid_cdata):
     with pytest.raises(ValueError):
-        Compressor(**params, legacy_mode=True).decompress({}, invalid_cdata)
+        Compressor(**params, legacy_mode=True).decompress(None, invalid_cdata)
 
 
 def test_zlib_legacy_compat():
@@ -61,7 +61,7 @@ def test_zlib_legacy_compat():
         meta1, cdata1 = c.compress({}, DATA)
         cdata2 = zlib.compress(DATA, level)
         assert cdata1 == cdata2
-        meta2, data2 = c.decompress({}, cdata2)
+        meta2, data2 = c.decompress(None, cdata2)
         assert DATA == data2
 
 

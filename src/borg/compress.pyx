@@ -445,7 +445,9 @@ class ZLIB_legacy(CompressorBase):
         meta["clevel"] = 255  # we do not know the compression level
         meta["csize"] = len(data)
         try:
-            return meta, zlib.decompress(data)
+            data = zlib.decompress(data)
+            self.check_fix_size(meta, data)
+            return meta, data
         except zlib.error as e:
             raise DecompressionError(str(e)) from None
 

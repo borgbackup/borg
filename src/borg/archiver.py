@@ -5325,6 +5325,17 @@ def main():  # pragma: no cover
             if tb_log_level == logging.ERROR:
                 print(tb, file=sys.stderr)
             sys.exit(e.exit_code)
+        except argparse.ArgumentTypeError as e:
+            # we might not have logging setup yet, so get out quickly
+            print(str(e), file=sys.stderr)
+            sys.exit(EXIT_ERROR)
+        except Exception:
+            msg = 'Local Exception'
+            tb = f'{traceback.format_exc()}\n{sysinfo()}'
+            # we might not have logging setup yet, so get out quickly
+            print(msg, file=sys.stderr)
+            print(tb, file=sys.stderr)
+            sys.exit(EXIT_ERROR)
         try:
             with sig_int:
                 exit_code = archiver.run(args)

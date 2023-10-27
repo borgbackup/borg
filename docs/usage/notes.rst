@@ -276,7 +276,7 @@ with file 6::
 
 That's all to do in the repository.
 
-If you want to access this rollbacked repository from a client that already has
+If you want to access this rolled back repository from a client that already has
 a cache for this repository, the cache will reflect a newer repository state
 than what you actually have in the repository now, after the rollback.
 

@@ -228,7 +228,7 @@ def SortBySpec(text):
     for token in text.split(','):
         if token not in AI_HUMAN_SORT_KEYS:
             raise argparse.ArgumentTypeError('Invalid sort key: %s' % token)
-    return text.replace('timestamp', 'ts')
+    return text.replace('timestamp', 'ts').replace('archive', 'name')
 
 
 def format_file_size(v, precision=2, sign=False, iec=False):

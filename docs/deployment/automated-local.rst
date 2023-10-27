@@ -29,26 +29,12 @@ Configuring the system
 First, create the ``/etc/backups`` directory (as root).
 All configuration goes into this directory.
 
+Find out the ID of the partition table of your backup disk (here assumed to be /dev/sdz):
+    lsblk --fs -o +PTUUID /dev/sdz
+
 Then, create ``/etc/backups/40-backup.rules`` with the following content (all on one line)::
 
-    ACTION=="add", SUBSYSTEM=="bdi", DEVPATH=="/devices/virtual/bdi/*",
-    TAG+="systemd", ENV{SYSTEMD_WANTS}="automatic-backup.service"
-
-.. topic:: Finding a more precise udev rule
-
-    If you always connect the drive(s) to the same physical hardware path, e.g. the same
-    eSATA port, then you can make a more precise udev rule.
-
-    Execute ``udevadm monitor`` and connect a drive to the port you intend to use.
-    You should see a flurry of events, find those regarding the `block` subsystem.
-    Pick the event whose device path ends in something similar to a device file name,
-    typically`sdX/sdXY`. Use the event's device path and replace `sdX/sdXY` after the
-    `/block/` part in the path with a star (\*). For example:
-    `DEVPATH=="/devices/pci0000:00/0000:00:11.0/ata3/host2/target2:0:0/2:0:0:0/block/*"`.
-
-    Reboot a few times to ensure that the hardware path does not change: on some motherboards
-    components of it can be random. In these cases you cannot use a more accurate rule,
-    or need to insert additional stars for matching the path.
+    ACTION=="add", SUBSYSTEM=="block", ENV{ID_PART_TABLE_UUID}=="<the PTUUID you just noted>", TAG+="systemd", ENV{SYSTEMD_WANTS}="automatic-backup.service"
 
 The "systemd" tag in conjunction with the SYSTEMD_WANTS environment variable has systemd
 launch the "automatic-backup" service, which we will create next, as the
@@ -110,7 +96,7 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     # Mount file system if not already done. This assumes that if something is already
     # mounted at $MOUNTPOINT, it is the backup drive. It won't find the drive if
     # it was mounted somewhere else.
-    (mount | grep $MOUNTPOINT) || mount $partition_path $MOUNTPOINT
+    findmnt $MOUNTPOINT >/dev/null || mount $partition_path $MOUNTPOINT
     drive=$(lsblk --inverse --noheadings --list --paths --output name $partition_path | head --lines 1)
     echo "Drive path: $drive"
 

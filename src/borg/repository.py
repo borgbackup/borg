@@ -195,6 +195,9 @@ class Repository:
         # segment_n PUT A, segment_x DELETE A
         # After the "DELETE A" in segment_x the shadow index will contain "A -> [n]".
         # .delete() is updating this index, it is persisted into "hints" file and is later used by .compact_segments().
+        # We need the entries in the shadow_index to not accidentally drop the "DELETE A" when we compact segment_x
+        # only (and we do not compact segment_n), because DELETE A is still needed then because PUT A will be still
+        # there. Otherwise chunk A would reappear although it was previously deleted.
         self.shadow_index = {}
         self._active_txn = False
         self.lock_wait = lock_wait

@@ -826,6 +826,15 @@ class RepositoryHintsTestCase(RepositoryTestCaseBase):
         self.assert_equal(compact_expected, self.repository.compact)
         del self.repository.segments[2]  # ignore the segment created by put(H(42), ...)
         self.assert_equal(segments_expected, self.repository.segments)
+        self.reopen()
+        self.assert_equal(self.repository.check(repair=True), True)
+        self.reopen()
+        self.repository.put(H(42), b'foobar')  # this will call prepare_txn() and load the hints data
+        self.assert_equal(shadow_index_expected, self.repository.shadow_index)
+        # sizes do not match, with vs. without header?
+        # self.assert_equal(compact_expected, self.repository.compact)
+        del self.repository.segments[2]  # ignore the segment created by put(H(42), ...)
+        self.assert_equal(segments_expected, self.repository.segments)
 
     def test_hints_behaviour(self):
         self.repository.put(H(0), b'data')

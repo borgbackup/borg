@@ -1299,8 +1299,11 @@ class Repository:
         except KeyError:
             pass
         else:
-            # note: doing a delete first will do some bookkeeping.
-            self._delete(id, in_index.segment, in_index.offset, in_index.size, update_shadow_index=True)
+            # this put call supersedes a previous put to same id.
+            # it is essential to do a delete first to get correct quota bookkeeping
+            # and also a correctly updated shadow_index, so that the compaction code
+            # does not wrongly resurrect an old PUT by dropping a DEL that is still needed.
+            self._delete(id, in_index.segment, in_index.offset, in_index.size)
         segment, offset = self.io.write_put(id, data)
         self.storage_quota_use += header_size(TAG_PUT2) + len(data)
         self.segments.setdefault(segment, 0)
@@ -1324,16 +1327,15 @@ class Repository:
             in_index = self.index.pop(id)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
-        # if we get here, there is an object with this id in the repo,
-        # we write a DEL here that shadows the respective PUT.
-        # after the delete, the object is not in the repo index any more,
-        # for the compaction code, we need to update the shadow_index in this case.
-        self._delete(id, in_index.segment, in_index.offset, in_index.size, update_shadow_index=True)
+        self._delete(id, in_index.segment, in_index.offset, in_index.size)
 
-    def _delete(self, id, segment, offset, size, *, update_shadow_index):
+    def _delete(self, id, segment, offset, size):
         # common code used by put and delete
-        if update_shadow_index:
-            self.shadow_index.setdefault(id, []).append(segment)
+        # because we'll write a DEL tag to the repository, we must update the shadow index.
+        # this is always true, no matter whether we are called from put() or delete().
+        # the compaction code needs this to not drop DEL tags if they are still required
+        # to keep a PUT in an earlier segment in the "effectively deleted" state.
+        self.shadow_index.setdefault(id, []).append(segment)
         self.segments[segment] -= 1
         self.compact[segment] += header_size(TAG_PUT2) + size
         segment, size = self.io.write_delete(id)

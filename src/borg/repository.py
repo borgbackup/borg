@@ -1300,10 +1300,7 @@ class Repository:
             pass
         else:
             # note: doing a delete first will do some bookkeeping.
-            # we do not want to update the shadow_index here, because
-            # we know already that we will PUT to this id, so it will
-            # be in the repo index (and we won't need it in the shadow_index).
-            self._delete(id, in_index.segment, in_index.offset, in_index.size, update_shadow_index=False)
+            self._delete(id, in_index.segment, in_index.offset, in_index.size, update_shadow_index=True)
         segment, offset = self.io.write_put(id, data)
         self.storage_quota_use += header_size(TAG_PUT2) + len(data)
         self.segments.setdefault(segment, 0)

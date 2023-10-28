@@ -963,6 +963,7 @@ class Repository:
                     in_index = self.index[key]
                     self.compact[in_index.segment] += header_size(tag) + size
                     self.segments[in_index.segment] -= 1
+                    self.shadow_index.setdefault(key, []).append(in_index.segment)
                 except KeyError:
                     pass
                 self.index[key] = NSIndexEntry(segment, offset, size)
@@ -980,6 +981,7 @@ class Repository:
                         # is already gone, then it was already compacted.
                         self.segments[in_index.segment] -= 1
                         self.compact[in_index.segment] += header_size(tag) + in_index.size
+                        self.shadow_index.setdefault(key, []).append(in_index.segment)
             elif tag == TAG_COMMIT:
                 continue
             else:

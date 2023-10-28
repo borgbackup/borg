@@ -1061,6 +1061,15 @@ def test_hints_persistence(repository):
         assert compact_expected == repository.compact
         del repository.segments[2]  # ignore the segment created by put(H(42), ...)
         assert segments_expected == repository.segments
+    with reopen(repository) as repository:
+        check(repository, repository.path, repair=True)
+    with reopen(repository) as repository:
+        repository.put(H(42), fchunk(b"foobar"))  # this will call prepare_txn() and load the hints data
+        assert shadow_index_expected == repository.shadow_index
+        # sizes do not match, with vs. without header?
+        # assert compact_expected == repository.compact
+        del repository.segments[2]  # ignore the segment created by put(H(42), ...)
+        assert segments_expected == repository.segments
 
 
 def test_hints_behaviour(repository):

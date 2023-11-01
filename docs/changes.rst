@@ -40,7 +40,7 @@ no matter what encryption mode they use, including "none"):
    Note: it is not required to upgrade a server, except if the server-side borg
    is also used as a client (and not just for "borg serve").
 
-   Do **not** run ``borg check`` with borg > 1.2.4 before completing the upgrade steps:
+   Do **not** run ``borg check`` with borg 1.2.6 before completing the upgrade steps:
 
    - ``borg check`` would complain about archives without a valid archive TAM.
    - ``borg check --repair`` would remove such archives!
@@ -310,6 +310,8 @@ Some things can be recommended for the upgrade process from borg 1.1.x
 - if you want to play safer, first **create a backup of your borg repository**.
 - upgrade to latest borg 1.2.x release (you could use the fat binary from
   github releases page)
+- borg 1.2.6 has a security fix for the pre-1.2.5 archives spoofing vulnerability
+  (CVE-2023-36811), see details and necessary upgrade procedure described above.
 - run `borg compact --cleanup-commits` to clean up a ton of 17 bytes long files
   in your repo caused by a borg 1.1 bug
 - run `borg check` again (now with borg 1.2.x) and check if there is anything
@@ -318,8 +320,6 @@ Some things can be recommended for the upgrade process from borg 1.1.x
   take significant time, but after that it will be fast) - for more details
   see below.
 - check the compatibility notes (see below) and adapt your scripts, if needed.
-- borg 1.2.5 has a security fix for the pre-1.2.5 archives spoofing vulnerability
-  (CVE-2023-36811), see details and necessary upgrade procedure described above.
 - if you run into any issues, please check the github issue tracker before
   posting new issues there or elsewhere.
 

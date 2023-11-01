@@ -33,7 +33,8 @@ Below, if we speak of borg 1.2.6, we mean a borg version >= 1.2.6 **or** a
 borg version that has the relevant security patches for this vulnerability applied
 (could be also an older version in that case).
 
-Steps you must take to upgrade a repository:
+Steps you must take to upgrade a repository (this applies to all kinds of repos
+no matter what encryption mode they use, including "none"):
 
 1. Upgrade all clients using this repository to borg 1.2.6.
    Note: it is not required to upgrade a server, except if the server-side borg

@@ -377,19 +377,43 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.2.7 (2023-10-xx)
+Version 1.2.7 (2023-11-xx)
 --------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
 
+Fixes:
+
+- check/compact: fix spurious reappearance of orphan chunks since borg 1.2, #6687.
+  this consist of 2 fixes:
+
+  - for existing chunks: check --repair: recreate shadow index, #6687
+  - for newly created chunks: update shadow index when doing a double-put, #5661
+- list --sort-by: support "archive" as alias of "name", #7873
+- fix rc and msg if arg parsing throws an exception, #7885
+
 Other changes:
 
 - support and test on Python 3.12
-- allow msgpack 1.0.6
+- allow msgpack 1.0.6 and 1.0.7
 - TAM issues: show tracebacks, improve borg check logging, #7797
-- readthedocs: also build offline docs (HTMLzip), #7835
-- vagrant: add VM with debian bookworm / test on OpenSSL 3.0.x.
+- replace "datetime.utcfromtimestamp" with custom helper to avoid
+  deprecation warnings when using Python 3.12
+- vagrant:
+
+  - use generic/debian9 box, fixes #7579
+  - add VM with debian bookworm / test on OpenSSL 3.0.x.
+- docs:
+
+  - not only attack/unsafe, can also be a fs issue, #7853
+  - point to CVE-2023-36811 upgrade steps from borg 1.1 to 1.2 upgrade steps, #7899
+  - upgrade steps needed for all kinds of repos (including "none" encryption mode), #7813
+  - upgrade steps: talk about consequences of borg check, #7816
+  - automated-local.rst: use GPT UUID for consistent udev rule
+  - update macOS hint about full disk access
+  - clarify borg prune -a option description, #7871
+  - readthedocs: also build offline docs (HTMLzip), #7835
 
 
 Version 1.2.6 (2023-08-31)

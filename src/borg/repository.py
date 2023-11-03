@@ -917,6 +917,7 @@ class Repository:
                     s, _ = self.index[key]
                     self.compact[s] += size
                     self.segments[s] -= 1
+                    self.shadow_index.setdefault(key, []).append(s)
                 except KeyError:
                     pass
                 self.index[key] = segment, offset
@@ -935,6 +936,7 @@ class Repository:
                         self.segments[s] -= 1
                         size = self.io.read(s, offset, key, read_data=False)
                         self.compact[s] += size
+                        self.shadow_index.setdefault(key, []).append(s)
             elif tag == TAG_COMMIT:
                 continue
             else:

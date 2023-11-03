@@ -345,7 +345,8 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
         # we have no put or del any more for H(1), so we lost knowledge about H(1).
         assert H(1) not in self.repository.shadow_index
 
-    def test_shadowed_entries_are_preserved(self):
+    def test_shadowed_entries_are_preserved1(self):
+        # this tests the shadowing-by-del behaviour
         get_latest_segment = self.repository.io.get_latest_segment
         self.repository.put(H(1), b'1')
         # This is the segment with our original PUT of interest
@@ -354,6 +355,54 @@ class RepositoryCommitTestCase(RepositoryTestCaseBase):
 
         # We now delete H(1), and force this segment to not be compacted, which can happen
         # if it's not sparse enough (symbolized by H(2) here).
+        self.repository.delete(H(1))
+        self.repository.put(H(2), b'1')
+        delete_segment = get_latest_segment()
+
+        # We pretend these are mostly dense (not sparse) and won't be compacted
+        del self.repository.compact[put_segment]
+        del self.repository.compact[delete_segment]
+
+        self.repository.commit(compact=True)
+
+        # Now we perform an unrelated operation on the segment containing the DELETE,
+        # causing it to be compacted.
+        self.repository.delete(H(2))
+        self.repository.commit(compact=True)
+
+        assert self.repository.io.segment_exists(put_segment)
+        assert not self.repository.io.segment_exists(delete_segment)
+
+        # Basic case, since the index survived this must be ok
+        assert H(1) not in self.repository
+        # Nuke index, force replay
+        os.unlink(os.path.join(self.repository.path, 'index.%d' % get_latest_segment()))
+        # Must not reappear
+        assert H(1) not in self.repository
+
+    def test_shadowed_entries_are_preserved2(self):
+        # this tests the shadowing-by-double-put behaviour, see issue #5661
+        # assume this repo state:
+        # seg1: PUT H1
+        # seg2: COMMIT
+        # seg3: DEL H1, PUT H1, DEL H1, PUT H2
+        # seg4: COMMIT
+        # Note how due to the final DEL H1 in seg3, H1 is effectively deleted.
+        #
+        # compaction of only seg3:
+        # PUT H1 gets dropped because it is not needed any more.
+        # DEL H1 must be kept, because there is still a PUT H1 in seg1 which must not
+        # "reappear" in the index if the index gets rebuilt.
+        get_latest_segment = self.repository.io.get_latest_segment
+        self.repository.put(H(1), b'1')
+        # This is the segment with our original PUT of interest
+        put_segment = get_latest_segment()
+        self.repository.commit(compact=False)
+
+        # We now put H(1) again (which implicitly does DEL(H(1)) followed by PUT(H(1), ...)),
+        # delete H(1) afterwards, and force this segment to not be compacted, which can happen
+        # if it's not sparse enough (symbolized by H(2) here).
+        self.repository.put(H(1), b'1')
         self.repository.delete(H(1))
         self.repository.put(H(2), b'1')
         delete_segment = get_latest_segment()

@@ -33,14 +33,17 @@ Below, if we speak of borg 1.2.6, we mean a borg version >= 1.2.6 **or** a
 borg version that has the relevant security patches for this vulnerability applied
 (could be also an older version in that case).
 
-Steps you must take to upgrade a repository:
+Steps you must take to upgrade a repository (this applies to all kinds of repos
+no matter what encryption mode they use, including "none"):
 
 1. Upgrade all clients using this repository to borg 1.2.6.
    Note: it is not required to upgrade a server, except if the server-side borg
    is also used as a client (and not just for "borg serve").
 
-   Do **not** run ``borg check`` with borg > 1.2.4 before completing the upgrade steps.
+   Do **not** run ``borg check`` with borg 1.2.6 before completing the upgrade steps:
 
+   - ``borg check`` would complain about archives without a valid archive TAM.
+   - ``borg check --repair`` would remove such archives!
 2. Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg info --debug <repo> 2>&1 | grep TAM | grep -i manifest``.
 
    a) If you get "TAM-verified manifest", continue with 3.

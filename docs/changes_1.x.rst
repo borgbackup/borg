@@ -288,6 +288,91 @@ The best check that everything is ok is to run a dry-run extraction::
 
     borg extract -v --dry-run REPO::ARCHIVE
 
+
+.. _upgradenotes:
+
+Upgrade Notes
+=============
+
+borg 1.1.x to 1.2.x
+-------------------
+
+Some things can be recommended for the upgrade process from borg 1.1.x
+(please also read the important compatibility notes below):
+
+- first upgrade to a recent 1.1.x release - especially if you run some older
+  1.1.* or even 1.0.* borg release.
+- using that, run at least one `borg create` (your normal backup), `prune`
+  and especially a `check` to see everything is in a good state.
+- check the output of `borg check` - if there is anything special, consider
+  a `borg check --repair` followed by another `borg check`.
+- if everything is fine so far (borg check reports no issues), you can consider
+  upgrading to 1.2.x. if not, please first fix any already existing issue.
+- if you want to play safer, first **create a backup of your borg repository**.
+- upgrade to latest borg 1.2.x release (you could use the fat binary from
+  github releases page)
+- borg 1.2.6 has a security fix for the pre-1.2.5 archives spoofing vulnerability
+  (CVE-2023-36811), see details and necessary upgrade procedure described above.
+- run `borg compact --cleanup-commits` to clean up a ton of 17 bytes long files
+  in your repo caused by a borg 1.1 bug
+- run `borg check` again (now with borg 1.2.x) and check if there is anything
+  special.
+- run `borg info` (with borg 1.2.x) to build the local pre12-meta cache (can
+  take significant time, but after that it will be fast) - for more details
+  see below.
+- check the compatibility notes (see below) and adapt your scripts, if needed.
+- if you run into any issues, please check the github issue tracker before
+  posting new issues there or elsewhere.
+
+If you follow this procedure, you can help avoiding that we get a lot of
+"borg 1.2" issue reports that are not really 1.2 issues, but existed before
+and maybe just were not noticed.
+
+Compatibility notes:
+
+- matching of path patterns has been aligned with borg storing relative paths.
+  Borg archives file paths without leading slashes. Previously, include/exclude
+  patterns could contain leading slashes. You should check your patterns and
+  remove leading slashes.
+- dropped support / testing for older Pythons, minimum requirement is 3.8.
+  In case your OS does not provide Python >= 3.8, consider using our binary,
+  which does not need an external Python interpreter. Or continue using
+  borg 1.1.x, which is still supported.
+- freeing repository space only happens when "borg compact" is invoked.
+- mount: the default for --numeric-ids is False now (same as borg extract)
+- borg create --noatime is deprecated. Not storing atime is the default behaviour
+  now (use --atime if you want to store the atime).
+- --prefix is deprecated, use -a / --glob-archives, see #6806
+- list: corrected mix-up of "isomtime" and "mtime" formats.
+  Previously, "isomtime" was the default but produced a verbose human format,
+  while "mtime" produced a ISO-8601-like format.
+  The behaviours have been swapped (so "mtime" is human, "isomtime" is ISO-like),
+  and the default is now "mtime".
+  "isomtime" is now a real ISO-8601 format ("T" between date and time, not a space).
+- create/recreate --list: file status for all files used to get announced *AFTER*
+  the file (with borg < 1.2). Now, file status is announced *BEFORE* the file
+  contents are processed. If the file status changes later (e.g. due to an error
+  or a content change), the updated/final file status will be printed again.
+- removed deprecated-since-long stuff (deprecated since):
+
+  - command "borg change-passphrase" (2017-02), use "borg key ..."
+  - option "--keep-tag-files" (2017-01), use "--keep-exclude-tags"
+  - option "--list-format" (2017-10), use "--format"
+  - option "--ignore-inode" (2017-09), use "--files-cache" w/o "inode"
+  - option "--no-files-cache" (2017-09), use "--files-cache=disabled"
+- removed BORG_HOSTNAME_IS_UNIQUE env var.
+  to use borg you must implement one of these 2 scenarios:
+
+  - 1) the combination of FQDN and result of uuid.getnode() must be unique
+       and stable (this should be the case for almost everybody, except when
+       having duplicate FQDN *and* MAC address or all-zero MAC address)
+  - 2) if you are aware that 1) is not the case for you, you must set
+       BORG_HOST_ID env var to something unique.
+- exit with 128 + signal number, #5161.
+  if you have scripts expecting rc == 2 for a signal exit, you need to update
+  them to check for >= 128.
+
+
 .. _changelog_1x:
 
 Change Log 1.x

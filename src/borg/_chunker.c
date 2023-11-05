@@ -1,5 +1,8 @@
 #include <Python.h>
 #include <fcntl.h>
+#if !defined(_MSC_VER)
+#   include <unistd.h>
+#endif
 
 /* Cyclic polynomial / buzhash
 

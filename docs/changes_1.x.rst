@@ -33,14 +33,17 @@ Below, if we speak of borg 1.2.6, we mean a borg version >= 1.2.6 **or** a
 borg version that has the relevant security patches for this vulnerability applied
 (could be also an older version in that case).
 
-Steps you must take to upgrade a repository:
+Steps you must take to upgrade a repository (this applies to all kinds of repos
+no matter what encryption mode they use, including "none"):
 
 1. Upgrade all clients using this repository to borg 1.2.6.
    Note: it is not required to upgrade a server, except if the server-side borg
    is also used as a client (and not just for "borg serve").
 
-   Do **not** run ``borg check`` with borg > 1.2.4 before completing the upgrade steps.
+   Do **not** run ``borg check`` with borg 1.2.6 before completing the upgrade steps:
 
+   - ``borg check`` would complain about archives without a valid archive TAM.
+   - ``borg check --repair`` would remove such archives!
 2. Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg info --debug <repo> 2>&1 | grep TAM | grep -i manifest``.
 
    a) If you get "TAM-verified manifest", continue with 3.
@@ -285,6 +288,91 @@ The best check that everything is ok is to run a dry-run extraction::
 
     borg extract -v --dry-run REPO::ARCHIVE
 
+
+.. _upgradenotes:
+
+Upgrade Notes
+=============
+
+borg 1.1.x to 1.2.x
+-------------------
+
+Some things can be recommended for the upgrade process from borg 1.1.x
+(please also read the important compatibility notes below):
+
+- first upgrade to a recent 1.1.x release - especially if you run some older
+  1.1.* or even 1.0.* borg release.
+- using that, run at least one `borg create` (your normal backup), `prune`
+  and especially a `check` to see everything is in a good state.
+- check the output of `borg check` - if there is anything special, consider
+  a `borg check --repair` followed by another `borg check`.
+- if everything is fine so far (borg check reports no issues), you can consider
+  upgrading to 1.2.x. if not, please first fix any already existing issue.
+- if you want to play safer, first **create a backup of your borg repository**.
+- upgrade to latest borg 1.2.x release (you could use the fat binary from
+  github releases page)
+- borg 1.2.6 has a security fix for the pre-1.2.5 archives spoofing vulnerability
+  (CVE-2023-36811), see details and necessary upgrade procedure described above.
+- run `borg compact --cleanup-commits` to clean up a ton of 17 bytes long files
+  in your repo caused by a borg 1.1 bug
+- run `borg check` again (now with borg 1.2.x) and check if there is anything
+  special.
+- run `borg info` (with borg 1.2.x) to build the local pre12-meta cache (can
+  take significant time, but after that it will be fast) - for more details
+  see below.
+- check the compatibility notes (see below) and adapt your scripts, if needed.
+- if you run into any issues, please check the github issue tracker before
+  posting new issues there or elsewhere.
+
+If you follow this procedure, you can help avoiding that we get a lot of
+"borg 1.2" issue reports that are not really 1.2 issues, but existed before
+and maybe just were not noticed.
+
+Compatibility notes:
+
+- matching of path patterns has been aligned with borg storing relative paths.
+  Borg archives file paths without leading slashes. Previously, include/exclude
+  patterns could contain leading slashes. You should check your patterns and
+  remove leading slashes.
+- dropped support / testing for older Pythons, minimum requirement is 3.8.
+  In case your OS does not provide Python >= 3.8, consider using our binary,
+  which does not need an external Python interpreter. Or continue using
+  borg 1.1.x, which is still supported.
+- freeing repository space only happens when "borg compact" is invoked.
+- mount: the default for --numeric-ids is False now (same as borg extract)
+- borg create --noatime is deprecated. Not storing atime is the default behaviour
+  now (use --atime if you want to store the atime).
+- --prefix is deprecated, use -a / --glob-archives, see #6806
+- list: corrected mix-up of "isomtime" and "mtime" formats.
+  Previously, "isomtime" was the default but produced a verbose human format,
+  while "mtime" produced a ISO-8601-like format.
+  The behaviours have been swapped (so "mtime" is human, "isomtime" is ISO-like),
+  and the default is now "mtime".
+  "isomtime" is now a real ISO-8601 format ("T" between date and time, not a space).
+- create/recreate --list: file status for all files used to get announced *AFTER*
+  the file (with borg < 1.2). Now, file status is announced *BEFORE* the file
+  contents are processed. If the file status changes later (e.g. due to an error
+  or a content change), the updated/final file status will be printed again.
+- removed deprecated-since-long stuff (deprecated since):
+
+  - command "borg change-passphrase" (2017-02), use "borg key ..."
+  - option "--keep-tag-files" (2017-01), use "--keep-exclude-tags"
+  - option "--list-format" (2017-10), use "--format"
+  - option "--ignore-inode" (2017-09), use "--files-cache" w/o "inode"
+  - option "--no-files-cache" (2017-09), use "--files-cache=disabled"
+- removed BORG_HOSTNAME_IS_UNIQUE env var.
+  to use borg you must implement one of these 2 scenarios:
+
+  - 1) the combination of FQDN and result of uuid.getnode() must be unique
+       and stable (this should be the case for almost everybody, except when
+       having duplicate FQDN *and* MAC address or all-zero MAC address)
+  - 2) if you are aware that 1) is not the case for you, you must set
+       BORG_HOST_ID env var to something unique.
+- exit with 128 + signal number, #5161.
+  if you have scripts expecting rc == 2 for a signal exit, you need to update
+  them to check for >= 128.
+
+
 .. _changelog_1x:
 
 Change Log 1.x
@@ -334,6 +422,301 @@ Other changes:
 - OpenBSD: build borg with OpenSSL (not: LibreSSL), #6474
 - remove support for LibreSSL, #6474
 - remove support for OpenSSL < 1.1.1
+
+
+Version 1.2.6 (2023-08-31)
+--------------------------
+
+Fixes:
+
+- The upgrade procedure docs as published with borg 1.2.5 did not work, if the
+  repository had archives resulting from a borg rename or borg recreate operation.
+
+  The updated docs now use BORG_WORKAROUNDS=ignore_invalid_archive_tam at some
+  places to avoid that issue, #7791.
+
+  See: fix pre-1.2.5 archives spoofing vulnerability (CVE-2023-36811),
+  details and necessary upgrade procedure described above.
+
+Other changes:
+
+- updated 1.2.5 changelog entry: 1.2.5 already has the fix for rename/recreate.
+- remove cython restrictions. recommended is to build with cython 0.29.latest,
+  because borg 1.2.x uses this since years and it is very stable.
+  you can also try to build with cython 3.0.x, there is a good chance that it works.
+  as a 3rd option, we also bundle the `*.c` files cython outputs in the release
+  pypi package, so you can also just use these and not need cython at all.
+
+
+Version 1.2.5 (2023-08-30)
+--------------------------
+
+Fixes:
+
+- Security: fix pre-1.2.5 archives spoofing vulnerability (CVE-2023-36811),
+  see details and necessary upgrade procedure described above.
+- rename/recreate: correctly update resulting archive's TAM, see #7791
+- create: do not try to read parent dir of recursion root, #7746
+- extract: fix false warning about pattern never matching, #4110
+- diff: remove surrogates before output, #7535
+- compact: clear empty directories at end of compact process, #6823
+- create --files-cache=size: fix crash, #7658
+- keyfiles: improve key sanity check, #7561
+- only warn about "invalid" chunker params, #7590
+- ProgressIndicatorPercent: fix space computation for wide chars, #3027
+- improve argparse validator error messages
+
+New features:
+
+- mount: make up volname if not given (macOS), #7690.
+  macFUSE supports a volname mount option to give what finder displays on the
+  desktop / in the directory view. if the user did not specify it, we make
+  something up, because otherwise it would be "macFUSE Volume 0 (Python)" and
+  hide the mountpoint directory name.
+- BORG_WORKAROUNDS=authenticated_no_key to extract from authenticated repos
+  without key, #7700
+
+Other changes:
+
+- add `utcnow()` helper function to avoid deprecated `datetime.utcnow()`
+- stay on latest Cython 0.29 (0.29.36) for borg 1.2.x (do not use Cython 3.0 yet)
+- docs:
+
+  - move upgrade notes to own section, see #7546
+  - mount -olocal: how to show mount in finder's sidebar, #5321
+  - list: fix --pattern examples, #7611
+  - improve patterns help
+  - incl./excl. options, path-from-stdin exclusiveness
+  - obfuscation docs: markup fix, note about MAX_DATA_SIZE
+  - --one-file-system: add macOS apfs notes, #4876
+  - improve --one-file-system help string, #5618
+  - rewrite borg check docs
+  - improve the docs for --keep-within, #7687
+  - fix borg init command in environment.rst.inc
+  - 1.1.x upgrade notes: more precise borg upgrade instructions, #3396
+
+- tests:
+
+  - fix repo reopen
+  - avoid long ids in pytest output
+  - check buzhash chunksize distribution, see #7586
+
+
+Version 1.2.4 (2023-03-24)
+--------------------------
+
+New features:
+
+- import-tar: add --ignore-zeros to process concatenated tars, #7432.
+- debug id-hash: computes file/chunk content id-hash, #7406
+- diff: --content-only does not show mode/ctime/mtime changes, #7248
+- diff: JSON strings in diff output are now sorted alphabetically
+
+Bug fixes:
+
+- xattrs: fix namespace processing on FreeBSD, #6997
+- diff: fix path related bug seen when addressing deferred items.
+- debug get-obj/put-obj: always give chunkid as cli param, see #7290
+  (this is an incompatible change, see also borg debug id-hash)
+- extract: fix mtime when ResourceFork xattr is set (macOS specific), #7234
+- recreate: without --chunker-params, do not re-chunk, #7337
+- recreate: when --target is given, do not detect "nothing to do".
+  use case: borg recreate -a src --target dst can be used to make a copy
+  of an archive inside the same repository, #7254.
+- set .hardlink_master for ALL hardlinkable items, #7175
+- locking: fix host, pid, tid order.
+  tid (thread id) must be parsed as hex from lock file name.
+- update development.lock.txt, including a setuptools security fix, #7227
+
+Other changes:
+
+- requirements: allow msgpack 1.0.5 also
+- upgrade Cython to 0.29.33
+- hashindex minor fixes, refactor, tweaks, tests
+- use os.replace not os.rename
+- remove BORG_LIBB2_PREFIX (not used any more)
+- docs:
+
+  - BORG_KEY_FILE: clarify docs, #7444
+  - update FAQ about locale/unicode issues, #6999
+  - improve mount options rendering, #7359
+  - make timestamps in manual pages reproducible
+  - installation: update Fedora in distribution list, #7357
+- tests:
+
+  - fix test_size_on_disk_accurate for large st_blksize, #7250
+  - add same_ts_ns function and use it for relaxed timestamp comparisons
+  - "auto" compressor tests: don't assume a specific size,
+    do not assume zlib is better than lz4, #7363
+  - add test for extracted directory mtime
+- vagrant:
+
+  - upgrade local freebsd 12.1 box -> generic/freebsd13 box (13.1)
+  - use pythons > 3.8 which work on freebsd 13.1
+  - pyenv: also install python 3.11.1 for testing
+  - pyenv: use python 3.10.1, 3.10.0 build is broken on freebsd
+
+
+Version 1.2.3 (2022-12-24)
+--------------------------
+
+Fixes:
+
+- create: fix --list --dry-run output for directories, #7209
+- diff/recreate: normalize chunker params before comparing them, #7079
+- check: fix uninitialised variable if repo is completely empty, #7034
+- xattrs: improve error handling, #6988
+- fix args.paths related argparsing, #6994
+- archive.save(): always use metadata from stats (e.g. nfiles, size, ...), #7072
+- tar_filter: recognize .tar.zst as zstd, #7093
+- get_chunker: fix missing sparse=False argument, #7056
+- file_integrity.py: make sure file_fd is always closed on exit
+- repository: cleanup(): close segment before unlinking
+- repository: use os.replace instead of os.rename
+
+Other changes:
+
+- remove python < 3.7 compatibility code
+- do not use version_tuple placeholder in setuptools_scm template
+- CI: fix tox4 passenv issue, #7199
+- vagrant: update to python 3.9.16, use the openbsd 7.1 box
+- misc. test suite and docs fixes / improvements
+- remove deprecated --prefix from docs, #7109
+- Windows: use MSYS2 for Github CI, remove Appveyor CI
+
+
+Version 1.2.2 (2022-08-20)
+--------------------------
+
+New features:
+
+- prune/delete --checkpoint-interval=1800 and ctrl-c/SIGINT support, #6284
+
+Fixes:
+
+- SaveFile: use a custom mkstemp with mode support, #6933, #6400, #6786.
+  This fixes umask/mode/ACL issues (and also "chmod not supported" exceptions
+  seen in 1.2.1) of files updated using SaveFile, e.g. the repo config.
+- hashindex_compact: fix eval order (check idx before use), #5899
+- create --paths-from-(stdin|command): normalize paths, #6778
+- secure_erase: avoid collateral damage, #6768.
+  If a hardlink copy of a repo was made and a new repo config shall be saved,
+  do NOT fill in random garbage before deleting the previous repo config,
+  because that would damage the hardlink copy.
+- list: fix {flags:<WIDTH>} formatting, #6081
+- check: try harder to create the key, #5719
+- misc commands: ctrl-c must not kill other subprocesses, #6912
+
+  - borg create with a remote repo via ssh
+  - borg create --content-from-command
+  - borg create --paths-from-command
+  - (de)compression filter process of import-tar / export-tar
+
+Other changes:
+
+- deprecate --prefix, use -a / --glob-archives, see #6806
+- make setuptools happy ("package would be ignored"), #6874
+- fix pyproject.toml to create a fixed _version.py file, compatible with both
+  old and new setuptools_scm version, #6875
+- automate asciinema screencasts
+- CI: test on macOS 12 without fuse / fuse tests
+  (too troublesome on github CI due to kernel extensions needed by macFUSE)
+- tests: fix test_obfuscate byte accounting
+- repository: add debug logging for issue #6687
+- _chunker.c: fix warnings on macOS
+- requirements.lock.txt: use the latest cython 0.29.32
+- docs:
+
+  - add info on man page installation, #6894
+  - update archive_progress json description about "finished", #6570
+  - json progress_percent: some values are optional, #4074
+  - FAQ: full quota / full disk, #5960
+  - correct shell syntax for installation using git
+
+
+Version 1.2.1 (2022-06-06)
+--------------------------
+
+Fixes:
+
+- create: skip with warning if opening the parent dir of recursion root fails, #6374
+- create: fix crash. metadata stream can produce all-zero chunks, #6587
+- fix crash when computing stats, escape % chars in archive name, #6500
+- fix transaction rollback: use files cache filename as found in txn.active/, #6353
+- import-tar: kill filter process in case of borg exceptions, #6401 #6681
+- import-tar: fix mtime type bug
+- ensure_dir: respect umask for created directory modes, #6400
+- SaveFile: respect umask for final file mode, #6400
+- check archive: improve error handling for corrupt archive metadata block, make
+  robust_iterator more robust, #4777
+- pre12-meta cache: do not use the cache if want_unique is True, #6612
+- fix scp-style repo url parsing for ip v6 address, #6526
+- mount -o versions: give clear error msg instead of crashing.
+  it does not make sense to request versions view if you only look at 1 archive,
+  but the code shall not crash in that case as it did, but give a clear error msg.
+- show_progress: add finished=true/false to archive_progress json, #6570
+- delete/prune: fix --iec mode output (decimal vs. binary units), #6606
+- info: fix authenticated mode repo to show "Encrypted: No", #6462
+- diff: support presence change for blkdev, chrdev and fifo items, #6615
+
+New features:
+
+- delete: add repository id and location to prompt, #6453
+- borg debug dump-repo-objs --ghost: new --segment=S --offset=O options
+
+Other changes:
+
+- support python 3.11
+- allow msgpack 1.0.4, #6716
+- load_key: no key is same as empty key, #6441
+- give a more helpful error msg for unsupported key formats, #6561
+- better error msg for defect or unsupported repo configs, #6566
+- docs:
+
+  - document borg 1.2 pattern matching behavior change, #6407
+    Make clear that absolute paths always go into the matcher as if they are
+    relative (without leading slash). Adapt all examples accordingly.
+  - authentication primitives: improved security and performance infos
+  - mention BORG_FILES_CACHE_SUFFIX as alternative to BORG_FILES_CACHE_TTL, #5602
+  - FAQ: add a hint about --debug-topic=files_cache
+  - improve borg check --max-duration description
+  - fix values of TAG bytes, #6515
+  - borg compact --cleanup-commits also runs a normal compaction, #6324
+  - virtualization speed tips
+  - recommend umask for passphrase file perms
+  - borg 1.2 is security supported
+  - update link to ubuntu packages, #6485
+  - use --numeric-ids in pull mode docs
+  - remove blake2 docs, blake2 code not bundled any more, #6371
+  - clarify on-disk order and size of segment file log entry fields, #6357
+  - docs building: do not transform --/--- to unicode dashes
+- tests:
+
+  - check that borg does not require pytest for normal usage, fixes #6563
+  - fix OpenBSD symlink mode test failure, #2055
+- vagrant:
+
+  - darwin64: remove fakeroot, #6314
+  - update development.lock.txt
+  - use pyinstaller 4.10 and python 3.9.13 for binary build
+  - upgrade VMCPUS and xdistn from 4 to 16, maybe this speeds up the tests
+- crypto:
+
+  - use hmac.compare_digest instead of ==, #6470
+  - hmac_sha256: replace own cython wrapper code by hmac.digest python stdlib (since py38)
+  - hmac and blake2b minor optimizations and cleanups
+  - removed some unused crypto related code, #6472
+  - avoid losing the key (potential use-after-free). this never could happen in
+    1.2 due to the way we use the code. The issue was discovered in master after
+    other changes, so we also "fixed" it here before it bites us.
+- setup / build:
+
+  - add pyproject.toml, fix sys.path, #6466
+  - setuptools_scm: also require it via pyproject.toml
+  - allow extra compiler flags for every extension build
+  - fix misc. C / Cython compiler warnings, deprecation warnings
+  - fix zstd.h include for bundled zstd, #6369
+- source using python 3.8 features: ``pyupgrade --py38-plus ./**/*.py``
 
 
 Version 1.2.0 (2022-02-22 22:02:22 :-)

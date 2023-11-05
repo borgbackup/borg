@@ -194,7 +194,7 @@ if not on_rtd:
         )
     else:
         linux_ext_kwargs = members_appended(
-            dict(sources=[platform_linux_source], libraries=["acl"], extra_compile_args=cflags),
+            dict(sources=[platform_linux_source], libraries=["acl"], extra_compile_args=cflags)
         )
 
     # note: _chunker.c and _hashindex.c are relatively complex/large pieces of handwritten C code,

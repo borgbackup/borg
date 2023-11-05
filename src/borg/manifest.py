@@ -28,7 +28,8 @@ class MandatoryFeatureUnsupported(Error):
 
 ArchiveInfo = namedtuple("ArchiveInfo", "name id ts")
 
-AI_HUMAN_SORT_KEYS = ["timestamp"] + list(ArchiveInfo._fields)
+# timestamp is a replacement for ts, archive is an alias for name (see SortBySpec)
+AI_HUMAN_SORT_KEYS = ["timestamp", "archive"] + list(ArchiveInfo._fields)
 AI_HUMAN_SORT_KEYS.remove("ts")
 
 

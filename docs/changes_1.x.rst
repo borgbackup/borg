@@ -50,7 +50,7 @@ no matter what encryption mode they use, including "none"):
    b) If you get "Manifest TAM not found and not required", run
       ``borg upgrade --tam --force <repository>`` *on every client*.
 
-3. Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg list --format='{name} {time} tam:{tam}{NL}' <repo>``.
+3. Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg list --consider-checkpoints --format='{name} {time} tam:{tam}{NL}' <repo>``.
    "tam:verified" means that the archive has a valid TAM authentication.
    "tam:none" is expected as output for archives created by borg <1.0.9.
    "tam:none" is also expected for archives resulting from a borg rename
@@ -66,7 +66,7 @@ no matter what encryption mode they use, including "none"):
    Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg upgrade --archives-tam <repo>``.
    This will unconditionally add a correct archive TAM to all archives not having one.
    ``borg check`` would consider TAM-less or invalid-TAM archives as garbage or a potential attack.
-   To see that all archives now are "tam:verified" run: ``borg list --format='{name} {time} tam:{tam}{NL}' <repo>``
+   To see that all archives now are "tam:verified" run: ``borg list --consider-checkpoints --format='{name} {time} tam:{tam}{NL}' <repo>``
 
 5. Please note that you should never use BORG_WORKAROUNDS=ignore_invalid_archive_tam
    for normal production operations - it is only needed once to get the archives in a

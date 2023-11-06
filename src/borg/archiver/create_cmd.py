@@ -25,6 +25,7 @@ from ..helpers import dir_is_tagged
 from ..helpers import log_multi
 from ..helpers import basic_json_data, json_print
 from ..helpers import flags_dir, flags_special_follow, flags_special
+from ..helpers import prepare_subprocess_env
 from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
@@ -70,8 +71,12 @@ class CreateMixIn:
                 if not dry_run:
                     try:
                         try:
+                            env = prepare_subprocess_env(system=True)
                             proc = subprocess.Popen(
-                                args.paths, stdout=subprocess.PIPE, preexec_fn=None if is_win32 else ignore_sigint
+                                args.paths,
+                                stdout=subprocess.PIPE,
+                                env=env,
+                                preexec_fn=None if is_win32 else ignore_sigint,
                             )
                         except (FileNotFoundError, PermissionError) as e:
                             self.print_error("Failed to execute command: %s", e)
@@ -93,8 +98,9 @@ class CreateMixIn:
                 paths_sep = eval_escapes(args.paths_delimiter) if args.paths_delimiter is not None else "\n"
                 if args.paths_from_command:
                     try:
+                        env = prepare_subprocess_env(system=True)
                         proc = subprocess.Popen(
-                            args.paths, stdout=subprocess.PIPE, preexec_fn=None if is_win32 else ignore_sigint
+                            args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=None if is_win32 else ignore_sigint
                         )
                     except (FileNotFoundError, PermissionError) as e:
                         self.print_error("Failed to execute command: %s", e)

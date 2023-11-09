@@ -114,10 +114,11 @@ FILES_CACHE_MODE_UI_DEFAULT = "ctime,size,inode"  # default for "borg create" co
 FILES_CACHE_MODE_DISABLED = "d"  # most borg commands do not use the files cache at all (disable)
 
 # return codes returned by borg command
-# when borg is killed by signal N, rc = 128 + N
 EXIT_SUCCESS = 0  # everything done, no problems
-EXIT_WARNING = 1  # reached normal end of operation, but there were issues
-EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation
+EXIT_WARNING = 1  # reached normal end of operation, but there were issues (generic warning)
+EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation (generic error)
+EXIT_ERROR_BASE = 3  # specific error codes are 3..99 (enabled by BORG_EXIT_CODES=modern)
+EXIT_WARNING_BASE = 100  # specific warning codes are 100..127 (enabled by BORG_EXIT_CODES=modern)
 EXIT_SIGNAL_BASE = 128  # terminated due to signal, rc = 128 + sig_no
 
 ISO_FORMAT_NO_USECS = "%Y-%m-%dT%H:%M:%S"

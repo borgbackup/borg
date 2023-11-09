@@ -454,14 +454,20 @@ def archive_put_items(chunk_ids, *, repo_objs, cache=None, stats=None, add_refer
 
 
 class Archive:
-    class DoesNotExist(Error):
-        """Archive {} does not exist"""
-
     class AlreadyExists(Error):
         """Archive {} already exists"""
 
+        exit_mcode = 30
+
+    class DoesNotExist(Error):
+        """Archive {} does not exist"""
+
+        exit_mcode = 31
+
     class IncompatibleFilesystemEncodingError(Error):
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
+
+        exit_mcode = 32
 
     def __init__(
         self,

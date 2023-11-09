@@ -13,6 +13,7 @@ from ..helpers import bin_to_hex, prepare_dump_dict
 from ..helpers import dash_open
 from ..helpers import StableDict
 from ..helpers import positive_int_validator, archivename_validator
+from ..helpers import CommandError, RTError
 from ..manifest import Manifest
 from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
@@ -191,8 +192,7 @@ class DebugMixIn:
         except (ValueError, UnicodeEncodeError):
             wanted = None
         if not wanted:
-            self.print_error("search term needs to be hex:123abc or str:foobar style")
-            return EXIT_ERROR
+            raise CommandError("search term needs to be hex:123abc or str:foobar style")
 
         from ..crypto.key import key_factory
 
@@ -245,13 +245,11 @@ class DebugMixIn:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print(f"object id {hex_id} is invalid [{str(err)}].")
-            return EXIT_ERROR
+            raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
         try:
             data = repository.get(id)
         except Repository.ObjectNotFound:
-            print("object %s not found." % hex_id)
-            return EXIT_ERROR
+            raise RTError("object %s not found." % hex_id)
         with open(args.path, "wb") as f:
             f.write(data)
         print("object %s fetched." % hex_id)
@@ -278,8 +276,7 @@ class DebugMixIn:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print(f"object id {hex_id} is invalid [{str(err)}].")
-            return EXIT_ERROR
+            raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
 
         with open(args.object_path, "rb") as f:
             cdata = f.read()
@@ -306,8 +303,7 @@ class DebugMixIn:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print(f"object id {hex_id} is invalid [{str(err)}].")
-            return EXIT_ERROR
+            raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
 
         with open(args.binary_path, "rb") as f:
             data = f.read()
@@ -334,8 +330,8 @@ class DebugMixIn:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print(f"object id {hex_id} is invalid [{str(err)}].")
-            return EXIT_ERROR
+            raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
+
         repository.put(id, data)
         print("object %s put." % hex_id)
         repository.commit(compact=False)

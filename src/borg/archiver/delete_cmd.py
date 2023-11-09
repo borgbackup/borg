@@ -87,7 +87,7 @@ class DeleteMixIn:
                         uncommitted_deletes = 0 if checkpointed else (uncommitted_deletes + 1)
             if sig_int:
                 # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
-                self.print_error("Got Ctrl-C / SIGINT.")
+                raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
                 checkpoint_func()
             if args.stats:

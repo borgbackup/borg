@@ -29,6 +29,7 @@ from ..helpers import prepare_subprocess_env
 from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
+from ..helpers import Error, CommandError
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -79,18 +80,15 @@ class CreateMixIn:
                                 preexec_fn=None if is_win32 else ignore_sigint,
                             )
                         except (FileNotFoundError, PermissionError) as e:
-                            self.print_error("Failed to execute command: %s", e)
-                            return self.exit_code
+                            raise CommandError("Failed to execute command: %s", e)
                         status = fso.process_pipe(
                             path=path, cache=cache, fd=proc.stdout, mode=mode, user=user, group=group
                         )
                         rc = proc.wait()
                         if rc != 0:
-                            self.print_error("Command %r exited with status %d", args.paths[0], rc)
-                            return self.exit_code
+                            raise CommandError("Command %r exited with status %d", args.paths[0], rc)
                     except BackupOSError as e:
-                        self.print_error("%s: %s", path, e)
-                        return self.exit_code
+                        raise Error("%s: %s", path, e)
                 else:
                     status = "+"  # included
                 self.print_file_status(status, path)
@@ -103,8 +101,7 @@ class CreateMixIn:
                             args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=None if is_win32 else ignore_sigint
                         )
                     except (FileNotFoundError, PermissionError) as e:
-                        self.print_error("Failed to execute command: %s", e)
-                        return self.exit_code
+                        raise CommandError("Failed to execute command: %s", e)
                     pipe_bin = proc.stdout
                 else:  # args.paths_from_stdin == True
                     pipe_bin = sys.stdin.buffer
@@ -135,8 +132,7 @@ class CreateMixIn:
                 if args.paths_from_command:
                     rc = proc.wait()
                     if rc != 0:
-                        self.print_error("Command %r exited with status %d", args.paths[0], rc)
-                        return self.exit_code
+                        raise CommandError("Command %r exited with status %d", args.paths[0], rc)
             else:
                 for path in args.paths:
                     if path == "":  # issue #5637
@@ -197,7 +193,7 @@ class CreateMixIn:
                 if sig_int:
                     # do not save the archive if the user ctrl-c-ed - it is valid, but incomplete.
                     # we already have a checkpoint archive in this case.
-                    self.print_error("Got Ctrl-C / SIGINT.")
+                    raise Error("Got Ctrl-C / SIGINT.")
                 else:
                     archive.save(comment=args.comment, timestamp=args.timestamp)
                     args.stats |= args.json

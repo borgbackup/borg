@@ -5,6 +5,9 @@ from ..constants import *  # NOQA
 from ..crypto.low_level import IntegrityError as IntegrityErrorBase
 
 
+modern_ec = os.environ.get("BORG_EXIT_CODES", "legacy") == "modern"
+
+
 class Error(Exception):
     """Error: {}"""
 
@@ -30,9 +33,8 @@ class Error(Exception):
     @property
     def exit_code(self):
         # legacy: borg used to always use rc 2 (EXIT_ERROR) for all errors.
-        # modern: users can opt in to more specific return codes, using BORG_RC_STYLE:
-        modern = os.environ.get("BORG_EXIT_CODES", "legacy") == "modern"
-        return self.exit_mcode if modern else EXIT_ERROR
+        # modern: users can opt in to more specific return codes, using BORG_EXIT_CODES:
+        return self.exit_mcode if modern_ec else EXIT_ERROR
 
 
 class ErrorWithTraceback(Error):
@@ -45,6 +47,26 @@ class ErrorWithTraceback(Error):
 class IntegrityError(ErrorWithTraceback, IntegrityErrorBase):
     """Data integrity error: {}"""
 
+    exit_mcode = 90
+
 
 class DecompressionError(IntegrityError):
     """Decompression error: {}"""
+
+    exit_mcode = 92
+
+
+class CancelledByUser(Error):
+    """Cancelled by user."""
+
+    exit_mcode = 3
+
+
+class RTError(Error):
+    """Runtime Error: {}"""
+
+
+class CommandError(Error):
+    """Command Error: {}"""
+
+    exit_mcode = 4

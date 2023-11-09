@@ -25,7 +25,7 @@ try:
     from .. import __version__
     from ..constants import *  # NOQA
     from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
-    from ..helpers import Error, set_ec
+    from ..helpers import Error, CommandError, set_ec, modern_ec
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
@@ -127,11 +127,6 @@ class Archiver(
         self.lock_wait = lock_wait
         self.prog = prog
         self.last_checkpoint = time.monotonic()
-
-    def print_error(self, msg, *args):
-        msg = args and msg % args or msg
-        self.exit_code = EXIT_ERROR
-        logger.error(msg)
 
     def print_warning(self, msg, *args):
         msg = args and msg % args or msg
@@ -631,7 +626,7 @@ def main():  # pragma: no cover
         except argparse.ArgumentTypeError as e:
             # we might not have logging setup yet, so get out quickly
             print(str(e), file=sys.stderr)
-            sys.exit(EXIT_ERROR)
+            sys.exit(CommandError.exit_mcode if modern_ec else EXIT_ERROR)
         except Exception:
             msg = "Local Exception"
             tb = f"{traceback.format_exc()}\n{sysinfo()}"
@@ -687,9 +682,9 @@ def main():  # pragma: no cover
             exit_msg = "terminating with %s status, rc %d"
             if exit_code == EXIT_SUCCESS:
                 rc_logger.info(exit_msg % ("success", exit_code))
-            elif exit_code == EXIT_WARNING:
+            elif exit_code == EXIT_WARNING or EXIT_WARNING_BASE <= exit_code < EXIT_SIGNAL_BASE:
                 rc_logger.warning(exit_msg % ("warning", exit_code))
-            elif exit_code == EXIT_ERROR:
+            elif exit_code == EXIT_ERROR or EXIT_ERROR_BASE <= exit_code < EXIT_WARNING_BASE:
                 rc_logger.error(exit_msg % ("error", exit_code))
             elif exit_code >= EXIT_SIGNAL_BASE:
                 rc_logger.error(exit_msg % ("signal", exit_code))

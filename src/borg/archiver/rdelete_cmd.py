@@ -3,7 +3,7 @@ import argparse
 from ._common import with_repository
 from ..cache import Cache, SecurityManager
 from ..constants import *  # NOQA
-from ..helpers import EXIT_ERROR
+from ..helpers import CancelledByUser
 from ..helpers import format_archive
 from ..helpers import bin_to_hex
 from ..helpers import yes
@@ -72,8 +72,7 @@ class RDeleteMixIn:
                     retry=False,
                     env_var_override="BORG_DELETE_I_KNOW_WHAT_I_AM_DOING",
                 ):
-                    self.exit_code = EXIT_ERROR
-                    return self.exit_code
+                    raise CancelledByUser()
             if not dry_run:
                 repository.destroy()
                 logger.info("Repository deleted.")

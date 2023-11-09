@@ -18,12 +18,16 @@ from .patterns import get_regex_from_pattern
 from .repoobj import RepoObj
 
 
+class MandatoryFeatureUnsupported(Error):
+    """Unsupported repository feature(s) {}. A newer version of borg is required to access this repository."""
+
+    exit_mcode = 25
+
+
 class NoManifestError(Error):
     """Repository has no manifest."""
 
-
-class MandatoryFeatureUnsupported(Error):
-    """Unsupported repository feature(s) {}. A newer version of borg is required to access this repository."""
+    exit_mcode = 26
 
 
 ArchiveInfo = namedtuple("ArchiveInfo", "name id ts")

@@ -16,6 +16,7 @@ from ...constants import *  # NOQA
 from ...manifest import Manifest
 from ...platform import is_cygwin, is_win32, is_darwin
 from ...repository import Repository
+from ...helpers import CommandError
 from .. import has_lchflags
 from .. import changedir
 from .. import (
@@ -360,8 +361,12 @@ def test_create_content_from_command(archivers, request):
 def test_create_content_from_command_with_failed_command(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
-    output = cmd(archiver, "create", "--content-from-command", "test", "--", "sh", "-c", "exit 73;", exit_code=2)
-    assert output.endswith("Command 'sh' exited with status 73" + os.linesep)
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, "create", "--content-from-command", "test", "--", "sh", "-c", "exit 73;", exit_code=2)
+        assert output.endswith("Command 'sh' exited with status 73" + os.linesep)
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, "create", "--content-from-command", "test", "--", "sh", "-c", "exit 73;")
     archive_list = json.loads(cmd(archiver, "rlist", "--json"))
     assert archive_list["archives"] == []
 
@@ -408,8 +413,12 @@ def test_create_paths_from_command(archivers, request):
 def test_create_paths_from_command_with_failed_command(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
-    output = cmd(archiver, "create", "--paths-from-command", "test", "--", "sh", "-c", "exit 73;", exit_code=2)
-    assert output.endswith("Command 'sh' exited with status 73" + os.linesep)
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, "create", "--paths-from-command", "test", "--", "sh", "-c", "exit 73;", exit_code=2)
+        assert output.endswith("Command 'sh' exited with status 73" + os.linesep)
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, "create", "--paths-from-command", "test", "--", "sh", "-c", "exit 73;")
     archive_list = json.loads(cmd(archiver, "rlist", "--json"))
     assert archive_list["archives"] == []
 

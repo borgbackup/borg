@@ -10,7 +10,7 @@ from ._common import with_repository, Highlander
 from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import ArchiveFormatter, interval, sig_int, log_multi, ProgressIndicatorPercent
+from ..helpers import ArchiveFormatter, interval, sig_int, log_multi, ProgressIndicatorPercent, CommandError, Error
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -77,12 +77,12 @@ class PruneMixIn:
         if not any(
             (args.secondly, args.minutely, args.hourly, args.daily, args.weekly, args.monthly, args.yearly, args.within)
         ):
-            self.print_error(
+            raise CommandError(
                 'At least one of the "keep-within", "keep-last", '
                 '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                 '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.'
             )
-            return self.exit_code
+
         if args.format is not None:
             format = args.format
         elif args.short:
@@ -173,7 +173,7 @@ class PruneMixIn:
             pi.finish()
             if sig_int:
                 # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
-                self.print_error("Got Ctrl-C / SIGINT.")
+                raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
                 checkpoint_func()
             if args.stats:

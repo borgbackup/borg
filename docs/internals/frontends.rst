@@ -565,92 +565,150 @@ Message IDs are strings that essentially give a log message or operation a name,
 full text, since texts change more frequently. Message IDs are unambiguous and reduce the need to parse
 log messages.
 
-Assigned message IDs are:
+Assigned message IDs and related error RCs (exit codes) are:
 
 .. See scripts/errorlist.py; this is slightly edited.
 
 Errors
-    Archive.AlreadyExists
-        Archive {} already exists
-    Archive.DoesNotExist
-        Archive {} does not exist
-    Archive.IncompatibleFilesystemEncodingError
-        Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable.
-    Cache.CacheInitAbortedError
-        Cache initialization aborted
-    Cache.EncryptionMethodMismatch
-        Repository encryption method changed since last access, refusing to continue
-    Cache.RepositoryAccessAborted
-        Repository access aborted
-    Cache.RepositoryIDNotUnique
-        Cache is newer than repository - do you have multiple, independently updated repos with same ID?
-    Cache.RepositoryReplay
-        Cache is newer than repository - this is either an attack or unsafe (multiple repos with same ID)
-    Buffer.MemoryLimitExceeded
+    Error rc: 2 traceback: no
+        Error: {}
+    ErrorWithTraceback rc: 2 traceback: yes
+        Error: {}
+
+    ExtensionModuleError rc: 2 traceback: no
+        The Borg binary extension modules do not seem to be properly installed.
+    PythonLibcTooOld rc: 2 traceback: no
+        FATAL: this Python was compiled for a too old (g)libc and misses required functionality.
+    Buffer.MemoryLimitExceeded rc: 2 traceback: no
         Requested buffer size {} is above the limit of {}.
-    ExtensionModuleError
-        The Borg binary extension modules do not seem to be installed properly
-    IntegrityError
-        Data integrity error: {}
-    NoManifestError
-        Repository has no manifest.
-    PlaceholderError
+    EfficientCollectionQueue.SizeUnderflow rc: 2 traceback: no
+        Could not pop_front first {} elements, collection only has {} elements..
+    RTError rc: 2 traceback: no
+        Runtime Error: {}
+
+    CancelledByUser rc: 3 traceback: no
+        Cancelled by user.
+
+    CommandError rc: 4 traceback: no
+        Command Error: {}
+    PlaceholderError rc: 5 traceback: no
         Formatting Error: "{}".format({}): {}({})
-    KeyfileInvalidError
-        Invalid key file for repository {} found in {}.
-    KeyfileMismatchError
-        Mismatch between repository {} and key file {}.
-    KeyfileNotFoundError
-        No key file for repository {} found in {}.
-    PassphraseWrong
-        passphrase supplied in BORG_PASSPHRASE is incorrect
-    PasswordRetriesExceeded
-        exceeded the maximum password retries
-    RepoKeyNotFoundError
-        No key entry found in the config of repository {}.
-    UnsupportedManifestError
+    InvalidPlaceholder rc: 6 traceback: no
+        Invalid placeholder "{}" in string: {}
+
+    Repository.AlreadyExists rc: 10 traceback: no
+        A repository already exists at {}.
+    Repository.CheckNeeded rc: 12 traceback: yes
+        Inconsistency detected. Please run "borg check {}".
+    Repository.DoesNotExist rc: 13 traceback: no
+        Repository {} does not exist.
+    Repository.InsufficientFreeSpaceError rc: 14 traceback: no
+        Insufficient free space to complete transaction (required: {}, available: {}).
+    Repository.InvalidRepository rc: 15 traceback: no
+        {} is not a valid repository. Check repo config.
+    Repository.InvalidRepositoryConfig rc: 16 traceback: no
+        {} does not have a valid configuration. Check repo config [{}].
+    Repository.ObjectNotFound rc: 17 traceback: yes
+        Object with key {} not found in repository {}.
+    Repository.ParentPathDoesNotExist rc: 18 traceback: no
+        The parent path of the repo directory [{}] does not exist.
+    Repository.PathAlreadyExists rc: 19 traceback: no
+        There is already something at {}.
+    Repository.StorageQuotaExceeded rc: 20 traceback: no
+        The storage quota ({}) has been exceeded ({}). Try deleting some archives.
+
+    MandatoryFeatureUnsupported rc: 25 traceback: no
+        Unsupported repository feature(s) {}. A newer version of borg is required to access this repository.
+    NoManifestError rc: 26 traceback: no
+        Repository has no manifest.
+    UnsupportedManifestError rc: 27 traceback: no
         Unsupported manifest envelope. A newer version is required to access this repository.
-    UnsupportedPayloadError
-        Unsupported payload type {}. A newer version is required to access this repository.
-    NotABorgKeyFile
+
+    Archive.AlreadyExists rc: 30 traceback: no
+        Archive {} already exists
+    Archive.DoesNotExist rc: 31 traceback: no
+        Archive {} does not exist
+    Archive.IncompatibleFilesystemEncodingError rc: 32 traceback: no
+        Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable.
+
+    KeyfileInvalidError rc: 40 traceback: no
+        Invalid key file for repository {} found in {}.
+    KeyfileMismatchError rc: 41 traceback: no
+        Mismatch between repository {} and key file {}.
+    KeyfileNotFoundError rc: 42 traceback: no
+        No key file for repository {} found in {}.
+    NotABorgKeyFile rc: 43 traceback: no
         This file is not a borg key backup, aborting.
-    RepoIdMismatch
+    RepoKeyNotFoundError rc: 44 traceback: no
+        No key entry found in the config of repository {}.
+    RepoIdMismatch rc: 45 traceback: no
         This key backup seems to be for a different backup repository, aborting.
-    UnencryptedRepo
-        Keymanagement not available for unencrypted repositories.
-    UnknownKeyType
-        Keytype {0} is unknown.
-    LockError
+    UnencryptedRepo rc: 46 traceback: no
+        Key management not available for unencrypted repositories.
+    UnknownKeyType rc: 47 traceback: no
+        Key type {0} is unknown.
+   UnsupportedPayloadError rc: 48 traceback: no
+        Unsupported payload type {}. A newer version is required to access this repository.
+    UnsupportedKeyFormatError rc: 49 traceback:no
+        Your borg key is stored in an unsupported format. Try using a newer version of borg.
+
+
+    NoPassphraseFailure rc: 50 traceback: no
+        can not acquire a passphrase: {}
+    PasscommandFailure rc: 51 traceback: no
+        passcommand supplied in BORG_PASSCOMMAND failed: {}
+    PassphraseWrong rc: 52 traceback: no
+        passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect.
+    PasswordRetriesExceeded rc: 53 traceback: no
+        exceeded the maximum password retries
+
+    Cache.CacheInitAbortedError rc: 60 traceback: no
+        Cache initialization aborted
+    Cache.EncryptionMethodMismatch rc: 61 traceback: no
+        Repository encryption method changed since last access, refusing to continue
+    Cache.RepositoryAccessAborted rc: 62 traceback: no
+        Repository access aborted
+    Cache.RepositoryIDNotUnique rc: 63 traceback: no
+        Cache is newer than repository - do you have multiple, independently updated repos with same ID?
+    Cache.RepositoryReplay rc: 64 traceback: no
+        Cache, or information obtained from the security directory is newer than repository - this is either an attack or unsafe (multiple repos with same ID)
+
+    LockError rc: 70 traceback: no
         Failed to acquire the lock {}.
-    LockErrorT
+    LockErrorT rc: 71 traceback: yes
         Failed to acquire the lock {}.
-    ConnectionClosed
+    LockFailed rc: 72 traceback: yes
+        Failed to create/acquire the lock {} ({}).
+    LockTimeout rc: 73 traceback: no
+        Failed to create/acquire the lock {} (timeout).
+    NotLocked rc: 74 traceback: yes
+        Failed to release the lock {} (was not locked).
+    NotMyLock rc: 75 traceback: yes
+        Failed to release the lock {} (was/is locked, but not by me).
+
+    ConnectionClosed rc: 80 traceback: no
         Connection closed by remote host
-    InvalidRPCMethod
+    ConnectionClosedWithHint rc: 81 traceback: no
+        Connection closed by remote host. {}
+    InvalidRPCMethod rc: 82 traceback: no
         RPC method {} is not valid
-    PathNotAllowed
-        Repository path not allowed
-    RemoteRepository.RPCServerOutdated
+    PathNotAllowed rc: 83 traceback: no
+        Repository path not allowed: {}
+    RemoteRepository.RPCServerOutdated rc: 84 traceback: no
         Borg server is too old for {}. Required version {}
-    UnexpectedRPCDataFormatFromClient
+    UnexpectedRPCDataFormatFromClient rc: 85 traceback: no
         Borg {}: Got unexpected RPC data format from client.
-    UnexpectedRPCDataFormatFromServer
+    UnexpectedRPCDataFormatFromServer rc: 86 traceback: no
         Got unexpected RPC data format from server:
         {}
-    Repository.AlreadyExists
-        Repository {} already exists.
-    Repository.CheckNeeded
-        Inconsistency detected. Please run "borg check {}".
-    Repository.DoesNotExist
-        Repository {} does not exist.
-    Repository.InsufficientFreeSpaceError
-        Insufficient free space to complete transaction (required: {}, available: {}).
-    Repository.InvalidRepository
-        {} is not a valid repository. Check repo config.
-    Repository.AtticRepository
-        Attic repository detected. Please run "borg upgrade {}".
-    Repository.ObjectNotFound
-        Object with key {} not found in repository {}.
+
+    IntegrityError rc: 90 traceback: yes
+        Data integrity error: {}
+    FileIntegrityError rc: 91 traceback: yes
+        File failed integrity check: {}
+    DecompressionError rc: 92 traceback: yes
+        Decompression error: {}
+
 
 Operations
     - cache.begin_transaction

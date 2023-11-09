@@ -6,7 +6,7 @@ import pytest
 from ...constants import *  # NOQA
 from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPOKeyfileKey, Passphrase
 from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
-from ...helpers import EXIT_ERROR
+from ...helpers import EXIT_ERROR, CommandError
 from ...helpers import bin_to_hex
 from ...helpers import msgpack
 from ...repository import Repository
@@ -170,7 +170,11 @@ def test_key_export_directory(archivers, request):
     export_directory = archiver.output_path + "/exported"
     os.mkdir(export_directory)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
-    cmd(archiver, "key", "export", export_directory, exit_code=EXIT_ERROR)
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "key", "export", export_directory, exit_code=EXIT_ERROR)
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, "key", "export", export_directory)
 
 
 def test_key_export_qr_directory(archivers, request):
@@ -178,14 +182,22 @@ def test_key_export_qr_directory(archivers, request):
     export_directory = archiver.output_path + "/exported"
     os.mkdir(export_directory)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
-    cmd(archiver, "key", "export", "--qr-html", export_directory, exit_code=EXIT_ERROR)
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "key", "export", "--qr-html", export_directory, exit_code=EXIT_ERROR)
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, "key", "export", "--qr-html", export_directory)
 
 
 def test_key_import_errors(archivers, request):
     archiver = request.getfixturevalue(archivers)
     export_file = archiver.output_path + "/exported"
     cmd(archiver, "rcreate", KF_ENCRYPTION)
-    cmd(archiver, "key", "import", export_file, exit_code=EXIT_ERROR)
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "key", "import", export_file, exit_code=EXIT_ERROR)
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, "key", "import", export_file)
 
     with open(export_file, "w") as fd:
         fd.write("something not a key\n")

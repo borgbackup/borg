@@ -5,6 +5,7 @@ from datetime import datetime
 import pytest
 
 from ...constants import *  # NOQA
+from ...helpers import CommandError
 from .. import changedir, are_hardlinks_supported
 from . import (
     _create_test_caches,
@@ -82,8 +83,12 @@ def test_recreate_hardlinked_tags(archivers, request):  # test for issue #4911
 def test_recreate_target_rc(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
-    output = cmd(archiver, "recreate", "--target=asdf", exit_code=2)
-    assert "Need to specify single archive" in output
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, "recreate", "--target=asdf", exit_code=2)
+        assert "Need to specify single archive" in output
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, "recreate", "--target=asdf")
 
 
 def test_recreate_target(archivers, request):

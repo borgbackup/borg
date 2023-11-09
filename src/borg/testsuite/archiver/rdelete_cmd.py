@@ -1,6 +1,9 @@
 import os
 
+import pytest
+
 from ...constants import *  # NOQA
+from ...helpers import CancelledByUser
 from . import create_regular_file, cmd, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -14,7 +17,11 @@ def test_delete_repo(archivers, request):
     cmd(archiver, "create", "test", "input")
     cmd(archiver, "create", "test.2", "input")
     os.environ["BORG_DELETE_I_KNOW_WHAT_I_AM_DOING"] = "no"
-    cmd(archiver, "rdelete", exit_code=2)
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "rdelete", exit_code=2)
+    else:
+        with pytest.raises(CancelledByUser):
+            cmd(archiver, "rdelete")
     assert os.path.exists(archiver.repository_path)
     os.environ["BORG_DELETE_I_KNOW_WHAT_I_AM_DOING"] = "YES"
     cmd(archiver, "rdelete")

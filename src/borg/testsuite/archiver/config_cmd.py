@@ -1,7 +1,9 @@
 import os
+import pytest
 
 from ...constants import *  # NOQA
 from . import RK_ENCRYPTION, create_test_files, cmd, generate_archiver_tests
+from ...helpers import CommandError
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
@@ -40,5 +42,9 @@ def test_config(archivers, request):
         cmd(archiver, "config", cfg_key, exit_code=1)
 
     cmd(archiver, "config", "--list", "--delete", exit_code=2)
-    cmd(archiver, "config", exit_code=2)
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "config", exit_code=2)
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, "config")
     cmd(archiver, "config", "invalid-option", exit_code=1)

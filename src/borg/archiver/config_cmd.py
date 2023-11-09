@@ -7,7 +7,7 @@ from ._common import with_repository
 from ..cache import Cache, assert_secure
 from ..constants import *  # NOQA
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING
-from ..helpers import Error
+from ..helpers import Error, CommandError
 from ..helpers import Location
 from ..helpers import parse_file_size
 from ..manifest import Manifest
@@ -99,9 +99,7 @@ class ConfigMixIn:
 
         if not args.list:
             if args.name is None:
-                self.print_error("No config key name was provided.")
-                return self.exit_code
-
+                raise CommandError("No config key name was provided.")
             try:
                 section, name = args.name.split(".")
             except ValueError:

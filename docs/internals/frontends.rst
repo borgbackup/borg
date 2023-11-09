@@ -664,6 +664,7 @@ Operations
     - repository.check
     - check.verify_data
     - check.rebuild_manifest
+    - check.rebuild_refcounts
     - extract
 
       *info* is one string element, the name of the path currently extracted.

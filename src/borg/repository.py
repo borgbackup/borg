@@ -120,43 +120,54 @@ class Repository:
     will still get rid of them.
     """
 
-    class DoesNotExist(Error):
-        """Repository {} does not exist."""
-
     class AlreadyExists(Error):
         """A repository already exists at {}."""
-
-    class PathAlreadyExists(Error):
-        """There is already something at {}."""
-
-    class ParentPathDoesNotExist(Error):
-        """The parent path of the repo directory [{}] does not exist."""
-
-    class InvalidRepository(Error):
-        """{} is not a valid repository. Check repo config."""
-
-    class InvalidRepositoryConfig(Error):
-        """{} does not have a valid configuration. Check repo config [{}]."""
+        exit_mcode = 10
 
     class AtticRepository(Error):
         """Attic repository detected. Please run "borg upgrade {}"."""
+        exit_mcode = 11
 
     class CheckNeeded(ErrorWithTraceback):
         """Inconsistency detected. Please run "borg check {}"."""
+        exit_mcode = 12
+
+    class DoesNotExist(Error):
+        """Repository {} does not exist."""
+        exit_mcode = 13
+
+    class InsufficientFreeSpaceError(Error):
+        """Insufficient free space to complete transaction (required: {}, available: {})."""
+        exit_mcode = 14
+
+    class InvalidRepository(Error):
+        """{} is not a valid repository. Check repo config."""
+        exit_mcode = 15
+
+    class InvalidRepositoryConfig(Error):
+        """{} does not have a valid configuration. Check repo config [{}]."""
+        exit_mcode = 16
 
     class ObjectNotFound(ErrorWithTraceback):
         """Object with key {} not found in repository {}."""
+        exit_mcode = 17
 
         def __init__(self, id, repo):
             if isinstance(id, bytes):
                 id = bin_to_hex(id)
             super().__init__(id, repo)
 
-    class InsufficientFreeSpaceError(Error):
-        """Insufficient free space to complete transaction (required: {}, available: {})."""
+    class ParentPathDoesNotExist(Error):
+        """The parent path of the repo directory [{}] does not exist."""
+        exit_mcode = 18
+
+    class PathAlreadyExists(Error):
+        """There is already something at {}."""
+        exit_mcode = 19
 
     class StorageQuotaExceeded(Error):
         """The storage quota ({}) has been exceeded ({}). Try deleting some archives."""
+        exit_mcode = 20
 
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True,
                  append_only=False, storage_quota=None, check_segment_magic=True,

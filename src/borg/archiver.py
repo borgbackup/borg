@@ -46,7 +46,7 @@ try:
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
     from .crypto.keymanager import KeyManager
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
-    from .helpers import Error, NoManifestError, set_ec
+    from .helpers import Error, NoManifestError, CancelledByUser, RTError, CommandError, modern_ec, set_ec
     from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, PathSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
@@ -240,11 +240,6 @@ class Archiver:
         self.prog = prog
         self.last_checkpoint = time.monotonic()
 
-    def print_error(self, msg, *args):
-        msg = args and msg % args or msg
-        self.exit_code = EXIT_ERROR
-        logger.error(msg)
-
     def print_warning(self, msg, *args):
         msg = args and msg % args or msg
         self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
@@ -330,21 +325,18 @@ class Archiver:
             if not yes(msg, false_msg="Aborting.", invalid_msg="Invalid answer, aborting.",
                        truish=('YES', ), retry=False,
                        env_var_override='BORG_CHECK_I_KNOW_WHAT_I_AM_DOING'):
-                return EXIT_ERROR
+                raise CancelledByUser()
         if args.repo_only and any(
            (args.verify_data, args.first, args.last, args.prefix is not None, args.glob_archives)):
-            self.print_error("--repository-only contradicts --first, --last, --glob-archives, --prefix and --verify-data arguments.")
-            return EXIT_ERROR
+            raise CommandError("--repository-only contradicts --first, --last, --glob-archives, --prefix and --verify-data arguments.")
         if args.repair and args.max_duration:
-            self.print_error("--repair does not allow --max-duration argument.")
-            return EXIT_ERROR
+            raise CommandError("--repair does not allow --max-duration argument.")
         if args.max_duration and not args.repo_only:
             # when doing a partial repo check, we can only check crc32 checksums in segment files,
             # we can't build a fresh repo index in memory to verify the on-disk index against it.
             # thus, we should not do an archives check based on a unknown-quality on-disk repo index.
             # also, there is no max_duration support in the archives check code anyway.
-            self.print_error("--repository-only is required for --max-duration support.")
-            return EXIT_ERROR
+            raise CommandError("--repository-only is required for --max-duration support.")
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space, max_duration=args.max_duration):
                 return EXIT_WARNING
@@ -361,8 +353,7 @@ class Archiver:
     def do_change_passphrase(self, args, repository, manifest, key):
         """Change repository key file passphrase"""
         if not hasattr(key, 'change_passphrase'):
-            print('This repository is not encrypted, cannot change the passphrase.')
-            return EXIT_ERROR
+            raise CommandError('This repository is not encrypted, cannot change the passphrase.')
         key.change_passphrase()
         logger.info('Key updated')
         if hasattr(key, 'find_key'):
@@ -384,8 +375,7 @@ class Archiver:
                 else:
                     manager.export(args.path)
             except IsADirectoryError:
-                self.print_error(f"'{args.path}' must be a file, not a directory")
-                return EXIT_ERROR
+                raise CommandError(f"'{args.path}' must be a file, not a directory")
         return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
@@ -394,16 +384,13 @@ class Archiver:
         manager = KeyManager(repository)
         if args.paper:
             if args.path:
-                self.print_error("with --paper import from file is not supported")
-                return EXIT_ERROR
+                raise CommandError("with --paper import from file is not supported")
             manager.import_paperkey(args)
         else:
             if not args.path:
-                self.print_error("input file to import key from expected")
-                return EXIT_ERROR
+                raise CommandError("expected input file to import key from")
             if args.path != '-' and not os.path.exists(args.path):
-                self.print_error("input file does not exist: " + args.path)
-                return EXIT_ERROR
+                raise CommandError("input file does not exist: " + args.path)
             manager.import_keyfile(args)
         return EXIT_SUCCESS
 
@@ -536,16 +523,13 @@ class Archiver:
                             env = prepare_subprocess_env(system=True)
                             proc = subprocess.Popen(args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=ignore_sigint)
                         except (FileNotFoundError, PermissionError) as e:
-                            self.print_error('Failed to execute command: %s', e)
-                            return self.exit_code
+                            raise CommandError('Failed to execute command: %s', e)
                         status = fso.process_pipe(path=path, cache=cache, fd=proc.stdout, mode=mode, user=user, group=group)
                         rc = proc.wait()
                         if rc != 0:
-                            self.print_error('Command %r exited with status %d', args.paths[0], rc)
-                            return self.exit_code
+                            raise CommandError('Command %r exited with status %d', args.paths[0], rc)
                     except BackupOSError as e:
-                        self.print_error('%s: %s', path, e)
-                        return self.exit_code
+                        raise Error('%s: %s', path, e)
                 else:
                     status = '-'
                 self.print_file_status(status, path)
@@ -556,8 +540,7 @@ class Archiver:
                         env = prepare_subprocess_env(system=True)
                         proc = subprocess.Popen(args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=ignore_sigint)
                     except (FileNotFoundError, PermissionError) as e:
-                        self.print_error('Failed to execute command: %s', e)
-                        return self.exit_code
+                        raise CommandError('Failed to execute command: %s', e)
                     pipe_bin = proc.stdout
                 else:  # args.paths_from_stdin == True
                     pipe_bin = sys.stdin.buffer
@@ -578,8 +561,7 @@ class Archiver:
                 if args.paths_from_command:
                     rc = proc.wait()
                     if rc != 0:
-                        self.print_error('Command %r exited with status %d', args.paths[0], rc)
-                        return self.exit_code
+                        raise CommandError('Command %r exited with status %d', args.paths[0], rc)
             else:
                 for path in args.paths:
                     if path == '-':  # stdin
@@ -621,7 +603,7 @@ class Archiver:
                 if sig_int:
                     # do not save the archive if the user ctrl-c-ed - it is valid, but incomplete.
                     # we already have a checkpoint archive in this case.
-                    self.print_error("Got Ctrl-C / SIGINT.")
+                    raise Error("Got Ctrl-C / SIGINT.")
                 else:
                     archive.save(comment=args.comment, timestamp=args.timestamp)
                     args.stats |= args.json
@@ -1189,8 +1171,7 @@ class Archiver:
         explicit_archives_specified = args.location.archive or args.archives
         self.output_list = args.output_list
         if archive_filter_specified and explicit_archives_specified:
-            self.print_error('Mixing archive filters and explicitly named archives is not supported.')
-            return self.exit_code
+            raise CommandError('Mixing archive filters and explicitly named archives is not supported.')
         if archive_filter_specified or explicit_archives_specified:
             return self._delete_archives(args, repository)
         else:
@@ -1270,7 +1251,7 @@ class Archiver:
                         uncommitted_deletes = 0 if checkpointed else (uncommitted_deletes + 1)
             if sig_int:
                 # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
-                self.print_error("Got Ctrl-C / SIGINT.")
+                raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
                 checkpoint_func()
             if args.stats:
@@ -1325,8 +1306,7 @@ class Archiver:
                 msg = '\n'.join(msg)
                 if not yes(msg, false_msg="Aborting.", invalid_msg='Invalid answer, aborting.', truish=('YES',),
                            retry=False, env_var_override='BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'):
-                    self.exit_code = EXIT_ERROR
-                    return self.exit_code
+                    raise CancelledByUser()
             if not dry_run:
                 repository.destroy()
                 logger.info("Repository deleted.")
@@ -1348,12 +1328,10 @@ class Archiver:
 
         from .fuse_impl import llfuse, BORG_FUSE_IMPL
         if llfuse is None:
-            self.print_error('borg mount not available: no FUSE support, BORG_FUSE_IMPL=%s.' % BORG_FUSE_IMPL)
-            return self.exit_code
+            raise RTError('borg mount not available: no FUSE support, BORG_FUSE_IMPL=%s.' % BORG_FUSE_IMPL)
 
         if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
-            self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)
-            return self.exit_code
+            raise RTError('%s: Mount point must be a writable directory' % args.mountpoint)
 
         return self._do_mount(args)
 
@@ -1368,7 +1346,7 @@ class Archiver:
                 operations.mount(args.mountpoint, args.options, args.foreground)
             except RuntimeError:
                 # Relevant error message already printed to stderr by FUSE
-                self.exit_code = EXIT_ERROR
+                raise RTError("FUSE mount failed")
         return self.exit_code
 
     def do_umount(self, args):
@@ -1380,13 +1358,11 @@ class Archiver:
         """List archive or repository contents"""
         if args.location.archive:
             if args.json:
-                self.print_error('The --json option is only valid for listing archives, not archive contents.')
-                return self.exit_code
+                raise CommandError('The --json option is only valid for listing archives, not archive contents.')
             return self._list_archive(args, repository, manifest, key)
         else:
             if args.json_lines:
-                self.print_error('The --json-lines option is only valid for listing archive contents, not archives.')
-                return self.exit_code
+                raise CommandError('The --json-lines option is only valid for listing archive contents, not archives.')
             return self._list_repository(args, repository, manifest, key)
 
     def _list_archive(self, args, repository, manifest, key):
@@ -1533,10 +1509,9 @@ class Archiver:
         """Prune repository archives according to specified rules"""
         if not any((args.secondly, args.minutely, args.hourly, args.daily,
                     args.weekly, args.monthly, args.yearly, args.within)):
-            self.print_error('At least one of the "keep-within", "keep-last", '
-                             '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
-                             '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
-            return self.exit_code
+            raise CommandError('At least one of the "keep-within", "keep-last", '
+                               '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
+                               '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
         checkpoint_re = r'\.checkpoint(\.\d+)?'
@@ -1615,7 +1590,7 @@ class Archiver:
             pi.finish()
             if sig_int:
                 # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
-                self.print_error("Got Ctrl-C / SIGINT.")
+                raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
                 checkpoint_func()
             if args.stats:
@@ -1722,15 +1697,13 @@ class Archiver:
         if args.location.archive:
             name = args.location.archive
             if recreater.is_temporary_archive(name):
-                self.print_error('Refusing to work on temporary archive of prior recreate: %s', name)
-                return self.exit_code
+                raise CommandError('Refusing to work on temporary archive of prior recreate: %s', name)
             if not recreater.recreate(name, args.comment, args.target):
-                self.print_error('Nothing to do. Archive was not processed.\n'
-                                 'Specify at least one pattern, PATH, --comment, re-compression or re-chunking option.')
+                raise CommandError('Nothing to do. Archive was not processed.\n'
+                                   'Specify at least one pattern, PATH, --comment, re-compression or re-chunking option.')
         else:
             if args.target is not None:
-                self.print_error('--target: Need to specify single archive')
-                return self.exit_code
+                raise CommandError('--target: Need to specify single archive')
             for archive in manifest.archives.list(sort_by=['ts']):
                 name = archive.name
                 if recreater.is_temporary_archive(name):
@@ -1945,8 +1918,7 @@ class Archiver:
 
         if not args.list:
             if args.name is None:
-                self.print_error('No config key name was provided.')
-                return self.exit_code
+                raise CommandError('No config key name was provided.')
 
             try:
                 section, name = args.name.split('.')
@@ -2158,8 +2130,7 @@ class Archiver:
         except (ValueError, UnicodeEncodeError):
             wanted = None
         if not wanted:
-            self.print_error('search term needs to be hex:123abc or str:foobar style')
-            return EXIT_ERROR
+            raise CommandError('search term needs to be hex:123abc or str:foobar style')
 
         from .crypto.key import key_factory
         # set up the key without depending on a manifest obj
@@ -2212,13 +2183,11 @@ class Archiver:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print(f"object id {hex_id} is invalid [{str(err)}].")
-            return EXIT_ERROR
+            raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
         try:
             data = repository.get(id)
         except Repository.ObjectNotFound:
-            print("object %s not found." % hex_id)
-            return EXIT_ERROR
+            raise RTError("object %s not found." % hex_id)
         with open(args.path, "wb") as f:
             f.write(data)
         print("object %s fetched." % hex_id)
@@ -2244,8 +2213,7 @@ class Archiver:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print(f"object id {hex_id} is invalid [{str(err)}].")
-            return EXIT_ERROR
+            raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
         repository.put(id, data)
         print("object %s put." % hex_id)
         repository.commit(compact=False)
@@ -5330,7 +5298,7 @@ def main():  # pragma: no cover
         except argparse.ArgumentTypeError as e:
             # we might not have logging setup yet, so get out quickly
             print(str(e), file=sys.stderr)
-            sys.exit(EXIT_ERROR)
+            sys.exit(CommandError.exit_mcode if modern_ec else EXIT_ERROR)
         except Exception:
             msg = 'Local Exception'
             tb = f'{traceback.format_exc()}\n{sysinfo()}'
@@ -5388,9 +5356,9 @@ def main():  # pragma: no cover
             exit_msg = 'terminating with %s status, rc %d'
             if exit_code == EXIT_SUCCESS:
                 rc_logger.info(exit_msg % ('success', exit_code))
-            elif exit_code == EXIT_WARNING:
+            elif exit_code == EXIT_WARNING or EXIT_WARNING_BASE <= exit_code < EXIT_SIGNAL_BASE:
                 rc_logger.warning(exit_msg % ('warning', exit_code))
-            elif exit_code == EXIT_ERROR:
+            elif exit_code == EXIT_ERROR or EXIT_ERROR_BASE <= exit_code < EXIT_WARNING_BASE:
                 rc_logger.error(exit_msg % ('error', exit_code))
             elif exit_code >= EXIT_SIGNAL_BASE:
                 rc_logger.error(exit_msg % ('signal', exit_code))

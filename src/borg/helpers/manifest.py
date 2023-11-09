@@ -18,12 +18,14 @@ from .. import shellpattern
 from ..constants import *  # NOQA
 
 
-class NoManifestError(Error):
-    """Repository has no manifest."""
-
-
 class MandatoryFeatureUnsupported(Error):
     """Unsupported repository feature(s) {}. A newer version of borg is required to access this repository."""
+    exit_mcode = 25
+
+
+class NoManifestError(Error):
+    """Repository has no manifest."""
+    exit_mcode = 26
 
 
 ArchiveInfo = namedtuple('ArchiveInfo', 'name id ts')

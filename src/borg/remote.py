@@ -66,26 +66,32 @@ def os_write(fd, data):
 
 class ConnectionClosed(Error):
     """Connection closed by remote host"""
+    exit_mcode = 80
 
 
 class ConnectionClosedWithHint(ConnectionClosed):
     """Connection closed by remote host. {}"""
+    exit_mcode = 81
 
 
 class PathNotAllowed(Error):
     """Repository path not allowed: {}"""
+    exit_mcode = 83
 
 
 class InvalidRPCMethod(Error):
     """RPC method {} is not valid"""
+    exit_mcode = 82
 
 
 class UnexpectedRPCDataFormatFromClient(Error):
     """Borg {}: Got unexpected RPC data format from client."""
+    exit_mcode = 85
 
 
 class UnexpectedRPCDataFormatFromServer(Error):
     """Got unexpected RPC data format from server:\n{}"""
+    exit_mcode = 86
 
     def __init__(self, data):
         try:
@@ -517,6 +523,7 @@ class RemoteRepository:
 
     class RPCServerOutdated(Error):
         """Borg server is too old for {}. Required version {}"""
+        exit_mcode = 84
 
         @property
         def method(self):

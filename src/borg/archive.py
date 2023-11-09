@@ -424,14 +424,17 @@ def get_item_uid_gid(item, *, numeric, uid_forced=None, gid_forced=None, uid_def
 
 class Archive:
 
-    class DoesNotExist(Error):
-        """Archive {} does not exist"""
-
     class AlreadyExists(Error):
         """Archive {} already exists"""
+        exit_mcode = 30
+
+    class DoesNotExist(Error):
+        """Archive {} does not exist"""
+        exit_mcode = 31
 
     class IncompatibleFilesystemEncodingError(Error):
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
+        exit_mcode = 32
 
     def __init__(self, repository, key, manifest, name, cache=None, create=False,
                  checkpoint_interval=1800, numeric_ids=False, noatime=False, noctime=False,

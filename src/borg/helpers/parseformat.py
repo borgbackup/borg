@@ -176,10 +176,12 @@ class DatetimeWrapper:
 
 class PlaceholderError(Error):
     """Formatting Error: "{}".format({}): {}({})"""
+    exit_mcode = 5
 
 
 class InvalidPlaceholder(PlaceholderError):
     """Invalid placeholder "{}" in string: {}"""
+    exit_mcode = 6
 
 
 def format_line(format, data):

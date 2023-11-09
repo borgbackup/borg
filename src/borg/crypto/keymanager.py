@@ -10,20 +10,24 @@ from ..repository import Repository
 from .key import KeyfileKey, KeyfileNotFoundError, RepoKeyNotFoundError, KeyBlobStorage, identify_key
 
 
-class UnencryptedRepo(Error):
-    """Keymanagement not available for unencrypted repositories."""
-
-
-class UnknownKeyType(Error):
-    """Keytype {0} is unknown."""
+class NotABorgKeyFile(Error):
+    """This file is not a borg key backup, aborting."""
+    exit_mcode = 43
 
 
 class RepoIdMismatch(Error):
     """This key backup seems to be for a different backup repository, aborting."""
+    exit_mcode = 45
 
 
-class NotABorgKeyFile(Error):
-    """This file is not a borg key backup, aborting."""
+class UnencryptedRepo(Error):
+    """Key management not available for unencrypted repositories."""
+    exit_mcode = 46
+
+
+class UnknownKeyType(Error):
+    """Key type {0} is unknown."""
+    exit_mcode = 47
 
 
 def sha256_truncated(data, num):

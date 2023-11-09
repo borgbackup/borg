@@ -69,26 +69,32 @@ class TimeoutTimer:
 
 class LockError(Error):
     """Failed to acquire the lock {}."""
+    exit_mcode = 70
 
 
 class LockErrorT(ErrorWithTraceback):
     """Failed to acquire the lock {}."""
-
-
-class LockTimeout(LockError):
-    """Failed to create/acquire the lock {} (timeout)."""
+    exit_mcode = 71
 
 
 class LockFailed(LockErrorT):
     """Failed to create/acquire the lock {} ({})."""
+    exit_mcode = 72
+
+
+class LockTimeout(LockError):
+    """Failed to create/acquire the lock {} (timeout)."""
+    exit_mcode = 73
 
 
 class NotLocked(LockErrorT):
     """Failed to release the lock {} (was not locked)."""
+    exit_mcode = 74
 
 
 class NotMyLock(LockErrorT):
     """Failed to release the lock {} (was/is locked, but not by me)."""
+    exit_mcode = 75
 
 
 class ExclusiveLock:

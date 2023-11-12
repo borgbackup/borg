@@ -15,21 +15,21 @@ Use:
 .. code-block:: bash
 
     # You can find the short disk serial by:
-    # udevadm info --query=property --name=nvme0n1 | grep ID_SERIAL_SHORT | cut -d '=' -f 2
+    # udevadm info --query=property --name=nvme1n1 | grep ID_SERIAL_SHORT | cut -d '=' -f 2
 
     DISK_SERIAL="7VS0224F"
-    DISK_ID=$(readlink -f /dev/disk/by-id/*"${DISK_SERIAL}") # Returns /dev/nvme0n1
+    DISK_ID=$(readlink -f /dev/disk/by-id/*"${DISK_SERIAL}") # Returns /dev/nvme1n1
 
-    PARTITIONS=$(lsblk -o NAME,TYPE -p -n -l "$DISK_ID" | awk '$2 == "part" {print $1}')
+    mapfile -t PARTITIONS < <(lsblk -o NAME,TYPE -p -n -l "$DISK_ID" | awk '$2 == "part" {print $1}')
     echo "Partitions of $DISK_ID:"
-    echo "$PARTITIONS"
+    echo "${PARTITIONS[@]}"
     echo "Disk Identifier: $DISK_ID"
 
     # Use the following line to perform a borg backup for the full disk:
-    # borg create /path/to/repo::{now} $DISK_ID
+    borg create --read-special /path/to/repo::{now} "$DISK_ID"
 
     # Use the following to perform a borg backup for all partitions of the disk
-    # borg create /path/to/repo::{now} "${PARTITIONS[*]}"
+    borg create --read-special /path/to/repo::{now} "${PARTITIONS[@]}"
 
     # Example output:
     # Partitions of /dev/nvme1n1:

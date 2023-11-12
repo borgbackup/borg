@@ -5314,7 +5314,7 @@ def main():  # pragma: no cover
             tb = f"{traceback.format_exc()}\n{sysinfo()}"
             exit_code = e.exit_code
         except RemoteRepository.RPCError as e:
-            important = e.exception_class not in ('LockTimeout', ) and e.traceback
+            important = e.traceback
             msgid = e.exception_class
             tb_log_level = logging.ERROR if important else logging.DEBUG
             if important:

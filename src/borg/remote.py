@@ -30,6 +30,7 @@ from .helpers import format_file_size
 from .helpers import safe_unlink
 from .helpers import prepare_subprocess_env, ignore_sigint
 from .helpers import get_socket_filename
+from .locking import LockTimeout, NotLocked, NotMyLock, LockFailed
 from .logger import create_logger, borg_serve_log_queue
 from .helpers import msgpack
 from .repository import Repository
@@ -781,6 +782,14 @@ class RemoteRepository:
                 raise Repository.ObjectNotFound(args[0], self.location.processed)
             elif error == "InvalidRPCMethod":
                 raise InvalidRPCMethod(args[0])
+            elif error == "LockTimeout":
+                raise LockTimeout(args[0])
+            elif error == "LockFailed":
+                raise LockFailed(args[0], args[1])
+            elif error == "NotLocked":
+                raise NotLocked(args[0])
+            elif error == "NotMyLock":
+                raise NotMyLock(args[0])
             else:
                 raise self.RPCError(unpacked)
 

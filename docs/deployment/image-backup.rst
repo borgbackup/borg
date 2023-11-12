@@ -26,10 +26,10 @@ Use:
     echo "Disk Identifier: $DISK_ID"
 
     # Use the following line to perform a borg backup for the full disk:
-    borg create --read-special /path/to/repo::{now} "$DISK_ID"
+    # borg create --read-special /path/to/repo::{now} "$DISK_ID"
 
     # Use the following to perform a borg backup for all partitions of the disk
-    borg create --read-special /path/to/repo::{now} "${PARTITIONS[@]}"
+    # borg create --read-special /path/to/repo::{now} "${PARTITIONS[@]}"
 
     # Example output:
     # Partitions of /dev/nvme1n1:

@@ -37,8 +37,8 @@ Use:
     # /dev/nvme1n1p2
     # /dev/nvme1n1p3
     # Disk Identifier: /dev/nvme1n1
-    # borg create /path/to/repo::{now} /dev/nvme1n1
-    # borg create /path/to/repo::{now} /dev/nvme1n1p1 /dev/nvme1n1p2 /dev/nvme1n1p3
+    # borg create --read-special /path/to/repo::{now} /dev/nvme1n1
+    # borg create --read-special /path/to/repo::{now} /dev/nvme1n1p1 /dev/nvme1n1p2 /dev/nvme1n1p3
 
 
 

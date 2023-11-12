@@ -1201,8 +1201,7 @@ class Archiver:
                 try:
                     current_archive = manifest.archives.pop(archive_name)
                 except KeyError:
-                    self.exit_code = EXIT_WARNING
-                    logger.warning(f'Archive {archive_name} not found ({i}/{len(archive_names)}).')
+                    self.print_warning('Archive %s not found (%d/%d).', archive_name, i, len(archive_names))
                 else:
                     deleted = True
                     if self.output_list:
@@ -1215,9 +1214,9 @@ class Archiver:
                 manifest.write()
                 # note: might crash in compact() after committing the repo
                 repository.commit(compact=False)
-                logger.warning('Done. Run "borg check --repair" to clean up the mess.')
+                self.print_warning('Done. Run "borg check --repair" to clean up the mess.')
             else:
-                logger.warning('Aborted.')
+                self.print_warning('Aborted.')
             return self.exit_code
 
         stats = Statistics(iec=args.iec)
@@ -1237,7 +1236,7 @@ class Archiver:
                 try:
                     archive_info = manifest.archives[archive_name]
                 except KeyError:
-                    logger.warning(msg_not_found.format(archive_name, i, len(archive_names)))
+                    self.print_warning(msg_not_found, archive_name, i, len(archive_names))
                 else:
                     if self.output_list:
                         logger_list.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))

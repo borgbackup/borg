@@ -1065,7 +1065,6 @@ class Archiver:
                 tarinfo.type = tarfile.FIFOTYPE
             else:
                 self.print_warning('%s: unsupported file type %o for tar export', remove_surrogates(item.path), modebits)
-                set_ec(EXIT_WARNING)
                 return None, stream
             return tarinfo, stream
 
@@ -5195,7 +5194,7 @@ class Archiver:
             logger.error("You do not have a supported version of the msgpack python package installed. Terminating.")
             logger.error("This should never happen as specific, supported versions are required by our setup.py.")
             logger.error("Do not contact borgbackup support about this.")
-            return set_ec(EXIT_ERROR)
+            raise Error("unsupported msgpack version")
         if is_slow_msgpack():
             logger.warning(PURE_PYTHON_MSGPACK_WARNING)
         if args.debug_profile:

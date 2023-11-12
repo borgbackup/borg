@@ -27,6 +27,7 @@ from .helpers import sysinfo
 from .helpers import format_file_size
 from .helpers import safe_unlink
 from .helpers import prepare_subprocess_env, ignore_sigint
+from .locking import LockTimeout, NotLocked, NotMyLock, LockFailed
 from .logger import create_logger, setup_logging
 from .helpers import msgpack
 from .repository import Repository
@@ -779,6 +780,26 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     raise InvalidRPCMethod('(not available)')
                 else:
                     raise InvalidRPCMethod(args[0].decode())
+            elif error == 'LockTimeout':
+                if old_server:
+                    raise LockTimeout('(not available)')
+                else:
+                    raise LockTimeout(args[0].decode())
+            elif error == 'LockFailed':
+                if old_server:
+                    raise LockFailed('(not available)', '')
+                else:
+                    raise LockFailed(args[0].decode(), args[1].decode())
+            elif error == 'NotLocked':
+                if old_server:
+                    raise NotLocked('(not available)')
+                else:
+                    raise NotLocked(args[0].decode())
+            elif error == 'NotMyLock':
+                if old_server:
+                    raise NotMyLock('(not available)')
+                else:
+                    raise NotMyLock(args[0].decode())
             else:
                 raise self.RPCError(unpacked)
 

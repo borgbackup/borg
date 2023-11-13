@@ -689,11 +689,6 @@ Errors
         Data integrity error: {}
     TAMRequiredError rc: 98 traceback: yes
         Manifest is unauthenticated, but it is required for this repository.
-
-        This either means that you are under attack, or that you modified this repository
-        with a Borg version older than 1.0.9 after TAM authentication was enabled.
-
-        In the latter case, use "borg upgrade --tam --force '{}'" to re-authenticate the manifest.
     TAMUnsupportedSuiteError rc: 99 traceback: yes
         Could not verify manifest: Unsupported suite {!r}; a newer version is needed.
 

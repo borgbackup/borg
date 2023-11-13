@@ -548,10 +548,6 @@ Errors
     ErrorWithTraceback rc: 2 traceback: yes
         Error: {}
 
-    ExtensionModuleError rc: 2 traceback: no
-        The Borg binary extension modules do not seem to be properly installed.
-    PythonLibcTooOld rc: 2 traceback: no
-        FATAL: this Python was compiled for a too old (g)libc and misses required functionality.
     Buffer.MemoryLimitExceeded rc: 2 traceback: no
         Requested buffer size {} is above the limit of {}.
     EfficientCollectionQueue.SizeUnderflow rc: 2 traceback: no

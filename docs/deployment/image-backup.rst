@@ -16,7 +16,7 @@ Use:
 
     # You can find the short disk serial by:
     # udevadm info --query=property --name=nvme1n1 | grep ID_SERIAL_SHORT | cut -d '=' -f 2
-
+    export BORG_REPO=/path/to/repo
     DISK_SERIAL="7VS0224F"
     DISK_ID=$(readlink -f /dev/disk/by-id/*"${DISK_SERIAL}") # Returns /dev/nvme1n1
 
@@ -26,10 +26,10 @@ Use:
     echo "Disk Identifier: $DISK_ID"
 
     # Use the following line to perform a borg backup for the full disk:
-    # borg create --read-special /path/to/repo::{now} "$DISK_ID"
+    # borg create --read-special {now} "$DISK_ID"
 
     # Use the following to perform a borg backup for all partitions of the disk
-    # borg create --read-special /path/to/repo::{now} "${PARTITIONS[@]}"
+    # borg create --read-special {now} "${PARTITIONS[@]}"
 
     # Example output:
     # Partitions of /dev/nvme1n1:
@@ -37,8 +37,8 @@ Use:
     # /dev/nvme1n1p2
     # /dev/nvme1n1p3
     # Disk Identifier: /dev/nvme1n1
-    # borg create --read-special /path/to/repo::{now} /dev/nvme1n1
-    # borg create --read-special /path/to/repo::{now} /dev/nvme1n1p1 /dev/nvme1n1p2 /dev/nvme1n1p3
+    # borg create --read-special {now} /dev/nvme1n1
+    # borg create --read-special {now} /dev/nvme1n1p1 /dev/nvme1n1p2 /dev/nvme1n1p3
 
 
 

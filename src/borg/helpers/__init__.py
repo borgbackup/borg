@@ -14,6 +14,7 @@ from .datastruct import StableDict, Buffer, EfficientCollectionQueue
 from .errors import Error, ErrorWithTraceback, IntegrityError, DecompressionError, CancelledByUser, CommandError
 from .errors import RTError, modern_ec
 from .errors import BorgWarning, FileChangedWarning, BackupExcWarning, IncludePatternNeverMatchedWarning
+from .errors import BackupError, BackupOSError, BackupRaceConditionError
 from .fs import ensure_dir, join_base_dir, get_socket_filename
 from .fs import get_security_dir, get_keys_dir, get_base_dir, get_cache_dir, get_config_dir, get_runtime_dir
 from .fs import dir_is_tagged, dir_is_cachedir, remove_dotdot_prefixes, make_path_safe, scandir_inorder

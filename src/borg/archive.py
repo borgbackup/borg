@@ -26,6 +26,7 @@ from .crypto.key import key_factory, UnsupportedPayloadError
 from .compress import CompressionSpec
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
+from .helpers import BackupError, BackupOSError, BackupRaceConditionError
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
@@ -179,43 +180,6 @@ Bytes sent to remote: {stats.tx_bytes}
 def is_special(mode):
     # file types that get special treatment in --read-special mode
     return stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
-
-
-class BackupError(Exception):
-    """
-    Exception raised for non-OSError-based exceptions while accessing backup files.
-    """
-
-
-class BackupRaceConditionError(BackupError):
-    """
-    Exception raised when encountering a critical race condition while trying to back up a file.
-    """
-
-
-class BackupOSError(Exception):
-    """
-    Wrapper for OSError raised while accessing backup files.
-
-    Borg does different kinds of IO, and IO failures have different consequences.
-    This wrapper represents failures of input file or extraction IO.
-    These are non-critical and are only reported (exit code = 1, warning).
-
-    Any unwrapped IO error is critical and aborts execution (for example repository IO failure).
-    """
-
-    def __init__(self, op, os_error):
-        self.op = op
-        self.os_error = os_error
-        self.errno = os_error.errno
-        self.strerror = os_error.strerror
-        self.filename = os_error.filename
-
-    def __str__(self):
-        if self.op:
-            return f"{self.op}: {self.os_error}"
-        else:
-            return str(self.os_error)
 
 
 class BackupIO:

@@ -24,8 +24,9 @@ try:
     from ._common import Highlander
     from .. import __version__
     from ..constants import *  # NOQA
-    from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
-    from ..helpers import Error, CommandError, set_ec, modern_ec
+    from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE, classify_ec
+    from ..helpers import Error, CommandError, get_ec, modern_ec
+    from ..helpers import add_warning, BorgWarning
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
@@ -128,10 +129,23 @@ class Archiver(
         self.prog = prog
         self.last_checkpoint = time.monotonic()
 
-    def print_warning(self, msg, *args):
-        msg = args and msg % args or msg
-        self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
-        logger.warning(msg)
+    def print_warning(self, msg, *args, **kw):
+        warning_code = kw.get("wc", EXIT_WARNING)  # note: wc=None can be used to not influence exit code
+        warning_type = kw.get("wt", "percent")
+        assert warning_type in ("percent", "curly")
+        if warning_code is not None:
+            add_warning(msg, *args, wc=warning_code, wt=warning_type)
+        if warning_type == "percent":
+            output = args and msg % args or msg
+        else:  # == "curly"
+            output = args and msg.format(*args) or msg
+        logger.warning(output)
+
+    def print_warning_instance(self, warning):
+        assert isinstance(warning, BorgWarning)
+        msg = type(warning).__doc__
+        args = warning.args
+        self.print_warning(msg, *args, wc=warning.exit_code, wt="curly")
 
     def print_file_status(self, status, path):
         # if we get called with status == None, the final file status was already printed
@@ -514,7 +528,7 @@ class Archiver(
                 variables = dict(locals())
                 profiler.enable()
                 try:
-                    return set_ec(func(args))
+                    return get_ec(func(args))
                 finally:
                     profiler.disable()
                     profiler.snapshot_stats()
@@ -531,7 +545,7 @@ class Archiver(
                         # it compatible (see above).
                         msgpack.pack(profiler.stats, fd, use_bin_type=True)
         else:
-            return set_ec(func(args))
+            return get_ec(func(args))
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover
@@ -680,16 +694,19 @@ def main():  # pragma: no cover
         if args.show_rc:
             rc_logger = logging.getLogger("borg.output.show-rc")
             exit_msg = "terminating with %s status, rc %d"
-            if exit_code == EXIT_SUCCESS:
-                rc_logger.info(exit_msg % ("success", exit_code))
-            elif exit_code == EXIT_WARNING or EXIT_WARNING_BASE <= exit_code < EXIT_SIGNAL_BASE:
-                rc_logger.warning(exit_msg % ("warning", exit_code))
-            elif exit_code == EXIT_ERROR or EXIT_ERROR_BASE <= exit_code < EXIT_WARNING_BASE:
-                rc_logger.error(exit_msg % ("error", exit_code))
-            elif exit_code >= EXIT_SIGNAL_BASE:
-                rc_logger.error(exit_msg % ("signal", exit_code))
-            else:
+            try:
+                ec_class = classify_ec(exit_code)
+            except ValueError:
                 rc_logger.error(exit_msg % ("abnormal", exit_code or 666))
+            else:
+                if ec_class == "success":
+                    rc_logger.info(exit_msg % (ec_class, exit_code))
+                elif ec_class == "warning":
+                    rc_logger.warning(exit_msg % (ec_class, exit_code))
+                elif ec_class == "error":
+                    rc_logger.error(exit_msg % (ec_class, exit_code))
+                elif ec_class == "signal":
+                    rc_logger.error(exit_msg % (ec_class, exit_code))
         sys.exit(exit_code)
 
 

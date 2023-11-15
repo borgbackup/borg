@@ -49,9 +49,9 @@ class DeleteMixIn:
                 manifest.write()
                 # note: might crash in compact() after committing the repo
                 repository.commit(compact=False)
-                self.print_warning('Done. Run "borg check --repair" to clean up the mess.')
+                self.print_warning('Done. Run "borg check --repair" to clean up the mess.', wc=None)
             else:
-                self.print_warning("Aborted.")
+                self.print_warning("Aborted.", wc=None)
             return self.exit_code
 
         stats = Statistics(iec=args.iec)

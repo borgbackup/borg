@@ -187,6 +187,12 @@ class BackupError(Exception):
     """
 
 
+class BackupRaceConditionError(BackupError):
+    """
+    Exception raised when encountering a critical race condition while trying to back up a file.
+    """
+
+
 class BackupOSError(Exception):
     """
     Wrapper for OSError raised while accessing backup files.
@@ -259,10 +265,10 @@ def stat_update_check(st_old, st_curr):
     # are not duplicate in a short timeframe, this check is redundant and solved by the ino check:
     if stat.S_IFMT(st_old.st_mode) != stat.S_IFMT(st_curr.st_mode):
         # in this case, we dispatched to wrong handler - abort
-        raise BackupError("file type changed (race condition), skipping file")
+        raise BackupRaceConditionError("file type changed (race condition), skipping file")
     if st_old.st_ino != st_curr.st_ino:
         # in this case, the hardlinks-related code in create_helper has the wrong inode - abort!
-        raise BackupError("file inode changed (race condition), skipping file")
+        raise BackupRaceConditionError("file inode changed (race condition), skipping file")
     # looks ok, we are still dealing with the same thing - return current stat:
     return st_curr
 

@@ -29,7 +29,7 @@ from ..helpers import prepare_subprocess_env
 from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
-from ..helpers import Error, CommandError
+from ..helpers import Error, CommandError, BackupExcWarning, FileChangedWarning
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -122,10 +122,10 @@ class CreateMixIn:
                             dry_run=dry_run,
                         )
                     except (BackupOSError, BackupError) as e:
-                        self.print_warning("%s: %s", path, e)
+                        self.print_warning_instance(BackupExcWarning(path, e))
                         status = "E"
                     if status == "C":
-                        self.print_warning("%s: file changed while we backed it up", path)
+                        self.print_warning_instance(FileChangedWarning(path))
                     self.print_file_status(status, path)
                     if not dry_run and status is not None:
                         fso.stats.files_stats[status] += 1
@@ -149,8 +149,8 @@ class CreateMixIn:
                                     path=path, cache=cache, fd=sys.stdin.buffer, mode=mode, user=user, group=group
                                 )
                             except BackupOSError as e:
+                                self.print_warning_instance(BackupExcWarning(path, e))
                                 status = "E"
-                                self.print_warning("%s: %s", path, e)
                         else:
                             status = "+"  # included
                         self.print_file_status(status, path)
@@ -182,7 +182,7 @@ class CreateMixIn:
                         skip_inodes.add((st.st_ino, st.st_dev))
                     except (BackupOSError, BackupError) as e:
                         # this comes from os.stat, self._rec_walk has own exception handler
-                        self.print_warning("%s: %s", path, e)
+                        self.print_warning_instance(BackupExcWarning(path, e))
                         continue
             if not dry_run:
                 if args.progress:
@@ -522,10 +522,10 @@ class CreateMixIn:
                             )
 
         except (BackupOSError, BackupError) as e:
-            self.print_warning("%s: %s", path, e)
+            self.print_warning_instance(BackupExcWarning(path, e))
             status = "E"
         if status == "C":
-            self.print_warning("%s: file changed while we backed it up", path)
+            self.print_warning_instance(FileChangedWarning(path))
         if not recurse_excluded_dir:
             self.print_file_status(status, path)
             if not dry_run and status is not None:

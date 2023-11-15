@@ -12,6 +12,7 @@ from ..helpers import archivename_validator, PathSpec
 from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
+from ..helpers import BackupExcWarning, IncludePatternNeverMatchedWarning
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -65,7 +66,7 @@ class ExtractMixIn:
                     try:
                         archive.extract_item(dir_item, stdout=stdout)
                     except BackupOSError as e:
-                        self.print_warning("%s: %s", remove_surrogates(dir_item.path), e)
+                        self.print_warning_instance(BackupExcWarning(remove_surrogates(dir_item.path), e))
             if output_list:
                 logging.getLogger("borg.output.list").info(remove_surrogates(item.path))
             try:
@@ -80,7 +81,7 @@ class ExtractMixIn:
                             item, stdout=stdout, sparse=sparse, hlm=hlm, pi=pi, continue_extraction=continue_extraction
                         )
             except (BackupOSError, BackupError) as e:
-                self.print_warning("%s: %s", remove_surrogates(orig_path), e)
+                self.print_warning_instance(BackupExcWarning(remove_surrogates(orig_path), e))
 
         if pi:
             pi.finish()
@@ -95,9 +96,9 @@ class ExtractMixIn:
                 try:
                     archive.extract_item(dir_item, stdout=stdout)
                 except BackupOSError as e:
-                    self.print_warning("%s: %s", remove_surrogates(dir_item.path), e)
+                    self.print_warning_instance(BackupExcWarning(remove_surrogates(dir_item.path), e))
         for pattern in matcher.get_unmatched_include_patterns():
-            self.print_warning("Include pattern '%s' never matched.", pattern)
+            self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
         if pi:
             # clear progress output
             pi.finish()

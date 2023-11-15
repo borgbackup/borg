@@ -76,7 +76,7 @@ def test_delete_double_force(archivers, request):
         id = archive.metadata.items[0]
         repository.put(id, b"corrupted items metadata stream chunk")
         repository.commit(compact=False)
-    cmd(archiver, "delete", "-a", "test", "--force", "--force", exit_code=1)
+    cmd(archiver, "delete", "-a", "test", "--force", "--force")
     cmd(archiver, "check", "--repair")
     output = cmd(archiver, "rlist")
     assert "test" not in output

@@ -78,6 +78,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             archiver.prerun_checks = lambda *args: None
             archiver.exit_code = EXIT_SUCCESS
             helpers.exit_code = EXIT_SUCCESS
+            helpers.warnings_list = []
             try:
                 args = archiver.parse_args(list(args))
                 # argparse parsing may raise SystemExit when the command line is bad or

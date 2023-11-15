@@ -240,7 +240,7 @@ class TarMixIn:
         tar.close()
 
         for pattern in matcher.get_unmatched_include_patterns():
-            self.print_warning("Include pattern '%s' never matched.", pattern)
+            self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
         return self.exit_code
 
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.WRITE,))

@@ -124,10 +124,12 @@ class BackupOSWarning(BorgWarning):
 
 
 class PermissionWarning(BorgWarning):
+    """{}: {}"""
     exit_mcode = 105
 
 
 class IOWarning(BorgWarning):
+    """{}: {}"""
     exit_mcode = 106
 
 

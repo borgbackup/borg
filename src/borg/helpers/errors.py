@@ -64,3 +64,43 @@ class RTError(Error):
 class CommandError(Error):
     """Command Error: {}"""
     exit_mcode = 4
+
+
+class BorgWarning:
+    """Warning: {}"""
+    # Warning base class
+
+    # please note that this class and its subclasses are NOT exceptions, we do not raise them.
+    # so this is just to have inheritance, inspectability and the exit_code property.
+    exit_mcode = EXIT_WARNING  # modern, more specific exit code (defaults to EXIT_WARNING)
+
+    def __init__(self, *args):
+        self.args = args
+
+    def get_message(self):
+        return type(self).__doc__.format(*self.args)
+
+    __str__ = get_message
+
+    @property
+    def exit_code(self):
+        # legacy: borg used to always use rc 1 (EXIT_WARNING) for all warnings.
+        # modern: users can opt in to more specific return codes, using BORG_EXIT_CODES:
+        return self.exit_mcode if modern_ec else EXIT_WARNING
+
+
+class FileChangedWarning(BorgWarning):
+    """{}: file changed while we backed it up"""
+    exit_mcode = 100
+
+
+class IncludePatternNeverMatchedWarning(BorgWarning):
+    """Include pattern '{}' never matched."""
+    exit_mcode = 101
+
+
+class BackupExcWarning(BorgWarning):
+    """{}: {}"""
+    exit_mcode = 102
+
+    # TODO: override exit_code and compute the exit code based on the wrapped exception.

@@ -37,7 +37,7 @@ try:
     from . import helpers
     from .algorithms.checksums import crc32
     from .archive import Archive, ArchiveChecker, ArchiveRecreater, Statistics, is_special
-    from .archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
+    from .archive import BackupError, BackupRaceConditionError, BackupOSError, backup_io, OsOpen, stat_update_check
     from .archive import FilesystemObjectProcessors, TarfileObjectProcessors, MetadataCollector, ChunksProcessor
     from .archive import has_link
     from .cache import Cache, assert_secure, SecurityManager
@@ -45,8 +45,9 @@ try:
     from .compress import CompressionSpec
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
     from .crypto.keymanager import KeyManager
-    from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
-    from .helpers import Error, NoManifestError, CancelledByUser, RTError, CommandError, modern_ec, set_ec
+    from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE, classify_ec
+    from .helpers import Error, NoManifestError, CancelledByUser, RTError, CommandError, modern_ec, set_ec, get_ec
+    from .helpers import add_warning, BorgWarning, FileChangedWarning, BackupExcWarning, IncludePatternNeverMatchedWarning
     from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, PathSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
@@ -240,10 +241,23 @@ class Archiver:
         self.prog = prog
         self.last_checkpoint = time.monotonic()
 
-    def print_warning(self, msg, *args):
-        msg = args and msg % args or msg
-        self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
-        logger.warning(msg)
+    def print_warning(self, msg, *args, **kw):
+        warning_code = kw.get("wc", EXIT_WARNING)  # note: wc=None can be used to not influence exit code
+        warning_type = kw.get("wt", "percent")
+        assert warning_type in ("percent", "curly")
+        if warning_code is not None:
+            add_warning(msg, *args, wc=warning_code, wt=warning_type)
+        if warning_type == "percent":
+            output = args and msg % args or msg
+        else:  # == "curly"
+            output = args and msg.format(*args) or msg
+        logger.warning(output)
+
+    def print_warning_instance(self, warning):
+        assert isinstance(warning, BorgWarning)
+        msg = type(warning).__doc__
+        args = warning.args
+        self.print_warning(msg, *args, wc=warning.exit_code, wt="curly")
 
     def print_file_status(self, status, path):
         # if we get called with status == None, the final file status was already printed
@@ -553,10 +567,10 @@ class Archiver:
                         status = self._process_any(path=path, parent_fd=None, name=None, st=st, fso=fso,
                                                    cache=cache, read_special=args.read_special, dry_run=dry_run)
                     except (BackupOSError, BackupError) as e:
-                        self.print_warning('%s: %s', path, e)
+                        self.print_warning_instance(BackupExcWarning(path, e))
                         status = 'E'
                     if status == 'C':
-                        self.print_warning('%s: file changed while we backed it up', path)
+                        self.print_warning_instance(FileChangedWarning(path))
                     self.print_file_status(status, path)
                 if args.paths_from_command:
                     rc = proc.wait()
@@ -573,8 +587,8 @@ class Archiver:
                             try:
                                 status = fso.process_pipe(path=path, cache=cache, fd=sys.stdin.buffer, mode=mode, user=user, group=group)
                             except BackupOSError as e:
+                                self.print_warning_instance(BackupExcWarning(path, e))
                                 status = 'E'
-                                self.print_warning('%s: %s', path, e)
                         else:
                             status = '-'
                         self.print_file_status(status, path)
@@ -594,7 +608,7 @@ class Archiver:
                         skip_inodes.add((st.st_ino, st.st_dev))
                     except (BackupOSError, BackupError) as e:
                         # this comes from os.stat, self._rec_walk has own exception handler
-                        self.print_warning('%s: %s', path, e)
+                        self.print_warning_instance(BackupExcWarning(path, e))
                         continue
             if not dry_run:
                 if args.progress:
@@ -806,10 +820,10 @@ class Archiver:
                                     read_special=read_special, dry_run=dry_run)
 
         except (BackupOSError, BackupError) as e:
-            self.print_warning('%s: %s', path, e)
+            self.print_warning_instance(BackupExcWarning(path, e))
             status = 'E'
         if status == 'C':
-            self.print_warning('%s: file changed while we backed it up', path)
+            self.print_warning_instance(FileChangedWarning(path))
         if not recurse_excluded_dir:
             self.print_file_status(status, path)
 
@@ -882,7 +896,7 @@ class Archiver:
                     try:
                         archive.extract_item(dir_item, stdout=stdout)
                     except BackupOSError as e:
-                        self.print_warning('%s: %s', remove_surrogates(dir_item.path), e)
+                        self.print_warning_instance(BackupExcWarning(remove_surrogates(dir_item.path), e))
             if output_list:
                 logging.getLogger('borg.output.list').info(remove_surrogates(item.path))
             try:
@@ -896,7 +910,7 @@ class Archiver:
                         archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
                                              stripped_components=strip_components, original_path=orig_path, pi=pi)
             except (BackupOSError, BackupError) as e:
-                self.print_warning('%s: %s', remove_surrogates(orig_path), e)
+                self.print_warning_instance(BackupExcWarning(remove_surrogates(orig_path), e))
 
         if pi:
             pi.finish()
@@ -910,9 +924,9 @@ class Archiver:
                 try:
                     archive.extract_item(dir_item, stdout=stdout)
                 except BackupOSError as e:
-                    self.print_warning('%s: %s', remove_surrogates(dir_item.path), e)
+                    self.print_warning_instance(BackupExcWarning(remove_surrogates(dir_item.path), e))
         for pattern in matcher.get_unmatched_include_patterns():
-            self.print_warning("Include pattern '%s' never matched.", pattern)
+            self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
         if pi:
             # clear progress output
             pi.finish()
@@ -1086,7 +1100,7 @@ class Archiver:
         tar.close()
 
         for pattern in matcher.get_unmatched_include_patterns():
-            self.print_warning("Include pattern '%s' never matched.", pattern)
+            self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
         return self.exit_code
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
@@ -1114,13 +1128,13 @@ class Archiver:
             # we know chunker params of both archives
             can_compare_chunk_ids = normalize_chunker_params(cp1) == normalize_chunker_params(cp2)
             if not can_compare_chunk_ids:
-                self.print_warning('--chunker-params are different between archives, diff will be slow.')
+                self.print_warning('--chunker-params are different between archives, diff will be slow.', wc=None)
         else:
             # we do not know chunker params of at least one of the archives
             can_compare_chunk_ids = False
             self.print_warning('--chunker-params might be different between archives, diff will be slow.\n'
                                'If you know for certain that they are the same, pass --same-chunker-params '
-                               'to override this check.')
+                               'to override this check.', wc=None)
 
         matcher = self.build_matcher(args.patterns, args.paths)
 
@@ -1135,7 +1149,7 @@ class Archiver:
             print_output(diff, remove_surrogates(path))
 
         for pattern in matcher.get_unmatched_include_patterns():
-            self.print_warning("Include pattern '%s' never matched.", pattern)
+            self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
 
         return self.exit_code
 
@@ -1213,9 +1227,9 @@ class Archiver:
                 manifest.write()
                 # note: might crash in compact() after committing the repo
                 repository.commit(compact=False)
-                self.print_warning('Done. Run "borg check --repair" to clean up the mess.')
+                self.print_warning('Done. Run "borg check --repair" to clean up the mess.', wc=None)
             else:
-                self.print_warning('Aborted.')
+                self.print_warning('Aborted.', wc=None)
             return self.exit_code
 
         stats = Statistics(iec=args.iec)
@@ -5209,7 +5223,7 @@ class Archiver:
                 variables = dict(locals())
                 profiler.enable()
                 try:
-                    return set_ec(func(args))
+                    return get_ec(func(args))
                 finally:
                     profiler.disable()
                     profiler.snapshot_stats()
@@ -5226,7 +5240,7 @@ class Archiver:
                         # it compatible (see above).
                         msgpack.pack(profiler.stats, fd, use_bin_type=True)
         else:
-            return set_ec(func(args))
+            return get_ec(func(args))
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover
@@ -5352,16 +5366,19 @@ def main():  # pragma: no cover
         if args.show_rc:
             rc_logger = logging.getLogger('borg.output.show-rc')
             exit_msg = 'terminating with %s status, rc %d'
-            if exit_code == EXIT_SUCCESS:
-                rc_logger.info(exit_msg % ('success', exit_code))
-            elif exit_code == EXIT_WARNING or EXIT_WARNING_BASE <= exit_code < EXIT_SIGNAL_BASE:
-                rc_logger.warning(exit_msg % ('warning', exit_code))
-            elif exit_code == EXIT_ERROR or EXIT_ERROR_BASE <= exit_code < EXIT_WARNING_BASE:
-                rc_logger.error(exit_msg % ('error', exit_code))
-            elif exit_code >= EXIT_SIGNAL_BASE:
-                rc_logger.error(exit_msg % ('signal', exit_code))
-            else:
+            try:
+                ec_class = classify_ec(exit_code)
+            except ValueError:
                 rc_logger.error(exit_msg % ('abnormal', exit_code or 666))
+            else:
+                if ec_class == "success":
+                    rc_logger.info(exit_msg % (ec_class, exit_code))
+                elif ec_class == "warning":
+                    rc_logger.warning(exit_msg % (ec_class, exit_code))
+                elif ec_class == "error":
+                    rc_logger.error(exit_msg % (ec_class, exit_code))
+                elif ec_class == "signal":
+                    rc_logger.error(exit_msg % (ec_class, exit_code))
         sys.exit(exit_code)
 
 

@@ -98,6 +98,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_outpu
             archiver.prerun_checks = lambda *args: None
             archiver.exit_code = EXIT_SUCCESS
             helpers.exit_code = EXIT_SUCCESS
+            helpers.warnings_list = []
             try:
                 args = archiver.parse_args(list(args))
                 # argparse parsing may raise SystemExit when the command line is bad or
@@ -1748,7 +1749,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             id = archive.metadata.items[0]
             repository.put(id, b'corrupted items metadata stream chunk')
             repository.commit(compact=False)
-        self.cmd('delete', '--force', '--force', self.repository_location + '::test', exit_code=1)
+        self.cmd('delete', '--force', '--force', self.repository_location + '::test')
         self.cmd('check', '--repair', self.repository_location)
         output = self.cmd('list', self.repository_location)
         self.assert_not_in('test', output)
@@ -4587,7 +4588,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
         output = self.cmd("diff", self.repository_location + "::test0", "test1a")
         do_asserts(output, True)
-        output = self.cmd("diff", self.repository_location + "::test0", "test1b", "--content-only", exit_code=1)
+        output = self.cmd("diff", self.repository_location + "::test0", "test1b", "--content-only")
         do_asserts(output, False, content_only=True)
 
         output = self.cmd("diff", self.repository_location + "::test0", "test1a", "--json-lines")

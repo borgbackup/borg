@@ -1,3 +1,4 @@
+import errno
 import os
 
 from ..constants import *  # NOQA
@@ -107,6 +108,27 @@ class BackupWarning(BorgWarning):
 class BackupOSWarning(BorgWarning):
     """{}: {}"""
     exit_mcode = 104
+
+    @property
+    def exit_code(self):
+        if not modern_ec:
+            return EXIT_WARNING
+        exc = self.args[1]
+        assert isinstance(exc, BackupOSError)
+        if exc.errno in (errno.EPERM, errno.EACCES, ):
+            return PermissionWarning.exit_mcode
+        elif exc.errno in (errno.EIO, ):
+            return IOWarning.exit_mcode
+        else:
+            return self.exit_mcode
+
+
+class PermissionWarning(BorgWarning):
+    exit_mcode = 105
+
+
+class IOWarning(BorgWarning):
+    exit_mcode = 106
 
 
 class BackupError(Exception):

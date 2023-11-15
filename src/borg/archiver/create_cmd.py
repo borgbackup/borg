@@ -29,7 +29,7 @@ from ..helpers import prepare_subprocess_env
 from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
-from ..helpers import Error, CommandError, BackupExcWarning, FileChangedWarning
+from ..helpers import Error, CommandError, BackupWarning, BackupOSWarning, FileChangedWarning
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -121,8 +121,11 @@ class CreateMixIn:
                             read_special=args.read_special,
                             dry_run=dry_run,
                         )
-                    except (BackupOSError, BackupError) as e:
-                        self.print_warning_instance(BackupExcWarning(path, e))
+                    except BackupOSError as e:
+                        self.print_warning_instance(BackupOSWarning(path, e))
+                        status = "E"
+                    except BackupError as e:
+                        self.print_warning_instance(BackupWarning(path, e))
                         status = "E"
                     if status == "C":
                         self.print_warning_instance(FileChangedWarning(path))
@@ -149,7 +152,7 @@ class CreateMixIn:
                                     path=path, cache=cache, fd=sys.stdin.buffer, mode=mode, user=user, group=group
                                 )
                             except BackupOSError as e:
-                                self.print_warning_instance(BackupExcWarning(path, e))
+                                self.print_warning_instance(BackupOSWarning(path, e))
                                 status = "E"
                         else:
                             status = "+"  # included
@@ -180,9 +183,9 @@ class CreateMixIn:
                         # if we get back here, we've finished recursing into <path>,
                         # we do not ever want to get back in there (even if path is given twice as recursion root)
                         skip_inodes.add((st.st_ino, st.st_dev))
-                    except (BackupOSError, BackupError) as e:
+                    except BackupOSError as e:
                         # this comes from os.stat, self._rec_walk has own exception handler
-                        self.print_warning_instance(BackupExcWarning(path, e))
+                        self.print_warning_instance(BackupOSWarning(path, e))
                         continue
             if not dry_run:
                 if args.progress:
@@ -521,8 +524,11 @@ class CreateMixIn:
                                 dry_run=dry_run,
                             )
 
-        except (BackupOSError, BackupError) as e:
-            self.print_warning_instance(BackupExcWarning(path, e))
+        except BackupOSError as e:
+            self.print_warning_instance(BackupOSWarning(path, e))
+            status = "E"
+        except BackupError as e:
+            self.print_warning_instance(BackupWarning(path, e))
             status = "E"
         if status == "C":
             self.print_warning_instance(FileChangedWarning(path))

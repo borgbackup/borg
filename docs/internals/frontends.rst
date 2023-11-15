@@ -688,6 +688,11 @@ Errors
     TAMUnsupportedSuiteError rc: 99 traceback: yes
         Could not verify manifest: Unsupported suite {!r}; a newer version is needed.
 
+Warnings
+    FileChangedWarning rc: 100
+    IncludePatternNeverMatchedWarning rc: 101
+    BackupExcWarning rc: 102 (needs more work!)
+
 Operations
     - cache.begin_transaction
     - cache.download_chunks, appears with ``borg create --no-cache-sync``

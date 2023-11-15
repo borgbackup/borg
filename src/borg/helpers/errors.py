@@ -99,11 +99,14 @@ class IncludePatternNeverMatchedWarning(BorgWarning):
     exit_mcode = 101
 
 
-class BackupExcWarning(BorgWarning):
+class BackupWarning(BorgWarning):
     """{}: {}"""
     exit_mcode = 102
 
-    # TODO: override exit_code and compute the exit code based on the wrapped exception.
+
+class BackupOSWarning(BorgWarning):
+    """{}: {}"""
+    exit_mcode = 104
 
 
 class BackupError(Exception):

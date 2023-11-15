@@ -47,7 +47,7 @@ try:
     from .crypto.keymanager import KeyManager
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE, classify_ec
     from .helpers import Error, NoManifestError, CancelledByUser, RTError, CommandError, modern_ec, set_ec, get_ec
-    from .helpers import add_warning, BorgWarning, FileChangedWarning, BackupExcWarning, IncludePatternNeverMatchedWarning
+    from .helpers import add_warning, BorgWarning, FileChangedWarning, BackupWarning, BackupOSWarning, IncludePatternNeverMatchedWarning
     from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, PathSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
@@ -566,8 +566,11 @@ class Archiver:
                             st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)
                         status = self._process_any(path=path, parent_fd=None, name=None, st=st, fso=fso,
                                                    cache=cache, read_special=args.read_special, dry_run=dry_run)
-                    except (BackupOSError, BackupError) as e:
-                        self.print_warning_instance(BackupExcWarning(path, e))
+                    except BackupOSError as e:
+                        self.print_warning_instance(BackupOSWarning(path, e))
+                        status = 'E'
+                    except BackupError as e:
+                        self.print_warning_instance(BackupWarning(path, e))
                         status = 'E'
                     if status == 'C':
                         self.print_warning_instance(FileChangedWarning(path))
@@ -587,7 +590,7 @@ class Archiver:
                             try:
                                 status = fso.process_pipe(path=path, cache=cache, fd=sys.stdin.buffer, mode=mode, user=user, group=group)
                             except BackupOSError as e:
-                                self.print_warning_instance(BackupExcWarning(path, e))
+                                self.print_warning_instance(BackupOSWarning(path, e))
                                 status = 'E'
                         else:
                             status = '-'
@@ -606,9 +609,9 @@ class Archiver:
                         # if we get back here, we've finished recursing into <path>,
                         # we do not ever want to get back in there (even if path is given twice as recursion root)
                         skip_inodes.add((st.st_ino, st.st_dev))
-                    except (BackupOSError, BackupError) as e:
+                    except BackupOSError as e:
                         # this comes from os.stat, self._rec_walk has own exception handler
-                        self.print_warning_instance(BackupExcWarning(path, e))
+                        self.print_warning_instance(BackupOSWarning(path, e))
                         continue
             if not dry_run:
                 if args.progress:
@@ -818,9 +821,11 @@ class Archiver:
                                     exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
                                     keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes, restrict_dev=restrict_dev,
                                     read_special=read_special, dry_run=dry_run)
-
-        except (BackupOSError, BackupError) as e:
-            self.print_warning_instance(BackupExcWarning(path, e))
+        except BackupOSError as e:
+            self.print_warning_instance(BackupOSWarning(path, e))
+            status = 'E'
+        except BackupError as e:
+            self.print_warning_instance(BackupWarning(path, e))
             status = 'E'
         if status == 'C':
             self.print_warning_instance(FileChangedWarning(path))
@@ -896,7 +901,7 @@ class Archiver:
                     try:
                         archive.extract_item(dir_item, stdout=stdout)
                     except BackupOSError as e:
-                        self.print_warning_instance(BackupExcWarning(remove_surrogates(dir_item.path), e))
+                        self.print_warning_instance(BackupOSWarning(remove_surrogates(dir_item.path), e))
             if output_list:
                 logging.getLogger('borg.output.list').info(remove_surrogates(item.path))
             try:
@@ -909,9 +914,10 @@ class Archiver:
                     else:
                         archive.extract_item(item, stdout=stdout, sparse=sparse, hardlink_masters=hardlink_masters,
                                              stripped_components=strip_components, original_path=orig_path, pi=pi)
-            except (BackupOSError, BackupError) as e:
-                self.print_warning_instance(BackupExcWarning(remove_surrogates(orig_path), e))
-
+            except BackupOSError as e:
+                self.print_warning_instance(BackupOSWarning(remove_surrogates(orig_path), e))
+            except BackupError as e:
+                self.print_warning_instance(BackupWarning(remove_surrogates(orig_path), e))
         if pi:
             pi.finish()
 
@@ -924,7 +930,8 @@ class Archiver:
                 try:
                     archive.extract_item(dir_item, stdout=stdout)
                 except BackupOSError as e:
-                    self.print_warning_instance(BackupExcWarning(remove_surrogates(dir_item.path), e))
+                    self.print_warning_instance(BackupOSWarning(remove_surrogates(dir_item.path), e))
+
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
         if pi:

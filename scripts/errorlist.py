@@ -5,7 +5,8 @@
 from textwrap import indent
 
 import borg.archiver  # noqa: F401 - need import to get Error subclasses.
-from borg.helpers import Error
+from borg.constants import *  # NOQA
+from borg.helpers import Error, BorgWarning
 
 
 def subclasses(cls):
@@ -17,26 +18,46 @@ def subclasses(cls):
 # 3..99 are available for specific errors
 # 100..127 are available for specific warnings
 # 128+ are reserved for signals
-free_rcs = set(range(3, 99 + 1))  # 3 .. 99 (we only deal with errors here)
+free_error_rcs = set(range(EXIT_ERROR_BASE, EXIT_WARNING_BASE))  # 3 .. 99
+free_warning_rcs = set(range(EXIT_WARNING_BASE, EXIT_SIGNAL_BASE))  # 100 .. 127
 
 # these classes map to rc 2
-generic_rc_classes = set()
+generic_error_rc_classes = set()
+generic_warning_rc_classes = set()
 
-classes = {Error}.union(subclasses(Error))
+error_classes = {Error}.union(subclasses(Error))
 
-for cls in sorted(classes, key=lambda cls: (cls.__module__, cls.__qualname__)):
+for cls in sorted(error_classes, key=lambda cls: (cls.__module__, cls.__qualname__)):
     traceback = "yes" if cls.traceback else "no"
     rc = cls.exit_mcode
     print("   ", cls.__qualname__, "rc:", rc, "traceback:", traceback)
     print(indent(cls.__doc__, " " * 8))
-    if rc in free_rcs:
-        free_rcs.remove(rc)
+    if rc in free_error_rcs:
+        free_error_rcs.remove(rc)
     elif rc == 2:
-        generic_rc_classes.add(cls.__qualname__)
+        generic_error_rc_classes.add(cls.__qualname__)
     else:  # rc != 2
         # if we did not intentionally map this to the generic error rc, this might be an issue:
         print(f"ERROR: {rc} is not a free/available RC, but either duplicate or invalid")
 
 print()
-print("free RCs:", sorted(free_rcs))
-print("generic errors:", sorted(generic_rc_classes))
+print("free error RCs:", sorted(free_error_rcs))
+print("generic errors:", sorted(generic_error_rc_classes))
+
+warning_classes = {BorgWarning}.union(subclasses(BorgWarning))
+
+for cls in sorted(warning_classes, key=lambda cls: (cls.__module__, cls.__qualname__)):
+    rc = cls.exit_mcode
+    print("   ", cls.__qualname__, "rc:", rc)
+    print(indent(cls.__doc__, " " * 8))
+    if rc in free_warning_rcs:
+        free_warning_rcs.remove(rc)
+    elif rc == 1:
+        generic_warning_rc_classes.add(cls.__qualname__)
+    else:  # rc != 1
+        # if we did not intentionally map this to the generic warning rc, this might be an issue:
+        print(f"ERROR: {rc} is not a free/available RC, but either duplicate or invalid")
+
+print("\n")
+print("free warning RCs:", sorted(free_warning_rcs))
+print("generic warnings:", sorted(generic_warning_rc_classes))

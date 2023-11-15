@@ -707,9 +707,20 @@ Errors
 
 
 Warnings
+    BorgWarning rc: 1
+        Warning: {}
     FileChangedWarning rc: 100
+        {}: file changed while we backed it up
     IncludePatternNeverMatchedWarning rc: 101
-    BackupExcWarning rc: 102 (needs more work!)
+        Include pattern '{}' never matched.
+    BackupWarning rc: 102
+        {}: {}
+    BackupOSWarning rc: 104
+        {}: {}
+    PermissionWarning rc: 105
+        {}: {}
+    IOWarning rc: 106
+        {}: {}
 
 Operations
     - cache.begin_transaction

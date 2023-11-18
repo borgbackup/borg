@@ -11,6 +11,7 @@ from configparser import ConfigParser
 from datetime import datetime, timezone
 from functools import partial
 from itertools import islice
+from typing import Callable, DefaultDict
 
 from .constants import *  # NOQA
 from .hashindex import NSIndexEntry, NSIndex, NSIndex1, hashindex_variant
@@ -48,7 +49,7 @@ TAG_PUT2 = 3
 # may not be able to handle the new tags.
 MAX_TAG_ID = 15
 
-FreeSpace = partial(defaultdict, int)
+FreeSpace: Callable[[], DefaultDict] = partial(defaultdict, int)
 
 
 def header_size(tag):

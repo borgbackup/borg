@@ -721,6 +721,8 @@ Warnings
         {}: {}
     IOWarning rc: 106
         {}: {}
+    NotFoundWarning rc: 107
+        {}: {}
 
 Operations
     - cache.begin_transaction

@@ -245,19 +245,21 @@ class Archiver:
         warning_code = kw.get("wc", EXIT_WARNING)  # note: wc=None can be used to not influence exit code
         warning_type = kw.get("wt", "percent")
         assert warning_type in ("percent", "curly")
+        warning_msgid = kw.get("msgid")
         if warning_code is not None:
             add_warning(msg, *args, wc=warning_code, wt=warning_type)
         if warning_type == "percent":
             output = args and msg % args or msg
         else:  # == "curly"
             output = args and msg.format(*args) or msg
-        logger.warning(output)
+        logger.warning(output, msgid=warning_msgid) if warning_msgid else logger.warning(output)
 
     def print_warning_instance(self, warning):
         assert isinstance(warning, BorgWarning)
         msg = type(warning).__doc__
+        msgid = type(warning).__qualname__
         args = warning.args
-        self.print_warning(msg, *args, wc=warning.exit_code, wt="curly")
+        self.print_warning(msg, *args, wc=warning.exit_code, wt="curly", msgid=msgid)
 
     def print_file_status(self, status, path):
         # if we get called with status == None, the final file status was already printed

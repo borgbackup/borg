@@ -241,7 +241,7 @@ class TestLock:
             assert roster.get(SHARED) == {our_id}
         assert roster.get(EXCLUSIVE) == set()
         assert roster.get(SHARED) == set()
-        with pytest.raises(KeyError):
+        with pytest.raises(NotLocked):
             dead_lock.release()
 
         with Lock(lockpath, id=cant_know_if_dead_id, exclusive=True):

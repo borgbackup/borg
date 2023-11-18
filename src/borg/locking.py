@@ -8,7 +8,7 @@ from . import platform
 from .helpers import Error, ErrorWithTraceback
 from .logger import create_logger
 
-ADD, REMOVE = 'add', 'remove'
+ADD, REMOVE, REMOVE2 = 'add', 'remove', 'remove2'
 SHARED, EXCLUSIVE = 'shared', 'exclusive'
 
 logger = create_logger(__name__)
@@ -313,6 +313,11 @@ class LockRoster:
         if op == ADD:
             elements.add(self.id)
         elif op == REMOVE:
+            # note: we ignore it if the element is already not present anymore.
+            # this has been frequently seen in teardowns involving Repository.__del__ and Repository.__exit__.
+            elements.discard(self.id)
+        elif op == REMOVE2:
+            # needed for callers that do not want to ignore.
             elements.remove(self.id)
         else:
             raise ValueError('Unknown LockRoster op %r' % op)
@@ -327,7 +332,7 @@ class LockRoster:
         killing, self.kill_stale_locks = self.kill_stale_locks, False
         try:
             try:
-                self.modify(key, REMOVE)
+                self.modify(key, REMOVE2)
             except KeyError:
                 # entry was not there, so no need to add a new one, but still update our id
                 self.id = new_id

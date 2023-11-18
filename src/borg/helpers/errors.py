@@ -117,6 +117,8 @@ class BackupOSWarning(BorgWarning):
         assert isinstance(exc, BackupOSError)
         if exc.errno in (errno.EPERM, errno.EACCES, ):
             return PermissionWarning.exit_mcode
+        elif exc.errno in (errno.ENOENT, ):
+            return NotFoundWarning.exit_mcode
         elif exc.errno in (errno.EIO, ):
             return IOWarning.exit_mcode
         else:
@@ -131,6 +133,11 @@ class PermissionWarning(BorgWarning):
 class IOWarning(BorgWarning):
     """{}: {}"""
     exit_mcode = 106
+
+
+class NotFoundWarning(BorgWarning):
+    """{}: {}"""
+    exit_mcode = 107
 
 
 class BackupError(Exception):

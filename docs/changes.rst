@@ -44,13 +44,14 @@ no matter what encryption mode they use, including "none"):
 
    - ``borg check`` would complain about archives without a valid archive TAM.
    - ``borg check --repair`` would remove such archives!
-2. Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg info --debug <repo> 2>&1 | grep TAM | grep -i manifest``.
+2. Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg info --debug <repo> 2>&1 | grep TAM | grep -i manifest``
 
    a) If you get "TAM-verified manifest", continue with 3.
    b) If you get "Manifest TAM not found and not required", run
       ``borg upgrade --tam --force <repository>`` *on every client*.
 
-3. Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg list --consider-checkpoints --format='{name} {time} tam:{tam}{NL}' <repo>``.
+3. Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg list --consider-checkpoints --format='{name} {time} tam:{tam}{NL}' <repo>``
+
    "tam:verified" means that the archive has a valid TAM authentication.
    "tam:none" is expected as output for archives created by borg <1.0.9.
    "tam:none" is also expected for archives resulting from a borg rename

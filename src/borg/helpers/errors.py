@@ -1,4 +1,3 @@
-import errno
 import os
 
 from ..constants import *  # NOQA
@@ -102,66 +101,40 @@ class IncludePatternNeverMatchedWarning(BorgWarning):
 
 class BackupWarning(BorgWarning):
     """{}: {}"""
-    exit_mcode = 102
-
-
-class BackupOSWarning(BorgWarning):
-    """{}: {}"""
-    exit_mcode = 104
+    # this is to wrap a caught BackupError exception, so it can be given to print_warning_instance
 
     @property
     def exit_code(self):
         if not modern_ec:
             return EXIT_WARNING
         exc = self.args[1]
-        assert isinstance(exc, BackupOSError)
-        if exc.errno in (errno.EPERM, errno.EACCES, ):
-            return PermissionWarning.exit_mcode
-        elif exc.errno in (errno.ENOENT, ):
-            return NotFoundWarning.exit_mcode
-        elif exc.errno in (errno.EIO, ):
-            return IOWarning.exit_mcode
-        else:
-            return self.exit_mcode
+        assert isinstance(exc, BackupError)
+        return exc.exit_mcode
 
 
-class PermissionWarning(BorgWarning):
-    """{}: {}"""
-    exit_mcode = 105
-
-
-class IOWarning(BorgWarning):
-    """{}: {}"""
-    exit_mcode = 106
-
-
-class NotFoundWarning(BorgWarning):
-    """{}: {}"""
-    exit_mcode = 107
-
-
-class BackupError(Exception):
-    """
-    Exception raised for non-OSError-based exceptions while accessing backup files.
-    """
+class BackupError(Error):
+    """{}: backup error"""
+    # Exception raised for non-OSError-based exceptions while accessing backup files.
+    exit_mcode = 102
 
 
 class BackupRaceConditionError(BackupError):
-    """
-    Exception raised when encountering a critical race condition while trying to back up a file.
-    """
+    """{}: file type or inode changed while we backed it up (race condition, skipped file)"""
+    # Exception raised when encountering a critical race condition while trying to back up a file.
+    exit_mcode = 103
 
 
-class BackupOSError(Exception):
-    """
-    Wrapper for OSError raised while accessing backup files.
+class BackupOSError(BackupError):
+    """{}: {}"""
+    # Wrapper for OSError raised while accessing backup files.
+    #
+    # Borg does different kinds of IO, and IO failures have different consequences.
+    # This wrapper represents failures of input file or extraction IO.
+    # These are non-critical and are only reported (warnings).
+    #
+    # Any unwrapped IO error is critical and aborts execution (for example repository IO failure).
+    exit_mcode = 104
 
-    Borg does different kinds of IO, and IO failures have different consequences.
-    This wrapper represents failures of input file or extraction IO.
-    These are non-critical and are only reported (exit code = 1, warning).
-
-    Any unwrapped IO error is critical and aborts execution (for example repository IO failure).
-    """
     def __init__(self, op, os_error):
         self.op = op
         self.os_error = os_error
@@ -174,3 +147,18 @@ class BackupOSError(Exception):
             return f'{self.op}: {self.os_error}'
         else:
             return str(self.os_error)
+
+
+class BackupPermissionError(BackupOSError):
+    """{}: {}"""
+    exit_mcode = 105
+
+
+class BackupIOError(BackupOSError):
+    """{}: {}"""
+    exit_mcode = 106
+
+
+class BackupFileNotFoundError(BackupOSError):
+    """{}: {}"""
+    exit_mcode = 107

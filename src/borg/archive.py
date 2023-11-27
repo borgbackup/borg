@@ -1,3 +1,4 @@
+import errno
 import json
 import os
 import socket
@@ -25,7 +26,8 @@ from .crypto.key import key_factory, UnsupportedPayloadError
 from .compress import Compressor, CompressionSpec
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
-from .helpers import BackupError, BackupOSError, BackupRaceConditionError
+from .helpers import BackupError, BackupRaceConditionError
+from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Manifest
 from .helpers import hardlinkable
@@ -190,7 +192,14 @@ class BackupIO:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type and issubclass(exc_type, OSError):
-            raise BackupOSError(self.op, exc_val) from exc_val
+            E_MAP = {
+                errno.EPERM: BackupPermissionError,
+                errno.EACCES: BackupPermissionError,
+                errno.ENOENT: BackupFileNotFoundError,
+                errno.EIO: BackupIOError,
+            }
+            e_cls = E_MAP.get(exc_val.errno, BackupOSError)
+            raise e_cls(self.op, exc_val) from exc_val
 
 
 backup_io = BackupIO()

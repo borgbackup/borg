@@ -385,11 +385,14 @@ above.
 
 Fixes:
 
+- docs: CVE-2023-36811 upgrade steps: consider checkpoint archives, #7802
 - check/compact: fix spurious reappearance of orphan chunks since borg 1.2, #6687.
   this consist of 2 fixes:
 
   - for existing chunks: check --repair: recreate shadow index, #6687
   - for newly created chunks: update shadow index when doing a double-put, #5661
+- LockRoster.modify: no KeyError if element was already gone, #7937
+- create --*-from-command: run subcommands with a clean environment, #7916
 - list --sort-by: support "archive" as alias of "name", #7873
 - fix rc and msg if arg parsing throws an exception, #7885
 
@@ -411,6 +414,7 @@ Other changes:
   - upgrade steps needed for all kinds of repos (including "none" encryption mode), #7813
   - upgrade steps: talk about consequences of borg check, #7816
   - automated-local.rst: use GPT UUID for consistent udev rule
+  - create disk/partition sector backup by disk serial number, #7934
   - update macOS hint about full disk access
   - clarify borg prune -a option description, #7871
   - readthedocs: also build offline docs (HTMLzip), #7835

@@ -26,7 +26,7 @@ try:
     from ..constants import *  # NOQA
     from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE, classify_ec
     from ..helpers import Error, CommandError, get_ec, modern_ec
-    from ..helpers import add_warning, BorgWarning
+    from ..helpers import add_warning, BorgWarning, BackupWarning
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
@@ -144,10 +144,10 @@ class Archiver(
 
     def print_warning_instance(self, warning):
         assert isinstance(warning, BorgWarning)
-        msg = type(warning).__doc__
-        msgid = type(warning).__qualname__
-        args = warning.args
-        self.print_warning(msg, *args, wc=warning.exit_code, wt="curly", msgid=msgid)
+        # if it is a BackupWarning, use the wrapped BackupError exception instance:
+        cls = type(warning.args[1]) if isinstance(warning, BackupWarning) else type(warning)
+        msg, msgid, args, wc = cls.__doc__, cls.__qualname__, warning.args, warning.exit_code
+        self.print_warning(msg, *args, wc=wc, wt="curly", msgid=msgid)
 
     def print_file_status(self, status, path):
         # if we get called with status == None, the final file status was already printed

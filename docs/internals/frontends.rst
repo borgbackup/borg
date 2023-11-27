@@ -713,15 +713,17 @@ Warnings
         {}: file changed while we backed it up
     IncludePatternNeverMatchedWarning rc: 101
         Include pattern '{}' never matched.
-    BackupWarning rc: 102
+    BackupError rc: 102
         {}: {}
-    BackupOSWarning rc: 104
+    BackupRaceConditionError rc: 103
+        Error: {}
+    BackupOSError rc: 104
         {}: {}
-    PermissionWarning rc: 105
+    BackupPermissionError rc: 105
         {}: {}
-    IOWarning rc: 106
+    BackupIOError rc: 106
         {}: {}
-    NotFoundWarning rc: 107
+    BackupFileNotFoundError rc: 107
         {}: {}
 
 Operations

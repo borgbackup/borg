@@ -27,7 +27,7 @@ from ..platform import SaveFile
 from ..repoobj import RepoObj
 
 
-from .low_level import AES, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256, hkdf_hmac_sha512
+from .low_level import AES, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256
 from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, AES256_OCB, CHACHA20_POLY1305
 from . import low_level
 
@@ -833,7 +833,7 @@ class AEADKeyBase(KeyBase):
         # to decrypt existing data, we need to get a cipher configured for the sessionid and iv from header
         self.assert_type(data[0], id)
         iv_48bit = data[2:8]
-        sessionid = data[8:32]
+        sessionid = bytes(data[8:32])
         iv = int.from_bytes(iv_48bit, "big")
         cipher = self._get_cipher(sessionid, iv)
         try:
@@ -857,15 +857,22 @@ class AEADKeyBase(KeyBase):
             chunk_seed = chunk_seed - 0xFFFFFFFF - 1
         self.init_from_given_data(crypt_key=data[0:64], id_key=data[64:96], chunk_seed=chunk_seed)
 
-    def _get_session_key(self, sessionid):
+    def _get_session_key(self, sessionid, domain=None):
+        """
+        Derive a session key from the secret long-term static crypt_key (which is a fully random PRK)
+        and the session id (which is fully random also).
+        Optionally, a domain can be given for domain separation (defaults to a different binary string
+        per cipher suite).
+        """
+        # Performance note:
+        # While this is only invoked once per session to generate a new key for encrypting new data, it is invoked
+        # frequently (per encrypted repo object) to compute the corresponding key for decrypting existing data.
         assert len(sessionid) == 24  # 192bit
-        key = hkdf_hmac_sha512(
-            ikm=self.crypt_key,
-            salt=sessionid,
-            info=b"borg-session-key-" + self.CIPHERSUITE.__name__.encode(),
-            output_length=32,
-        )
-        return key
+        if domain is None:
+            domain = b"borg-session-key-" + self.CIPHERSUITE.__name__.encode()
+        # Because crypt_key is already a PRK, we do not need KDF security here, PRF security is good enough.
+        # See https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Cr2.pdf section 4 "one-step KDF".
+        return sha256(self.crypt_key + sessionid + domain).digest()
 
     def _get_cipher(self, sessionid, iv):
         assert isinstance(iv, int)

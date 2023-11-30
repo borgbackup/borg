@@ -714,30 +714,3 @@ def blake2b_256(key, data):
 
 def blake2b_128(data):
     return hashlib.blake2b(data, digest_size=16).digest()
-
-
-def hkdf_hmac_sha512(ikm, salt, info, output_length):
-    """
-    Compute HKDF-HMAC-SHA512 with input key material *ikm*, *salt* and *info* to produce *output_length* bytes.
-
-    This is the "HMAC-based Extract-and-Expand Key Derivation Function (HKDF)" (RFC 5869)
-    instantiated with HMAC-SHA512.
-
-    *output_length* must not be greater than 64 * 255 bytes.
-    """
-    digest_length = 64
-    assert output_length <= (255 * digest_length), 'output_length must be <= 255 * 64 bytes'
-    # Step 1. HKDF-Extract (ikm, salt) -> prk
-    if salt is None:
-        salt = bytes(64)
-    prk = hmac.digest(salt, ikm, 'sha512')
-
-    # Step 2. HKDF-Expand (prk, info, output_length) -> output key
-    n = ceil(output_length / digest_length)
-    t_n = b''
-    output = b''
-    for i in range(n):
-        msg = t_n + info + (i + 1).to_bytes(1, 'little')
-        t_n = hmac.digest(prk, msg, 'sha512')
-        output += t_n
-    return output[:output_length]

@@ -420,7 +420,7 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             dest="older",
             type=relative_time_marker_validator,
             action=Highlander,
-            help="consider archives older than (now - TIMESPAN), e.g. 7d oder 12m.",
+            help="consider archives older than (now - TIMESPAN), e.g. 7d or 12m.",
         )
         group.add_argument(
             "--newer",

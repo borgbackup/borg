@@ -248,7 +248,7 @@ Other changes:
   - improve mount options rendering, #7359
   - make timestamps in manual pages reproducible.
   - describe performing pull-backups via ssh remote forwarding
-  - suggest to use forced command when using remote-fowarding via ssh
+  - suggest to use forced command when using remote-forwarding via ssh
   - fix some -a / --match-archives docs issues
   - incl./excl. options header, clarify --path-from-stdin exclusive control
   - add note about MAX_DATA_SIZE

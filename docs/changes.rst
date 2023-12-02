@@ -390,8 +390,12 @@ Fixes:
 - check/compact: fix spurious reappearance of orphan chunks since borg 1.2, #6687 -
   this consists of 2 fixes:
 
-  - for existing chunks: check --repair: recreate shadow index, #6687
-  - for newly created chunks: update shadow index when doing a double-put, #5661
+  - for existing chunks: check --repair: recreate shadow index, #7897 #6687
+  - for newly created chunks: update shadow index when doing a double-put, #7896 #5661
+
+  If you have experienced issue #6687, you may want to run borg check --repair
+  after upgrading to borg 1.2.7 to recreate the shadow index and get rid of the
+  issue for existing chunks.
 - LockRoster.modify: no KeyError if element was already gone, #7937
 - create --X-from-command: run subcommands with a clean environment, #7916
 - list --sort-by: support "archive" as alias of "name", #7873

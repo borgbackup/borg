@@ -8,8 +8,8 @@ import borg.crypto.low_level
 modern_ec = os.environ.get("BORG_EXIT_CODES", "legacy") == "modern"
 
 
-class Error(Exception):
-    """Error: {}"""
+class ErrorBase(Exception):
+    """ErrorBase: {}"""
     # Error base class
 
     # if we raise such an Error and it is only caught by the uppermost
@@ -34,6 +34,10 @@ class Error(Exception):
         # legacy: borg used to always use rc 2 (EXIT_ERROR) for all errors.
         # modern: users can opt in to more specific return codes, using BORG_EXIT_CODES:
         return self.exit_mcode if modern_ec else EXIT_ERROR
+
+
+class Error(ErrorBase):
+    """Error: {}"""
 
 
 class ErrorWithTraceback(Error):
@@ -112,7 +116,7 @@ class BackupWarning(BorgWarning):
         return exc.exit_mcode
 
 
-class BackupError(Error):
+class BackupError(ErrorBase):
     """{}: backup error"""
     # Exception raised for non-OSError-based exceptions while accessing backup files.
     exit_mcode = 102

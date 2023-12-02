@@ -6,12 +6,12 @@ from textwrap import indent
 
 import borg.archiver  # noqa: F401 - need import to get Error subclasses.
 from borg.constants import *  # NOQA
-from borg.helpers import Error, BorgWarning
+from borg.helpers import Error, BackupError, BorgWarning
 
 
 def subclasses(cls):
     direct_subclasses = cls.__subclasses__()
-    return set(direct_subclasses).union([s for c in direct_subclasses for s in subclasses(c)])
+    return set(direct_subclasses) | set(s for c in direct_subclasses for s in subclasses(c))
 
 
 # 0, 1, 2 are used for success, generic warning, generic error
@@ -25,7 +25,7 @@ free_warning_rcs = set(range(EXIT_WARNING_BASE, EXIT_SIGNAL_BASE))  # 100 .. 127
 generic_error_rc_classes = set()
 generic_warning_rc_classes = set()
 
-error_classes = {Error}.union(subclasses(Error))
+error_classes = {Error} | subclasses(Error)
 
 for cls in sorted(error_classes, key=lambda cls: (cls.__module__, cls.__qualname__)):
     traceback = "yes" if cls.traceback else "no"
@@ -44,7 +44,7 @@ print()
 print('free error RCs:', sorted(free_error_rcs))
 print('generic errors:', sorted(generic_error_rc_classes))
 
-warning_classes = {BorgWarning}.union(subclasses(BorgWarning))
+warning_classes = {BorgWarning} | subclasses(BorgWarning) | {BackupError} | subclasses(BackupError)
 
 for cls in sorted(warning_classes, key=lambda cls: (cls.__module__, cls.__qualname__)):
     rc = cls.exit_mcode

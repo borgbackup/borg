@@ -618,7 +618,7 @@ Errors
         Key management not available for unencrypted repositories.
     UnknownKeyType rc: 47 traceback: no
         Key type {0} is unknown.
-   UnsupportedPayloadError rc: 48 traceback: no
+    UnsupportedPayloadError rc: 48 traceback: no
         Unsupported payload type {}. A newer version is required to access this repository.
 
     NoPassphraseFailure rc: 50 traceback: no
@@ -691,14 +691,17 @@ Errors
 Warnings
     BorgWarning rc: 1
         Warning: {}
+    BackupWarning rc: 1
+        {}: {}
+
     FileChangedWarning rc: 100
         {}: file changed while we backed it up
     IncludePatternNeverMatchedWarning rc: 101
         Include pattern '{}' never matched.
     BackupError rc: 102
-        {}: {}
+        {}: backup error
     BackupRaceConditionError rc: 103
-        Error: {}
+        {}: file type or inode changed while we backed it up (race condition, skipped file)
     BackupOSError rc: 104
         {}: {}
     BackupPermissionError rc: 105

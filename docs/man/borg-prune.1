@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2023-08-30" "" "borg backup tool"
+.TH "BORG-PRUNE" 1 "2023-12-02" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -149,7 +149,7 @@ write checkpoint every SECONDS seconds (Default: 1800)
 only consider archive names starting with this prefix. (deprecated)
 .TP
 .BI \-a \ GLOB\fR,\fB \ \-\-glob\-archives \ GLOB
-only consider archive names matching the glob. sh: rules apply, see \(dqborg help patterns\(dq.
+only consider archive names matching the glob. sh: rules apply (without actually using the sh: prefix), see \(dqborg help patterns\(dq.
 .UNINDENT
 .SH EXAMPLES
 .sp

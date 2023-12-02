@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2023-08-30" "" "borg backup tool"
+.TH "BORG" 1 "2023-12-02" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -539,6 +539,14 @@ BORG_WORKAROUNDS=authenticated_no_key borg delete repo
 .UNINDENT
 .sp
 Now you can init a fresh repo. Make sure you do not use the workaround any more.
+.TP
+.B ignore_invalid_archive_tam
+Work around invalid archive TAMs created by borg < 1.2.5, see #7791\&.
+.sp
+This workaround likely needs to get used only once when following the upgrade
+instructions for CVE\-2023\-36811, see \fIarchives_tam_vuln\fP\&.
+.sp
+In normal production operations, this workaround should never be used.
 .UNINDENT
 .UNINDENT
 .TP
@@ -669,7 +677,7 @@ At least three directory levels with short names
 Typically, file sizes up to a few hundred MB.
 Large repositories may require large files (>2 GB).
 .IP \(bu 2
-Up to 1000 files per directory (10000 for repositories initialized with Borg 1.0)
+Up to 1000 files per directory.
 .IP \(bu 2
 rename(2) / MoveFile(Ex) should work as specified, i.e. on the same file system
 it should be a move (not a copy) operation, and in case of a directory
@@ -866,7 +874,7 @@ Yes [1]
 T}
 _
 T{
-Mac OS X
+macOS
 T}	T{
 Yes
 T}	T{

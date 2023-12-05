@@ -1,4 +1,3 @@
-import sys
 import argparse
 import configparser
 from binascii import unhexlify
@@ -6,7 +5,6 @@ from binascii import unhexlify
 from ._common import with_repository
 from ..cache import Cache, assert_secure
 from ..constants import *  # NOQA
-from ..helpers import EXIT_SUCCESS, EXIT_WARNING
 from ..helpers import Error, CommandError
 from ..helpers import Location
 from ..helpers import parse_file_size
@@ -140,9 +138,7 @@ class ConfigMixIn:
                 try:
                     print(config.get(section, name))
                 except (configparser.NoOptionError, configparser.NoSectionError) as e:
-                    print(e, file=sys.stderr)
-                    return EXIT_WARNING
-            return EXIT_SUCCESS
+                    raise Error(e)
         finally:
             if args.cache:
                 cache.close()

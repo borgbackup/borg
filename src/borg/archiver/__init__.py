@@ -24,7 +24,7 @@ try:
     from ._common import Highlander
     from .. import __version__
     from ..constants import *  # NOQA
-    from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE, classify_ec
+    from ..helpers import EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE, classify_ec
     from ..helpers import Error, CommandError, get_ec, modern_ec
     from ..helpers import add_warning, BorgWarning, BackupWarning
     from ..helpers import format_file_size
@@ -124,7 +124,6 @@ class Archiver(
     VersionMixIn,
 ):
     def __init__(self, lock_wait=None, prog=None):
-        self.exit_code = EXIT_SUCCESS
         self.lock_wait = lock_wait
         self.prog = prog
         self.last_checkpoint = time.monotonic()
@@ -547,7 +546,9 @@ class Archiver(
                         # it compatible (see above).
                         msgpack.pack(profiler.stats, fd, use_bin_type=True)
         else:
-            return get_ec(func(args))
+            rc = func(args)
+            assert rc is None
+            return get_ec(rc)
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

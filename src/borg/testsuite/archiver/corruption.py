@@ -7,7 +7,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...crypto.file_integrity import FileIntegrityError
-from ...helpers import bin_to_hex
+from ...helpers import bin_to_hex, Error
 from . import cmd, create_src_archive, create_test_files, RK_ENCRYPTION
 
 
@@ -22,7 +22,11 @@ def test_check_corrupted_repository(archiver):
         fd.seek(100)
         fd.write(b"XXXX")
 
-    cmd(archiver, "check", exit_code=1)
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "check", exit_code=1)
+    else:
+        with pytest.raises(Error):
+            cmd(archiver, "check")
 
 
 def corrupt_archiver(archiver):

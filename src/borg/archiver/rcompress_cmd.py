@@ -178,8 +178,6 @@ class RCompressMixIn:
             print(f"Kept as is: {stats_process['kept_count']}")
             print(f"Total: {stats_process['recompressed_count'] + stats_process['kept_count']}")
 
-        return self.exit_code
-
     def build_parser_rcompress(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 

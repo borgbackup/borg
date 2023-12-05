@@ -28,7 +28,6 @@ class DebugMixIn:
         """display system information for debugging / bug reports"""
         print(sysinfo())
         print("Process ID:", get_process_id())
-        return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_archive_items(self, args, repository, manifest):
@@ -42,7 +41,6 @@ class DebugMixIn:
             with open(filename, "wb") as fd:
                 fd.write(data)
         print("Done.")
-        return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_archive(self, args, repository, manifest):
@@ -97,7 +95,6 @@ class DebugMixIn:
 
         with dash_open(args.path, "w") as fd:
             output(fd)
-        return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_manifest(self, args, repository, manifest):
@@ -109,7 +106,6 @@ class DebugMixIn:
 
         with dash_open(args.path, "w") as fd:
             json.dump(meta, fd, indent=4)
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False)
     def do_debug_dump_repo_objs(self, args, repository):
@@ -165,7 +161,6 @@ class DebugMixIn:
                     decrypt_dump(i, id, cdata)
                     i += 1
         print("Done.")
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False)
     def do_debug_search_repo_objs(self, args, repository):
@@ -234,7 +229,6 @@ class DebugMixIn:
                 if i % 10000 == 0:
                     print("%d objects processed." % i)
         print("Done.")
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False)
     def do_debug_get_obj(self, args, repository):
@@ -253,7 +247,6 @@ class DebugMixIn:
         with open(args.path, "wb") as f:
             f.write(data)
         print("object %s fetched." % hex_id)
-        return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_id_hash(self, args, repository, manifest):
@@ -263,7 +256,6 @@ class DebugMixIn:
         key = manifest.key
         id = key.id_hash(data)
         print(id.hex())
-        return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_parse_obj(self, args, repository, manifest):
@@ -290,8 +282,6 @@ class DebugMixIn:
         with open(args.binary_path, "wb") as f:
             f.write(data)
 
-        return EXIT_SUCCESS
-
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_format_obj(self, args, repository, manifest):
         """format file and metadata into borg object file"""
@@ -317,7 +307,6 @@ class DebugMixIn:
 
         with open(args.object_path, "wb") as f:
             f.write(data_encrypted)
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True)
     def do_debug_put_obj(self, args, repository):
@@ -335,7 +324,6 @@ class DebugMixIn:
         repository.put(id, data)
         print("object %s put." % hex_id)
         repository.commit(compact=False)
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True)
     def do_debug_delete_obj(self, args, repository):
@@ -356,7 +344,6 @@ class DebugMixIn:
         if modified:
             repository.commit(compact=False)
         print("Done.")
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True, cache=True, compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_refcount_obj(self, args, repository, manifest, cache):
@@ -372,7 +359,6 @@ class DebugMixIn:
                     print("object %s has %d referrers [info from chunks cache]." % (hex_id, refcount))
                 except KeyError:
                     print("object %s not found [info from chunks cache]." % hex_id)
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True)
     def do_debug_dump_hints(self, args, repository):
@@ -390,7 +376,6 @@ class DebugMixIn:
                 json.dump(hints, fd, indent=4)
         finally:
             repository.rollback()
-        return EXIT_SUCCESS
 
     def do_debug_convert_profile(self, args):
         """convert Borg profile to Python profile"""
@@ -398,7 +383,6 @@ class DebugMixIn:
 
         with args.output, args.input:
             marshal.dump(msgpack.unpack(args.input, use_list=False, raw=False), args.output)
-        return EXIT_SUCCESS
 
     def build_parser_debug(self, subparsers, common_parser, mid_common_parser):
         debug_epilog = process_epilog(

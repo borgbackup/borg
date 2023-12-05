@@ -4,7 +4,7 @@ import subprocess
 from ._common import with_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import prepare_subprocess_env
+from ..helpers import prepare_subprocess_env, set_ec
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -33,7 +33,8 @@ class LocksMixIn:
         env = prepare_subprocess_env(system=True)
         try:
             # we exit with the return code we get from the subprocess
-            return subprocess.call([args.command] + args.args, env=env)
+            rc = subprocess.call([args.command] + args.args, env=env)
+            set_ec(rc)
         finally:
             # we need to commit the "no change" operation we did to the manifest
             # because it created a new segment file in the repository. if we would
@@ -48,7 +49,6 @@ class LocksMixIn:
         """Break the repository lock (e.g. in case it was left by a dead borg."""
         repository.break_lock()
         Cache.break_lock(repository)
-        return self.exit_code
 
     def build_parser_locks(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

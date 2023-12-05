@@ -2,7 +2,6 @@ import argparse
 
 from .. import __version__
 from ..constants import *  # NOQA
-from ..helpers import EXIT_SUCCESS
 from ..remote import RemoteRepository
 
 from ..logger import create_logger
@@ -22,7 +21,6 @@ class VersionMixIn:
         else:
             server_version = client_version
         print(f"{format_version(client_version)} / {format_version(server_version)}")
-        return EXIT_SUCCESS
 
     def build_parser_version(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

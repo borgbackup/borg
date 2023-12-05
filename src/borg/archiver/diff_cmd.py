@@ -77,8 +77,6 @@ class DiffMixIn:
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
 
-        return self.exit_code
-
     def build_parser_diff(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
         from ._common import define_exclusion_group

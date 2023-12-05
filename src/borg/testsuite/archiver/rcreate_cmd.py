@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from ...helpers.errors import Error
+from ...helpers.errors import Error, CancelledByUser
 from ...constants import *  # NOQA
 from ...crypto.key import FlexiKey
 from ...repository import Repository
@@ -37,7 +37,12 @@ def test_rcreate_interrupt(archivers, request):
         raise EOFError
 
     with patch.object(FlexiKey, "create", raise_eof):
-        cmd(archiver, "rcreate", RK_ENCRYPTION, exit_code=1)
+        if archiver.FORK_DEFAULT:
+            cmd(archiver, "rcreate", RK_ENCRYPTION, exit_code=2)
+        else:
+            with pytest.raises(CancelledByUser):
+                cmd(archiver, "rcreate", RK_ENCRYPTION)
+
     assert not os.path.exists(archiver.repository_location)
 
 

@@ -475,12 +475,10 @@ class HelpMixIn:
             msg_lines += ["    Commands: %s" % ", ".join(sorted(commands.keys()))]
             msg_lines += ["    Topics: %s" % ", ".join(sorted(self.helptext.keys()))]
             parser.error("\n".join(msg_lines))
-        return self.exit_code
 
     def do_subcommand_help(self, parser, args):
         """display infos about subcommand"""
         parser.print_help()
-        return EXIT_SUCCESS
 
     do_maincommand_help = do_subcommand_help
 

@@ -273,7 +273,6 @@ class CreateMixIn:
                 create_inner(archive, cache, fso)
         else:
             create_inner(None, None, None)
-        return self.exit_code
 
     def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run):
         """

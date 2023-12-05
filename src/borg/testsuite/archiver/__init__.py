@@ -76,7 +76,6 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             if archiver is None:
                 archiver = Archiver()
             archiver.prerun_checks = lambda *args: None
-            archiver.exit_code = EXIT_SUCCESS
             helpers.exit_code = EXIT_SUCCESS
             helpers.warnings_list = []
             try:

@@ -28,7 +28,6 @@ class KeysMixIn:
         if hasattr(key, "find_key"):
             # print key location to make backing it up easier
             logger.info("Key location: %s", key.find_key())
-        return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
     def do_change_location(self, args, repository, manifest, cache):
@@ -48,7 +47,7 @@ class KeysMixIn:
                 key_new = Blake2CHPOKeyfileKey(repository)
             else:
                 print("Change not needed or not supported.")
-                return EXIT_WARNING
+                return
         if args.key_mode == "repokey":
             if isinstance(key, AESOCBKeyfileKey):
                 key_new = AESOCBRepoKey(repository)
@@ -60,7 +59,7 @@ class KeysMixIn:
                 key_new = Blake2CHPORepoKey(repository)
             else:
                 print("Change not needed or not supported.")
-                return EXIT_WARNING
+                return
 
         for name in ("repository_id", "crypt_key", "id_key", "chunk_seed", "sessionid", "cipher"):
             value = getattr(key, name)
@@ -89,8 +88,6 @@ class KeysMixIn:
             key.remove(key.target)  # remove key from current location
             logger.info(f"Key moved to {loc}")
 
-        return EXIT_SUCCESS
-
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
         """Export the repository key for backup"""
@@ -108,7 +105,6 @@ class KeysMixIn:
                     manager.export(args.path)
             except IsADirectoryError:
                 raise CommandError(f"'{args.path}' must be a file, not a directory")
-        return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_import(self, args, repository):
@@ -124,7 +120,6 @@ class KeysMixIn:
             if args.path != "-" and not os.path.exists(args.path):
                 raise CommandError("input file does not exist: " + args.path)
             manager.import_keyfile(args)
-        return EXIT_SUCCESS
 
     def build_parser_keys(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

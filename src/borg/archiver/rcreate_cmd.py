@@ -4,7 +4,7 @@ from ._common import with_repository, with_other_repository, Highlander
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names
-from ..helpers import EXIT_WARNING
+from ..helpers import CancelledByUser
 from ..helpers import location_validator, Location
 from ..helpers import parse_storage_quota
 from ..manifest import Manifest
@@ -28,7 +28,7 @@ class RCreateMixIn:
             key = key_creator(repository, args, other_key=other_key)
         except (EOFError, KeyboardInterrupt):
             repository.destroy()
-            return EXIT_WARNING
+            raise CancelledByUser()
         manifest = Manifest(key, repository)
         manifest.key = key
         manifest.write()
@@ -51,7 +51,6 @@ class RCreateMixIn:
                 "   borg key export -r REPOSITORY --qr-html encrypted-key-backup.html\n"
                 "2. Write down the borg key passphrase and store it at safe place.\n"
             )
-        return self.exit_code
 
     def build_parser_rcreate(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

@@ -30,7 +30,7 @@ class MountMixIn:
         if not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
             raise RTError(f"{args.mountpoint}: Mountpoint must be a **writable** directory")
 
-        return self._do_mount(args)
+        self._do_mount(args)
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def _do_mount(self, args, repository, manifest):
@@ -44,11 +44,10 @@ class MountMixIn:
             except RuntimeError:
                 # Relevant error message already printed to stderr by FUSE
                 raise RTError("FUSE mount failed")
-        return self.exit_code
 
     def do_umount(self, args):
         """un-mount the FUSE filesystem"""
-        return umount(args.mountpoint)
+        umount(args.mountpoint)
 
     def build_parser_mount_umount(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

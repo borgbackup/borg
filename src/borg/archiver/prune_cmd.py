@@ -178,7 +178,6 @@ class PruneMixIn:
                 checkpoint_func()
             if args.stats:
                 log_multi(str(stats), logger=logging.getLogger("borg.output.stats"))
-        return self.exit_code
 
     def build_parser_prune(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

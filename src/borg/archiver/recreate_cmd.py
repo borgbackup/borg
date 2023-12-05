@@ -53,7 +53,6 @@ class RecreateMixIn:
             manifest.write()
             repository.commit(compact=False)
             cache.commit()
-        return self.exit_code
 
     def build_parser_recreate(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

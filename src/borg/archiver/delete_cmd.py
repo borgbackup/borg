@@ -22,13 +22,13 @@ class DeleteMixIn:
         manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
         archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
         if not archive_names:
-            return self.exit_code
+            return
         if args.match_archives is None and args.first == 0 and args.last == 0:
             self.print_error(
                 "Aborting: if you really want to delete all archives, please use -a 'sh:*' "
                 "or just delete the whole repository (might be much faster)."
             )
-            return EXIT_ERROR
+            return
 
         if args.forced == 2:
             deleted = False
@@ -52,7 +52,7 @@ class DeleteMixIn:
                 self.print_warning('Done. Run "borg check --repair" to clean up the mess.', wc=None)
             else:
                 self.print_warning("Aborted.", wc=None)
-            return self.exit_code
+            return
 
         stats = Statistics(iec=args.iec)
         with Cache(repository, manifest, progress=args.progress, lock_wait=self.lock_wait, iec=args.iec) as cache:
@@ -91,8 +91,6 @@ class DeleteMixIn:
                 checkpoint_func()
             if args.stats:
                 log_multi(str(stats), logger=logging.getLogger("borg.output.stats"))
-
-        return self.exit_code
 
     def build_parser_delete(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_archive_filters_group

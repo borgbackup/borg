@@ -49,8 +49,7 @@ def add_warning(msg, *args, **kwargs):
 
 """
 The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
-warning or error occurred during their operation. This is different from archiver.exit_code, which is only accessible
-from the archiver object.
+warning or error occurred during their operation.
 
 Note: keep this in helpers/__init__.py as the code expects to be able to assign to helpers.exit_code.
 """

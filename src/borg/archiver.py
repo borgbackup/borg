@@ -236,7 +236,6 @@ class Highlander(argparse.Action):
 class Archiver:
 
     def __init__(self, lock_wait=None, prog=None):
-        self.exit_code = EXIT_SUCCESS
         self.lock_wait = lock_wait
         self.prog = prog
         self.last_checkpoint = time.monotonic()
@@ -288,7 +287,6 @@ class Archiver:
             append_only=args.append_only,
             storage_quota=args.storage_quota,
         ).serve()
-        return EXIT_SUCCESS
 
     @with_repository(create=True, exclusive=True, manifest=False)
     def do_init(self, args, repository):
@@ -299,7 +297,7 @@ class Archiver:
             key = key_creator(repository, args)
         except (EOFError, KeyboardInterrupt):
             repository.destroy()
-            return EXIT_WARNING
+            raise CancelledByUser()
         manifest = Manifest(key, repository)
         manifest.key = key
         manifest.write()
@@ -327,7 +325,6 @@ class Archiver:
                 'If you used a repokey mode, the key is stored in the repo, but you should back it up separately.\n'
                 'Use "borg key export" to export the key, optionally in printable format.\n'
                 'Write down the passphrase. Store both at safe place(s).\n')
-        return self.exit_code
 
     @with_repository(exclusive=True, manifest=False)
     def do_check(self, args, repository):
@@ -355,15 +352,16 @@ class Archiver:
             raise CommandError("--repository-only is required for --max-duration support.")
         if not args.archives_only:
             if not repository.check(repair=args.repair, save_space=args.save_space, max_duration=args.max_duration):
-                return EXIT_WARNING
+                set_ec(EXIT_WARNING)
+                return
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
         if not args.repo_only and not ArchiveChecker().check(
                 repository, repair=args.repair, archive=args.location.archive,
                 first=args.first, last=args.last, sort_by=args.sort_by or 'ts', glob=args.glob_archives,
                 verify_data=args.verify_data, save_space=args.save_space):
-            return EXIT_WARNING
-        return EXIT_SUCCESS
+            set_ec(EXIT_WARNING)
+            return
 
     @with_repository(compatibility=(Manifest.Operation.CHECK,))
     def do_change_passphrase(self, args, repository, manifest, key):
@@ -375,7 +373,6 @@ class Archiver:
         if hasattr(key, 'find_key'):
             # print key location to make backing it up easier
             logger.info('Key location: %s', key.find_key())
-        return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
@@ -392,7 +389,6 @@ class Archiver:
                     manager.export(args.path)
             except IsADirectoryError:
                 raise CommandError(f"'{args.path}' must be a file, not a directory")
-        return EXIT_SUCCESS
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_import(self, args, repository):
@@ -408,7 +404,6 @@ class Archiver:
             if args.path != '-' and not os.path.exists(args.path):
                 raise CommandError("input file does not exist: " + args.path)
             manager.import_keyfile(args)
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False)
     def do_migrate_to_repokey(self, args, repository):
@@ -424,7 +419,6 @@ class Archiver:
         key_new.chunk_seed = key_old.chunk_seed
         key_new.change_passphrase()  # option to change key protection passphrase, save
         logger.info('Key updated')
-        return EXIT_SUCCESS
 
     def do_benchmark_crud(self, args):
         """Benchmark Create, Read, Update, Delete for archives."""
@@ -433,30 +427,30 @@ class Archiver:
             compression = '--compression=none'
             # measure create perf (without files cache to always have it chunking)
             t_start = time.monotonic()
-            rc = self.do_create(self.parse_args(['create', compression, '--files-cache=disabled', archive + '1', path]))
+            rc = get_ec(self.do_create(self.parse_args(['create', compression, '--files-cache=disabled', archive + '1', path])))
             t_end = time.monotonic()
             dt_create = t_end - t_start
             assert rc == 0
             # now build files cache
-            rc1 = self.do_create(self.parse_args(['create', compression, archive + '2', path]))
-            rc2 = self.do_delete(self.parse_args(['delete', archive + '2']))
+            rc1 = get_ec(self.do_create(self.parse_args(['create', compression, archive + '2', path])))
+            rc2 = get_ec(self.do_delete(self.parse_args(['delete', archive + '2'])))
             assert rc1 == rc2 == 0
             # measure a no-change update (archive1 is still present)
             t_start = time.monotonic()
-            rc1 = self.do_create(self.parse_args(['create', compression, archive + '3', path]))
+            rc1 = get_ec(self.do_create(self.parse_args(['create', compression, archive + '3', path])))
             t_end = time.monotonic()
             dt_update = t_end - t_start
-            rc2 = self.do_delete(self.parse_args(['delete', archive + '3']))
+            rc2 = get_ec(self.do_delete(self.parse_args(['delete', archive + '3'])))
             assert rc1 == rc2 == 0
             # measure extraction (dry-run: without writing result to disk)
             t_start = time.monotonic()
-            rc = self.do_extract(self.parse_args(['extract', '--dry-run', archive + '1']))
+            rc = get_ec(self.do_extract(self.parse_args(['extract', '--dry-run', archive + '1'])))
             t_end = time.monotonic()
             dt_extract = t_end - t_start
             assert rc == 0
             # measure archive deletion (of LAST present archive with the data)
             t_start = time.monotonic()
-            rc = self.do_delete(self.parse_args(['delete', archive + '1']))
+            rc = get_ec(self.do_delete(self.parse_args(['delete', archive + '1'])))
             t_end = time.monotonic()
             dt_delete = t_end - t_start
             assert rc == 0
@@ -503,8 +497,6 @@ class Archiver:
             print(fmt % ('R', msg, total_size_MB / dt_extract, count, file_size_formatted, content, dt_extract))
             print(fmt % ('U', msg, total_size_MB / dt_update, count, file_size_formatted, content, dt_update))
             print(fmt % ('D', msg, total_size_MB / dt_delete, count, file_size_formatted, content, dt_delete))
-
-        return 0
 
     @with_repository(fake='dry_run', exclusive=True, compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest=None, key=None):
@@ -670,7 +662,6 @@ class Archiver:
                 create_inner(archive, cache, fso)
         else:
             create_inner(None, None, None)
-        return self.exit_code
 
     def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run):
         """
@@ -931,7 +922,6 @@ class Archiver:
         if pi:
             # clear progress output
             pi.finish()
-        return self.exit_code
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
@@ -964,8 +954,6 @@ class Archiver:
 
         with create_filter_process(filter, stream=tarstream, stream_close=tarstream_close, inbound=False) as _stream:
             self._export_tar(args, archive, _stream)
-
-        return self.exit_code
 
     def _export_tar(self, args, archive, tarstream):
         matcher = self.build_matcher(args.patterns, args.paths)
@@ -1102,7 +1090,6 @@ class Archiver:
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
-        return self.exit_code
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
@@ -1152,8 +1139,6 @@ class Archiver:
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
 
-        return self.exit_code
-
     @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
     @with_archive
     def do_rename(self, args, repository, manifest, key, cache, archive):
@@ -1162,7 +1147,6 @@ class Archiver:
         manifest.write()
         repository.commit(compact=False)
         cache.commit()
-        return self.exit_code
 
     def maybe_checkpoint(self, *, checkpoint_func, checkpoint_interval):
         checkpointed = False
@@ -1187,9 +1171,9 @@ class Archiver:
         if archive_filter_specified and explicit_archives_specified:
             raise CommandError('Mixing archive filters and explicitly named archives is not supported.')
         if archive_filter_specified or explicit_archives_specified:
-            return self._delete_archives(args, repository)
+            self._delete_archives(args, repository)
         else:
-            return self._delete_repository(args, repository)
+            self._delete_repository(args, repository)
 
     def _delete_archives(self, args, repository):
         """Delete archives"""
@@ -1206,7 +1190,7 @@ class Archiver:
             args.consider_checkpoints = True
             archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
             if not archive_names:
-                return self.exit_code
+                return
 
         if args.forced == 2:
             deleted = False
@@ -1231,7 +1215,7 @@ class Archiver:
                 self.print_warning('Done. Run "borg check --repair" to clean up the mess.', wc=None)
             else:
                 self.print_warning('Aborted.', wc=None)
-            return self.exit_code
+            return
 
         stats = Statistics(iec=args.iec)
         with Cache(repository, key, manifest, progress=args.progress, lock_wait=self.lock_wait, iec=args.iec) as cache:
@@ -1250,7 +1234,7 @@ class Archiver:
                 try:
                     archive_info = manifest.archives[archive_name]
                 except KeyError:
-                    self.print_warning(msg_not_found, archive_name, i, len(archive_names))
+                    self.print_warning(msg_not_found, archive_name, i, len(archive_names), wt="curly")
                 else:
                     if self.output_list:
                         logger_list.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
@@ -1273,8 +1257,6 @@ class Archiver:
                           stats.summary.format(label='Deleted data:', stats=stats),
                           str(cache),
                           DASHES, logger=logging.getLogger('borg.output.stats'))
-
-        return self.exit_code
 
     def _delete_repository(self, args, repository):
         """Delete a repository"""
@@ -1333,7 +1315,6 @@ class Archiver:
             logger.info("Cache deleted.")
         else:
             logger.info("Would delete cache.")
-        return self.exit_code
 
     def do_mount(self, args):
         """Mount archive or an entire repository as a FUSE filesystem"""
@@ -1346,7 +1327,7 @@ class Archiver:
         if not os.path.isdir(args.mountpoint) or not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
             raise RTError('%s: Mount point must be a writable directory' % args.mountpoint)
 
-        return self._do_mount(args)
+        self._do_mount(args)
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def _do_mount(self, args, repository, manifest, key):
@@ -1360,11 +1341,10 @@ class Archiver:
             except RuntimeError:
                 # Relevant error message already printed to stderr by FUSE
                 raise RTError("FUSE mount failed")
-        return self.exit_code
 
     def do_umount(self, args):
         """un-mount the FUSE filesystem"""
-        return umount(args.mountpoint)
+        umount(args.mountpoint)
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest, key):
@@ -1372,11 +1352,11 @@ class Archiver:
         if args.location.archive:
             if args.json:
                 raise CommandError('The --json option is only valid for listing archives, not archive contents.')
-            return self._list_archive(args, repository, manifest, key)
+            self._list_archive(args, repository, manifest, key)
         else:
             if args.json_lines:
                 raise CommandError('The --json-lines option is only valid for listing archive contents, not archives.')
-            return self._list_repository(args, repository, manifest, key)
+            self._list_repository(args, repository, manifest, key)
 
     def _list_archive(self, args, repository, manifest, key):
         matcher = self.build_matcher(args.patterns, args.paths)
@@ -1402,8 +1382,6 @@ class Archiver:
         else:
             _list_inner(cache=None)
 
-        return self.exit_code
-
     def _list_repository(self, args, repository, manifest, key):
         if args.format is not None:
             format = args.format
@@ -1426,15 +1404,13 @@ class Archiver:
                 'archives': output_data
             }))
 
-        return self.exit_code
-
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
     def do_info(self, args, repository, manifest, key, cache):
         """Show archive details such as disk space used"""
         if any((args.location.archive, args.first, args.last, args.prefix is not None, args.glob_archives)):
-            return self._info_archives(args, repository, manifest, key, cache)
+            self._info_archives(args, repository, manifest, key, cache)
         else:
-            return self._info_repository(args, repository, manifest, key, cache)
+            self._info_repository(args, repository, manifest, key, cache)
 
     def _info_archives(self, args, repository, manifest, key, cache):
         def format_cmdline(cmdline):
@@ -1474,8 +1450,6 @@ class Archiver:
                 This archive:   {stats[original_size]:>20s} {stats[compressed_size]:>20s} {stats[deduplicated_size]:>20s}
                 {cache}
                 """).strip().format(cache=cache, **info))
-            if self.exit_code:
-                break
             if not args.json and len(archive_names) - i:
                 print()
 
@@ -1483,7 +1457,6 @@ class Archiver:
             json_print(basic_json_data(manifest, cache=cache, extra={
                 'archives': output_data,
             }))
-        return self.exit_code
 
     def _info_repository(self, args, repository, manifest, key, cache):
         info = basic_json_data(manifest, cache=cache, extra={
@@ -1515,7 +1488,6 @@ class Archiver:
             print(DASHES)
             print(STATS_HEADER)
             print(str(cache))
-        return self.exit_code
 
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest, key):
@@ -1612,7 +1584,6 @@ class Archiver:
                           stats.summary.format(label='Deleted data:', stats=stats),
                           str(cache),
                           DASHES, logger=logging.getLogger('borg.output.stats'))
-        return self.exit_code
 
     @with_repository(fake=('tam', 'disable_tam', 'archives_tam'), invert_fake=True, manifest=False, exclusive=True)
     def do_upgrade(self, args, repository, manifest=None, key=None):
@@ -1687,7 +1658,6 @@ class Archiver:
                 repo.upgrade(args.dry_run, inplace=args.inplace, progress=args.progress)
             except NotImplementedError as e:
                 print("warning: %s" % e)
-        return self.exit_code
 
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, key, cache):
@@ -1728,7 +1698,6 @@ class Archiver:
             manifest.write()
             repository.commit(compact=False)
             cache.commit()
-        return self.exit_code
 
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.WRITE,))
     def do_import_tar(self, args, repository, manifest, key, cache):
@@ -1743,8 +1712,6 @@ class Archiver:
 
         with create_filter_process(filter, stream=tarstream, stream_close=tarstream_close, inbound=True) as _stream:
             self._import_tar(args, repository, manifest, key, cache, _stream)
-
-        return self.exit_code
 
     def _import_tar(self, args, repository, manifest, key, cache, tarstream):
         t0 = utcnow()
@@ -1836,7 +1803,8 @@ class Archiver:
         env = prepare_subprocess_env(system=True)
         try:
             # we exit with the return code we get from the subprocess
-            return subprocess.call([args.command] + args.args, env=env)
+            rc = subprocess.call([args.command] + args.args, env=env)
+            set_ec(rc)
         finally:
             # we need to commit the "no change" operation we did to the manifest
             # because it created a new segment file in the repository. if we would
@@ -1854,7 +1822,6 @@ class Archiver:
         repository.put(Manifest.MANIFEST_ID, data)
         threshold = args.threshold / 100
         repository.commit(compact=True, threshold=threshold, cleanup_commits=args.cleanup_commits)
-        return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=False)
     def do_config(self, args, repository):
@@ -1973,9 +1940,7 @@ class Archiver:
                 try:
                     print(config.get(section, name))
                 except (configparser.NoOptionError, configparser.NoSectionError) as e:
-                    print(e, file=sys.stderr)
-                    return EXIT_WARNING
-            return EXIT_SUCCESS
+                    raise Error(e)
         finally:
             if args.cache:
                 cache.close()
@@ -1987,7 +1952,6 @@ class Archiver:
         # Additional debug information
         print('CRC implementation:', crc32.__name__)
         print('Process ID:', get_process_id())
-        return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_archive_items(self, args, repository, manifest, key):
@@ -2001,7 +1965,6 @@ class Archiver:
             with open(filename, 'wb') as fd:
                 fd.write(data)
         print('Done.')
-        return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_archive(self, args, repository, manifest, key):
@@ -2051,7 +2014,6 @@ class Archiver:
 
         with dash_open(args.path, 'w') as fd:
             output(fd)
-        return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_manifest(self, args, repository, manifest, key):
@@ -2063,7 +2025,6 @@ class Archiver:
 
         with dash_open(args.path, 'w') as fd:
             json.dump(meta, fd, indent=4)
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False)
     def do_debug_dump_repo_objs(self, args, repository):
@@ -2119,7 +2080,6 @@ class Archiver:
                     decrypt_dump(i, id, cdata)
                     i += 1
         print('Done.')
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False)
     def do_debug_search_repo_objs(self, args, repository):
@@ -2185,7 +2145,6 @@ class Archiver:
                 if i % 10000 == 0:
                     print('%d objects processed.' % i)
         print('Done.')
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False)
     def do_debug_get_obj(self, args, repository):
@@ -2204,7 +2163,6 @@ class Archiver:
         with open(args.path, "wb") as f:
             f.write(data)
         print("object %s fetched." % hex_id)
-        return EXIT_SUCCESS
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_id_hash(self, args, repository, manifest, key):
@@ -2213,7 +2171,6 @@ class Archiver:
             data = f.read()
         id = key.id_hash(data)
         print(id.hex())
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True)
     def do_debug_put_obj(self, args, repository):
@@ -2230,7 +2187,6 @@ class Archiver:
         repository.put(id, data)
         print("object %s put." % hex_id)
         repository.commit(compact=False)
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True)
     def do_debug_delete_obj(self, args, repository):
@@ -2251,7 +2207,6 @@ class Archiver:
         if modified:
             repository.commit(compact=False)
         print('Done.')
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True, cache=True, compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_refcount_obj(self, args, repository, manifest, key, cache):
@@ -2267,7 +2222,6 @@ class Archiver:
                     print("object %s has %d referrers [info from chunks cache]." % (hex_id, refcount))
                 except KeyError:
                     print("object %s not found [info from chunks cache]." % hex_id)
-        return EXIT_SUCCESS
 
     @with_repository(manifest=False, exclusive=True)
     def do_debug_dump_hints(self, args, repository):
@@ -2285,21 +2239,18 @@ class Archiver:
                 json.dump(hints, fd, indent=4)
         finally:
             repository.rollback()
-        return EXIT_SUCCESS
 
     def do_debug_convert_profile(self, args):
         """convert Borg profile to Python profile"""
         import marshal
         with args.output, args.input:
             marshal.dump(msgpack.unpack(args.input, use_list=False, raw=False), args.output)
-        return EXIT_SUCCESS
 
     @with_repository(lock=False, manifest=False)
     def do_break_lock(self, args, repository):
         """Break the repository lock (e.g. in case it was left by a dead borg."""
         repository.break_lock()
         Cache.break_lock(repository)
-        return self.exit_code
 
     helptext = collections.OrderedDict()
     helptext['patterns'] = textwrap.dedent('''
@@ -2730,12 +2681,10 @@ class Archiver:
             msg_lines += ['    Commands: %s' % ', '.join(sorted(commands.keys()))]
             msg_lines += ['    Topics: %s' % ', '.join(sorted(self.helptext.keys()))]
             parser.error('\n'.join(msg_lines))
-        return self.exit_code
 
     def do_subcommand_help(self, parser, args):
         """display infos about subcommand"""
         parser.print_help()
-        return EXIT_SUCCESS
 
     do_maincommand_help = do_subcommand_help
 
@@ -5241,7 +5190,9 @@ class Archiver:
                         # it compatible (see above).
                         msgpack.pack(profiler.stats, fd, use_bin_type=True)
         else:
-            return get_ec(func(args))
+            rc = func(args)
+            assert rc is None
+            return get_ec(rc)
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover

@@ -96,7 +96,6 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_outpu
             if archiver is None:
                 archiver = Archiver()
             archiver.prerun_checks = lambda *args: None
-            archiver.exit_code = EXIT_SUCCESS
             helpers.exit_code = EXIT_SUCCESS
             helpers.warnings_list = []
             try:
@@ -2979,7 +2978,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             raise EOFError
 
         with patch.object(KeyfileKeyBase, 'create', raise_eof):
-            self.cmd('init', '--encryption=repokey', self.repository_location, exit_code=1)
+            if self.FORK_DEFAULT:
+                self.cmd('init', '--encryption=repokey', self.repository_location, exit_code=2)
+            else:
+                with pytest.raises(CancelledByUser):
+                    self.cmd('init', '--encryption=repokey', self.repository_location)
         assert not os.path.exists(self.repository_location)
 
     def test_init_requires_encryption_option(self):
@@ -3516,8 +3519,13 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.assert_in('id', output)
         self.assert_not_in('last_segment_checked', output)
 
-        output = self.cmd('config', self.repository_location, 'last_segment_checked', exit_code=1)
-        self.assert_in('No option ', output)
+        if self.FORK_DEFAULT:
+            output = self.cmd('config', self.repository_location, 'last_segment_checked', exit_code=2)
+            self.assert_in('No option ', output)
+        else:
+            with pytest.raises(Error):
+                self.cmd('config', self.repository_location, 'last_segment_checked')
+
         self.cmd('config', self.repository_location, 'last_segment_checked', '123')
         output = self.cmd('config', self.repository_location, 'last_segment_checked')
         assert output == '123' + '\n'
@@ -3535,7 +3543,11 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             output = self.cmd('config', self.repository_location, cfg_key)
             assert output == cfg_value + '\n'
             self.cmd('config', '--delete', self.repository_location, cfg_key)
-            self.cmd('config', self.repository_location, cfg_key, exit_code=1)
+            if self.FORK_DEFAULT:
+                self.cmd('config', self.repository_location, cfg_key, exit_code=2)
+            else:
+                with pytest.raises(Error):
+                    self.cmd('config', self.repository_location, cfg_key)
 
         self.cmd('config', '--list', '--delete', self.repository_location, exit_code=2)
         if self.FORK_DEFAULT:
@@ -3543,7 +3555,11 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         else:
             with pytest.raises(CommandError):
                 self.cmd('config', self.repository_location)
-        self.cmd('config', self.repository_location, 'invalid-option', exit_code=1)
+        if self.FORK_DEFAULT:
+            self.cmd('config', self.repository_location, 'invalid-option', exit_code=2)
+        else:
+            with pytest.raises(Error):
+                self.cmd('config', self.repository_location, 'invalid-option')
 
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')

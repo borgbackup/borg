@@ -68,7 +68,7 @@ class Passphrase(str):
         except (ValueError, TypeError):
             return None
         with os.fdopen(fd, mode="r") as f:
-            passphrase = f.read()
+            passphrase = f.readline()
         return cls(passphrase.rstrip("\n"))
 
     @classmethod

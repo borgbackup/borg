@@ -46,7 +46,8 @@ try:
     from .crypto.key import key_creator, key_argument_names, tam_required_file, tam_required, RepoKey, PassphraseKey
     from .crypto.keymanager import KeyManager
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE, classify_ec
-    from .helpers import Error, NoManifestError, CancelledByUser, RTError, CommandError, modern_ec, set_ec, get_ec
+    from .helpers import Error, NoManifestError, CancelledByUser, RTError, CommandError
+    from .helpers import modern_ec, set_ec, get_ec, get_reset_ec
     from .helpers import add_warning, BorgWarning, FileChangedWarning, BackupWarning, IncludePatternNeverMatchedWarning
     from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, FilesCacheMode
@@ -427,30 +428,30 @@ class Archiver:
             compression = '--compression=none'
             # measure create perf (without files cache to always have it chunking)
             t_start = time.monotonic()
-            rc = get_ec(self.do_create(self.parse_args(['create', compression, '--files-cache=disabled', archive + '1', path])))
+            rc = get_reset_ec(self.do_create(self.parse_args(['create', compression, '--files-cache=disabled', archive + '1', path])))
             t_end = time.monotonic()
             dt_create = t_end - t_start
             assert rc == 0
             # now build files cache
-            rc1 = get_ec(self.do_create(self.parse_args(['create', compression, archive + '2', path])))
-            rc2 = get_ec(self.do_delete(self.parse_args(['delete', archive + '2'])))
+            rc1 = get_reset_ec(self.do_create(self.parse_args(['create', compression, archive + '2', path])))
+            rc2 = get_reset_ec(self.do_delete(self.parse_args(['delete', archive + '2'])))
             assert rc1 == rc2 == 0
             # measure a no-change update (archive1 is still present)
             t_start = time.monotonic()
-            rc1 = get_ec(self.do_create(self.parse_args(['create', compression, archive + '3', path])))
+            rc1 = get_reset_ec(self.do_create(self.parse_args(['create', compression, archive + '3', path])))
             t_end = time.monotonic()
             dt_update = t_end - t_start
-            rc2 = get_ec(self.do_delete(self.parse_args(['delete', archive + '3'])))
+            rc2 = get_reset_ec(self.do_delete(self.parse_args(['delete', archive + '3'])))
             assert rc1 == rc2 == 0
             # measure extraction (dry-run: without writing result to disk)
             t_start = time.monotonic()
-            rc = get_ec(self.do_extract(self.parse_args(['extract', '--dry-run', archive + '1'])))
+            rc = get_reset_ec(self.do_extract(self.parse_args(['extract', '--dry-run', archive + '1'])))
             t_end = time.monotonic()
             dt_extract = t_end - t_start
             assert rc == 0
             # measure archive deletion (of LAST present archive with the data)
             t_start = time.monotonic()
-            rc = get_ec(self.do_delete(self.parse_args(['delete', archive + '1'])))
+            rc = get_reset_ec(self.do_delete(self.parse_args(['delete', archive + '1'])))
             t_end = time.monotonic()
             dt_delete = t_end - t_start
             assert rc == 0

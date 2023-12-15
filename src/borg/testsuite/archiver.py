@@ -41,6 +41,7 @@ from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
 from ..helpers import Location, get_security_dir
 from ..helpers import Manifest, MandatoryFeatureUnsupported, ArchiveInfo
+from ..helpers import init_ec_warnings
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, Error, CancelledByUser, RTError, CommandError
 from ..helpers import bin_to_hex
 from ..helpers import MAX_S
@@ -97,8 +98,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_outpu
             if archiver is None:
                 archiver = Archiver()
             archiver.prerun_checks = lambda *args: None
-            helpers.exit_code = EXIT_SUCCESS
-            helpers.warnings_list = []
+            init_ec_warnings()
             try:
                 args = archiver.parse_args(list(args))
                 # argparse parsing may raise SystemExit when the command line is bad or

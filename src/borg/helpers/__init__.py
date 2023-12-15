@@ -64,28 +64,24 @@ warning_info = namedtuple("warning_info", "wc,msg,args,wt")
 
 """
 The global warnings_list variable is used to collect warning_info elements while borg is running.
-
-Note: keep this in helpers/__init__.py as the code expects to be able to assign to helpers.warnings_list.
 """
-warnings_list = []
+_warnings_list = []
 
 
 def add_warning(msg, *args, **kwargs):
-    global warnings_list
+    global _warnings_list
     warning_code = kwargs.get("wc", EXIT_WARNING)
     assert isinstance(warning_code, int)
     warning_type = kwargs.get("wt", "percent")
     assert warning_type in ("percent", "curly")
-    warnings_list.append(warning_info(warning_code, msg, args, warning_type))
+    _warnings_list.append(warning_info(warning_code, msg, args, warning_type))
 
 
 """
 The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
 warning or error occurred during their operation.
-
-Note: keep this in helpers/__init__.py as the code expects to be able to assign to helpers.exit_code.
 """
-exit_code = EXIT_SUCCESS
+_exit_code = EXIT_SUCCESS
 
 
 def classify_ec(ec):
@@ -128,8 +124,19 @@ def set_ec(ec):
     """
     Sets the exit code of the program to ec IF ec is more severe than the current exit code.
     """
-    global exit_code
-    exit_code = max_ec(exit_code, ec)
+    global _exit_code
+    _exit_code = max_ec(_exit_code, ec)
+
+
+def init_ec_warnings(ec=EXIT_SUCCESS, warnings=None):
+    """
+    (Re-)Init the globals for the exit code and the warnings list.
+    """
+    global _exit_code, _warnings_list
+    _exit_code = ec
+    warnings = [] if warnings is None else warnings
+    assert isinstance(warnings, list)
+    _warnings_list = warnings
 
 
 def get_ec(ec=None):
@@ -139,18 +146,18 @@ def get_ec(ec=None):
     if ec is not None:
         set_ec(ec)
 
-    global exit_code
-    exit_code_class = classify_ec(exit_code)
+    global _exit_code
+    exit_code_class = classify_ec(_exit_code)
     if exit_code_class in ("signal", "error", "warning"):
         # there was a signal/error/warning, return its exit code
-        return exit_code
+        return _exit_code
     assert exit_code_class == "success"
-    global warnings_list
-    if not warnings_list:
+    global _warnings_list
+    if not _warnings_list:
         # we do not have any warnings in warnings list, return success exit code
-        return exit_code
+        return _exit_code
     # looks like we have some warning(s)
-    rcs = sorted(set(w_info.wc for w_info in warnings_list))
+    rcs = sorted(set(w_info.wc for w_info in _warnings_list))
     logger.debug(f"rcs: {rcs!r}")
     if len(rcs) == 1:
         # easy: there was only one kind of warning, so we can be specific

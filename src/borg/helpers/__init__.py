@@ -164,3 +164,10 @@ def get_ec(ec=None):
         return rcs[0]
     # there were different kinds of warnings
     return EXIT_WARNING  # generic warning rc, user has to look into the logs
+
+
+def get_reset_ec(ec=None):
+    """Like get_ec, but re-initialize ec/warnings afterwards."""
+    rc = get_ec(ec)
+    init_ec_warnings()
+    return rc

@@ -382,7 +382,7 @@ How do I remove files from an existing backup?
 
 A file is only removed from a BorgBackup repository if all archives that contain
 the file are deleted and the corresponding data chunks are removed from the
-repository There are two ways how to remove files from a repository.
+repository. There are two ways how to remove files from a repository.
 
 1. Use :ref:`borg_delete` to remove all archives that contain the files. This
 will of course delete everything in the archive, not only some files.

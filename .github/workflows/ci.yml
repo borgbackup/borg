@@ -4,7 +4,7 @@ name: CI
 
 on:
   push:
-    branches: [ 1.2-maint ]
+    branches: [ 1.4-maint ]
     paths:
     - '**.py'
     - '**.pyx'
@@ -16,7 +16,7 @@ on:
     - 'requirements.d/*'
     - '!docs/**'
   pull_request:
-    branches: [ 1.2-maint ]
+    branches: [ 1.4-maint ]
     paths:
     - '**.py'
     - '**.pyx'

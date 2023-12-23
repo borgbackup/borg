@@ -262,10 +262,6 @@ if not on_rtd:
 # https://github.com/borgbackup/borg/issues/6875
 setup(
     name='borgbackup',
-    use_scm_version={
-        'write_to': 'src/borg/_version.py',
-        'write_to_template': '__version__ = version = {version!r}\n',
-    },
     author='The Borg Collective (see AUTHORS file)',
     author_email='borgbackup@python.org',
     url='https://borgbackup.readthedocs.io/',

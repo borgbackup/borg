@@ -243,9 +243,9 @@ if not on_rtd:
 
     if cythonize and cythonizing:
         cython_opts = dict(
-            # default language_level will be '3str' starting from Cython 3.0.0,
-            # but old cython versions (< 0.29) do not know that, thus we use 3 for now.
-            compiler_directives={'language_level': 3},
+            # 3str is the default in Cython3 and we do not support older Cython releases.
+            # we only set this to avoid the related FutureWarning from Cython3.
+            compiler_directives={'language_level': '3str'}
         )
         if not is_win32:
             # compile .pyx extensions to .c in parallel, does not work on windows

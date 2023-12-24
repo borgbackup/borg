@@ -2,6 +2,7 @@ setuptools==69.0.3
 setuptools-scm==8.0.4
 pip==23.3.2
 virtualenv==20.25.0
+build==1.0.3
 pkgconfig==1.5.5
 tox==4.11.4
 pytest==7.4.3

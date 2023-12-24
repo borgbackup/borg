@@ -158,10 +158,10 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.12.0  # tests, version supporting openssl 1.1
-    pyenv install 3.11.7  # tests, version supporting openssl 1.1, binary build
-    pyenv install 3.10.2  # tests, version supporting openssl 1.1
-    pyenv install 3.9.3  # tests, version supporting openssl 1.1
+    pyenv install 3.12.0  # tests
+    pyenv install 3.11.7  # tests, binary build
+    pyenv install 3.10.2  # tests
+    pyenv install 3.9.3  # tests
     pyenv rehash
   EOF
 end

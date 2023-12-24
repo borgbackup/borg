@@ -39,7 +39,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.8
+        python-version: 3.9
     - name: Lint with flake8
       run: |
         pip install flake8
@@ -53,11 +53,8 @@ jobs:
       matrix:
         include:
             - os: ubuntu-20.04
-              python-version: '3.8'
-              toxenv: py38-fuse2
-            - os: ubuntu-20.04
               python-version: '3.9'
-              toxenv: py39-fuse3
+              toxenv: py39-fuse2
             - os: ubuntu-20.04
               python-version: '3.10'
               toxenv: py310-fuse3
@@ -68,8 +65,8 @@ jobs:
               python-version: '3.12'
               toxenv: py312-fuse3
             - os: macos-12
-              python-version: '3.8'
-              toxenv: py38-none  # note: no fuse testing, due to #6099, see also #6196.
+              python-version: '3.9'
+              toxenv: py39-none  # note: no fuse testing, due to #6099, see also #6196.
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew

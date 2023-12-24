@@ -294,6 +294,11 @@ The best check that everything is ok is to run a dry-run extraction::
 Upgrade Notes
 =============
 
+borg 1.2.x to 1.4.x
+-------------------
+
+(nothing here yet)
+
 borg 1.1.x to 1.2.x
 -------------------
 
@@ -378,11 +383,32 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.2.7 (2023-12-02)
---------------------------
+Version 1.4.0 (not released yet)
+--------------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+Fixes:
+
+Other changes:
+
+- Python: require Python >= 3.9, drop support for 3.8, #6383
+- Cython: require Cython >= 3.0, drop support for Cython 0.29.x,
+  use 3str language level (default in cython3), #7978
+- use pyinstaller 5.13.2 and python 3.11 for binary build, #7987
+- msgpack: require >= 1.0.2, <= 1.0.7
+- vagrant: use a freebsd 14 box, #6871
+- require recent setuptools and setuptools_scm
+- move setuptools_scm configuration to pyproject.toml
+- crypto: get rid of deprecated HMAC_* functions to avoid warnings.
+  Instead, use hmac.digest from Python stdlib.
+
+
+Version 1.2.7 (2023-12-02)
+--------------------------
 
 Fixes:
 

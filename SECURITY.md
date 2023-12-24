@@ -4,11 +4,12 @@
 
 These borg releases are currently supported with security updates.
 
-| Version | Supported          |
-|---------|--------------------|
-| 1.2.x   | :white_check_mark: |
-| 1.1.x   | :x:                |
-| < 1.1   | :x:                |
+| Version | Supported              |
+|---------|------------------------|
+| 1.4.x   | :x: (not released yet) |
+| 1.2.x   | :white_check_mark:     |
+| 1.1.x   | :x:                    |
+| < 1.1   | :x:                    |
 
 ## Reporting a Vulnerability
 

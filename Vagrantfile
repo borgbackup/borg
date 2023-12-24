@@ -42,9 +42,9 @@ def packages_freebsd
     pkg install -y fusefs-libs3 || true
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python (for the tests we use pyenv built pythons):
-    pkg install -y python38 py38-sqlite3
+    pkg install -y python310 py310-sqlite3
     # make sure there is a python3 command
-    ln -sf /usr/local/bin/python3.8 /usr/local/bin/python3
+    ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3
     python3 -m ensurepip
     pip3 install virtualenv
     # make bash default / work:
@@ -360,7 +360,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "generic/freebsd13"
+    b.vm.box = "generic/freebsd14"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

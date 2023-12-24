@@ -42,9 +42,9 @@ def packages_freebsd
     pkg install -y fusefs-libs3 || true
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python (for the tests we use pyenv built pythons):
-    pkg install -y python38 py38-sqlite3
+    pkg install -y python310 py310-sqlite3
     # make sure there is a python3 command
-    ln -sf /usr/local/bin/python3.8 /usr/local/bin/python3
+    ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3
     python3 -m ensurepip
     pip3 install virtualenv
     # make bash default / work:
@@ -158,10 +158,10 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.12.0  # tests, version supporting openssl 1.1
-    pyenv install 3.11.1  # tests, version supporting openssl 1.1
-    pyenv install 3.10.2  # tests, version supporting openssl 1.1
-    pyenv install 3.9.18  # tests, version supporting openssl 1.1, binary build
+    pyenv install 3.12.0  # tests
+    pyenv install 3.11.7  # tests, binary build
+    pyenv install 3.10.2  # tests
+    pyenv install 3.9.3  # tests
     pyenv rehash
   EOF
 end
@@ -178,9 +178,9 @@ def build_pyenv_venv(boxname)
   return <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
-    # use the latest 3.9 release
-    pyenv global 3.9.18
-    pyenv virtualenv 3.9.18 borg-env
+    # use the latest 3.11 release
+    pyenv global 3.11.7
+    pyenv virtualenv 3.11.7 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -227,8 +227,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.18 3.10.2 3.11.1 3.12.0
-      pyenv local 3.9.18 3.10.2 3.11.1 3.12.0
+      pyenv global 3.9.3 3.10.2 3.11.7 3.12.0
+      pyenv local 3.9.3 3.10.2 3.11.7 3.12.0
     fi
     # otherwise: just use the system python
     # avoid that git complains about dubious ownership if we use fakeroot:
@@ -360,7 +360,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "generic/freebsd13"
+    b.vm.box = "generic/freebsd14"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

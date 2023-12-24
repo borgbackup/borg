@@ -224,8 +224,11 @@ jobs:
         run: ./scripts/msys2-install-deps development
       - name: Build
         run: |
-          pip install -e .
+          # build borg.exe
+          SETUPTOOLS_USE_DISTUTILS=stdlib pip install -e .
           pyinstaller -y scripts/borg.exe.spec
+          # build sdist and wheel in dist/...
+          SETUPTOOLS_USE_DISTUTILS=stdlib python -m build
       - uses: actions/upload-artifact@v3
         with:
           name: borg-windows

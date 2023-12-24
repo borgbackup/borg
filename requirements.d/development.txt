@@ -3,6 +3,7 @@ setuptools_scm
 pip
 wheel
 virtualenv
+build
 pkgconfig
 tox
 pytest

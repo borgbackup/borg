@@ -2212,7 +2212,7 @@ class Archiver:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print("object id {} is invalid [{}].".format(hex_id, str(err)))
+            print(f"object id {hex_id} is invalid [{str(err)}].")
             return EXIT_ERROR
         try:
             data = repository.get(id)
@@ -2244,7 +2244,7 @@ class Archiver:
             if len(id) != 32:  # 256bit
                 raise ValueError("id must be 256bits or 64 hex digits")
         except ValueError as err:
-            print("object id {} is invalid [{}].".format(hex_id, str(err)))
+            print(f"object id {hex_id} is invalid [{str(err)}].")
             return EXIT_ERROR
         repository.put(id, data)
         print("object %s put." % hex_id)

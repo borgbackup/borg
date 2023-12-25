@@ -1,3 +1,76 @@
+[project]
+name = "borgbackup"
+dynamic = ["version"]
+authors = [{name="The Borg Collective (see AUTHORS file)"}]
+maintainers = [
+    {name="Thomas Waldmann", email="tw@waldmann-edv.de"},
+]
+description = "Deduplicated, encrypted, authenticated and compressed backups"
+readme = "README.rst"
+requires-python = ">=3.9"
+keywords = ["backup", "borgbackup"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: POSIX :: BSD :: FreeBSD",
+    "Operating System :: POSIX :: BSD :: OpenBSD",
+    "Operating System :: POSIX :: BSD :: NetBSD",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security :: Cryptography",
+    "Topic :: System :: Archiving :: Backup",
+]
+license = {text="BSD"}
+dependencies = [
+    # we are rather picky about msgpack versions, because a good working msgpack is
+    # very important for borg, see: https://github.com/borgbackup/borg/issues/3753
+    # Please note:
+    # using any other msgpack version is not supported by borg development and
+    # any feedback related to issues caused by this will be ignored.
+    "msgpack >=1.0.3, <=1.0.7",
+    "packaging",
+]
+
+# note for package maintainers: if you package borgbackup for distribution,
+# please (if available) add pyfuse3 (preferably) or llfuse as a *requirement*.
+# "borg mount" needs one of them to work.
+# if neither is available, do not require it, most of borgbackup will work.
+[project.optional-dependencies]
+llfuse = ["llfuse >= 1.3.8"]
+pyfuse3 = ["pyfuse3 >= 3.1.1"]
+nofuse = []
+
+[project.urls]
+"Homepage" = "https://borgbackup.org/"
+"Bug Tracker" = "https://github.com/borgbackup/borg/issues"
+"Documentation" = "https://borgbackup.readthedocs.io/"
+"Repository" = "https://github.com/borgbackup/borg"
+"Changelog" = "https://github.com/borgbackup/borg/blob/1.4-maint/docs/changes.rst"
+
+[project.scripts]
+borg = "borg.archiver:main"
+borgfs = "borg.archiver:main"
+
+[tool.setuptools]
+# See also the MANIFEST.in file.
+# We want to install all the files in the package directories...
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.exclude-package-data]
+# ...except the source files which have been compiled (C extensions):
+"*" = ["*.c", "*.h", "*.pyx"]
+
 [build-system]
 requires = ["setuptools>=64", "setuptools_scm>=8", "wheel", "pkgconfig", "Cython>=3"]
 build-backend = "setuptools.build_meta"
@@ -8,3 +81,9 @@ build-backend = "setuptools.build_meta"
 # https://github.com/borgbackup/borg/issues/6875
 write_to = "src/borg/_version.py"
 write_to_template = "__version__ = version = {version!r}\n"
+
+[tool.pytest.ini_options]
+python_files = "testsuite/*.py"
+markers = [
+    "allow_cache_wipe",
+]

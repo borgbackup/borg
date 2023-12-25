@@ -98,8 +98,13 @@ def packages_netbsd
     pkg_add pkg-config
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
-    pkg_add python39  py39-sqlite3  py39-pip  py39-virtualenv  py39-expat
-    pkg_add python310 py310-sqlite3 py310-pip py310-virtualenv py310-expat
+    pkg_add py311-sqlite3 py311-pip py311-virtualenv py311-expat
+    ln -s /usr/pkg/bin/python3.11 /usr/pkg/bin/python
+    ln -s /usr/pkg/bin/python3.11 /usr/pkg/bin/python3
+    ln -s /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip
+    ln -s /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3
+    ln -s /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv
+    ln -s /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3
   EOF
 end
 

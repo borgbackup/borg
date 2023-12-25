@@ -512,7 +512,7 @@ class Passphrase(str):
             # passcommand is a system command (not inside pyinstaller env)
             env = prepare_subprocess_env(system=True)
             try:
-                passphrase = subprocess.check_output(shlex.split(passcommand), universal_newlines=True, env=env)
+                passphrase = subprocess.check_output(shlex.split(passcommand), text=True, env=env)
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 raise PasscommandFailure(e)
             return cls(passphrase.rstrip('\n'))
@@ -785,7 +785,7 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
                 raise KeyfileMismatchError(self.repository._location.canonical_path(), filename)
         # we get here if it really looks like a borg key for this repo,
         # do some more checks that are close to how borg reads/parses the key.
-        with open(filename, 'r') as fd:
+        with open(filename) as fd:
             lines = fd.readlines()
             if len(lines) < 2:
                 logger.warning(f"borg key sanity check: expected 2+ lines total. [{filename}]")

@@ -74,7 +74,7 @@ def packages_openbsd
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
-    pkg_add openssl%1.1
+    pkg_add openssl%3.0
     pkg_add py3-pip
     pkg_add py3-virtualenv
   EOF
@@ -113,10 +113,13 @@ def packages_darwin
     sudo softwareupdate --install --all
     which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
-    brew install pkg-config readline openssl@1.1 zstd lz4 xz
+    brew install pkg-config readline openssl@3.0 zstd lz4 xz
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
-    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile
+    echo 'export LDFLAGS=-L/usr/local/opt/openssl@3.0/lib' >> ~vagrant/.bash_profile
+    echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3.0/include' >> ~vagrant/.bash_profile
+    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3.0/lib/pkgconfig' >> ~vagrant/.bash_profile
+    echo 'export PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@3.0' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -346,7 +349,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "openbsd71-64"
+    b.vm.box = "generic/openbsd7"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -408,7 +411,4 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64", ".*fuse.*")
   end
-
-  # TODO: create more VMs with python 3.9+ and openssl 1.1.
-  # See branch 1.1-maint for a better equipped Vagrantfile (but still on py35 and openssl 1.0).
 end

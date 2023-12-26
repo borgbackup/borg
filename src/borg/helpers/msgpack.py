@@ -182,7 +182,7 @@ def is_slow_msgpack():
 def is_supported_msgpack():
     # DO NOT CHANGE OR REMOVE! See also requirements and comments in setup.py.
     import msgpack
-    return (1, 0, 2) <= msgpack.version <= (1, 0, 7) and \
+    return (1, 0, 3) <= msgpack.version <= (1, 0, 7) and \
            msgpack.version not in []  # < add bad releases here to deny list
 
 

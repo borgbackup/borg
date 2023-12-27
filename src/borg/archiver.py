@@ -48,7 +48,7 @@ try:
     from .helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from .helpers import Error, NoManifestError, set_ec
     from .helpers import positive_int_validator, location_validator, archivename_validator, ChunkerParams, Location
-    from .helpers import PrefixSpec, GlobSpec, CommentSpec, SortBySpec, FilesCacheMode
+    from .helpers import PrefixSpec, GlobSpec, CommentSpec, PathSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
     from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
@@ -3061,7 +3061,7 @@ class Archiver:
             parser.add_argument('--numeric-ids', dest='numeric_ids', action='store_true',
                                   help='use numeric user and group identifiers from archive(s)')
             define_archive_filters_group(parser)
-            parser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+            parser.add_argument('paths', metavar='PATH', nargs='*', type=PathSpec,
                                    help='paths to extract; patterns are supported')
             define_exclusion_group(parser, strip_components=True)
 
@@ -3732,7 +3732,7 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='name of archive to create (must be also a valid directory name)')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str, action='extend',
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=PathSpec, action='extend',
                                help='paths to archive')
 
         # borg debug
@@ -4052,7 +4052,7 @@ class Archiver:
         subparser.add_argument('archive2', metavar='ARCHIVE2',
                                type=archivename_validator(),
                                help='ARCHIVE2 name (no repository location allowed)')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=PathSpec,
                                help='paths of items inside the archives to compare; patterns are supported')
         define_exclusion_group(subparser)
 
@@ -4109,7 +4109,7 @@ class Archiver:
                                help='archive to export')
         subparser.add_argument('tarfile', metavar='FILE',
                                help='output tar file. "-" to write to stdout instead.')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=PathSpec,
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)
 
@@ -4167,7 +4167,7 @@ class Archiver:
         subparser.add_argument('location', metavar='ARCHIVE',
                                type=location_validator(archive=True),
                                help='archive to extract')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=PathSpec,
                                help='paths to extract; patterns are supported')
         define_exclusion_group(subparser, strip_components=True)
 
@@ -4421,7 +4421,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_key_export)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
-        subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
+        subparser.add_argument('path', metavar='PATH', nargs='?', type=PathSpec,
                                help='where to store the backup')
         subparser.add_argument('--paper', dest='paper', action='store_true',
                                help='Create an export suitable for printing and later type-in')
@@ -4452,7 +4452,7 @@ class Archiver:
         subparser.set_defaults(func=self.do_key_import)
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False))
-        subparser.add_argument('path', metavar='PATH', nargs='?', type=str,
+        subparser.add_argument('path', metavar='PATH', nargs='?', type=PathSpec,
                                help='path to the backup (\'-\' to read from stdin)')
         subparser.add_argument('--paper', dest='paper', action='store_true',
                                help='interactively import from a backup done with ``--paper``')
@@ -4580,7 +4580,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository or archive to list contents of')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=PathSpec,
                                help='paths to list; patterns are supported')
         define_archive_filters_group(subparser)
         define_exclusion_group(subparser)
@@ -4798,7 +4798,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY_OR_ARCHIVE', nargs='?', default='',
                                type=location_validator(),
                                help='repository or archive to recreate')
-        subparser.add_argument('paths', metavar='PATH', nargs='*', type=str,
+        subparser.add_argument('paths', metavar='PATH', nargs='*', type=PathSpec,
                                help='paths to recreate; patterns are supported')
 
         # borg rename

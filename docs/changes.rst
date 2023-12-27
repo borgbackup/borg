@@ -393,16 +393,29 @@ New features:
 
 Fixes:
 
+- PATH: do not accept empty strings, #4221
+  This affects the cli interface of misc. commands (create, extract, diff, mount, ...)
+  and they now will reject "" (empty string) given as a path.
+
 Other changes:
 
 - Python: require Python >= 3.9, drop support for 3.8, #6383
 - Cython: require Cython >= 3.0, drop support for Cython 0.29.x,
   use 3str language level (default in cython3), #7978
-- use pyinstaller 5.13.2 and python 3.11 for binary build, #7987
-- msgpack: require >= 1.0.2, <= 1.0.7
-- vagrant: use a freebsd 14 box, #6871
+- use pyinstaller 6.3.0 and python 3.11 for binary build, #7987
+- msgpack: require >= 1.0.3, <= 1.0.7
+- replace flake8 by ruff style/issue checker
+- tests: remove python-dateutil dependency
+- tests: move conftest.py to src/borg/testsuite, #6386
+- move misc. config/metadata to pyproject.toml
+- vagrant:
+
+  - use a freebsd 14 box, #6871
+  - use generic/openbsd7 box
+  - use openssl 3 on macOS, FreeBSD, OpenBSD
+  - remove ubuntu 20.04 "focal" box
+  - remove debian 9 "stretch" box (remove stretch-based binary builds)
 - require recent setuptools and setuptools_scm
-- move setuptools_scm configuration to pyproject.toml
 - crypto: get rid of deprecated HMAC_* functions to avoid warnings.
   Instead, use hmac.digest from Python stdlib.
 

@@ -223,6 +223,12 @@ GlobSpec = replace_placeholders
 CommentSpec = replace_placeholders
 
 
+def PathSpec(text):
+    if not text:
+        raise argparse.ArgumentTypeError('Empty strings are not accepted as paths.')
+    return text
+
+
 def SortBySpec(text):
     from .manifest import AI_HUMAN_SORT_KEYS
     for token in text.split(','):

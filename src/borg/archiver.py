@@ -1355,6 +1355,9 @@ class Archiver:
             self.print_error('%s: Mountpoint must be a writable directory' % args.mountpoint)
             return self.exit_code
 
+        if "" in args.paths:
+            self.print_warning('Empty string given as PATH, this will not match anything!')
+
         return self._do_mount(args)
 
     @with_repository(compatibility=(Manifest.Operation.READ,))

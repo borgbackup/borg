@@ -119,6 +119,7 @@ SUPPORTED_ALGORITHMS = {
 
 class FileIntegrityError(IntegrityError):
     """File failed integrity check: {}"""
+    exit_mcode = 91
 
 
 class IntegrityCheckedFile(FileLikeWrapper):

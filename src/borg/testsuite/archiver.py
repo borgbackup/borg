@@ -40,7 +40,8 @@ from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
 from ..helpers import Location, get_security_dir
 from ..helpers import Manifest, MandatoryFeatureUnsupported, ArchiveInfo
-from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from ..helpers import init_ec_warnings
+from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, Error, CancelledByUser, RTError, CommandError
 from ..helpers import bin_to_hex
 from ..helpers import MAX_S
 from ..helpers import msgpack
@@ -96,8 +97,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_outpu
             if archiver is None:
                 archiver = Archiver()
             archiver.prerun_checks = lambda *args: None
-            archiver.exit_code = EXIT_SUCCESS
-            helpers.exit_code = EXIT_SUCCESS
+            init_ec_warnings()
             try:
                 args = archiver.parse_args(list(args))
                 # argparse parsing may raise SystemExit when the command line is bad or
@@ -1171,9 +1171,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_create_content_from_command_with_failed_command(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--content-from-command', self.repository_location + '::test',
-                          '--', 'sh', '-c', 'exit 73;', exit_code=2)
-        assert output.endswith("Command 'sh' exited with status 73\n")
+        if self.FORK_DEFAULT:
+            output = self.cmd('create', '--content-from-command', self.repository_location + '::test',
+                              '--', 'sh', '-c', 'exit 73;', exit_code=2)
+            assert output.endswith("Command 'sh' exited with status 73\n")
+        else:
+            with pytest.raises(CommandError):
+                self.cmd('create', '--content-from-command', self.repository_location + '::test',
+                         '--', 'sh', '-c', 'exit 73;')
         archive_list = json.loads(self.cmd('list', '--json', self.repository_location))
         assert archive_list['archives'] == []
 
@@ -1212,9 +1217,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_create_paths_from_command_with_failed_command(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('create', '--paths-from-command', self.repository_location + '::test',
-                          '--', 'sh', '-c', 'exit 73;', exit_code=2)
-        assert output.endswith("Command 'sh' exited with status 73\n")
+        if self.FORK_DEFAULT:
+            output = self.cmd('create', '--paths-from-command', self.repository_location + '::test',
+                              '--', 'sh', '-c', 'exit 73;', exit_code=2)
+            assert output.endswith("Command 'sh' exited with status 73\n")
+        else:
+            with pytest.raises(CommandError):
+                self.cmd('create', '--paths-from-command', self.repository_location + '::test',
+                         '--', 'sh', '-c', 'exit 73;')
         archive_list = json.loads(self.cmd('list', '--json', self.repository_location))
         assert archive_list['archives'] == []
 
@@ -1699,7 +1709,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('create', self.repository_location + '::test', 'input')
         self.cmd('create', self.repository_location + '::test.2', 'input')
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'no'
-        self.cmd('delete', self.repository_location, exit_code=2)
+        if self.FORK_DEFAULT:
+            self.cmd('delete', self.repository_location, exit_code=2)
+        else:
+            with pytest.raises(CancelledByUser):
+                self.cmd('delete', self.repository_location)
         assert os.path.exists(self.repository_path)
         os.environ['BORG_DELETE_I_KNOW_WHAT_I_AM_DOING'] = 'YES'
         self.cmd('delete', self.repository_location)
@@ -2470,8 +2484,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_list_json_args(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('list', '--json-lines', self.repository_location, exit_code=2)
-        self.cmd('list', '--json', self.repository_location + '::archive', exit_code=2)
+        if self.FORK_DEFAULT:
+            self.cmd('list', '--json-lines', self.repository_location, exit_code=2)
+        else:
+            with pytest.raises(CommandError):
+                self.cmd('list', '--json-lines', self.repository_location)
+        if self.FORK_DEFAULT:
+            self.cmd('list', '--json', self.repository_location + '::archive', exit_code=2)
+        else:
+            with pytest.raises(CommandError):
+                self.cmd('list', '--json', self.repository_location + '::archive')
 
     def test_log_json(self):
         self.create_test_files()
@@ -2956,7 +2978,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             raise EOFError
 
         with patch.object(KeyfileKeyBase, 'create', raise_eof):
-            self.cmd('init', '--encryption=repokey', self.repository_location, exit_code=1)
+            if self.FORK_DEFAULT:
+                self.cmd('init', '--encryption=repokey', self.repository_location, exit_code=2)
+            else:
+                with pytest.raises(CancelledByUser):
+                    self.cmd('init', '--encryption=repokey', self.repository_location)
         assert not os.path.exists(self.repository_location)
 
     def test_init_requires_encryption_option(self):
@@ -3025,8 +3051,12 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_recreate_target_rc(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        output = self.cmd('recreate', self.repository_location, '--target=asdf', exit_code=2)
-        assert 'Need to specify single archive' in output
+        if self.FORK_DEFAULT:
+            output = self.cmd('recreate', self.repository_location, '--target=asdf', exit_code=2)
+            assert 'Need to specify single archive' in output
+        else:
+            with pytest.raises(CommandError):
+                self.cmd('recreate', self.repository_location, '--target=asdf')
 
     def test_recreate_target(self):
         self.create_test_files()
@@ -3317,13 +3347,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         self.cmd('init', self.repository_location, '--encryption', 'repokey')
 
-        self.cmd('key', 'export', self.repository_location, export_directory, exit_code=EXIT_ERROR)
+        if self.FORK_DEFAULT:
+            self.cmd('key', 'export', self.repository_location, export_directory, exit_code=EXIT_ERROR)
+        else:
+            with pytest.raises(CommandError):
+                self.cmd('key', 'export', self.repository_location, export_directory)
 
     def test_key_import_errors(self):
         export_file = self.output_path + '/exported'
         self.cmd('init', self.repository_location, '--encryption', 'keyfile')
 
-        self.cmd('key', 'import', self.repository_location, export_file, exit_code=EXIT_ERROR)
+        if self.FORK_DEFAULT:
+            self.cmd('key', 'import', self.repository_location, export_file, exit_code=EXIT_ERROR)
+        else:
+            with pytest.raises(CommandError):
+                self.cmd('key', 'import', self.repository_location, export_file)
 
         with open(export_file, 'w') as fd:
             fd.write('something not a key\n')
@@ -3481,8 +3519,13 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.assert_in('id', output)
         self.assert_not_in('last_segment_checked', output)
 
-        output = self.cmd('config', self.repository_location, 'last_segment_checked', exit_code=1)
-        self.assert_in('No option ', output)
+        if self.FORK_DEFAULT:
+            output = self.cmd('config', self.repository_location, 'last_segment_checked', exit_code=2)
+            self.assert_in('No option ', output)
+        else:
+            with pytest.raises(Error):
+                self.cmd('config', self.repository_location, 'last_segment_checked')
+
         self.cmd('config', self.repository_location, 'last_segment_checked', '123')
         output = self.cmd('config', self.repository_location, 'last_segment_checked')
         assert output == '123' + '\n'
@@ -3500,11 +3543,23 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             output = self.cmd('config', self.repository_location, cfg_key)
             assert output == cfg_value + '\n'
             self.cmd('config', '--delete', self.repository_location, cfg_key)
-            self.cmd('config', self.repository_location, cfg_key, exit_code=1)
+            if self.FORK_DEFAULT:
+                self.cmd('config', self.repository_location, cfg_key, exit_code=2)
+            else:
+                with pytest.raises(Error):
+                    self.cmd('config', self.repository_location, cfg_key)
 
         self.cmd('config', '--list', '--delete', self.repository_location, exit_code=2)
-        self.cmd('config', self.repository_location, exit_code=2)
-        self.cmd('config', self.repository_location, 'invalid-option', exit_code=1)
+        if self.FORK_DEFAULT:
+            self.cmd('config', self.repository_location, exit_code=2)
+        else:
+            with pytest.raises(CommandError):
+                self.cmd('config', self.repository_location)
+        if self.FORK_DEFAULT:
+            self.cmd('config', self.repository_location, 'invalid-option', exit_code=2)
+        else:
+            with pytest.raises(Error):
+                self.cmd('config', self.repository_location, 'invalid-option')
 
     requires_gnutar = pytest.mark.skipif(not have_gnutar(), reason='GNU tar must be installed for this test.')
     requires_gzip = pytest.mark.skipif(not shutil.which('gzip'), reason='gzip must be installed for this test.')
@@ -4549,7 +4604,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
         output = self.cmd("diff", self.repository_location + "::test0", "test1a")
         do_asserts(output, True)
-        output = self.cmd("diff", self.repository_location + "::test0", "test1b", "--content-only", exit_code=1)
+        output = self.cmd("diff", self.repository_location + "::test0", "test1b", "--content-only")
         do_asserts(output, False, content_only=True)
 
         output = self.cmd("diff", self.repository_location + "::test0", "test1a", "--json-lines")

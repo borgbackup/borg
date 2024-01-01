@@ -39,54 +39,60 @@ AUTHENTICATED_NO_KEY = 'authenticated_no_key' in workarounds
 
 class NoPassphraseFailure(Error):
     """can not acquire a passphrase: {}"""
-
-
-class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."""
+    exit_mcode = 50
 
 
 class PasscommandFailure(Error):
     """passcommand supplied in BORG_PASSCOMMAND failed: {}"""
+    exit_mcode = 51
+
+
+class PassphraseWrong(Error):
+    """passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."""
+    exit_mcode = 52
 
 
 class PasswordRetriesExceeded(Error):
     """exceeded the maximum password retries"""
+    exit_mcode = 53
 
 
 class UnsupportedPayloadError(Error):
     """Unsupported payload type {}. A newer version is required to access this repository."""
+    exit_mcode = 48
 
 
 class UnsupportedManifestError(Error):
     """Unsupported manifest envelope. A newer version is required to access this repository."""
+    exit_mcode = 27
 
 
 class KeyfileNotFoundError(Error):
     """No key file for repository {} found in {}."""
+    exit_mcode = 42
 
 
 class KeyfileInvalidError(Error):
     """Invalid key file for repository {} found in {}."""
+    exit_mcode = 40
 
 
 class KeyfileMismatchError(Error):
     """Mismatch between repository {} and key file {}."""
+    exit_mcode = 41
 
 
 class RepoKeyNotFoundError(Error):
     """No key entry found in the config of repository {}."""
+    exit_mcode = 44
 
 
 class TAMRequiredError(IntegrityError):
     __doc__ = textwrap.dedent("""
     Manifest is unauthenticated, but it is required for this repository.
-
-    This either means that you are under attack, or that you modified this repository
-    with a Borg version older than 1.0.9 after TAM authentication was enabled.
-
-    In the latter case, use "borg upgrade --tam --force '{}'" to re-authenticate the manifest.
     """).strip()
     traceback = True
+    exit_mcode = 98
 
 
 class ArchiveTAMRequiredError(TAMRequiredError):
@@ -94,11 +100,13 @@ class ArchiveTAMRequiredError(TAMRequiredError):
     Archive '{}' is unauthenticated, but it is required for this repository.
     """).strip()
     traceback = True
+    exit_mcode = 96
 
 
 class TAMInvalid(IntegrityError):
     __doc__ = IntegrityError.__doc__
     traceback = True
+    exit_mcode = 97
 
     def __init__(self):
         # Error message becomes: "Data integrity error: Manifest authentication did not verify"
@@ -108,6 +116,7 @@ class TAMInvalid(IntegrityError):
 class ArchiveTAMInvalid(IntegrityError):
     __doc__ = IntegrityError.__doc__
     traceback = True
+    exit_mcode = 95
 
     def __init__(self):
         # Error message becomes: "Data integrity error: Archive authentication did not verify"
@@ -117,6 +126,7 @@ class ArchiveTAMInvalid(IntegrityError):
 class TAMUnsupportedSuiteError(IntegrityError):
     """Could not verify manifest: Unsupported suite {!r}; a newer version is needed."""
     traceback = True
+    exit_mcode = 99
 
 
 class KeyBlobStorage:

@@ -341,20 +341,25 @@ class CacheConfig:
 class Cache:
     """Client Side cache
     """
-    class RepositoryIDNotUnique(Error):
-        """Cache is newer than repository - do you have multiple, independently updated repos with same ID?"""
-
-    class RepositoryReplay(Error):
-        """Cache, or information obtained from the security directory is newer than repository - this is either an attack or unsafe (multiple repos with same ID)"""
-
     class CacheInitAbortedError(Error):
         """Cache initialization aborted"""
-
-    class RepositoryAccessAborted(Error):
-        """Repository access aborted"""
+        exit_mcode = 60
 
     class EncryptionMethodMismatch(Error):
         """Repository encryption method changed since last access, refusing to continue"""
+        exit_mcode = 61
+
+    class RepositoryAccessAborted(Error):
+        """Repository access aborted"""
+        exit_mcode = 62
+
+    class RepositoryIDNotUnique(Error):
+        """Cache is newer than repository - do you have multiple, independently updated repos with same ID?"""
+        exit_mcode = 63
+
+    class RepositoryReplay(Error):
+        """Cache, or information obtained from the security directory is newer than repository - this is either an attack or unsafe (multiple repos with same ID)"""
+        exit_mcode = 64
 
     @staticmethod
     def break_lock(repository, path=None):

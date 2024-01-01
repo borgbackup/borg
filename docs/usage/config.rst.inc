@@ -21,7 +21,7 @@ borg config
     +-------------------------------------------------------+----------------------+----------------------------------------+
     |                                                       | ``VALUE``            | new value for key                      |
     +-------------------------------------------------------+----------------------+----------------------------------------+
-    | **options**                                                                                                           |
+    | **optional arguments**                                                                                                |
     +-------------------------------------------------------+----------------------+----------------------------------------+
     |                                                       | ``-c``, ``--cache``  | get and set values from the repo cache |
     +-------------------------------------------------------+----------------------+----------------------------------------+
@@ -52,7 +52,7 @@ borg config
         new value for key
 
 
-    options
+    optional arguments
         -c, --cache    get and set values from the repo cache
         -d, --delete    delete the key from the config file
         -l, --list     list the configuration of the repo

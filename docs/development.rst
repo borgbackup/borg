@@ -310,7 +310,7 @@ Checklist:
 - Update ``CHANGES.rst``, based on ``git log $PREVIOUS_RELEASE..``.
 - Check version number of upcoming release in ``CHANGES.rst``.
 - Render ``CHANGES.rst`` via ``make html`` and check for markup errors.
-- Verify that ``MANIFEST.in`` and ``setup.py`` are complete.
+- Verify that ``MANIFEST.in``, ``pyproject.toml`` and ``setup.py`` are complete.
 - ``python setup.py build_usage ; python setup.py build_man`` and commit.
 - Tag the release::
 

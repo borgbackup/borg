@@ -21,7 +21,7 @@ borg diff
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     |                                                       | ``PATH``                              | paths of items inside the archives to compare; patterns are supported |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
-    | **options**                                                                                                                                                           |
+    | **optional arguments**                                                                                                                                                |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
     |                                                       | ``--numeric-owner``                   | deprecated, use ``--numeric-ids`` instead                             |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------+
@@ -68,7 +68,7 @@ borg diff
         paths of items inside the archives to compare; patterns are supported
 
 
-    options
+    optional arguments
         --numeric-owner    deprecated, use ``--numeric-ids`` instead
         --numeric-ids    only consider numeric user and group identifiers
         --same-chunker-params    Override check of chunker parameters.

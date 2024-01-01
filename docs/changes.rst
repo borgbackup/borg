@@ -297,7 +297,18 @@ Upgrade Notes
 borg 1.2.x to 1.4.x
 -------------------
 
-(nothing here yet)
+Coming from borg 1.2 there are no upgrade steps needed - just make sure you
+already have done the previous upgrade steps up to 1.2.7.
+
+Compatibility notes:
+
+By default, borg 1.4 will behave quite similar to borg 1.2 (it was forked off
+from 1.2-maint branch at 1.2.7).
+
+For better error handling in your scripts, wrappers or GUI frontends, you may
+want to use BORG_EXIT_CODES=modern - in that case you of course will need to
+make sure these deal with the new error and warning exit codes, see
+internals/frontends docs.
 
 borg 1.1.x to 1.2.x
 -------------------
@@ -390,6 +401,11 @@ For upgrade and compatibility hints, please also read the section "Upgrade Notes
 above.
 
 New features:
+
+- BORG_EXIT_CODES=modern: optional more specific return codes (for errors and warnings).
+  The default value of this new environment variable is "legacy", which should result in
+  a behaviour similar to borg 1.2 and older (only using rc 0, 1 and 2).
+  "modern" exit codes are much more specific (see the internals/frontends docs).
 
 Fixes:
 

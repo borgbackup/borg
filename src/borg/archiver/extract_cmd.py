@@ -8,7 +8,7 @@ from ._common import with_repository, with_archive
 from ._common import build_filter, build_matcher
 from ..archive import BackupError, BackupOSError
 from ..constants import *  # NOQA
-from ..helpers import archivename_validator
+from ..helpers import archivename_validator, PathSpec
 from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
@@ -177,6 +177,6 @@ class ExtractMixIn:
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(
-            "paths", metavar="PATH", nargs="*", type=str, help="paths to extract; patterns are supported"
+            "paths", metavar="PATH", nargs="*", type=PathSpec, help="paths to extract; patterns are supported"
         )
         define_exclusion_group(subparser, strip_components=True)

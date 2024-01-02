@@ -7,7 +7,7 @@ import os
 from ._common import with_repository, with_archive, build_matcher, Highlander
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, BorgJsonEncoder
+from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
 from ..manifest import Manifest
 from ..logger import create_logger
 
@@ -167,7 +167,7 @@ class DiffMixIn:
             "paths",
             metavar="PATH",
             nargs="*",
-            type=str,
+            type=PathSpec,
             help="paths of items inside the archives to compare; patterns are supported",
         )
         define_exclusion_group(subparser)

@@ -7,7 +7,7 @@ from ._common import with_repository, build_matcher, Highlander
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import ItemFormatter, BaseFormatter, archivename_validator
+from ..helpers import ItemFormatter, BaseFormatter, archivename_validator, PathSpec
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -119,6 +119,6 @@ class ListMixIn:
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(
-            "paths", metavar="PATH", nargs="*", type=str, help="paths to list; patterns are supported"
+            "paths", metavar="PATH", nargs="*", type=PathSpec, help="paths to list; patterns are supported"
         )
         define_exclusion_group(subparser)

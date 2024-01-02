@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, List
 
 import pytest
 
@@ -89,7 +89,7 @@ def set_env_variables():
 class ArchiverSetup:
     EXE: str = None  # python source based
     FORK_DEFAULT = False
-    BORG_EXES = []
+    BORG_EXES: List[str] = []
 
     def __init__(self):
         self.archiver = None

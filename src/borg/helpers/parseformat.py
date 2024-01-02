@@ -284,6 +284,12 @@ class PlaceholderReplacer:
 replace_placeholders = PlaceholderReplacer()
 
 
+def PathSpec(text):
+    if not text:
+        raise argparse.ArgumentTypeError("Empty strings are not accepted as paths.")
+    return text
+
+
 def SortBySpec(text):
     from ..manifest import AI_HUMAN_SORT_KEYS
 

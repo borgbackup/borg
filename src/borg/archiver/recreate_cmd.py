@@ -5,7 +5,7 @@ from ._common import build_matcher
 from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
-from ..helpers import archivename_validator, comment_validator, ChunkerParams
+from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams
 from ..helpers import timestamp
 from ..manifest import Manifest
 
@@ -205,5 +205,5 @@ class RecreateMixIn:
         )
 
         subparser.add_argument(
-            "paths", metavar="PATH", nargs="*", type=str, help="paths to recreate; patterns are supported"
+            "paths", metavar="PATH", nargs="*", type=PathSpec, help="paths to recreate; patterns are supported"
         )

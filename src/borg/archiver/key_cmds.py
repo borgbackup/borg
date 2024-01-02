@@ -6,6 +6,7 @@ from ..constants import *  # NOQA
 from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
 from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
 from ..crypto.keymanager import KeyManager
+from ..helpers import PathSpec
 from ..manifest import Manifest
 
 from ._common import with_repository
@@ -194,7 +195,7 @@ class KeysMixIn:
             help="export repository key for backup",
         )
         subparser.set_defaults(func=self.do_key_export)
-        subparser.add_argument("path", metavar="PATH", nargs="?", type=str, help="where to store the backup")
+        subparser.add_argument("path", metavar="PATH", nargs="?", type=PathSpec, help="where to store the backup")
         subparser.add_argument(
             "--paper",
             dest="paper",
@@ -237,7 +238,7 @@ class KeysMixIn:
         )
         subparser.set_defaults(func=self.do_key_import)
         subparser.add_argument(
-            "path", metavar="PATH", nargs="?", type=str, help="path to the backup ('-' to read from stdin)"
+            "path", metavar="PATH", nargs="?", type=PathSpec, help="path to the backup ('-' to read from stdin)"
         )
         subparser.add_argument(
             "--paper",

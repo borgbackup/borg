@@ -15,7 +15,7 @@ from ..helpers import dash_open
 from ..helpers import msgpack
 from ..helpers import create_filter_process
 from ..helpers import ChunkIteratorFileWrapper
-from ..helpers import archivename_validator, comment_validator, ChunkerParams
+from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams
 from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
@@ -418,7 +418,7 @@ class TarMixIn:
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument("tarfile", metavar="FILE", help='output tar file. "-" to write to stdout instead.')
         subparser.add_argument(
-            "paths", metavar="PATH", nargs="*", type=str, help="paths to extract; patterns are supported"
+            "paths", metavar="PATH", nargs="*", type=PathSpec, help="paths to extract; patterns are supported"
         )
         define_exclusion_group(subparser, strip_components=True)
 

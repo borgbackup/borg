@@ -4,6 +4,7 @@ import os
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import EXIT_ERROR
+from ..helpers import PathSpec
 from ..helpers import umount
 from ..manifest import Manifest
 from ..remote import cache_if_remote
@@ -180,6 +181,6 @@ class MountMixIn:
         )
         define_archive_filters_group(parser)
         parser.add_argument(
-            "paths", metavar="PATH", nargs="*", type=str, help="paths to extract; patterns are supported"
+            "paths", metavar="PATH", nargs="*", type=PathSpec, help="paths to extract; patterns are supported"
         )
         define_exclusion_group(parser, strip_components=True)

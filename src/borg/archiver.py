@@ -1853,7 +1853,7 @@ class Archiver:
             ret = subprocess.call([args.command] + args.args, env=env)
         except (ValueError, FileNotFoundError, OSError) as e:
             self.print_error(f"Could not execute '{args.command}': {e}")
-            ret = -1
+            ret = -2
         finally:
             # we need to commit the "no change" operation we did to the manifest
             # because it created a new segment file in the repository. if we would

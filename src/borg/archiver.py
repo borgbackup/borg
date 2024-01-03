@@ -1852,8 +1852,8 @@ class Archiver:
             # we exit with the return code we get from the subprocess
             ret = subprocess.call([args.command] + args.args, env=env)
         except (ValueError, FileNotFoundError, OSError) as e:
-            self.print_error(f"Could not execute '{args.command}': {e}")
-            ret = -2
+            self.print_error(f"Error while trying to run '{args.command}': {e}")
+            ret = EXIT_ERROR
         finally:
             # we need to commit the "no change" operation we did to the manifest
             # because it created a new segment file in the repository. if we would

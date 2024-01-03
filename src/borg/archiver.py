@@ -1850,13 +1850,10 @@ class Archiver:
         env = prepare_subprocess_env(system=True)
         try:
             # we exit with the return code we get from the subprocess
-            try:
-                ret = subprocess.call([args.command] + args.args, env=env)
-            except FileNotFoundError as e:
-                self.print_error(f"Could not execute '{args.command}': {e}")
-                ret = 1
-            finally:
-                return ret
+            ret = subprocess.call([args.command] + args.args, env=env)
+        except (ValueError, FileNotFoundError, OSError) as e:
+            self.print_error(f"Could not execute '{args.command}': {e}")
+            ret = -1
         finally:
             # we need to commit the "no change" operation we did to the manifest
             # because it created a new segment file in the repository. if we would
@@ -1865,6 +1862,7 @@ class Archiver:
             # any other mechanism relying on existing segment data not changing).
             # see issue #1867.
             repository.commit(compact=False)
+            return ret
 
     @with_repository(manifest=False, exclusive=True)
     def do_compact(self, args, repository):

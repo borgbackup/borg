@@ -77,7 +77,7 @@ class LocksMixIn:
 
         ::
 
-        $ borg with-lock /mnt/borgrepo rsync -av /mnt/borgrepo /somewhere/else
+            $ borg with-lock /mnt/borgrepo rsync -av /mnt/borgrepo /somewhere/else/borgrepo
 
         It will first try to acquire the lock (make sure that no other operation is
         running in the repo), then execute the given command as a subprocess and wait

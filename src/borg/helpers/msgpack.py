@@ -3,8 +3,9 @@ from ..constants import *  # NOQA
 
 # wrapping msgpack ---------------------------------------------------------------------------------------------------
 #
-# due to the planned breaking api changes in upstream msgpack, we wrap it the way we need it -
+# due to the breaking api changes in upstream msgpack (from 0.x to 1.0), we wrapped it the way we need it -
 # to avoid having lots of clutter in the calling code. see tickets #968 and #3632.
+# as borg 1.4 now requires msgpack > 1.0 anyway, the wrapper has reduced functionality, but was kept.
 #
 # Packing
 # -------
@@ -29,8 +30,6 @@ from msgpack import OutOfData
 
 
 version = mp_version
-
-_post_100 = version >= (1, 0, 0)
 
 
 class PackException(Exception):
@@ -95,13 +94,12 @@ class Unpacker(mp_Unpacker):
                   object_hook=object_hook, object_pairs_hook=object_pairs_hook, list_hook=list_hook,
                   unicode_errors=unicode_errors, max_buffer_size=max_buffer_size,
                   ext_hook=ext_hook,
+                  strict_map_key=strict_map_key,
                   max_str_len=max_str_len,
                   max_bin_len=max_bin_len,
                   max_array_len=max_array_len,
                   max_map_len=max_map_len,
                   max_ext_len=max_ext_len)
-        if _post_100:
-            kw['strict_map_key'] = strict_map_key
         super().__init__(**kw)
 
     def unpack(self):
@@ -133,15 +131,13 @@ def unpackb(packed, *, raw=True, unicode_errors=None,
             **kwargs):
     assert unicode_errors is None
     try:
-        kw = dict(raw=raw, unicode_errors=unicode_errors,
+        kw = dict(raw=raw, unicode_errors=unicode_errors, strict_map_key=strict_map_key,
                   max_str_len=max_str_len,
                   max_bin_len=max_bin_len,
                   max_array_len=max_array_len,
                   max_map_len=max_map_len,
                   max_ext_len=max_ext_len)
         kw.update(kwargs)
-        if _post_100:
-            kw['strict_map_key'] = strict_map_key
         return mp_unpackb(packed, **kw)
     except Exception as e:
         raise UnpackException(e)
@@ -157,15 +153,13 @@ def unpack(stream, *, raw=True, unicode_errors=None,
            **kwargs):
     assert unicode_errors is None
     try:
-        kw = dict(raw=raw, unicode_errors=unicode_errors,
+        kw = dict(raw=raw, unicode_errors=unicode_errors, strict_map_key=strict_map_key,
                   max_str_len=max_str_len,
                   max_bin_len=max_bin_len,
                   max_array_len=max_array_len,
                   max_map_len=max_map_len,
                   max_ext_len=max_ext_len)
         kw.update(kwargs)
-        if _post_100:
-            kw['strict_map_key'] = strict_map_key
         return mp_unpack(stream, **kw)
     except Exception as e:
         raise UnpackException(e)

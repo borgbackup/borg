@@ -1851,7 +1851,7 @@ class Archiver:
         try:
             # we exit with the return code we get from the subprocess
             ret = subprocess.call([args.command] + args.args, env=env)
-        except (ValueError, FileNotFoundError, OSError) as e:
+        except (FileNotFoundError, OSError, ValueError) as e:
             self.print_error(f"Error while trying to run '{args.command}': {e}")
             ret = EXIT_ERROR
         finally:

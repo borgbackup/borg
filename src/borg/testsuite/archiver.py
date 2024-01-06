@@ -3186,6 +3186,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         cmd = 'python3', '-c', 'import os, sys; sys.exit(42 if os.path.exists("%s") else 23)' % lock_path
         self.cmd('with-lock', self.repository_location, *cmd, fork=True, exit_code=42)
 
+    def test_with_lock_non_existent_command(self):
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        cmd = ['non_existent_command', ]
+        self.cmd('with-lock', self.repository_location, *cmd, fork=True, exit_code=EXIT_ERROR)
+
     def test_recreate_list_output(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('file1', size=0)

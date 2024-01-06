@@ -3188,7 +3188,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
     def test_with_lock_non_existent_command(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        cmd = 'non_existent_command',
+        cmd = ['non_existent_command', ]
         self.cmd('with-lock', self.repository_location, *cmd, fork=True, exit_code=EXIT_ERROR)
 
     def test_recreate_list_output(self):

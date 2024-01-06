@@ -18,3 +18,10 @@ def test_with_lock(archivers, request):
     lock_path = os.path.join(archiver.repository_path, "lock.exclusive")
     command = "python3", "-c", 'import os, sys; sys.exit(42 if os.path.exists("%s") else 23)' % lock_path
     cmd(archiver, "with-lock", *command, fork=True, exit_code=42)
+
+
+def test_with_lock_non_existent_command(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    command = ["non_existent_command"]
+    cmd(archiver, "with-lock", *command, fork=True, exit_code=EXIT_ERROR)

@@ -4,7 +4,7 @@ import subprocess
 from ._common import with_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import prepare_subprocess_env, set_ec
+from ..helpers import prepare_subprocess_env, set_ec, CommandError
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -35,6 +35,8 @@ class LocksMixIn:
             # we exit with the return code we get from the subprocess
             rc = subprocess.call([args.command] + args.args, env=env)
             set_ec(rc)
+        except (FileNotFoundError, OSError, ValueError) as e:
+            raise CommandError(f"Error while trying to run '{args.command}': {e}")
         finally:
             # we need to commit the "no change" operation we did to the manifest
             # because it created a new segment file in the repository. if we would

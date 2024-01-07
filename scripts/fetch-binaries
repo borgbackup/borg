@@ -1,0 +1,21 @@
+#!/bin/bash
+
+mkdir -p dist/
+
+check_and_copy () {
+    echo "--- EXE $2 -----------------------------------------------"
+    vagrant ssh $1 -c "/vagrant/borg/borg.exe -V"
+    vagrant scp $1:/vagrant/borg/borg.exe   dist/$2
+    echo "--- DIR $2 -----------------------------------------------"
+    vagrant ssh $1 -c "/vagrant/borg/borg-dir/borg.exe -V"
+    vagrant scp $1:/vagrant/borg/borg.tgz   dist/$2.tgz
+    echo ""
+}
+
+check_and_copy buster64   borg-linux-glibc228
+check_and_copy bullseye64 borg-linux-glibc231
+check_and_copy bookworm64 borg-linux-glibc236
+
+check_and_copy freebsd64  borg-freebsd
+
+check_and_copy darwin64   borg-macos

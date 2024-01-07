@@ -4924,7 +4924,11 @@ class Archiver:
 
         # borg with-lock
         with_lock_epilog = process_epilog("""
-        This command runs a user-specified command while the repository lock is held.
+        This command runs a user-specified command while locking the repository. For example:
+
+        ::
+
+            $ borg with-lock /mnt/borgrepo rsync -av /mnt/borgrepo /somewhere/else/borgrepo
 
         It will first try to acquire the lock (make sure that no other operation is
         running in the repo), then execute the given command as a subprocess and wait

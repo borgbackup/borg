@@ -403,7 +403,7 @@ class Archiver:
             if not args.path:
                 raise CommandError("expected input file to import key from")
             if args.path != '-' and not os.path.exists(args.path):
-                raise CommandError("input file does not exist: " + args.path)
+                raise CommandError(f"input file does not exist: {args.path}")
             manager.import_keyfile(args)
 
     @with_repository(manifest=False)
@@ -532,11 +532,11 @@ class Archiver:
                             env = prepare_subprocess_env(system=True)
                             proc = subprocess.Popen(args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=ignore_sigint)
                         except (FileNotFoundError, PermissionError) as e:
-                            raise CommandError('Failed to execute command: %s', e)
+                            raise CommandError(f'Failed to execute command: {e}')
                         status = fso.process_pipe(path=path, cache=cache, fd=proc.stdout, mode=mode, user=user, group=group)
                         rc = proc.wait()
                         if rc != 0:
-                            raise CommandError('Command %r exited with status %d', args.paths[0], rc)
+                            raise CommandError(f'Command {args.paths[0]!r} exited with status {rc}')
                     except BackupError as e:
                         raise Error('%s: %s', path, e)
                 else:
@@ -549,7 +549,7 @@ class Archiver:
                         env = prepare_subprocess_env(system=True)
                         proc = subprocess.Popen(args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=ignore_sigint)
                     except (FileNotFoundError, PermissionError) as e:
-                        raise CommandError('Failed to execute command: %s', e)
+                        raise CommandError(f'Failed to execute command: {e}')
                     pipe_bin = proc.stdout
                 else:  # args.paths_from_stdin == True
                     pipe_bin = sys.stdin.buffer
@@ -570,7 +570,7 @@ class Archiver:
                 if args.paths_from_command:
                     rc = proc.wait()
                     if rc != 0:
-                        raise CommandError('Command %r exited with status %d', args.paths[0], rc)
+                        raise CommandError(f'Command {args.paths[0]!r} exited with status {rc}')
             else:
                 for path in args.paths:
                     if path == '-':  # stdin
@@ -1681,7 +1681,7 @@ class Archiver:
         if args.location.archive:
             name = args.location.archive
             if recreater.is_temporary_archive(name):
-                raise CommandError('Refusing to work on temporary archive of prior recreate: %s', name)
+                raise CommandError(f'Refusing to work on temporary archive of prior recreate: {name}')
             if not recreater.recreate(name, args.comment, args.target):
                 raise CommandError('Nothing to do. Archive was not processed.\n'
                                    'Specify at least one pattern, PATH, --comment, re-compression or re-chunking option.')

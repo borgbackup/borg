@@ -110,6 +110,92 @@ most minor changes and fixes where committed to a maintenance branch
 back into the main development branch. This became more and more
 troublesome due to merges growing more conflict-heavy and error-prone.
 
+How to submit a pull request
+----------------------------
+
+In order to contribute to Borg, you will need to fork the ``borgbackup/borg``
+main repository to your own Github repository. Then clone your Github repository
+to your local machine. The instructions for forking and cloning a repository
+can be found there:
+`<https://docs.github.com/en/get-started/quickstart/fork-a-repo>`_ .
+
+To work on your contribution, you first need to decide which branch your pull
+request should be against. Often, this might be master branch (esp. for big /
+risky contributions), but it could be also a maintenance branch like e.g.
+1.4-maint (esp. for small fixes that should go into next maintenance release,
+e.g. 1.4.x).
+
+Start by checking out the appropriate branch:
+::
+    git checkout master
+
+It is best practice for a developer to keep local ``master`` branch as an
+uptodate copy of the upstream ``master`` branch and always do own work in a
+separate feature or bugfix branch.
+This is useful to be able to rebase own branches onto the upstream branches
+they were branched from, if necessary.
+
+This also applies to other upstream branches (like e.g. ``1.4-maint``), not
+only to ``master``.
+
+Thus, create a new branch now:
+::
+    git checkout -b MYCONTRIB-master  # choose an appropriate own branch name
+
+Now, work on your contribution in that branch. Use these git commands:
+::
+    git status   # is there anything that needs to be added?
+    git add ...  # if so, add it
+    git commit   # finally, commit it. use a descriptive comment.
+
+Then push the changes to your Github repository:
+::
+    git push --set-upstream origin MYCONTRIB-master
+
+Finally, make a pull request on ``borgbackup/borg`` Github repository against
+the appropriate branch (e.g. ``master``) so that your changes can be reviewed.
+
+What to do if work was accidentally started in wrong branch
+-----------------------------------------------------------
+
+If you accidentally worked in ``master`` branch, check out the ``master``
+branch and make sure there are no uncommitted changes. Then, create a feature
+branch from that, so that your contribution is in a feature branch.
+::
+
+    git checkout master
+    git checkout -b MYCONTRIB-master
+
+Next, check out the ``master`` branch again. Find the commit hash of the last
+commit that was made before you started working on your contribution and perform
+a hard reset.
+::
+    git checkout master
+    git log
+    git reset --hard THATHASH
+
+Then, update the local ``master`` branch with changes made in the upstream
+repository.
+::
+    git pull borg master
+
+Rebase feature branch onto updated master branch
+------------------------------------------------
+
+After updating the local ``master`` branch from upstream, the feature branch
+can be checked out and rebased onto (the now uptodate) ``master`` branch.
+::
+    git checkout MYCONTRIB-master
+    git rebase -i master
+
+Next, check if there are any commits that exist in the feature branch
+but not in the ``master`` branch and vice versa. If there are no
+conflicts or after resolving them, push your changes to your Github repository.
+::
+    git log
+    git diff master
+    git push -f
+
 Code and issues
 ---------------
 

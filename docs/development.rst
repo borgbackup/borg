@@ -110,76 +110,87 @@ most minor changes and fixes where committed to a maintenance branch
 back into the main development branch. This became more and more
 troublesome due to merges growing more conflict-heavy and error-prone.
 
-How to Submit Pull Requests
----------------------------
+How to submit a pull request
+----------------------------
 
-In order to work on a copy of Borg's repository, you will need to fork
-the repository to your own Github repository, and then clone the repository
+In order to contribute to Borg, you will need to fork the ``borgbackup/borg``
+main repository to your own Github repository. Then clone your Github repository
 to your local machine. The instructions for forking and cloning a repository
-can be found at the following page on GitHub docs:
+can be found there:
 `<https://docs.github.com/en/get-started/quickstart/fork-a-repo>`_ .
 
-In order to make changes to files and commit those changes, you will need
-to create and check out a new feature branch using the following command:
+To work on your contribution, you first need to decide which branch your pull
+request should be against. Often, this might be master branch (esp. for big /
+risky contributions), but it could be also a maintenance branch like e.g.
+1.4-maint (esp. for small fixes that should go into next maintenance release,
+e.g. 1.4.x).
+
+Start by checking out the appropriate branch:
 ::
-    git checkout -b MYFEATURE
+    git checkout master
 
-Next, add changes to the feature branch. In order to see the changes made
-to the feature branch, add the new or modified files to the branch, and
-commit those changes, use the following sequence of commands:
+It is best practice for a developer to keep local ``master`` branch as an
+uptodate copy of the upstream ``master`` branch and always do own work in a
+separate feature or bugfix branch.
+This is useful to be able to rebase own branches onto the upstream branches
+they were branched from, if necessary.
+
+This also applies to other upstream branches (like e.g. ``1.4-maint``), not
+only to ``master``.
+
+Thus, create a new branch now:
 ::
-    git status
-    git add *
-    git commit
+    git checkout -b MYCONTRIB-master  # choose an appropriate own branch name
 
-After making the changes, push the changes to your remote repository
-using the following command:
+Now, work on your contribution in that branch. Use these git commands:
 ::
-    git push -u origin MYFEATURE
+    git status   # is there anything that needs to be added?
+    git add ...  # if so, add it
+    git commit   # finally, commit it. use a descriptive comment.
 
-Finally, make a pull request on Github against the ``master`` branch so
-that your changes can be reviewed.
+Then push the changes to your Github repository:
+::
+    git push --set-upstream origin MYCONTRIB-master
 
-How to Work in a Feature Branch if Work Was Started in a Local Branch
----------------------------------------------------------------------
+Finally, make a pull request on ``borgbackup/borg`` Github repository against
+the appropriate branch (e.g. ``master``) so that your changes can be reviewed.
 
-It is best practice for a developer to keep a local ``master`` branch as an
-up-to-date copy of the upstream ``master`` branch, to always work in a
-separate feature or bugfix branch, and to be able to rebase that branch onto the
-``master`` branch if necessary.
+What to do if work was accidentally started in wrong branch
+-----------------------------------------------------------
 
-.. rubric:: Update Local Branch with Remote Master
-
-If changes have been made to the ``master`` branch, check out the ``master``
-branch and make sure there are no uncommitted changes. Then, check out
-a feature branch so that your code is in a feature branch.
+If you accidentally worked in ``master`` branch, check out the ``master``
+branch and make sure there are no uncommitted changes. Then, create a feature
+branch from that, so that your contribution is in a feature branch.
 ::
 
     git checkout master
-    git checkout -b MYFEATURE
+    git checkout -b MYCONTRIB-master
 
-Next, check out the ``master`` branch. Find the commit hash of the last
-commit that you made before working on your feature branch, and perform
-a hard reset. Then, update the local ``master`` branch with changes
-made in the upstream repository using a pull request.
+Next, check out the ``master`` branch again. Find the commit hash of the last
+commit that was made before you started working on your contribution and perform
+a hard reset.
 ::
     git checkout master
     git log
     git reset --hard THATHASH
+
+Then, update the local ``master`` branch with changes made in the upstream
+repository.
+::
     git pull borg master
 
-.. rubric:: Rebase Feature Branch to Updated Master Branch
+Rebase feature branch onto updated master branch
+------------------------------------------------
 
-After updating the local ``master`` branch to reflect any changes
-made in the upstream version, the feature branch can be checked
-out and rebased onto the local ``master`` branch.
+After updating the local ``master`` branch from upstream, the feature branch
+can be checked out and rebased onto (the now uptodate) ``master`` branch.
 ::
-    git checkout MYFEATURE
+    git checkout MYCONTRIB-master
     git rebase -i master
 
 Next, check if there are any commits that exist in the feature branch
 but not in the ``master`` branch and vice versa. If there are no
-conflicts, push your changes to your personal repository on Github.
+conflicts or after resolving them, push your changes to your Github repository.
 ::
     git log
     git diff master

@@ -45,9 +45,9 @@ def packages_freebsd
     pkg install -y fusefs-libs3 || true
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python (for the tests we use pyenv built pythons):
-    pkg install -y python39 py39-sqlite3
+    pkg install -y python310 py310-sqlite3
     # make sure there is a python3 command
-    ln -sf /usr/local/bin/python3.9 /usr/local/bin/python3
+    ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3
     python3 -m ensurepip
     pip3 install virtualenv
     # make bash default / work:
@@ -98,8 +98,13 @@ def packages_netbsd
     pkg_add pkg-config
     # pkg_add fuse  # llfuse supports netbsd, but is still buggy.
     # https://bitbucket.org/nikratio/python-llfuse/issues/70/perfuse_open-setsockopt-no-buffer-space
-    pkg_add python39  py39-sqlite3  py39-pip  py39-virtualenv  py39-expat
-    pkg_add python310 py310-sqlite3 py310-pip py310-virtualenv py310-expat
+    pkg_add py311-sqlite3 py311-pip py311-virtualenv py311-expat
+    ln -s /usr/pkg/bin/python3.11 /usr/pkg/bin/python
+    ln -s /usr/pkg/bin/python3.11 /usr/pkg/bin/python3
+    ln -s /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip
+    ln -s /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3
+    ln -s /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv
+    ln -s /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3
   EOF
 end
 
@@ -113,10 +118,13 @@ def packages_darwin
     sudo softwareupdate --install --all
     which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
-    brew install pkg-config readline xxhash zstd lz4 xz openssl@1.1
+    brew install pkg-config readline xxhash openssl@3.0 zstd lz4 xz
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
-    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile
+    echo 'export LDFLAGS=-L/usr/local/opt/openssl@3.0/lib' >> ~vagrant/.bash_profile
+    echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3.0/include' >> ~vagrant/.bash_profile
+    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3.0/lib/pkgconfig' >> ~vagrant/.bash_profile
+    echo 'export PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@3.0' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -129,92 +137,6 @@ def packages_openindiana
     python3 -m ensurepip
     ln -sf /usr/bin/pip3.9 /usr/bin/pip3
     pip3 install virtualenv
-  EOF
-end
-
-
-# Build and install borg dependencies from source
-def install_source_dependencies(user)
-  return <<-EOF
-    set -e -o pipefail
-
-    # Install in /usr/local
-    export PREFIX=/usr/local
-
-    # Make PKG_CONFIG_PATH explicit, even if /usr/local/lib/pkgconfig is enabled per default
-    export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig
-    echo 'export PKG_CONFIG_PATH="'${PKG_CONFIG_PATH}'"' >> ~#{user}/.bash_profile
-
-    # All source packages integrate with pkg-config, remove any previous overrides
-    sed -i '/BORG_.*_PREFIX/d' ~#{user}/.bash_profile
-
-    # Setup pyenv to pick up the custom openssl version (python >= 3.9 requires openssl >= 1.1.1)
-    echo 'export PYTHON_CONFIGURE_OPTS="--with-openssl='"${PREFIX}"' --with-openssl-rpath=auto"' >> ~#{user}/.bash_profile
-    echo 'export LDFLAGS=-Wl,-rpath,'"${PREFIX}"'/lib' >> ~#{user}/.bash_profile
-
-    # Silence git warning about shallow clones
-    git config --global advice.detachedHead false
-
-    # libattr
-    VERSION_LIBATTR=2.5.1
-    curl -s -L https://download.savannah.nongnu.org/releases/attr/attr-${VERSION_LIBATTR}.tar.gz | tar xvz --strip-components=1 --one-top-level=attr -f - -C ${PREFIX}/src
-    cd ${PREFIX}/src/attr
-    ./configure --prefix=${PREFIX}
-    make -j$(nproc) install
-
-    # libacl
-    VERSION_LIBACL=2.3.1
-    curl -s -L https://download.savannah.nongnu.org/releases/acl/acl-${VERSION_LIBACL}.tar.gz | tar xvz --strip-components=1 --one-top-level=acl -f - -C ${PREFIX}/src
-    cd ${PREFIX}/src/acl
-    ./configure --prefix=${PREFIX}
-    make -j$(nproc) install
-
-    # liblz4
-    VERSION_LIBLZ4=1.9.4
-    git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_LIBLZ4} https://github.com/lz4/lz4.git
-    cd ${PREFIX}/src/lz4
-    make -j$(nproc) install PREFIX=${PREFIX}
-
-    # libzstd
-    VERSION_LIBZSTD=1.5.5
-    git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_LIBZSTD} https://github.com/facebook/zstd.git
-    cd ${PREFIX}/src/zstd
-    make -j$(nproc) install PREFIX=${PREFIX}
-
-    # xxHash
-    VERSION_LIBXXHASH=0.8.2
-    git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_LIBXXHASH} https://github.com/Cyan4973/xxHash.git
-    cd ${PREFIX}/src/xxHash
-    make -j$(nproc) install PREFIX=${PREFIX}
-
-    # openssl
-    VERSION_OPENSSL=1_1_1w
-    git -C ${PREFIX}/src clone --depth 1 --branch OpenSSL_${VERSION_OPENSSL} https://github.com/openssl/openssl.git
-    cd ${PREFIX}/src/openssl
-    ./config --prefix=${PREFIX} --openssldir=${PREFIX}/lib/ssl
-    make -j$(nproc)
-    make -j$(nproc) install
-
-    # libfuse3 requires ninja
-    VERSION_NINJA=1.11.1
-    git -C ${PREFIX}/src clone --depth 1 --branch v${VERSION_NINJA} https://github.com/ninja-build/ninja.git
-    cd ${PREFIX}/src/ninja
-    python3 configure.py --bootstrap
-    install --mode=755 --target-directory=${PREFIX}/bin ninja
-
-    # libfuse3 requires meson >= 0.50; python3.5 support is dropped in meson >= 0.57
-    VERSION_MESON=0.56.2
-    git -C ${PREFIX}/src clone --depth 1 --branch ${VERSION_MESON} https://github.com/mesonbuild/meson.git
-    ln -s ${PREFIX}/src/meson/meson.py ${PREFIX}/bin/meson
-
-    # libfuse3
-    VERSION_LIBFUSE=3.16.1
-    git -C ${PREFIX}/src clone --depth 1 --branch fuse-${VERSION_LIBFUSE} https://github.com/libfuse/libfuse.git
-    cd ${PREFIX}/src/libfuse
-    mkdir build; cd build
-    meson setup --prefix ${PREFIX} --libdir ${PREFIX}/lib ..
-    ninja
-    ninja install
   EOF
 end
 
@@ -244,9 +166,9 @@ def install_pythons(boxname)
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
     pyenv install 3.12.0  # tests
-    pyenv install 3.11.5  # tests, binary build
+    pyenv install 3.11.7  # tests, binary build
     pyenv install 3.10.2  # tests
-    pyenv install 3.9.10  # tests
+    pyenv install 3.9.4  # tests
     pyenv rehash
   EOF
 end
@@ -264,8 +186,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.11 release
-    pyenv global 3.11.5
-    pyenv virtualenv 3.11.5 borg-env
+    pyenv global 3.11.7
+    pyenv virtualenv 3.11.7 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -311,8 +233,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.10 3.10.2 3.11.5 3.12.0
-      pyenv local 3.9.10 3.10.2 3.11.5 3.12.0
+      pyenv global 3.9.4 3.10.2 3.11.7 3.12.0
+      pyenv local 3.9.4 3.10.2 3.11.7 3.12.0
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -425,25 +347,8 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster64", ".*none.*")
   end
 
-  config.vm.define "stretch64" do |b|
-    b.vm.box = "generic/debian9"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "install source dependencies", :type => :shell, :privileged => true, :inline => install_source_dependencies("vagrant")
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("stretch64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("stretch64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("stretch64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("stretch64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("stretch64", ".*none.*")
-  end
-
   config.vm.define "freebsd64" do |b|
-    b.vm.box = "generic/freebsd13"
+    b.vm.box = "generic/freebsd14"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -460,7 +365,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "openbsd71-64"
+    b.vm.box = "generic/openbsd7"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -522,7 +427,4 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64", ".*fuse.*")
   end
-
-  # TODO: create more VMs with python 3.9+ and openssl 1.1 or 3.0.
-  # See branch 1.1-maint for a better equipped Vagrantfile (but still on py35 and openssl 1.0).
 end

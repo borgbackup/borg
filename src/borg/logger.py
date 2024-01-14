@@ -169,43 +169,43 @@ def create_logger(name=None):
         def getChild(self, suffix):
             return LazyLogger(self.__name + '.' + suffix)
 
-        def setLevel(self, *args, **kw):
-            return self.__logger.setLevel(*args, **kw)
+        def setLevel(self, level):
+            return self.__logger.setLevel(level)
 
-        def log(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.log(*args, **kw)
+        def log(self, level, msg, *args, **kwargs):
+            if 'msgid' in kwargs:
+                kwargs.setdefault('extra', {})['msgid'] = kwargs.pop('msgid')
+            return self.__logger.log(level, msg, *args, **kwargs)
 
-        def exception(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.exception(*args, **kw)
+        def exception(self, msg, *args, exc_info=True, **kwargs):
+            if 'msgid' in kwargs:
+                kwargs.setdefault('extra', {})['msgid'] = kwargs.pop('msgid')
+            return self.__logger.exception(msg, *args, exc_info=exc_info, **kwargs)
 
-        def debug(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.debug(*args, **kw)
+        def debug(self, msg, *args, **kwargs):
+            if 'msgid' in kwargs:
+                kwargs.setdefault('extra', {})['msgid'] = kwargs.pop('msgid')
+            return self.__logger.debug(msg, *args, **kwargs)
 
-        def info(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.info(*args, **kw)
+        def info(self, msg, *args, **kwargs):
+            if 'msgid' in kwargs:
+                kwargs.setdefault('extra', {})['msgid'] = kwargs.pop('msgid')
+            return self.__logger.info(msg, *args, **kwargs)
 
-        def warning(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.warning(*args, **kw)
+        def warning(self, msg, *args, **kwargs):
+            if 'msgid' in kwargs:
+                kwargs.setdefault('extra', {})['msgid'] = kwargs.pop('msgid')
+            return self.__logger.warning(msg, *args, **kwargs)
 
-        def error(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.error(*args, **kw)
+        def error(self, msg, *args, **kwargs):
+            if 'msgid' in kwargs:
+                kwargs.setdefault('extra', {})['msgid'] = kwargs.pop('msgid')
+            return self.__logger.error(msg, *args, **kwargs)
 
-        def critical(self, *args, **kw):
-            if 'msgid' in kw:
-                kw.setdefault('extra', {})['msgid'] = kw.pop('msgid')
-            return self.__logger.critical(*args, **kw)
+        def critical(self, msg, *args, **kwargs):
+            if 'msgid' in kwargs:
+                kwargs.setdefault('extra', {})['msgid'] = kwargs.pop('msgid')
+            return self.__logger.critical(msg, *args, **kwargs)
 
     return LazyLogger(name)
 

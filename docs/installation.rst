@@ -245,16 +245,10 @@ Alternatively, you can enumerate all build dependencies in the command line::
 macOS
 +++++
 
-When installing via Homebrew_, dependencies are installed automatically. To install
-dependencies manually::
+When installing borgbackup via Homebrew_, the basic dependencies are installed automatically.
 
-    brew install python3 openssl zstd lz4 xxhash
-    brew install pkg-config
-    pip3 install virtualenv pkgconfig
-
-For FUSE support to mount the backup archives, you need at least version 3.0 of
-macFUSE, which is available via `github
-<https://github.com/osxfuse/osxfuse/releases/latest>`__, or Homebrew::
+For FUSE support to mount the backup archives, you need macFUSE, which is available
+via `github <https://github.com/osxfuse/osxfuse/releases/latest>`__, or Homebrew::
 
     brew install --cask macfuse
 
@@ -263,6 +257,13 @@ since macFUSE only supports FUSE API v2. Also, since Homebrew won't link
 the installed ``openssl`` formula, point pkg-config to the correct path::
 
     PKG_CONFIG_PATH="/usr/local/opt/openssl@1.1/lib/pkgconfig" pip install borgbackup[llfuse]
+
+When working from a borg git repo workdir, you can install dependencies using the
+Brewfile::
+
+    brew install python@3.11  # can be any supported python3 version
+    brew bundle install  # install requirements from borg repo's ./Brewfile
+    pip3 install virtualenv pkgconfig
 
 Be aware that for all recent macOS releases you must authorize full disk access.
 It is no longer sufficient to run borg backups as root. If you have not yet

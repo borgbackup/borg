@@ -99,11 +99,7 @@ jobs:
 
     - name: Install macOS packages
       if: ${{ runner.os == 'macOS' }}
-      run: |
-        brew install pkg-config || brew upgrade pkg-config
-        brew install zstd || brew upgrade zstd
-        brew install lz4 || brew upgrade lz4
-        brew install openssl@1.1 || brew upgrade openssl@1.1
+      run: brew bundle install
 
     - name: Install Python requirements
       run: |

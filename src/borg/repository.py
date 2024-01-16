@@ -16,7 +16,7 @@ from .hashindex import NSIndex
 from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
-from .helpers import bin_to_hex
+from .helpers import bin_to_hex, hex_to_bin
 from .helpers import secure_erase, safe_unlink
 from .helpers import Manifest
 from .helpers import msgpack
@@ -363,9 +363,15 @@ class Repository:
         nonce_path = os.path.join(self.path, 'nonce')
         try:
             with open(nonce_path) as fd:
-                return int.from_bytes(unhexlify(fd.read()), byteorder='big')
+                nonce_hex = fd.read().strip()
         except FileNotFoundError:
             return None
+        else:
+            try:
+                nonce_bytes = hex_to_bin(nonce_hex, length=8)
+            except ValueError as e:
+                raise Error(f"Repository has an invalid nonce file: {e}") from None
+            return int.from_bytes(nonce_bytes, byteorder='big')
 
     def commit_nonce_reservation(self, next_unreserved, start_nonce):
         if self.do_lock and not self.lock.got_exclusive_lock():

@@ -21,7 +21,7 @@ import borg.logger
 from . import __version__
 from .compress import Compressor
 from .constants import *  # NOQA
-from .helpers import Error, IntegrityError
+from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import bin_to_hex
 from .helpers import get_limited_unpacker
 from .helpers import replace_placeholders
@@ -766,7 +766,11 @@ class RemoteRepository:
             error = unpacked["exception_class"]
             args = unpacked["exception_args"]
 
-            if error == "DoesNotExist":
+            if error == "Error":
+                raise Error(args[0])
+            elif error == "ErrorWithTraceback":
+                raise ErrorWithTraceback(args[0])
+            elif error == "DoesNotExist":
                 raise Repository.DoesNotExist(self.location.processed)
             elif error == "AlreadyExists":
                 raise Repository.AlreadyExists(self.location.processed)

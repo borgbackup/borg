@@ -5,7 +5,6 @@ import shutil
 import stat
 import struct
 import time
-from binascii import unhexlify
 from collections import defaultdict
 from configparser import ConfigParser
 from datetime import datetime, timezone
@@ -18,7 +17,7 @@ from .hashindex import NSIndexEntry, NSIndex, NSIndex1, hashindex_variant
 from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
-from .helpers import bin_to_hex
+from .helpers import bin_to_hex, hex_to_bin
 from .helpers import secure_erase, safe_unlink
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
@@ -490,7 +489,7 @@ class Repository:
         if self.storage_quota is None:
             # self.storage_quota is None => no explicit storage_quota was specified, use repository setting.
             self.storage_quota = parse_file_size(self.config.get("repository", "storage_quota", fallback=0))
-        self.id = unhexlify(self.config.get("repository", "id").strip())
+        self.id = hex_to_bin(self.config.get("repository", "id").strip(), length=32)
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
     def _load_hints(self):

@@ -2,7 +2,6 @@ import configparser
 import os
 import shutil
 import stat
-from binascii import unhexlify
 from collections import namedtuple
 from time import perf_counter
 
@@ -17,7 +16,7 @@ from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import Location
 from .helpers import Error
 from .helpers import get_cache_dir, get_security_dir
-from .helpers import bin_to_hex, parse_stringified_list
+from .helpers import bin_to_hex, hex_to_bin, parse_stringified_list
 from .helpers import format_file_size
 from .helpers import safe_ns
 from .helpers import yes
@@ -299,7 +298,7 @@ class CacheConfig:
             self._config.read_file(fd)
         self._check_upgrade(self.config_path)
         self.id = self._config.get("cache", "repository")
-        self.manifest_id = unhexlify(self._config.get("cache", "manifest"))
+        self.manifest_id = hex_to_bin(self._config.get("cache", "manifest"))
         self.timestamp = self._config.get("cache", "timestamp", fallback=None)
         self.key_type = self._config.get("cache", "key_type", fallback=None)
         self.ignored_features = set(parse_stringified_list(self._config.get("cache", "ignored_features", fallback="")))
@@ -733,8 +732,8 @@ class LocalCache(CacheStatsMixin):
                 fns = os.listdir(archive_path)
                 # filenames with 64 hex digits == 256bit,
                 # or compact indices which are 64 hex digits + ".compact"
-                return {unhexlify(fn) for fn in fns if len(fn) == 64} | {
-                    unhexlify(fn[:64]) for fn in fns if len(fn) == 72 and fn.endswith(".compact")
+                return {hex_to_bin(fn) for fn in fns if len(fn) == 64} | {
+                    hex_to_bin(fn[:64]) for fn in fns if len(fn) == 72 and fn.endswith(".compact")
                 }
             else:
                 return set()

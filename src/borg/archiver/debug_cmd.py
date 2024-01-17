@@ -1,5 +1,4 @@
 import argparse
-from binascii import unhexlify, hexlify
 import functools
 import json
 import textwrap
@@ -9,7 +8,7 @@ from ..compress import CompressionSpec
 from ..constants import *  # NOQA
 from ..helpers import msgpack
 from ..helpers import sysinfo
-from ..helpers import bin_to_hex, prepare_dump_dict
+from ..helpers import bin_to_hex, hex_to_bin, prepare_dump_dict
 from ..helpers import dash_open
 from ..helpers import StableDict
 from ..helpers import positive_int_validator, archivename_validator
@@ -179,7 +178,7 @@ class DebugMixIn:
         wanted = args.wanted
         try:
             if wanted.startswith("hex:"):
-                wanted = unhexlify(wanted[4:])
+                wanted = hex_to_bin(wanted[4:])
             elif wanted.startswith("str:"):
                 wanted = wanted[4:].encode()
             else:
@@ -235,9 +234,7 @@ class DebugMixIn:
         """get object contents from the repository and write it into file"""
         hex_id = args.id
         try:
-            id = unhexlify(hex_id)
-            if len(id) != 32:  # 256bit
-                raise ValueError("id must be 256bits or 64 hex digits")
+            id = hex_to_bin(hex_id, length=32)
         except ValueError as err:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
         try:
@@ -264,9 +261,7 @@ class DebugMixIn:
         # get the object from id
         hex_id = args.id
         try:
-            id = unhexlify(hex_id)
-            if len(id) != 32:  # 256bit
-                raise ValueError("id must be 256bits or 64 hex digits")
+            id = hex_to_bin(hex_id, length=32)
         except ValueError as err:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
 
@@ -289,9 +284,7 @@ class DebugMixIn:
         # get the object from id
         hex_id = args.id
         try:
-            id = unhexlify(hex_id)
-            if len(id) != 32:  # 256bit
-                raise ValueError("id must be 256bits or 64 hex digits")
+            id = hex_to_bin(hex_id, length=32)
         except ValueError as err:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
 
@@ -315,9 +308,7 @@ class DebugMixIn:
             data = f.read()
         hex_id = args.id
         try:
-            id = unhexlify(hex_id)
-            if len(id) != 32:  # 256bit
-                raise ValueError("id must be 256bits or 64 hex digits")
+            id = hex_to_bin(hex_id, length=32)
         except ValueError as err:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
 
@@ -331,7 +322,7 @@ class DebugMixIn:
         modified = False
         for hex_id in args.ids:
             try:
-                id = unhexlify(hex_id)
+                id = hex_to_bin(hex_id, length=32)
             except ValueError:
                 print("object id %s is invalid." % hex_id)
             else:
@@ -350,7 +341,7 @@ class DebugMixIn:
         """display refcounts for the objects with the given IDs"""
         for hex_id in args.ids:
             try:
-                id = unhexlify(hex_id)
+                id = hex_to_bin(hex_id, length=32)
             except ValueError:
                 print("object id %s is invalid." % hex_id)
             else:
@@ -370,7 +361,7 @@ class DebugMixIn:
                 segments=repository.segments,
                 compact=repository.compact,
                 storage_quota_use=repository.storage_quota_use,
-                shadow_index={hexlify(k).decode(): v for k, v in repository.shadow_index.items()},
+                shadow_index={bin_to_hex(k): v for k, v in repository.shadow_index.items()},
             )
             with dash_open(args.path, "w") as fd:
                 json.dump(hints, fd, indent=4)

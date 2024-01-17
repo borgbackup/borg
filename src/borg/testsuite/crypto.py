@@ -1,11 +1,10 @@
 # Note: these tests are part of the self test, do not use or import pytest functionality here.
 #       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
 
-from binascii import hexlify
-
 from ..crypto.low_level import AES256_CTR_HMAC_SHA256, UNENCRYPTED, IntegrityError
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import hkdf_hmac_sha512
+from ..helpers import bin_to_hex
 
 from . import BaseTestCase
 
@@ -43,10 +42,10 @@ class CryptoTestCase(BaseTestCase):
         mac = hdr_mac_iv_cdata[1:33]
         iv = hdr_mac_iv_cdata[33:41]
         cdata = hdr_mac_iv_cdata[41:]
-        self.assert_equal(hexlify(hdr), b'42')
-        self.assert_equal(hexlify(mac), b'af90b488b0cc4a8f768fe2d6814fa65aec66b148135e54f7d4d29a27f22f57a8')
-        self.assert_equal(hexlify(iv), b'0000000000000000')
-        self.assert_equal(hexlify(cdata), b'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
+        self.assert_equal(bin_to_hex(hdr), '42')
+        self.assert_equal(bin_to_hex(mac), 'af90b488b0cc4a8f768fe2d6814fa65aec66b148135e54f7d4d29a27f22f57a8')
+        self.assert_equal(bin_to_hex(iv), '0000000000000000')
+        self.assert_equal(bin_to_hex(cdata), 'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
         self.assert_equal(cs.next_iv(), 2)
         # auth-then-decrypt
         cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)
@@ -72,10 +71,10 @@ class CryptoTestCase(BaseTestCase):
         mac = hdr_mac_iv_cdata[3:35]
         iv = hdr_mac_iv_cdata[35:43]
         cdata = hdr_mac_iv_cdata[43:]
-        self.assert_equal(hexlify(hdr), b'123456')
-        self.assert_equal(hexlify(mac), b'7659a915d9927072ef130258052351a17ef882692893c3850dd798c03d2dd138')
-        self.assert_equal(hexlify(iv), b'0000000000000000')
-        self.assert_equal(hexlify(cdata), b'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
+        self.assert_equal(bin_to_hex(hdr), '123456')
+        self.assert_equal(bin_to_hex(mac), '7659a915d9927072ef130258052351a17ef882692893c3850dd798c03d2dd138')
+        self.assert_equal(bin_to_hex(iv), '0000000000000000')
+        self.assert_equal(bin_to_hex(cdata), 'c6efb702de12498f34a2c2bbc8149e759996d08bf6dc5c610aefc0c3a466')
         self.assert_equal(cs.next_iv(), 2)
         # auth-then-decrypt
         cs = AES256_CTR_HMAC_SHA256(mac_key, enc_key, header_len=len(header), aad_offset=1)

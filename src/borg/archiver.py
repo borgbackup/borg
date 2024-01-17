@@ -23,7 +23,6 @@ try:
     import tarfile
     import textwrap
     import time
-    from binascii import unhexlify, hexlify
     from contextlib import contextmanager
     from datetime import datetime, timedelta
     from io import TextIOWrapper
@@ -53,7 +52,7 @@ try:
     from .helpers import PrefixSpec, GlobSpec, CommentSpec, PathSpec, SortBySpec, FilesCacheMode
     from .helpers import BaseFormatter, ItemFormatter, ArchiveFormatter
     from .helpers import format_timedelta, format_file_size, parse_file_size, format_archive
-    from .helpers import safe_encode, remove_surrogates, bin_to_hex, prepare_dump_dict, eval_escapes
+    from .helpers import safe_encode, remove_surrogates, bin_to_hex, hex_to_bin, prepare_dump_dict, eval_escapes
     from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
     from .helpers import timestamp, utcnow
     from .helpers import get_cache_dir, os_stat
@@ -1856,12 +1855,7 @@ class Archiver:
                     raise ValueError('Invalid value')
             elif name in ['id', ]:
                 if check_value:
-                    try:
-                        bin_id = unhexlify(value)
-                    except:
-                        raise ValueError('Invalid value, must be 64 hex digits') from None
-                    if len(bin_id) != 32:
-                        raise ValueError('Invalid value, must be 64 hex digits')
+                    hex_to_bin(value, length=32)
             else:
                 raise ValueError('Invalid name')
 
@@ -2098,7 +2092,7 @@ class Archiver:
         wanted = args.wanted
         try:
             if wanted.startswith('hex:'):
-                wanted = unhexlify(wanted[4:])
+                wanted = hex_to_bin(wanted[4:])
             elif wanted.startswith('str:'):
                 wanted = wanted[4:].encode()
             else:
@@ -2154,9 +2148,7 @@ class Archiver:
         """get object contents from the repository and write it into file"""
         hex_id = args.id
         try:
-            id = unhexlify(hex_id)
-            if len(id) != 32:  # 256bit
-                raise ValueError("id must be 256bits or 64 hex digits")
+            id = hex_to_bin(hex_id, length=32)
         except ValueError as err:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
         try:
@@ -2182,9 +2174,7 @@ class Archiver:
             data = f.read()
         hex_id = args.id
         try:
-            id = unhexlify(hex_id)
-            if len(id) != 32:  # 256bit
-                raise ValueError("id must be 256bits or 64 hex digits")
+            id = hex_to_bin(hex_id, length=32)
         except ValueError as err:
             raise CommandError(f"object id {hex_id} is invalid [{str(err)}].")
         repository.put(id, data)
@@ -2197,7 +2187,7 @@ class Archiver:
         modified = False
         for hex_id in args.ids:
             try:
-                id = unhexlify(hex_id)
+                id = hex_to_bin(hex_id, length=32)
             except ValueError:
                 print("object id %s is invalid." % hex_id)
             else:
@@ -2216,7 +2206,7 @@ class Archiver:
         """display refcounts for the objects with the given IDs"""
         for hex_id in args.ids:
             try:
-                id = unhexlify(hex_id)
+                id = hex_to_bin(hex_id, length=32)
             except ValueError:
                 print("object id %s is invalid." % hex_id)
             else:
@@ -2236,7 +2226,7 @@ class Archiver:
                 segments=repository.segments,
                 compact=repository.compact,
                 storage_quota_use=repository.storage_quota_use,
-                shadow_index={hexlify(k).decode(): v for k, v in repository.shadow_index.items()}
+                shadow_index={bin_to_hex(k): v for k, v in repository.shadow_index.items()}
             )
             with dash_open(args.path, 'w') as fd:
                 json.dump(hints, fd, indent=4)

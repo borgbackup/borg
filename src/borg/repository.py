@@ -5,7 +5,6 @@ import shutil
 import stat
 import struct
 import time
-from binascii import hexlify, unhexlify
 from collections import defaultdict
 from configparser import ConfigParser
 from functools import partial
@@ -481,7 +480,7 @@ class Repository:
         if self.storage_quota is None:
             # self.storage_quota is None => no explicit storage_quota was specified, use repository setting.
             self.storage_quota = parse_file_size(self.config.get('repository', 'storage_quota', fallback=0))
-        self.id = unhexlify(self.config.get('repository', 'id').strip())
+        self.id = hex_to_bin(self.config.get('repository', 'id').strip(), length=32)
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
         if self.check_segment_magic:
             # read a segment and check whether we are dealing with a non-upgraded Attic repository

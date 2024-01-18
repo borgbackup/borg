@@ -18,15 +18,15 @@ def check_extension_modules():
     import borg.crypto.low_level
     from .. import platform, compress, item, chunker, hashindex
     msg = """The Borg binary extension modules do not seem to be properly installed."""
-    if hashindex.API_VERSION != '1.2_01':
+    if hashindex.API_VERSION != '1.4_01':
         raise RTError(msg)
-    if chunker.API_VERSION != '1.2_01':
+    if chunker.API_VERSION != '1.4_01':
         raise RTError(msg)
-    if compress.API_VERSION != '1.2_02':
+    if compress.API_VERSION != '1.4_01':
         raise RTError(msg)
-    if borg.crypto.low_level.API_VERSION != '1.2_01':
+    if borg.crypto.low_level.API_VERSION != '1.4_01':
         raise RTError(msg)
-    if item.API_VERSION != '1.2_01':
+    if item.API_VERSION != '1.4_01':
         raise RTError(msg)
-    if platform.API_VERSION != platform.OS_API_VERSION or platform.API_VERSION != '1.2_05':
+    if platform.API_VERSION != platform.OS_API_VERSION or platform.API_VERSION != '1.4_01':
         raise RTError(msg)

@@ -72,7 +72,7 @@ class KeyfileNotFoundError(Error):
 
 
 class KeyfileInvalidError(Error):
-    """Invalid key file for repository {} found in {}."""
+    """Invalid key data for repository {} found in {}."""
     exit_mcode = 40
 
 
@@ -689,8 +689,14 @@ class KeyfileKeyBase(AESKeyBase):
         raise NotImplementedError
 
     def _load(self, key_data, passphrase):
-        cdata = binascii.a2b_base64(key_data)
-        data = self.decrypt_key_file(cdata, passphrase)
+        try:
+            key = binascii.a2b_base64(key_data)
+        except (ValueError, binascii.Error):
+            raise KeyfileInvalidError(self.repository._location.canonical_path(), "(repokey)") from None
+        if len(key) < 20:
+            # this is in no way a precise check, usually we have about 400b key data.
+            raise KeyfileInvalidError(self.repository._location.canonical_path(), "(repokey)")
+        data = self.decrypt_key_file(key, passphrase)
         if data:
             data = msgpack.unpackb(data)
             key = Key(internal_dict=data)
@@ -805,9 +811,9 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
             key_b64 = ''.join(lines[1:])
             try:
                 key = binascii.a2b_base64(key_b64)
-            except binascii.Error:
+            except (ValueError, binascii.Error):
                 logger.warning(f"borg key sanity check: key line 2+ does not look like base64. [{filename}]")
-                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
+                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename) from None
             if len(key) < 20:
                 # this is in no way a precise check, usually we have about 400b key data.
                 logger.warning(f"borg key sanity check: binary encrypted key data from key line 2+ suspiciously short."

@@ -1,10 +1,9 @@
 import binascii
 import pkgutil
 import textwrap
-from binascii import unhexlify, a2b_base64, b2a_base64
 from hashlib import sha256
 
-from ..helpers import Manifest, NoManifestError, Error, yes, bin_to_hex, dash_open
+from ..helpers import Manifest, NoManifestError, Error, yes, bin_to_hex, hex_to_bin, dash_open
 from ..repository import Repository
 
 from .key import KeyfileKey, KeyfileNotFoundError, RepoKeyNotFoundError, KeyBlobStorage, identify_key
@@ -119,7 +118,7 @@ class KeyManager:
 
         export = 'To restore key use borg key import --paper /path/to/repo\n\n'
 
-        binary = a2b_base64(self.keyblob)
+        binary = binascii.a2b_base64(self.keyblob)
         export += 'BORG PAPER KEY v1\n'
         lines = (len(binary) + 17) // 18
         repoid = bin_to_hex(self.repository.id)[:18]
@@ -208,9 +207,9 @@ class KeyManager:
                         print("each line must contain exactly one '-', try again")
                         continue
                     try:
-                        part = unhexlify(data)
-                    except binascii.Error:
-                        print("only characters 0-9 and a-f and '-' are valid, try again")
+                        part = hex_to_bin(data)
+                    except ValueError as e:
+                        print(f"only characters 0-9 and a-f and '-' are valid, try again [{e}]")
                         continue
                     if sha256_truncated(idx.to_bytes(2, byteorder='big') + part, 2) != checksum:
                         print(f'line checksum did not match, try line {idx} again')
@@ -224,7 +223,7 @@ class KeyManager:
                     print('The overall checksum did not match, retry or enter a blank line to abort.')
                     continue
 
-                self.keyblob = '\n'.join(textwrap.wrap(b2a_base64(result).decode('ascii'))) + '\n'
+                self.keyblob = '\n'.join(textwrap.wrap(binascii.b2a_base64(result).decode('ascii'))) + '\n'
                 self.store_keyblob(args)
                 break
 

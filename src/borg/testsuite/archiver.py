@@ -1,4 +1,5 @@
 import argparse
+import binascii
 import errno
 import io
 import json
@@ -15,7 +16,6 @@ import sys
 import tempfile
 import time
 import unittest
-from binascii import unhexlify, b2a_base64
 from configparser import ConfigParser
 from datetime import datetime
 from datetime import timezone
@@ -42,7 +42,7 @@ from ..helpers import Location, get_security_dir
 from ..helpers import Manifest, MandatoryFeatureUnsupported, ArchiveInfo
 from ..helpers import init_ec_warnings
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, Error, CancelledByUser, RTError, CommandError
-from ..helpers import bin_to_hex
+from ..helpers import bin_to_hex, hex_to_bin
 from ..helpers import MAX_S
 from ..helpers import msgpack
 from ..helpers import flags_noatime, flags_normal
@@ -3391,13 +3391,13 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         export_file = self.output_path + '/exported'
         self.cmd('init', self.repository_location, '--encryption', 'keyfile')
-        self._set_repository_id(self.repository_path, unhexlify(repo_id))
+        self._set_repository_id(self.repository_path, hex_to_bin(repo_id))
 
         key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
 
         with open(key_file, 'w') as fd:
             fd.write(KeyfileKey.FILE_ID + ' ' + repo_id + '\n')
-            fd.write(b2a_base64(b'abcdefghijklmnopqrstu').decode())
+            fd.write(binascii.b2a_base64(b'abcdefghijklmnopqrstu').decode())
 
         self.cmd('key', 'export', '--paper', self.repository_location, export_file)
 
@@ -3415,12 +3415,12 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
     def test_key_import_paperkey(self):
         repo_id = 'e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239'
         self.cmd('init', self.repository_location, '--encryption', 'keyfile')
-        self._set_repository_id(self.repository_path, unhexlify(repo_id))
+        self._set_repository_id(self.repository_path, hex_to_bin(repo_id))
 
         key_file = self.keys_path + '/' + os.listdir(self.keys_path)[0]
         with open(key_file, 'w') as fd:
             fd.write(KeyfileKey.FILE_ID + ' ' + repo_id + '\n')
-            fd.write(b2a_base64(b'abcdefghijklmnopqrstu').decode())
+            fd.write(binascii.b2a_base64(b'abcdefghijklmnopqrstu').decode())
 
         typed_input = (
             b'2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41  02\n'   # Forgot to type "-"

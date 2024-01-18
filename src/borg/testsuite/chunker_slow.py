@@ -1,10 +1,10 @@
 from io import BytesIO
-from binascii import unhexlify
 
 from .chunker import cf
 from ..chunker import Chunker
 from ..crypto.low_level import blake2b_256
 from ..constants import *  # NOQA
+from ..helpers import hex_to_bin
 from . import BaseTestCase
 
 
@@ -37,4 +37,4 @@ class ChunkerRegressionTestCase(BaseTestCase):
         # The "correct" hash below matches the existing chunker behavior.
         # Future chunker optimisations must not change this, or existing repos will bloat.
         overall_hash = blake2b_256(b'', b''.join(runs))
-        self.assert_equal(overall_hash, unhexlify("b559b0ac8df8daaa221201d018815114241ea5c6609d98913cd2246a702af4e3"))
+        self.assert_equal(overall_hash, hex_to_bin("b559b0ac8df8daaa221201d018815114241ea5c6609d98913cd2246a702af4e3"))

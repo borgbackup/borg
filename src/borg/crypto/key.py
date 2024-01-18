@@ -7,7 +7,6 @@ import shlex
 import sys
 import textwrap
 import subprocess
-from binascii import a2b_base64, b2a_base64, hexlify
 from hashlib import sha256, sha512, pbkdf2_hmac
 
 from ..logger import create_logger
@@ -690,7 +689,7 @@ class KeyfileKeyBase(AESKeyBase):
         raise NotImplementedError
 
     def _load(self, key_data, passphrase):
-        cdata = a2b_base64(key_data)
+        cdata = binascii.a2b_base64(key_data)
         data = self.decrypt_key_file(cdata, passphrase)
         if data:
             data = msgpack.unpackb(data)
@@ -747,7 +746,7 @@ class KeyfileKeyBase(AESKeyBase):
             tam_required=self.tam_required,
         )
         data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase)
-        key_data = '\n'.join(textwrap.wrap(b2a_base64(data).decode('ascii')))
+        key_data = '\n'.join(textwrap.wrap(binascii.b2a_base64(data).decode('ascii')))
         return key_data
 
     def change_passphrase(self, passphrase=None):
@@ -785,7 +784,7 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
 
     def sanity_check(self, filename, id):
         file_id = self.FILE_ID.encode() + b' '
-        repo_id = hexlify(id)
+        repo_id = bin_to_hex(id).encode('ascii')
         with open(filename, 'rb') as fd:
             # we do the magic / id check in binary mode to avoid stumbling over
             # decoding errors if somebody has binary files in the keys dir for some reason.
@@ -805,7 +804,7 @@ class KeyfileKey(ID_HMAC_SHA_256, KeyfileKeyBase):
                 raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
             key_b64 = ''.join(lines[1:])
             try:
-                key = a2b_base64(key_b64)
+                key = binascii.a2b_base64(key_b64)
             except binascii.Error:
                 logger.warning(f"borg key sanity check: key line 2+ does not look like base64. [{filename}]")
                 raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)

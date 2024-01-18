@@ -2,11 +2,10 @@ import getpass
 import os.path
 import re
 import tempfile
-from binascii import hexlify, unhexlify
 
 import pytest
 
-from ..crypto.key import Passphrase, PasswordRetriesExceeded, bin_to_hex
+from ..crypto.key import Passphrase, PasswordRetriesExceeded
 from ..crypto.key import PlaintextKey, PassphraseKey, AuthenticatedKey, RepoKey, KeyfileKey, \
     Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey
 from ..crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
@@ -20,7 +19,7 @@ from ..helpers import Location
 from ..helpers import StableDict
 from ..helpers import get_security_dir
 from ..helpers import msgpack
-
+from ..helpers import hex_to_bin, bin_to_hex
 
 class TestKey:
     class MockArgs:
@@ -36,11 +35,11 @@ class TestKey:
         /cXJq7jrqmrJ1phd6dg4SHAM/i+hubadZoS6m25OQzYAW09wZD/phG8OVa698Z5ed3HTaT
         SmrtgJL3EoOKgUI9d6BLE4dJdBqntifo""".strip()
 
-    keyfile2_cdata = unhexlify(re.sub(r'\W', '', """
+    keyfile2_cdata = hex_to_bin(re.sub(r'\W', '', """
         0055f161493fcfc16276e8c31493c4641e1eb19a79d0326fad0291e5a9c98e5933
         00000000000003e8d21eaf9b86c297a8cd56432e1915bb
         """))
-    keyfile2_id = unhexlify('c3fbf14bc001ebcc3cd86e696c13482ed071740927cd7cbe1b01b4bfcee49314')
+    keyfile2_id = hex_to_bin('c3fbf14bc001ebcc3cd86e696c13482ed071740927cd7cbe1b01b4bfcee49314')
 
     keyfile_blake2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000
@@ -112,7 +111,7 @@ class TestKey:
     def test_plaintext(self):
         key = PlaintextKey.create(None, None)
         chunk = b'foo'
-        assert hexlify(key.id_hash(chunk)) == b'2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae'
+        assert bin_to_hex(key.id_hash(chunk)) == '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae'
         assert chunk == key.decrypt(key.id_hash(chunk), key.encrypt(chunk))
 
     def test_keyfile(self, monkeypatch, keys_dir):
@@ -187,9 +186,9 @@ class TestKey:
         monkeypatch.setenv('BORG_PASSPHRASE', 'test')
         key = PassphraseKey.create(self.MockRepository(), None)
         assert key.cipher.next_iv() == 0
-        assert hexlify(key.id_key) == b'793b0717f9d8fb01c751a487e9b827897ceea62409870600013fbc6b4d8d7ca6'
-        assert hexlify(key.enc_hmac_key) == b'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901'
-        assert hexlify(key.enc_key) == b'2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a'
+        assert bin_to_hex(key.id_key) == '793b0717f9d8fb01c751a487e9b827897ceea62409870600013fbc6b4d8d7ca6'
+        assert bin_to_hex(key.enc_hmac_key) == 'b885a05d329a086627412a6142aaeb9f6c54ab7950f996dd65587251f6bc0901'
+        assert bin_to_hex(key.enc_key) == '2ff3654c6daf7381dbbe718d2b20b4f1ea1e34caa6cc65f6bb3ac376b93fed2a'
         assert key.chunk_seed == -775740477
         manifest = key.encrypt(b'ABC')
         assert key.cipher.extract_iv(manifest) == 0
@@ -205,7 +204,7 @@ class TestKey:
         assert key.enc_key == key2.enc_key
         assert key.chunk_seed == key2.chunk_seed
         chunk = b'foo'
-        assert hexlify(key.id_hash(chunk)) == b'818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990'
+        assert bin_to_hex(key.id_hash(chunk)) == '818217cf07d37efad3860766dcdf1d21e401650fed2d76ed1d797d3aae925990'
         assert chunk == key2.decrypt(key2.id_hash(chunk), key.encrypt(chunk))
 
     def _corrupt_byte(self, key, data, offset):

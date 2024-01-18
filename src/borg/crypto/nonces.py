@@ -1,9 +1,9 @@
 import os
 import sys
-from binascii import unhexlify
 
+from ..helpers import Error
 from ..helpers import get_security_dir
-from ..helpers import bin_to_hex
+from ..helpers import bin_to_hex, hex_to_bin
 from ..platform import SaveFile
 from ..remote import InvalidRPCMethod
 
@@ -23,9 +23,15 @@ class NonceManager:
     def get_local_free_nonce(self):
         try:
             with open(self.nonce_file) as fd:
-                return bytes_to_long(unhexlify(fd.read()))
+                nonce_hex = fd.read().strip()
         except FileNotFoundError:
             return None
+        else:
+            try:
+                nonce_bytes = hex_to_bin(nonce_hex, length=8)
+            except ValueError as e:
+                raise Error(f"Local security dir has an invalid nonce file: {e}") from None
+            return bytes_to_long(nonce_bytes)
 
     def commit_local_nonce_reservation(self, next_unreserved, start_nonce):
         if self.get_local_free_nonce() != start_nonce:

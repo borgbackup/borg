@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-API_VERSION = '1.2_01'
+API_VERSION = '1.4_01'
 
 import errno
 import os

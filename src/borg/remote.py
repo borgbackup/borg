@@ -780,6 +780,8 @@ class RemoteRepository:
                 raise IntegrityError(args[0])
             elif error == "PathNotAllowed":
                 raise PathNotAllowed(args[0])
+            elif error == "PathPermissionDenied":
+                raise Repository.PathPermissionDenied(args[0])
             elif error == "ParentPathDoesNotExist":
                 raise Repository.ParentPathDoesNotExist(args[0])
             elif error == "ObjectNotFound":

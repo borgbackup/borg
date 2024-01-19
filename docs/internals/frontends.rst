@@ -612,6 +612,8 @@ Errors
         There is already something at {}.
     Repository.StorageQuotaExceeded rc: 20 traceback: no
         The storage quota ({}) has been exceeded ({}). Try deleting some archives.
+    Repository.PathPermissionDenied rc: 21 traceback: no
+        Permission denied to {}.
 
     MandatoryFeatureUnsupported rc: 25 traceback: no
         Unsupported repository feature(s) {}. A newer version of borg is required to access this repository.

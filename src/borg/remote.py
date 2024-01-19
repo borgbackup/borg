@@ -104,6 +104,11 @@ class UnexpectedRPCDataFormatFromServer(Error):
         super().__init__(data)
 
 
+class ConnectionBrokenWithHint(Error):
+    """Connection to remote host is broken. {}"""
+    exit_mcode = 87
+
+
 # Protocol compatibility:
 # In general the server is responsible for rejecting too old clients and the client it responsible for rejecting
 # too old servers. This ensures that the knowledge what is compatible is always held by the newer component.
@@ -421,7 +426,10 @@ class SleepingBandwidthLimiter:
                 self.ratelimit_last = time.monotonic()
             if len(to_send) > self.ratelimit_quota:
                 to_send = to_send[:self.ratelimit_quota]
-        written = os.write(fd, to_send)
+        try:
+            written = os.write(fd, to_send)
+        except BrokenPipeError:
+            raise ConnectionBrokenWithHint("Broken Pipe") from None
         if self.ratelimit:
             self.ratelimit_quota -= written
         return written

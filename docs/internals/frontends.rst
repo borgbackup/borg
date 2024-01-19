@@ -671,6 +671,8 @@ Errors
     UnexpectedRPCDataFormatFromServer rc: 86 traceback: no
         Got unexpected RPC data format from server:
         {}
+    ConnectionBrokenWithHint rc: 87 traceback: no
+        Connection to remote host is broken. {}
 
     IntegrityError rc: 90 traceback: yes
         Data integrity error: {}

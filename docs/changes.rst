@@ -394,11 +394,33 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.0a1 (2024-01-01)
-----------------------------
+Version 1.4.0a2 (not released yet)
+----------------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Fixes:
+
+- fix CommandError args, #8029
+
+New features:
+
+Other changes:
+
+- better error msg for corrupted key data, #8016
+- repository: give clean error msg for invalid nonce file, #7967
+- with-lock: catch exception, print error msg, #8022
+- use cython 3.0.8
+- modernize msgpack wrapper
+- docs:
+
+  - add brew bundle instructions (macOS)
+  - improve docs for borg with-lock, #8022
+
+
+Version 1.4.0a1 (2024-01-01)
+----------------------------
 
 New features:
 

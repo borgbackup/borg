@@ -772,6 +772,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     raise PathNotAllowed('(unknown)')
                 else:
                     raise PathNotAllowed(args[0].decode())
+            elif error == 'PathPermissionDenied':
+                raise Repository.PathPermissionDenied(args[0].decode())
             elif error == 'ParentPathDoesNotExist':
                 raise Repository.ParentPathDoesNotExist(args[0].decode())
             elif error == 'ObjectNotFound':

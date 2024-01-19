@@ -168,6 +168,10 @@ class Repository:
         """The storage quota ({}) has been exceeded ({}). Try deleting some archives."""
         exit_mcode = 20
 
+    class PathPermissionDenied(Error):
+        """Permission denied to {}."""
+        exit_mcode = 21
+
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True,
                  append_only=False, storage_quota=None, check_segment_magic=True,
                  make_parent_dirs=False):
@@ -261,13 +265,23 @@ class Repository:
             st = os.stat(path)
         except FileNotFoundError:
             pass  # nothing there!
+        except PermissionError:
+            raise self.PathPermissionDenied(path) from None
         else:
             # there is something already there!
             if self.is_repository(path):
                 raise self.AlreadyExists(path)
-            if not stat.S_ISDIR(st.st_mode) or os.listdir(path):
+            if not stat.S_ISDIR(st.st_mode):
                 raise self.PathAlreadyExists(path)
-            # an empty directory is acceptable for us.
+            try:
+                files = os.listdir(path)
+            except PermissionError:
+                raise self.PathPermissionDenied(path) from None
+            else:
+                if files:  # a dir, but not empty
+                    raise self.PathAlreadyExists(path)
+                else:  # an empty directory is acceptable for us.
+                    pass
 
         while True:
             # Check all parent directories for Borg's repository README

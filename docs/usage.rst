@@ -47,6 +47,7 @@ Usage
    usage/prune
    usage/compact
    usage/info
+   usage/version
    usage/mount
    usage/key
    usage/upgrade

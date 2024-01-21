@@ -394,8 +394,8 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.0a2 (not released yet)
-----------------------------------
+Version 1.4.0b1 (2024-01-21)
+----------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
@@ -406,10 +406,15 @@ Fixes:
 
 New features:
 
+- implement "borg version" (shows client and server version), #7829
+
 Other changes:
 
 - better error msg for corrupted key data, #8016
 - repository: give clean error msg for invalid nonce file, #7967
+- check_can_create_repository: deal with PermissionErrors, #7016
+- add ConnectionBrokenWithHint for BrokenPipeErrors and similar, #7016
+
 - with-lock: catch exception, print error msg, #8022
 - use cython 3.0.8
 - modernize msgpack wrapper

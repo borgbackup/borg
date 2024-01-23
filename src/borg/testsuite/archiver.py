@@ -2172,6 +2172,31 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         output = self.cmd('list', archive)
         assert 'input/link -> somewhere does not exist' in output
 
+    def test_create_dotslash_hack(self):
+        os.makedirs(os.path.join(self.input_path, 'first', 'secondA', 'thirdA'))
+        os.makedirs(os.path.join(self.input_path, 'first', 'secondB', 'thirdB'))
+        self.cmd('init', '--encryption=none', self.repository_location)
+        archive = self.repository_location + '::test'
+        self.cmd('create', archive, 'input/first/./')  # hack!
+        output = self.cmd('list', archive)
+        # dir levels left of slashdot (= input, first) not in archive:
+        assert 'input' not in output
+        assert 'input/first' not in output
+        assert 'input/first/secondA' not in output
+        assert 'input/first/secondA/thirdA' not in output
+        assert 'input/first/secondB' not in output
+        assert 'input/first/secondB/thirdB' not in output
+        assert 'first' not in output
+        assert 'first/secondA' not in output
+        assert 'first/secondA/thirdA' not in output
+        assert 'first/secondB' not in output
+        assert 'first/secondB/thirdB' not in output
+        # dir levels right of slashdot are in archive:
+        assert 'secondA' in output
+        assert 'secondA/thirdA' in output
+        assert 'secondB' in output
+        assert 'secondB/thirdB' in output
+
     # def test_cmdline_compatibility(self):
     #    self.create_regular_file('file1', size=1024 * 80)
     #    self.cmd('init', '--encryption=repokey', self.repository_location)

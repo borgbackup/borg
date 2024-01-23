@@ -55,7 +55,7 @@ try:
     from .helpers import safe_encode, remove_surrogates, bin_to_hex, hex_to_bin, prepare_dump_dict, eval_escapes
     from .helpers import interval, prune_within, prune_split, PRUNING_PATTERNS
     from .helpers import timestamp, utcnow
-    from .helpers import get_cache_dir, os_stat
+    from .helpers import get_cache_dir, os_stat, get_strip_prefix
     from .helpers import Manifest, AI_HUMAN_SORT_KEYS
     from .helpers import hardlinkable
     from .helpers import StableDict
@@ -565,12 +565,14 @@ class Archiver:
                     pipe_bin = sys.stdin.buffer
                 pipe = TextIOWrapper(pipe_bin, errors='surrogateescape')
                 for path in iter_separated(pipe, paths_sep):
+                    strip_prefix = get_strip_prefix(path)
                     path = os.path.normpath(path)
                     try:
                         with backup_io('stat'):
                             st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)
                         status = self._process_any(path=path, parent_fd=None, name=None, st=st, fso=fso,
-                                                   cache=cache, read_special=args.read_special, dry_run=dry_run)
+                                                   cache=cache, read_special=args.read_special, dry_run=dry_run,
+                                                   strip_prefix=strip_prefix)
                     except BackupError as e:
                         self.print_warning_instance(BackupWarning(path, e))
                         status = 'E'
@@ -598,6 +600,8 @@ class Archiver:
                             status = '-'
                         self.print_file_status(status, path)
                         continue
+
+                    strip_prefix = get_strip_prefix(path)
                     path = os.path.normpath(path)
                     try:
                         with backup_io('stat'):
@@ -607,7 +611,8 @@ class Archiver:
                                        fso=fso, cache=cache, matcher=matcher,
                                        exclude_caches=args.exclude_caches, exclude_if_present=args.exclude_if_present,
                                        keep_exclude_tags=args.keep_exclude_tags, skip_inodes=skip_inodes,
-                                       restrict_dev=restrict_dev, read_special=args.read_special, dry_run=dry_run)
+                                       restrict_dev=restrict_dev, read_special=args.read_special, dry_run=dry_run,
+                                       strip_prefix=strip_prefix)
                         # if we get back here, we've finished recursing into <path>,
                         # we do not ever want to get back in there (even if path is given twice as recursion root)
                         skip_inodes.add((st.st_ino, st.st_dev))
@@ -674,7 +679,7 @@ class Archiver:
         else:
             create_inner(None, None, None)
 
-    def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run):
+    def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run, strip_prefix):
         """
         Call the right method on the given FilesystemObjectProcessor.
         """
@@ -682,12 +687,12 @@ class Archiver:
         if dry_run:
             return '-'
         elif stat.S_ISREG(st.st_mode):
-            return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st, cache=cache)
+            return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st, cache=cache, strip_prefix=strip_prefix)
         elif stat.S_ISDIR(st.st_mode):
-            return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st)
+            return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
         elif stat.S_ISLNK(st.st_mode):
             if not read_special:
-                return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
+                return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
             else:
                 try:
                     st_target = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=True)
@@ -697,27 +702,27 @@ class Archiver:
                     special = is_special(st_target.st_mode)
                 if special:
                     return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st_target,
-                                              cache=cache, flags=flags_special_follow)
+                                              cache=cache, flags=flags_special_follow, strip_prefix=strip_prefix)
                 else:
-                    return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
+                    return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
         elif stat.S_ISFIFO(st.st_mode):
             if not read_special:
-                return fso.process_fifo(path=path, parent_fd=parent_fd, name=name, st=st)
+                return fso.process_fifo(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
             else:
                 return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
-                                        cache=cache, flags=flags_special)
+                                        cache=cache, flags=flags_special, strip_prefix=strip_prefix)
         elif stat.S_ISCHR(st.st_mode):
             if not read_special:
-                return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='c')
+                return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='c', strip_prefix=strip_prefix)
             else:
                 return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
-                                        cache=cache, flags=flags_special)
+                                        cache=cache, flags=flags_special, strip_prefix=strip_prefix)
         elif stat.S_ISBLK(st.st_mode):
             if not read_special:
-                return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='b')
+                return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type='b', strip_prefix=strip_prefix)
             else:
                 return fso.process_file(path=path, parent_fd=parent_fd, name=name, st=st,
-                                        cache=cache, flags=flags_special)
+                                        cache=cache, flags=flags_special, strip_prefix=strip_prefix)
         elif stat.S_ISSOCK(st.st_mode):
             # Ignore unix sockets
             return
@@ -733,7 +738,7 @@ class Archiver:
 
     def _rec_walk(self, *, path, parent_fd, name, fso, cache, matcher,
                   exclude_caches, exclude_if_present, keep_exclude_tags,
-                  skip_inodes, restrict_dev, read_special, dry_run):
+                  skip_inodes, restrict_dev, read_special, dry_run, strip_prefix):
         """
         Process *path* (or, preferably, parent_fd/name) recursively according to the various parameters.
 
@@ -781,7 +786,7 @@ class Archiver:
                 # directories cannot go in this branch because they can be excluded based on tag
                 # files they might contain
                 status = self._process_any(path=path, parent_fd=parent_fd, name=name, st=st, fso=fso, cache=cache,
-                                           read_special=read_special, dry_run=dry_run)
+                                           read_special=read_special, dry_run=dry_run, strip_prefix=strip_prefix)
             else:
                 with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir,
                             noatime=True, op='dir_open') as child_fd:
@@ -797,19 +802,19 @@ class Archiver:
                             if not recurse_excluded_dir:
                                 if keep_exclude_tags:
                                     if not dry_run:
-                                        fso.process_dir_with_fd(path=path, fd=child_fd, st=st)
+                                        fso.process_dir_with_fd(path=path, fd=child_fd, st=st, strip_prefix=strip_prefix)
                                     for tag_name in tag_names:
                                         tag_path = os.path.join(path, tag_name)
                                         self._rec_walk(
                                                 path=tag_path, parent_fd=child_fd, name=tag_name, fso=fso, cache=cache,
                                                 matcher=matcher, exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
                                                 keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes,
-                                                restrict_dev=restrict_dev, read_special=read_special, dry_run=dry_run)
+                                                restrict_dev=restrict_dev, read_special=read_special, dry_run=dry_run, strip_prefix=strip_prefix)
                                 self.print_file_status('x', path)
                             return
                     if not recurse_excluded_dir:
                         if not dry_run:
-                            status = fso.process_dir_with_fd(path=path, fd=child_fd, st=st)
+                            status = fso.process_dir_with_fd(path=path, fd=child_fd, st=st, strip_prefix=strip_prefix)
                         else:
                             status = '-'
                     if recurse:
@@ -821,7 +826,7 @@ class Archiver:
                                     path=normpath, parent_fd=child_fd, name=dirent.name, fso=fso, cache=cache, matcher=matcher,
                                     exclude_caches=exclude_caches, exclude_if_present=exclude_if_present,
                                     keep_exclude_tags=keep_exclude_tags, skip_inodes=skip_inodes, restrict_dev=restrict_dev,
-                                    read_special=read_special, dry_run=dry_run)
+                                    read_special=read_special, dry_run=dry_run, strip_prefix=strip_prefix)
         except BackupError as e:
             self.print_warning_instance(BackupWarning(path, e))
             status = 'E'
@@ -3391,6 +3396,11 @@ class Archiver:
         that means if relative paths are desired, the command has to be run from the correct
         directory.
 
+        The slashdot hack in paths (recursion roots) is triggered by using ``/./``:
+        ``/this/gets/stripped/./this/gets/archived`` means to process that fs object, but
+        strip the prefix on the left side of ``./`` from the archived items (in this case,
+        ``this/gets/archived`` will be the path in the archived item).
+
         When giving '-' as path, borg will read data from standard input and create a
         file 'stdin' in the created archive from that data. In some cases it's more
         appropriate to use --content-from-command, however. See section *Reading from
@@ -3530,8 +3540,8 @@ class Archiver:
         - 'x' = excluded, item was *not* backed up
         - '?' = missing status code (if you see this, please file a bug report!)
 
-        Reading from stdin
-        ++++++++++++++++++
+        Reading backup data from stdin
+        ++++++++++++++++++++++++++++++
 
         There are two methods to read from stdin. Either specify ``-`` as path and
         pipe directly to borg::
@@ -3562,6 +3572,21 @@ class Archiver:
 
         By default, the content read from stdin is stored in a file called 'stdin'.
         Use ``--stdin-name`` to change the name.
+
+        Feeding all file paths from externally
+        ++++++++++++++++++++++++++++++++++++++
+
+        Usually, you give a starting path (recursion root) to borg and then borg
+        automatically recurses, finds and backs up all fs objects contained in
+        there (optionally considering include/exclude rules).
+
+        If you need more control and you want to give every single fs object path
+        to borg (maybe implementing your own recursion or your own rules), you can use
+        ``--paths-from-stdin`` or ``--paths-from-command`` (with the latter, borg will
+        fail to create an archive should the command fail).
+
+        Borg supports paths with the slashdot hack to strip path prefixes here also.
+        So, be careful not to unintentionally trigger that.
         """)
 
         subparser = subparsers.add_parser('create', parents=[common_parser], add_help=False,

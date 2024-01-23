@@ -20,7 +20,7 @@ from ..helpers import comment_validator, ChunkerParams, PathSpec
 from ..helpers import archivename_validator, FilesCacheMode
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
-from ..helpers import get_cache_dir, os_stat
+from ..helpers import get_cache_dir, os_stat, get_strip_prefix
 from ..helpers import dir_is_tagged
 from ..helpers import log_multi
 from ..helpers import basic_json_data, json_print
@@ -107,6 +107,7 @@ class CreateMixIn:
                     pipe_bin = sys.stdin.buffer
                 pipe = TextIOWrapper(pipe_bin, errors="surrogateescape")
                 for path in iter_separated(pipe, paths_sep):
+                    strip_prefix = get_strip_prefix(path)
                     path = os.path.normpath(path)
                     try:
                         with backup_io("stat"):
@@ -120,6 +121,7 @@ class CreateMixIn:
                             cache=cache,
                             read_special=args.read_special,
                             dry_run=dry_run,
+                            strip_prefix=strip_prefix,
                         )
                     except BackupError as e:
                         self.print_warning_instance(BackupWarning(path, e))
@@ -157,6 +159,8 @@ class CreateMixIn:
                         if not dry_run and status is not None:
                             fso.stats.files_stats[status] += 1
                         continue
+
+                    strip_prefix = get_strip_prefix(path)
                     path = os.path.normpath(path)
                     try:
                         with backup_io("stat"):
@@ -176,6 +180,7 @@ class CreateMixIn:
                             restrict_dev=restrict_dev,
                             read_special=args.read_special,
                             dry_run=dry_run,
+                            strip_prefix=strip_prefix,
                         )
                         # if we get back here, we've finished recursing into <path>,
                         # we do not ever want to get back in there (even if path is given twice as recursion root)
@@ -274,7 +279,7 @@ class CreateMixIn:
         else:
             create_inner(None, None, None)
 
-    def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run):
+    def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run, strip_prefix):
         """
         Call the right method on the given FilesystemObjectProcessor.
         """
@@ -287,13 +292,21 @@ class CreateMixIn:
             try:
                 if stat.S_ISREG(st.st_mode):
                     return fso.process_file(
-                        path=path, parent_fd=parent_fd, name=name, st=st, cache=cache, last_try=last_try
+                        path=path,
+                        parent_fd=parent_fd,
+                        name=name,
+                        st=st,
+                        cache=cache,
+                        last_try=last_try,
+                        strip_prefix=strip_prefix,
                     )
                 elif stat.S_ISDIR(st.st_mode):
-                    return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st)
+                    return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
                 elif stat.S_ISLNK(st.st_mode):
                     if not read_special:
-                        return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
+                        return fso.process_symlink(
+                            path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
+                        )
                     else:
                         try:
                             st_target = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=True)
@@ -310,12 +323,17 @@ class CreateMixIn:
                                 cache=cache,
                                 flags=flags_special_follow,
                                 last_try=last_try,
+                                strip_prefix=strip_prefix,
                             )
                         else:
-                            return fso.process_symlink(path=path, parent_fd=parent_fd, name=name, st=st)
+                            return fso.process_symlink(
+                                path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
+                            )
                 elif stat.S_ISFIFO(st.st_mode):
                     if not read_special:
-                        return fso.process_fifo(path=path, parent_fd=parent_fd, name=name, st=st)
+                        return fso.process_fifo(
+                            path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
+                        )
                     else:
                         return fso.process_file(
                             path=path,
@@ -325,10 +343,13 @@ class CreateMixIn:
                             cache=cache,
                             flags=flags_special,
                             last_try=last_try,
+                            strip_prefix=strip_prefix,
                         )
                 elif stat.S_ISCHR(st.st_mode):
                     if not read_special:
-                        return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type="c")
+                        return fso.process_dev(
+                            path=path, parent_fd=parent_fd, name=name, st=st, dev_type="c", strip_prefix=strip_prefix
+                        )
                     else:
                         return fso.process_file(
                             path=path,
@@ -338,10 +359,13 @@ class CreateMixIn:
                             cache=cache,
                             flags=flags_special,
                             last_try=last_try,
+                            strip_prefix=strip_prefix,
                         )
                 elif stat.S_ISBLK(st.st_mode):
                     if not read_special:
-                        return fso.process_dev(path=path, parent_fd=parent_fd, name=name, st=st, dev_type="b")
+                        return fso.process_dev(
+                            path=path, parent_fd=parent_fd, name=name, st=st, dev_type="b", strip_prefix=strip_prefix
+                        )
                     else:
                         return fso.process_file(
                             path=path,
@@ -351,6 +375,7 @@ class CreateMixIn:
                             cache=cache,
                             flags=flags_special,
                             last_try=last_try,
+                            strip_prefix=strip_prefix,
                         )
                 elif stat.S_ISSOCK(st.st_mode):
                     # Ignore unix sockets
@@ -401,6 +426,7 @@ class CreateMixIn:
         restrict_dev,
         read_special,
         dry_run,
+        strip_prefix,
     ):
         """
         Process *path* (or, preferably, parent_fd/name) recursively according to the various parameters.
@@ -457,6 +483,7 @@ class CreateMixIn:
                     cache=cache,
                     read_special=read_special,
                     dry_run=dry_run,
+                    strip_prefix=strip_prefix,
                 )
             else:
                 with OsOpen(
@@ -474,7 +501,9 @@ class CreateMixIn:
                             if not recurse_excluded_dir:
                                 if keep_exclude_tags:
                                     if not dry_run:
-                                        fso.process_dir_with_fd(path=path, fd=child_fd, st=st)
+                                        fso.process_dir_with_fd(
+                                            path=path, fd=child_fd, st=st, strip_prefix=strip_prefix
+                                        )
                                     for tag_name in tag_names:
                                         tag_path = os.path.join(path, tag_name)
                                         self._rec_walk(
@@ -491,12 +520,13 @@ class CreateMixIn:
                                             restrict_dev=restrict_dev,
                                             read_special=read_special,
                                             dry_run=dry_run,
+                                            strip_prefix=strip_prefix,
                                         )
                                 self.print_file_status("-", path)  # excluded
                             return
                     if not recurse_excluded_dir:
                         if not dry_run:
-                            status = fso.process_dir_with_fd(path=path, fd=child_fd, st=st)
+                            status = fso.process_dir_with_fd(path=path, fd=child_fd, st=st, strip_prefix=strip_prefix)
                         else:
                             status = "+"  # included (dir)
                     if recurse:
@@ -518,6 +548,7 @@ class CreateMixIn:
                                 restrict_dev=restrict_dev,
                                 read_special=read_special,
                                 dry_run=dry_run,
+                                strip_prefix=strip_prefix,
                             )
 
         except BackupError as e:
@@ -540,6 +571,11 @@ class CreateMixIn:
         traversing all paths specified. Paths are added to the archive as they are given,
         that means if relative paths are desired, the command has to be run from the correct
         directory.
+
+        The slashdot hack in paths (recursion roots) is triggered by using ``/./``:
+        ``/this/gets/stripped/./this/gets/archived`` means to process that fs object, but
+        strip the prefix on the left side of ``./`` from the archived items (in this case,
+        ``this/gets/archived`` will be the path in the archived item).
 
         When giving '-' as path, borg will read data from standard input and create a
         file 'stdin' in the created archive from that data. In some cases it's more
@@ -680,8 +716,8 @@ class CreateMixIn:
         - 'i' = backup data was read from standard input (stdin)
         - '?' = missing status code (if you see this, please file a bug report!)
 
-        Reading from stdin
-        ++++++++++++++++++
+        Reading backup data from stdin
+        ++++++++++++++++++++++++++++++
 
         There are two methods to read from stdin. Either specify ``-`` as path and
         pipe directly to borg::
@@ -712,6 +748,21 @@ class CreateMixIn:
 
         By default, the content read from stdin is stored in a file called 'stdin'.
         Use ``--stdin-name`` to change the name.
+
+        Feeding all file paths from externally
+        ++++++++++++++++++++++++++++++++++++++
+
+        Usually, you give a starting path (recursion root) to borg and then borg
+        automatically recurses, finds and backs up all fs objects contained in
+        there (optionally considering include/exclude rules).
+
+        If you need more control and you want to give every single fs object path
+        to borg (maybe implementing your own recursion or your own rules), you can use
+        ``--paths-from-stdin`` or ``--paths-from-command`` (with the latter, borg will
+        fail to create an archive should the command fail).
+
+        Borg supports paths with the slashdot hack to strip path prefixes here also.
+        So, be careful not to unintentionally trigger that.
         """
         )
 

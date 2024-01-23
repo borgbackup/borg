@@ -908,6 +908,32 @@ def test_create_read_special_broken_symlink(archivers, request):
     assert "input/link -> somewhere does not exist" in output
 
 
+def test_create_dotslash_hack(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    os.makedirs(os.path.join(archiver.input_path, "first", "secondA", "thirdA"))
+    os.makedirs(os.path.join(archiver.input_path, "first", "secondB", "thirdB"))
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input/first/./")  # hack!
+    output = cmd(archiver, "list", "test")
+    # dir levels left of slashdot (= input, first) not in archive:
+    assert "input" not in output
+    assert "input/first" not in output
+    assert "input/first/secondA" not in output
+    assert "input/first/secondA/thirdA" not in output
+    assert "input/first/secondB" not in output
+    assert "input/first/secondB/thirdB" not in output
+    assert "first" not in output
+    assert "first/secondA" not in output
+    assert "first/secondA/thirdA" not in output
+    assert "first/secondB" not in output
+    assert "first/secondB/thirdB" not in output
+    # dir levels right of slashdot are in archive:
+    assert "secondA" in output
+    assert "secondA/thirdA" in output
+    assert "secondB" in output
+    assert "secondB/thirdB" in output
+
+
 def test_log_json(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)

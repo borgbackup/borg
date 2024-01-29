@@ -21,7 +21,6 @@ except ImportError:
     cythonize = None
 
 sys.path += [os.path.dirname(__file__)]
-import setup_docs
 
 is_win32 = sys.platform.startswith("win32")
 is_openbsd = sys.platform.startswith("openbsd")
@@ -111,13 +110,7 @@ class Clean(Command):
                 rm(compiled)
 
 
-cmdclass = {
-    "build_ext": build_ext,
-    "build_usage": setup_docs.build_usage,
-    "build_man": setup_docs.build_man,
-    "sdist": Sdist,
-    "clean2": Clean,
-}
+cmdclass = {"build_ext": build_ext, "sdist": Sdist, "clean2": Clean}
 
 
 ext_modules = []

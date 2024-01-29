@@ -220,8 +220,8 @@ for easier use by packagers downstream.
 When a command is added, a command line flag changed, added or removed,
 the usage docs need to be rebuilt as well::
 
-  python setup.py build_usage
-  python setup.py build_man
+  python scripts/gendocs.py build_usage
+  python scripts/gendocs.py build_man
 
 However, we prefer to do this as part of our :ref:`releasing`
 preparations, so it is generally not necessary to update these when
@@ -311,7 +311,11 @@ Checklist:
 - Check version number of upcoming release in ``CHANGES.rst``.
 - Render ``CHANGES.rst`` via ``make html`` and check for markup errors.
 - Verify that ``MANIFEST.in``, ``pyproject.toml`` and ``setup.py`` are complete.
-- ``python setup.py build_usage ; python setup.py build_man`` and commit.
+- Run these commands and commit::
+
+  python scripts/gendocs.py build_usage
+  python scripts/gendocs.py build_man
+
 - Tag the release::
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z

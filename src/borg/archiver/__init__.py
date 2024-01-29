@@ -501,7 +501,7 @@ class Archiver(
         self.prerun_checks(logger, is_serve)
         if not is_supported_msgpack():
             logger.error("You do not have a supported version of the msgpack python package installed. Terminating.")
-            logger.error("This should never happen as specific, supported versions are required by our setup.py.")
+            logger.error("This should never happen as specific, supported versions are required by our pyproject.toml.")
             logger.error("Do not contact borgbackup support about this.")
             return set_ec(EXIT_ERROR)
         if is_slow_msgpack():

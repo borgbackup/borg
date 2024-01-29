@@ -179,7 +179,7 @@ following dependencies first:
 
   - Either pyfuse3_ (preferably, newer) or llfuse_ (older).
     See also the BORG_FUSE_IMPL env variable.
-  - See setup.py about the version requirements.
+  - See pyproject.toml about the version requirements.
 
 If you have troubles finding the right package names, have a look at the
 distribution specific sections below or the Vagrantfile in the git repository,

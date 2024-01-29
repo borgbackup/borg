@@ -24,7 +24,6 @@ sys.path += [os.path.dirname(__file__)]
 import setup_checksums
 import setup_compress
 import setup_crypto
-import setup_docs
 
 is_win32 = sys.platform.startswith('win32')
 
@@ -142,8 +141,6 @@ class Clean(Command):
 
 cmdclass = {
     'build_ext': build_ext,
-    'build_usage': setup_docs.build_usage,
-    'build_man': setup_docs.build_man,
     'sdist': Sdist,
     'clean2': Clean,
 }

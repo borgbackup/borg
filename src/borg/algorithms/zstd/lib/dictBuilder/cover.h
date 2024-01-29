@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020, Facebook, Inc.
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
  * All rights reserved.
  *
  * This source code is licensed under both the BSD-style license (found in the
@@ -7,6 +7,10 @@
  * in the COPYING file in the root directory of this source tree).
  * You may select, at your option, one of the above-listed licenses.
  */
+
+#ifndef ZDICT_STATIC_LINKING_ONLY
+#  define ZDICT_STATIC_LINKING_ONLY
+#endif
 
 #include <stdio.h>  /* fprintf */
 #include <stdlib.h> /* malloc, free, qsort */
@@ -16,10 +20,7 @@
 #include "../common/pool.h"
 #include "../common/threading.h"
 #include "../common/zstd_internal.h" /* includes zstd.h */
-#ifndef ZDICT_STATIC_LINKING_ONLY
-#define ZDICT_STATIC_LINKING_ONLY
-#endif
-#include "zdict.h"
+#include "../zdict.h"
 
 /**
  * COVER_best_t is used for two purposes:
@@ -152,6 +153,6 @@ void COVER_dictSelectionFree(COVER_dictSelection_t selection);
  * smallest dictionary within a specified regression of the compressed size
  * from the largest dictionary.
  */
- COVER_dictSelection_t COVER_selectDict(BYTE* customDictContent,
+ COVER_dictSelection_t COVER_selectDict(BYTE* customDictContent, size_t dictBufferCapacity,
                        size_t dictContentSize, const BYTE* samplesBuffer, const size_t* samplesSizes, unsigned nbFinalizeSamples,
                        size_t nbCheckSamples, size_t nbSamples, ZDICT_cover_params_t params, size_t* offsets, size_t totalCompressedSize);

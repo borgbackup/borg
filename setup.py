@@ -1,6 +1,7 @@
 # borgbackup - main setup code (see also pyproject.toml and other setup_*.py files)
 
 import os
+import re
 import sys
 from collections import defaultdict
 from glob import glob
@@ -23,7 +24,6 @@ sys.path += [os.path.dirname(__file__)]
 import setup_checksums
 import setup_compress
 import setup_crypto
-import setup_docs
 
 is_win32 = sys.platform.startswith('win32')
 
@@ -141,8 +141,6 @@ class Clean(Command):
 
 cmdclass = {
     'build_ext': build_ext,
-    'build_usage': setup_docs.build_usage,
-    'build_man': setup_docs.build_man,
     'sdist': Sdist,
     'clean2': Clean,
 }
@@ -233,4 +231,19 @@ if not on_rtd:
         # generate C code from Cython for THIS platform (and for all platform-independent Cython parts).
         ext_modules = cythonize(ext_modules, **cython_opts)
 
-setup(cmdclass=cmdclass, ext_modules=ext_modules, long_description=setup_docs.long_desc_from_readme())
+
+def long_desc_from_readme():
+    with open('README.rst') as fd:
+        long_description = fd.read()
+        # remove header, but have one \n before first headline
+        start = long_description.find('What is BorgBackup?')
+        assert start >= 0
+        long_description = '\n' + long_description[start:]
+        # remove badges
+        long_description = re.compile(r'^\.\. start-badges.*^\.\. end-badges', re.M | re.S).sub('', long_description)
+        # remove unknown directives
+        long_description = re.compile(r'^\.\. highlight:: \w+$', re.M).sub('', long_description)
+        return long_description
+
+
+setup(cmdclass=cmdclass, ext_modules=ext_modules, long_description=long_desc_from_readme())

@@ -9,8 +9,6 @@ from collections import OrderedDict
 from datetime import datetime, timezone
 import time
 
-from setuptools import Command
-
 
 def format_metavar(option):
     if option.nargs in ("*", "..."):
@@ -23,16 +21,8 @@ def format_metavar(option):
         raise ValueError(f"Can't format metavar {option.metavar}, unknown nargs {option.nargs}!")
 
 
-class build_usage(Command):
-    description = "generate usage for each command"
-
-    user_options = [("output=", "O", "output directory")]
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
+class BuildUsage:
+    """generate usage docs for each command"""
 
     def run(self):
         print("generating usage docs")
@@ -49,6 +39,7 @@ class build_usage(Command):
         # borgfs_parser = Archiver(prog='borgfs').build_parser()
 
         self.generate_level("", parser, Archiver)
+        return 0
 
     def generate_level(self, prefix, parser, Archiver, extra_choices=None):
         is_subcommand = False
@@ -122,10 +113,6 @@ class build_usage(Command):
 
         # HTML output:
         # A table using some column-spans
-
-        def html_write(s):
-            for line in s.splitlines():
-                fp.write("    " + line + "\n")
 
         rows = []
         for group in parser._action_groups:
@@ -265,10 +252,8 @@ class build_usage(Command):
             fp.write(indent + option.ljust(padding) + desc + "\n")
 
 
-class build_man(Command):
-    description = "build man pages"
-
-    user_options = []
+class BuildMan:
+    """build man pages"""
 
     see_also = {
         "create": ("delete", "prune", "check", "patterns", "placeholders", "compression", "rcreate"),
@@ -308,12 +293,6 @@ class build_man(Command):
         "umount": "mount",
     }
 
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
     def run(self):
         print("building man pages (in docs/man)", file=sys.stderr)
         import borg
@@ -329,6 +308,7 @@ class build_man(Command):
         self.generate_level("", parser, Archiver, {"borgfs": borgfs_parser})
         self.build_topic_pages(Archiver)
         self.build_intro_page()
+        return 0
 
     def generate_level(self, prefix, parser, Archiver, extra_choices=None):
         is_subcommand = False
@@ -548,3 +528,33 @@ class build_man(Command):
 
         for option, desc in opts.items():
             write(option.ljust(padding), desc)
+
+
+def usage():
+    print(
+        textwrap.dedent(
+            """
+        Usage:
+            python scripts/gendocs.py build_usage  # build usage documentation
+            python scripts/gendocs.py build_man    # build man pages
+    """
+        )
+    )
+
+
+def main(argv):
+    if len(argv) < 2 or len(argv) == 2 and argv[1] in ("-h", "--help"):
+        usage()
+        return 0
+    command = argv[1]
+    if command == "build_usage":
+        return BuildUsage().run()
+    if command == "build_man":
+        return BuildMan().run()
+    usage()
+    return 1
+
+
+if __name__ == "__main__":
+    rc = main(sys.argv)
+    sys.exit(rc)

@@ -1,5 +1,6 @@
 # Support code for building docs (build_usage, build_man)
 
+import glob
 import os
 import io
 import re
@@ -530,11 +531,48 @@ class BuildMan:
             write(option.ljust(padding), desc)
 
 
+cython_sources = """
+src/borg/compress.pyx
+src/borg/crypto/low_level.pyx
+src/borg/chunker.pyx
+src/borg/hashindex.pyx
+src/borg/item.pyx
+src/borg/checksums.pyx
+src/borg/platform/posix.pyx
+src/borg/platform/linux.pyx
+src/borg/platform/syncfilerange.pyx
+src/borg/platform/darwin.pyx
+src/borg/platform/freebsd.pyx
+src/borg/platform/windows.pyx
+""".strip().splitlines()
+
+
+def rm(file):
+    try:
+        os.unlink(file)
+    except FileNotFoundError:
+        return False
+    else:
+        return True
+
+
+class Clean:
+    def run(self):
+        for source in cython_sources:
+            genc = source.replace(".pyx", ".c")
+            rm(genc)
+            compiled_glob = source.replace(".pyx", ".cpython*")
+            for compiled in sorted(glob.glob(compiled_glob)):
+                rm(compiled)
+        return 0
+
+
 def usage():
     print(
         textwrap.dedent(
             """
         Usage:
+            python scripts/make.py clean        # clean workdir (remove generated files)
             python scripts/make.py build_usage  # build usage documentation
             python scripts/make.py build_man    # build man pages
     """
@@ -547,6 +585,8 @@ def main(argv):
         usage()
         return 0
     command = argv[1]
+    if command == "clean":
+        return Clean().run()
     if command == "build_usage":
         return BuildUsage().run()
     if command == "build_man":

@@ -535,8 +535,8 @@ def usage():
         textwrap.dedent(
             """
         Usage:
-            python scripts/gendocs.py build_usage  # build usage documentation
-            python scripts/gendocs.py build_man    # build man pages
+            python scripts/make.py build_usage  # build usage documentation
+            python scripts/make.py build_man    # build man pages
     """
         )
     )

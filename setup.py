@@ -4,7 +4,6 @@ import os
 import re
 import sys
 from collections import defaultdict
-from glob import glob
 
 try:
     import multiprocessing
@@ -12,7 +11,7 @@ except ImportError:
     multiprocessing = None
 
 from setuptools.command.build_ext import build_ext
-from setuptools import setup, Extension, Command
+from setuptools import setup, Extension
 from setuptools.command.sdist import sdist
 
 try:
@@ -113,36 +112,9 @@ else:
         raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
 
 
-def rm(file):
-    try:
-        os.unlink(file)
-        print('rm', file)
-    except FileNotFoundError:
-        pass
-
-
-class Clean(Command):
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        for source in cython_sources:
-            genc = source.replace('.pyx', '.c')
-            rm(genc)
-            compiled_glob = source.replace('.pyx', '.cpython*')
-            for compiled in sorted(glob(compiled_glob)):
-                rm(compiled)
-
-
 cmdclass = {
     'build_ext': build_ext,
     'sdist': Sdist,
-    'clean2': Clean,
 }
 
 ext_modules = []
@@ -213,7 +185,7 @@ if not on_rtd:
     # sometimes there's no need to cythonize
     # this breaks chained commands like 'clean sdist'
     cythonizing = len(sys.argv) > 1 and sys.argv[1] not in (
-        ('clean', 'clean2', 'egg_info', '--help-commands', '--version')) and '--help' not in sys.argv[1:]
+        ('clean', 'egg_info', '--help-commands', '--version')) and '--help' not in sys.argv[1:]
 
     if cythonize and cythonizing:
         cython_opts = dict(

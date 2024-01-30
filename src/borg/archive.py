@@ -1299,7 +1299,16 @@ class FilesystemObjectProcessors:
         self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=sparse)
 
     @contextmanager
-    def create_helper(self, path, st, status=None, hardlinkable=True):
+    def create_helper(self, path, st, status=None, hardlinkable=True, strip_prefix=None):
+        if strip_prefix is not None:
+            assert not path.endswith(os.sep)
+            if strip_prefix.startswith(path + os.sep):
+                # still on a directory level that shall be stripped - do not create an item for this!
+                yield None, 'x', False, False
+                return
+            # adjust path, remove stripped directory levels
+            path = path.removeprefix(strip_prefix)
+
         safe_path = make_path_safe(path)
         item = Item(path=safe_path)
         hardlink_master = False
@@ -1318,13 +1327,16 @@ class FilesystemObjectProcessors:
         if hardlink_master:
             self.hard_links[(st.st_ino, st.st_dev)] = safe_path
 
-    def process_dir_with_fd(self, *, path, fd, st):
-        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
-            item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
+    def process_dir_with_fd(self, *, path, fd, st, strip_prefix):
+        with self.create_helper(path, st, 'd', hardlinkable=False, strip_prefix=strip_prefix) as (item, status, hardlinked, hardlink_master):
+            if item is not None:
+                item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
             return status
 
-    def process_dir(self, *, path, parent_fd, name, st):
-        with self.create_helper(path, st, 'd', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+    def process_dir(self, *, path, parent_fd, name, st, strip_prefix):
+        with self.create_helper(path, st, 'd', hardlinkable=False, strip_prefix=strip_prefix) as (item, status, hardlinked, hardlink_master):
+            if item is None:
+                return status
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_dir,
                         noatime=True, op='dir_open') as fd:
                 # fd is None for directories on windows, in that case a race condition check is not possible.
@@ -1334,8 +1346,10 @@ class FilesystemObjectProcessors:
                 item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
                 return status
 
-    def process_fifo(self, *, path, parent_fd, name, st):
-        with self.create_helper(path, st, 'f') as (item, status, hardlinked, hardlink_master):  # fifo
+    def process_fifo(self, *, path, parent_fd, name, st, strip_prefix):
+        with self.create_helper(path, st, 'f', strip_prefix=strip_prefix) as (item, status, hardlinked, hardlink_master):  # fifo
+            if item is None:
+                return status
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags_normal, noatime=True) as fd:
                 with backup_io('fstat'):
                     st = stat_update_check(st, os.fstat(fd))
@@ -1344,9 +1358,11 @@ class FilesystemObjectProcessors:
                 item.update(self.metadata_collector.stat_attrs(st, path, fd=fd))
                 return status
 
-    def process_dev(self, *, path, parent_fd, name, st, dev_type):
-        with self.create_helper(path, st, dev_type) as (item, status, hardlinked, hardlink_master):  # char/block device
+    def process_dev(self, *, path, parent_fd, name, st, dev_type, strip_prefix):
+        with self.create_helper(path, st, dev_type, strip_prefix=strip_prefix) as (item, status, hardlinked, hardlink_master):  # char/block device
             # looks like we can not work fd-based here without causing issues when trying to open/close the device
+            if item is None:
+                return status
             with backup_io('stat'):
                 st = stat_update_check(st, os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False))
             item.rdev = st.st_rdev
@@ -1355,11 +1371,13 @@ class FilesystemObjectProcessors:
             item.update(self.metadata_collector.stat_attrs(st, path))
             return status
 
-    def process_symlink(self, *, path, parent_fd, name, st):
+    def process_symlink(self, *, path, parent_fd, name, st, strip_prefix):
         # note: using hardlinkable=False because we can not support hardlinked symlinks,
         #       due to the dual-use of item.source, see issue #2343:
         # hardlinked symlinks will be archived [and extracted] as non-hardlinked symlinks.
-        with self.create_helper(path, st, 's', hardlinkable=False) as (item, status, hardlinked, hardlink_master):
+        with self.create_helper(path, st, 's', hardlinkable=False, strip_prefix=strip_prefix) as (item, status, hardlinked, hardlink_master):
+            if item is None:
+                return status
             fname = name if name is not None and parent_fd is not None else path
             with backup_io('readlink'):
                 source = os.readlink(fname, dir_fd=parent_fd)
@@ -1392,8 +1410,10 @@ class FilesystemObjectProcessors:
         self.add_item(item, stats=self.stats)
         return status
 
-    def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal):
-        with self.create_helper(path, st, None) as (item, status, hardlinked, hardlink_master):  # no status yet
+    def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal, strip_prefix):
+        with self.create_helper(path, st, None, strip_prefix=strip_prefix) as (item, status, hardlinked, hardlink_master):  # no status yet
+            if item is None:
+                return status
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
                 with backup_io('fstat'):
                     st = stat_update_check(st, os.fstat(fd))

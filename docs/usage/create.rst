@@ -10,6 +10,9 @@ Examples
     # same, but list all files as we process them
     $ borg create --list /path/to/repo::my-documents ~/Documents
 
+    # Backup /mnt/disk/docs, but strip path prefix using the slashdot hack
+    $ borg create /path/to/repo::docs /mnt/disk/./docs
+
     # Backup ~/Documents and ~/src but exclude pyc files
     $ borg create /path/to/repo::my-files \
         ~/Documents                       \

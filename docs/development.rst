@@ -220,8 +220,8 @@ for easier use by packagers downstream.
 When a command is added, a command line flag changed, added or removed,
 the usage docs need to be rebuilt as well::
 
-  python scripts/gendocs.py build_usage
-  python scripts/gendocs.py build_man
+  python scripts/make.py build_usage
+  python scripts/make.py build_man
 
 However, we prefer to do this as part of our :ref:`releasing`
 preparations, so it is generally not necessary to update these when
@@ -313,8 +313,8 @@ Checklist:
 - Verify that ``MANIFEST.in``, ``pyproject.toml`` and ``setup.py`` are complete.
 - Run these commands and commit::
 
-  python scripts/gendocs.py build_usage
-  python scripts/gendocs.py build_man
+  python scripts/make.py build_usage
+  python scripts/make.py build_man
 
 - Tag the release::
 

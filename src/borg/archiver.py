@@ -318,16 +318,6 @@ class Archiver:
         if key.tam_required:
             tam_file = tam_required_file(repository)
             open(tam_file, 'w').close()
-            logger.warning(
-                '\n'
-                'By default repositories initialized with this version will produce security\n'
-                'errors if written to with an older version (up to and including Borg 1.0.8).\n'
-                '\n'
-                'If you want to use these older versions, you can disable the check by running:\n'
-                'borg upgrade --disable-tam %s\n'
-                '\n'
-                'See https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability '
-                'for details about the security implications.', shlex.quote(path))
 
         if key.NAME != 'plaintext':
             logger.warning(

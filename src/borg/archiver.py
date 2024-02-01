@@ -318,24 +318,23 @@ class Archiver:
         if key.tam_required:
             tam_file = tam_required_file(repository)
             open(tam_file, 'w').close()
-            logger.warning(
-                '\n'
-                'By default repositories initialized with this version will produce security\n'
-                'errors if written to with an older version (up to and including Borg 1.0.8).\n'
-                '\n'
-                'If you want to use these older versions, you can disable the check by running:\n'
-                'borg upgrade --disable-tam %s\n'
-                '\n'
-                'See https://borgbackup.readthedocs.io/en/stable/changes.html#pre-1-0-9-manifest-spoofing-vulnerability '
-                'for details about the security implications.', shlex.quote(path))
 
         if key.NAME != 'plaintext':
             logger.warning(
                 '\n'
                 'IMPORTANT: you will need both KEY AND PASSPHRASE to access this repo!\n'
-                'If you used a repokey mode, the key is stored in the repo, but you should back it up separately.\n'
-                'Use "borg key export" to export the key, optionally in printable format.\n'
-                'Write down the passphrase. Store both at safe place(s).\n')
+                '\n'
+                'Key storage location depends on the mode:\n'
+                '- repokey modes: key is stored in the repository directory.\n'
+                '- keyfile modes: key is stored in the home directory of this user.\n'
+                '\n'
+                'For any mode, you should:\n'
+                '1. Export the borg key and store the result at a safe place:\n'
+                '   borg key export           REPOSITORY encrypted-key-backup\n'
+                '   borg key export --paper   REPOSITORY encrypted-key-backup.txt\n'
+                '   borg key export --qr-html REPOSITORY encrypted-key-backup.html\n'
+                '2. Write down the borg key passphrase and store it at safe place.\n'
+            )
 
     @with_repository(exclusive=True, manifest=False)
     def do_check(self, args, repository):

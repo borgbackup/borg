@@ -305,10 +305,13 @@ Compatibility notes:
 By default, borg 1.4 will behave quite similar to borg 1.2 (it was forked off
 from 1.2-maint branch at 1.2.7).
 
-For better error handling in your scripts, wrappers or GUI frontends, you may
-want to use BORG_EXIT_CODES=modern - in that case you of course will need to
-make sure these deal with the new error and warning exit codes, see
-internals/frontends docs.
+- the slashdot hack: be careful not to accidentally give paths containing /./
+  to "borg create" if you do not want to trigger this feature (which strips the
+  left part of the path from archived items).
+- BORG_EXIT_CODES=modern is a feature that borg script, wrapper and GUI authors
+  may want to use to get more specific error and warning return codes from borg.
+  In that case, of course they will need to make sure to correctly deal with these
+  new codes, see the internals/frontends docs.
 
 borg 1.1.x to 1.2.x
 -------------------
@@ -394,11 +397,33 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.0b1 (2024-01-21)
-----------------------------
+Version 1.4.0rc1 (not released yet)
+-----------------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Fixes:
+
+New features:
+
+- create: add the slashdot hack, update docs, #4685
+
+Other changes:
+
+- upgrade bundled zstd to 1.5.5
+- upgrade bundled xxhash to 0.8.2
+- upgrade bundled lz4 to 1.9.4
+- init: better borg key export instructions
+- init: remove compatibility warning for borg <=1.0.8
+  The warning refers to a compatibility issue not relevant any
+  more since borg 1.0.9 (released 2016-12).
+- scripts/make.py: move clean, build_man, build_usage to there,
+  so we do not need to invoke setup.py directly, update docs
+
+
+Version 1.4.0b1 (2024-01-21)
+----------------------------
 
 Fixes:
 

@@ -985,10 +985,10 @@ class Repository:
             raise ValueError(self.path + " is in append-only mode")
         error_found = False
 
-        def report_error(msg):
+        def report_error(msg, *args):
             nonlocal error_found
             error_found = True
-            logger.error(msg)
+            logger.error(msg, *args)
 
         logger.info('Starting repository check')
         assert not self._active_txn
@@ -1075,8 +1075,8 @@ class Repository:
                 # self.index = "as rebuilt in-memory from segments"
                 if len(current_index) != len(self.index):
                     report_error('Index object count mismatch.')
-                    logger.error('committed index: %d objects', len(current_index))
-                    logger.error('rebuilt index:   %d objects', len(self.index))
+                    report_error('committed index: %d objects', len(current_index))
+                    report_error('rebuilt index:   %d objects', len(self.index))
                 else:
                     logger.info('Index object count match.')
                 line_format = 'ID: %-64s rebuilt index: %-16s committed index: %-16s'
@@ -1084,13 +1084,13 @@ class Repository:
                 for key, value in self.index.iteritems():
                     current_value = current_index.get(key, not_found)
                     if current_value != value:
-                        logger.warning(line_format, bin_to_hex(key), value, current_value)
+                        report_error(line_format, bin_to_hex(key), value, current_value)
                 for key, current_value in current_index.iteritems():
                     if key in self.index:
                         continue
                     value = self.index.get(key, not_found)
                     if current_value != value:
-                        logger.warning(line_format, bin_to_hex(key), value, current_value)
+                        report_error(line_format, bin_to_hex(key), value, current_value)
             if repair:
                 self.write_index()
         self.rollback()

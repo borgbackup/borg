@@ -39,9 +39,17 @@ class RCreateMixIn:
             logger.warning(
                 "\n"
                 "IMPORTANT: you will need both KEY AND PASSPHRASE to access this repo!\n"
-                "If you used a repokey mode, the key is stored in the repo, but you should back it up separately.\n"
-                'Use "borg key export" to export the key, optionally in printable format.\n'
-                "Write down the passphrase. Store both at safe place(s).\n"
+                "\n"
+                "Key storage location depends on the mode:\n"
+                "- repokey modes: key is stored in the repository directory.\n"
+                "- keyfile modes: key is stored in the home directory of this user.\n"
+                "\n"
+                "For any mode, you should:\n"
+                "1. Export the borg key and store the result at a safe place:\n"
+                "   borg key export -r REPOSITORY           encrypted-key-backup\n"
+                "   borg key export -r REPOSITORY --paper   encrypted-key-backup.txt\n"
+                "   borg key export -r REPOSITORY --qr-html encrypted-key-backup.html\n"
+                "2. Write down the borg key passphrase and store it at safe place.\n"
             )
         return self.exit_code
 

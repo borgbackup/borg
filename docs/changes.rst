@@ -120,8 +120,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b7 (2023-09-14)
-----------------------------
+Version 2.0.0b8 (not released yet)
+----------------------------------
 
 Please note:
 
@@ -129,6 +129,69 @@ This is a beta release, only for testing - do not use for production repos.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+Fixes:
+
+- docs: CVE-2023-36811 upgrade steps: consider checkpoint archives, #7802
+- check/compact: fix spurious reappearance of orphan chunks since borg 1.2, #6687 -
+  this consists of 2 fixes:
+
+  - for existing chunks: check --repair: recreate shadow index, #7897 #6687
+  - for newly created chunks: update shadow index when doing a double-put, #7896 #5661
+
+  If you have experienced issue #6687, you may want to run borg check --repair
+  after upgrading to borg 1.2.7 to recreate the shadow index and get rid of the
+  issue for existing chunks.
+- LockRoster.modify: no KeyError if element was already gone, #7937
+- create --X-from-command: run subcommands with a clean environment, #7916
+- list --sort-by: support "archive" as alias of "name", #7873
+- fix rc and msg if arg parsing throws an exception, #7885
+- PATH: do not accept empty strings, #4221
+- fix invalid pattern argument error msg
+- zlib legacy decompress fixes, #7883
+
+Other changes:
+
+- replace archive/manifest TAMs by typed repo objects (ro_type), docs, #7670
+- crypto: use a one-step kdf for session keys, #7953
+- remove recreate --recompress option, use the more efficient repo-wide "rcompress".
+- include unistd.h in _chunker.c (fix for Python 3.13)
+- allow msgpack 1.0.7
+- allow platformdirs 4, #7950
+- use and require cython3
+- move conftest.py to src/borg/testsuite, #6386
+- use less setup.py, use pip and build
+- linux: use pkgconfig to find libacl
+- borg.logger: use same method params as python logging
+- create and use Brewfile, document "brew bundle" install (macOS)
+- blacken master branch
+- prevent CLI argument issues in scripts/glibc_check.py
+- pyproject.toml: exclude source files which have been compiled, #7828
+- vagrant:
+
+  - use openssl 3.0 on macOS
+  - add script for fetching borg binaries from VMs, #7989
+  - use generic/openbsd7 box
+  - netbsd: test on py311 only
+  - remove debian 9 "stretch" box
+  - use freebsd 14, #6871
+  - use python 3.9.4 for tests, latest python 3.11.7 for binary builds
+  - use pyinstaller 6.3.0
+- docs:
+
+  - add typical PR workflow to development docs, #7495
+  - improve docs for borg with-lock, add example #8024
+  - create disk/partition sector backup by disk serial number
+  - Add "check.rebuild_refcounts" message
+  - not only attack/unsafe, can also be a fs issue, #7853
+  - use virtualenv on Cygwin
+  - readthedocs: also build offline docs, #7835
+
+
+Version 2.0.0b7 (2023-09-14)
+----------------------------
 
 New features:
 

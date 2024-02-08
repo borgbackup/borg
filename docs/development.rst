@@ -199,6 +199,37 @@ Important notes:
 - When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
 
 
+Running the tests (using the pypi package)
+------------------------------------------
+
+Since borg 1.4, it is also possible to run the tests without a development
+environment, using the borgbackup dist package (downloaded from pypi.org or
+github releases page)::
+
+    # optional: create and use a virtual env:
+    python3 -m venv env
+    . env/bin/activate
+
+    # install packages
+    pip install borgbackup
+    pip install pytest pytest-benchmark
+
+    # method A: use a pytest.ini
+
+    cat >pytest.ini <<<EOF
+    [pytest]
+    python_files = testsuite/*.py
+    markers = allow_cache_wipe
+    addopts = -rs --benchmark-skip
+    EOF
+
+    pytest --pyargs borg.testsuite
+
+    # method B: give the options via the cmdline (each time you invoke the tests):
+
+    pytest -rs --benchmark-skip -o 'python_files=testsuite/*.py' -o 'markers=allow_cache_wipe' --pyargs borg.testsuite
+
+
 Adding a compression algorithm
 ------------------------------
 

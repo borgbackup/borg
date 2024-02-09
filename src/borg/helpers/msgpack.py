@@ -204,7 +204,7 @@ def is_slow_msgpack():
 
 
 def is_supported_msgpack():
-    # DO NOT CHANGE OR REMOVE! See also requirements and comments in setup.cfg.
+    # DO NOT CHANGE OR REMOVE! See also requirements and comments in pyproject.toml.
     import msgpack
 
     if msgpack.version in []:  # < add bad releases here to deny list

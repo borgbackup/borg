@@ -200,7 +200,7 @@ def install_borg(fuse)
     pip install -U wheel  # upgrade wheel, might be too old
     cd borg
     pip install -r requirements.d/development.lock.txt
-    python setup.py clean clean2
+    python3 scripts/make.py clean
     pip install -e .[#{fuse}]
   EOF
 end

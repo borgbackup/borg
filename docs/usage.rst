@@ -42,6 +42,7 @@ Usage
    usage/rcompress
    usage/rdelete
    usage/serve
+   usage/version
    usage/compact
    usage/config
    usage/lock

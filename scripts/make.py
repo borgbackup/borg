@@ -1,5 +1,6 @@
 # Support code for building docs (build_usage, build_man)
 
+import glob
 import os
 import io
 import re
@@ -8,22 +9,6 @@ import textwrap
 from collections import OrderedDict
 from datetime import datetime, timezone
 import time
-
-from setuptools import Command
-
-
-def long_desc_from_readme():
-    with open("README.rst") as fd:
-        long_description = fd.read()
-        # remove header, but have one \n before first headline
-        start = long_description.find("What is BorgBackup?")
-        assert start >= 0
-        long_description = "\n" + long_description[start:]
-        # remove badges
-        long_description = re.compile(r"^\.\. start-badges.*^\.\. end-badges", re.M | re.S).sub("", long_description)
-        # remove unknown directives
-        long_description = re.compile(r"^\.\. highlight:: \w+$", re.M).sub("", long_description)
-        return long_description
 
 
 def format_metavar(option):
@@ -37,16 +22,8 @@ def format_metavar(option):
         raise ValueError(f"Can't format metavar {option.metavar}, unknown nargs {option.nargs}!")
 
 
-class build_usage(Command):
-    description = "generate usage for each command"
-
-    user_options = [("output=", "O", "output directory")]
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
+class BuildUsage:
+    """generate usage docs for each command"""
 
     def run(self):
         print("generating usage docs")
@@ -63,6 +40,7 @@ class build_usage(Command):
         # borgfs_parser = Archiver(prog='borgfs').build_parser()
 
         self.generate_level("", parser, Archiver)
+        return 0
 
     def generate_level(self, prefix, parser, Archiver, extra_choices=None):
         is_subcommand = False
@@ -136,10 +114,6 @@ class build_usage(Command):
 
         # HTML output:
         # A table using some column-spans
-
-        def html_write(s):
-            for line in s.splitlines():
-                fp.write("    " + line + "\n")
 
         rows = []
         for group in parser._action_groups:
@@ -279,10 +253,8 @@ class build_usage(Command):
             fp.write(indent + option.ljust(padding) + desc + "\n")
 
 
-class build_man(Command):
-    description = "build man pages"
-
-    user_options = []
+class BuildMan:
+    """build man pages"""
 
     see_also = {
         "create": ("delete", "prune", "check", "patterns", "placeholders", "compression", "rcreate"),
@@ -322,12 +294,6 @@ class build_man(Command):
         "umount": "mount",
     }
 
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
     def run(self):
         print("building man pages (in docs/man)", file=sys.stderr)
         import borg
@@ -343,6 +309,7 @@ class build_man(Command):
         self.generate_level("", parser, Archiver, {"borgfs": borgfs_parser})
         self.build_topic_pages(Archiver)
         self.build_intro_page()
+        return 0
 
     def generate_level(self, prefix, parser, Archiver, extra_choices=None):
         is_subcommand = False
@@ -562,3 +529,72 @@ class build_man(Command):
 
         for option, desc in opts.items():
             write(option.ljust(padding), desc)
+
+
+cython_sources = """
+src/borg/compress.pyx
+src/borg/crypto/low_level.pyx
+src/borg/chunker.pyx
+src/borg/hashindex.pyx
+src/borg/item.pyx
+src/borg/checksums.pyx
+src/borg/platform/posix.pyx
+src/borg/platform/linux.pyx
+src/borg/platform/syncfilerange.pyx
+src/borg/platform/darwin.pyx
+src/borg/platform/freebsd.pyx
+src/borg/platform/windows.pyx
+""".strip().splitlines()
+
+
+def rm(file):
+    try:
+        os.unlink(file)
+    except FileNotFoundError:
+        return False
+    else:
+        return True
+
+
+class Clean:
+    def run(self):
+        for source in cython_sources:
+            genc = source.replace(".pyx", ".c")
+            rm(genc)
+            compiled_glob = source.replace(".pyx", ".cpython*")
+            for compiled in sorted(glob.glob(compiled_glob)):
+                rm(compiled)
+        return 0
+
+
+def usage():
+    print(
+        textwrap.dedent(
+            """
+        Usage:
+            python scripts/make.py clean        # clean workdir (remove generated files)
+            python scripts/make.py build_usage  # build usage documentation
+            python scripts/make.py build_man    # build man pages
+    """
+        )
+    )
+
+
+def main(argv):
+    if len(argv) < 2 or len(argv) == 2 and argv[1] in ("-h", "--help"):
+        usage()
+        return 0
+    command = argv[1]
+    if command == "clean":
+        return Clean().run()
+    if command == "build_usage":
+        return BuildUsage().run()
+    if command == "build_man":
+        return BuildMan().run()
+    usage()
+    return 1
+
+
+if __name__ == "__main__":
+    rc = main(sys.argv)
+    sys.exit(rc)

@@ -1,9 +1,9 @@
 # borgbackup - main setup code (see also setup.cfg and other setup_*.py files)
 
 import os
+import re
 import sys
 from collections import defaultdict
-from glob import glob
 
 try:
     import multiprocessing
@@ -11,7 +11,7 @@ except ImportError:
     multiprocessing = None
 
 from setuptools.command.build_ext import build_ext
-from setuptools import setup, Extension, Command
+from setuptools import setup, Extension
 from setuptools.command.sdist import sdist
 
 try:
@@ -20,7 +20,6 @@ except ImportError:
     cythonize = None
 
 sys.path += [os.path.dirname(__file__)]
-import setup_docs
 
 is_win32 = sys.platform.startswith("win32")
 is_openbsd = sys.platform.startswith("openbsd")
@@ -84,39 +83,7 @@ else:
         raise ImportError("The GIT version of Borg needs Cython. Install Cython or use a released version.")
 
 
-def rm(file):
-    try:
-        os.unlink(file)
-        print("rm", file)
-    except FileNotFoundError:
-        pass
-
-
-class Clean(Command):
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        for source in cython_sources:
-            genc = source.replace(".pyx", ".c")
-            rm(genc)
-            compiled_glob = source.replace(".pyx", ".cpython*")
-            for compiled in sorted(glob(compiled_glob)):
-                rm(compiled)
-
-
-cmdclass = {
-    "build_ext": build_ext,
-    "build_usage": setup_docs.build_usage,
-    "build_man": setup_docs.build_man,
-    "sdist": Sdist,
-    "clean2": Clean,
-}
+cmdclass = {"build_ext": build_ext, "sdist": Sdist}
 
 
 ext_modules = []
@@ -234,7 +201,7 @@ if not on_rtd:
     # this breaks chained commands like 'clean sdist'
     cythonizing = (
         len(sys.argv) > 1
-        and sys.argv[1] not in (("clean", "clean2", "egg_info", "--help-commands", "--version"))
+        and sys.argv[1] not in (("clean", "egg_info", "--help-commands", "--version"))
         and "--help" not in sys.argv[1:]
     )
 
@@ -253,4 +220,18 @@ if not on_rtd:
         ext_modules = cythonize(ext_modules, **cython_opts)
 
 
-setup(cmdclass=cmdclass, ext_modules=ext_modules, long_description=setup_docs.long_desc_from_readme())
+def long_desc_from_readme():
+    with open("README.rst") as fd:
+        long_description = fd.read()
+        # remove header, but have one \n before first headline
+        start = long_description.find("What is BorgBackup?")
+        assert start >= 0
+        long_description = "\n" + long_description[start:]
+        # remove badges
+        long_description = re.compile(r"^\.\. start-badges.*^\.\. end-badges", re.M | re.S).sub("", long_description)
+        # remove unknown directives
+        long_description = re.compile(r"^\.\. highlight:: \w+$", re.M).sub("", long_description)
+        return long_description
+
+
+setup(cmdclass=cmdclass, ext_modules=ext_modules, long_description=long_desc_from_readme())

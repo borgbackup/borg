@@ -90,6 +90,7 @@ from .rlist_cmd import RListMixIn
 from .serve_cmd import ServeMixIn
 from .tar_cmds import TarMixIn
 from .transfer_cmd import TransferMixIn
+from .version_cmd import VersionMixIn
 
 
 class Archiver(
@@ -119,6 +120,7 @@ class Archiver(
     ServeMixIn,
     TarMixIn,
     TransferMixIn,
+    VersionMixIn,
 ):
     def __init__(self, lock_wait=None, prog=None):
         self.exit_code = EXIT_SUCCESS
@@ -347,6 +349,7 @@ class Archiver(
         self.build_parser_serve(subparsers, common_parser, mid_common_parser)
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)
+        self.build_parser_version(subparsers, common_parser, mid_common_parser)
         return parser
 
     def get_args(self, argv, cmd):

@@ -1,12 +1,11 @@
 [project]
 name = "borgbackup"
-dynamic = ["version"]
+dynamic = ["version", "readme"]
 authors = [{name="The Borg Collective (see AUTHORS file)"}]
 maintainers = [
     {name="Thomas Waldmann", email="tw@waldmann-edv.de"},
 ]
 description = "Deduplicated, encrypted, authenticated and compressed backups"
-readme = "README.rst"
 requires-python = ">=3.9"
 keywords = ["backup", "borgbackup"]
 classifiers = [

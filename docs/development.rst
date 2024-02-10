@@ -344,8 +344,8 @@ Checklist:
 - Verify that ``MANIFEST.in``, ``pyproject.toml`` and ``setup.py`` are complete.
 - Run these commands and commit::
 
-  python scripts/make.py build_usage
-  python scripts/make.py build_man
+    python scripts/make.py build_usage
+    python scripts/make.py build_man
 
 - Tag the release::
 

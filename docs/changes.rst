@@ -405,6 +405,9 @@ above.
 
 Fixes:
 
+- check: fix return code for index entry value discrepancies
+- sdist: dynamically compute readme (long_description)
+
 New features:
 
 - create: add the slashdot hack, update docs, #4685
@@ -420,6 +423,7 @@ Other changes:
   more since borg 1.0.9 (released 2016-12).
 - scripts/make.py: move clean, build_man, build_usage to there,
   so we do not need to invoke setup.py directly, update docs
+- docs: how to run the testsuite using the dist package
 
 
 Version 1.4.0b1 (2024-01-21)

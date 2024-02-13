@@ -132,6 +132,8 @@ above.
 
 New features:
 
+- implement "borg version" (shows client and server version), #7829
+
 Fixes:
 
 - docs: CVE-2023-36811 upgrade steps: consider checkpoint archives, #7802
@@ -144,6 +146,7 @@ Fixes:
   If you have experienced issue #6687, you may want to run borg check --repair
   after upgrading to borg 1.2.7 to recreate the shadow index and get rid of the
   issue for existing chunks.
+- check: fix return code for index entry value discrepancies
 - LockRoster.modify: no KeyError if element was already gone, #7937
 - create --X-from-command: run subcommands with a clean environment, #7916
 - list --sort-by: support "archive" as alias of "name", #7873
@@ -169,6 +172,10 @@ Other changes:
 - blacken master branch
 - prevent CLI argument issues in scripts/glibc_check.py
 - pyproject.toml: exclude source files which have been compiled, #7828
+- sdist: dynamically compute readme (long_description)
+- init: better borg key export instructions
+- scripts/make.py: move clean, build_man, build_usage to there,
+  so we do not need to invoke setup.py directly, update docs
 - vagrant:
 
   - use openssl 3.0 on macOS
@@ -188,6 +195,9 @@ Other changes:
   - not only attack/unsafe, can also be a fs issue, #7853
   - use virtualenv on Cygwin
   - readthedocs: also build offline docs, #7835
+  - do not refer to setup.py installation method
+  - how to run the testsuite using the dist package
+  - requirements are defined in pyproject.toml
 
 
 Version 2.0.0b7 (2023-09-14)

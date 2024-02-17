@@ -6,6 +6,7 @@ Code used to be in borg/helpers.py but was split into the modules in this
 package, which are imported into here for compatibility.
 """
 import os
+from typing import List
 from collections import namedtuple
 
 from ..constants import *  # NOQA
@@ -65,7 +66,7 @@ warning_info = namedtuple("warning_info", "wc,msg,args,wt")
 """
 The global warnings_list variable is used to collect warning_info elements while borg is running.
 """
-_warnings_list = []
+_warnings_list: List[warning_info] = []
 
 
 def add_warning(msg, *args, **kwargs):

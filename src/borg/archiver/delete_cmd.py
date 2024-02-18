@@ -22,13 +22,13 @@ class DeleteMixIn:
         manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
         archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
         if not archive_names:
-            return self.exit_code
+            return
         if args.match_archives is None and args.first == 0 and args.last == 0:
             self.print_error(
                 "Aborting: if you really want to delete all archives, please use -a 'sh:*' "
                 "or just delete the whole repository (might be much faster)."
             )
-            return EXIT_ERROR
+            return
 
         if args.forced == 2:
             deleted = False
@@ -37,8 +37,7 @@ class DeleteMixIn:
                 try:
                     current_archive = manifest.archives.pop(archive_name)
                 except KeyError:
-                    self.exit_code = EXIT_WARNING
-                    logger.warning(f"Archive {archive_name} not found ({i}/{len(archive_names)}).")
+                    self.print_warning(f"Archive {archive_name} not found ({i}/{len(archive_names)}).")
                 else:
                     deleted = True
                     if self.output_list:
@@ -50,10 +49,10 @@ class DeleteMixIn:
                 manifest.write()
                 # note: might crash in compact() after committing the repo
                 repository.commit(compact=False)
-                logger.warning('Done. Run "borg check --repair" to clean up the mess.')
+                self.print_warning('Done. Run "borg check --repair" to clean up the mess.', wc=None)
             else:
-                logger.warning("Aborted.")
-            return self.exit_code
+                self.print_warning("Aborted.", wc=None)
+            return
 
         stats = Statistics(iec=args.iec)
         with Cache(repository, manifest, progress=args.progress, lock_wait=self.lock_wait, iec=args.iec) as cache:
@@ -73,7 +72,7 @@ class DeleteMixIn:
                 try:
                     archive_info = manifest.archives[archive_name]
                 except KeyError:
-                    logger.warning(msg_not_found.format(archive_name, i, len(archive_names)))
+                    self.print_warning(msg_not_found.format(archive_name, i, len(archive_names)))
                 else:
                     if self.output_list:
                         logger_list.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
@@ -87,13 +86,11 @@ class DeleteMixIn:
                         uncommitted_deletes = 0 if checkpointed else (uncommitted_deletes + 1)
             if sig_int:
                 # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
-                self.print_error("Got Ctrl-C / SIGINT.")
+                raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
                 checkpoint_func()
             if args.stats:
                 log_multi(str(stats), logger=logging.getLogger("borg.output.stats"))
-
-        return self.exit_code
 
     def build_parser_delete(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_archive_filters_group

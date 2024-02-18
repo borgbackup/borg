@@ -2,7 +2,6 @@ import argparse
 
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
-from ..helpers import EXIT_SUCCESS
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -19,7 +18,6 @@ class CompactMixIn:
         repository.put(Manifest.MANIFEST_ID, data)
         threshold = args.threshold / 100
         repository.commit(compact=True, threshold=threshold)
-        return EXIT_SUCCESS
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

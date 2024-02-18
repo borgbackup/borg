@@ -72,7 +72,6 @@ class RInfoMixIn:
 
             print(output)
             print(str(cache))
-        return self.exit_code
 
     def build_parser_rinfo(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

@@ -9,6 +9,7 @@ from ..constants import *  # NOQA
 from ..crypto.key import FlexiKey
 from ..helpers import format_file_size
 from ..helpers import msgpack
+from ..helpers import get_reset_ec
 from ..item import Item
 from ..platform import SyncFile
 
@@ -21,38 +22,55 @@ class BenchmarkMixIn:
             compression = "--compression=none"
             # measure create perf (without files cache to always have it chunking)
             t_start = time.monotonic()
-            rc = self.do_create(
-                self.parse_args(
-                    [f"--repo={repo}", "create", compression, "--files-cache=disabled", "borg-benchmark-crud1", path]
+            rc = get_reset_ec(
+                self.do_create(
+                    self.parse_args(
+                        [
+                            f"--repo={repo}",
+                            "create",
+                            compression,
+                            "--files-cache=disabled",
+                            "borg-benchmark-crud1",
+                            path,
+                        ]
+                    )
                 )
             )
             t_end = time.monotonic()
             dt_create = t_end - t_start
             assert rc == 0
             # now build files cache
-            rc1 = self.do_create(
-                self.parse_args([f"--repo={repo}", "create", compression, "borg-benchmark-crud2", path])
+            rc1 = get_reset_ec(
+                self.do_create(self.parse_args([f"--repo={repo}", "create", compression, "borg-benchmark-crud2", path]))
             )
-            rc2 = self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud2"]))
+            rc2 = get_reset_ec(
+                self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud2"]))
+            )
             assert rc1 == rc2 == 0
             # measure a no-change update (archive1 is still present)
             t_start = time.monotonic()
-            rc1 = self.do_create(
-                self.parse_args([f"--repo={repo}", "create", compression, "borg-benchmark-crud3", path])
+            rc1 = get_reset_ec(
+                self.do_create(self.parse_args([f"--repo={repo}", "create", compression, "borg-benchmark-crud3", path]))
             )
             t_end = time.monotonic()
             dt_update = t_end - t_start
-            rc2 = self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud3"]))
+            rc2 = get_reset_ec(
+                self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud3"]))
+            )
             assert rc1 == rc2 == 0
             # measure extraction (dry-run: without writing result to disk)
             t_start = time.monotonic()
-            rc = self.do_extract(self.parse_args([f"--repo={repo}", "extract", "borg-benchmark-crud1", "--dry-run"]))
+            rc = get_reset_ec(
+                self.do_extract(self.parse_args([f"--repo={repo}", "extract", "borg-benchmark-crud1", "--dry-run"]))
+            )
             t_end = time.monotonic()
             dt_extract = t_end - t_start
             assert rc == 0
             # measure archive deletion (of LAST present archive with the data)
             t_start = time.monotonic()
-            rc = self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud1"]))
+            rc = get_reset_ec(
+                self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud1"]))
+            )
             t_end = time.monotonic()
             dt_delete = t_end - t_start
             assert rc == 0
@@ -92,8 +110,6 @@ class BenchmarkMixIn:
             print(fmt % ("R", msg, total_size_MB / dt_extract, count, file_size_formatted, content, dt_extract))
             print(fmt % ("U", msg, total_size_MB / dt_update, count, file_size_formatted, content, dt_update))
             print(fmt % ("D", msg, total_size_MB / dt_delete, count, file_size_formatted, content, dt_delete))
-
-        return 0
 
     def do_benchmark_cpu(self, args):
         """Benchmark CPU bound operations."""

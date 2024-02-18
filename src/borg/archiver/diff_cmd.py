@@ -37,7 +37,8 @@ class DiffMixIn:
             self.print_warning(
                 "--chunker-params might be different between archives, diff will be slow.\n"
                 "If you know for certain that they are the same, pass --same-chunker-params "
-                "to override this check."
+                "to override this check.",
+                wc=None,
             )
 
         matcher = build_matcher(args.patterns, args.paths)
@@ -74,9 +75,7 @@ class DiffMixIn:
                     sys.stdout.write(res)
 
         for pattern in matcher.get_unmatched_include_patterns():
-            self.print_warning("Include pattern '%s' never matched.", pattern)
-
-        return self.exit_code
+            self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
 
     def build_parser_diff(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

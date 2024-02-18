@@ -2,7 +2,6 @@ import argparse
 
 from ._common import Highlander
 from ..constants import *  # NOQA
-from ..helpers import EXIT_SUCCESS
 from ..helpers import parse_storage_quota
 from ..remote import RepositoryServer
 
@@ -21,7 +20,6 @@ class ServeMixIn:
             storage_quota=args.storage_quota,
             use_socket=args.use_socket,
         ).serve()
-        return EXIT_SUCCESS
 
     def build_parser_serve(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

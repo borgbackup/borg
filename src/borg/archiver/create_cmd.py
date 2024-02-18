@@ -29,6 +29,7 @@ from ..helpers import prepare_subprocess_env
 from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
+from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -79,18 +80,15 @@ class CreateMixIn:
                                 preexec_fn=None if is_win32 else ignore_sigint,
                             )
                         except (FileNotFoundError, PermissionError) as e:
-                            self.print_error("Failed to execute command: %s", e)
-                            return self.exit_code
+                            raise CommandError(f"Failed to execute command: {e}")
                         status = fso.process_pipe(
                             path=path, cache=cache, fd=proc.stdout, mode=mode, user=user, group=group
                         )
                         rc = proc.wait()
                         if rc != 0:
-                            self.print_error("Command %r exited with status %d", args.paths[0], rc)
-                            return self.exit_code
-                    except BackupOSError as e:
-                        self.print_error("%s: %s", path, e)
-                        return self.exit_code
+                            raise CommandError(f"Command {args.paths[0]!r} exited with status {rc}")
+                    except BackupError as e:
+                        raise Error(f"{path!r}: {e}")
                 else:
                     status = "+"  # included
                 self.print_file_status(status, path)
@@ -103,8 +101,7 @@ class CreateMixIn:
                             args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=None if is_win32 else ignore_sigint
                         )
                     except (FileNotFoundError, PermissionError) as e:
-                        self.print_error("Failed to execute command: %s", e)
-                        return self.exit_code
+                        raise CommandError(f"Failed to execute command: {e}")
                     pipe_bin = proc.stdout
                 else:  # args.paths_from_stdin == True
                     pipe_bin = sys.stdin.buffer
@@ -124,19 +121,18 @@ class CreateMixIn:
                             read_special=args.read_special,
                             dry_run=dry_run,
                         )
-                    except (BackupOSError, BackupError) as e:
-                        self.print_warning("%s: %s", path, e)
+                    except BackupError as e:
+                        self.print_warning_instance(BackupWarning(path, e))
                         status = "E"
                     if status == "C":
-                        self.print_warning("%s: file changed while we backed it up", path)
+                        self.print_warning_instance(FileChangedWarning(path))
                     self.print_file_status(status, path)
                     if not dry_run and status is not None:
                         fso.stats.files_stats[status] += 1
                 if args.paths_from_command:
                     rc = proc.wait()
                     if rc != 0:
-                        self.print_error("Command %r exited with status %d", args.paths[0], rc)
-                        return self.exit_code
+                        raise CommandError(f"Command {args.paths[0]!r} exited with status {rc}")
             else:
                 for path in args.paths:
                     if path == "":  # issue #5637
@@ -152,9 +148,9 @@ class CreateMixIn:
                                 status = fso.process_pipe(
                                     path=path, cache=cache, fd=sys.stdin.buffer, mode=mode, user=user, group=group
                                 )
-                            except BackupOSError as e:
+                            except BackupError as e:
+                                self.print_warning_instance(BackupWarning(path, e))
                                 status = "E"
-                                self.print_warning("%s: %s", path, e)
                         else:
                             status = "+"  # included
                         self.print_file_status(status, path)
@@ -184,9 +180,9 @@ class CreateMixIn:
                         # if we get back here, we've finished recursing into <path>,
                         # we do not ever want to get back in there (even if path is given twice as recursion root)
                         skip_inodes.add((st.st_ino, st.st_dev))
-                    except (BackupOSError, BackupError) as e:
+                    except BackupError as e:
                         # this comes from os.stat, self._rec_walk has own exception handler
-                        self.print_warning("%s: %s", path, e)
+                        self.print_warning_instance(BackupWarning(path, e))
                         continue
             if not dry_run:
                 if args.progress:
@@ -197,7 +193,7 @@ class CreateMixIn:
                 if sig_int:
                     # do not save the archive if the user ctrl-c-ed - it is valid, but incomplete.
                     # we already have a checkpoint archive in this case.
-                    self.print_error("Got Ctrl-C / SIGINT.")
+                    raise Error("Got Ctrl-C / SIGINT.")
                 else:
                     archive.save(comment=args.comment, timestamp=args.timestamp)
                     args.stats |= args.json
@@ -277,7 +273,6 @@ class CreateMixIn:
                 create_inner(archive, cache, fso)
         else:
             create_inner(None, None, None)
-        return self.exit_code
 
     def _process_any(self, *, path, parent_fd, name, st, fso, cache, read_special, dry_run):
         """
@@ -369,7 +364,7 @@ class CreateMixIn:
                 else:
                     self.print_warning("Unknown file type: %s", path)
                     return
-            except (BackupError, BackupOSError) as err:
+            except BackupError as err:
                 if isinstance(err, BackupOSError):
                     if err.errno in (errno.EPERM, errno.EACCES):
                         # Do not try again, such errors can not be fixed by retrying.
@@ -525,11 +520,11 @@ class CreateMixIn:
                                 dry_run=dry_run,
                             )
 
-        except (BackupOSError, BackupError) as e:
-            self.print_warning("%s: %s", path, e)
+        except BackupError as e:
+            self.print_warning_instance(BackupWarning(path, e))
             status = "E"
         if status == "C":
-            self.print_warning("%s: file changed while we backed it up", path)
+            self.print_warning_instance(FileChangedWarning(path))
         if not recurse_excluded_dir:
             self.print_file_status(status, path)
             if not dry_run and status is not None:

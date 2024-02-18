@@ -2,7 +2,7 @@ import argparse
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
-from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
+from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError
 from ..helpers import yes
 
 from ..logger import create_logger
@@ -30,25 +30,22 @@ class CheckMixIn:
                 retry=False,
                 env_var_override="BORG_CHECK_I_KNOW_WHAT_I_AM_DOING",
             ):
-                return EXIT_ERROR
+                raise CancelledByUser()
         if args.repo_only and any((args.verify_data, args.first, args.last, args.match_archives)):
-            self.print_error(
+            raise CommandError(
                 "--repository-only contradicts --first, --last, -a / --match-archives and --verify-data arguments."
             )
-            return EXIT_ERROR
         if args.repair and args.max_duration:
-            self.print_error("--repair does not allow --max-duration argument.")
-            return EXIT_ERROR
+            raise CommandError("--repair does not allow --max-duration argument.")
         if args.max_duration and not args.repo_only:
             # when doing a partial repo check, we can only check crc32 checksums in segment files,
             # we can't build a fresh repo index in memory to verify the on-disk index against it.
             # thus, we should not do an archives check based on a unknown-quality on-disk repo index.
             # also, there is no max_duration support in the archives check code anyway.
-            self.print_error("--repository-only is required for --max-duration support.")
-            return EXIT_ERROR
+            raise CommandError("--repository-only is required for --max-duration support.")
         if not args.archives_only:
             if not repository.check(repair=args.repair, max_duration=args.max_duration):
-                return EXIT_WARNING
+                set_ec(EXIT_WARNING)
         if not args.repo_only and not ArchiveChecker().check(
             repository,
             verify_data=args.verify_data,
@@ -62,8 +59,8 @@ class CheckMixIn:
             oldest=args.oldest,
             newest=args.newest,
         ):
-            return EXIT_WARNING
-        return EXIT_SUCCESS
+            set_ec(EXIT_WARNING)
+            return
 
     def build_parser_check(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

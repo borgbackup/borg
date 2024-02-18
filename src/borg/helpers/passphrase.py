@@ -17,17 +17,25 @@ logger = create_logger()
 class NoPassphraseFailure(Error):
     """can not acquire a passphrase: {}"""
 
-
-class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."""
+    exit_mcode = 50
 
 
 class PasscommandFailure(Error):
     """passcommand supplied in BORG_PASSCOMMAND failed: {}"""
 
+    exit_mcode = 51
+
+
+class PassphraseWrong(Error):
+    """passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."""
+
+    exit_mcode = 52
+
 
 class PasswordRetriesExceeded(Error):
     """exceeded the maximum password retries"""
+
+    exit_mcode = 53
 
 
 class Passphrase(str):

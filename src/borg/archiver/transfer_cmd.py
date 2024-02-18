@@ -5,7 +5,7 @@ from ..archive import Archive
 from ..compress import CompressionSpec
 from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
-from ..helpers import EXIT_SUCCESS, EXIT_ERROR, Error
+from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
 from ..helpers import format_file_size
 from ..manifest import Manifest
@@ -23,22 +23,20 @@ class TransferMixIn:
         key = manifest.key
         other_key = other_manifest.key
         if not uses_same_id_hash(other_key, key):
-            self.print_error(
+            raise Error(
                 "You must keep the same ID hash ([HMAC-]SHA256 or BLAKE2b) or deduplication will break. "
                 "Use a related repository!"
             )
-            return EXIT_ERROR
         if not uses_same_chunker_secret(other_key, key):
-            self.print_error(
+            raise Error(
                 "You must use the same chunker secret or deduplication will break. " "Use a related repository!"
             )
-            return EXIT_ERROR
 
         dry_run = args.dry_run
         args.consider_checkpoints = True
         archive_names = tuple(x.name for x in other_manifest.archives.list_considering(args))
         if not archive_names:
-            return EXIT_SUCCESS
+            return
 
         an_errors = []
         for archive_name in archive_names:
@@ -47,10 +45,8 @@ class TransferMixIn:
             except argparse.ArgumentTypeError as err:
                 an_errors.append(str(err))
         if an_errors:
-            self.print_error("Invalid archive names detected, please rename them before transfer:")
-            for err_msg in an_errors:
-                self.print_error(err_msg)
-            return EXIT_ERROR
+            an_errors.insert(0, "Invalid archive names detected, please rename them before transfer:")
+            raise Error("\n".join(an_errors))
 
         ac_errors = []
         for archive_name in archive_names:
@@ -58,20 +54,17 @@ class TransferMixIn:
             try:
                 comment_validator(archive.metadata.get("comment", ""))
             except argparse.ArgumentTypeError as err:
-                ac_errors.append((archive_name, str(err)))
+                ac_errors.append(f"{archive_name}: {err}")
         if ac_errors:
-            self.print_error("Invalid archive comments detected, please fix them before transfer:")
-            for archive_name, err_msg in ac_errors:
-                self.print_error(f"{archive_name}: {err_msg}")
-            return EXIT_ERROR
+            ac_errors.insert(0, "Invalid archive comments detected, please fix them before transfer:")
+            raise Error("\n".join(ac_errors))
 
         from .. import upgrade as upgrade_mod
 
         try:
             UpgraderCls = getattr(upgrade_mod, f"Upgrader{args.upgrader}")
         except AttributeError:
-            self.print_error(f"No such upgrader: {args.upgrader}")
-            return EXIT_ERROR
+            raise Error(f"No such upgrader: {args.upgrader}")
 
         if UpgraderCls is not upgrade_mod.UpgraderFrom12To20 and other_manifest.repository.version == 1:
             raise Error("To transfer from a borg 1.x repo, you need to use: --upgrader=From12To20")
@@ -177,7 +170,6 @@ class TransferMixIn:
                         f"transfer_size: {format_file_size(transfer_size)} "
                         f"present_size: {format_file_size(present_size)}"
                     )
-        return EXIT_SUCCESS
 
     def build_parser_transfer(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

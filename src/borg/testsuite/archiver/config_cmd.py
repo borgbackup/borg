@@ -1,7 +1,9 @@
 import os
+import pytest
 
 from ...constants import *  # NOQA
 from . import RK_ENCRYPTION, create_test_files, cmd, generate_archiver_tests
+from ...helpers import CommandError, Error
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,binary")  # NOQA
 
@@ -21,8 +23,13 @@ def test_config(archivers, request):
     assert "id" in output
     assert "last_segment_checked" not in output
 
-    output = cmd(archiver, "config", "last_segment_checked", exit_code=1)
-    assert "No option " in output
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, "config", "last_segment_checked", exit_code=2)
+        assert "No option " in output
+    else:
+        with pytest.raises(Error):
+            cmd(archiver, "config", "last_segment_checked")
+
     cmd(archiver, "config", "last_segment_checked", "123")
     output = cmd(archiver, "config", "last_segment_checked")
     assert output == "123" + os.linesep
@@ -37,8 +44,20 @@ def test_config(archivers, request):
         output = cmd(archiver, "config", cfg_key)
         assert output == cfg_value + os.linesep
         cmd(archiver, "config", "--delete", cfg_key)
-        cmd(archiver, "config", cfg_key, exit_code=1)
+        if archiver.FORK_DEFAULT:
+            cmd(archiver, "config", cfg_key, exit_code=2)
+        else:
+            with pytest.raises(Error):
+                cmd(archiver, "config", cfg_key)
 
     cmd(archiver, "config", "--list", "--delete", exit_code=2)
-    cmd(archiver, "config", exit_code=2)
-    cmd(archiver, "config", "invalid-option", exit_code=1)
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "config", exit_code=2)
+    else:
+        with pytest.raises(CommandError):
+            cmd(archiver, "config")
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "config", "invalid-option", exit_code=2)
+    else:
+        with pytest.raises(Error):
+            cmd(archiver, "config", "invalid-option")

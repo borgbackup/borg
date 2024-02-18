@@ -36,8 +36,6 @@ class RListMixIn:
         if args.json:
             json_print(basic_json_data(manifest, extra={"archives": output_data}))
 
-        return self.exit_code
-
     def build_parser_rlist(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_archive_filters_group
 

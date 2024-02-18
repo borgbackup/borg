@@ -124,6 +124,8 @@ SUPPORTED_ALGORITHMS = {
 class FileIntegrityError(IntegrityError):
     """File failed integrity check: {}"""
 
+    exit_mcode = 91
+
 
 class IntegrityCheckedFile(FileLikeWrapper):
     def __init__(self, path, write, filename=None, override_fd=None, integrity_data=None):

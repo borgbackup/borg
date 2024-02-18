@@ -220,8 +220,7 @@ def test_basic_functionality(archivers, request):
     output = cmd(archiver, "diff", "test0", "test1a")
     do_asserts(output, True)
 
-    # We expect exit_code=1 due to the chunker params warning
-    output = cmd(archiver, "diff", "test0", "test1b", "--content-only", exit_code=1)
+    output = cmd(archiver, "diff", "test0", "test1b", "--content-only")
     do_asserts(output, False, content_only=True)
 
     output = cmd(archiver, "diff", "test0", "test1a", "--json-lines")

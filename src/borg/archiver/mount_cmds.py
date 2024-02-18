@@ -3,7 +3,7 @@ import os
 
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
-from ..helpers import EXIT_ERROR
+from ..helpers import RTError
 from ..helpers import PathSpec
 from ..helpers import umount
 from ..manifest import Manifest
@@ -22,18 +22,15 @@ class MountMixIn:
         from ..fuse_impl import llfuse, BORG_FUSE_IMPL
 
         if llfuse is None:
-            self.print_error("borg mount not available: no FUSE support, BORG_FUSE_IMPL=%s." % BORG_FUSE_IMPL)
-            return self.exit_code
+            raise RTError("borg mount not available: no FUSE support, BORG_FUSE_IMPL=%s." % BORG_FUSE_IMPL)
 
         if not os.path.isdir(args.mountpoint):
-            self.print_error(f"{args.mountpoint}: Mountpoint must be an **existing directory**")
-            return self.exit_code
+            raise RTError(f"{args.mountpoint}: Mountpoint must be an **existing directory**")
 
         if not os.access(args.mountpoint, os.R_OK | os.W_OK | os.X_OK):
-            self.print_error(f"{args.mountpoint}: Mountpoint must be a **writable** directory")
-            return self.exit_code
+            raise RTError(f"{args.mountpoint}: Mountpoint must be a **writable** directory")
 
-        return self._do_mount(args)
+        self._do_mount(args)
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def _do_mount(self, args, repository, manifest):
@@ -46,12 +43,11 @@ class MountMixIn:
                 operations.mount(args.mountpoint, args.options, args.foreground)
             except RuntimeError:
                 # Relevant error message already printed to stderr by FUSE
-                self.exit_code = EXIT_ERROR
-        return self.exit_code
+                raise RTError("FUSE mount failed")
 
     def do_umount(self, args):
         """un-mount the FUSE filesystem"""
-        return umount(args.mountpoint)
+        umount(args.mountpoint)
 
     def build_parser_mount_umount(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

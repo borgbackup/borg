@@ -5,7 +5,7 @@ from ._common import build_matcher
 from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
-from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams
+from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, CommandError
 from ..helpers import timestamp
 from ..manifest import Manifest
 
@@ -42,8 +42,7 @@ class RecreateMixIn:
 
         archive_names = tuple(archive.name for archive in manifest.archives.list_considering(args))
         if args.target is not None and len(archive_names) != 1:
-            self.print_error("--target: Need to specify single archive")
-            return self.exit_code
+            raise CommandError("--target: Need to specify single archive")
         for name in archive_names:
             if recreater.is_temporary_archive(name):
                 continue
@@ -54,7 +53,6 @@ class RecreateMixIn:
             manifest.write()
             repository.commit(compact=False)
             cache.commit()
-        return self.exit_code
 
     def build_parser_recreate(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

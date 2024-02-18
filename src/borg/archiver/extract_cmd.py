@@ -6,12 +6,13 @@ import stat
 
 from ._common import with_repository, with_archive
 from ._common import build_filter, build_matcher
-from ..archive import BackupError, BackupOSError
+from ..archive import BackupError
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator, PathSpec
 from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
+from ..helpers import BackupWarning, IncludePatternNeverMatchedWarning
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -64,8 +65,8 @@ class ExtractMixIn:
                     dir_item = dirs.pop(-1)
                     try:
                         archive.extract_item(dir_item, stdout=stdout)
-                    except BackupOSError as e:
-                        self.print_warning("%s: %s", remove_surrogates(dir_item.path), e)
+                    except BackupError as e:
+                        self.print_warning_instance(BackupWarning(remove_surrogates(dir_item.path), e))
             if output_list:
                 logging.getLogger("borg.output.list").info(remove_surrogates(item.path))
             try:
@@ -79,9 +80,8 @@ class ExtractMixIn:
                         archive.extract_item(
                             item, stdout=stdout, sparse=sparse, hlm=hlm, pi=pi, continue_extraction=continue_extraction
                         )
-            except (BackupOSError, BackupError) as e:
-                self.print_warning("%s: %s", remove_surrogates(orig_path), e)
-
+            except BackupError as e:
+                self.print_warning_instance(BackupWarning(remove_surrogates(orig_path), e))
         if pi:
             pi.finish()
 
@@ -94,14 +94,13 @@ class ExtractMixIn:
                 dir_item = dirs.pop(-1)
                 try:
                     archive.extract_item(dir_item, stdout=stdout)
-                except BackupOSError as e:
-                    self.print_warning("%s: %s", remove_surrogates(dir_item.path), e)
+                except BackupError as e:
+                    self.print_warning_instance(BackupWarning(remove_surrogates(dir_item.path), e))
         for pattern in matcher.get_unmatched_include_patterns():
-            self.print_warning("Include pattern '%s' never matched.", pattern)
+            self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
         if pi:
             # clear progress output
             pi.finish()
-        return self.exit_code
 
     def build_parser_extract(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

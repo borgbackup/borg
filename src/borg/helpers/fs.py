@@ -519,11 +519,14 @@ def os_stat(*, path=None, parent_fd=None, name=None, follow_symlinks=False):
 
 
 def umount(mountpoint):
+    from . import set_ec
+
     env = prepare_subprocess_env(system=True)
     try:
-        return subprocess.call(["fusermount", "-u", mountpoint], env=env)
+        rc = subprocess.call(["fusermount", "-u", mountpoint], env=env)
     except FileNotFoundError:
-        return subprocess.call(["umount", mountpoint], env=env)
+        rc = subprocess.call(["umount", mountpoint], env=env)
+    set_ec(rc)
 
 
 # below is a slightly modified tempfile.mkstemp that has an additional mode parameter.

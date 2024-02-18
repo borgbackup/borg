@@ -15,7 +15,7 @@ from io import BytesIO, StringIO
 
 import pytest
 
-from ... import xattr, helpers, platform
+from ... import xattr, platform
 from ...archive import Archive
 from ...archiver import Archiver, PURE_PYTHON_MSGPACK_WARNING
 from ...cache import Cache
@@ -23,6 +23,7 @@ from ...constants import *  # NOQA
 from ...helpers import Location, umount
 from ...helpers import EXIT_SUCCESS
 from ...helpers import bin_to_hex
+from ...helpers import init_ec_warnings
 from ...logger import flush_logging
 from ...manifest import Manifest
 from ...platform import get_flags
@@ -76,8 +77,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             if archiver is None:
                 archiver = Archiver()
             archiver.prerun_checks = lambda *args: None
-            archiver.exit_code = EXIT_SUCCESS
-            helpers.exit_code = EXIT_SUCCESS
+            init_ec_warnings()
             try:
                 args = archiver.parse_args(list(args))
                 # argparse parsing may raise SystemExit when the command line is bad or

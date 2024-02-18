@@ -86,8 +86,6 @@ class TarMixIn:
         with create_filter_process(filter, stream=tarstream, stream_close=tarstream_close, inbound=False) as _stream:
             self._export_tar(args, archive, _stream)
 
-        return self.exit_code
-
     def _export_tar(self, args, archive, tarstream):
         matcher = build_matcher(args.patterns, args.paths)
 
@@ -240,8 +238,7 @@ class TarMixIn:
         tar.close()
 
         for pattern in matcher.get_unmatched_include_patterns():
-            self.print_warning("Include pattern '%s' never matched.", pattern)
-        return self.exit_code
+            self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
 
     @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.WRITE,))
     def do_import_tar(self, args, repository, manifest, cache):
@@ -256,8 +253,6 @@ class TarMixIn:
 
         with create_filter_process(filter, stream=tarstream, stream_close=tarstream_close, inbound=True) as _stream:
             self._import_tar(args, repository, manifest, manifest.key, cache, _stream)
-
-        return self.exit_code
 
     def _import_tar(self, args, repository, manifest, key, cache, tarstream):
         t0 = archive_ts_now()

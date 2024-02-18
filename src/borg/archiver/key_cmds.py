@@ -6,7 +6,7 @@ from ..constants import *  # NOQA
 from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
 from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
 from ..crypto.keymanager import KeyManager
-from ..helpers import PathSpec
+from ..helpers import PathSpec, CommandError
 from ..manifest import Manifest
 
 from ._common import with_repository
@@ -22,22 +22,19 @@ class KeysMixIn:
         """Change repository key file passphrase"""
         key = manifest.key
         if not hasattr(key, "change_passphrase"):
-            print("This repository is not encrypted, cannot change the passphrase.")
-            return EXIT_ERROR
+            raise CommandError("This repository is not encrypted, cannot change the passphrase.")
         key.change_passphrase()
         logger.info("Key updated")
         if hasattr(key, "find_key"):
             # print key location to make backing it up easier
             logger.info("Key location: %s", key.find_key())
-        return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
     def do_change_location(self, args, repository, manifest, cache):
         """Change repository key location"""
         key = manifest.key
         if not hasattr(key, "change_passphrase"):
-            print("This repository is not encrypted, cannot change the key location.")
-            return EXIT_ERROR
+            raise CommandError("This repository is not encrypted, cannot change the key location.")
 
         if args.key_mode == "keyfile":
             if isinstance(key, AESOCBRepoKey):
@@ -50,7 +47,7 @@ class KeysMixIn:
                 key_new = Blake2CHPOKeyfileKey(repository)
             else:
                 print("Change not needed or not supported.")
-                return EXIT_WARNING
+                return
         if args.key_mode == "repokey":
             if isinstance(key, AESOCBKeyfileKey):
                 key_new = AESOCBRepoKey(repository)
@@ -62,7 +59,7 @@ class KeysMixIn:
                 key_new = Blake2CHPORepoKey(repository)
             else:
                 print("Change not needed or not supported.")
-                return EXIT_WARNING
+                return
 
         for name in ("repository_id", "crypt_key", "id_key", "chunk_seed", "sessionid", "cipher"):
             value = getattr(key, name)
@@ -91,8 +88,6 @@ class KeysMixIn:
             key.remove(key.target)  # remove key from current location
             logger.info(f"Key moved to {loc}")
 
-        return EXIT_SUCCESS
-
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
         """Export the repository key for backup"""
@@ -109,9 +104,7 @@ class KeysMixIn:
                 else:
                     manager.export(args.path)
             except IsADirectoryError:
-                self.print_error(f"'{args.path}' must be a file, not a directory")
-                return EXIT_ERROR
-        return EXIT_SUCCESS
+                raise CommandError(f"'{args.path}' must be a file, not a directory")
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_import(self, args, repository):
@@ -119,18 +112,14 @@ class KeysMixIn:
         manager = KeyManager(repository)
         if args.paper:
             if args.path:
-                self.print_error("with --paper import from file is not supported")
-                return EXIT_ERROR
+                raise CommandError("with --paper import from file is not supported")
             manager.import_paperkey(args)
         else:
             if not args.path:
-                self.print_error("input file to import key from expected")
-                return EXIT_ERROR
+                raise CommandError("expected input file to import key from")
             if args.path != "-" and not os.path.exists(args.path):
-                self.print_error("input file does not exist: " + args.path)
-                return EXIT_ERROR
+                raise CommandError("input file does not exist: " + args.path)
             manager.import_keyfile(args)
-        return EXIT_SUCCESS
 
     def build_parser_keys(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

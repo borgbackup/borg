@@ -7,10 +7,12 @@ Borg can exit with the following return codes (rc):
 Return code Meaning
 =========== =======
 0           success (logged as INFO)
-1           warning (operation reached its normal end, but there were warnings --
+1           generic warning (operation reached its normal end, but there were warnings --
             you should check the log, logged as WARNING)
-2           error (like a fatal error, a local or remote exception, the operation
+2           generic error (like a fatal error, a local or remote exception, the operation
             did not reach its normal end, logged as ERROR)
+3..99       specific error (enabled by BORG_EXIT_CODES=modern)
+100..127    specific warning (enabled by BORG_EXIT_CODES=modern)
 128+N       killed by signal N (e.g. 137 == kill -9)
 =========== =======
 

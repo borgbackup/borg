@@ -38,29 +38,43 @@ AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 class UnsupportedPayloadError(Error):
     """Unsupported payload type {}. A newer version is required to access this repository."""
 
+    exit_mcode = 48
+
 
 class UnsupportedManifestError(Error):
     """Unsupported manifest envelope. A newer version is required to access this repository."""
+
+    exit_mcode = 27
 
 
 class KeyfileNotFoundError(Error):
     """No key file for repository {} found in {}."""
 
+    exit_mcode = 42
+
 
 class KeyfileInvalidError(Error):
     """Invalid key file for repository {} found in {}."""
+
+    exit_mcode = 40
 
 
 class KeyfileMismatchError(Error):
     """Mismatch between repository {} and key file {}."""
 
+    exit_mcode = 41
+
 
 class RepoKeyNotFoundError(Error):
     """No key entry found in the config of repository {}."""
 
+    exit_mcode = 44
+
 
 class UnsupportedKeyFormatError(Error):
     """Your borg key is stored in an unsupported format. Try using a newer version of borg."""
+
+    exit_mcode = 49
 
 
 def key_creator(repository, args, *, other_key=None):

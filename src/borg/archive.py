@@ -1,4 +1,5 @@
 import base64
+import errno
 import json
 import os
 import stat
@@ -26,6 +27,8 @@ from .crypto.key import key_factory, UnsupportedPayloadError
 from .compress import CompressionSpec
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
+from .helpers import BackupError, BackupRaceConditionError
+from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
@@ -181,37 +184,6 @@ def is_special(mode):
     return stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
 
 
-class BackupError(Exception):
-    """
-    Exception raised for non-OSError-based exceptions while accessing backup files.
-    """
-
-
-class BackupOSError(Exception):
-    """
-    Wrapper for OSError raised while accessing backup files.
-
-    Borg does different kinds of IO, and IO failures have different consequences.
-    This wrapper represents failures of input file or extraction IO.
-    These are non-critical and are only reported (exit code = 1, warning).
-
-    Any unwrapped IO error is critical and aborts execution (for example repository IO failure).
-    """
-
-    def __init__(self, op, os_error):
-        self.op = op
-        self.os_error = os_error
-        self.errno = os_error.errno
-        self.strerror = os_error.strerror
-        self.filename = os_error.filename
-
-    def __str__(self):
-        if self.op:
-            return f"{self.op}: {self.os_error}"
-        else:
-            return str(self.os_error)
-
-
 class BackupIO:
     op = ""
 
@@ -224,7 +196,14 @@ class BackupIO:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type and issubclass(exc_type, OSError):
-            raise BackupOSError(self.op, exc_val) from exc_val
+            E_MAP = {
+                errno.EPERM: BackupPermissionError,
+                errno.EACCES: BackupPermissionError,
+                errno.ENOENT: BackupFileNotFoundError,
+                errno.EIO: BackupIOError,
+            }
+            e_cls = E_MAP.get(exc_val.errno, BackupOSError)
+            raise e_cls(self.op, exc_val) from exc_val
 
 
 backup_io = BackupIO()
@@ -259,10 +238,10 @@ def stat_update_check(st_old, st_curr):
     # are not duplicate in a short timeframe, this check is redundant and solved by the ino check:
     if stat.S_IFMT(st_old.st_mode) != stat.S_IFMT(st_curr.st_mode):
         # in this case, we dispatched to wrong handler - abort
-        raise BackupError("file type changed (race condition), skipping file")
+        raise BackupRaceConditionError("file type changed (race condition), skipping file")
     if st_old.st_ino != st_curr.st_ino:
         # in this case, the hardlinks-related code in create_helper has the wrong inode - abort!
-        raise BackupError("file inode changed (race condition), skipping file")
+        raise BackupRaceConditionError("file inode changed (race condition), skipping file")
     # looks ok, we are still dealing with the same thing - return current stat:
     return st_curr
 
@@ -454,14 +433,20 @@ def archive_put_items(chunk_ids, *, repo_objs, cache=None, stats=None, add_refer
 
 
 class Archive:
-    class DoesNotExist(Error):
-        """Archive {} does not exist"""
-
     class AlreadyExists(Error):
         """Archive {} already exists"""
 
+        exit_mcode = 30
+
+    class DoesNotExist(Error):
+        """Archive {} does not exist"""
+
+        exit_mcode = 31
+
     class IncompatibleFilesystemEncodingError(Error):
         """Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable."""
+
+        exit_mcode = 32
 
     def __init__(
         self,

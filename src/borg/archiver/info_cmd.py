@@ -50,14 +50,11 @@ class InfoMixIn:
                     .strip()
                     .format(**info)
                 )
-            if self.exit_code:
-                break
             if not args.json and len(archive_names) - i:
                 print()
 
         if args.json:
             json_print(basic_json_data(manifest, cache=cache, extra={"archives": output_data}))
-        return self.exit_code
 
     def build_parser_info(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_archive_filters_group

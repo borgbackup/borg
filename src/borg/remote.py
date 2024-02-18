@@ -30,6 +30,7 @@ from .helpers import format_file_size
 from .helpers import safe_unlink
 from .helpers import prepare_subprocess_env, ignore_sigint
 from .helpers import get_socket_filename
+from .locking import LockTimeout, NotLocked, NotMyLock, LockFailed
 from .logger import create_logger, borg_serve_log_queue
 from .helpers import msgpack
 from .repository import Repository
@@ -69,25 +70,37 @@ def os_write(fd, data):
 class ConnectionClosed(Error):
     """Connection closed by remote host"""
 
+    exit_mcode = 80
+
 
 class ConnectionClosedWithHint(ConnectionClosed):
     """Connection closed by remote host. {}"""
+
+    exit_mcode = 81
 
 
 class PathNotAllowed(Error):
     """Repository path not allowed: {}"""
 
+    exit_mcode = 83
+
 
 class InvalidRPCMethod(Error):
     """RPC method {} is not valid"""
+
+    exit_mcode = 82
 
 
 class UnexpectedRPCDataFormatFromClient(Error):
     """Borg {}: Got unexpected RPC data format from client."""
 
+    exit_mcode = 85
+
 
 class UnexpectedRPCDataFormatFromServer(Error):
     """Got unexpected RPC data format from server:\n{}"""
+
+    exit_mcode = 86
 
     def __init__(self, data):
         try:
@@ -513,6 +526,8 @@ class RemoteRepository:
     class RPCServerOutdated(Error):
         """Borg server is too old for {}. Required version {}"""
 
+        exit_mcode = 84
+
         @property
         def method(self):
             return self.args[0]
@@ -767,6 +782,14 @@ class RemoteRepository:
                 raise Repository.ObjectNotFound(args[0], self.location.processed)
             elif error == "InvalidRPCMethod":
                 raise InvalidRPCMethod(args[0])
+            elif error == "LockTimeout":
+                raise LockTimeout(args[0])
+            elif error == "LockFailed":
+                raise LockFailed(args[0], args[1])
+            elif error == "NotLocked":
+                raise NotLocked(args[0])
+            elif error == "NotMyLock":
+                raise NotMyLock(args[0])
             else:
                 raise self.RPCError(unpacked)
 

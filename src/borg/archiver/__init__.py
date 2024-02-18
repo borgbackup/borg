@@ -24,8 +24,9 @@ try:
     from ._common import Highlander
     from .. import __version__
     from ..constants import *  # NOQA
-    from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
-    from ..helpers import Error, set_ec
+    from ..helpers import EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE, classify_ec
+    from ..helpers import Error, CommandError, get_ec, modern_ec
+    from ..helpers import add_warning, BorgWarning, BackupWarning
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
@@ -123,20 +124,29 @@ class Archiver(
     VersionMixIn,
 ):
     def __init__(self, lock_wait=None, prog=None):
-        self.exit_code = EXIT_SUCCESS
         self.lock_wait = lock_wait
         self.prog = prog
         self.last_checkpoint = time.monotonic()
 
-    def print_error(self, msg, *args):
-        msg = args and msg % args or msg
-        self.exit_code = EXIT_ERROR
-        logger.error(msg)
+    def print_warning(self, msg, *args, **kw):
+        warning_code = kw.get("wc", EXIT_WARNING)  # note: wc=None can be used to not influence exit code
+        warning_type = kw.get("wt", "percent")
+        assert warning_type in ("percent", "curly")
+        warning_msgid = kw.get("msgid")
+        if warning_code is not None:
+            add_warning(msg, *args, wc=warning_code, wt=warning_type)
+        if warning_type == "percent":
+            output = args and msg % args or msg
+        else:  # == "curly"
+            output = args and msg.format(*args) or msg
+        logger.warning(output, msgid=warning_msgid) if warning_msgid else logger.warning(output)
 
-    def print_warning(self, msg, *args):
-        msg = args and msg % args or msg
-        self.exit_code = EXIT_WARNING  # we do not terminate here, so it is a warning
-        logger.warning(msg)
+    def print_warning_instance(self, warning):
+        assert isinstance(warning, BorgWarning)
+        # if it is a BackupWarning, use the wrapped BackupError exception instance:
+        cls = type(warning.args[1]) if isinstance(warning, BackupWarning) else type(warning)
+        msg, msgid, args, wc = cls.__doc__, cls.__qualname__, warning.args, warning.exit_code
+        self.print_warning(msg, *args, wc=wc, wt="curly", msgid=msgid)
 
     def print_file_status(self, status, path):
         # if we get called with status == None, the final file status was already printed
@@ -503,7 +513,7 @@ class Archiver(
             logger.error("You do not have a supported version of the msgpack python package installed. Terminating.")
             logger.error("This should never happen as specific, supported versions are required by our pyproject.toml.")
             logger.error("Do not contact borgbackup support about this.")
-            return set_ec(EXIT_ERROR)
+            raise Error("unsupported msgpack version")
         if is_slow_msgpack():
             logger.warning(PURE_PYTHON_MSGPACK_WARNING)
         if args.debug_profile:
@@ -519,7 +529,7 @@ class Archiver(
                 variables = dict(locals())
                 profiler.enable()
                 try:
-                    return set_ec(func(args))
+                    return get_ec(func(args))
                 finally:
                     profiler.disable()
                     profiler.snapshot_stats()
@@ -536,7 +546,9 @@ class Archiver(
                         # it compatible (see above).
                         msgpack.pack(profiler.stats, fd, use_bin_type=True)
         else:
-            return set_ec(func(args))
+            rc = func(args)
+            assert rc is None
+            return get_ec(rc)
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover
@@ -631,7 +643,7 @@ def main():  # pragma: no cover
         except argparse.ArgumentTypeError as e:
             # we might not have logging setup yet, so get out quickly
             print(str(e), file=sys.stderr)
-            sys.exit(EXIT_ERROR)
+            sys.exit(CommandError.exit_mcode if modern_ec else EXIT_ERROR)
         except Exception:
             msg = "Local Exception"
             tb = f"{traceback.format_exc()}\n{sysinfo()}"
@@ -649,7 +661,7 @@ def main():  # pragma: no cover
             tb = format_tb(e)
             exit_code = e.exit_code
         except RemoteRepository.RPCError as e:
-            important = e.exception_class not in ("LockTimeout",) and e.traceback
+            important = e.traceback
             msg = e.exception_full if important else e.get_message()
             msgid = e.exception_class
             tb_log_level = logging.ERROR if important else logging.DEBUG
@@ -685,16 +697,19 @@ def main():  # pragma: no cover
         if args.show_rc:
             rc_logger = logging.getLogger("borg.output.show-rc")
             exit_msg = "terminating with %s status, rc %d"
-            if exit_code == EXIT_SUCCESS:
-                rc_logger.info(exit_msg % ("success", exit_code))
-            elif exit_code == EXIT_WARNING:
-                rc_logger.warning(exit_msg % ("warning", exit_code))
-            elif exit_code == EXIT_ERROR:
-                rc_logger.error(exit_msg % ("error", exit_code))
-            elif exit_code >= EXIT_SIGNAL_BASE:
-                rc_logger.error(exit_msg % ("signal", exit_code))
-            else:
+            try:
+                ec_class = classify_ec(exit_code)
+            except ValueError:
                 rc_logger.error(exit_msg % ("abnormal", exit_code or 666))
+            else:
+                if ec_class == "success":
+                    rc_logger.info(exit_msg % (ec_class, exit_code))
+                elif ec_class == "warning":
+                    rc_logger.warning(exit_msg % (ec_class, exit_code))
+                elif ec_class == "error":
+                    rc_logger.error(exit_msg % (ec_class, exit_code))
+                elif ec_class == "signal":
+                    rc_logger.error(exit_msg % (ec_class, exit_code))
         sys.exit(exit_code)
 
 

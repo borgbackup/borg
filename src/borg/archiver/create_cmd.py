@@ -80,15 +80,15 @@ class CreateMixIn:
                                 preexec_fn=None if is_win32 else ignore_sigint,
                             )
                         except (FileNotFoundError, PermissionError) as e:
-                            raise CommandError("Failed to execute command: %s", e)
+                            raise CommandError(f"Failed to execute command: {e}")
                         status = fso.process_pipe(
                             path=path, cache=cache, fd=proc.stdout, mode=mode, user=user, group=group
                         )
                         rc = proc.wait()
                         if rc != 0:
-                            raise CommandError("Command %r exited with status %d", args.paths[0], rc)
+                            raise CommandError(f"Command {args.paths[0]!r} exited with status {rc}")
                     except BackupError as e:
-                        raise Error("%s: %s", path, e)
+                        raise Error(f"{path!r}: {e}")
                 else:
                     status = "+"  # included
                 self.print_file_status(status, path)
@@ -101,7 +101,7 @@ class CreateMixIn:
                             args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=None if is_win32 else ignore_sigint
                         )
                     except (FileNotFoundError, PermissionError) as e:
-                        raise CommandError("Failed to execute command: %s", e)
+                        raise CommandError(f"Failed to execute command: {e}")
                     pipe_bin = proc.stdout
                 else:  # args.paths_from_stdin == True
                     pipe_bin = sys.stdin.buffer
@@ -132,7 +132,7 @@ class CreateMixIn:
                 if args.paths_from_command:
                     rc = proc.wait()
                     if rc != 0:
-                        raise CommandError("Command %r exited with status %d", args.paths[0], rc)
+                        raise CommandError(f"Command {args.paths[0]!r} exited with status {rc}")
             else:
                 for path in args.paths:
                     if path == "":  # issue #5637

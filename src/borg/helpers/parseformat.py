@@ -1,6 +1,7 @@
 import abc
 import argparse
 import base64
+import binascii
 import hashlib
 import json
 import os
@@ -10,7 +11,6 @@ import shlex
 import stat
 import uuid
 from typing import Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING, Literal
-from binascii import hexlify
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 from functools import partial
@@ -33,7 +33,18 @@ if TYPE_CHECKING:
 
 
 def bin_to_hex(binary):
-    return hexlify(binary).decode("ascii")
+    return binascii.hexlify(binary).decode("ascii")
+
+
+def hex_to_bin(hex, length=None):
+    try:
+        binary = binascii.unhexlify(hex)
+        binary_len = len(binary)
+        if length is not None and binary_len != length:
+            raise ValueError(f"Expected {length} bytes ({2 * length} hex digits), got {binary_len} bytes.")
+    except binascii.Error as e:
+        raise ValueError(str(e)) from None
+    return binary
 
 
 def safe_decode(s, coding="utf-8", errors="surrogateescape"):

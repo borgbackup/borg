@@ -118,7 +118,7 @@ class KeysMixIn:
             if not args.path:
                 raise CommandError("expected input file to import key from")
             if args.path != "-" and not os.path.exists(args.path):
-                raise CommandError("input file does not exist: " + args.path)
+                raise CommandError(f"input file does not exist: {args.path}")
             manager.import_keyfile(args)
 
     def build_parser_keys(self, subparsers, common_parser, mid_common_parser):

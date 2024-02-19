@@ -1,10 +1,9 @@
 import tempfile
-from binascii import hexlify, unhexlify, a2b_base64
+from binascii import a2b_base64
 from unittest.mock import MagicMock
 
 import pytest
 
-from ..crypto.key import bin_to_hex
 from ..crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey
 from ..crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey
 from ..crypto.key import AEADKeyBase
@@ -18,6 +17,7 @@ from ..helpers import IntegrityError
 from ..helpers import Location
 from ..helpers import msgpack
 from ..constants import KEY_ALGORITHMS
+from ..helpers import hex_to_bin, bin_to_hex
 
 
 class TestKey:
@@ -35,10 +35,10 @@ class TestKey:
         F84MsMMiqpbz4KVICeBZhfAaTPs4W7BC63qml0ZXJhdGlvbnPOAAGGoKRzYWx02gAgLENQ
         2uVCoR7EnAoiRzn8J+orbojKtJlNCnQ31SSC8rendmVyc2lvbgE=""".strip()
 
-    keyfile2_cdata = bytes.fromhex(
+    keyfile2_cdata = hex_to_bin(
         "003be7d57280d1a42add9f3f36ea363bbc5e9349ad01ddec0634a54dd02959e70500000000000003ec063d2cbcacba6b"
     )
-    keyfile2_id = unhexlify("c3fbf14bc001ebcc3cd86e696c13482ed071740927cd7cbe1b01b4bfcee49314")
+    keyfile2_id = hex_to_bin("c3fbf14bc001ebcc3cd86e696c13482ed071740927cd7cbe1b01b4bfcee49314")
 
     keyfile_blake2_key_file = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000
@@ -54,7 +54,7 @@ class TestKey:
         UTHFJg343jqml0ZXJhdGlvbnPOAAGGoKRzYWx02gAgz3YaUZZ/s+UWywj97EY5b4KhtJYi
         qkPqtDDxs2j/T7+ndmVyc2lvbgE=""".strip()
 
-    keyfile_blake2_cdata = bytes.fromhex(
+    keyfile_blake2_cdata = hex_to_bin(
         "04d6040f5ef80e0a8ac92badcbe3dee83b7a6b53d5c9a58c4eed14964cb10ef591040404040404040d1e65cc1f435027"
     )
     # Verified against b2sum. Entire string passed to BLAKE2, including the padded 64 byte key contained in
@@ -64,7 +64,7 @@ class TestKey:
     # 000000000000000000000000000000000000000000000000000000000000000000000000000000
     # 00000000000000000000007061796c6f6164
     #                       p a y l o a d
-    keyfile_blake2_id = bytes.fromhex("d8bc68e961c79f99be39061589e5179b2113cd9226e07b08ddd4a1fef7ce93fb")
+    keyfile_blake2_id = hex_to_bin("d8bc68e961c79f99be39061589e5179b2113cd9226e07b08ddd4a1fef7ce93fb")
 
     @pytest.fixture
     def keys_dir(self, request, monkeypatch, tmpdir):
@@ -119,7 +119,7 @@ class TestKey:
         key = PlaintextKey.create(None, None)
         chunk = b"foo"
         id = key.id_hash(chunk)
-        assert hexlify(id) == b"2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+        assert bin_to_hex(id) == "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
         assert chunk == key.decrypt(id, key.encrypt(id, chunk))
 
     def test_keyfile(self, monkeypatch, keys_dir):

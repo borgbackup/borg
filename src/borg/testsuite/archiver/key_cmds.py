@@ -1,5 +1,5 @@
+import binascii
 import os
-from binascii import unhexlify, b2a_base64, a2b_base64
 
 import pytest
 
@@ -7,7 +7,7 @@ from ...constants import *  # NOQA
 from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPOKeyfileKey, Passphrase
 from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ...helpers import EXIT_ERROR, CommandError
-from ...helpers import bin_to_hex
+from ...helpers import bin_to_hex, hex_to_bin
 from ...helpers import msgpack
 from ...repository import Repository
 from .. import key
@@ -223,12 +223,12 @@ def test_key_export_paperkey(archivers, request):
     repo_id = "e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239"
     export_file = archiver.output_path + "/exported"
     cmd(archiver, "rcreate", KF_ENCRYPTION)
-    _set_repository_id(archiver.repository_path, unhexlify(repo_id))
+    _set_repository_id(archiver.repository_path, hex_to_bin(repo_id))
     key_file = archiver.keys_path + "/" + os.listdir(archiver.keys_path)[0]
 
     with open(key_file, "w") as fd:
         fd.write(CHPOKeyfileKey.FILE_ID + " " + repo_id + "\n")
-        fd.write(b2a_base64(b"abcdefghijklmnopqrstu").decode())
+        fd.write(binascii.b2a_base64(b"abcdefghijklmnopqrstu").decode())
 
     cmd(archiver, "key", "export", "--paper", export_file)
 
@@ -251,12 +251,12 @@ def test_key_import_paperkey(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_id = "e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239"
     cmd(archiver, "rcreate", KF_ENCRYPTION)
-    _set_repository_id(archiver.repository_path, unhexlify(repo_id))
+    _set_repository_id(archiver.repository_path, hex_to_bin(repo_id))
 
     key_file = archiver.keys_path + "/" + os.listdir(archiver.keys_path)[0]
     with open(key_file, "w") as fd:
         fd.write(AESOCBKeyfileKey.FILE_ID + " " + repo_id + "\n")
-        fd.write(b2a_base64(b"abcdefghijklmnopqrstu").decode())
+        fd.write(binascii.b2a_base64(b"abcdefghijklmnopqrstu").decode())
 
     typed_input = (
         b"2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41  02\n"  # Forgot to type "-"
@@ -298,7 +298,7 @@ def test_init_defaults_to_argon2(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     with Repository(archiver.repository_path) as repository:
-        key = msgpack.unpackb(a2b_base64(repository.load_key()))
+        key = msgpack.unpackb(binascii.a2b_base64(repository.load_key()))
         assert key["algorithm"] == "argon2 chacha20-poly1305"
 
 
@@ -309,7 +309,7 @@ def test_change_passphrase_does_not_change_algorithm_argon2(archivers, request):
     cmd(archiver, "key", "change-passphrase")
 
     with Repository(archiver.repository_path) as repository:
-        key = msgpack.unpackb(a2b_base64(repository.load_key()))
+        key = msgpack.unpackb(binascii.a2b_base64(repository.load_key()))
         assert key["algorithm"] == "argon2 chacha20-poly1305"
 
 
@@ -319,5 +319,5 @@ def test_change_location_does_not_change_algorithm_argon2(archivers, request):
     cmd(archiver, "key", "change-location", "repokey")
 
     with Repository(archiver.repository_path) as repository:
-        key = msgpack.unpackb(a2b_base64(repository.load_key()))
+        key = msgpack.unpackb(binascii.a2b_base64(repository.load_key()))
         assert key["algorithm"] == "argon2 chacha20-poly1305"

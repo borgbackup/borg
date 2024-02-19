@@ -1,13 +1,12 @@
 import argparse
 import configparser
-from binascii import unhexlify
 
 from ._common import with_repository
 from ..cache import Cache, assert_secure
 from ..constants import *  # NOQA
 from ..helpers import Error, CommandError
 from ..helpers import Location
-from ..helpers import parse_file_size
+from ..helpers import parse_file_size, hex_to_bin
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -46,12 +45,7 @@ class ConfigMixIn:
                     raise ValueError("Invalid value")
             elif name in ["id"]:
                 if check_value:
-                    try:
-                        bin_id = unhexlify(value)
-                    except:  # noqa
-                        raise ValueError("Invalid value, must be 64 hex digits") from None
-                    if len(bin_id) != 32:
-                        raise ValueError("Invalid value, must be 64 hex digits")
+                    hex_to_bin(value, length=32)
             else:
                 raise ValueError("Invalid name")
 

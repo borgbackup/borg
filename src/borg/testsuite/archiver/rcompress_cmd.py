@@ -1,10 +1,10 @@
 import os
-from binascii import hexlify
 
 from ...constants import *  # NOQA
 from ...repository import Repository
 from ...manifest import Manifest
 from ...compress import ZSTD, ZLIB, LZ4, CNONE
+from ...helpers import bin_to_hex
 
 from . import create_regular_file, cmd, RK_ENCRYPTION
 
@@ -27,15 +27,7 @@ def test_rcompress(archiver):
                     )  # will also decompress according to metadata
                     m_olevel = meta.get("olevel", -1)
                     m_psize = meta.get("psize", -1)
-                    print(
-                        hexlify(id).decode(),
-                        meta["ctype"],
-                        meta["clevel"],
-                        meta["csize"],
-                        meta["size"],
-                        m_olevel,
-                        m_psize,
-                    )
+                    print(bin_to_hex(id), meta["ctype"], meta["clevel"], meta["csize"], meta["size"], m_olevel, m_psize)
                     # this is not as easy as one thinks due to the DecidingCompressor choosing the smallest of
                     # (desired compressed, lz4 compressed, not compressed).
                     assert meta["ctype"] in (ctype, LZ4.ID, CNONE.ID)

@@ -628,7 +628,7 @@ Errors
         Failed to encode filename "{}" into file system encoding "{}". Consider configuring the LANG environment variable.
 
     KeyfileInvalidError rc: 40 traceback: no
-        Invalid key file for repository {} found in {}.
+        Invalid key data for repository {} found in {}.
     KeyfileMismatchError rc: 41 traceback: no
         Mismatch between repository {} and key file {}.
     KeyfileNotFoundError rc: 42 traceback: no

@@ -547,7 +547,7 @@ class Archiver:
                         if rc != 0:
                             raise CommandError(f'Command {args.paths[0]!r} exited with status {rc}')
                     except BackupError as e:
-                        raise Error('%s: %s', path, e)
+                        raise Error(f'{path!r}: {e}')
                 else:
                     status = '-'
                 self.print_file_status(status, path)

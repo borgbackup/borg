@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RECREATE" 1 "2023-09-14" "" "borg backup tool"
+.TH "BORG-RECREATE" 1 "2024-02-20" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .SH SYNOPSIS
@@ -50,11 +50,6 @@ the resulting archives will only contain files from these PATHs.
 Note that all paths in an archive are relative, therefore absolute patterns/paths
 will \fInot\fP match (\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, PATHs).
 .sp
-\fB\-\-recompress\fP allows one to change the compression of existing data in archives.
-Due to how Borg stores compressed size information this might display
-incorrect information for archives that were not recreated at the same time.
-There is no risk of data loss by this.
-.sp
 \fB\-\-chunker\-params\fP will re\-chunk all files in the archive, this can be
 used to have upgraded Borg 0.xx archives deduplicate with Borg 1.x archives.
 .sp
@@ -70,9 +65,9 @@ archive that is built during the operation exists at the same time at
 .sp
 With \fB\-\-target\fP the original archive is not replaced, instead a new archive is created.
 .sp
-When rechunking (or recompressing), space usage can be substantial \- expect
+When rechunking, space usage can be substantial \- expect
 at least the entire deduplicated size of the archives using the previous
-chunker (or compression) params.
+chunker params.
 .sp
 If you recently ran borg check \-\-repair and it had to fix lost chunks with all\-zero
 replacement chunks, please first run another backup for the same data and re\-run
@@ -139,7 +134,7 @@ if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit 
 only consider archive names matching the pattern. see \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
-Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp
 .TP
 .BI \-\-first \ N
 consider first N archives after other filters were applied
@@ -154,7 +149,7 @@ consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESP
 consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d oder 12m.
+consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
 consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
@@ -176,9 +171,6 @@ manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
 select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
-.TP
-.BI \-\-recompress \ MODE
-recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIif\-different\fP: recompress if current compression is with a different compression algorithm or different level; \fIalways\fP: recompress unconditionally; and \fInever\fP: do not recompress (use this option explicitly to prevent recompression). If no MODE is given, \fIif\-different\fP will be used. Not passing \-\-recompress is equivalent to \(dq\-\-recompress never\(dq.
 .TP
 .BI \-\-chunker\-params \ PARAMS
 rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the chunker defaults. default: do not rechunk

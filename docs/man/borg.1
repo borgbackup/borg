@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2023-09-14" "" "borg backup tool"
+.TH "BORG" 1 "2024-02-20" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -341,15 +341,27 @@ _
 T{
 1
 T}	T{
-warning (operation reached its normal end, but there were warnings \-\-
+generic warning (operation reached its normal end, but there were warnings \-\-
 you should check the log, logged as WARNING)
 T}
 _
 T{
 2
 T}	T{
-error (like a fatal error, a local or remote exception, the operation
+generic error (like a fatal error, a local or remote exception, the operation
 did not reach its normal end, logged as ERROR)
+T}
+_
+T{
+3..99
+T}	T{
+specific error (enabled by BORG_EXIT_CODES=modern)
+T}
+_
+T{
+100..127
+T}	T{
+specific warning (enabled by BORG_EXIT_CODES=modern)
 T}
 _
 T{
@@ -408,6 +420,10 @@ Main usecase for this is to automate fully \fBborg change\-passphrase\fP\&.
 .TP
 .B BORG_DISPLAY_PASSPHRASE
 When set, use the value to answer the \(dqdisplay the passphrase for verification\(dq question when defining a new passphrase for encrypted repositories.
+.TP
+.B BORG_EXIT_CODES
+When set to \(dqmodern\(dq, the borg process will return more specific exit codes (rc).
+Default is \(dqlegacy\(dq and returns rc 2 for all errors, 1 for all warnings, 0 for success.
 .TP
 .B BORG_HOST_ID
 Borg usually computes a host id from the FQDN plus the results of \fBuuid.getnode()\fP (which usually returns
@@ -634,6 +650,10 @@ operations), see \fI\%tempfile\fP for details.
 .TP
 .B BORG_OPENSSL_PREFIX
 Adds given OpenSSL header file directory to the default locations (setup.py).
+.TP
+.B BORG_LIBACL_PREFIX
+Adds given prefix directory to the default locations. If an \(aqinclude/acl/libacl.h\(aq is found
+Borg will be linked against the system libacl instead of a bundled implementation. (setup.py)
 .TP
 .B BORG_LIBLZ4_PREFIX
 Adds given prefix directory to the default locations. If a \(aqinclude/lz4.h\(aq is found Borg

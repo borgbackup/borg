@@ -120,8 +120,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b8 (not released yet)
-----------------------------------
+Version 2.0.0b8 (2024-02-20)
+----------------------------
 
 Please note:
 

@@ -612,6 +612,8 @@ Errors
         There is already something at {}.
     Repository.StorageQuotaExceeded rc: 20 traceback: no
         The storage quota ({}) has been exceeded ({}). Try deleting some archives.
+    Repository.PathPermissionDenied rc: 21 traceback: no
+        Permission denied to {}.
 
     MandatoryFeatureUnsupported rc: 25 traceback: no
         Unsupported repository feature(s) {}. A newer version of borg is required to access this repository.
@@ -697,6 +699,8 @@ Errors
     UnexpectedRPCDataFormatFromServer rc: 86 traceback: no
         Got unexpected RPC data format from server:
         {}
+    ConnectionBrokenWithHint rc: 87 traceback: no
+        Connection to remote host is broken. {}
 
     IntegrityError rc: 90 traceback: yes
         Data integrity error: {}

@@ -132,6 +132,12 @@ above.
 
 New features:
 
+- create: add the slashdot hack, update docs, #4685
+- BORG_EXIT_CODES=modern: optional more specific return codes (for errors and warnings).
+
+  The default value of this new environment variable is "legacy", which should result in
+  a behaviour similar to borg 1.2 and older (only using rc 0, 1 and 2).
+  "modern" exit codes are much more specific (see the internals/frontends docs).
 - implement "borg version" (shows client and server version), #7829
 
 Fixes:

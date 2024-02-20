@@ -233,6 +233,21 @@ def make_path_safe(path):
     return path
 
 
+def get_strip_prefix(path):
+    # similar to how rsync does it, we allow users to give paths like:
+    # /this/gets/stripped/./this/is/kept
+    # the whole path is what is used to read from the fs,
+    # the strip_prefix will be /this/gets/stripped/ and
+    # this/is/kept is the path being archived.
+    pos = path.find("/./")  # detect slashdot hack
+    if pos > 0:
+        # found a prefix to strip! make sure it ends with one "/"!
+        return os.path.normpath(path[:pos]) + os.sep
+    else:
+        # no or empty prefix, nothing to strip!
+        return None
+
+
 _dotdot_re = re.compile(r"^(\.\./)+")
 
 

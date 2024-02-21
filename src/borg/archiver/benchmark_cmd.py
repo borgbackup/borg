@@ -226,8 +226,6 @@ class BenchmarkMixIn:
         spec = "msgpack"
         print(f"{spec:<12} {size:<10} {timeit(lambda: msgpack.packb(items), number=100):.3f}s")
 
-        return 0
-
     def build_parser_benchmarks(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 

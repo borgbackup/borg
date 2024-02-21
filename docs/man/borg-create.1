@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2023-09-14" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2024-02-20" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -39,6 +39,11 @@ This command creates a backup archive containing all files found while recursive
 traversing all paths specified. Paths are added to the archive as they are given,
 that means if relative paths are desired, the command has to be run from the correct
 directory.
+.sp
+The slashdot hack in paths (recursion roots) is triggered by using \fB/./\fP:
+\fB/this/gets/stripped/./this/gets/archived\fP means to process that fs object, but
+strip the prefix on the left side of \fB\&./\fP from the archived items (in this case,
+\fBthis/gets/archived\fP will be the path in the archived item).
 .sp
 When giving \(aq\-\(aq as path, borg will read data from standard input and create a
 file \(aqstdin\(aq in the created archive from that data. In some cases it\(aqs more
@@ -273,6 +278,9 @@ $ borg create my\-documents ~/Documents
 # same, but list all files as we process them
 $ borg create \-\-list my\-documents ~/Documents
 
+# Backup /mnt/disk/docs, but strip path prefix using the slashdot hack
+$ borg create /path/to/repo::docs /mnt/disk/./docs
+
 # Backup ~/Documents and ~/src but exclude pyc files
 $ borg create my\-files                \e
     ~/Documents                       \e
@@ -430,7 +438,7 @@ Other flags used include:
 .IP \(bu 2
 \(aq?\(aq = missing status code (if you see this, please file a bug report!)
 .UNINDENT
-.SS Reading from stdin
+.SS Reading backup data from stdin
 .sp
 There are two methods to read from stdin. Either specify \fB\-\fP as path and
 pipe directly to borg:
@@ -477,6 +485,19 @@ creation a bit.
 .sp
 By default, the content read from stdin is stored in a file called \(aqstdin\(aq.
 Use \fB\-\-stdin\-name\fP to change the name.
+.SS Feeding all file paths from externally
+.sp
+Usually, you give a starting path (recursion root) to borg and then borg
+automatically recurses, finds and backs up all fs objects contained in
+there (optionally considering include/exclude rules).
+.sp
+If you need more control and you want to give every single fs object path
+to borg (maybe implementing your own recursion or your own rules), you can use
+\fB\-\-paths\-from\-stdin\fP or \fB\-\-paths\-from\-command\fP (with the latter, borg will
+fail to create an archive should the command fail).
+.sp
+Borg supports paths with the slashdot hack to strip path prefixes here also.
+So, be careful not to unintentionally trigger that.
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP, \fIborg\-delete(1)\fP, \fIborg\-prune(1)\fP, \fIborg\-check(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP, \fIborg\-compression(1)\fP, \fIborg\-rcreate(1)\fP

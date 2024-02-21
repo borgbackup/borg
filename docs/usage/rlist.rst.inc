@@ -31,7 +31,7 @@ borg rlist
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archive names matching the pattern. see "borg help match-archives".                                                                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp                                                                                |
+    |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp                                                                       |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--first N``                                | consider first N archives after other filters were applied                                                                                                                      |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -41,7 +41,7 @@ borg rlist
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.                                                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g. 7d oder 12m.                                                                                                                |
+    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g. 7d or 12m.                                                                                                                  |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.                                                                                                                  |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -70,12 +70,12 @@ borg rlist
 
     Archive filters
         -a PATTERN, --match-archives PATTERN     only consider archive names matching the pattern. see "borg help match-archives".
-        --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+        --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp
         --first N                                consider first N archives after other filters were applied
         --last N                                 consider last N archives after other filters were applied
         --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
         --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.
-        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g. 7d oder 12m.
+        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g. 7d or 12m.
         --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.
 
 
@@ -124,7 +124,6 @@ Keys available only when listing archives in a repository:
 - name: alias of "archive"
 - comment: archive comment
 - id: internal ID of the archive
-- tam: TAM authentication state of this archive
 
 - start: time (start) of creation of the archive
 - time: alias of "start"

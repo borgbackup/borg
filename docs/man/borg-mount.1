@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-MOUNT" 1 "2023-09-14" "" "borg backup tool"
+.TH "BORG-MOUNT" 1 "2024-02-20" "" "borg backup tool"
 .SH NAME
 borg-mount \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
@@ -129,7 +129,7 @@ use numeric user and group identifiers from archive(s)
 only consider archive names matching the pattern. see \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
-Comma\-separated list of sorting keys; valid keys are: timestamp, name, id; default is: timestamp
+Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp
 .TP
 .BI \-\-first \ N
 consider first N archives after other filters were applied
@@ -144,7 +144,7 @@ consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESP
 consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d oder 12m.
+consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
 consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.

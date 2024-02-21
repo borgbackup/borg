@@ -1,4 +1,4 @@
-# borgbackup - main setup code (see also setup.cfg and other setup_*.py files)
+# borgbackup - main setup code (extension building here, rest see pyproject.toml)
 
 import os
 import re
@@ -156,7 +156,7 @@ if not on_rtd:
     if sys.platform == "linux":
         linux_ext_kwargs = members_appended(
             dict(sources=[platform_linux_source]),
-            lib_ext_kwargs(pc, "BORG_LIBACL_PREFIX", "acl", "libacl", ">=2.3.1"),
+            lib_ext_kwargs(pc, "BORG_LIBACL_PREFIX", "acl", "libacl", ">= 2.2.47"),
             dict(extra_compile_args=cflags),
         )
     else:

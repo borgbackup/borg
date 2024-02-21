@@ -6,18 +6,18 @@
 Backing up using a non-root user
 ================================
 
-This section shows how to run borg as a non-root user and still be able to
+This section describes how to run borg as a non-root user and still be able to
 backup every file on the system.
 
-Normally borg is run as the root user to bypass all filesystem permission and
+Normally borg is run as the root user to bypass all filesystem permissions and
 be able to read all files. But in theory this also allows borg to modify or
-delete files on you system, incase of a bug for example.
+delete files on your system, in case of a bug for example.
 
-To remove this possible we can run borg as a non-root user and give it readonly
+To eliminate this possibility, we can run borg as a non-root user and give it read-only
 permissions to all files on the system.
 
 
-Using linux capabilities inside a systemd service
+Using Linux capabilities inside a systemd service
 =================================================
 
 One way to do so, is to use linux `capabilities
@@ -46,6 +46,6 @@ A very basic unit file would look like this:
 
     AmbientCapabilities=CAP_DAC_READ_SEARCH
 
-The CAP_DAC_READ_SEARCH capability gives borg readonly access to all files and directories on the system.
+The ``CAP_DAC_READ_SEARCH`` capability gives borg read-only access to all files and directories on the system.
 
-This service can then be started manually using ``systemctl start`` or regularly with a systemd timer.
+This service can then be started manually using ``systemctl start``, a systemd timer or other methods.

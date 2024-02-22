@@ -432,35 +432,44 @@ class Archiver:
 
     def do_benchmark_crud(self, args):
         """Benchmark Create, Read, Update, Delete for archives."""
-        def measurement_run(repo, path):
+        def parse_args(args, cmd):
+            # we need to inherit some essential options from the "borg benchmark crud" invocation
+            if args.rsh is not None:
+                cmd[1:1] = ["--rsh", args.rsh]
+            if args.remote_path is not None:
+                cmd[1:1] = ["--remote-path", args.remote_path]
+            return self.parse_args(cmd)
+
+        def measurement_run(args, path):
+            repo = args.location.canonical_path()
             archive = repo + '::borg-benchmark-crud'
             compression = '--compression=none'
             # measure create perf (without files cache to always have it chunking)
             t_start = time.monotonic()
-            rc = get_reset_ec(self.do_create(self.parse_args(['create', compression, '--files-cache=disabled', archive + '1', path])))
+            rc = get_reset_ec(self.do_create(parse_args(args, ['create', compression, '--files-cache=disabled', archive + '1', path])))
             t_end = time.monotonic()
             dt_create = t_end - t_start
             assert rc == 0
             # now build files cache
-            rc1 = get_reset_ec(self.do_create(self.parse_args(['create', compression, archive + '2', path])))
-            rc2 = get_reset_ec(self.do_delete(self.parse_args(['delete', archive + '2'])))
+            rc1 = get_reset_ec(self.do_create(parse_args(args, ['create', compression, archive + '2', path])))
+            rc2 = get_reset_ec(self.do_delete(parse_args(args, ['delete', archive + '2'])))
             assert rc1 == rc2 == 0
             # measure a no-change update (archive1 is still present)
             t_start = time.monotonic()
-            rc1 = get_reset_ec(self.do_create(self.parse_args(['create', compression, archive + '3', path])))
+            rc1 = get_reset_ec(self.do_create(parse_args(args, ['create', compression, archive + '3', path])))
             t_end = time.monotonic()
             dt_update = t_end - t_start
-            rc2 = get_reset_ec(self.do_delete(self.parse_args(['delete', archive + '3'])))
+            rc2 = get_reset_ec(self.do_delete(parse_args(args, ['delete', archive + '3'])))
             assert rc1 == rc2 == 0
             # measure extraction (dry-run: without writing result to disk)
             t_start = time.monotonic()
-            rc = get_reset_ec(self.do_extract(self.parse_args(['extract', '--dry-run', archive + '1'])))
+            rc = get_reset_ec(self.do_extract(parse_args(args, ['extract', '--dry-run', archive + '1'])))
             t_end = time.monotonic()
             dt_extract = t_end - t_start
             assert rc == 0
             # measure archive deletion (of LAST present archive with the data)
             t_start = time.monotonic()
-            rc = get_reset_ec(self.do_delete(self.parse_args(['delete', archive + '1'])))
+            rc = get_reset_ec(self.do_delete(parse_args(args, ['delete', archive + '1'])))
             t_end = time.monotonic()
             dt_delete = t_end - t_start
             assert rc == 0
@@ -498,7 +507,7 @@ class Archiver:
 
         for msg, count, size, random in tests:
             with test_files(args.path, count, size, random) as path:
-                dt_create, dt_update, dt_extract, dt_delete = measurement_run(args.location.canonical_path(), path)
+                dt_create, dt_update, dt_extract, dt_delete = measurement_run(args, path)
             total_size_MB = count * size / 1e06
             file_size_formatted = format_file_size(size)
             content = 'random' if random else 'all-zero'

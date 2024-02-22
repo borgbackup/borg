@@ -49,3 +49,18 @@ A very basic unit file would look like this:
 The ``CAP_DAC_READ_SEARCH`` capability gives borg read-only access to all files and directories on the system.
 
 This service can then be started manually using ``systemctl start``, a systemd timer or other methods.
+
+Restore considerations
+======================
+
+When restoring files, the root user should be used. When using the non-root user, borg extract will
+change all files to be owned by the non-root user. Using borg mount will not allow the non-root user
+to access files that it would not have access to on the system itself.
+
+Other than that, the same restore process, that would be used when running the backup as root, can be used.
+
+.. warning::
+
+	When using a local repo and running borg commands as root, make sure to only use commands that do not
+    modify the repo itself, like extract or mount. Modifying the repo using the root user will break
+    the repo for the non-root user, since some files inside the repo will now be owned by root.

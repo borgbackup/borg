@@ -12,7 +12,7 @@ cdef extern from "crc32_dispatch.c":
     int _have_clmul "have_clmul"()
 
 
-cdef extern from "xxhash-libselect.h":
+cdef extern from "xxhash.h":
     ctypedef struct XXH64_canonical_t:
         char digest[8]
 

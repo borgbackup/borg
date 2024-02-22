@@ -18,13 +18,22 @@ class BenchmarkMixIn:
     def do_benchmark_crud(self, args):
         """Benchmark Create, Read, Update, Delete for archives."""
 
+        def parse_args(args, cmd):
+            # we need to inherit some essential options from the "borg benchmark crud" invocation
+            if args.rsh is not None:
+                cmd[1:1] = ["--rsh", args.rsh]
+            if args.remote_path is not None:
+                cmd[1:1] = ["--remote-path", args.remote_path]
+            return self.parse_args(cmd)
+
         def measurement_run(repo, path):
             compression = "--compression=none"
             # measure create perf (without files cache to always have it chunking)
             t_start = time.monotonic()
             rc = get_reset_ec(
                 self.do_create(
-                    self.parse_args(
+                    parse_args(
+                        args,
                         [
                             f"--repo={repo}",
                             "create",
@@ -32,7 +41,7 @@ class BenchmarkMixIn:
                             "--files-cache=disabled",
                             "borg-benchmark-crud1",
                             path,
-                        ]
+                        ],
                     )
                 )
             )
@@ -41,27 +50,31 @@ class BenchmarkMixIn:
             assert rc == 0
             # now build files cache
             rc1 = get_reset_ec(
-                self.do_create(self.parse_args([f"--repo={repo}", "create", compression, "borg-benchmark-crud2", path]))
+                self.do_create(
+                    parse_args(args, [f"--repo={repo}", "create", compression, "borg-benchmark-crud2", path])
+                )
             )
             rc2 = get_reset_ec(
-                self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud2"]))
+                self.do_delete(parse_args(args, [f"--repo={repo}", "delete", "-a", "borg-benchmark-crud2"]))
             )
             assert rc1 == rc2 == 0
             # measure a no-change update (archive1 is still present)
             t_start = time.monotonic()
             rc1 = get_reset_ec(
-                self.do_create(self.parse_args([f"--repo={repo}", "create", compression, "borg-benchmark-crud3", path]))
+                self.do_create(
+                    parse_args(args, [f"--repo={repo}", "create", compression, "borg-benchmark-crud3", path])
+                )
             )
             t_end = time.monotonic()
             dt_update = t_end - t_start
             rc2 = get_reset_ec(
-                self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud3"]))
+                self.do_delete(parse_args(args, [f"--repo={repo}", "delete", "-a", "borg-benchmark-crud3"]))
             )
             assert rc1 == rc2 == 0
             # measure extraction (dry-run: without writing result to disk)
             t_start = time.monotonic()
             rc = get_reset_ec(
-                self.do_extract(self.parse_args([f"--repo={repo}", "extract", "borg-benchmark-crud1", "--dry-run"]))
+                self.do_extract(parse_args(args, [f"--repo={repo}", "extract", "borg-benchmark-crud1", "--dry-run"]))
             )
             t_end = time.monotonic()
             dt_extract = t_end - t_start
@@ -69,7 +82,7 @@ class BenchmarkMixIn:
             # measure archive deletion (of LAST present archive with the data)
             t_start = time.monotonic()
             rc = get_reset_ec(
-                self.do_delete(self.parse_args([f"--repo={repo}", "delete", "-a", "borg-benchmark-crud1"]))
+                self.do_delete(parse_args(args, [f"--repo={repo}", "delete", "-a", "borg-benchmark-crud1"]))
             )
             t_end = time.monotonic()
             dt_delete = t_end - t_start

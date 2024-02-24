@@ -1,6 +1,7 @@
 import os
 
 from libc.stdint cimport uint32_t
+from libc cimport errno
 
 from .posix import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
@@ -121,7 +122,10 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
         else:
             acl = acl_get_link_np(path, ACL_TYPE_EXTENDED)
         if acl == NULL:
-            return
+            if errno.errno == errno.ENOENT:
+                # macOS weirdness: if a file has no ACLs, it sets errno to ENOENT. :-(
+                return
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         text = acl_to_text(acl, NULL)
         if text == NULL:
             return
@@ -148,8 +152,10 @@ def acl_set(path, item, numeric_ids=False, fd=None):
             if isinstance(path, str):
                 path = os.fsencode(path)
             if fd is not None:
-                acl_set_fd_np(fd, acl, ACL_TYPE_EXTENDED)
+                if acl_set_fd_np(fd, acl, ACL_TYPE_EXTENDED) == -1:
+                    raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
             else:
-                acl_set_link_np(path, ACL_TYPE_EXTENDED, acl)
+                if acl_set_link_np(path, ACL_TYPE_EXTENDED, acl) == -1:
+                    raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
             acl_free(acl)

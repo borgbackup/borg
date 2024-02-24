@@ -4,11 +4,9 @@ from .posix import posix_acl_use_stored_uid_gid
 from ..helpers import safe_encode, safe_decode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
 
-API_VERSION = '1.4_01'
+from libc cimport errno
 
-cdef extern from "errno.h":
-    int errno
-    int EINVAL
+API_VERSION = '1.4_01'
 
 cdef extern from "sys/extattr.h":
     ssize_t c_extattr_list_file "extattr_list_file" (const char *path, int attrnamespace, void *data, size_t nbytes)
@@ -136,6 +134,8 @@ cdef _get_acl(p, type, item, attribute, flags, fd=None):
             item[attribute] = text
             acl_free(text)
         acl_free(acl)
+    else:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
 
 
 def acl_get(path, item, st, numeric_ids=False, fd=None):
@@ -147,7 +147,7 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     if isinstance(path, str):
         path = os.fsencode(path)
     ret = lpathconf(path, _PC_ACL_NFS4)
-    if ret < 0 and errno == EINVAL:
+    if ret < 0 and errno.errno == errno.EINVAL:
         return
     flags |= ACL_TEXT_NUMERIC_IDS if numeric_ids else 0
     if ret > 0:
@@ -167,11 +167,15 @@ cdef _set_acl(p, type, item, attribute, numeric_ids=False, fd=None):
             text = posix_acl_use_stored_uid_gid(text)
         acl = acl_from_text(<bytes>text)
         if acl:
-            if fd is not None:
-                acl_set_fd_np(fd, acl, type)
-            else:
-                acl_set_link_np(p, type, acl)
-            acl_free(acl)
+            try:
+                if fd is not None:
+                    if acl_set_fd_np(fd, acl, type) == -1:
+                        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
+                else:
+                    if acl_set_link_np(p, type, acl) == -1:
+                        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
+            finally:
+                acl_free(acl)
 
 
 cdef _nfs4_use_stored_uid_gid(acl):

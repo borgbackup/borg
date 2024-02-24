@@ -406,6 +406,7 @@ above.
 Fixes:
 
 - check: fix return code for index entry value discrepancies
+- benchmark: inherit options --rsh --remote-path, #8099
 - sdist: dynamically compute readme (long_description)
 
 New features:
@@ -414,16 +415,20 @@ New features:
 
 Other changes:
 
-- upgrade bundled zstd to 1.5.5
-- upgrade bundled xxhash to 0.8.2
-- upgrade bundled lz4 to 1.9.4
+- remove bundled lz4/zstd/xxhash code (require the respective libs/headers),
+  simplify setup.py, remove support for all BORG_USE_BUNDLED_*=YES, #8094
 - init: better borg key export instructions
 - init: remove compatibility warning for borg <=1.0.8
   The warning refers to a compatibility issue not relevant any
   more since borg 1.0.9 (released 2016-12).
+- use OpenSSL 3.0 on OpenBSD
+- locate libacl via pkgconfig
 - scripts/make.py: move clean, build_man, build_usage to there,
   so we do not need to invoke setup.py directly, update docs
-- docs: how to run the testsuite using the dist package
+- docs:
+
+  - how to run the testsuite using the dist package
+  - add non-root deployment strategy (systemd / capabilities)
 
 
 Version 1.4.0b1 (2024-01-21)

@@ -252,23 +252,24 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
             access_acl = acl_get_fd(fd)
         else:
             access_acl = acl_get_file(path, ACL_TYPE_ACCESS)
-        if access_acl is not NULL:
-            access_text = acl_to_text(access_acl, NULL)
-            if access_text is not NULL:
-                item['acl_access'] = converter(access_text)
-    finally:
-        acl_free(access_text)
-        acl_free(access_acl)
-
-    try:
+        if access_acl == NULL:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         if stat.S_ISDIR(st.st_mode):
             # only directories can have a default ACL. there is no fd-based api to get it.
             default_acl = acl_get_file(path, ACL_TYPE_DEFAULT)
-            if default_acl is not NULL:
-                default_text = acl_to_text(default_acl, NULL)
-                if default_text is not NULL:
-                    item['acl_default'] = converter(default_text)
+            if default_acl == NULL:
+                raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+        if access_acl:
+            access_text = acl_to_text(access_acl, NULL)
+            if access_text:
+                item['acl_access'] = converter(access_text)
+        if default_acl:
+            default_text = acl_to_text(default_acl, NULL)
+            if default_text:
+                item['acl_default'] = converter(default_text)
     finally:
+        acl_free(access_text)
+        acl_free(access_acl)
         acl_free(default_text)
         acl_free(default_acl)
 
@@ -293,9 +294,11 @@ def acl_set(path, item, numeric_ids=False, fd=None):
             access_acl = acl_from_text(<bytes> converter(access_text))
             if access_acl is not NULL:
                 if fd is not None:
-                    acl_set_fd(fd, access_acl)
+                    if acl_set_fd(fd, access_acl) == -1:
+                        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
                 else:
-                    acl_set_file(path, ACL_TYPE_ACCESS, access_acl)
+                    if acl_set_file(path, ACL_TYPE_ACCESS, access_acl) == -1:
+                        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
             acl_free(access_acl)
     default_text = item.get('acl_default')
@@ -304,7 +307,8 @@ def acl_set(path, item, numeric_ids=False, fd=None):
             default_acl = acl_from_text(<bytes> converter(default_text))
             if default_acl is not NULL:
                 # only directories can get a default ACL. there is no fd-based api to set it.
-                acl_set_file(path, ACL_TYPE_DEFAULT, default_acl)
+                if acl_set_file(path, ACL_TYPE_DEFAULT, default_acl) == -1:
+                    raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
             acl_free(default_acl)
 

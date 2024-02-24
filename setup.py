@@ -1,4 +1,4 @@
-# borgbackup - main setup code (see also pyproject.toml and other setup_*.py files)
+# borgbackup - main setup code (extension building here, rest see pyproject.toml)
 
 import os
 import re
@@ -20,69 +20,40 @@ except ImportError:
     cythonize = None
 
 sys.path += [os.path.dirname(__file__)]
-import setup_checksums
-import setup_compress
-import setup_crypto
 
-is_win32 = sys.platform.startswith('win32')
-
-# How the build process finds the system libs / uses the bundled code:
-#
-# 1. it will try to use (system) libs (see 1.1. and 1.2.),
-#    except if you use these env vars to force using the bundled code:
-#    BORG_USE_BUNDLED_XXX undefined  -->  try using system lib
-#    BORG_USE_BUNDLED_XXX=YES        -->  use the bundled code
-#    Note: do not use =NO, that is not supported!
-# 1.1. if BORG_LIBXXX_PREFIX is set, it will use headers and libs from there.
-# 1.2. if not and pkg-config can locate the lib, the lib located by
-#      pkg-config will be used. We use the pkg-config tool via the pkgconfig
-#      python package, which must be installed before invoking setup.py.
-#      if pkgconfig is not installed, this step is skipped.
-# 2. if no system lib could be located via 1.1. or 1.2., it will fall back
-#    to using the bundled code.
-
-# OpenSSL is required as a (system) lib in any case as we do not bundle it.
-# Thus, only step 1.1. and 1.2. apply to openssl (but not 1. and 2.).
-# needed: openssl >=1.0.2 or >=1.1.0 (or compatible)
-system_prefix_openssl = os.environ.get('BORG_OPENSSL_PREFIX')
-
-# needed: lz4 (>= 1.7.0 / r129)
-prefer_system_liblz4 = not bool(os.environ.get('BORG_USE_BUNDLED_LZ4'))
-system_prefix_liblz4 = os.environ.get('BORG_LIBLZ4_PREFIX')
-
-# needed: zstd (>= 1.3.0)
-prefer_system_libzstd = not bool(os.environ.get('BORG_USE_BUNDLED_ZSTD'))
-system_prefix_libzstd = os.environ.get('BORG_LIBZSTD_PREFIX')
-
-prefer_system_libxxhash = not bool(os.environ.get('BORG_USE_BUNDLED_XXHASH'))
-system_prefix_libxxhash = os.environ.get('BORG_LIBXXHASH_PREFIX')
+is_win32 = sys.platform.startswith("win32")
+is_openbsd = sys.platform.startswith("openbsd")
 
 # Number of threads to use for cythonize, not used on windows
-cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != 'spawn' else None
+cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != "spawn" else None
+
+# How the build process finds the system libs:
+#
+# 1. if BORG_{LIBXXX,OPENSSL}_PREFIX is set, it will use headers and libs from there.
+# 2. if not and pkg-config can locate the lib, the lib located by
+#    pkg-config will be used. We use the pkg-config tool via the pkgconfig
+#    python package, which must be installed before invoking setup.py.
+#    if pkgconfig is not installed, this step is skipped.
+# 3. otherwise raise a fatal error.
 
 # Are we building on ReadTheDocs?
-on_rtd = os.environ.get('READTHEDOCS')
+on_rtd = os.environ.get("READTHEDOCS")
 
-# Extra cflags for all extensions, usually just warnings we want to explicitly enable
-cflags = [
-    '-Wall',
-    '-Wextra',
-    '-Wpointer-arith',
-]
+# Extra cflags for all extensions, usually just warnings we want to enable explicitly
+cflags = ["-Wall", "-Wextra", "-Wpointer-arith"]
 
-compress_source = 'src/borg/compress.pyx'
-crypto_ll_source = 'src/borg/crypto/low_level.pyx'
-crypto_helpers = 'src/borg/crypto/_crypto_helpers.c'
-chunker_source = 'src/borg/chunker.pyx'
-hashindex_source = 'src/borg/hashindex.pyx'
-item_source = 'src/borg/item.pyx'
-checksums_source = 'src/borg/algorithms/checksums.pyx'
-platform_posix_source = 'src/borg/platform/posix.pyx'
-platform_linux_source = 'src/borg/platform/linux.pyx'
-platform_syncfilerange_source = 'src/borg/platform/syncfilerange.pyx'
-platform_darwin_source = 'src/borg/platform/darwin.pyx'
-platform_freebsd_source = 'src/borg/platform/freebsd.pyx'
-platform_windows_source = 'src/borg/platform/windows.pyx'
+compress_source = "src/borg/compress.pyx"
+crypto_ll_source = "src/borg/crypto/low_level.pyx"
+chunker_source = "src/borg/chunker.pyx"
+hashindex_source = "src/borg/hashindex.pyx"
+item_source = "src/borg/item.pyx"
+checksums_source = "src/borg/algorithms/checksums.pyx"
+platform_posix_source = "src/borg/platform/posix.pyx"
+platform_linux_source = "src/borg/platform/linux.pyx"
+platform_syncfilerange_source = "src/borg/platform/syncfilerange.pyx"
+platform_darwin_source = "src/borg/platform/darwin.pyx"
+platform_freebsd_source = "src/borg/platform/freebsd.pyx"
+platform_windows_source = "src/borg/platform/windows.pyx"
 
 cython_sources = [
     compress_source,
@@ -91,7 +62,6 @@ cython_sources = [
     hashindex_source,
     item_source,
     checksums_source,
-
     platform_posix_source,
     platform_linux_source,
     platform_syncfilerange_source,
@@ -103,19 +73,18 @@ cython_sources = [
 if cythonize:
     Sdist = sdist
 else:
+
     class Sdist(sdist):
         def __init__(self, *args, **kwargs):
-            raise Exception('Cython is required to run sdist')
+            raise Exception("Cython is required to run sdist")
 
-    cython_c_files = [fn.replace('.pyx', '.c') for fn in cython_sources]
+    cython_c_files = [fn.replace(".pyx", ".c") for fn in cython_sources]
     if not on_rtd and not all(os.path.exists(path) for path in cython_c_files):
-        raise ImportError('The GIT version of Borg needs Cython. Install Cython or use a released version.')
+        raise ImportError("The GIT version of Borg needs Cython. Install Cython or use a released version.")
 
 
-cmdclass = {
-    'build_ext': build_ext,
-    'sdist': Sdist,
-}
+cmdclass = {"build_ext": build_ext, "sdist": Sdist}
+
 
 ext_modules = []
 if not on_rtd:
@@ -131,71 +100,118 @@ if not on_rtd:
     try:
         import pkgconfig as pc
     except ImportError:
-        print('Warning: can not import pkgconfig python package.')
+        print("Warning: can not import pkgconfig python package.")
         pc = None
 
+    def lib_ext_kwargs(pc, prefix_env_var, lib_name, lib_pkg_name, pc_version, lib_subdir="lib"):
+        system_prefix = os.environ.get(prefix_env_var)
+        if system_prefix:
+            print(f"Detected and preferring {lib_pkg_name} [via {prefix_env_var}]")
+            return dict(
+                include_dirs=[os.path.join(system_prefix, "include")],
+                library_dirs=[os.path.join(system_prefix, lib_subdir)],
+                libraries=[lib_name],
+            )
+
+        if pc and pc.installed(lib_pkg_name, pc_version):
+            print(f"Detected and preferring {lib_pkg_name} [via pkg-config]")
+            return pc.parse(lib_pkg_name)
+        raise Exception(
+            f"Could not find {lib_name} lib/headers, please set {prefix_env_var} "
+            f"or ensure {lib_pkg_name}.pc is in PKG_CONFIG_PATH."
+        )
+
+    crypto_extra_objects = []
+    if is_win32:
+        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "libcrypto", "libcrypto", ">=1.1.1", lib_subdir="")
+    elif is_openbsd:
+        # Use openssl (not libressl) because we need AES-OCB via EVP api. Link
+        # it statically to avoid conflicting with shared libcrypto from the base
+        # OS pulled in via dependencies.
+        crypto_ext_lib = {"include_dirs": ["/usr/local/include/eopenssl30"]}
+        crypto_extra_objects += ["/usr/local/lib/eopenssl30/libcrypto.a"]
+    else:
+        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "crypto", "libcrypto", ">=1.1.1")
+
     crypto_ext_kwargs = members_appended(
-        dict(sources=[crypto_ll_source, crypto_helpers]),
-        setup_crypto.crypto_ext_kwargs(pc, system_prefix_openssl),
+        dict(sources=[crypto_ll_source]),
+        crypto_ext_lib,
         dict(extra_compile_args=cflags),
+        dict(extra_objects=crypto_extra_objects),
     )
 
     compress_ext_kwargs = members_appended(
         dict(sources=[compress_source]),
-        setup_compress.lz4_ext_kwargs(pc, prefer_system_liblz4, system_prefix_liblz4),
-        setup_compress.zstd_ext_kwargs(pc, prefer_system_libzstd, system_prefix_libzstd,
-                                       multithreaded=False, legacy=False),
+        lib_ext_kwargs(pc, "BORG_LIBLZ4_PREFIX", "lz4", "liblz4", ">= 1.7.0"),
+        lib_ext_kwargs(pc, "BORG_LIBZSTD_PREFIX", "zstd", "libzstd", ">= 1.3.0"),
         dict(extra_compile_args=cflags),
     )
 
     checksums_ext_kwargs = members_appended(
         dict(sources=[checksums_source]),
-        setup_checksums.xxhash_ext_kwargs(pc, prefer_system_libxxhash, system_prefix_libxxhash),
+        lib_ext_kwargs(pc, "BORG_LIBXXHASH_PREFIX", "xxhash", "libxxhash", ">= 0.7.3"),
         dict(extra_compile_args=cflags),
     )
 
+    if sys.platform == "linux":
+        linux_ext_kwargs = members_appended(
+            dict(sources=[platform_linux_source]),
+            lib_ext_kwargs(pc, "BORG_LIBACL_PREFIX", "acl", "libacl", ">= 2.2.47"),
+            dict(extra_compile_args=cflags),
+        )
+    else:
+        linux_ext_kwargs = members_appended(
+            dict(sources=[platform_linux_source], libraries=["acl"], extra_compile_args=cflags)
+        )
+
+    # note: _chunker.c and _hashindex.c are relatively complex/large pieces of handwritten C code,
+    # thus we undef NDEBUG for them, so the compiled code will contain and execute assert().
     ext_modules += [
-        Extension('borg.crypto.low_level', **crypto_ext_kwargs),
-        Extension('borg.compress', **compress_ext_kwargs),
-        Extension('borg.hashindex', [hashindex_source], extra_compile_args=cflags),
-        Extension('borg.item', [item_source], extra_compile_args=cflags),
-        Extension('borg.chunker', [chunker_source], extra_compile_args=cflags),
-        Extension('borg.algorithms.checksums', **checksums_ext_kwargs),
+        Extension("borg.crypto.low_level", **crypto_ext_kwargs),
+        Extension("borg.compress", **compress_ext_kwargs),
+        Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags, undef_macros=["NDEBUG"]),
+        Extension("borg.item", [item_source], extra_compile_args=cflags),
+        Extension("borg.chunker", [chunker_source], extra_compile_args=cflags, undef_macros=["NDEBUG"]),
+        Extension("borg.algorithms.checksums", **checksums_ext_kwargs),
     ]
 
-    posix_ext = Extension('borg.platform.posix', [platform_posix_source], extra_compile_args=cflags)
-    linux_ext = Extension('borg.platform.linux', [platform_linux_source], libraries=['acl'], extra_compile_args=cflags)
-    syncfilerange_ext = Extension('borg.platform.syncfilerange', [platform_syncfilerange_source], extra_compile_args=cflags)
-    freebsd_ext = Extension('borg.platform.freebsd', [platform_freebsd_source], extra_compile_args=cflags)
-    darwin_ext = Extension('borg.platform.darwin', [platform_darwin_source], extra_compile_args=cflags)
-    windows_ext = Extension('borg.platform.windows', [platform_windows_source], extra_compile_args=cflags)
+    posix_ext = Extension("borg.platform.posix", [platform_posix_source], extra_compile_args=cflags)
+    linux_ext = Extension("borg.platform.linux", **linux_ext_kwargs)
+
+    syncfilerange_ext = Extension(
+        "borg.platform.syncfilerange", [platform_syncfilerange_source], extra_compile_args=cflags
+    )
+    freebsd_ext = Extension("borg.platform.freebsd", [platform_freebsd_source], extra_compile_args=cflags)
+    darwin_ext = Extension("borg.platform.darwin", [platform_darwin_source], extra_compile_args=cflags)
+    windows_ext = Extension("borg.platform.windows", [platform_windows_source], extra_compile_args=cflags)
 
     if not is_win32:
         ext_modules.append(posix_ext)
     else:
         ext_modules.append(windows_ext)
-    if sys.platform == 'linux':
+    if sys.platform == "linux":
         ext_modules.append(linux_ext)
         ext_modules.append(syncfilerange_ext)
-    elif sys.platform.startswith('freebsd'):
+    elif sys.platform.startswith("freebsd"):
         ext_modules.append(freebsd_ext)
-    elif sys.platform == 'darwin':
+    elif sys.platform == "darwin":
         ext_modules.append(darwin_ext)
 
     # sometimes there's no need to cythonize
     # this breaks chained commands like 'clean sdist'
-    cythonizing = len(sys.argv) > 1 and sys.argv[1] not in (
-        ('clean', 'egg_info', '--help-commands', '--version')) and '--help' not in sys.argv[1:]
+    cythonizing = (
+        len(sys.argv) > 1
+        and sys.argv[1] not in (("clean", "egg_info", "--help-commands", "--version"))
+        and "--help" not in sys.argv[1:]
+    )
 
     if cythonize and cythonizing:
-        cython_opts = dict(
-            # 3str is the default in Cython3 and we do not support older Cython releases.
-            # we only set this to avoid the related FutureWarning from Cython3.
-            compiler_directives={'language_level': '3str'}
-        )
+        # 3str is the default in Cython3 and we do not support older Cython releases.
+        # we only set this to avoid the related FutureWarning from Cython3.
+        cython_opts = dict(compiler_directives={"language_level": "3str"})
         if not is_win32:
             # compile .pyx extensions to .c in parallel, does not work on windows
-            cython_opts['nthreads'] = cpu_threads
+            cython_opts["nthreads"] = cpu_threads
 
         # generate C code from Cython for ALL supported platforms, so we have them in the sdist.
         # the sdist does not require Cython at install time, so we need all as C.
@@ -205,16 +221,16 @@ if not on_rtd:
 
 
 def long_desc_from_readme():
-    with open('README.rst') as fd:
+    with open("README.rst") as fd:
         long_description = fd.read()
         # remove header, but have one \n before first headline
-        start = long_description.find('What is BorgBackup?')
+        start = long_description.find("What is BorgBackup?")
         assert start >= 0
-        long_description = '\n' + long_description[start:]
+        long_description = "\n" + long_description[start:]
         # remove badges
-        long_description = re.compile(r'^\.\. start-badges.*^\.\. end-badges', re.M | re.S).sub('', long_description)
+        long_description = re.compile(r"^\.\. start-badges.*^\.\. end-badges", re.M | re.S).sub("", long_description)
         # remove unknown directives
-        long_description = re.compile(r'^\.\. highlight:: \w+$', re.M).sub('', long_description)
+        long_description = re.compile(r"^\.\. highlight:: \w+$", re.M).sub("", long_description)
         return long_description
 
 

@@ -195,6 +195,7 @@ class BackupIO:
             E_MAP = {
                 errno.EPERM: BackupPermissionError,
                 errno.EACCES: BackupPermissionError,
+                errno.EBUSY: BackupPermissionError,
                 errno.ENOENT: BackupFileNotFoundError,
                 errno.EIO: BackupIOError,
             }

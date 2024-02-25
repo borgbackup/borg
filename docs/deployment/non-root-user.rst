@@ -61,6 +61,6 @@ Other than that, the same restore process, that would be used when running the b
 
 .. warning::
 
-	When using a local repo and running borg commands as root, make sure to only use commands that do not
+    When using a local repo and running borg commands as root, make sure to only use commands that do not
     modify the repo itself, like extract or mount. Modifying the repo using the root user will break
     the repo for the non-root user, since some files inside the repo will now be owned by root.

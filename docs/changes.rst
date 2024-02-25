@@ -421,7 +421,6 @@ Other changes:
 - init: remove compatibility warning for borg <=1.0.8
   The warning refers to a compatibility issue not relevant any
   more since borg 1.0.9 (released 2016-12).
-- use OpenSSL 3.0 on OpenBSD
 - locate libacl via pkgconfig
 - scripts/make.py: move clean, build_man, build_usage to there,
   so we do not need to invoke setup.py directly, update docs

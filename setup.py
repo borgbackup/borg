@@ -22,7 +22,6 @@ except ImportError:
 sys.path += [os.path.dirname(__file__)]
 
 is_win32 = sys.platform.startswith("win32")
-is_openbsd = sys.platform.startswith("openbsd")
 
 # Number of threads to use for cythonize, not used on windows
 cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != "spawn" else None
@@ -124,12 +123,6 @@ if not on_rtd:
     crypto_extra_objects = []
     if is_win32:
         crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "libcrypto", "libcrypto", ">=1.1.1", lib_subdir="")
-    elif is_openbsd:
-        # Use openssl (not libressl) because we need AES-OCB via EVP api. Link
-        # it statically to avoid conflicting with shared libcrypto from the base
-        # OS pulled in via dependencies.
-        crypto_ext_lib = {"include_dirs": ["/usr/local/include/eopenssl30"]}
-        crypto_extra_objects += ["/usr/local/lib/eopenssl30/libcrypto.a"]
     else:
         crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "crypto", "libcrypto", ">=1.1.1")
 

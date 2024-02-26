@@ -128,15 +128,15 @@ cdef _get_acl(p, type, item, attribute, flags, fd=None):
         acl = acl_get_fd_np(fd, type)
     else:
         acl = acl_get_link_np(p, type)
-    if acl:
-        text = acl_to_text_np(acl, NULL, flags)
-        if text:
-            item[attribute] = text
-            acl_free(text)
-        acl_free(acl)
-    else:
+    if acl == NULL:
         raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
-
+    text = acl_to_text_np(acl, NULL, flags)
+    if text == NULL:
+        acl_free(acl)
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
+    item[attribute] = text
+    acl_free(text)
+    acl_free(acl)
 
 def acl_get(path, item, st, numeric_ids=False, fd=None):
     """Saves ACL Entries
@@ -166,16 +166,17 @@ cdef _set_acl(p, type, item, attribute, numeric_ids=False, fd=None):
         elif numeric_ids and type in(ACL_TYPE_ACCESS, ACL_TYPE_DEFAULT):
             text = posix_acl_use_stored_uid_gid(text)
         acl = acl_from_text(<bytes>text)
-        if acl:
-            try:
-                if fd is not None:
-                    if acl_set_fd_np(fd, acl, type) == -1:
-                        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
-                else:
-                    if acl_set_link_np(p, type, acl) == -1:
-                        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
-            finally:
-                acl_free(acl)
+        if acl == NULL:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
+        try:
+            if fd is not None:
+                if acl_set_fd_np(fd, acl, type) == -1:
+                    raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
+            else:
+                if acl_set_link_np(p, type, acl) == -1:
+                    raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
+        finally:
+            acl_free(acl)
 
 
 cdef _nfs4_use_stored_uid_gid(acl):

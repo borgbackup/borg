@@ -130,7 +130,7 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
             raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         text = acl_to_text(acl, NULL)
         if text == NULL:
-            return
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         if numeric_ids:
             item['acl_extended'] = _remove_non_numeric_identifier(text)
         else:
@@ -145,14 +145,14 @@ def acl_set(path, item, numeric_ids=False, fd=None):
     acl_text = item.get('acl_extended')
     if acl_text is not None:
         try:
+            if isinstance(path, str):
+                path = os.fsencode(path)
             if numeric_ids:
                 acl = acl_from_text(acl_text)
             else:
                 acl = acl_from_text(<bytes>_remove_numeric_id_if_possible(acl_text))
             if acl == NULL:
-                return
-            if isinstance(path, str):
-                path = os.fsencode(path)
+                raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
             if fd is not None:
                 if acl_set_fd_np(fd, acl, ACL_TYPE_EXTENDED) == -1:
                     raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))

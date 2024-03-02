@@ -232,16 +232,22 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     cdef acl_t access_acl = NULL
     cdef char *default_text = NULL
     cdef char *access_text = NULL
+    cdef int ret = 0
 
     if stat.S_ISLNK(st.st_mode):
         # symlinks can not have ACLs
         return
     if isinstance(path, str):
         path = os.fsencode(path)
-    if (fd is not None and acl_extended_fd(fd) <= 0
-        or
-        fd is None and acl_extended_file(path) <= 0):
+    if fd is not None:
+        ret = acl_extended_fd(fd)
+    else:
+        ret = acl_extended_file(path)
+    if ret == 0:
+        # there is no ACL defining permissions other than those defined by the traditional file permission bits.
         return
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
     if numeric_ids:
         converter = acl_numeric_ids
     else:

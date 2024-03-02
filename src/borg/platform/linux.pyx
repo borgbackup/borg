@@ -288,7 +288,7 @@ def acl_set(path, item, numeric_ids=False, fd=None):
         # Linux does not support setting ACLs on symlinks
         return
 
-    if fd is None and isinstance(path, str):
+    if isinstance(path, str):
         path = os.fsencode(path)
     if numeric_ids:
         converter = posix_acl_use_stored_uid_gid

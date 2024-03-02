@@ -50,7 +50,7 @@ cdef extern from "sys/acl.h":
     char *acl_to_text(acl_t acl, ssize_t *len)
 
 cdef extern from "acl/libacl.h":
-    int acl_extended_file(const char *path)
+    int acl_extended_file_nofollow(const char *path)
     int acl_extended_fd(int fd)
 
 cdef extern from "linux/fs.h":
@@ -235,17 +235,15 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     cdef char *access_text = NULL
     cdef int ret = 0
 
-    if stat.S_ISLNK(st.st_mode):
-        # symlinks can not have ACLs
-        return
     if isinstance(path, str):
         path = os.fsencode(path)
     if fd is not None:
         ret = acl_extended_fd(fd)
     else:
-        ret = acl_extended_file(path)
+        ret = acl_extended_file_nofollow(path)
     if ret == 0:
         # there is no ACL defining permissions other than those defined by the traditional file permission bits.
+        # note: this should also be the case for symlink fs objects, as they can not have ACLs.
         return
     if ret < 0:
         raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))

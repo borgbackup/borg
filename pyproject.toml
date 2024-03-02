@@ -34,7 +34,7 @@ dependencies = [
     # Please note:
     # using any other msgpack version is not supported by borg development and
     # any feedback related to issues caused by this will be ignored.
-    "msgpack >=1.0.3, <=1.0.7",
+    "msgpack >=1.0.3, <=1.0.8",
     "packaging",
 ]
 
@@ -71,7 +71,7 @@ where = ["src"]
 "*" = ["*.c", "*.h", "*.pyx"]
 
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm>=8", "wheel", "pkgconfig", "Cython>=3"]
+requires = ["setuptools>=64", "setuptools_scm>=8", "wheel", "pkgconfig", "Cython>=3.0.3"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]

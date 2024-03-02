@@ -378,11 +378,31 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.2.7 (2023-12-02)
---------------------------
+Version 1.2.8 (not released yet)
+--------------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Fixes:
+
+- check: fix return code and log level for index entry value discrepancies
+- with-lock: catch FileNotFoundError exception, print error msg, #8022
+- benchmark: inherit options --rsh --remote-path, #8099
+
+Other changes:
+
+- allow msgpack 1.0.8 (this might fix memory leaks with Python 3.12), #8133
+- use the latest Cython 0.29.x
+- docs:
+
+  - improve docs for borg with-lock, #8022
+  - add more infos borg check --repair recreating the shadow index
+    to change log, see #6687
+
+
+Version 1.2.7 (2023-12-02)
+--------------------------
 
 Fixes:
 

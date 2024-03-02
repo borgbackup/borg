@@ -80,7 +80,7 @@ class PruneMixIn:
             raise CommandError(
                 'At least one of the "keep-within", "keep-last", '
                 '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
-                '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.'
+                '"keep-weekly", "keep-monthly", "keep-yearly" or "keep-all" settings must be specified.'
             )
 
         if args.format is not None:
@@ -298,6 +298,13 @@ class PruneMixIn:
             default=0,
             action=Highlander,
             help="number of secondly archives to keep",
+        )
+        subparser.add_argument(
+            "--keep-all",
+            dest="secondly",
+            action="store_const",
+            const=float("inf"),
+            help="keep all archives (alias of --keep-last=<infinite>)",
         )
         subparser.add_argument(
             "--keep-minutely",

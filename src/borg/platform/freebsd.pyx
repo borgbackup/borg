@@ -145,6 +145,7 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     If `numeric_ids` is True the user/group field is not preserved only uid/gid
     """
     cdef int flags = ACL_TEXT_APPEND_ID
+    flags |= ACL_TEXT_NUMERIC_IDS if numeric_ids else 0
     if isinstance(path, str):
         path = os.fsencode(path)
     ret = acl_extended_link_np(path)
@@ -154,10 +155,10 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
         # there is no ACL defining permissions other than those defined by the traditional file permission bits.
         return
     ret = lpathconf(path, _PC_ACL_NFS4)
-    if ret < 0 and errno.errno == errno.EINVAL:
-        return
-    flags |= ACL_TEXT_NUMERIC_IDS if numeric_ids else 0
-    if ret > 0:
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    nfs4_acl = ret == 1
+    if nfs4_acl:
         _get_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', flags, fd=fd)
     else:
         _get_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', flags, fd=fd)

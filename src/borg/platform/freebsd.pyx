@@ -42,6 +42,7 @@ cdef extern from "sys/acl.h":
     char *acl_to_text_np(acl_t acl, ssize_t *len, int flags)
     int ACL_TEXT_NUMERIC_IDS
     int ACL_TEXT_APPEND_ID
+    int acl_extended_link_np(const char * path)  # check also: acl_is_trivial_np
 
 cdef extern from "unistd.h":
     long lpathconf(const char *path, int name)
@@ -146,6 +147,12 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     cdef int flags = ACL_TEXT_APPEND_ID
     if isinstance(path, str):
         path = os.fsencode(path)
+    ret = acl_extended_link_np(path)
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    if ret == 0:
+        # there is no ACL defining permissions other than those defined by the traditional file permission bits.
+        return
     ret = lpathconf(path, _PC_ACL_NFS4)
     if ret < 0 and errno.errno == errno.EINVAL:
         return

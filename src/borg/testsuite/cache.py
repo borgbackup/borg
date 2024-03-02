@@ -189,7 +189,7 @@ class TestAdHocCache:
 
     def test_does_not_delete_existing_chunks(self, repository, cache):
         assert cache.seen_chunk(H(1)) == ChunkIndex.MAX_VALUE
-        cache.chunk_decref(H(1), Statistics())
+        cache.chunk_decref(H(1), 1, Statistics())
         assert repository.get(H(1)) == b"1234"
 
     def test_seen_chunk_add_chunk_size(self, cache):
@@ -199,7 +199,7 @@ class TestAdHocCache:
         """E.g. checkpoint archives"""
         cache.add_chunk(H(5), {}, b"1010", stats=Statistics())
         assert cache.seen_chunk(H(5)) == 1
-        cache.chunk_decref(H(5), Statistics())
+        cache.chunk_decref(H(5), 1, Statistics())
         assert not cache.seen_chunk(H(5))
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(H(5))
@@ -220,9 +220,9 @@ class TestAdHocCache:
 
     def test_incref_after_add_chunk(self, cache):
         assert cache.add_chunk(H(3), {}, b"5678", stats=Statistics()) == (H(3), 4)
-        assert cache.chunk_incref(H(3), Statistics()) == (H(3), 4)
+        assert cache.chunk_incref(H(3), 4, Statistics()) == (H(3), 4)
 
     def test_existing_incref_after_add_chunk(self, cache):
         """This case occurs with part files, see Archive.chunk_file."""
         assert cache.add_chunk(H(1), {}, b"5678", stats=Statistics()) == (H(1), 4)
-        assert cache.chunk_incref(H(1), Statistics()) == (H(1), 4)
+        assert cache.chunk_incref(H(1), 4, Statistics()) == (H(1), 4)

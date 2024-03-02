@@ -338,10 +338,11 @@ def test_extra_chunks(archivers, request):
     with Repository(archiver.repository_location, exclusive=True) as repository:
         repository.put(b"01234567890123456789012345678901", b"xxxx")
         repository.commit(compact=False)
-    cmd(archiver, "check", exit_code=1)
-    cmd(archiver, "check", exit_code=1)
+    output = cmd(archiver, "check", "-v", exit_code=0)  # orphans are not considered warnings anymore
+    assert "1 orphaned (unused) objects found." in output
     cmd(archiver, "check", "--repair", exit_code=0)
-    cmd(archiver, "check", exit_code=0)
+    output = cmd(archiver, "check", "-v", exit_code=0)
+    assert "orphaned (unused) objects found." not in output
     cmd(archiver, "extract", "archive1", "--dry-run", exit_code=0)
 
 

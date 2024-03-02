@@ -277,6 +277,7 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
             repository._location = Location(archiver.repository_location)
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         with Cache(repository, manifest) as cache:
+            is_localcache = isinstance(cache, LocalCache)
             cache.begin_txn()
             cache.cache_config.mandatory_features = {"unknown-feature"}
             cache.commit()
@@ -295,7 +296,8 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
         with patch.object(LocalCache, "wipe_cache", wipe_wrapper):
             cmd(archiver, "create", "test", "input")
 
-        assert called
+        if is_localcache:
+            assert called
 
     with Repository(archiver.repository_path, exclusive=True) as repository:
         if remote_repo:

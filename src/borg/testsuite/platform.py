@@ -1,7 +1,6 @@
 import errno
 import functools
 import os
-import random
 import shutil
 import sys
 import tempfile
@@ -35,8 +34,6 @@ group:8888:r--:8888
 mask::rw-
 other::r--
 """.strip().encode('ascii')
-
-_acls_working = None
 
 
 def fakeroot_detected():
@@ -82,7 +79,7 @@ def are_acls_working():
         return False
 
 
-@unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
+@unittest.skipUnless(is_linux, 'linux only test')
 @unittest.skipIf(fakeroot_detected(), 'not compatible with fakeroot')
 class PlatformLinuxTestCase(BaseTestCase):
 
@@ -160,7 +157,7 @@ class PlatformLinuxTestCase(BaseTestCase):
         self.assert_equal(acl_use_local_uid_gid(b'group:root:rw-:0'), b'group:0:rw-')
 
 
-@unittest.skipUnless(sys.platform.startswith('darwin'), 'macOS only test')
+@unittest.skipUnless(is_darwin, 'macOS only test')
 @unittest.skipIf(fakeroot_detected(), 'not compatible with fakeroot')
 class PlatformDarwinTestCase(BaseTestCase):
 
@@ -180,7 +177,7 @@ class PlatformDarwinTestCase(BaseTestCase):
         acl_set(path, item, numeric_ids=numeric_ids)
 
     @unittest.skipIf(not are_acls_working(), 'ACLs do not work')
-    def test_access_acl(self):
+    def test_extended_acl(self):
         file = tempfile.NamedTemporaryFile()
         file2 = tempfile.NamedTemporaryFile()
         self.assert_equal(self.get_acl(file.name), {})

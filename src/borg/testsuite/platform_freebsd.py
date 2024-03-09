@@ -49,6 +49,7 @@ def set_acl(path, access=None, default=None, nfs4=None, numeric_ids=False):
 @skipif_acls_not_working
 def test_access_acl():
     file1 = tempfile.NamedTemporaryFile()
+    assert get_acl(file1.name) == {}
     set_acl(
         file1.name,
         access=b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-\ngroup:wheel:rw-\n",
@@ -86,6 +87,7 @@ def test_access_acl():
 @skipif_acls_not_working
 def test_default_acl():
     tmpdir = tempfile.mkdtemp()
+    assert get_acl(tmpdir) == {}
     set_acl(tmpdir, access=ACCESS_ACL, default=DEFAULT_ACL)
     assert get_acl(tmpdir)["acl_access"] == ACCESS_ACL
     assert get_acl(tmpdir)["acl_default"] == DEFAULT_ACL

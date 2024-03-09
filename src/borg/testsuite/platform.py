@@ -35,16 +35,28 @@ def are_acls_working():
             if is_darwin:
                 acl_key = "acl_extended"
                 acl_value = b"!#acl 1\nuser:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n"
-            else:
+            elif is_linux:
                 acl_key = "acl_access"
                 acl_value = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:9999\ngroup:root:rw-:9999\n"
+            elif is_freebsd:
+                acl_key = "acl_access"
+                acl_value = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-\ngroup:wheel:rw-\n"
+            else:
+                return False  # ACLs unsupported on this platform.
             write_acl = {acl_key: acl_value}
             acl_set(filepath, write_acl)
             read_acl = {}
             acl_get(filepath, read_acl, os.stat(filepath))
             acl = read_acl.get(acl_key, None)
             if acl is not None:
-                check_for = b"root:0:allow:read" if is_darwin else b"user::rw-"
+                if is_darwin:
+                    check_for = b"root:0:allow:read"
+                elif is_linux:
+                    check_for = b"user::rw-"
+                elif is_freebsd:
+                    check_for = b"user::rw-"
+                else:
+                    return False  # ACLs unsupported on this platform.
                 if check_for in acl:
                     return True
         except PermissionError:

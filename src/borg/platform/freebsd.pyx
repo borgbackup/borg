@@ -1,4 +1,5 @@
 import os
+import stat
 
 from .posix import posix_acl_use_stored_uid_gid
 from ..helpers import safe_encode, safe_decode
@@ -162,7 +163,8 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
         _get_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', flags, fd=fd)
     else:
         _get_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', flags, fd=fd)
-        _get_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', flags, fd=fd)
+        if stat.S_ISDIR(st.st_mode):
+            _get_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', flags, fd=fd)
 
 
 cdef _set_acl(p, type, item, attribute, numeric_ids=False, fd=None):

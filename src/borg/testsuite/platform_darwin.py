@@ -20,7 +20,7 @@ def set_acl(path, acl, numeric_ids=False):
 
 
 @skipif_acls_not_working
-def test_access_acl():
+def test_extended_acl():
     file = tempfile.NamedTemporaryFile()
     assert get_acl(file.name) == {}
     set_acl(

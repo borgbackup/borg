@@ -13,29 +13,6 @@ from . import BaseTestCase, unopened_tempfile
 from .locking import free_pid
 
 
-ACCESS_ACL = """
-user::rw-
-user:root:rw-:0
-user:9999:r--:9999
-group::r--
-group:root:r--:0
-group:9999:r--:9999
-mask::rw-
-other::r--
-""".strip().encode('ascii')
-
-DEFAULT_ACL = """
-user::rw-
-user:root:r--:0
-user:8888:r--:8888
-group::r--
-group:root:r--:0
-group:8888:r--:8888
-mask::rw-
-other::r--
-""".strip().encode('ascii')
-
-
 def fakeroot_detected():
     return 'FAKEROOTKEY' in os.environ
 
@@ -125,6 +102,8 @@ class PlatformLinuxTestCase(BaseTestCase):
 
     @unittest.skipIf(not are_acls_working(), 'ACLs do not work')
     def test_default_acl(self):
+        ACCESS_ACL = b'user::rw-\nuser:root:rw-:0\nuser:9999:r--:9999\ngroup::r--\ngroup:root:r--:0\ngroup:9999:r--:9999\nmask::rw-\nother::r--'
+        DEFAULT_ACL = b'user::rw-\nuser:root:r--:0\nuser:8888:r--:8888\ngroup::r--\ngroup:root:r--:0\ngroup:8888:r--:8888\nmask::rw-\nother::r--'
         self.assert_equal(self.get_acl(self.tmpdir), {})
         self.set_acl(self.tmpdir, access=ACCESS_ACL, default=DEFAULT_ACL)
         self.assert_equal(self.get_acl(self.tmpdir)['acl_access'], ACCESS_ACL)

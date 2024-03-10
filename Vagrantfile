@@ -113,7 +113,7 @@ def packages_darwin
     sudo softwareupdate --install --all
     which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
-    brew install pkg-config readline openssl@3.0 zstd lz4 xz
+    brew install pkg-config readline openssl@3.0 zstd lz4 xz xxhash
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
     echo 'export LDFLAGS=-L/usr/local/opt/openssl@3.0/lib' >> ~vagrant/.bash_profile

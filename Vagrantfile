@@ -15,7 +15,7 @@ def packages_debianoid(user)
     apt-get -y -qq update
     apt-get -y -qq dist-upgrade
     # for building borgbackup and dependencies:
-    apt install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev pkg-config
+    apt install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev libxxhash-dev pkg-config
     apt install -y libfuse-dev fuse || true
     apt install -y libfuse3-dev fuse3 || true
     apt install -y locales || true

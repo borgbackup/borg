@@ -48,6 +48,7 @@ cdef extern from "sys/acl.h":
 cdef extern from "unistd.h":
     long lpathconf(const char *path, int name)
     int _PC_ACL_NFS4
+    int _PC_ACL_EXTENDED
 
 
 # On FreeBSD, borg currently only deals with the USER namespace as it is unclear
@@ -212,6 +213,14 @@ def acl_set(path, item, numeric_ids=False, fd=None):
     """
     if isinstance(path, str):
         path = os.fsencode(path)
-    _set_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', numeric_ids, fd=fd)
-    _set_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', numeric_ids, fd=fd)
-    _set_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', numeric_ids, fd=fd)
+    ret = lpathconf(path, _PC_ACL_NFS4)
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    if ret == 1:
+        _set_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', numeric_ids, fd=fd)
+    ret = lpathconf(path, _PC_ACL_EXTENDED)
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    if ret == 1:
+        _set_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', numeric_ids, fd=fd)
+        _set_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', numeric_ids, fd=fd)

@@ -171,10 +171,11 @@ cdef _set_acl(p, type, item, attribute, numeric_ids=False, fd=None):
     cdef acl_t acl
     text = item.get(attribute)
     if text:
-        if numeric_ids and type == ACL_TYPE_NFS4:
-            text = _nfs4_use_stored_uid_gid(text)
-        elif numeric_ids and type in(ACL_TYPE_ACCESS, ACL_TYPE_DEFAULT):
-            text = posix_acl_use_stored_uid_gid(text)
+        if numeric_ids:
+            if type == ACL_TYPE_NFS4:
+                text = _nfs4_use_stored_uid_gid(text)
+            elif type in (ACL_TYPE_ACCESS, ACL_TYPE_DEFAULT):
+                text = posix_acl_use_stored_uid_gid(text)
         acl = acl_from_text(<bytes>text)
         if acl == NULL:
             raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))

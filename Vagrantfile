@@ -15,7 +15,7 @@ def packages_debianoid(user)
     apt-get -y -qq update
     apt-get -y -qq dist-upgrade
     # for building borgbackup and dependencies:
-    apt install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev pkg-config
+    apt install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev libxxhash-dev pkg-config
     apt install -y libfuse-dev fuse || true
     apt install -y libfuse3-dev fuse3 || true
     apt install -y locales || true
@@ -113,7 +113,7 @@ def packages_darwin
     sudo softwareupdate --install --all
     which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
-    brew install pkg-config readline openssl@3.0 zstd lz4 xz
+    brew install pkg-config readline openssl@3.0 zstd lz4 xz xxhash
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
     echo 'export LDFLAGS=-L/usr/local/opt/openssl@3.0/lib' >> ~vagrant/.bash_profile
@@ -160,7 +160,7 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     pyenv install 3.12.0  # tests
-    pyenv install 3.11.7  # tests, binary build
+    pyenv install 3.11.8  # tests, binary build
     pyenv install 3.10.2  # tests
     pyenv install 3.9.4  # tests
     pyenv rehash
@@ -180,8 +180,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.11 release
-    pyenv global 3.11.7
-    pyenv virtualenv 3.11.7 borg-env
+    pyenv global 3.11.8
+    pyenv virtualenv 3.11.8 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -204,7 +204,7 @@ def install_pyinstaller()
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    pip install 'pyinstaller==6.3.0'
+    pip install 'pyinstaller==6.5.0'
   EOF
 end
 
@@ -227,8 +227,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.4 3.10.2 3.11.7 3.12.0
-      pyenv local 3.9.4 3.10.2 3.11.7 3.12.0
+      pyenv global 3.9.4 3.10.2 3.11.8 3.12.0
+      pyenv local 3.9.4 3.10.2 3.11.8 3.12.0
     fi
     # otherwise: just use the system python
     # avoid that git complains about dubious ownership if we use fakeroot:

@@ -241,12 +241,12 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
         ret = acl_extended_fd(fd)
     else:
         ret = acl_extended_file_nofollow(path)
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
     if ret == 0:
         # there is no ACL defining permissions other than those defined by the traditional file permission bits.
         # note: this should also be the case for symlink fs objects, as they can not have ACLs.
         return
-    if ret < 0:
-        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
     if numeric_ids:
         converter = acl_numeric_ids
     else:
@@ -258,26 +258,26 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
             access_acl = acl_get_file(path, ACL_TYPE_ACCESS)
         if access_acl == NULL:
             raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-        if stat.S_ISDIR(st.st_mode):
-            # only directories can have a default ACL. there is no fd-based api to get it.
+        access_text = acl_to_text(access_acl, NULL)
+        if access_text == NULL:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+        item['acl_access'] = converter(access_text)
+    finally:
+        acl_free(access_text)
+        acl_free(access_acl)
+    if stat.S_ISDIR(st.st_mode):
+        # only directories can have a default ACL. there is no fd-based api to get it.
+        try:
             default_acl = acl_get_file(path, ACL_TYPE_DEFAULT)
             if default_acl == NULL:
                 raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-        if access_acl:
-            access_text = acl_to_text(access_acl, NULL)
-            if access_text == NULL:
-                raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-            item['acl_access'] = converter(access_text)
-        if default_acl:
             default_text = acl_to_text(default_acl, NULL)
             if default_text == NULL:
                 raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
             item['acl_default'] = converter(default_text)
-    finally:
-        acl_free(access_text)
-        acl_free(access_acl)
-        acl_free(default_text)
-        acl_free(default_acl)
+        finally:
+            acl_free(default_text)
+            acl_free(default_acl)
 
 
 def acl_set(path, item, numeric_ids=False, fd=None):

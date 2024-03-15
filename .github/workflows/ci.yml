@@ -114,6 +114,7 @@ jobs:
         brew install pkg-config || brew upgrade pkg-config
         brew install zstd || brew upgrade zstd
         brew install lz4 || brew upgrade lz4
+        brew install xxhash || brew upgrade xxhash
         brew install openssl@3.0 || brew upgrade openssl@3.0
 
     - name: Install Python requirements

@@ -11,6 +11,7 @@ on:
     - '**.c'
     - '**.h'
     - '**.yml'
+    - '**.toml'
     - '**.cfg'
     - '**.ini'
     - 'requirements.d/*'
@@ -23,6 +24,7 @@ on:
     - '**.c'
     - '**.h'
     - '**.yml'
+    - '**.toml'
     - '**.cfg'
     - '**.ini'
     - 'requirements.d/*'
@@ -35,7 +37,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: chartboost/ruff-action@v1
 
   pytest:
@@ -48,38 +50,38 @@ jobs:
             - os: ubuntu-20.04
               python-version: '3.9'
               toxenv: py39-fuse2
-            - os: ubuntu-20.04
+            - os: ubuntu-22.04
               python-version: '3.10'
               toxenv: py310-fuse3
-            - os: ubuntu-20.04
+            - os: ubuntu-22.04
               python-version: '3.11'
               toxenv: py311-fuse2
             - os: ubuntu-22.04
               python-version: '3.12'
               toxenv: py312-fuse3
-            - os: macos-12
-              python-version: '3.9'
-              toxenv: py39-none  # note: no fuse testing, due to #6099, see also #6196.
+            - os: macos-14
+              python-version: '3.11'
+              toxenv: py311-none  # note: no fuse testing, due to #6099, see also #6196.
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
-      PKG_CONFIG_PATH: "/usr/local/opt/openssl@1.1/lib/pkgconfig:$PKG_CONFIG_PATH"
+      PKG_CONFIG_PATH: "/usr/local/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         # just fetching 1 commit is not enough for setuptools-scm, so we fetch all
         fetch-depth: 0
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Cache pip
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
@@ -93,7 +95,6 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev pkg-config build-essential
         sudo apt-get install -y libxxhash-dev || true
-        sudo apt-get install -y libb2-dev || true
         sudo apt-get install -y libfuse-dev fuse || true  # Required for Python llfuse module
         sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
 
@@ -109,20 +110,20 @@ jobs:
       env:
         # we already have that in the global env, but something is broken and overwrites that.
         # so, set it here, again.
-        PKG_CONFIG_PATH: "/usr/local/opt/openssl@1.1/lib/pkgconfig:$PKG_CONFIG_PATH"
+        PKG_CONFIG_PATH: "/usr/local/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
       run: |
-        pip install -e .
+        pip install -ve .
     - name: run pytest via tox
       env:
         # we already have that in the global env, but something is broken and overwrites that.
         # so, set it here, again.
-        PKG_CONFIG_PATH: "/usr/local/opt/openssl@1.1/lib/pkgconfig:$PKG_CONFIG_PATH"
+        PKG_CONFIG_PATH: "/usr/local/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
         tox --skip-missing-interpreters
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v4
       env:
         OS: ${{ runner.os }}
         python: ${{ matrix.python-version }}

@@ -397,8 +397,8 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.0rc1 (not released yet)
------------------------------------
+Version 1.4.0b2 (not released yet)
+----------------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
@@ -408,6 +408,8 @@ Fixes:
 - check: fix return code for index entry value discrepancies
 - benchmark: inherit options --rsh --remote-path, #8099
 - sdist: dynamically compute readme (long_description)
+- create: deal with EBUSY, #8123
+- No need to use OpenSSL 3.0 on OpenBSD, use LibreSSL.
 
 New features:
 
@@ -417,6 +419,8 @@ Other changes:
 
 - remove bundled lz4/zstd/xxhash code (require the respective libs/headers),
   simplify setup.py, remove support for all BORG_USE_BUNDLED_*=YES, #8094
+- require Cython 3.0.3 at least (fixes py312 memory leak), #8133
+- allow msgpack 1.0.8, #8133
 - init: better borg key export instructions
 - init: remove compatibility warning for borg <=1.0.8
   The warning refers to a compatibility issue not relevant any
@@ -428,6 +432,11 @@ Other changes:
 
   - how to run the testsuite using the dist package
   - add non-root deployment strategy (systemd / capabilities)
+- vagrant:
+
+  - use python 3.11.8
+  - use pyinstaller 6.5.0
+  - add xxhash for macOS, add libxxhash-dev for debianoid systems
 
 
 Version 1.4.0b1 (2024-01-21)

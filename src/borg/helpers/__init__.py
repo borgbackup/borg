@@ -5,6 +5,7 @@ that did not fit better elsewhere.
 Code used to be in borg/helpers.py but was split into the modules in this
 package, which are imported into here for compatibility.
 """
+from contextlib import contextmanager
 
 from .checks import *  # NOQA
 from .datastruct import *  # NOQA
@@ -25,6 +26,17 @@ from . import msgpack
 # BORG_WORKAROUNDS environment variable to a list of comma-separated strings.
 # see the docs for a list of known workaround strings.
 workarounds = tuple(os.environ.get('BORG_WORKAROUNDS', '').split(','))
+
+
+@contextmanager
+def ignore_invalid_archive_tam():
+    global workarounds
+    saved = workarounds
+    if 'ignore_invalid_archive_tam' not in workarounds:
+        # we really need this workaround here or borg will likely raise an exception.
+        workarounds += ('ignore_invalid_archive_tam',)
+    yield
+    workarounds = saved
 
 
 # element data type for warnings_list:

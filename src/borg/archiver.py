@@ -1639,6 +1639,7 @@ class Archiver:
     def do_upgrade(self, args, repository, manifest=None, key=None):
         """upgrade a repository from a previous version"""
         if args.archives_tam or args.check_archives_tam:
+            archive_tam_issues = 0
             read_only = args.check_archives_tam
             manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
             with Cache(repository, key, manifest) as cache:
@@ -1662,12 +1663,23 @@ class Archiver:
                             print(f"Added archive TAM:   {archive_formatted} -> [{bin_to_hex(new_archive_id)}]")
                         else:
                             print(f"Archive TAM missing: {archive_formatted}")
+                        archive_tam_issues += 1
                     else:
                         print(f"Archive TAM present: {archive_formatted}")
                 if not read_only:
                     manifest.write()
                     repository.commit(compact=False)
                     cache.commit()
+                    if archive_tam_issues > 0:
+                        print(f"Fixed {archive_tam_issues} archives with TAM issues!")
+                        print("All archives are TAM authenticated now.")
+                    else:
+                        print("All archives are TAM authenticated.")
+                else:
+                    if archive_tam_issues > 0:
+                        self.print_warning(f"Found {archive_tam_issues} archives with TAM issues!")
+                    else:
+                        print("All archives are TAM authenticated.")
         elif args.tam:
             manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
             if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):

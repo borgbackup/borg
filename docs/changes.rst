@@ -29,49 +29,63 @@ places. Borg now considers archives without TAM as garbage or an attack.
 
 We are not aware of others having discovered, disclosed or exploited this vulnerability.
 
-Below, if we speak of borg 1.2.6, we mean a borg version >= 1.2.6 **or** a
-borg version that has the relevant security patches for this vulnerability applied
+Below, if we speak of borg 1.2.8, we mean a borg version >= 1.2.8 **or** a
+borg version that has the relevant patches for this vulnerability applied
 (could be also an older version in that case).
 
 Steps you must take to upgrade a repository (this applies to all kinds of repos
 no matter what encryption mode they use, including "none"):
 
-1. Upgrade all clients using this repository to borg 1.2.6.
+1. Upgrade all clients using this repository to borg 1.2.8.
    Note: it is not required to upgrade a server, except if the server-side borg
    is also used as a client (and not just for "borg serve").
 
-   Do **not** run ``borg check`` with borg 1.2.6 before completing the upgrade steps:
+   Do **not** run ``borg check`` with borg > 1.2.4 before completing the upgrade steps:
 
    - ``borg check`` would complain about archives without a valid archive TAM.
    - ``borg check --repair`` would remove such archives!
-2. Run: ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg info --debug <repo> 2>&1 | grep TAM | grep -i manifest``
+2. Do this step on every client using this repo: ``borg upgrade --show-rc --check-tam <repo>``
 
-   a) If you get "TAM-verified manifest", continue with 3.
-   b) If you get "Manifest TAM not found and not required", run
-      ``borg upgrade --tam --force <repository>`` *on every client*.
+   This will check the manifest TAM authentication setup in the repo and on this client.
+   The command will exit with rc=0 if all is OK, otherwise with rc=1.
 
-3. Run: ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg list --consider-checkpoints --format='{name} {time} tam:{tam}{NL}' <repo>``
+   a) If you get "Manifest authentication setup OK for this client and this repository."
+      and rc=0, continue with 3.
+   b) If you get some warnings and rc=1, run:
+      ``borg upgrade --tam --force <repository>``
 
-   "tam:verified" means that the archive has a valid TAM authentication.
-   "tam:none" is expected as output for archives created by borg <1.0.9.
-   "tam:none" is also expected for archives resulting from a borg rename
-   or borg recreate operation (see #7791).
-   "tam:none" could also come from archives created by an attacker.
-   You should verify that "tam:none" archives are authentic and not malicious
+3. Run: ``borg upgrade --show-rc --check-archives-tam <repo>``
+
+   This will create a report about the TAM status for all archives.
+   In the last line(s) of the report, it will also report the overall status.
+   The command will exit with rc=0 if all archives are TAM authenticated or with rc=1
+   if there are some archives with TAM issues.
+
+   If there are no issues and all archives are TAM authenticated, continue with 5.
+
+   Archive TAM issues are expected for:
+
+   - archives created by borg <1.0.9.
+   - archives resulting from a borg rename or borg recreate operation (see #7791)
+
+   But, important, archive TAM issues could also come from archives created by an attacker.
+   You should verify that archives with TAM issues are authentic and not malicious
    (== have good content, have correct timestamp, can be extracted successfully).
    In case you find crappy/malicious archives, you must delete them before proceeding.
+
    In low-risk, trusted environments, you may decide on your own risk to skip step 3
    and just trust in everything being OK.
 
-4. If there are no tam:none archives left at this point, you can skip this step.
-   Run ``BORG_WORKAROUNDS=ignore_invalid_archive_tam borg upgrade --archives-tam <repo>``.
+4. If there are no archives with TAM issues left at this point, you can skip this step.
+
+   Run ``borg upgrade --archives-tam <repo>``.
+
    This will unconditionally add a correct archive TAM to all archives not having one.
    ``borg check`` would consider TAM-less or invalid-TAM archives as garbage or a potential attack.
-   To see that all archives now are "tam:verified" run: ``borg list --consider-checkpoints --format='{name} {time} tam:{tam}{NL}' <repo>``
 
-5. Please note that you should never use BORG_WORKAROUNDS=ignore_invalid_archive_tam
-   for normal production operations - it is only needed once to get the archives in a
-   repository into a good state. All archives have a valid TAM now.
+   To see that all archives are OK now, you can optionally repeat the command from step 3.
+
+5. Done. Manifest and archives are TAM authenticated now.
 
 Vulnerability time line:
 

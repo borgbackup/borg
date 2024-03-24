@@ -75,6 +75,7 @@ try:
     from .helpers import sig_int, ignore_sigint
     from .helpers import iter_separated
     from .helpers import get_tar_filter
+    from .helpers import ignore_invalid_archive_tam
     from .helpers.parseformat import BorgJsonEncoder, safe_decode
     from .nanorst import rst_to_terminal
     from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
@@ -1635,52 +1636,88 @@ class Archiver:
                           DASHES, logger=logging.getLogger('borg.output.stats'))
         return self.exit_code
 
-    @with_repository(fake=('tam', 'disable_tam', 'archives_tam'), invert_fake=True, manifest=False, exclusive=True)
+    @with_repository(fake=('tam', 'check_tam', 'disable_tam', 'archives_tam', 'check_archives_tam'), invert_fake=True, manifest=False, exclusive=True)
     def do_upgrade(self, args, repository, manifest=None, key=None):
         """upgrade a repository from a previous version"""
-        if args.archives_tam:
-            manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
-            with Cache(repository, key, manifest) as cache:
-                stats = Statistics()
-                for info in manifest.archives.list(sort_by=['ts']):
-                    archive_id = info.id
-                    archive_formatted = format_archive(info)
-                    cdata = repository.get(archive_id)
-                    data = key.decrypt(archive_id, cdata)
-                    archive, verified, _ = key.unpack_and_verify_archive(data, force_tam_not_required=True)
-                    if not verified:  # we do not have an archive TAM yet -> add TAM now!
-                        archive = ArchiveItem(internal_dict=archive)
-                        archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
-                        data = key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive')
-                        new_archive_id = key.id_hash(data)
-                        cache.add_chunk(new_archive_id, data, stats)
-                        cache.chunk_decref(archive_id, stats)
-                        manifest.archives[info.name] = (new_archive_id, info.ts)
-                        print(f"Added archive TAM:   {archive_formatted} -> [{bin_to_hex(new_archive_id)}]")
+        if args.archives_tam or args.check_archives_tam:
+            with ignore_invalid_archive_tam():
+                archive_tam_issues = 0
+                read_only = args.check_archives_tam
+                manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
+                with Cache(repository, key, manifest) as cache:
+                    stats = Statistics()
+                    for info in manifest.archives.list(sort_by=['ts']):
+                        archive_id = info.id
+                        archive_formatted = format_archive(info)
+                        cdata = repository.get(archive_id)
+                        data = key.decrypt(archive_id, cdata)
+                        archive, verified, _ = key.unpack_and_verify_archive(data, force_tam_not_required=True)
+                        if not verified:
+                            if not read_only:
+                                # we do not have an archive TAM yet -> add TAM now!
+                                archive = ArchiveItem(internal_dict=archive)
+                                archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
+                                data = key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive')
+                                new_archive_id = key.id_hash(data)
+                                cache.add_chunk(new_archive_id, data, stats)
+                                cache.chunk_decref(archive_id, stats)
+                                manifest.archives[info.name] = (new_archive_id, info.ts)
+                                print(f"Added archive TAM:   {archive_formatted} -> [{bin_to_hex(new_archive_id)}]")
+                            else:
+                                print(f"Archive TAM missing: {archive_formatted}")
+                            archive_tam_issues += 1
+                        else:
+                            print(f"Archive TAM present: {archive_formatted}")
+                    if not read_only:
+                        manifest.write()
+                        repository.commit(compact=False)
+                        cache.commit()
+                        if archive_tam_issues > 0:
+                            print(f"Fixed {archive_tam_issues} archives with TAM issues!")
+                            print("All archives are TAM authenticated now.")
+                        else:
+                            print("All archives are TAM authenticated.")
                     else:
-                        print(f"Archive TAM present: {archive_formatted}")
-                manifest.write()
-                repository.commit(compact=False)
-                cache.commit()
-        elif args.tam:
-            manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
-            if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):
-                print('Manifest contents:')
-                for archive_info in manifest.archives.list(sort_by=['ts']):
-                    print(format_archive(archive_info))
-                manifest.config[b'tam_required'] = True
-                manifest.write()
-                repository.commit(compact=False)
-            if not key.tam_required and hasattr(key, 'change_passphrase'):
-                key.tam_required = True
-                key.change_passphrase(key._passphrase)
-                print('Key updated')
-                if hasattr(key, 'find_key'):
-                    print('Key location:', key.find_key())
-            if not tam_required(repository):
-                tam_file = tam_required_file(repository)
-                open(tam_file, 'w').close()
-                print('Updated security database')
+                        if archive_tam_issues > 0:
+                            self.print_warning(f"Found {archive_tam_issues} archives with TAM issues!")
+                        else:
+                            print("All archives are TAM authenticated.")
+        elif args.tam or args.check_tam:
+            with ignore_invalid_archive_tam():
+                manifest_tam_issues = 0
+                read_only = args.check_tam
+                manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
+                if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):
+                    if not read_only:
+                        print('Manifest contents:')
+                        for archive_info in manifest.archives.list(sort_by=['ts']):
+                            print(format_archive(archive_info))
+                        manifest.config[b'tam_required'] = True
+                        manifest.write()
+                        repository.commit(compact=False)
+                    else:
+                        manifest_tam_issues += 1
+                        self.print_warning("Repository Manifest is not TAM verified or a TAM is not required!")
+                if not key.tam_required and hasattr(key, 'change_passphrase'):
+                    if not read_only:
+                        key.tam_required = True
+                        key.change_passphrase(key._passphrase)
+                        print('Key updated')
+                        if hasattr(key, 'find_key'):
+                            print('Key location:', key.find_key())
+                    else:
+                        manifest_tam_issues += 1
+                        self.print_warning("Key does not require TAM authentication!")
+                if not tam_required(repository):
+                    if not read_only:
+                        tam_file = tam_required_file(repository)
+                        open(tam_file, 'w').close()
+                        print('Updated security database')
+                    else:
+                        manifest_tam_issues += 1
+                        self.print_warning("Client-side security database does not require a TAM!")
+                if read_only and manifest_tam_issues == 0:
+                    print("Manifest authentication setup OK for this client and this repository.")
         elif args.disable_tam:
             manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK, force_tam_not_required=True)
             if tam_required(repository):
@@ -4996,8 +5033,12 @@ class Archiver:
                                help='Force upgrade')
         subparser.add_argument('--tam', dest='tam', action='store_true',
                                help='Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).')
+        subparser.add_argument('--check-tam', dest='check_tam', action='store_true',
+                               help='check manifest authentication (in key and cache).')
         subparser.add_argument('--disable-tam', dest='disable_tam', action='store_true',
                                help='Disable manifest authentication (in key and cache).')
+        subparser.add_argument('--check-archives-tam', dest='check_archives_tam', action='store_true',
+                               help='check TAM authentication for all archives.')
         subparser.add_argument('--archives-tam', dest='archives_tam', action='store_true',
                                help='add TAM authentication for all archives.')
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',

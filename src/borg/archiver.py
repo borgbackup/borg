@@ -75,6 +75,7 @@ try:
     from .helpers import sig_int, ignore_sigint
     from .helpers import iter_separated
     from .helpers import get_tar_filter
+    from .helpers import ignore_invalid_archive_tam
     from .helpers.parseformat import BorgJsonEncoder, safe_decode
     from .nanorst import rst_to_terminal
     from .patterns import ArgparsePatternAction, ArgparseExcludeFileAction, ArgparsePatternFileAction, parse_exclude_pattern
@@ -1639,47 +1640,48 @@ class Archiver:
     def do_upgrade(self, args, repository, manifest=None, key=None):
         """upgrade a repository from a previous version"""
         if args.archives_tam or args.check_archives_tam:
-            archive_tam_issues = 0
-            read_only = args.check_archives_tam
-            manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
-            with Cache(repository, key, manifest) as cache:
-                stats = Statistics()
-                for info in manifest.archives.list(sort_by=['ts']):
-                    archive_id = info.id
-                    archive_formatted = format_archive(info)
-                    cdata = repository.get(archive_id)
-                    data = key.decrypt(archive_id, cdata)
-                    archive, verified, _ = key.unpack_and_verify_archive(data, force_tam_not_required=True)
-                    if not verified:
-                        if not read_only:
-                            # we do not have an archive TAM yet -> add TAM now!
-                            archive = ArchiveItem(internal_dict=archive)
-                            archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
-                            data = key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive')
-                            new_archive_id = key.id_hash(data)
-                            cache.add_chunk(new_archive_id, data, stats)
-                            cache.chunk_decref(archive_id, stats)
-                            manifest.archives[info.name] = (new_archive_id, info.ts)
-                            print(f"Added archive TAM:   {archive_formatted} -> [{bin_to_hex(new_archive_id)}]")
+            with ignore_invalid_archive_tam():
+                archive_tam_issues = 0
+                read_only = args.check_archives_tam
+                manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
+                with Cache(repository, key, manifest) as cache:
+                    stats = Statistics()
+                    for info in manifest.archives.list(sort_by=['ts']):
+                        archive_id = info.id
+                        archive_formatted = format_archive(info)
+                        cdata = repository.get(archive_id)
+                        data = key.decrypt(archive_id, cdata)
+                        archive, verified, _ = key.unpack_and_verify_archive(data, force_tam_not_required=True)
+                        if not verified:
+                            if not read_only:
+                                # we do not have an archive TAM yet -> add TAM now!
+                                archive = ArchiveItem(internal_dict=archive)
+                                archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
+                                data = key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive')
+                                new_archive_id = key.id_hash(data)
+                                cache.add_chunk(new_archive_id, data, stats)
+                                cache.chunk_decref(archive_id, stats)
+                                manifest.archives[info.name] = (new_archive_id, info.ts)
+                                print(f"Added archive TAM:   {archive_formatted} -> [{bin_to_hex(new_archive_id)}]")
+                            else:
+                                print(f"Archive TAM missing: {archive_formatted}")
+                            archive_tam_issues += 1
                         else:
-                            print(f"Archive TAM missing: {archive_formatted}")
-                        archive_tam_issues += 1
+                            print(f"Archive TAM present: {archive_formatted}")
+                    if not read_only:
+                        manifest.write()
+                        repository.commit(compact=False)
+                        cache.commit()
+                        if archive_tam_issues > 0:
+                            print(f"Fixed {archive_tam_issues} archives with TAM issues!")
+                            print("All archives are TAM authenticated now.")
+                        else:
+                            print("All archives are TAM authenticated.")
                     else:
-                        print(f"Archive TAM present: {archive_formatted}")
-                if not read_only:
-                    manifest.write()
-                    repository.commit(compact=False)
-                    cache.commit()
-                    if archive_tam_issues > 0:
-                        print(f"Fixed {archive_tam_issues} archives with TAM issues!")
-                        print("All archives are TAM authenticated now.")
-                    else:
-                        print("All archives are TAM authenticated.")
-                else:
-                    if archive_tam_issues > 0:
-                        self.print_warning(f"Found {archive_tam_issues} archives with TAM issues!")
-                    else:
-                        print("All archives are TAM authenticated.")
+                        if archive_tam_issues > 0:
+                            self.print_warning(f"Found {archive_tam_issues} archives with TAM issues!")
+                        else:
+                            print("All archives are TAM authenticated.")
         elif args.tam:
             manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
             if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):

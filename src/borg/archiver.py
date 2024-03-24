@@ -1635,10 +1635,11 @@ class Archiver:
                           DASHES, logger=logging.getLogger('borg.output.stats'))
         return self.exit_code
 
-    @with_repository(fake=('tam', 'disable_tam', 'archives_tam'), invert_fake=True, manifest=False, exclusive=True)
+    @with_repository(fake=('tam', 'disable_tam', 'archives_tam', 'check_archives_tam'), invert_fake=True, manifest=False, exclusive=True)
     def do_upgrade(self, args, repository, manifest=None, key=None):
         """upgrade a repository from a previous version"""
-        if args.archives_tam:
+        if args.archives_tam or args.check_archives_tam:
+            read_only = args.check_archives_tam
             manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
             with Cache(repository, key, manifest) as cache:
                 stats = Statistics()
@@ -1648,20 +1649,25 @@ class Archiver:
                     cdata = repository.get(archive_id)
                     data = key.decrypt(archive_id, cdata)
                     archive, verified, _ = key.unpack_and_verify_archive(data, force_tam_not_required=True)
-                    if not verified:  # we do not have an archive TAM yet -> add TAM now!
-                        archive = ArchiveItem(internal_dict=archive)
-                        archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
-                        data = key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive')
-                        new_archive_id = key.id_hash(data)
-                        cache.add_chunk(new_archive_id, data, stats)
-                        cache.chunk_decref(archive_id, stats)
-                        manifest.archives[info.name] = (new_archive_id, info.ts)
-                        print(f"Added archive TAM:   {archive_formatted} -> [{bin_to_hex(new_archive_id)}]")
+                    if not verified:
+                        if not read_only:
+                            # we do not have an archive TAM yet -> add TAM now!
+                            archive = ArchiveItem(internal_dict=archive)
+                            archive.cmdline = [safe_decode(arg) for arg in archive.cmdline]
+                            data = key.pack_and_authenticate_metadata(archive.as_dict(), context=b'archive')
+                            new_archive_id = key.id_hash(data)
+                            cache.add_chunk(new_archive_id, data, stats)
+                            cache.chunk_decref(archive_id, stats)
+                            manifest.archives[info.name] = (new_archive_id, info.ts)
+                            print(f"Added archive TAM:   {archive_formatted} -> [{bin_to_hex(new_archive_id)}]")
+                        else:
+                            print(f"Archive TAM missing: {archive_formatted}")
                     else:
                         print(f"Archive TAM present: {archive_formatted}")
-                manifest.write()
-                repository.commit(compact=False)
-                cache.commit()
+                if not read_only:
+                    manifest.write()
+                    repository.commit(compact=False)
+                    cache.commit()
         elif args.tam:
             manifest, key = Manifest.load(repository, (Manifest.Operation.CHECK,), force_tam_not_required=args.force)
             if not manifest.tam_verified or not manifest.config.get(b'tam_required', False):
@@ -4998,6 +5004,8 @@ class Archiver:
                                help='Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).')
         subparser.add_argument('--disable-tam', dest='disable_tam', action='store_true',
                                help='Disable manifest authentication (in key and cache).')
+        subparser.add_argument('--check-archives-tam', dest='check_archives_tam', action='store_true',
+                               help='check TAM authentication for all archives.')
         subparser.add_argument('--archives-tam', dest='archives_tam', action='store_true',
                                help='add TAM authentication for all archives.')
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',

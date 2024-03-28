@@ -14,6 +14,7 @@ from ..logger import create_logger
 
 logger = create_logger()
 
+from .. import helpers
 from ..constants import *  # NOQA
 from ..compress import Compressor
 from ..helpers import StableDict
@@ -24,7 +25,6 @@ from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers import prepare_subprocess_env
 from ..helpers import msgpack
-from ..helpers import workarounds
 from ..item import Key, EncryptedKey
 from ..platform import SaveFile
 
@@ -34,7 +34,7 @@ from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b
 
 
 # workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
-AUTHENTICATED_NO_KEY = 'authenticated_no_key' in workarounds
+AUTHENTICATED_NO_KEY = 'authenticated_no_key' in helpers.workarounds
 
 
 class NoPassphraseFailure(Error):
@@ -322,7 +322,7 @@ class KeyBase:
         tam_key = self._tam_key(tam_salt, context=b'archive')
         calculated_hmac = hmac.digest(tam_key, data, 'sha512')
         if not hmac.compare_digest(calculated_hmac, tam_hmac):
-            if 'ignore_invalid_archive_tam' in workarounds:
+            if 'ignore_invalid_archive_tam' in helpers.workarounds:
                 logger.debug('ignoring invalid archive TAM due to BORG_WORKAROUNDS')
                 return unpacked, False, None  # same as if no TAM is present
             else:

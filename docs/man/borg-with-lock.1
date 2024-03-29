@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-WITH-LOCK" 1 "2023-12-02" "" "borg backup tool"
+.TH "BORG-WITH-LOCK" 1 "2024-03-29" "" "borg backup tool"
 .SH NAME
 borg-with-lock \- run a user specified command with the repository lock held
 .SH SYNOPSIS
@@ -35,7 +35,17 @@ borg-with-lock \- run a user specified command with the repository lock held
 borg [common options] with\-lock [options] REPOSITORY COMMAND [ARGS...]
 .SH DESCRIPTION
 .sp
-This command runs a user\-specified command while the repository lock is held.
+This command runs a user\-specified command while locking the repository. For example:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+$ borg with\-lock /mnt/borgrepo rsync \-av /mnt/borgrepo /somewhere/else/borgrepo
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
 .sp
 It will first try to acquire the lock (make sure that no other operation is
 running in the repo), then execute the given command as a subprocess and wait

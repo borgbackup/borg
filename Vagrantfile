@@ -126,7 +126,7 @@ def packages_openindiana
   return <<-EOF
     # needs separate provisioning step + reboot:
     #pkg update
-    #pkg install gcc-7 python-39 setuptools-39
+    pkg install gcc-13 git pkg-config libxxhash
     ln -sf /usr/bin/python3.9 /usr/bin/python3
     python3 -m ensurepip
     ln -sf /usr/bin/pip3.9 /usr/bin/pip3
@@ -429,7 +429,7 @@ Vagrant.configure(2) do |config|
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
   # permission errors. can be manually fixed in the VM by: sudo chown -R vagrant /vagrant/borg ; then rsync again.
   config.vm.define "openindiana64" do |b|
-    b.vm.box = "openindiana"
+    b.vm.box = "openindiana/hipster"
     b.vm.provider :virtualbox do |v|
       v.memory = 2048 + $wmem
     end

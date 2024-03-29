@@ -403,13 +403,24 @@ Fixes:
 - check: fix return code and log level for index entry value discrepancies
 - with-lock: catch FileNotFoundError exception, print error msg, #8022
 - benchmark: inherit options --rsh --remote-path, #8099
+- fix Ctrl-C / SIGINT behaviour for pyinstaller-made binaries, #8155
+
+New features:
+
+- upgrade --check-tam: check manifest TAM auth issues,
+  exit with rc=1 if there are issues.
+- upgrade --check-archives-tam: check archives tam status,
+  exit with rc=1 if there are issues.
+
 
 Other changes:
 
 - allow msgpack 1.0.8 (this might fix memory leaks with Python 3.12), #8133
 - use the latest Cython 0.29.x
+- vagrant: use / build binaries with python 3.9.19
 - docs:
 
+  - simplify TAM-related upgrade docs using the new commands
   - improve docs for borg with-lock, #8022
   - add more infos borg check --repair recreating the shadow index
     to change log, see #6687

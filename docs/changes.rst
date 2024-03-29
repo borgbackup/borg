@@ -392,8 +392,8 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.2.8 (not released yet)
---------------------------------
+Version 1.2.8 (2024-03-29)
+--------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
@@ -407,9 +407,9 @@ Fixes:
 
 New features:
 
-- upgrade --check-tam: check manifest TAM auth issues,
+- upgrade --check-tam: check manifest TAM auth,
   exit with rc=1 if there are issues.
-- upgrade --check-archives-tam: check archives tam status,
+- upgrade --check-archives-tam: check archives TAM auth,
   exit with rc=1 if there are issues.
 
 
@@ -417,7 +417,10 @@ Other changes:
 
 - allow msgpack 1.0.8 (this might fix memory leaks with Python 3.12), #8133
 - use the latest Cython 0.29.x
-- vagrant: use / build binaries with python 3.9.19
+- vagrant:
+
+  - use / build binaries with python 3.9.19
+  - use generic/openbsd7 box
 - docs:
 
   - simplify TAM-related upgrade docs using the new commands

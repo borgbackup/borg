@@ -115,7 +115,7 @@ def packages_darwin
     sudo softwareupdate --install --all
     which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
     brew update > /dev/null
-    brew install pkg-config readline openssl@1.1 zstd lz4 xz
+    brew install pkg-config readline openssl@1.1 zstd lz4 xz xxhash
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
     echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig' >> ~vagrant/.bash_profile
@@ -126,7 +126,7 @@ def packages_openindiana
   return <<-EOF
     # needs separate provisioning step + reboot:
     #pkg update
-    #pkg install gcc-7 python-39 setuptools-39
+    pkg install gcc-13 git pkg-config libxxhash
     ln -sf /usr/bin/python3.9 /usr/bin/python3
     python3 -m ensurepip
     ln -sf /usr/bin/pip3.9 /usr/bin/pip3
@@ -377,7 +377,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd64" do |b|
-    b.vm.box = "openbsd71-64"
+    b.vm.box = "generic/openbsd7"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -429,7 +429,7 @@ Vagrant.configure(2) do |config|
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
   # permission errors. can be manually fixed in the VM by: sudo chown -R vagrant /vagrant/borg ; then rsync again.
   config.vm.define "openindiana64" do |b|
-    b.vm.box = "openindiana"
+    b.vm.box = "openindiana/hipster"
     b.vm.provider :virtualbox do |v|
       v.memory = 2048 + $wmem
     end

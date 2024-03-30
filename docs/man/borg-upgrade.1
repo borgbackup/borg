@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UPGRADE" 1 "2024-01-20" "" "borg backup tool"
+.TH "BORG-UPGRADE" 1 "2024-03-30" "" "borg backup tool"
 .SH NAME
 borg-upgrade \- upgrade a repository from a previous version
 .SH SYNOPSIS
@@ -148,7 +148,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B REPOSITORY
 path to the repository to be upgraded
 .UNINDENT
-.SS options
+.SS optional arguments
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -163,8 +163,14 @@ Force upgrade
 .B  \-\-tam
 Enable manifest authentication (in key and cache) (Borg 1.0.9 and later).
 .TP
+.B  \-\-check\-tam
+check manifest authentication (in key and cache).
+.TP
 .B  \-\-disable\-tam
 Disable manifest authentication (in key and cache).
+.TP
+.B  \-\-check\-archives\-tam
+check TAM authentication for all archives.
 .TP
 .B  \-\-archives\-tam
 add TAM authentication for all archives.

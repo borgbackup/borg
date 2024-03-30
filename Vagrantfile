@@ -132,6 +132,8 @@ def packages_openindiana
     python3 -m ensurepip
     ln -sf /usr/bin/pip3.9 /usr/bin/pip3
     pip3 install virtualenv
+    # let borg's pkg-config find openssl:
+    pfexec pkg set-mediator -V 3.1 openssl
   EOF
 end
 

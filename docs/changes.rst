@@ -411,6 +411,7 @@ Compatibility notes:
 Change Log
 ==========
 
+
 Version 1.4.0b2 (not released yet)
 ----------------------------------
 
@@ -424,13 +425,17 @@ Fixes:
 - sdist: dynamically compute readme (long_description)
 - create: deal with EBUSY, #8123
 - No need to use OpenSSL 3.0 on OpenBSD, use LibreSSL.
+- fix Ctrl-C / SIGINT behaviour for pyinstaller-made binaries, #8155
 
 New features:
 
 - create: add the slashdot hack, update docs, #4685
+- upgrade --check-tam: check manifest TAM auth, exit with rc=1 if there are issues.
+- upgrade --check-archives-tam: check archives TAM auth, exit with rc=1 if there are issues.
 
 Other changes:
 
+- improve acl_get / acl_set error handling, improved/added tests, #8125
 - remove bundled lz4/zstd/xxhash code (require the respective libs/headers),
   simplify setup.py, remove support for all BORG_USE_BUNDLED_*=YES, #8094
 - require Cython 3.0.3 at least (fixes py312 memory leak), #8133
@@ -446,11 +451,13 @@ Other changes:
 
   - how to run the testsuite using the dist package
   - add non-root deployment strategy (systemd / capabilities)
+  - simplify TAM-related upgrade docs using the new commands
 - vagrant:
 
   - use python 3.11.8
   - use pyinstaller 6.5.0
   - add xxhash for macOS, add libxxhash-dev for debianoid systems
+  - use openindiana/hipster box
 
 
 Version 1.4.0b1 (2024-01-21)

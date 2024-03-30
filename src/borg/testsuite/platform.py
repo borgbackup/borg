@@ -1,6 +1,6 @@
+import errno
 import functools
 import os
-import random
 import shutil
 import sys
 import tempfile
@@ -11,31 +11,6 @@ from ..platform import acl_get, acl_set, swidth
 from ..platform import get_process_id, process_alive
 from . import BaseTestCase, unopened_tempfile
 from .locking import free_pid
-
-
-ACCESS_ACL = """
-user::rw-
-user:root:rw-:0
-user:9999:r--:9999
-group::r--
-group:root:r--:0
-group:9999:r--:9999
-mask::rw-
-other::r--
-""".strip().encode('ascii')
-
-DEFAULT_ACL = """
-user::rw-
-user:root:r--:0
-user:8888:r--:8888
-group::r--
-group:root:r--:0
-group:8888:r--:8888
-mask::rw-
-other::r--
-""".strip().encode('ascii')
-
-_acls_working = None
 
 
 def fakeroot_detected():
@@ -58,20 +33,42 @@ def are_acls_working():
     with unopened_tempfile() as filepath:
         open(filepath, 'w').close()
         try:
-            access = b'user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:9999\ngroup:root:rw-:9999\n'
-            acl = {'acl_access': access}
-            acl_set(filepath, acl)
+            if is_darwin:
+                acl_key = 'acl_extended'
+                acl_value = b'!#acl 1\nuser:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n'
+            elif is_linux:
+                acl_key = 'acl_access'
+                acl_value = b'user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:9999\ngroup:root:rw-:9999\n'
+            elif is_freebsd:
+                acl_key = 'acl_access'
+                acl_value = b'user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-\ngroup:wheel:rw-\n'
+            else:
+                return False  # ACLs unsupported on this platform.
+            write_acl = {acl_key: acl_value}
+            acl_set(filepath, write_acl)
             read_acl = {}
             acl_get(filepath, read_acl, os.stat(filepath))
-            read_acl_access = read_acl.get('acl_access', None)
-            if read_acl_access and b'user::rw-' in read_acl_access:
-                return True
+            acl = read_acl.get(acl_key, None)
+            if acl is not None:
+                if is_darwin:
+                    check_for = b'root:0:allow:read'
+                elif is_linux:
+                    check_for = b'user::rw-'
+                elif is_freebsd:
+                    check_for = b'user::rw-'
+                else:
+                    return False  # ACLs unsupported on this platform.
+                if check_for in acl:
+                    return True
         except PermissionError:
             pass
+        except OSError as e:
+            if e.errno not in (errno.ENOTSUP, ):
+                raise
         return False
 
 
-@unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
+@unittest.skipUnless(is_linux, 'linux only test')
 @unittest.skipIf(fakeroot_detected(), 'not compatible with fakeroot')
 class PlatformLinuxTestCase(BaseTestCase):
 
@@ -105,6 +102,8 @@ class PlatformLinuxTestCase(BaseTestCase):
 
     @unittest.skipIf(not are_acls_working(), 'ACLs do not work')
     def test_default_acl(self):
+        ACCESS_ACL = b'user::rw-\nuser:root:rw-:0\nuser:9999:r--:9999\ngroup::r--\ngroup:root:r--:0\ngroup:9999:r--:9999\nmask::rw-\nother::r--'
+        DEFAULT_ACL = b'user::rw-\nuser:root:r--:0\nuser:8888:r--:8888\ngroup::r--\ngroup:root:r--:0\ngroup:8888:r--:8888\nmask::rw-\nother::r--'
         self.assert_equal(self.get_acl(self.tmpdir), {})
         self.set_acl(self.tmpdir, access=ACCESS_ACL, default=DEFAULT_ACL)
         self.assert_equal(self.get_acl(self.tmpdir)['acl_access'], ACCESS_ACL)
@@ -149,7 +148,48 @@ class PlatformLinuxTestCase(BaseTestCase):
         self.assert_equal(acl_use_local_uid_gid(b'group:root:rw-:0'), b'group:0:rw-')
 
 
-@unittest.skipUnless(sys.platform.startswith('darwin'), 'macOS only test')
+@unittest.skipUnless(is_freebsd, 'freebsd only test')
+class PlatformFreeBSDTestCase(BaseTestCase):
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def get_acl(self, path, numeric_ids=False):
+        item = {}
+        acl_get(path, item, os.stat(path), numeric_ids=numeric_ids)
+        return item
+
+    def set_acl(self, path, access=None, default=None, numeric_ids=False):
+        item = {'acl_access': access, 'acl_default': default}
+        acl_set(path, item, numeric_ids=numeric_ids)
+
+    @unittest.skipIf(not are_acls_working(), 'ACLs do not work')
+    def test_access_acl(self):
+        file = tempfile.NamedTemporaryFile()
+        self.assert_equal(self.get_acl(file.name), {})
+        self.set_acl(file.name, access=b'user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-\ngroup:wheel:rw-\n', numeric_ids=False)
+        self.assert_in(b'user:root:rw-', self.get_acl(file.name)['acl_access'])
+        self.assert_in(b'group:wheel:rw-', self.get_acl(file.name)['acl_access'])
+        self.assert_in(b'user:0:rw-', self.get_acl(file.name, numeric_ids=True)['acl_access'])
+        file2 = tempfile.NamedTemporaryFile()
+        self.set_acl(file2.name, access=b'user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-\ngroup:wheel:rw-\n', numeric_ids=True)
+        self.assert_in(b'user::rw-', self.get_acl(file2.name)['acl_access'])
+        self.assert_in(b'group::r--', self.get_acl(file2.name)['acl_access'])
+
+    @unittest.skipIf(not are_acls_working(), 'ACLs do not work')
+    def test_default_acl(self):
+        ACCESS_ACL = b'user::rw-\nuser:root:rw-\nuser:9999:r--\ngroup::r--\ngroup:wheel:r--\ngroup:9999:r--\nmask::rw-\nother::r--\n'
+        DEFAULT_ACL = b'user::rw-\nuser:root:r--\nuser:8888:r--\ngroup::r--\ngroup:wheel:r--\ngroup:8888:r--\nmask::rw-\nother::r--\n'
+        self.assert_equal(self.get_acl(self.tmpdir), {})
+        self.set_acl(self.tmpdir, access=ACCESS_ACL, default=DEFAULT_ACL)
+        self.assert_equal(self.get_acl(self.tmpdir)['acl_access'], ACCESS_ACL)
+        self.assert_equal(self.get_acl(self.tmpdir)['acl_default'], DEFAULT_ACL)
+
+
+@unittest.skipUnless(is_darwin, 'macOS only test')
 @unittest.skipIf(fakeroot_detected(), 'not compatible with fakeroot')
 class PlatformDarwinTestCase(BaseTestCase):
 
@@ -169,7 +209,7 @@ class PlatformDarwinTestCase(BaseTestCase):
         acl_set(path, item, numeric_ids=numeric_ids)
 
     @unittest.skipIf(not are_acls_working(), 'ACLs do not work')
-    def test_access_acl(self):
+    def test_extended_acl(self):
         file = tempfile.NamedTemporaryFile()
         file2 = tempfile.NamedTemporaryFile()
         self.assert_equal(self.get_acl(file.name), {})

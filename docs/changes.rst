@@ -412,8 +412,8 @@ Change Log
 ==========
 
 
-Version 1.4.0b2 (not released yet)
-----------------------------------
+Version 1.4.0b2 (2024-03-31)
+----------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.

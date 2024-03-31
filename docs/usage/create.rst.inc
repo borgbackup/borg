@@ -19,7 +19,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``PATH``                                          | paths to archive                                                                                                                                                  |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **options**                                                                                                                                                                                                                                                                   |
+    | **optional arguments**                                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-n``, ``--dry-run``                             | do not create a backup archive                                                                                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -130,7 +130,7 @@ borg create
         paths to archive
 
 
-    options
+    optional arguments
         -n, --dry-run    do not create a backup archive
         -s, --stats     print statistics for the created archive
         --list          output verbose list of items (files, dirs, ...)
@@ -193,6 +193,11 @@ This command creates a backup archive containing all files found while recursive
 traversing all paths specified. Paths are added to the archive as they are given,
 that means if relative paths are desired, the command has to be run from the correct
 directory.
+
+The slashdot hack in paths (recursion roots) is triggered by using ``/./``:
+``/this/gets/stripped/./this/gets/archived`` means to process that fs object, but
+strip the prefix on the left side of ``./`` from the archived items (in this case,
+``this/gets/archived`` will be the path in the archived item).
 
 When giving '-' as path, borg will read data from standard input and create a
 file 'stdin' in the created archive from that data. In some cases it's more
@@ -333,8 +338,8 @@ Other flags used include:
 - 'x' = excluded, item was *not* backed up
 - '?' = missing status code (if you see this, please file a bug report!)
 
-Reading from stdin
-++++++++++++++++++
+Reading backup data from stdin
+++++++++++++++++++++++++++++++
 
 There are two methods to read from stdin. Either specify ``-`` as path and
 pipe directly to borg::
@@ -365,3 +370,18 @@ creation a bit.
 
 By default, the content read from stdin is stored in a file called 'stdin'.
 Use ``--stdin-name`` to change the name.
+
+Feeding all file paths from externally
+++++++++++++++++++++++++++++++++++++++
+
+Usually, you give a starting path (recursion root) to borg and then borg
+automatically recurses, finds and backs up all fs objects contained in
+there (optionally considering include/exclude rules).
+
+If you need more control and you want to give every single fs object path
+to borg (maybe implementing your own recursion or your own rules), you can use
+``--paths-from-stdin`` or ``--paths-from-command`` (with the latter, borg will
+fail to create an archive should the command fail).
+
+Borg supports paths with the slashdot hack to strip path prefixes here also.
+So, be careful not to unintentionally trigger that.

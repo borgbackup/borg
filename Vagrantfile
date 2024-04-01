@@ -28,8 +28,6 @@ def packages_debianoid(user)
     apt install -y python3-dev python3-setuptools virtualenv
     # for building python:
     apt install -y zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev libffi-dev
-    # older debian / ubuntu have no .pc file for these, so we need to point at the lib/header location:
-    echo 'export BORG_LIBXXHASH_PREFIX=/usr' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -132,11 +130,13 @@ def packages_openindiana
   return <<-EOF
     # needs separate provisioning step + reboot:
     #pkg update
-    #pkg install gcc-7 python-39 setuptools-39
+    pkg install gcc-13 git pkg-config libxxhash
     ln -sf /usr/bin/python3.9 /usr/bin/python3
     python3 -m ensurepip
     ln -sf /usr/bin/pip3.9 /usr/bin/pip3
     pip3 install virtualenv
+    # let borg's pkg-config find openssl:
+    pfexec pkg set-mediator -V 3.1 openssl
   EOF
 end
 
@@ -166,7 +166,7 @@ def install_pythons(boxname)
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
     pyenv install 3.12.0  # tests
-    pyenv install 3.11.7  # tests, binary build
+    pyenv install 3.11.8  # tests, binary build
     pyenv install 3.10.2  # tests
     pyenv install 3.9.4  # tests
     pyenv rehash
@@ -186,8 +186,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.11 release
-    pyenv global 3.11.7
-    pyenv virtualenv 3.11.7 borg-env
+    pyenv global 3.11.8
+    pyenv virtualenv 3.11.8 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -210,7 +210,7 @@ def install_pyinstaller()
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    pip install 'pyinstaller==6.3.0'
+    pip install 'pyinstaller==6.5.0'
   EOF
 end
 
@@ -233,8 +233,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.4 3.10.2 3.11.7 3.12.0
-      pyenv local 3.9.4 3.10.2 3.11.7 3.12.0
+      pyenv global 3.9.4 3.10.2 3.11.8 3.12.0
+      pyenv local 3.9.4 3.10.2 3.11.8 3.12.0
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -275,16 +275,16 @@ Vagrant.configure(2) do |config|
     v.cpus = $cpus
   end
 
-  config.vm.define "lunar64" do |b|
-    b.vm.box = "ubuntu/lunar64"
+  config.vm.define "noble64" do |b|
+    b.vm.box = "ubuntu/noble64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("lunar64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("noble64")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("lunar64", ".*none.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("noble64", ".*none.*")
   end
 
   config.vm.define "jammy64" do |b|
@@ -329,22 +329,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("bullseye64")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bullseye64", ".*none.*")
-  end
-
-  config.vm.define "buster64" do |b|
-    b.vm.box = "debian/buster64"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("buster64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("buster64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("buster64")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("buster64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster64", ".*none.*")
   end
 
   config.vm.define "freebsd64" do |b|
@@ -417,7 +401,7 @@ Vagrant.configure(2) do |config|
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
   # permission errors. can be manually fixed in the VM by: sudo chown -R vagrant /vagrant/borg ; then rsync again.
   config.vm.define "openindiana64" do |b|
-    b.vm.box = "openindiana"
+    b.vm.box = "openindiana/hipster"
     b.vm.provider :virtualbox do |v|
       v.memory = 2048 + $wmem
     end

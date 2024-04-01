@@ -195,6 +195,8 @@ class SigIntManager:
         self._action_triggered = False
         self._action_done = False
         self.ctx = signal_handler("SIGINT", self.handler)
+        self.debounce_interval = 20000000  # ns
+        self.last = None  # monotonic time when we last processed SIGINT
 
     def __bool__(self):
         # this will be True (and stay True) after the first Ctrl-C/SIGINT
@@ -215,10 +217,22 @@ class SigIntManager:
         self._action_done = True
 
     def handler(self, sig_no, stack):
-        # handle the first ctrl-c / SIGINT.
-        self.__exit__(None, None, None)
-        self._sig_int_triggered = True
-        self._action_triggered = True
+        # Ignore a SIGINT if it comes too quickly after the last one, e.g. because it
+        # was caused by the same Ctrl-C key press and a parent process forwarded it to us.
+        # This can easily happen for the pyinstaller-made binaries because the bootloader
+        # process and the borg process are in same process group (see #8155), but maybe also
+        # under other circumstances.
+        now = time.monotonic_ns()
+        if self.last is None:  # first SIGINT
+            self.last = now
+            self._sig_int_triggered = True
+            self._action_triggered = True
+        elif now - self.last >= self.debounce_interval:  # second SIGINT
+            # restore the original signal handler for the 3rd+ SIGINT -
+            # this implies that this handler here loses control!
+            self.__exit__(None, None, None)
+            # handle 2nd SIGINT like the default handler would do it:
+            raise KeyboardInterrupt  # python docs say this might show up at an arbitrary place.
 
     def __enter__(self):
         self.ctx.__enter__()

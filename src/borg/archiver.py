@@ -1594,7 +1594,7 @@ class Archiver:
                             rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
                         )
                 if args.output_list:
-                    list_logger.info("{message:<40} {archive}".format(
+                    list_logger.info("{message:<44} {archive}".format(
                         message=log_message, archive=format_archive(archive)
                     ))
             pi.finish()

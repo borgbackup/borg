@@ -1,3 +1,4 @@
+import errno
 import functools
 import os
 
@@ -31,25 +32,38 @@ def are_acls_working():
     with unopened_tempfile() as filepath:
         open(filepath, "w").close()
         try:
-            if is_freebsd:
-                access = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-\n"
-                contained = b"user:root:rw-"
+            if is_darwin:
+                acl_key = "acl_extended"
+                acl_value = b"!#acl 1\nuser:FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000:root:0:allow:read\n"
             elif is_linux:
-                access = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:0\n"
-                contained = b"user:root:rw-:0"
-            elif is_darwin:
-                return True  # improve?
+                acl_key = "acl_access"
+                acl_value = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:9999\ngroup:root:rw-:9999\n"
+            elif is_freebsd:
+                acl_key = "acl_access"
+                acl_value = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-\ngroup:wheel:rw-\n"
             else:
-                return False  # unsupported platform
-            acl = {"acl_access": access}
-            acl_set(filepath, acl)
+                return False  # ACLs unsupported on this platform.
+            write_acl = {acl_key: acl_value}
+            acl_set(filepath, write_acl)
             read_acl = {}
             acl_get(filepath, read_acl, os.stat(filepath))
-            read_acl_access = read_acl.get("acl_access", None)
-            if read_acl_access and contained in read_acl_access:
-                return True
+            acl = read_acl.get(acl_key, None)
+            if acl is not None:
+                if is_darwin:
+                    check_for = b"root:0:allow:read"
+                elif is_linux:
+                    check_for = b"user::rw-"
+                elif is_freebsd:
+                    check_for = b"user::rw-"
+                else:
+                    return False  # ACLs unsupported on this platform.
+                if check_for in acl:
+                    return True
         except PermissionError:
             pass
+        except OSError as e:
+            if e.errno not in (errno.ENOTSUP,):
+                raise
         return False
 
 

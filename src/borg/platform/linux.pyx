@@ -50,7 +50,7 @@ cdef extern from "sys/acl.h":
     char *acl_to_text(acl_t acl, ssize_t *len)
 
 cdef extern from "acl/libacl.h":
-    int acl_extended_file(const char *path)
+    int acl_extended_file_nofollow(const char *path)
     int acl_extended_fd(int fd)
 
 cdef extern from "linux/fs.h":
@@ -233,15 +233,19 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     cdef acl_t access_acl = NULL
     cdef char *default_text = NULL
     cdef char *access_text = NULL
+    cdef int ret = 0
 
-    if stat.S_ISLNK(st.st_mode):
-        # symlinks can not have ACLs
-        return
     if isinstance(path, str):
         path = os.fsencode(path)
-    if (fd is not None and acl_extended_fd(fd) <= 0
-        or
-        fd is None and acl_extended_file(path) <= 0):
+    if fd is not None:
+        ret = acl_extended_fd(fd)
+    else:
+        ret = acl_extended_file_nofollow(path)
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    if ret == 0:
+        # there is no ACL defining permissions other than those defined by the traditional file permission bits.
+        # note: this should also be the case for symlink fs objects, as they can not have ACLs.
         return
     if numeric_ids:
         converter = acl_numeric_ids
@@ -252,25 +256,28 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
             access_acl = acl_get_fd(fd)
         else:
             access_acl = acl_get_file(path, ACL_TYPE_ACCESS)
-        if access_acl is not NULL:
-            access_text = acl_to_text(access_acl, NULL)
-            if access_text is not NULL:
-                item['acl_access'] = converter(access_text)
+        if access_acl == NULL:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+        access_text = acl_to_text(access_acl, NULL)
+        if access_text == NULL:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+        item['acl_access'] = converter(access_text)
     finally:
         acl_free(access_text)
         acl_free(access_acl)
-
-    try:
-        if stat.S_ISDIR(st.st_mode):
-            # only directories can have a default ACL. there is no fd-based api to get it.
+    if stat.S_ISDIR(st.st_mode):
+        # only directories can have a default ACL. there is no fd-based api to get it.
+        try:
             default_acl = acl_get_file(path, ACL_TYPE_DEFAULT)
-            if default_acl is not NULL:
-                default_text = acl_to_text(default_acl, NULL)
-                if default_text is not NULL:
-                    item['acl_default'] = converter(default_text)
-    finally:
-        acl_free(default_text)
-        acl_free(default_acl)
+            if default_acl == NULL:
+                raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+            default_text = acl_to_text(default_acl, NULL)
+            if default_text == NULL:
+                raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+            item['acl_default'] = converter(default_text)
+        finally:
+            acl_free(default_text)
+            acl_free(default_acl)
 
 
 def acl_set(path, item, numeric_ids=False, fd=None):
@@ -281,7 +288,7 @@ def acl_set(path, item, numeric_ids=False, fd=None):
         # Linux does not support setting ACLs on symlinks
         return
 
-    if fd is None and isinstance(path, str):
+    if isinstance(path, str):
         path = os.fsencode(path)
     if numeric_ids:
         converter = posix_acl_use_stored_uid_gid
@@ -290,21 +297,26 @@ def acl_set(path, item, numeric_ids=False, fd=None):
     access_text = item.get('acl_access')
     if access_text is not None:
         try:
-            access_acl = acl_from_text(<bytes> converter(access_text))
-            if access_acl is not NULL:
-                if fd is not None:
-                    acl_set_fd(fd, access_acl)
-                else:
-                    acl_set_file(path, ACL_TYPE_ACCESS, access_acl)
+            access_acl = acl_from_text(<bytes>converter(access_text))
+            if access_acl == NULL:
+                raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+            if fd is not None:
+                if acl_set_fd(fd, access_acl) == -1:
+                    raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+            else:
+                if acl_set_file(path, ACL_TYPE_ACCESS, access_acl) == -1:
+                    raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
             acl_free(access_acl)
     default_text = item.get('acl_default')
     if default_text is not None:
         try:
-            default_acl = acl_from_text(<bytes> converter(default_text))
-            if default_acl is not NULL:
-                # only directories can get a default ACL. there is no fd-based api to set it.
-                acl_set_file(path, ACL_TYPE_DEFAULT, default_acl)
+            default_acl = acl_from_text(<bytes>converter(default_text))
+            if default_acl == NULL:
+                raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+            # only directories can get a default ACL. there is no fd-based api to set it.
+            if acl_set_file(path, ACL_TYPE_DEFAULT, default_acl) == -1:
+                raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
             acl_free(default_acl)
 

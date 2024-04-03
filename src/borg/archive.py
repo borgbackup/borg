@@ -964,7 +964,11 @@ Duration: {0.duration}
                     if not symlink:
                         os.chmod(path, item.mode)
             if not self.noacls:
-                acl_set(path, item, self.numeric_ids, fd=fd)
+                try:
+                    acl_set(path, item, self.numeric_ids, fd=fd)
+                except OSError as e:
+                    if e.errno not in (errno.ENOTSUP,):
+                        raise
             if not self.noxattrs and "xattrs" in item:
                 # chown removes Linux capabilities, so set the extended attributes at the end, after chown,
                 # since they include the Linux capabilities in the "security.capability" attribute.
@@ -1210,7 +1214,11 @@ class MetadataCollector:
             attrs["xattrs"] = StableDict(xattrs)
         if not self.noacls:
             with backup_io("extended stat (ACLs)"):
-                acl_get(path, attrs, st, self.numeric_ids, fd=fd)
+                try:
+                    acl_get(path, attrs, st, self.numeric_ids, fd=fd)
+                except OSError as e:
+                    if e.errno not in (errno.ENOTSUP,):
+                        raise
         return attrs
 
     def stat_attrs(self, st, path, fd=None):

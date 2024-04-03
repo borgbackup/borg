@@ -1,14 +1,13 @@
 import os
+import stat
+
+from libc cimport errno
 
 from .posix import posix_acl_use_stored_uid_gid
 from ..helpers import safe_encode, safe_decode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
 
 API_VERSION = '1.2_05'
-
-cdef extern from "errno.h":
-    int errno
-    int EINVAL
 
 cdef extern from "sys/extattr.h":
     ssize_t c_extattr_list_file "extattr_list_file" (const char *path, int attrnamespace, void *data, size_t nbytes)
@@ -44,10 +43,12 @@ cdef extern from "sys/acl.h":
     char *acl_to_text_np(acl_t acl, ssize_t *len, int flags)
     int ACL_TEXT_NUMERIC_IDS
     int ACL_TEXT_APPEND_ID
+    int acl_extended_link_np(const char * path)  # check also: acl_is_trivial_np
 
 cdef extern from "unistd.h":
     long lpathconf(const char *path, int name)
     int _PC_ACL_NFS4
+    int _PC_ACL_EXTENDED
 
 
 # On FreeBSD, borg currently only deals with the USER namespace as it is unclear
@@ -124,21 +125,21 @@ def setxattr(path, name, value, *, follow_symlinks=False):
 
 
 cdef _get_acl(p, type, item, attribute, flags, fd=None):
-    cdef acl_t acl = NULL
-    cdef char *text = NULL
-    try:
-        if fd is not None:
-            acl = acl_get_fd_np(fd, type)
-        else:
-            acl = acl_get_link_np(p, type)
-        if acl is not NULL:
-            text = acl_to_text_np(acl, NULL, flags)
-            if text is not NULL:
-                item[attribute] = text
-    finally:
-        acl_free(text)
+    cdef acl_t acl
+    cdef char *text
+    if fd is not None:
+        acl = acl_get_fd_np(fd, type)
+    else:
+        acl = acl_get_link_np(p, type)
+    if acl == NULL:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
+    text = acl_to_text_np(acl, NULL, flags)
+    if text == NULL:
         acl_free(acl)
-
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(p))
+    item[attribute] = text
+    acl_free(text)
+    acl_free(acl)
 
 def acl_get(path, item, st, numeric_ids=False, fd=None):
     """Saves ACL Entries
@@ -146,34 +147,46 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     If `numeric_ids` is True the user/group field is not preserved only uid/gid
     """
     cdef int flags = ACL_TEXT_APPEND_ID
+    flags |= ACL_TEXT_NUMERIC_IDS if numeric_ids else 0
     if isinstance(path, str):
         path = os.fsencode(path)
-    ret = lpathconf(path, _PC_ACL_NFS4)
-    if ret < 0 and errno == EINVAL:
+    ret = acl_extended_link_np(path)
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    if ret == 0:
+        # there is no ACL defining permissions other than those defined by the traditional file permission bits.
         return
-    flags |= ACL_TEXT_NUMERIC_IDS if numeric_ids else 0
-    if ret > 0:
+    ret = lpathconf(path, _PC_ACL_NFS4)
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    nfs4_acl = ret == 1
+    if nfs4_acl:
         _get_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', flags, fd=fd)
     else:
         _get_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', flags, fd=fd)
-        _get_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', flags, fd=fd)
+        if stat.S_ISDIR(st.st_mode):
+            _get_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', flags, fd=fd)
 
 
 cdef _set_acl(path, type, item, attribute, numeric_ids=False, fd=None):
     cdef acl_t acl = NULL
     text = item.get(attribute)
-    if text is not None:
-        if numeric_ids and type == ACL_TYPE_NFS4:
-            text = _nfs4_use_stored_uid_gid(text)
-        elif numeric_ids and type in (ACL_TYPE_ACCESS, ACL_TYPE_DEFAULT):
-            text = posix_acl_use_stored_uid_gid(text)
+    if text:
+        if numeric_ids:
+            if type == ACL_TYPE_NFS4:
+                text = _nfs4_use_stored_uid_gid(text)
+            elif type in (ACL_TYPE_ACCESS, ACL_TYPE_DEFAULT):
+                text = posix_acl_use_stored_uid_gid(text)
+        acl = acl_from_text(<bytes>text)
+        if acl == NULL:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         try:
-            acl = acl_from_text(<bytes> text)
-            if acl is not NULL:
-                if fd is not None:
-                    acl_set_fd_np(fd, acl, type)
-                else:
-                    acl_set_link_np(path, type, acl)
+            if fd is not None:
+                if acl_set_fd_np(fd, acl, type) == -1:
+                    raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+            else:
+                if acl_set_link_np(path, type, acl) == -1:
+                    raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
             acl_free(acl)
 
@@ -201,6 +214,14 @@ def acl_set(path, item, numeric_ids=False, fd=None):
     """
     if isinstance(path, str):
         path = os.fsencode(path)
-    _set_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', numeric_ids, fd=fd)
-    _set_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', numeric_ids, fd=fd)
-    _set_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', numeric_ids, fd=fd)
+    ret = lpathconf(path, _PC_ACL_NFS4)
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    if ret == 1:
+        _set_acl(path, ACL_TYPE_NFS4, item, 'acl_nfs4', numeric_ids, fd=fd)
+    ret = lpathconf(path, _PC_ACL_EXTENDED)
+    if ret < 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    if ret == 1:
+        _set_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', numeric_ids, fd=fd)
+        _set_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', numeric_ids, fd=fd)

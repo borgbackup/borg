@@ -100,7 +100,7 @@ def format_timedelta(td):
     s = ts % 60
     m = int(ts / 60) % 60
     h = int(ts / 3600) % 24
-    txt = "%.2f seconds" % s
+    txt = "%.3f seconds" % s
     if m:
         txt = "%d minutes %s" % (m, txt)
     if h:

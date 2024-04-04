@@ -368,7 +368,7 @@ def test_text_invalid(text):
 def test_format_timedelta():
     t0 = datetime(2001, 1, 1, 10, 20, 3, 0)
     t1 = datetime(2001, 1, 1, 12, 20, 4, 100000)
-    assert format_timedelta(t1 - t0) == "2 hours 1.10 seconds"
+    assert format_timedelta(t1 - t0) == "2 hours 1.100 seconds"
 
 
 @pytest.mark.parametrize(

@@ -52,8 +52,7 @@ h1 {
 }
 
 .container.experimental,
-#debugging-facilities,
-#borg-recreate {
+#debugging-facilities {
     /* don't change text dimensions */
     margin: 0 -30px; /* padding below + border width */
     padding: 0 10px; /* 10 px visual margin between edge of text and the border */

@@ -21,6 +21,8 @@ except ImportError as exc:
     # either there is no Cython installed or there is some issue with it.
     cythonize = None
     cythonize_import_error_msg = "ImportError: " + str(exc)
+    if "failed to map segment from shared object" in cythonize_import_error_msg:
+        cythonize_import_error_msg += " Check if the borg build uses a +exec filesystem."
 
 sys.path += [os.path.dirname(__file__)]
 import setup_checksums

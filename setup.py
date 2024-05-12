@@ -2,6 +2,7 @@
 
 import os
 import sys
+import platform
 from collections import defaultdict
 from glob import glob
 
@@ -26,6 +27,20 @@ import setup_crypto
 import setup_docs
 
 is_win32 = sys.platform.startswith('win32')
+
+# On Linux if /tmp is mounted with noexec cythonize will fail
+def is_noexec(mount_point):
+    with open('/proc/mounts', 'r') as mounts_file:
+        for line in mounts_file:
+            fields = line.split()
+            if len(fields) >= 5 and fields[1] == mount_point:
+                options = fields[3].split(',')
+                if 'noexec' in options:
+                    return True
+    return False
+
+if platform.system() == 'Linux' and is_noexec('/tmp'):
+    print("Warning: /tmp is mounted with noexec capacity, cythonize may fail")
 
 # How the build process finds the system libs / uses the bundled code:
 #

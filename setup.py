@@ -16,8 +16,13 @@ from setuptools.command.sdist import sdist
 
 try:
     from Cython.Build import cythonize
-except ImportError:
+    cythonize_import_error_msg = None
+except ImportError as exc:
+    # either there is no Cython installed or there is some issue with it.
     cythonize = None
+    cythonize_import_error_msg = "ImportError: " + str(exc)
+    if "failed to map segment from shared object" in cythonize_import_error_msg:
+        cythonize_import_error_msg += " Check if the borg build uses a +exec filesystem."
 
 sys.path += [os.path.dirname(__file__)]
 
@@ -79,7 +84,9 @@ else:
 
     cython_c_files = [fn.replace(".pyx", ".c") for fn in cython_sources]
     if not on_rtd and not all(os.path.exists(path) for path in cython_c_files):
-        raise ImportError("The GIT version of Borg needs Cython. Install Cython or use a released version.")
+        raise ImportError("The GIT version of Borg needs a working Cython. " +
+                          "Install or fix Cython or use a released borg version. " +
+                          "Importing cythonize failed with: " + cythonize_import_error_msg)
 
 
 cmdclass = {"build_ext": build_ext, "sdist": Sdist}

@@ -411,12 +411,34 @@ Compatibility notes:
 Change Log
 ==========
 
-
-Version 1.4.0b2 (2024-03-31)
+Version 1.4.0xx (2024-05-20)
 ----------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Fixes:
+
+- setup.py: fix import error reporting for cythonize import, #8208
+- setup.py: detect noexec build fs issue, #8208
+
+Other changes:
+
+- changed insufficiently reserved length for log message, #8152
+- docs:
+
+  - use python 3.9 in cygwin install docs, fixes #8196
+  - recreate: remove experimental status
+- github CI: fix PKG_CONFIG_PATH for openssl 3.0
+- vagrant:
+
+  - use Cython 3.0.10
+  - add a ubuntu noble (24.04) VM
+  - drop buster VM, fixes #8171
+
+
+Version 1.4.0b2 (2024-03-31)
+----------------------------
 
 Fixes:
 

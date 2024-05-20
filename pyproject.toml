@@ -29,7 +29,7 @@ classifiers = [
 ]
 license = {text="BSD"}
 dependencies = [
-  "msgpack >=1.0.3, <=1.0.8",
+  "msgpack >=1.0.3, <=1.1.0",
   "packaging",
   "platformdirs >=3.0.0, <5.0.0; sys_platform == 'darwin'",  # for macOS: breaking changes in 3.0.0,
   "platformdirs >=2.6.0, <5.0.0; sys_platform != 'darwin'",  # for others: 2.6+ works consistently.

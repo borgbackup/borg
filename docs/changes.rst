@@ -411,8 +411,9 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.0xx (2024-05-20)
-----------------------------
+
+Version 1.4.0rc1 (2024-05-26)
+-----------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
@@ -425,6 +426,7 @@ Fixes:
 Other changes:
 
 - changed insufficiently reserved length for log message, #8152
+- use Python 3.11.9, Cython 3.0.10 and PyInstaller 6.7.0 for binary builds
 - docs:
 
   - use python 3.9 in cygwin install docs, fixes #8196
@@ -432,7 +434,6 @@ Other changes:
 - github CI: fix PKG_CONFIG_PATH for openssl 3.0
 - vagrant:
 
-  - use Cython 3.0.10
   - add a ubuntu noble (24.04) VM
   - drop buster VM, fixes #8171
 

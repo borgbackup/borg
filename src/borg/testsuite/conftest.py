@@ -38,7 +38,7 @@ def clean_env(tmpdir_factory, monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
 
-def pytest_report_header(config, startdir):
+def pytest_report_header(config, start_path):
     tests = {
         "BSD flags": has_lchflags,
         "fuse2": has_llfuse,

@@ -317,6 +317,9 @@ def test_check_cache(archivers, request):
             cache.begin_txn()
             cache.chunks.incref(list(cache.chunks.iteritems())[0][0])
             cache.commit()
+            persistent = isinstance(cache, LocalCache)
+    if not persistent:
+        pytest.skip("check_cache is pointless if we do not have a persistent chunks cache")
     with pytest.raises(AssertionError):
         check_cache(archiver)
 

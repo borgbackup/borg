@@ -33,7 +33,7 @@ def clean_env(tmpdir_factory, monkeypatch):
     monkeypatch.setenv("BORG_TESTONLY_WEAKEN_KDF", "1")
 
 
-def pytest_report_header(config, startdir):
+def pytest_report_header(config, start_path):
     tests = {
         "BSD flags": has_lchflags,
         "fuse2": has_llfuse,

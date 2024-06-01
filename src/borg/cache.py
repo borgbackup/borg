@@ -133,7 +133,7 @@ class SecurityManager:
             with SaveFile(self.location_file) as fd:
                 fd.write(repository_location)
 
-    def assert_no_manifest_replay(self, manifest, key, cache_config=None):
+    def assert_no_manifest_replay(self, manifest, key):
         try:
             with open(self.manifest_ts_file) as fd:
                 timestamp = fd.read()
@@ -144,8 +144,6 @@ class SecurityManager:
         except OSError as exc:
             logger.warning("Could not read previous location file: %s", exc)
             timestamp = ""
-        if cache_config:
-            timestamp = max(timestamp, cache_config.timestamp or "")
         logger.debug("security: determined newest manifest timestamp as %s", timestamp)
         # If repository is older than the cache or security dir something fishy is going on
         if timestamp and timestamp > manifest.timestamp:
@@ -159,25 +157,17 @@ class SecurityManager:
         if self.known() and not self.key_matches(key):
             raise Cache.EncryptionMethodMismatch()
 
-    def assert_secure(self, manifest, key, *, cache_config=None, warn_if_unencrypted=True, lock_wait=None):
+    def assert_secure(self, manifest, key, *, warn_if_unencrypted=True, lock_wait=None):
         # warn_if_unencrypted=False is only used for initializing a new repository.
         # Thus, avoiding asking about a repository that's currently initializing.
         self.assert_access_unknown(warn_if_unencrypted, manifest, key)
-        if cache_config:
-            self._assert_secure(manifest, key, cache_config)
-        else:
-            cache_config = CacheConfig(self.repository, lock_wait=lock_wait)
-            if cache_config.exists():
-                with cache_config:
-                    self._assert_secure(manifest, key, cache_config)
-            else:
-                self._assert_secure(manifest, key)
+        self._assert_secure(manifest, key)
         logger.debug("security: repository checks ok, allowing access")
 
-    def _assert_secure(self, manifest, key, cache_config=None):
+    def _assert_secure(self, manifest, key):
         self.assert_location_matches()
         self.assert_key_type(key)
-        self.assert_no_manifest_replay(manifest, key, cache_config)
+        self.assert_no_manifest_replay(manifest, key)
         if not self.known():
             logger.debug("security: remembering previously unknown repository")
             self.save(manifest, key)
@@ -258,7 +248,6 @@ class CacheConfig:
         self._check_upgrade(self.config_path)
         self.id = self._config.get("cache", "repository")
         self.manifest_id = hex_to_bin(self._config.get("cache", "manifest"))
-        self.timestamp = self._config.get("cache", "timestamp", fallback=None)
         self.ignored_features = set(parse_stringified_list(self._config.get("cache", "ignored_features", fallback="")))
         self.mandatory_features = set(
             parse_stringified_list(self._config.get("cache", "mandatory_features", fallback=""))
@@ -281,7 +270,6 @@ class CacheConfig:
     def save(self, manifest=None):
         if manifest:
             self._config.set("cache", "manifest", manifest.id_str)
-            self._config.set("cache", "timestamp", manifest.timestamp)
             self._config.set("cache", "ignored_features", ",".join(self.ignored_features))
             self._config.set("cache", "mandatory_features", ",".join(self.mandatory_features))
             if not self._config.has_section("integrity"):
@@ -780,7 +768,6 @@ class LocalCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
         self.key = manifest.key
         self.repo_objs = manifest.repo_objs
         self.progress = progress
-        self.timestamp = None
         self._txn_active = False
         self.do_cache = os.environ.get("BORG_USE_CHUNKS_ARCHIVE", "yes").lower() in ["yes", "1", "true"]
 
@@ -800,7 +787,7 @@ class LocalCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
             self.open()
 
         try:
-            self.security_manager.assert_secure(manifest, self.key, cache_config=self.cache_config)
+            self.security_manager.assert_secure(manifest, self.key)
 
             if not self.check_cache_compatibility():
                 self.wipe_cache()
@@ -1186,7 +1173,6 @@ class NewCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
         self.key = manifest.key
         self.repo_objs = manifest.repo_objs
         self.progress = progress
-        self.timestamp = None
         self._txn_active = False
 
         self.path = cache_dir(self.repository, path)
@@ -1200,7 +1186,7 @@ class NewCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
 
         self.open()
         try:
-            self.security_manager.assert_secure(manifest, self.key, cache_config=self.cache_config)
+            self.security_manager.assert_secure(manifest, self.key)
 
             if not self.check_cache_compatibility():
                 self.wipe_cache()

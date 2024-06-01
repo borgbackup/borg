@@ -153,30 +153,27 @@ def test_repository_move(archivers, request, monkeypatch):
     security_dir = get_security_directory(archiver.repository_path)
     os.replace(archiver.repository_path, archiver.repository_path + "_new")
     archiver.repository_location += "_new"
+    # borg should notice that the repository location changed and abort.
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "rinfo", exit_code=EXIT_ERROR)
+    else:
+        with pytest.raises(Cache.RepositoryAccessAborted):
+            cmd(archiver, "rinfo")
+    # if we explicitly allow relocated repos, it should work fine.
     monkeypatch.setenv("BORG_RELOCATED_REPO_ACCESS_IS_OK", "yes")
     cmd(archiver, "rinfo")
     monkeypatch.delenv("BORG_RELOCATED_REPO_ACCESS_IS_OK")
     with open(os.path.join(security_dir, "location")) as fd:
         location = fd.read()
         assert location == Location(archiver.repository_location).canonical_path()
-    # Needs no confirmation anymore
-    cmd(archiver, "rinfo")
-    shutil.rmtree(archiver.cache_path)
+    # after new repo location was confirmed once, it needs no further confirmation anymore.
     cmd(archiver, "rinfo")
     shutil.rmtree(security_dir)
+    # it also needs no confirmation if we have no knowledge about the previous location.
     cmd(archiver, "rinfo")
+    # it will re-create security-related infos in the security dir:
     for file in ("location", "key-type", "manifest-timestamp"):
         assert os.path.exists(os.path.join(security_dir, file))
-
-
-def test_security_dir_compat(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    with open(os.path.join(get_security_directory(archiver.repository_path), "location"), "w") as fd:
-        fd.write("something outdated")
-    # This is fine, because the cache still has the correct information. security_dir and cache can disagree
-    # if older versions are used to confirm a renamed repository.
-    cmd(archiver, "rinfo")
 
 
 def test_unknown_unencrypted(archivers, request, monkeypatch):

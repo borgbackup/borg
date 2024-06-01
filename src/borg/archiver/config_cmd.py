@@ -5,7 +5,6 @@ from ._common import with_repository
 from ..cache import Cache, assert_secure
 from ..constants import *  # NOQA
 from ..helpers import Error, CommandError
-from ..helpers import Location
 from ..helpers import parse_file_size, hex_to_bin
 from ..manifest import Manifest
 
@@ -52,11 +51,8 @@ class ConfigMixIn:
         def cache_validate(section, name, value=None, check_value=True):
             if section not in ["cache"]:
                 raise ValueError("Invalid section")
-            if name in ["previous_location"]:
-                if check_value:
-                    Location(value)
-            else:
-                raise ValueError("Invalid name")
+            # currently, we do not support setting anything in the cache via borg config.
+            raise ValueError("Invalid name")
 
         def list_config(config):
             default_values = {

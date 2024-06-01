@@ -13,7 +13,6 @@ files_cache_logger = create_logger("borg.debug.files_cache")
 
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
-from .helpers import Location
 from .helpers import Error
 from .helpers import get_cache_dir, get_security_dir
 from .helpers import bin_to_hex, hex_to_bin, parse_stringified_list
@@ -100,7 +99,7 @@ class SecurityManager:
         with SaveFile(self.manifest_ts_file) as fd:
             fd.write(manifest.timestamp)
 
-    def assert_location_matches(self, cache_config=None):
+    def assert_location_matches(self):
         # Warn user before sending data to a relocated repository
         try:
             with open(self.location_file) as fd:
@@ -112,10 +111,6 @@ class SecurityManager:
         except OSError as exc:
             logger.warning("Could not read previous location file: %s", exc)
             previous_location = None
-        if cache_config and cache_config.previous_location and previous_location != cache_config.previous_location:
-            # Reconcile cache and security dir; we take the cache location.
-            previous_location = cache_config.previous_location
-            logger.debug("security: using previous_location of cache: %r", previous_location)
 
         repository_location = self.repository._location.canonical_path()
         if previous_location and previous_location != repository_location:
@@ -134,11 +129,9 @@ class SecurityManager:
             ):
                 raise Cache.RepositoryAccessAborted()
             # adapt on-disk config immediately if the new location was accepted
-            logger.debug("security: updating location stored in cache and security dir")
+            logger.debug("security: updating location stored in security dir")
             with SaveFile(self.location_file) as fd:
                 fd.write(repository_location)
-            if cache_config:
-                cache_config.save()
 
     def assert_no_manifest_replay(self, manifest, key, cache_config=None):
         try:
@@ -184,7 +177,7 @@ class SecurityManager:
         logger.debug("security: repository checks ok, allowing access")
 
     def _assert_secure(self, manifest, key, cache_config=None):
-        self.assert_location_matches(cache_config)
+        self.assert_location_matches()
         self.assert_key_type(key, cache_config)
         self.assert_no_manifest_replay(manifest, key, cache_config)
         if not self.known():
@@ -219,29 +212,6 @@ class SecurityManager:
 def assert_secure(repository, manifest, lock_wait):
     sm = SecurityManager(repository)
     sm.assert_secure(manifest, manifest.key, lock_wait=lock_wait)
-
-
-def recanonicalize_relative_location(cache_location, repository):
-    # borg < 1.0.8rc1 had different canonicalization for the repo location (see #1655 and #1741).
-    repo_location = repository._location.canonical_path()
-    rl = Location(repo_location)
-    cl = Location(cache_location)
-    if (
-        cl.proto == rl.proto
-        and cl.user == rl.user
-        and cl.host == rl.host
-        and cl.port == rl.port
-        and cl.path
-        and rl.path
-        and cl.path.startswith("/~/")
-        and rl.path.startswith("/./")
-        and cl.path[3:] == rl.path[3:]
-    ):
-        # everything is same except the expected change in relative path canonicalization,
-        # update previous_location to avoid warning / user query about changed location:
-        return repo_location
-    else:
-        return cache_location
 
 
 def cache_dir(repository, path=None):
@@ -310,12 +280,6 @@ class CacheConfig:
         except configparser.NoSectionError:
             logger.debug("Cache integrity: No integrity data found (files, chunks). Cache is from old version.")
             self.integrity = {}
-        previous_location = self._config.get("cache", "previous_location", fallback=None)
-        if previous_location:
-            self.previous_location = recanonicalize_relative_location(previous_location, self.repository)
-        else:
-            self.previous_location = None
-        self._config.set("cache", "previous_location", self.repository._location.canonical_path())
 
     def save(self, manifest=None, key=None):
         if manifest:

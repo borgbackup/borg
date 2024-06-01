@@ -540,20 +540,20 @@ def test_create_pattern_intermediate_folders_first(archivers, request):
     assert out_list.index("d x/b") < out_list.index("- x/b/foo_b")
 
 
-def test_create_no_cache_sync(archivers, request):
+def test_create_no_cache_sync_adhoc(archivers, request):  # TODO: add test for NewCache
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     cmd(archiver, "rdelete", "--cache-only")
     create_json = json.loads(
-        cmd(archiver, "create", "--no-cache-sync", "--json", "--error", "test", "input")
+        cmd(archiver, "create", "--no-cache-sync", "--prefer-adhoc-cache", "--json", "--error", "test", "input")
     )  # ignore experimental warning
     info_json = json.loads(cmd(archiver, "info", "-a", "test", "--json"))
     create_stats = create_json["cache"]["stats"]
     info_stats = info_json["cache"]["stats"]
     assert create_stats == info_stats
     cmd(archiver, "rdelete", "--cache-only")
-    cmd(archiver, "create", "--no-cache-sync", "test2", "input")
+    cmd(archiver, "create", "--no-cache-sync", "--prefer-adhoc-cache", "test2", "input")
     cmd(archiver, "rinfo")
     cmd(archiver, "check")
 

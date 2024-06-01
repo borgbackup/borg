@@ -350,8 +350,9 @@ class Cache:
         warn_if_unencrypted=True,
         progress=False,
         lock_wait=None,
-        permit_adhoc_cache=False,
-        force_adhoc_cache=False,
+        no_cache_sync_permitted=False,
+        no_cache_sync_forced=False,
+        prefer_adhoc_cache=False,
         cache_mode=FILES_CACHE_MODE_DISABLED,
         iec=False,
     ):
@@ -381,14 +382,14 @@ class Cache:
         def adhoc():
             return AdHocCache(manifest=manifest, lock_wait=lock_wait, iec=iec)
 
-        if force_adhoc_cache:
-            return adhoc()
+        if no_cache_sync_forced:
+            return adhoc() if prefer_adhoc_cache else newcache()
 
-        if not permit_adhoc_cache:
+        if not no_cache_sync_permitted:
             return local()
 
-        # ad-hoc cache may be permitted, but if the local cache is in sync it'd be stupid to invalidate
-        # it by needlessly using the ad-hoc cache.
+        # no cache sync may be permitted, but if the local cache is in sync it'd be stupid to invalidate
+        # it by needlessly using the AdHocCache or the NewCache.
         # Check if the local cache exists and is in sync.
 
         cache_config = CacheConfig(repository, path, lock_wait)
@@ -400,8 +401,12 @@ class Cache:
                 # Local cache is in sync, use it
                 logger.debug("Cache: choosing local cache (in sync)")
                 return local()
-        logger.debug("Cache: choosing ad-hoc cache (local cache does not exist or is not in sync)")
-        return adhoc()
+        if prefer_adhoc_cache:
+            logger.debug("Cache: choosing AdHocCache (local cache does not exist or is not in sync)")
+            return adhoc()
+        else:
+            logger.debug("Cache: choosing NewCache (local cache does not exist or is not in sync)")
+            return newcache()
 
 
 class CacheStatsMixin:

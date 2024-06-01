@@ -154,10 +154,8 @@ class SecurityManager:
             else:
                 raise Cache.RepositoryReplay()
 
-    def assert_key_type(self, key, cache_config=None):
+    def assert_key_type(self, key):
         # Make sure an encrypted repository has not been swapped for an unencrypted repository
-        if cache_config and cache_config.key_type is not None and cache_config.key_type != str(key.TYPE):
-            raise Cache.EncryptionMethodMismatch()
         if self.known() and not self.key_matches(key):
             raise Cache.EncryptionMethodMismatch()
 
@@ -178,7 +176,7 @@ class SecurityManager:
 
     def _assert_secure(self, manifest, key, cache_config=None):
         self.assert_location_matches()
-        self.assert_key_type(key, cache_config)
+        self.assert_key_type(key)
         self.assert_no_manifest_replay(manifest, key, cache_config)
         if not self.known():
             logger.debug("security: remembering previously unknown repository")
@@ -261,7 +259,6 @@ class CacheConfig:
         self.id = self._config.get("cache", "repository")
         self.manifest_id = hex_to_bin(self._config.get("cache", "manifest"))
         self.timestamp = self._config.get("cache", "timestamp", fallback=None)
-        self.key_type = self._config.get("cache", "key_type", fallback=None)
         self.ignored_features = set(parse_stringified_list(self._config.get("cache", "ignored_features", fallback="")))
         self.mandatory_features = set(
             parse_stringified_list(self._config.get("cache", "mandatory_features", fallback=""))
@@ -281,7 +278,7 @@ class CacheConfig:
             logger.debug("Cache integrity: No integrity data found (files, chunks). Cache is from old version.")
             self.integrity = {}
 
-    def save(self, manifest=None, key=None):
+    def save(self, manifest=None):
         if manifest:
             self._config.set("cache", "manifest", manifest.id_str)
             self._config.set("cache", "timestamp", manifest.timestamp)
@@ -292,8 +289,6 @@ class CacheConfig:
             for file, integrity_data in self.integrity.items():
                 self._config.set("integrity", file, integrity_data)
             self._config.set("integrity", "manifest", manifest.id_str)
-        if key:
-            self._config.set("cache", "key_type", str(key.TYPE))
         with SaveFile(self.config_path) as fd:
             self._config.write(fd)
 
@@ -889,7 +884,7 @@ class LocalCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
             self.chunks.write(fd)
         self.cache_config.integrity["chunks"] = fd.integrity_data
         pi.output("Saving cache config")
-        self.cache_config.save(self.manifest, self.key)
+        self.cache_config.save(self.manifest)
         os.replace(os.path.join(self.path, "txn.active"), os.path.join(self.path, "txn.tmp"))
         shutil.rmtree(os.path.join(self.path, "txn.tmp"))
         self._txn_active = False
@@ -1271,7 +1266,7 @@ class NewCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
             integrity_data = self._write_files_cache()
             self.cache_config.integrity[self.files_cache_name()] = integrity_data
         pi.output("Saving cache config")
-        self.cache_config.save(self.manifest, self.key)
+        self.cache_config.save(self.manifest)
         os.replace(os.path.join(self.path, "txn.active"), os.path.join(self.path, "txn.tmp"))
         shutil.rmtree(os.path.join(self.path, "txn.tmp"))
         self._txn_active = False

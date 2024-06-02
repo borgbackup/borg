@@ -12,6 +12,7 @@ check_and_copy () {
     echo ""
 }
 
+check_and_copy buster64   borg-linux-glibc228
 check_and_copy bullseye64 borg-linux-glibc231
 check_and_copy bookworm64 borg-linux-glibc236
 

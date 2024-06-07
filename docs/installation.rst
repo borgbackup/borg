@@ -236,7 +236,7 @@ Install the dependencies automatically using zypper::
 Alternatively, you can enumerate all build dependencies in the command line::
 
     sudo zypper install python3 python3-devel \
-    libacl-devel openssl-devel libxxhash-devel \
+    libacl-devel openssl-devel xxhash-devel libzstd-devel liblz4-devel \
     python3-Cython python3-Sphinx python3-msgpack-python python3-pkgconfig pkgconf \
     python3-pytest python3-setuptools python3-setuptools_scm \
     python3-sphinx_rtd_theme gcc gcc-c++

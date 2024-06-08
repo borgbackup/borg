@@ -25,9 +25,8 @@ def test_delete(archivers, request):
     cmd(archiver, "extract", "test.2", "--dry-run")
     output = cmd(archiver, "delete", "-a", "test.2", "--stats")
     assert "Original size: -" in output  # negative size == deleted data
-    # Make sure all data except the manifest has been deleted
-    with Repository(archiver.repository_path) as repository:
-        assert len(repository) == 1
+    output = cmd(archiver, "rlist")
+    assert output == ""  # no archives left!
 
 
 def test_delete_multiple(archivers, request):

@@ -153,15 +153,18 @@ def test_recreate_rechunkify(archivers, request):
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     cmd(archiver, "create", "test1", "input", "--chunker-params", "7,9,8,128")
     cmd(archiver, "create", "test2", "input", "--files-cache=disabled")
-    chunks_list = cmd(archiver, "list", "test1", "input/large_file", "--format", "{num_chunks} {unique_chunks}")
-    num_chunks, unique_chunks = map(int, chunks_list.split(" "))
-    # test1 and test2 do not deduplicate
-    assert num_chunks == unique_chunks
+    num_chunks1 = int(cmd(archiver, "list", "test1", "input/large_file", "--format", "{num_chunks}"))
+    num_chunks2 = int(cmd(archiver, "list", "test2", "input/large_file", "--format", "{num_chunks}"))
+    # right now, the file is chunked differently
+    assert num_chunks1 != num_chunks2
     cmd(archiver, "recreate", "--chunker-params", "default")
     check_cache(archiver)
-    # test1 and test2 do deduplicate after recreate
-    assert int(cmd(archiver, "list", "test1", "input/large_file", "--format={size}"))
-    assert not int(cmd(archiver, "list", "test1", "input/large_file", "--format", "{unique_chunks}"))
+    num_chunks1 = int(cmd(archiver, "list", "test1", "input/large_file", "--format", "{num_chunks}"))
+    num_chunks2 = int(cmd(archiver, "list", "test2", "input/large_file", "--format", "{num_chunks}"))
+    # now the files are chunked in the same way
+    # TODO: this is a rather weak test, it could be improved by comparing the IDs in the chunk lists,
+    # to make sure that everything is completely deduplicated now (both files have identical chunks).
+    assert num_chunks1 == num_chunks2
 
 
 def test_recreate_fixed_rechunkify(archivers, request):

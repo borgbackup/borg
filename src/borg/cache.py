@@ -943,10 +943,16 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.integrity["files"] = fd.integrity_data
         self.cache_config.manifest_id = ""
         self.cache_config._config.set("cache", "manifest", "")
+        if not self.cache_config._config.has_section("integrity"):
+            self.cache_config._config.add_section("integrity")
+        for file, integrity_data in self.cache_config.integrity.items():
+            self.cache_config._config.set("integrity", file, integrity_data)
+        self.cache_config._config.set("integrity", "manifest", "")
 
         self.cache_config.ignored_features = set()
         self.cache_config.mandatory_features = set()
-        self.cache_config.save(self.manifest, self.key)
+        with SaveFile(self.cache_config.config_path) as fd:
+            self.cache_config._config.write(fd)
 
     def update_compatibility(self):
         operation_to_features_map = self.manifest.get_all_mandatory_features()

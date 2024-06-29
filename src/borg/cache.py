@@ -533,7 +533,7 @@ class LocalCache(CacheStatsMixin):
 
         try:
             self.open()
-        except:
+        except (FileNotFoundError, FileIntegrityError):
             self.wipe_cache()
             self.open()
 

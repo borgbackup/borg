@@ -531,7 +531,12 @@ class LocalCache(CacheStatsMixin):
             self.security_manager.assert_access_unknown(warn_if_unencrypted, manifest, self.key)
             self.create()
 
-        self.open()
+        try:
+            self.open()
+        except:
+            self.wipe_cache()
+            self.open()
+
         try:
             self.security_manager.assert_secure(manifest, self.key, cache_config=self.cache_config)
 
@@ -924,7 +929,7 @@ class LocalCache(CacheStatsMixin):
         return True
 
     def wipe_cache(self):
-        logger.warning("Discarding incompatible cache and forcing a cache rebuild")
+        logger.warning("Discarding incompatible or corrupted cache and forcing a cache rebuild")
         archive_path = os.path.join(self.path, "chunks.archive.d")
         if os.path.isdir(archive_path):
             shutil.rmtree(os.path.join(self.path, "chunks.archive.d"))

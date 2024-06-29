@@ -930,13 +930,18 @@ class LocalCache(CacheStatsMixin):
             shutil.rmtree(os.path.join(self.path, "chunks.archive.d"))
             os.makedirs(os.path.join(self.path, "chunks.archive.d"))
         self.chunks = ChunkIndex()
-        with SaveFile(os.path.join(self.path, files_cache_name()), binary=True):
+        with IntegrityCheckedFile(path=os.path.join(self.path, "chunks"), write=True) as fd:
+            self.chunks.write(fd)
+        self.cache_config.integrity["chunks"] = fd.integrity_data
+        with IntegrityCheckedFile(path=os.path.join(self.path, files_cache_name()), write=True) as fd:
             pass  # empty file
+        self.cache_config.integrity["files"] = fd.integrity_data
         self.cache_config.manifest_id = ""
         self.cache_config._config.set("cache", "manifest", "")
 
         self.cache_config.ignored_features = set()
         self.cache_config.mandatory_features = set()
+        self.cache_config.save(self.manifest, self.key)
 
     def update_compatibility(self):
         operation_to_features_map = self.manifest.get_all_mandatory_features()

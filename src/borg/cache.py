@@ -947,6 +947,7 @@ class LocalCache(CacheStatsMixin):
             self.cache_config._config.add_section("integrity")
         for file, integrity_data in self.cache_config.integrity.items():
             self.cache_config._config.set("integrity", file, integrity_data)
+        # This is needed to pass the integrity check later on inside CacheConfig.load()
         self.cache_config._config.set("integrity", "manifest", "")
 
         self.cache_config.ignored_features = set()

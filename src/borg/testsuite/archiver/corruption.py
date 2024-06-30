@@ -45,6 +45,7 @@ def corrupt(file, amount=1):
 @pytest.mark.allow_cache_wipe
 def test_cache_chunks(archiver):
     corrupt_archiver(archiver)
+    create_src_archive(archiver, "test")
     corrupt(os.path.join(archiver.cache_path, "chunks"))
     if archiver.FORK_DEFAULT:
         out = cmd(archiver, "rinfo")

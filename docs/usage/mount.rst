@@ -41,6 +41,13 @@ Examples
     $ borg mount /path/to/repo /tmp/mymountpoint only/that/path
     $ borg mount --exclude '...' /path/to/repo /tmp/mymountpoint
 
+    # When using BORG_REPO env var, use :: as positional argument:
+    export BORG_REPO=/path/to/repo
+    # Mount the whole repo:
+    borg mount :: /tmp/mymountpoint
+    # Mount some specific archive:
+    borg mount ::root-2016-02-15 /tmp/mymountpoint
+
 
 borgfs
 ++++++

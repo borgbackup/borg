@@ -2,6 +2,7 @@ import io
 import json
 import os
 from configparser import ConfigParser
+from unittest.mock import patch
 
 import pytest
 
@@ -9,6 +10,7 @@ from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, Error
 from . import cmd, create_src_archive, create_test_files, RK_ENCRYPTION
 from ...hashindex import ChunkIndex
+from ...cache import LocalCache
 
 def test_check_corrupted_repository(archiver):
     cmd(archiver, "rcreate", RK_ENCRYPTION)
@@ -49,10 +51,17 @@ def test_cache_chunks(archiver):
     chunks_path = os.path.join(archiver.cache_path, "chunks")
     chunks_before_corruption = set(ChunkIndex(path=chunks_path).iteritems())
     corrupt(chunks_path)
-    if archiver.FORK_DEFAULT:
+
+    chunks_in_memory = None
+    sync_chunks = LocalCache.sync
+    def sync_wrapper(*args):
+        nonlocal chunks_in_memory
+        sync_chunks(*args)
+        chunks_in_memory = set(args[0].chunks.iteritems())
+    with patch.object(LocalCache, "sync", sync_wrapper):
         out = cmd(archiver, "rinfo")
-    else:
-        out = cmd(archiver, "rinfo")
+
+    assert chunks_in_memory == chunks_before_corruption
     assert "forcing a cache rebuild" in out
     chunks_after_repair = set(ChunkIndex(path=chunks_path).iteritems())
     assert chunks_after_repair == chunks_before_corruption

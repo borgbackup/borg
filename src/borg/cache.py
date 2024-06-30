@@ -940,7 +940,7 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.integrity["chunks"] = fd.integrity_data
         with IntegrityCheckedFile(path=os.path.join(self.path, files_cache_name()), write=True) as fd:
             pass  # empty file
-        self.cache_config.integrity["files"] = fd.integrity_data
+        self.cache_config.integrity[files_cache_name()] = fd.integrity_data
         self.cache_config.manifest_id = ""
         self.cache_config._config.set("cache", "manifest", "")
         if not self.cache_config._config.has_section("integrity"):

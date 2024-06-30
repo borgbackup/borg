@@ -6,7 +6,6 @@ from configparser import ConfigParser
 import pytest
 
 from ...constants import *  # NOQA
-from ...crypto.file_integrity import FileIntegrityError
 from ...helpers import bin_to_hex, Error
 from . import cmd, create_src_archive, create_test_files, RK_ENCRYPTION
 
@@ -43,15 +42,15 @@ def corrupt(file, amount=1):
         fd.write(corrupted)
 
 
+@pytest.mark.allow_cache_wipe
 def test_cache_chunks(archiver):
     corrupt_archiver(archiver)
     corrupt(os.path.join(archiver.cache_path, "chunks"))
     if archiver.FORK_DEFAULT:
-        out = cmd(archiver, "rinfo", exit_code=2)
-        assert "failed integrity check" in out
+        out = cmd(archiver, "rinfo")
     else:
-        with pytest.raises(FileIntegrityError):
-            cmd(archiver, "rinfo")
+        out = cmd(archiver, "rinfo")
+    assert "forcing a cache rebuild" in out
 
 
 def test_cache_files(archiver):

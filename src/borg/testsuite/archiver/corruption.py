@@ -8,7 +8,7 @@ import pytest
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, Error
 from . import cmd, create_src_archive, create_test_files, RK_ENCRYPTION
-
+from ...hashindex import ChunkIndex
 
 def test_check_corrupted_repository(archiver):
     cmd(archiver, "rcreate", RK_ENCRYPTION)
@@ -46,13 +46,16 @@ def corrupt(file, amount=1):
 def test_cache_chunks(archiver):
     corrupt_archiver(archiver)
     create_src_archive(archiver, "test")
-    corrupt(os.path.join(archiver.cache_path, "chunks"))
+    chunks_path = os.path.join(archiver.cache_path, "chunks")
+    chunks_before_corruption = set(ChunkIndex(path=chunks_path).iteritems())
+    corrupt(chunks_path)
     if archiver.FORK_DEFAULT:
         out = cmd(archiver, "rinfo")
     else:
         out = cmd(archiver, "rinfo")
     assert "forcing a cache rebuild" in out
-
+    chunks_after_repair = set(ChunkIndex(path=chunks_path).iteritems())
+    assert chunks_after_repair == chunks_before_corruption
 
 def test_cache_files(archiver):
     corrupt_archiver(archiver)

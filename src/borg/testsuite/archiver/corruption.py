@@ -12,6 +12,7 @@ from . import cmd, create_src_archive, create_test_files, RK_ENCRYPTION
 from ...hashindex import ChunkIndex
 from ...cache import LocalCache
 
+
 def test_check_corrupted_repository(archiver):
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     create_src_archive(archiver, "test")
@@ -52,12 +53,16 @@ def test_cache_chunks(archiver):
     chunks_before_corruption = set(ChunkIndex(path=chunks_path).iteritems())
     corrupt(chunks_path)
 
+    assert not archiver.FORK_DEFAULT  # test does not support forking
+
     chunks_in_memory = None
     sync_chunks = LocalCache.sync
-    def sync_wrapper(*args):
+
+    def sync_wrapper(cache):
         nonlocal chunks_in_memory
-        sync_chunks(*args)
-        chunks_in_memory = set(args[0].chunks.iteritems())
+        sync_chunks(cache)
+        chunks_in_memory = set(cache.chunks.iteritems())
+
     with patch.object(LocalCache, "sync", sync_wrapper):
         out = cmd(archiver, "rinfo")
 
@@ -65,6 +70,7 @@ def test_cache_chunks(archiver):
     assert "forcing a cache rebuild" in out
     chunks_after_repair = set(ChunkIndex(path=chunks_path).iteritems())
     assert chunks_after_repair == chunks_before_corruption
+
 
 def test_cache_files(archiver):
     corrupt_archiver(archiver)

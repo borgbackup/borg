@@ -1870,9 +1870,14 @@ class ArchiveChecker:
             match=match, first=first, last=last, sort_by=sort_by, older=older, oldest=oldest, newer=newer, newest=newest
         )
         self.orphan_chunks_check()
+        self.repair_count = 0
+        self.orphan_chunks_check()
         self.finish()
         if self.error_found:
-            logger.error("Archive consistency check complete, problems found.")
+            if self.repair_count > 0:
+                logger.error(f"Archive consistency check complete, problems found and {self.repair_count} problem(s) repaired.")
+            else:
+                logger.error("Archive consistency check complete, problems found.")
         else:
             logger.info("Archive consistency check complete, no problems found.")
         return self.repair or not self.error_found
@@ -2338,7 +2343,9 @@ class ArchiveChecker:
                 )
                 for id_ in unused:
                     self.repository.delete(id_)
+                    self.repair_count += 1
                 logger.info("Finished deleting orphaned/superseded objects.")
+
         else:
             logger.info("Orphaned objects check skipped (needs all archives checked).")
 

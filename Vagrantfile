@@ -106,7 +106,7 @@ def packages_netbsd
   EOF
 end
 
-def packages_darwin
+def packages_macos
   return <<-EOF
     # install all the (security and other) updates
     sudo softwareupdate --ignore iTunesX
@@ -155,7 +155,7 @@ def install_pyenv(boxname)
   EOF
 end
 
-def fix_pyenv_darwin(boxname)
+def fix_pyenv_macos(boxname)
   return <<-EOF
     echo 'export PYTHON_CONFIGURE_OPTS="--enable-framework"' >> ~/.bash_profile
   EOF
@@ -389,7 +389,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd", ".*fuse.*")
   end
 
-  config.vm.define "darwin" do |b|
+  config.vm.define "macos1012" do |b|
     b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
       v.memory = 4096 + $wmem
@@ -404,15 +404,15 @@ Vagrant.configure(2) do |config|
       v.customize ["modifyvm", :id, '--usbehci', 'off', '--usbxhci', 'off']
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages darwin", :type => :shell, :privileged => false, :inline => packages_darwin
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("darwin")
-    b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_darwin("darwin")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("darwin")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("darwin")
+    b.vm.provision "packages macos", :type => :shell, :privileged => false, :inline => packages_macos
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("macos")
+    b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_macos("macos")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("macos")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("macos")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("darwin")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin", ".*(fuse3|none).*")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("macos")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("macos", ".*(fuse3|none).*")
   end
 
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of

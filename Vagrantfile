@@ -421,14 +421,14 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages macos", :type => :shell, :privileged => false, :inline => packages_macos
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("macos")
-    b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_macos("macos")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("macos")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("macos")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("macos1012")
+    b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_macos("macos1012")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("macos1012")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("macos1012")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("macos")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("macos", ".*(fuse3|none).*")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("macos1012")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("macos1012", ".*(fuse3|none).*")
   end
 
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of

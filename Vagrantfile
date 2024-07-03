@@ -381,28 +381,28 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd14", ".*(fuse3|none).*")
   end
 
-  config.vm.define "openbsd" do |b|
+  config.vm.define "openbsd7" do |b|
     b.vm.box = "generic/openbsd7"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd7")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd", ".*fuse.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd7", ".*fuse.*")
   end
 
-  config.vm.define "netbsd" do |b|
+  config.vm.define "netbsd9" do |b|
     b.vm.box = "generic/netbsd9"
     b.vm.provider :virtualbox do |v|
       v.memory = 4096 + $wmem  # need big /tmp tmpfs in RAM!
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd9")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd", ".*fuse.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd9", ".*fuse.*")
   end
 
   config.vm.define "macos1012" do |b|

@@ -275,79 +275,79 @@ Vagrant.configure(2) do |config|
     v.cpus = $cpus
   end
 
-  config.vm.define "noble64" do |b|
+  config.vm.define "noble" do |b|
     b.vm.box = "ubuntu/noble64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("noble64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("noble")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("noble64", ".*none.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("noble", ".*none.*")
   end
 
-  config.vm.define "jammy64" do |b|
+  config.vm.define "jammy" do |b|
     b.vm.box = "ubuntu/jammy64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jammy64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jammy")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jammy64", ".*none.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jammy", ".*none.*")
   end
 
-  config.vm.define "bookworm64" do |b|
+  config.vm.define "bookworm" do |b|
     b.vm.box = "debian/bookworm64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("bookworm64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("bookworm64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("bookworm64")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("bookworm")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("bookworm")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("bookworm")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("bookworm64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bookworm64", ".*none.*")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("bookworm")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bookworm", ".*none.*")
   end
 
-  config.vm.define "bullseye64" do |b|
+  config.vm.define "bullseye" do |b|
     b.vm.box = "debian/bullseye64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("bullseye64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("bullseye64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("bullseye64")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("bullseye")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("bullseye")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("bullseye")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("bullseye64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bullseye64", ".*none.*")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("bullseye")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bullseye", ".*none.*")
   end
 
-  config.vm.define "buster64" do |b|
+  config.vm.define "buster" do |b|
     b.vm.box = "debian/buster64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("buster64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("buster64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("buster64")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("buster")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("buster")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("buster")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("buster64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster64", ".*none.*")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("buster")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster", ".*none.*")
   end
 
-  config.vm.define "freebsd13_64" do |b|
+  config.vm.define "freebsd13" do |b|
     b.vm.box = "generic/freebsd13"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
@@ -355,16 +355,16 @@ Vagrant.configure(2) do |config|
     b.ssh.shell = "sh"
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages freebsd", :type => :shell, :inline => packages_freebsd
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("freebsd13_64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("freebsd13_64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("freebsd13_64")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("freebsd13")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("freebsd13")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("freebsd13")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd13_64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd13_64", ".*(fuse3|none).*")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd13")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd13", ".*(fuse3|none).*")
   end
 
-  config.vm.define "freebsd14_64" do |b|
+  config.vm.define "freebsd14" do |b|
     b.vm.box = "generic/freebsd14"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
@@ -372,40 +372,40 @@ Vagrant.configure(2) do |config|
     b.ssh.shell = "sh"
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages freebsd", :type => :shell, :inline => packages_freebsd
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("freebsd14_64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("freebsd14_64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("freebsd14_64")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("freebsd14")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("freebsd14")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("freebsd14")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd14_64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd14_64", ".*(fuse3|none).*")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd14")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd14", ".*(fuse3|none).*")
   end
 
-  config.vm.define "openbsd64" do |b|
+  config.vm.define "openbsd" do |b|
     b.vm.box = "generic/openbsd7"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages openbsd", :type => :shell, :inline => packages_openbsd
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openbsd")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd64", ".*fuse.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openbsd", ".*fuse.*")
   end
 
-  config.vm.define "netbsd64" do |b|
+  config.vm.define "netbsd" do |b|
     b.vm.box = "generic/netbsd9"
     b.vm.provider :virtualbox do |v|
       v.memory = 4096 + $wmem  # need big /tmp tmpfs in RAM!
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd64", ".*fuse.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd", ".*fuse.*")
   end
 
-  config.vm.define "darwin64" do |b|
+  config.vm.define "darwin" do |b|
     b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
       v.memory = 4096 + $wmem
@@ -421,27 +421,27 @@ Vagrant.configure(2) do |config|
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages darwin", :type => :shell, :privileged => false, :inline => packages_darwin
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("darwin64")
-    b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_darwin("darwin64")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("darwin64")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("darwin64")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("darwin")
+    b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_darwin("darwin")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("darwin")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("darwin")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("darwin64")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin64", ".*(fuse3|none).*")
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("darwin")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("darwin", ".*(fuse3|none).*")
   end
 
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
   # permission errors. can be manually fixed in the VM by: sudo chown -R vagrant /vagrant/borg ; then rsync again.
-  config.vm.define "openindiana64" do |b|
+  config.vm.define "openindiana" do |b|
     b.vm.box = "openindiana/hipster"
     b.vm.provider :virtualbox do |v|
       v.memory = 2048 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages openindiana", :type => :shell, :inline => packages_openindiana
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openindiana64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openindiana")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana64", ".*fuse.*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("openindiana", ".*fuse.*")
   end
 end

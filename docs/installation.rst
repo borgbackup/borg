@@ -105,22 +105,20 @@ Standalone Binary
 .. note:: Releases are signed with an OpenPGP key, see
           :ref:`security-contact` for more instructions.
 
-Borg x86/x64 amd/intel compatible binaries (generated with `pyinstaller`_)
-are available on the releases_ page for the following platforms:
+Borg x86-64 amd/intel compatible binaries (generated with `pyinstaller`_)
+are available on the releases_ page for the following platforms (for more
+details see the ``00_README.txt`` file there):
 
-* **Linux**: glibc >= 2.28 (ok for most supported Linux releases).
-  Older glibc releases are untested and may not work.
-* **MacOS**: 10.12 or newer (To avoid signing issues download the file via
-  command line **or** remove the ``quarantine`` attribute after downloading:
-  ``$ xattr -dr com.apple.quarantine borg-macosx64.tgz``)
-* **FreeBSD**: 12.1 (unknown whether it works for older releases)
+* Linux
+* FreeBSD
+* MacOS
 
 ARM binaries are built by Johann Bauer, see: https://borg.bauerj.eu/
 
 To install such a binary, just drop it into a directory in your ``PATH``,
 make borg readable and executable for its users and then you can run ``borg``::
 
-    sudo cp borg-linux64 /usr/local/bin/borg
+    sudo cp borg-linux /usr/local/bin/borg
     sudo chown root:root /usr/local/bin/borg
     sudo chmod 755 /usr/local/bin/borg
 

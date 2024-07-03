@@ -311,8 +311,11 @@ Upgrade Notes
 borg 1.2.x to 1.4.x
 -------------------
 
-Coming from borg 1.2 there are no upgrade steps needed - just make sure you
-already have done the previous upgrade steps up to 1.2.7.
+If you currently use borg 1.2.5+: no upgrade steps needed (if you already did
+them when upgrading to that version, otherwise see below).
+
+If you currently use borg 1.2.0 .. 1.2.4, read and follow "Pre-1.2.5 archives
+spoofing vulnerability (CVE-2023-36811)" section, see the top of this changelog.
 
 Compatibility notes:
 
@@ -411,12 +414,25 @@ Compatibility notes:
 Change Log
 ==========
 
-
-Version 1.4.0rc1 (2024-05-26)
------------------------------
+Version 1.4.0 (2024-07-03)
+--------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Other changes:
+
+- vagrant: revive the buster64 box, RHEL8 has same glibc
+- tests: fix pytest_report_header, #8232
+- docs:
+
+  - mount: add examples using :: positional argument, #8255
+  - Installation: update Arch Linux repo name
+  - update standalone binary section
+
+
+Version 1.4.0rc1 (2024-05-26)
+-----------------------------
 
 Fixes:
 

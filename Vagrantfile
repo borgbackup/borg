@@ -347,6 +347,23 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster64", ".*none.*")
   end
 
+  config.vm.define "freebsd64old" do |b|
+    b.vm.box = "generic/freebsd13"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.ssh.shell = "sh"
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages freebsd", :type => :shell, :inline => packages_freebsd
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("freebsd64")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("freebsd64")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("freebsd64")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd64")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd64", ".*(fuse3|none).*")
+  end
+
   config.vm.define "freebsd64" do |b|
     b.vm.box = "generic/freebsd14"
     b.vm.provider :virtualbox do |v|

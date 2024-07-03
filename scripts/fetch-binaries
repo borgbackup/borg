@@ -19,4 +19,4 @@ check_and_copy bookworm  borg-linux-glibc236
 check_and_copy freebsd13 borg-freebsd13
 check_and_copy freebsd14 borg-freebsd14
 
-check_and_copy darwin    borg-macos
+check_and_copy macos1012 borg-macos1012

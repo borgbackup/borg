@@ -2,13 +2,15 @@ import io
 import json
 import os
 from configparser import ConfigParser
+from unittest.mock import patch
 
 import pytest
 
 from ...constants import *  # NOQA
-from ...crypto.file_integrity import FileIntegrityError
 from ...helpers import bin_to_hex, Error
 from . import cmd, create_src_archive, create_test_files, RK_ENCRYPTION
+from ...hashindex import ChunkIndex
+from ...cache import LocalCache
 
 
 def test_check_corrupted_repository(archiver):
@@ -43,15 +45,31 @@ def corrupt(file, amount=1):
         fd.write(corrupted)
 
 
+@pytest.mark.allow_cache_wipe
 def test_cache_chunks(archiver):
     corrupt_archiver(archiver)
-    corrupt(os.path.join(archiver.cache_path, "chunks"))
-    if archiver.FORK_DEFAULT:
-        out = cmd(archiver, "rinfo", exit_code=2)
-        assert "failed integrity check" in out
-    else:
-        with pytest.raises(FileIntegrityError):
-            cmd(archiver, "rinfo")
+    create_src_archive(archiver, "test")
+    chunks_path = os.path.join(archiver.cache_path, "chunks")
+    chunks_before_corruption = set(ChunkIndex(path=chunks_path).iteritems())
+    corrupt(chunks_path)
+
+    assert not archiver.FORK_DEFAULT  # test does not support forking
+
+    chunks_in_memory = None
+    sync_chunks = LocalCache.sync
+
+    def sync_wrapper(cache):
+        nonlocal chunks_in_memory
+        sync_chunks(cache)
+        chunks_in_memory = set(cache.chunks.iteritems())
+
+    with patch.object(LocalCache, "sync", sync_wrapper):
+        out = cmd(archiver, "rinfo")
+
+    assert chunks_in_memory == chunks_before_corruption
+    assert "forcing a cache rebuild" in out
+    chunks_after_repair = set(ChunkIndex(path=chunks_path).iteritems())
+    assert chunks_after_repair == chunks_before_corruption
 
 
 def test_cache_files(archiver):

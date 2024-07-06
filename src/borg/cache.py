@@ -488,7 +488,12 @@ class LocalCache(CacheStatsMixin):
             self.security_manager.assert_access_unknown(warn_if_unencrypted, manifest, key)
             self.create()
 
-        self.open()
+        try:
+            self.open()
+        except (FileNotFoundError, FileIntegrityError):
+            self.wipe_cache()
+            self.open()
+
         try:
             self.security_manager.assert_secure(manifest, key, cache_config=self.cache_config)
 
@@ -920,19 +925,31 @@ class LocalCache(CacheStatsMixin):
         return True
 
     def wipe_cache(self):
-        logger.warning("Discarding incompatible cache and forcing a cache rebuild")
-        archive_path = os.path.join(self.path, 'chunks.archive.d')
+        logger.warning("Discarding incompatible or corrupted cache and forcing a cache rebuild")
+        archive_path = os.path.join(self.path, "chunks.archive.d")
         if os.path.isdir(archive_path):
             shutil.rmtree(os.path.join(self.path, 'chunks.archive.d'))
             os.makedirs(os.path.join(self.path, 'chunks.archive.d'))
         self.chunks = ChunkIndex()
-        with SaveFile(os.path.join(self.path, files_cache_name()), binary=True):
+        with IntegrityCheckedFile(path=os.path.join(self.path, "chunks"), write=True) as fd:
+            self.chunks.write(fd)
+        self.cache_config.integrity["chunks"] = fd.integrity_data
+        with IntegrityCheckedFile(path=os.path.join(self.path, files_cache_name()), write=True) as fd:
             pass  # empty file
-        self.cache_config.manifest_id = ''
-        self.cache_config._config.set('cache', 'manifest', '')
+        self.cache_config.integrity[files_cache_name()] = fd.integrity_data
+        self.cache_config.manifest_id = ""
+        self.cache_config._config.set("cache", "manifest", "")
+        if not self.cache_config._config.has_section("integrity"):
+            self.cache_config._config.add_section("integrity")
+        for file, integrity_data in self.cache_config.integrity.items():
+            self.cache_config._config.set("integrity", file, integrity_data)
+        # This is needed to pass the integrity check later on inside CacheConfig.load()
+        self.cache_config._config.set("integrity", "manifest", "")
 
         self.cache_config.ignored_features = set()
         self.cache_config.mandatory_features = set()
+        with SaveFile(self.cache_config.config_path) as fd:
+            self.cache_config._config.write(fd)
 
     def update_compatibility(self):
         operation_to_features_map = self.manifest.get_all_mandatory_features()

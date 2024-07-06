@@ -38,6 +38,7 @@ from ..crypto.low_level import bytes_to_long, num_cipher_blocks
 from ..crypto.key import KeyfileKeyBase, RepoKey, KeyfileKey, Passphrase, TAMRequiredError, ArchiveTAMRequiredError
 from ..crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ..crypto.file_integrity import FileIntegrityError
+from ..hashindex import ChunkIndex
 from ..helpers import Location, get_security_dir
 from ..helpers import Manifest, MandatoryFeatureUnsupported, ArchiveInfo
 from ..helpers import init_ec_warnings
@@ -4361,15 +4362,30 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
             fd.seek(-amount, io.SEEK_END)
             fd.write(corrupted)
 
+    @pytest.mark.allow_cache_wipe
     def test_cache_chunks(self):
-        self.corrupt(os.path.join(self.cache_path, 'chunks'))
+        self.create_src_archive("test")
+        chunks_path = os.path.join(self.cache_path, 'chunks')
+        chunks_before_corruption = set(ChunkIndex(path=chunks_path).iteritems())
+        self.corrupt(chunks_path)
 
-        if self.FORK_DEFAULT:
-            out = self.cmd('info', self.repository_location, exit_code=2)
-            assert 'failed integrity check' in out
-        else:
-            with pytest.raises(FileIntegrityError):
-                self.cmd('info', self.repository_location)
+        assert not self.FORK_DEFAULT  # test does not support forking
+
+        chunks_in_memory = None
+        sync_chunks = LocalCache.sync
+
+        def sync_wrapper(cache):
+            nonlocal chunks_in_memory
+            sync_chunks(cache)
+            chunks_in_memory = set(cache.chunks.iteritems())
+
+        with patch.object(LocalCache, "sync", sync_wrapper):
+            out = self.cmd("info", self.repository_location)
+
+        assert chunks_in_memory == chunks_before_corruption
+        assert "forcing a cache rebuild" in out
+        chunks_after_repair = set(ChunkIndex(path=chunks_path).iteritems())
+        assert chunks_after_repair == chunks_before_corruption
 
     def test_cache_files(self):
         self.cmd('create', self.repository_location + '::test', 'input')

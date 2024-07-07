@@ -194,6 +194,7 @@ jobs:
 
   windows:
 
+    if: false  # build is broken, thus disabled, see #8264
     runs-on: windows-latest
     timeout-minutes: 120
     needs: linux

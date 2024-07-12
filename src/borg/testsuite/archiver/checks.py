@@ -205,8 +205,10 @@ def test_unknown_feature_on_create(archivers, request):
 
 
 def test_unknown_feature_on_cache_sync(archivers, request):
+    # LocalCache.sync checks repo compat
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
+    # delete the cache to trigger a cache sync later in borg create
     cmd(archiver, "rdelete", "--cache-only")
     add_unknown_feature(archiver.repository_path, Manifest.Operation.READ)
     cmd_raises_unknown_feature(archiver, ["create", "test", "input"])

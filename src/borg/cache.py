@@ -382,6 +382,15 @@ class Cache:
         def adhoc():
             return AdHocCache(manifest=manifest, lock_wait=lock_wait, iec=iec)
 
+        impl = os.environ.get("BORG_CACHE_IMPL", None)
+        if impl is not None:
+            methods = dict(local=local, newcache=newcache, adhoc=adhoc)
+            try:
+                method = methods[impl]
+            except KeyError:
+                raise RuntimeError("Unknown BORG_CACHE_IMPL value: %s" % impl)
+            return method()
+
         if no_cache_sync_forced:
             return adhoc() if prefer_adhoc_cache else newcache()
 

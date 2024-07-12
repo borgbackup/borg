@@ -53,11 +53,10 @@ def test_cache_chunks(archiver):
 
     create_src_archive(archiver, "test")
     chunks_path = os.path.join(archiver.cache_path, "chunks")
-    chunks_before_corruption = set(ChunkIndex(path=chunks_path).iteritems())
+    if not os.path.exists(chunks_path):
+        pytest.skip("no persistent chunks index for this kind of Cache implementation")
 
-    chunks_index = os.path.join(archiver.cache_path, "chunks")
-    if not os.path.exists(chunks_index):
-        pytest.skip("Only works with LocalCache.")
+    chunks_before_corruption = set(ChunkIndex(path=chunks_path).iteritems())
 
     corrupt(chunks_path)
 

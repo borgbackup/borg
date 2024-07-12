@@ -546,8 +546,8 @@ def test_create_no_cache_sync_adhoc(archivers, request):  # TODO: add test for N
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     cmd(archiver, "rdelete", "--cache-only")
     create_json = json.loads(
-        cmd(archiver, "create", "--no-cache-sync", "--prefer-adhoc-cache", "--json", "--error", "test", "input")
-    )  # ignore experimental warning
+        cmd(archiver, "create", "--no-cache-sync", "--prefer-adhoc-cache", "--json", "test", "input")
+    )
     info_json = json.loads(cmd(archiver, "info", "-a", "test", "--json"))
     create_stats = create_json["cache"]["stats"]
     info_stats = info_json["cache"]["stats"]

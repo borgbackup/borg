@@ -428,6 +428,9 @@ Total chunks: {0.total_chunks}
     def stats(self):
         from .archive import Archive
 
+        if isinstance(self, AdHocCache) and getattr(self, "chunks", None) is None:
+            self.chunks = self._load_chunks_from_repo()  # AdHocCache usually only has .chunks after begin_txn.
+
         # XXX: this should really be moved down to `hashindex.pyx`
         total_size, unique_size, total_unique_chunks, total_chunks = self.chunks.summarize()
         # since borg 1.2 we have new archive metadata telling the total size per archive,
@@ -1339,8 +1342,6 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
         self.security_manager = SecurityManager(self.repository)
         self.security_manager.assert_secure(manifest, self.key, lock_wait=lock_wait)
-
-        logger.warning("Note: --no-cache-sync is an experimental feature.")
 
     # Public API
 

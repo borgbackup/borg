@@ -319,6 +319,23 @@ def test_check_cache(archivers, request):
         check_cache(archiver)
 
 
+def test_env_use_chunks_archive(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    monkeypatch.setenv("BORG_USE_CHUNKS_ARCHIVE", "no")
+    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    repository_id = bin_to_hex(_extract_repository_id(archiver.repository_path))
+    cache_path = os.path.join(archiver.cache_path, repository_id)
+    cmd(archiver, "create", "test", "input")
+    assert os.path.exists(cache_path)
+    assert os.path.exists(os.path.join(cache_path, "chunks.archive.d"))
+    assert len(os.listdir(os.path.join(cache_path, "chunks.archive.d"))) == 0
+    cmd(archiver, "rdelete", "--cache-only")
+    monkeypatch.setenv("BORG_USE_CHUNKS_ARCHIVE", "yes")
+    cmd(archiver, "create", "test2", "input")
+    assert len(os.listdir(os.path.join(cache_path, "chunks.archive.d"))) > 0
+
+
 # Begin Remote Tests
 def test_remote_repo_restrict_to_path(remote_archiver):
     original_location, repo_path = remote_archiver.repository_location, remote_archiver.repository_path

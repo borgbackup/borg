@@ -67,6 +67,9 @@ General:
         When set to a numeric value, this determines the maximum "time to live" for the files cache
         entries (default: 20). The files cache is used to determine quickly whether a file is unchanged.
         The FAQ explains this more detailed in: :ref:`always_chunking`
+    BORG_USE_CHUNKS_ARCHIVE
+        When set to no (default: yes), the ``chunks.archive.d`` folder will not be used. This reduces
+        disk space usage but slows down cache resyncs.
     BORG_SHOW_SYSINFO
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.

@@ -720,18 +720,8 @@ will make the subsequent rebuilds faster (because it needs to transfer less data
 from the repository). While being faster, the cache needs quite some disk space,
 which might be unwanted.
 
-There is a temporary (but maybe long lived) hack to avoid using lots of disk
-space for chunks.archive.d (see :issue:`235` for details):
-
-::
-
-    # this assumes you are working with the same user as the backup.
-    cd ~/.cache/borg/$(borg config id)
-    rm -rf chunks.archive.d ; touch chunks.archive.d
-
-This deletes all the cached archive chunk indexes and replaces the directory
-that kept them with a file, so borg won't be able to store anything "in" there
-in future.
+You can disable the cached archive chunk indexes by setting the environment
+variable ``BORG_USE_CHUNKS_ARCHIVE`` to ``no``.
 
 This has some pros and cons, though:
 

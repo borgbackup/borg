@@ -478,7 +478,6 @@ class LocalCache(CacheStatsMixin):
         self.consider_part_files = consider_part_files
         self.timestamp = None
         self.txn_active = False
-        self.do_cache = os.environ.get("BORG_USE_CHUNKS_ARCHIVE", "yes").lower() in ["yes", "1", "true"]
 
         self.path = cache_dir(repository, path)
         self.security_manager = SecurityManager(repository)
@@ -494,6 +493,13 @@ class LocalCache(CacheStatsMixin):
         except (FileNotFoundError, FileIntegrityError):
             self.wipe_cache()
             self.open()
+
+        # new way: tell whether to use the chunks archive via an environment variable:
+        do_cache_env = os.environ.get("BORG_USE_CHUNKS_ARCHIVE", "yes").lower() in ["yes", "1", "true"]
+        # backwards compatibility: a user might have replaced the archive_path directory with
+        # a regular file (as documented in the borg FAQ) to avoid chunks archive creation:
+        do_cache_fs = os.path.isdir(os.path.join(self.path, "chunks.archive.d"))
+        self.do_cache = do_cache_env and do_cache_fs
 
         try:
             self.security_manager.assert_secure(manifest, key, cache_config=self.cache_config)

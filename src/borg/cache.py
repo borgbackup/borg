@@ -478,6 +478,7 @@ class LocalCache(CacheStatsMixin):
         self.consider_part_files = consider_part_files
         self.timestamp = None
         self.txn_active = False
+        self.do_cache = os.environ.get("BORG_USE_CHUNKS_ARCHIVE", "yes").lower() in ["yes", "1", "true"]
 
         self.path = cache_dir(repository, path)
         self.security_manager = SecurityManager(repository)
@@ -907,9 +908,6 @@ class LocalCache(CacheStatsMixin):
         self.begin_txn()
         with cache_if_remote(self.repository, decrypted_cache=self.key) as decrypted_repository:
             legacy_cleanup()
-            # TEMPORARY HACK: to avoid archive index caching, create a FILE named ~/.cache/borg/REPOID/chunks.archive.d -
-            # this is only recommended if you have a fast, low latency connection to your repo (e.g. if repo is local disk)
-            self.do_cache = os.path.isdir(archive_path)
             self.chunks = create_master_idx(self.chunks)
 
     def check_cache_compatibility(self):

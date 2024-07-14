@@ -3075,6 +3075,21 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with pytest.raises(AssertionError):
             self.check_cache()
 
+    def test_env_use_chunks_archive(self):
+        self.create_test_files()
+        with environment_variable(BORG_USE_CHUNKS_ARCHIVE="no"):
+            self.cmd("init", "--encryption=repokey", self.repository_location)
+            self.cmd("create", self.repository_location + "::test", "input")
+        repository_id = bin_to_hex(self._extract_repository_id(self.repository_path))
+        cache_path = os.path.join(self.cache_path, repository_id)
+        assert os.path.exists(cache_path)
+        assert os.path.exists(os.path.join(cache_path, "chunks.archive.d"))
+        assert len(os.listdir(os.path.join(cache_path, "chunks.archive.d"))) == 0
+        self.cmd("delete", self.repository_location, "--cache-only")
+        with environment_variable(BORG_USE_CHUNKS_ARCHIVE="yes"):
+            self.cmd("create", self.repository_location + "::test2", "input")
+        assert len(os.listdir(os.path.join(cache_path, "chunks.archive.d"))) > 0
+
     def test_recreate_target_rc(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         if self.FORK_DEFAULT:

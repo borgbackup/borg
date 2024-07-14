@@ -5,7 +5,7 @@ from ._common import with_repository, Highlander
 from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import log_multi, format_archive, sig_int, CommandError
+from ..helpers import log_multi, format_archive, sig_int, CommandError, Error
 from ..manifest import Manifest
 
 from ..logger import create_logger

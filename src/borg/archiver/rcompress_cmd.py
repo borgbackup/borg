@@ -4,7 +4,7 @@ from collections import defaultdict
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec, ObfuscateSize, Auto, COMPRESSOR_TABLE
-from ..helpers import sig_int, ProgressIndicatorPercent
+from ..helpers import sig_int, ProgressIndicatorPercent, Error
 
 from ..manifest import Manifest
 
@@ -150,7 +150,7 @@ class RCompressMixIn:
         pi.finish()
         if sig_int:
             # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
-            self.print_error("Got Ctrl-C / SIGINT.")
+            raise Error("Got Ctrl-C / SIGINT.")
         elif uncommitted_chunks > 0:
             checkpoint_func()
         if args.stats:

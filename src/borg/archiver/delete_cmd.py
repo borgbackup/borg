@@ -5,7 +5,7 @@ from ._common import with_repository, Highlander
 from ..archive import Archive, Statistics
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import log_multi, format_archive, sig_int
+from ..helpers import log_multi, format_archive, sig_int, CommandError, Error
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -24,11 +24,10 @@ class DeleteMixIn:
         if not archive_names:
             return
         if args.match_archives is None and args.first == 0 and args.last == 0:
-            self.print_error(
+            raise CommandError(
                 "Aborting: if you really want to delete all archives, please use -a 'sh:*' "
                 "or just delete the whole repository (might be much faster)."
             )
-            return
 
         if args.forced == 2:
             deleted = False

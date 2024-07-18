@@ -84,6 +84,18 @@ General:
         - ``pyfuse3``: only try to load pyfuse3
         - ``llfuse``: only try to load llfuse
         - ``none``: do not try to load an implementation
+    BORG_CACHE_IMPL
+        Choose the implementation for the clientside cache, choose one of:
+
+        - ``local``: uses a persistent chunks cache and keeps it in a perfect state (precise refcounts and
+          sizes), requiring a potentially resource expensive cache sync in multi-client scenarios.
+          Also has a persistent files cache.
+        - ``adhoc``: builds a non-persistent chunks cache by querying the repo. Chunks cache contents
+          are somewhat sloppy for already existing chunks, concerning their refcount ("infinite") and
+          size (0). No files cache (slow, will chunk all input files). DEPRECATED.
+        - ``adhocwithfiles``: Like ``adhoc``, but with a persistent files cache. Default implementation.
+        - ``cli``: Determine the cache implementation from cli options. Without special options, will
+          usually end up with the ``local`` implementation.
     BORG_SELFTEST
         This can be used to influence borg's builtin self-tests. The default is to execute the tests
         at the beginning of each borg command invocation.

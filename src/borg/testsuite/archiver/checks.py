@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from ...cache import Cache, LocalCache
+from ...cache import Cache, LocalCache, get_cache_impl
 from ...constants import *  # NOQA
 from ...helpers import Location, get_security_dir, bin_to_hex
 from ...helpers import EXIT_ERROR
@@ -153,30 +153,27 @@ def test_repository_move(archivers, request, monkeypatch):
     security_dir = get_security_directory(archiver.repository_path)
     os.replace(archiver.repository_path, archiver.repository_path + "_new")
     archiver.repository_location += "_new"
+    # borg should notice that the repository location changed and abort.
+    if archiver.FORK_DEFAULT:
+        cmd(archiver, "rinfo", exit_code=EXIT_ERROR)
+    else:
+        with pytest.raises(Cache.RepositoryAccessAborted):
+            cmd(archiver, "rinfo")
+    # if we explicitly allow relocated repos, it should work fine.
     monkeypatch.setenv("BORG_RELOCATED_REPO_ACCESS_IS_OK", "yes")
     cmd(archiver, "rinfo")
     monkeypatch.delenv("BORG_RELOCATED_REPO_ACCESS_IS_OK")
     with open(os.path.join(security_dir, "location")) as fd:
         location = fd.read()
         assert location == Location(archiver.repository_location).canonical_path()
-    # Needs no confirmation anymore
-    cmd(archiver, "rinfo")
-    shutil.rmtree(archiver.cache_path)
+    # after new repo location was confirmed once, it needs no further confirmation anymore.
     cmd(archiver, "rinfo")
     shutil.rmtree(security_dir)
+    # it also needs no confirmation if we have no knowledge about the previous location.
     cmd(archiver, "rinfo")
+    # it will re-create security-related infos in the security dir:
     for file in ("location", "key-type", "manifest-timestamp"):
         assert os.path.exists(os.path.join(security_dir, file))
-
-
-def test_security_dir_compat(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    with open(os.path.join(get_security_directory(archiver.repository_path), "location"), "w") as fd:
-        fd.write("something outdated")
-    # This is fine, because the cache still has the correct information. security_dir and cache can disagree
-    # if older versions are used to confirm a renamed repository.
-    cmd(archiver, "rinfo")
 
 
 def test_unknown_unencrypted(archivers, request, monkeypatch):
@@ -207,9 +204,12 @@ def test_unknown_feature_on_create(archivers, request):
     cmd_raises_unknown_feature(archiver, ["create", "test", "input"])
 
 
+@pytest.mark.skipif(get_cache_impl() in ("adhocwithfiles", "adhoc"), reason="only works with LocalCache")
 def test_unknown_feature_on_cache_sync(archivers, request):
+    # LocalCache.sync checks repo compat
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
+    # delete the cache to trigger a cache sync later in borg create
     cmd(archiver, "rdelete", "--cache-only")
     add_unknown_feature(archiver.repository_path, Manifest.Operation.READ)
     cmd_raises_unknown_feature(archiver, ["create", "test", "input"])
@@ -277,6 +277,7 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
             repository._location = Location(archiver.repository_location)
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         with Cache(repository, manifest) as cache:
+            is_localcache = isinstance(cache, LocalCache)
             cache.begin_txn()
             cache.cache_config.mandatory_features = {"unknown-feature"}
             cache.commit()
@@ -295,7 +296,8 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
         with patch.object(LocalCache, "wipe_cache", wipe_wrapper):
             cmd(archiver, "create", "test", "input")
 
-        assert called
+        if is_localcache:
+            assert called
 
     with Repository(archiver.repository_path, exclusive=True) as repository:
         if remote_repo:
@@ -315,10 +317,14 @@ def test_check_cache(archivers, request):
             cache.begin_txn()
             cache.chunks.incref(list(cache.chunks.iteritems())[0][0])
             cache.commit()
+            persistent = isinstance(cache, LocalCache)
+    if not persistent:
+        pytest.skip("check_cache is pointless if we do not have a persistent chunks cache")
     with pytest.raises(AssertionError):
         check_cache(archiver)
 
 
+@pytest.mark.skipif(get_cache_impl() in ("adhocwithfiles", "adhoc"), reason="only works with LocalCache")
 def test_env_use_chunks_archive(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)

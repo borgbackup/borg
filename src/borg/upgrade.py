@@ -84,8 +84,8 @@ class UpgraderFrom12To20:
             chunks, chunks_healthy = self.hlm.retrieve(id=hlid, default=(None, None))
             if chunks is not None:
                 item.chunks = chunks
-                for chunk_id, _ in chunks:
-                    self.cache.chunk_incref(chunk_id, self.archive.stats)
+                for chunk_id, chunk_size in chunks:
+                    self.cache.chunk_incref(chunk_id, chunk_size, self.archive.stats)
             if chunks_healthy is not None:
                 item.chunks_healthy = chunks
             del item.source  # not used for hardlinks any more, replaced by hlid

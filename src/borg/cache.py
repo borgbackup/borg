@@ -13,7 +13,6 @@ files_cache_logger = create_logger("borg.debug.files_cache")
 
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM
 from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
-from .helpers import Location
 from .helpers import Error
 from .helpers import get_cache_dir, get_security_dir
 from .helpers import bin_to_hex, hex_to_bin, parse_stringified_list
@@ -35,8 +34,8 @@ from .platform import SaveFile
 from .remote import cache_if_remote
 from .repository import LIST_SCAN_LIMIT
 
-# note: cmtime might me either a ctime or a mtime timestamp
-FileCacheEntry = namedtuple("FileCacheEntry", "age inode size cmtime chunk_ids")
+# note: cmtime might be either a ctime or a mtime timestamp, chunks is a list of ChunkListEntry
+FileCacheEntry = namedtuple("FileCacheEntry", "age inode size cmtime chunks")
 
 
 class SecurityManager:
@@ -100,7 +99,7 @@ class SecurityManager:
         with SaveFile(self.manifest_ts_file) as fd:
             fd.write(manifest.timestamp)
 
-    def assert_location_matches(self, cache_config=None):
+    def assert_location_matches(self):
         # Warn user before sending data to a relocated repository
         try:
             with open(self.location_file) as fd:
@@ -112,10 +111,6 @@ class SecurityManager:
         except OSError as exc:
             logger.warning("Could not read previous location file: %s", exc)
             previous_location = None
-        if cache_config and cache_config.previous_location and previous_location != cache_config.previous_location:
-            # Reconcile cache and security dir; we take the cache location.
-            previous_location = cache_config.previous_location
-            logger.debug("security: using previous_location of cache: %r", previous_location)
 
         repository_location = self.repository._location.canonical_path()
         if previous_location and previous_location != repository_location:
@@ -134,13 +129,11 @@ class SecurityManager:
             ):
                 raise Cache.RepositoryAccessAborted()
             # adapt on-disk config immediately if the new location was accepted
-            logger.debug("security: updating location stored in cache and security dir")
+            logger.debug("security: updating location stored in security dir")
             with SaveFile(self.location_file) as fd:
                 fd.write(repository_location)
-            if cache_config:
-                cache_config.save()
 
-    def assert_no_manifest_replay(self, manifest, key, cache_config=None):
+    def assert_no_manifest_replay(self, manifest, key):
         try:
             with open(self.manifest_ts_file) as fd:
                 timestamp = fd.read()
@@ -151,8 +144,6 @@ class SecurityManager:
         except OSError as exc:
             logger.warning("Could not read previous location file: %s", exc)
             timestamp = ""
-        if cache_config:
-            timestamp = max(timestamp, cache_config.timestamp or "")
         logger.debug("security: determined newest manifest timestamp as %s", timestamp)
         # If repository is older than the cache or security dir something fishy is going on
         if timestamp and timestamp > manifest.timestamp:
@@ -161,32 +152,22 @@ class SecurityManager:
             else:
                 raise Cache.RepositoryReplay()
 
-    def assert_key_type(self, key, cache_config=None):
+    def assert_key_type(self, key):
         # Make sure an encrypted repository has not been swapped for an unencrypted repository
-        if cache_config and cache_config.key_type is not None and cache_config.key_type != str(key.TYPE):
-            raise Cache.EncryptionMethodMismatch()
         if self.known() and not self.key_matches(key):
             raise Cache.EncryptionMethodMismatch()
 
-    def assert_secure(self, manifest, key, *, cache_config=None, warn_if_unencrypted=True, lock_wait=None):
+    def assert_secure(self, manifest, key, *, warn_if_unencrypted=True, lock_wait=None):
         # warn_if_unencrypted=False is only used for initializing a new repository.
         # Thus, avoiding asking about a repository that's currently initializing.
         self.assert_access_unknown(warn_if_unencrypted, manifest, key)
-        if cache_config:
-            self._assert_secure(manifest, key, cache_config)
-        else:
-            cache_config = CacheConfig(self.repository, lock_wait=lock_wait)
-            if cache_config.exists():
-                with cache_config:
-                    self._assert_secure(manifest, key, cache_config)
-            else:
-                self._assert_secure(manifest, key)
+        self._assert_secure(manifest, key)
         logger.debug("security: repository checks ok, allowing access")
 
-    def _assert_secure(self, manifest, key, cache_config=None):
-        self.assert_location_matches(cache_config)
-        self.assert_key_type(key, cache_config)
-        self.assert_no_manifest_replay(manifest, key, cache_config)
+    def _assert_secure(self, manifest, key):
+        self.assert_location_matches()
+        self.assert_key_type(key)
+        self.assert_no_manifest_replay(manifest, key)
         if not self.known():
             logger.debug("security: remembering previously unknown repository")
             self.save(manifest, key)
@@ -221,40 +202,8 @@ def assert_secure(repository, manifest, lock_wait):
     sm.assert_secure(manifest, manifest.key, lock_wait=lock_wait)
 
 
-def recanonicalize_relative_location(cache_location, repository):
-    # borg < 1.0.8rc1 had different canonicalization for the repo location (see #1655 and #1741).
-    repo_location = repository._location.canonical_path()
-    rl = Location(repo_location)
-    cl = Location(cache_location)
-    if (
-        cl.proto == rl.proto
-        and cl.user == rl.user
-        and cl.host == rl.host
-        and cl.port == rl.port
-        and cl.path
-        and rl.path
-        and cl.path.startswith("/~/")
-        and rl.path.startswith("/./")
-        and cl.path[3:] == rl.path[3:]
-    ):
-        # everything is same except the expected change in relative path canonicalization,
-        # update previous_location to avoid warning / user query about changed location:
-        return repo_location
-    else:
-        return cache_location
-
-
 def cache_dir(repository, path=None):
     return path or os.path.join(get_cache_dir(), repository.id_str)
-
-
-def files_cache_name():
-    suffix = os.environ.get("BORG_FILES_CACHE_SUFFIX", "")
-    return "files." + suffix if suffix else "files"
-
-
-def discover_files_cache_name(path):
-    return [fn for fn in os.listdir(path) if fn == "files" or fn.startswith("files.")][0]
 
 
 class CacheConfig:
@@ -299,8 +248,6 @@ class CacheConfig:
         self._check_upgrade(self.config_path)
         self.id = self._config.get("cache", "repository")
         self.manifest_id = hex_to_bin(self._config.get("cache", "manifest"))
-        self.timestamp = self._config.get("cache", "timestamp", fallback=None)
-        self.key_type = self._config.get("cache", "key_type", fallback=None)
         self.ignored_features = set(parse_stringified_list(self._config.get("cache", "ignored_features", fallback="")))
         self.mandatory_features = set(
             parse_stringified_list(self._config.get("cache", "mandatory_features", fallback=""))
@@ -319,17 +266,10 @@ class CacheConfig:
         except configparser.NoSectionError:
             logger.debug("Cache integrity: No integrity data found (files, chunks). Cache is from old version.")
             self.integrity = {}
-        previous_location = self._config.get("cache", "previous_location", fallback=None)
-        if previous_location:
-            self.previous_location = recanonicalize_relative_location(previous_location, self.repository)
-        else:
-            self.previous_location = None
-        self._config.set("cache", "previous_location", self.repository._location.canonical_path())
 
-    def save(self, manifest=None, key=None):
+    def save(self, manifest=None):
         if manifest:
             self._config.set("cache", "manifest", manifest.id_str)
-            self._config.set("cache", "timestamp", manifest.timestamp)
             self._config.set("cache", "ignored_features", ",".join(self.ignored_features))
             self._config.set("cache", "mandatory_features", ",".join(self.mandatory_features))
             if not self._config.has_section("integrity"):
@@ -337,8 +277,6 @@ class CacheConfig:
             for file, integrity_data in self.integrity.items():
                 self._config.set("integrity", file, integrity_data)
             self._config.set("integrity", "manifest", manifest.id_str)
-        if key:
-            self._config.set("cache", "key_type", str(key.TYPE))
         with SaveFile(self.config_path) as fd:
             self._config.write(fd)
 
@@ -359,6 +297,10 @@ class CacheConfig:
         except configparser.NoSectionError:
             self.close()
             raise Exception("%s does not look like a Borg cache." % config_path) from None
+
+
+def get_cache_impl():
+    return os.environ.get("BORG_CACHE_IMPL", "adhocwithfiles")
 
 
 class Cache:
@@ -412,7 +354,9 @@ class Cache:
         warn_if_unencrypted=True,
         progress=False,
         lock_wait=None,
-        permit_adhoc_cache=False,
+        no_cache_sync_permitted=False,
+        no_cache_sync_forced=False,
+        prefer_adhoc_cache=False,
         cache_mode=FILES_CACHE_MODE_DISABLED,
         iec=False,
     ):
@@ -428,14 +372,37 @@ class Cache:
                 cache_mode=cache_mode,
             )
 
+        def adhocwithfiles():
+            return AdHocWithFilesCache(
+                manifest=manifest,
+                path=path,
+                warn_if_unencrypted=warn_if_unencrypted,
+                progress=progress,
+                iec=iec,
+                lock_wait=lock_wait,
+                cache_mode=cache_mode,
+            )
+
         def adhoc():
             return AdHocCache(manifest=manifest, lock_wait=lock_wait, iec=iec)
 
-        if not permit_adhoc_cache:
+        impl = get_cache_impl()
+        if impl != "cli":
+            methods = dict(local=local, adhocwithfiles=adhocwithfiles, adhoc=adhoc)
+            try:
+                method = methods[impl]
+            except KeyError:
+                raise RuntimeError("Unknown BORG_CACHE_IMPL value: %s" % impl)
+            return method()
+
+        if no_cache_sync_forced:
+            return adhoc() if prefer_adhoc_cache else adhocwithfiles()
+
+        if not no_cache_sync_permitted:
             return local()
 
-        # ad-hoc cache may be permitted, but if the local cache is in sync it'd be stupid to invalidate
-        # it by needlessly using the ad-hoc cache.
+        # no cache sync may be permitted, but if the local cache is in sync it'd be stupid to invalidate
+        # it by needlessly using the AdHocCache or the AdHocWithFilesCache.
         # Check if the local cache exists and is in sync.
 
         cache_config = CacheConfig(repository, path, lock_wait)
@@ -447,8 +414,12 @@ class Cache:
                 # Local cache is in sync, use it
                 logger.debug("Cache: choosing local cache (in sync)")
                 return local()
-        logger.debug("Cache: choosing ad-hoc cache (local cache does not exist or is not in sync)")
-        return adhoc()
+        if prefer_adhoc_cache:  # adhoc cache, without files cache
+            logger.debug("Cache: choosing AdHocCache (local cache does not exist or is not in sync)")
+            return adhoc()
+        else:
+            logger.debug("Cache: choosing AdHocWithFilesCache (local cache does not exist or is not in sync)")
+            return adhocwithfiles()
 
 
 class CacheStatsMixin:
@@ -470,6 +441,9 @@ Total chunks: {0.total_chunks}
     def stats(self):
         from .archive import Archive
 
+        if isinstance(self, AdHocCache) and getattr(self, "chunks", None) is None:
+            self.chunks = self._load_chunks_from_repo()  # AdHocCache usually only has .chunks after begin_txn.
+
         # XXX: this should really be moved down to `hashindex.pyx`
         total_size, unique_size, total_unique_chunks, total_chunks = self.chunks.summarize()
         # since borg 1.2 we have new archive metadata telling the total size per archive,
@@ -489,7 +463,303 @@ Total chunks: {0.total_chunks}
         return self.Summary(**stats)
 
 
-class LocalCache(CacheStatsMixin):
+class FilesCacheMixin:
+    """
+    Massively accelerate processing of unchanged files by caching their chunks list.
+    With that, we can avoid having to read and chunk them to get their chunks list.
+    """
+
+    FILES_CACHE_NAME = "files"
+
+    def __init__(self, cache_mode):
+        self.cache_mode = cache_mode
+        self.files = None
+        self._newest_cmtime = None
+
+    def files_cache_name(self):
+        suffix = os.environ.get("BORG_FILES_CACHE_SUFFIX", "")
+        return self.FILES_CACHE_NAME + "." + suffix if suffix else self.FILES_CACHE_NAME
+
+    def discover_files_cache_name(self, path):
+        return [
+            fn for fn in os.listdir(path) if fn == self.FILES_CACHE_NAME or fn.startswith(self.FILES_CACHE_NAME + ".")
+        ][0]
+
+    def _create_empty_files_cache(self, path):
+        with IntegrityCheckedFile(path=os.path.join(path, self.files_cache_name()), write=True) as fd:
+            pass  # empty file
+        return fd.integrity_data
+
+    def _read_files_cache(self):
+        if "d" in self.cache_mode:  # d(isabled)
+            return
+
+        self.files = {}
+        logger.debug("Reading files cache ...")
+        files_cache_logger.debug("FILES-CACHE-LOAD: starting...")
+        msg = None
+        try:
+            with IntegrityCheckedFile(
+                path=os.path.join(self.path, self.files_cache_name()),
+                write=False,
+                integrity_data=self.cache_config.integrity.get(self.files_cache_name()),
+            ) as fd:
+                u = msgpack.Unpacker(use_list=True)
+                while True:
+                    data = fd.read(64 * 1024)
+                    if not data:
+                        break
+                    u.feed(data)
+                    try:
+                        for path_hash, item in u:
+                            entry = FileCacheEntry(*item)
+                            # in the end, this takes about 240 Bytes per file
+                            self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
+                    except (TypeError, ValueError) as exc:
+                        msg = "The files cache seems invalid. [%s]" % str(exc)
+                        break
+        except OSError as exc:
+            msg = "The files cache can't be read. [%s]" % str(exc)
+        except FileIntegrityError as fie:
+            msg = "The files cache is corrupted. [%s]" % str(fie)
+        if msg is not None:
+            logger.warning(msg)
+            logger.warning("Continuing without files cache - expect lower performance.")
+            self.files = {}
+        files_cache_logger.debug("FILES-CACHE-LOAD: finished, %d entries loaded.", len(self.files))
+
+    def _write_files_cache(self):
+        if self._newest_cmtime is None:
+            # was never set because no files were modified/added
+            self._newest_cmtime = 2**63 - 1  # nanoseconds, good until y2262
+        ttl = int(os.environ.get("BORG_FILES_CACHE_TTL", 20))
+        files_cache_logger.debug("FILES-CACHE-SAVE: starting...")
+        with IntegrityCheckedFile(path=os.path.join(self.path, self.files_cache_name()), write=True) as fd:
+            entry_count = 0
+            for path_hash, item in self.files.items():
+                # Only keep files seen in this backup that are older than newest cmtime seen in this backup -
+                # this is to avoid issues with filesystem snapshots and cmtime granularity.
+                # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
+                entry = FileCacheEntry(*msgpack.unpackb(item))
+                if (
+                    entry.age == 0
+                    and timestamp_to_int(entry.cmtime) < self._newest_cmtime
+                    or entry.age > 0
+                    and entry.age < ttl
+                ):
+                    msgpack.pack((path_hash, entry), fd)
+                    entry_count += 1
+        files_cache_logger.debug("FILES-CACHE-KILL: removed all old entries with age >= TTL [%d]", ttl)
+        files_cache_logger.debug(
+            "FILES-CACHE-KILL: removed all current entries with newest cmtime %d", self._newest_cmtime
+        )
+        files_cache_logger.debug("FILES-CACHE-SAVE: finished, %d remaining entries saved.", entry_count)
+        return fd.integrity_data
+
+    def file_known_and_unchanged(self, hashed_path, path_hash, st):
+        """
+        Check if we know the file that has this path_hash (know == it is in our files cache) and
+        whether it is unchanged (the size/inode number/cmtime is same for stuff we check in this cache_mode).
+
+        :param hashed_path: the file's path as we gave it to hash(hashed_path)
+        :param path_hash: hash(hashed_path), to save some memory in the files cache
+        :param st: the file's stat() result
+        :return: known, chunks (known is True if we have infos about this file in the cache,
+                               chunks is a list[ChunkListEntry] IF the file has not changed, otherwise None).
+        """
+        if not stat.S_ISREG(st.st_mode):
+            return False, None
+        cache_mode = self.cache_mode
+        if "d" in cache_mode:  # d(isabled)
+            files_cache_logger.debug("UNKNOWN: files cache disabled")
+            return False, None
+        # note: r(echunk) does not need the files cache in this method, but the files cache will
+        # be updated and saved to disk to memorize the files. To preserve previous generations in
+        # the cache, this means that it also needs to get loaded from disk first.
+        if "r" in cache_mode:  # r(echunk)
+            files_cache_logger.debug("UNKNOWN: rechunking enforced")
+            return False, None
+        entry = self.files.get(path_hash)
+        if not entry:
+            files_cache_logger.debug("UNKNOWN: no file metadata in cache for: %r", hashed_path)
+            return False, None
+        # we know the file!
+        entry = FileCacheEntry(*msgpack.unpackb(entry))
+        if "s" in cache_mode and entry.size != st.st_size:
+            files_cache_logger.debug("KNOWN-CHANGED: file size has changed: %r", hashed_path)
+            return True, None
+        if "i" in cache_mode and entry.inode != st.st_ino:
+            files_cache_logger.debug("KNOWN-CHANGED: file inode number has changed: %r", hashed_path)
+            return True, None
+        if "c" in cache_mode and timestamp_to_int(entry.cmtime) != st.st_ctime_ns:
+            files_cache_logger.debug("KNOWN-CHANGED: file ctime has changed: %r", hashed_path)
+            return True, None
+        elif "m" in cache_mode and timestamp_to_int(entry.cmtime) != st.st_mtime_ns:
+            files_cache_logger.debug("KNOWN-CHANGED: file mtime has changed: %r", hashed_path)
+            return True, None
+        # we ignored the inode number in the comparison above or it is still same.
+        # if it is still the same, replacing it in the tuple doesn't change it.
+        # if we ignored it, a reason for doing that is that files were moved to a new
+        # disk / new fs (so a one-time change of inode number is expected) and we wanted
+        # to avoid everything getting chunked again. to be able to re-enable the inode
+        # number comparison in a future backup run (and avoid chunking everything
+        # again at that time), we need to update the inode number in the cache with what
+        # we see in the filesystem.
+        self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
+        chunks = [ChunkListEntry(*chunk) for chunk in entry.chunks]  # convert to list of namedtuple
+        return True, chunks
+
+    def memorize_file(self, hashed_path, path_hash, st, chunks):
+        if not stat.S_ISREG(st.st_mode):
+            return
+        cache_mode = self.cache_mode
+        # note: r(echunk) modes will update the files cache, d(isabled) mode won't
+        if "d" in cache_mode:
+            files_cache_logger.debug("FILES-CACHE-NOUPDATE: files cache disabled")
+            return
+        if "c" in cache_mode:
+            cmtime_type = "ctime"
+            cmtime_ns = safe_ns(st.st_ctime_ns)
+        elif "m" in cache_mode:
+            cmtime_type = "mtime"
+            cmtime_ns = safe_ns(st.st_mtime_ns)
+        else:  # neither 'c' nor 'm' in cache_mode, avoid UnboundLocalError
+            cmtime_type = "ctime"
+            cmtime_ns = safe_ns(st.st_ctime_ns)
+        entry = FileCacheEntry(
+            age=0, inode=st.st_ino, size=st.st_size, cmtime=int_to_timestamp(cmtime_ns), chunks=chunks
+        )
+        self.files[path_hash] = msgpack.packb(entry)
+        self._newest_cmtime = max(self._newest_cmtime or 0, cmtime_ns)
+        files_cache_logger.debug(
+            "FILES-CACHE-UPDATE: put %r [has %s] <- %r",
+            entry._replace(chunks="[%d entries]" % len(entry.chunks)),
+            cmtime_type,
+            hashed_path,
+        )
+
+
+class ChunksMixin:
+    """
+    Chunks index related code for misc. Cache implementations.
+    """
+
+    def chunk_incref(self, id, size, stats):
+        assert isinstance(size, int) and size > 0
+        if not self._txn_active:
+            self.begin_txn()
+        count, _size = self.chunks.incref(id)
+        stats.update(size, False)
+        return ChunkListEntry(id, size)
+
+    def chunk_decref(self, id, size, stats, wait=True):
+        assert isinstance(size, int) and size > 0
+        if not self._txn_active:
+            self.begin_txn()
+        count, _size = self.chunks.decref(id)
+        if count == 0:
+            del self.chunks[id]
+            self.repository.delete(id, wait=wait)
+            stats.update(-size, True)
+        else:
+            stats.update(-size, False)
+
+    def seen_chunk(self, id, size=None):
+        if not self._txn_active:
+            self.begin_txn()
+        entry = self.chunks.get(id, ChunkIndexEntry(0, None))
+        if entry.refcount and size is not None:
+            assert isinstance(entry.size, int)
+            if entry.size:
+                # LocalCache: has existing size information and uses *size* to make an effort at detecting collisions.
+                if size != entry.size:
+                    # we already have a chunk with that id, but different size.
+                    # this is either a hash collision (unlikely) or corruption or a bug.
+                    raise Exception(
+                        "chunk has same id [%r], but different size (stored: %d new: %d)!" % (id, entry.size, size)
+                    )
+            else:
+                # AdHocWithFilesCache / AdHocCache:
+                # Here *size* is used to update the chunk's size information, which will be zero for existing chunks.
+                self.chunks[id] = entry._replace(size=size)
+        return entry.refcount
+
+    def add_chunk(
+        self,
+        id,
+        meta,
+        data,
+        *,
+        stats,
+        wait=True,
+        compress=True,
+        size=None,
+        ctype=None,
+        clevel=None,
+        ro_type=ROBJ_FILE_STREAM,
+    ):
+        assert ro_type is not None
+        if not self._txn_active:
+            self.begin_txn()
+        if size is None:
+            if compress:
+                size = len(data)  # data is still uncompressed
+            else:
+                raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
+        refcount = self.seen_chunk(id, size)
+        if refcount:
+            return self.chunk_incref(id, size, stats)
+        cdata = self.repo_objs.format(
+            id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
+        )
+        self.repository.put(id, cdata, wait=wait)
+        self.chunks.add(id, 1, size)
+        stats.update(size, not refcount)
+        return ChunkListEntry(id, size)
+
+    def _load_chunks_from_repo(self):
+        # Explicitly set the initial usable hash table capacity to avoid performance issues
+        # due to hash table "resonance".
+        # Since we're creating an archive, add 10 % from the start.
+        num_chunks = len(self.repository)
+        chunks = ChunkIndex(usable=num_chunks * 1.1)
+        pi = ProgressIndicatorPercent(
+            total=num_chunks, msg="Downloading chunk list... %3.0f%%", msgid="cache.download_chunks"
+        )
+        t0 = perf_counter()
+        num_requests = 0
+        marker = None
+        while True:
+            result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+            num_requests += 1
+            if not result:
+                break
+            pi.show(increase=len(result))
+            marker = result[-1]
+            # All chunks from the repository have a refcount of MAX_VALUE, which is sticky,
+            # therefore we can't/won't delete them. Chunks we added ourselves in this transaction
+            # (e.g. checkpoint archives) are tracked correctly.
+            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
+            for id_ in result:
+                chunks[id_] = init_entry
+        assert len(chunks) == num_chunks
+        # LocalCache does not contain the manifest, either.
+        del chunks[self.manifest.MANIFEST_ID]
+        duration = perf_counter() - t0 or 0.01
+        pi.finish()
+        logger.debug(
+            "Cache: downloaded %d chunk IDs in %.2f s (%d requests), ~%s/s",
+            num_chunks,
+            duration,
+            num_requests,
+            format_file_size(num_chunks * 34 / duration),
+        )
+        # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.
+        # Protocol overhead is neglected in this calculation.
+        return chunks
+
+
+class LocalCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
     """
     Persistent, local (client-side) cache.
     """
@@ -512,15 +782,14 @@ class LocalCache(CacheStatsMixin):
         :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         """
         CacheStatsMixin.__init__(self, iec=iec)
+        FilesCacheMixin.__init__(self, cache_mode)
         assert isinstance(manifest, Manifest)
         self.manifest = manifest
         self.repository = manifest.repository
         self.key = manifest.key
         self.repo_objs = manifest.repo_objs
         self.progress = progress
-        self.cache_mode = cache_mode
-        self.timestamp = None
-        self.txn_active = False
+        self._txn_active = False
         self.do_cache = os.environ.get("BORG_USE_CHUNKS_ARCHIVE", "yes").lower() in ["yes", "1", "true"]
 
         self.path = cache_dir(self.repository, path)
@@ -539,7 +808,7 @@ class LocalCache(CacheStatsMixin):
             self.open()
 
         try:
-            self.security_manager.assert_secure(manifest, self.key, cache_config=self.cache_config)
+            self.security_manager.assert_secure(manifest, self.key)
 
             if not self.check_cache_compatibility():
                 self.wipe_cache()
@@ -567,8 +836,7 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.create()
         ChunkIndex().write(os.path.join(self.path, "chunks"))
         os.makedirs(os.path.join(self.path, "chunks.archive.d"))
-        with SaveFile(os.path.join(self.path, files_cache_name()), binary=True):
-            pass  # empty file
+        self._create_empty_files_cache(self.path)
 
     def _do_open(self):
         self.cache_config.load()
@@ -578,10 +846,7 @@ class LocalCache(CacheStatsMixin):
             integrity_data=self.cache_config.integrity.get("chunks"),
         ) as fd:
             self.chunks = ChunkIndex.read(fd)
-        if "d" in self.cache_mode:  # d(isabled)
-            self.files = None
-        else:
-            self._read_files()
+        self._read_files_cache()
 
     def open(self):
         if not os.path.isdir(self.path):
@@ -594,42 +859,6 @@ class LocalCache(CacheStatsMixin):
             self.cache_config.close()
             self.cache_config = None
 
-    def _read_files(self):
-        self.files = {}
-        self._newest_cmtime = None
-        logger.debug("Reading files cache ...")
-        files_cache_logger.debug("FILES-CACHE-LOAD: starting...")
-        msg = None
-        try:
-            with IntegrityCheckedFile(
-                path=os.path.join(self.path, files_cache_name()),
-                write=False,
-                integrity_data=self.cache_config.integrity.get(files_cache_name()),
-            ) as fd:
-                u = msgpack.Unpacker(use_list=True)
-                while True:
-                    data = fd.read(64 * 1024)
-                    if not data:
-                        break
-                    u.feed(data)
-                    try:
-                        for path_hash, item in u:
-                            entry = FileCacheEntry(*item)
-                            # in the end, this takes about 240 Bytes per file
-                            self.files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
-                    except (TypeError, ValueError) as exc:
-                        msg = "The files cache seems invalid. [%s]" % str(exc)
-                        break
-        except OSError as exc:
-            msg = "The files cache can't be read. [%s]" % str(exc)
-        except FileIntegrityError as fie:
-            msg = "The files cache is corrupted. [%s]" % str(fie)
-        if msg is not None:
-            logger.warning(msg)
-            logger.warning("Continuing without files cache - expect lower performance.")
-            self.files = {}
-        files_cache_logger.debug("FILES-CACHE-LOAD: finished, %d entries loaded.", len(self.files))
-
     def begin_txn(self):
         # Initialize transaction snapshot
         pi = ProgressIndicatorMessage(msgid="cache.begin_transaction")
@@ -641,57 +870,32 @@ class LocalCache(CacheStatsMixin):
         shutil.copy(os.path.join(self.path, "chunks"), txn_dir)
         pi.output("Initializing cache transaction: Reading files")
         try:
-            shutil.copy(os.path.join(self.path, files_cache_name()), txn_dir)
+            shutil.copy(os.path.join(self.path, self.files_cache_name()), txn_dir)
         except FileNotFoundError:
-            with SaveFile(os.path.join(txn_dir, files_cache_name()), binary=True):
-                pass  # empty file
+            self._create_empty_files_cache(txn_dir)
         os.replace(txn_dir, os.path.join(self.path, "txn.active"))
-        self.txn_active = True
+        self._txn_active = True
         pi.finish()
 
     def commit(self):
         """Commit transaction"""
-        if not self.txn_active:
+        if not self._txn_active:
             return
         self.security_manager.save(self.manifest, self.key)
         pi = ProgressIndicatorMessage(msgid="cache.commit")
         if self.files is not None:
-            if self._newest_cmtime is None:
-                # was never set because no files were modified/added
-                self._newest_cmtime = 2**63 - 1  # nanoseconds, good until y2262
-            ttl = int(os.environ.get("BORG_FILES_CACHE_TTL", 20))
             pi.output("Saving files cache")
-            files_cache_logger.debug("FILES-CACHE-SAVE: starting...")
-            with IntegrityCheckedFile(path=os.path.join(self.path, files_cache_name()), write=True) as fd:
-                entry_count = 0
-                for path_hash, item in self.files.items():
-                    # Only keep files seen in this backup that are older than newest cmtime seen in this backup -
-                    # this is to avoid issues with filesystem snapshots and cmtime granularity.
-                    # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
-                    entry = FileCacheEntry(*msgpack.unpackb(item))
-                    if (
-                        entry.age == 0
-                        and timestamp_to_int(entry.cmtime) < self._newest_cmtime
-                        or entry.age > 0
-                        and entry.age < ttl
-                    ):
-                        msgpack.pack((path_hash, entry), fd)
-                        entry_count += 1
-            files_cache_logger.debug("FILES-CACHE-KILL: removed all old entries with age >= TTL [%d]", ttl)
-            files_cache_logger.debug(
-                "FILES-CACHE-KILL: removed all current entries with newest cmtime %d", self._newest_cmtime
-            )
-            files_cache_logger.debug("FILES-CACHE-SAVE: finished, %d remaining entries saved.", entry_count)
-            self.cache_config.integrity[files_cache_name()] = fd.integrity_data
+            integrity_data = self._write_files_cache()
+            self.cache_config.integrity[self.files_cache_name()] = integrity_data
         pi.output("Saving chunks cache")
         with IntegrityCheckedFile(path=os.path.join(self.path, "chunks"), write=True) as fd:
             self.chunks.write(fd)
         self.cache_config.integrity["chunks"] = fd.integrity_data
         pi.output("Saving cache config")
-        self.cache_config.save(self.manifest, self.key)
+        self.cache_config.save(self.manifest)
         os.replace(os.path.join(self.path, "txn.active"), os.path.join(self.path, "txn.tmp"))
         shutil.rmtree(os.path.join(self.path, "txn.tmp"))
-        self.txn_active = False
+        self._txn_active = False
         pi.finish()
 
     def rollback(self):
@@ -704,12 +908,12 @@ class LocalCache(CacheStatsMixin):
         if os.path.exists(txn_dir):
             shutil.copy(os.path.join(txn_dir, "config"), self.path)
             shutil.copy(os.path.join(txn_dir, "chunks"), self.path)
-            shutil.copy(os.path.join(txn_dir, discover_files_cache_name(txn_dir)), self.path)
+            shutil.copy(os.path.join(txn_dir, self.discover_files_cache_name(txn_dir)), self.path)
             txn_tmp = os.path.join(self.path, "txn.tmp")
             os.replace(txn_dir, txn_tmp)
             if os.path.exists(txn_tmp):
                 shutil.rmtree(txn_tmp)
-        self.txn_active = False
+        self._txn_active = False
         self._do_open()
 
     def sync(self):
@@ -935,9 +1139,8 @@ class LocalCache(CacheStatsMixin):
         with IntegrityCheckedFile(path=os.path.join(self.path, "chunks"), write=True) as fd:
             self.chunks.write(fd)
         self.cache_config.integrity["chunks"] = fd.integrity_data
-        with IntegrityCheckedFile(path=os.path.join(self.path, files_cache_name()), write=True) as fd:
-            pass  # empty file
-        self.cache_config.integrity[files_cache_name()] = fd.integrity_data
+        integrity_data = self._create_empty_files_cache(self.path)
+        self.cache_config.integrity[self.files_cache_name()] = integrity_data
         self.cache_config.manifest_id = ""
         self.cache_config._config.set("cache", "manifest", "")
         if not self.cache_config._config.has_section("integrity"):
@@ -962,149 +1165,170 @@ class LocalCache(CacheStatsMixin):
         self.cache_config.ignored_features.update(repo_features - my_features)
         self.cache_config.mandatory_features.update(repo_features & my_features)
 
-    def add_chunk(
+
+class AdHocWithFilesCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
+    """
+    Like AdHocCache, but with a files cache.
+    """
+
+    def __init__(
         self,
-        id,
-        meta,
-        data,
-        *,
-        stats,
-        wait=True,
-        compress=True,
-        size=None,
-        ctype=None,
-        clevel=None,
-        ro_type=ROBJ_FILE_STREAM,
+        manifest,
+        path=None,
+        warn_if_unencrypted=True,
+        progress=False,
+        lock_wait=None,
+        cache_mode=FILES_CACHE_MODE_DISABLED,
+        iec=False,
     ):
-        assert ro_type is not None
-        if not self.txn_active:
-            self.begin_txn()
-        if size is None and compress:
-            size = len(data)  # data is still uncompressed
-        refcount = self.seen_chunk(id, size)
-        if refcount:
-            return self.chunk_incref(id, stats)
-        if size is None:
-            raise ValueError("when giving compressed data for a new chunk, the uncompressed size must be given also")
-        cdata = self.repo_objs.format(
-            id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
-        )
-        self.repository.put(id, cdata, wait=wait)
-        self.chunks.add(id, 1, size)
-        stats.update(size, not refcount)
-        return ChunkListEntry(id, size)
-
-    def seen_chunk(self, id, size=None):
-        refcount, stored_size = self.chunks.get(id, ChunkIndexEntry(0, None))
-        if size is not None and stored_size is not None and size != stored_size:
-            # we already have a chunk with that id, but different size.
-            # this is either a hash collision (unlikely) or corruption or a bug.
-            raise Exception(
-                "chunk has same id [%r], but different size (stored: %d new: %d)!" % (id, stored_size, size)
-            )
-        return refcount
-
-    def chunk_incref(self, id, stats, size=None):
-        if not self.txn_active:
-            self.begin_txn()
-        count, _size = self.chunks.incref(id)
-        stats.update(_size, False)
-        return ChunkListEntry(id, _size)
-
-    def chunk_decref(self, id, stats, wait=True):
-        if not self.txn_active:
-            self.begin_txn()
-        count, size = self.chunks.decref(id)
-        if count == 0:
-            del self.chunks[id]
-            self.repository.delete(id, wait=wait)
-            stats.update(-size, True)
-        else:
-            stats.update(-size, False)
-
-    def file_known_and_unchanged(self, hashed_path, path_hash, st):
         """
-        Check if we know the file that has this path_hash (know == it is in our files cache) and
-        whether it is unchanged (the size/inode number/cmtime is same for stuff we check in this cache_mode).
-
-        :param hashed_path: the file's path as we gave it to hash(hashed_path)
-        :param path_hash: hash(hashed_path), to save some memory in the files cache
-        :param st: the file's stat() result
-        :return: known, ids (known is True if we have infos about this file in the cache,
-                             ids is the list of chunk ids IF the file has not changed, otherwise None).
+        :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
+        :param lock_wait: timeout for lock acquisition (int [s] or None [wait forever])
+        :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         """
-        if not stat.S_ISREG(st.st_mode):
-            return False, None
-        cache_mode = self.cache_mode
-        if "d" in cache_mode:  # d(isabled)
-            files_cache_logger.debug("UNKNOWN: files cache disabled")
-            return False, None
-        # note: r(echunk) does not need the files cache in this method, but the files cache will
-        # be updated and saved to disk to memorize the files. To preserve previous generations in
-        # the cache, this means that it also needs to get loaded from disk first.
-        if "r" in cache_mode:  # r(echunk)
-            files_cache_logger.debug("UNKNOWN: rechunking enforced")
-            return False, None
-        entry = self.files.get(path_hash)
-        if not entry:
-            files_cache_logger.debug("UNKNOWN: no file metadata in cache for: %r", hashed_path)
-            return False, None
-        # we know the file!
-        entry = FileCacheEntry(*msgpack.unpackb(entry))
-        if "s" in cache_mode and entry.size != st.st_size:
-            files_cache_logger.debug("KNOWN-CHANGED: file size has changed: %r", hashed_path)
-            return True, None
-        if "i" in cache_mode and entry.inode != st.st_ino:
-            files_cache_logger.debug("KNOWN-CHANGED: file inode number has changed: %r", hashed_path)
-            return True, None
-        if "c" in cache_mode and timestamp_to_int(entry.cmtime) != st.st_ctime_ns:
-            files_cache_logger.debug("KNOWN-CHANGED: file ctime has changed: %r", hashed_path)
-            return True, None
-        elif "m" in cache_mode and timestamp_to_int(entry.cmtime) != st.st_mtime_ns:
-            files_cache_logger.debug("KNOWN-CHANGED: file mtime has changed: %r", hashed_path)
-            return True, None
-        # we ignored the inode number in the comparison above or it is still same.
-        # if it is still the same, replacing it in the tuple doesn't change it.
-        # if we ignored it, a reason for doing that is that files were moved to a new
-        # disk / new fs (so a one-time change of inode number is expected) and we wanted
-        # to avoid everything getting chunked again. to be able to re-enable the inode
-        # number comparison in a future backup run (and avoid chunking everything
-        # again at that time), we need to update the inode number in the cache with what
-        # we see in the filesystem.
-        self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
-        return True, entry.chunk_ids
+        CacheStatsMixin.__init__(self, iec=iec)
+        FilesCacheMixin.__init__(self, cache_mode)
+        assert isinstance(manifest, Manifest)
+        self.manifest = manifest
+        self.repository = manifest.repository
+        self.key = manifest.key
+        self.repo_objs = manifest.repo_objs
+        self.progress = progress
+        self._txn_active = False
 
-    def memorize_file(self, hashed_path, path_hash, st, ids):
-        if not stat.S_ISREG(st.st_mode):
+        self.path = cache_dir(self.repository, path)
+        self.security_manager = SecurityManager(self.repository)
+        self.cache_config = CacheConfig(self.repository, self.path, lock_wait)
+
+        # Warn user before sending data to a never seen before unencrypted repository
+        if not os.path.exists(self.path):
+            self.security_manager.assert_access_unknown(warn_if_unencrypted, manifest, self.key)
+            self.create()
+
+        self.open()
+        try:
+            self.security_manager.assert_secure(manifest, self.key)
+
+            if not self.check_cache_compatibility():
+                self.wipe_cache()
+
+            self.update_compatibility()
+        except:  # noqa
+            self.close()
+            raise
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def create(self):
+        """Create a new empty cache at `self.path`"""
+        os.makedirs(self.path)
+        with open(os.path.join(self.path, "README"), "w") as fd:
+            fd.write(CACHE_README)
+        self.cache_config.create()
+        self._create_empty_files_cache(self.path)
+
+    def _do_open(self):
+        self.cache_config.load()
+        self.chunks = self._load_chunks_from_repo()
+        self._read_files_cache()
+
+    def open(self):
+        if not os.path.isdir(self.path):
+            raise Exception("%s Does not look like a Borg cache" % self.path)
+        self.cache_config.open()
+        self.rollback()
+
+    def close(self):
+        if self.cache_config is not None:
+            self.cache_config.close()
+            self.cache_config = None
+
+    def begin_txn(self):
+        # Initialize transaction snapshot
+        pi = ProgressIndicatorMessage(msgid="cache.begin_transaction")
+        txn_dir = os.path.join(self.path, "txn.tmp")
+        os.mkdir(txn_dir)
+        pi.output("Initializing cache transaction: Reading config")
+        shutil.copy(os.path.join(self.path, "config"), txn_dir)
+        pi.output("Initializing cache transaction: Reading files")
+        try:
+            shutil.copy(os.path.join(self.path, self.files_cache_name()), txn_dir)
+        except FileNotFoundError:
+            self._create_empty_files_cache(txn_dir)
+        os.replace(txn_dir, os.path.join(self.path, "txn.active"))
+        pi.finish()
+        self._txn_active = True
+
+    def commit(self):
+        if not self._txn_active:
             return
-        cache_mode = self.cache_mode
-        # note: r(echunk) modes will update the files cache, d(isabled) mode won't
-        if "d" in cache_mode:
-            files_cache_logger.debug("FILES-CACHE-NOUPDATE: files cache disabled")
-            return
-        if "c" in cache_mode:
-            cmtime_type = "ctime"
-            cmtime_ns = safe_ns(st.st_ctime_ns)
-        elif "m" in cache_mode:
-            cmtime_type = "mtime"
-            cmtime_ns = safe_ns(st.st_mtime_ns)
-        else:  # neither 'c' nor 'm' in cache_mode, avoid UnboundLocalError
-            cmtime_type = "ctime"
-            cmtime_ns = safe_ns(st.st_ctime_ns)
-        entry = FileCacheEntry(
-            age=0, inode=st.st_ino, size=st.st_size, cmtime=int_to_timestamp(cmtime_ns), chunk_ids=ids
-        )
-        self.files[path_hash] = msgpack.packb(entry)
-        self._newest_cmtime = max(self._newest_cmtime or 0, cmtime_ns)
-        files_cache_logger.debug(
-            "FILES-CACHE-UPDATE: put %r [has %s] <- %r",
-            entry._replace(chunk_ids="[%d entries]" % len(entry.chunk_ids)),
-            cmtime_type,
-            hashed_path,
-        )
+        self.security_manager.save(self.manifest, self.key)
+        pi = ProgressIndicatorMessage(msgid="cache.commit")
+        if self.files is not None:
+            pi.output("Saving files cache")
+            integrity_data = self._write_files_cache()
+            self.cache_config.integrity[self.files_cache_name()] = integrity_data
+        pi.output("Saving cache config")
+        self.cache_config.save(self.manifest)
+        os.replace(os.path.join(self.path, "txn.active"), os.path.join(self.path, "txn.tmp"))
+        shutil.rmtree(os.path.join(self.path, "txn.tmp"))
+        self._txn_active = False
+        pi.finish()
+
+    def rollback(self):
+        # Remove partial transaction
+        if os.path.exists(os.path.join(self.path, "txn.tmp")):
+            shutil.rmtree(os.path.join(self.path, "txn.tmp"))
+        # Roll back active transaction
+        txn_dir = os.path.join(self.path, "txn.active")
+        if os.path.exists(txn_dir):
+            shutil.copy(os.path.join(txn_dir, "config"), self.path)
+            shutil.copy(os.path.join(txn_dir, self.discover_files_cache_name(txn_dir)), self.path)
+            txn_tmp = os.path.join(self.path, "txn.tmp")
+            os.replace(txn_dir, txn_tmp)
+            if os.path.exists(txn_tmp):
+                shutil.rmtree(txn_tmp)
+        self._txn_active = False
+        self._do_open()
+
+    def check_cache_compatibility(self):
+        my_features = Manifest.SUPPORTED_REPO_FEATURES
+        if self.cache_config.ignored_features & my_features:
+            # The cache might not contain references of chunks that need a feature that is mandatory for some operation
+            # and which this version supports. To avoid corruption while executing that operation force rebuild.
+            return False
+        if not self.cache_config.mandatory_features <= my_features:
+            # The cache was build with consideration to at least one feature that this version does not understand.
+            # This client might misinterpret the cache. Thus force a rebuild.
+            return False
+        return True
+
+    def wipe_cache(self):
+        logger.warning("Discarding incompatible cache and forcing a cache rebuild")
+        self.chunks = ChunkIndex()
+        self._create_empty_files_cache(self.path)
+        self.cache_config.manifest_id = ""
+        self.cache_config._config.set("cache", "manifest", "")
+
+        self.cache_config.ignored_features = set()
+        self.cache_config.mandatory_features = set()
+
+    def update_compatibility(self):
+        operation_to_features_map = self.manifest.get_all_mandatory_features()
+        my_features = Manifest.SUPPORTED_REPO_FEATURES
+        repo_features = set()
+        for operation, features in operation_to_features_map.items():
+            repo_features.update(features)
+
+        self.cache_config.ignored_features.update(repo_features - my_features)
+        self.cache_config.mandatory_features.update(repo_features & my_features)
 
 
-class AdHocCache(CacheStatsMixin):
+class AdHocCache(CacheStatsMixin, ChunksMixin):
     """
     Ad-hoc, non-persistent cache.
 
@@ -1132,8 +1356,6 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         self.security_manager = SecurityManager(self.repository)
         self.security_manager.assert_secure(manifest, self.key, lock_wait=lock_wait)
 
-        logger.warning("Note: --no-cache-sync is an experimental feature.")
-
     # Public API
 
     def __enter__(self):
@@ -1149,58 +1371,8 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
         files_cache_logger.debug("UNKNOWN: files cache not implemented")
         return False, None
 
-    def memorize_file(self, hashed_path, path_hash, st, ids):
+    def memorize_file(self, hashed_path, path_hash, st, chunks):
         pass
-
-    def add_chunk(self, id, meta, data, *, stats, wait=True, compress=True, size=None, ro_type=ROBJ_FILE_STREAM):
-        assert ro_type is not None
-        if not self._txn_active:
-            self.begin_txn()
-        if size is None and compress:
-            size = len(data)  # data is still uncompressed
-        if size is None:
-            raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
-        refcount = self.seen_chunk(id, size)
-        if refcount:
-            return self.chunk_incref(id, stats, size=size)
-        cdata = self.repo_objs.format(id, meta, data, compress=compress, ro_type=ro_type)
-        self.repository.put(id, cdata, wait=wait)
-        self.chunks.add(id, 1, size)
-        stats.update(size, not refcount)
-        return ChunkListEntry(id, size)
-
-    def seen_chunk(self, id, size=None):
-        if not self._txn_active:
-            self.begin_txn()
-        entry = self.chunks.get(id, ChunkIndexEntry(0, None))
-        if entry.refcount and size and not entry.size:
-            # The LocalCache has existing size information and uses *size* to make an effort at detecting collisions.
-            # This is of course not possible for the AdHocCache.
-            # Here *size* is used to update the chunk's size information, which will be zero for existing chunks.
-            self.chunks[id] = entry._replace(size=size)
-        return entry.refcount
-
-    def chunk_incref(self, id, stats, size=None):
-        if not self._txn_active:
-            self.begin_txn()
-        count, _size = self.chunks.incref(id)
-        # When _size is 0 and size is not given, then this chunk has not been locally visited yet (seen_chunk with
-        # size or add_chunk); we can't add references to those (size=0 is invalid) and generally don't try to.
-        size = _size or size
-        assert size
-        stats.update(size, False)
-        return ChunkListEntry(id, size)
-
-    def chunk_decref(self, id, stats, wait=True):
-        if not self._txn_active:
-            self.begin_txn()
-        count, size = self.chunks.decref(id)
-        if count == 0:
-            del self.chunks[id]
-            self.repository.delete(id, wait=wait)
-            stats.update(-size, True)
-        else:
-            stats.update(-size, False)
 
     def commit(self):
         if not self._txn_active:
@@ -1214,41 +1386,4 @@ Chunk index:    {0.total_unique_chunks:20d}             unknown"""
 
     def begin_txn(self):
         self._txn_active = True
-        # Explicitly set the initial usable hash table capacity to avoid performance issues
-        # due to hash table "resonance".
-        # Since we're creating an archive, add 10 % from the start.
-        num_chunks = len(self.repository)
-        self.chunks = ChunkIndex(usable=num_chunks * 1.1)
-        pi = ProgressIndicatorPercent(
-            total=num_chunks, msg="Downloading chunk list... %3.0f%%", msgid="cache.download_chunks"
-        )
-        t0 = perf_counter()
-        num_requests = 0
-        marker = None
-        while True:
-            result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-            num_requests += 1
-            if not result:
-                break
-            pi.show(increase=len(result))
-            marker = result[-1]
-            # All chunks from the repository have a refcount of MAX_VALUE, which is sticky,
-            # therefore we can't/won't delete them. Chunks we added ourselves in this transaction
-            # (e.g. checkpoint archives) are tracked correctly.
-            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
-            for id_ in result:
-                self.chunks[id_] = init_entry
-        assert len(self.chunks) == num_chunks
-        # LocalCache does not contain the manifest, either.
-        del self.chunks[self.manifest.MANIFEST_ID]
-        duration = perf_counter() - t0 or 0.01
-        pi.finish()
-        logger.debug(
-            "AdHocCache: downloaded %d chunk IDs in %.2f s (%d requests), ~%s/s",
-            num_chunks,
-            duration,
-            num_requests,
-            format_file_size(num_chunks * 34 / duration),
-        )
-        # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.
-        # Protocol overhead is neglected in this calculation.
+        self.chunks = self._load_chunks_from_repo()

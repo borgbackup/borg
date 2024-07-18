@@ -18,7 +18,7 @@ import pytest
 from ... import xattr, platform
 from ...archive import Archive
 from ...archiver import Archiver, PURE_PYTHON_MSGPACK_WARNING
-from ...cache import Cache
+from ...cache import Cache, LocalCache
 from ...constants import *  # NOQA
 from ...helpers import Location, umount
 from ...helpers import EXIT_SUCCESS
@@ -356,9 +356,15 @@ def check_cache(archiver):
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         with Cache(repository, manifest, sync=False) as cache:
             original_chunks = cache.chunks
+            # the LocalCache implementation has an on-disk chunks cache,
+            # but AdHocWithFilesCache and AdHocCache don't have persistent chunks cache.
+            persistent = isinstance(cache, LocalCache)
         Cache.destroy(repository)
         with Cache(repository, manifest) as cache:
             correct_chunks = cache.chunks
+    if not persistent:
+        # there is no point in doing the checks
+        return
     assert original_chunks is not correct_chunks
     seen = set()
     for id, (refcount, size) in correct_chunks.iteritems():

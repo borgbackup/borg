@@ -1184,13 +1184,13 @@ class BorgJsonEncoder(json.JSONEncoder):
         from ..repository import Repository
         from ..remote import RemoteRepository
         from ..archive import Archive
-        from ..cache import LocalCache, AdHocCache
+        from ..cache import LocalCache, AdHocCache, AdHocWithFilesCache
 
         if isinstance(o, Repository) or isinstance(o, RemoteRepository):
             return {"id": bin_to_hex(o.id), "location": o._location.canonical_path()}
         if isinstance(o, Archive):
             return o.info()
-        if isinstance(o, LocalCache):
+        if isinstance(o, (LocalCache, AdHocWithFilesCache)):
             return {"path": o.path, "stats": o.stats()}
         if isinstance(o, AdHocCache):
             return {"stats": o.stats()}

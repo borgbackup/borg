@@ -40,9 +40,9 @@ def test_list_chunk_counts(archivers, request):
         fd.write(b"baab" * 2000000)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
-    output = cmd(archiver, "list", "test", "--format", "{num_chunks} {unique_chunks} {path}{NL}")
-    assert "0 0 input/empty_file" in output
-    assert "2 2 input/two_chunks" in output
+    output = cmd(archiver, "list", "test", "--format", "{num_chunks} {path}{NL}")
+    assert "0 input/empty_file" in output
+    assert "2 input/two_chunks" in output
 
 
 def test_list_size(archivers, request):

@@ -299,6 +299,10 @@ class CacheConfig:
             raise Exception("%s does not look like a Borg cache." % config_path) from None
 
 
+def get_cache_impl():
+    return os.environ.get("BORG_CACHE_IMPL", "adhocwithfiles")
+
+
 class Cache:
     """Client Side cache"""
 
@@ -382,8 +386,8 @@ class Cache:
         def adhoc():
             return AdHocCache(manifest=manifest, lock_wait=lock_wait, iec=iec)
 
-        impl = os.environ.get("BORG_CACHE_IMPL", None)
-        if impl is not None:
+        impl = get_cache_impl()
+        if impl != "cli":
             methods = dict(local=local, adhocwithfiles=adhocwithfiles, adhoc=adhoc)
             try:
                 method = methods[impl]

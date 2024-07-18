@@ -12,6 +12,7 @@ import time
 import pytest
 
 from ... import platform
+from ...cache import get_cache_impl
 from ...constants import *  # NOQA
 from ...manifest import Manifest
 from ...platform import is_cygwin, is_win32, is_darwin
@@ -540,9 +541,7 @@ def test_create_pattern_intermediate_folders_first(archivers, request):
     assert out_list.index("d x/b") < out_list.index("- x/b/foo_b")
 
 
-@pytest.mark.skipif(
-    os.environ.get("BORG_CACHE_IMPL") in ("adhocwithfiles", "local"), reason="only works with AdHocCache"
-)
+@pytest.mark.skipif(get_cache_impl() in ("adhocwithfiles", "local"), reason="only works with AdHocCache")
 def test_create_no_cache_sync_adhoc(archivers, request):  # TODO: add test for AdHocWithFilesCache
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)

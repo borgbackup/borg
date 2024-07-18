@@ -169,7 +169,7 @@ def test_debug_refcount_obj(archivers, request):
     archive_id = create_json["archive"]["id"]
     output = cmd(archiver, "debug", "refcount-obj", archive_id).strip()
     # LocalCache does precise refcounting, so we'll get 1 reference for the archive.
-    # AdHocCache or NewCache doesn't, we'll get ChunkIndex.MAX_VALUE as refcount.
+    # AdHocCache or AdHocWithFilesCache doesn't, we'll get ChunkIndex.MAX_VALUE as refcount.
     assert (
         output == f"object {archive_id} has 1 referrers [info from chunks cache]."
         or output == f"object {archive_id} has 4294966271 referrers [info from chunks cache]."

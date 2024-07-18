@@ -815,7 +815,7 @@ class CreateMixIn:
             "--prefer-adhoc-cache",
             dest="prefer_adhoc_cache",
             action="store_true",
-            help="experimental: prefer AdHocCache (w/o files cache) over NewCache (with files cache).",
+            help="experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).",
         )
         subparser.add_argument(
             "--stdin-name",

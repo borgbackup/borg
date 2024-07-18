@@ -368,8 +368,8 @@ class Cache:
                 cache_mode=cache_mode,
             )
 
-        def newcache():
-            return NewCache(
+        def adhocwithfiles():
+            return AdHocWithFilesCache(
                 manifest=manifest,
                 path=path,
                 warn_if_unencrypted=warn_if_unencrypted,
@@ -384,7 +384,7 @@ class Cache:
 
         impl = os.environ.get("BORG_CACHE_IMPL", None)
         if impl is not None:
-            methods = dict(local=local, newcache=newcache, adhoc=adhoc)
+            methods = dict(local=local, adhocwithfiles=adhocwithfiles, adhoc=adhoc)
             try:
                 method = methods[impl]
             except KeyError:
@@ -392,13 +392,13 @@ class Cache:
             return method()
 
         if no_cache_sync_forced:
-            return adhoc() if prefer_adhoc_cache else newcache()
+            return adhoc() if prefer_adhoc_cache else adhocwithfiles()
 
         if not no_cache_sync_permitted:
             return local()
 
         # no cache sync may be permitted, but if the local cache is in sync it'd be stupid to invalidate
-        # it by needlessly using the AdHocCache or the NewCache.
+        # it by needlessly using the AdHocCache or the AdHocWithFilesCache.
         # Check if the local cache exists and is in sync.
 
         cache_config = CacheConfig(repository, path, lock_wait)
@@ -410,12 +410,12 @@ class Cache:
                 # Local cache is in sync, use it
                 logger.debug("Cache: choosing local cache (in sync)")
                 return local()
-        if prefer_adhoc_cache:
+        if prefer_adhoc_cache:  # adhoc cache, without files cache
             logger.debug("Cache: choosing AdHocCache (local cache does not exist or is not in sync)")
             return adhoc()
         else:
-            logger.debug("Cache: choosing NewCache (local cache does not exist or is not in sync)")
-            return newcache()
+            logger.debug("Cache: choosing AdHocWithFilesCache (local cache does not exist or is not in sync)")
+            return adhocwithfiles()
 
 
 class CacheStatsMixin:
@@ -675,7 +675,7 @@ class ChunksMixin:
                         "chunk has same id [%r], but different size (stored: %d new: %d)!" % (id, entry.size, size)
                     )
             else:
-                # NewCache / AdHocCache:
+                # AdHocWithFilesCache / AdHocCache:
                 # Here *size* is used to update the chunk's size information, which will be zero for existing chunks.
                 self.chunks[id] = entry._replace(size=size)
         return entry.refcount
@@ -1162,7 +1162,7 @@ class LocalCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
         self.cache_config.mandatory_features.update(repo_features & my_features)
 
 
-class NewCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
+class AdHocWithFilesCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
     """
     Like AdHocCache, but with a files cache.
     """

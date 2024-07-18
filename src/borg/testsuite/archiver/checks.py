@@ -204,7 +204,9 @@ def test_unknown_feature_on_create(archivers, request):
     cmd_raises_unknown_feature(archiver, ["create", "test", "input"])
 
 
-@pytest.mark.skipif(os.environ.get("BORG_CACHE_IMPL") in ("newcache", "adhoc"), reason="only works with LocalCache")
+@pytest.mark.skipif(
+    os.environ.get("BORG_CACHE_IMPL") in ("adhocwithfiles", "adhoc"), reason="only works with LocalCache"
+)
 def test_unknown_feature_on_cache_sync(archivers, request):
     # LocalCache.sync checks repo compat
     archiver = request.getfixturevalue(archivers)
@@ -324,7 +326,9 @@ def test_check_cache(archivers, request):
         check_cache(archiver)
 
 
-@pytest.mark.skipif(os.environ.get("BORG_CACHE_IMPL") in ("newcache", "adhoc"), reason="only works with LocalCache")
+@pytest.mark.skipif(
+    os.environ.get("BORG_CACHE_IMPL") in ("adhocwithfiles", "adhoc"), reason="only works with LocalCache"
+)
 def test_env_use_chunks_archive(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)

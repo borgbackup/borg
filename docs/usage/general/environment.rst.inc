@@ -93,7 +93,7 @@ General:
         - ``adhoc``: builds a non-persistent chunks cache by querying the repo. Chunks cache contents
           are somewhat sloppy for already existing chunks, concerning their refcount ("infinite") and
           size (0). No files cache (slow, will chunk all input files). DEPRECATED.
-        - ``newcache``: Like ``adhoc``, but with a persistent files cache.
+        - ``adhocwithfiles``: Like ``adhoc``, but with a persistent files cache.
     BORG_SELFTEST
         This can be used to influence borg's builtin self-tests. The default is to execute the tests
         at the beginning of each borg command invocation.

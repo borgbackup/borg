@@ -357,7 +357,7 @@ def check_cache(archiver):
         with Cache(repository, manifest, sync=False) as cache:
             original_chunks = cache.chunks
             # the LocalCache implementation has an on-disk chunks cache,
-            # but NewCache and AdHocCache don't have persistent chunks cache.
+            # but AdHocWithFilesCache and AdHocCache don't have persistent chunks cache.
             persistent = isinstance(cache, LocalCache)
         Cache.destroy(repository)
         with Cache(repository, manifest) as cache:

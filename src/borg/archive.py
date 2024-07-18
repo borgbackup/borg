@@ -2334,7 +2334,7 @@ class ArchiveChecker:
                 logger.info(f"{len(orphaned)} orphaned (unused) objects found.")
                 for chunk_id in orphaned:
                     logger.debug(f"chunk {bin_to_hex(chunk_id)} is orphaned.")
-                # To support working with AdHocCache or NewCache, we do not set self.error_found = True.
+                # To support working with AdHocCache or AdHocWithFilesCache, we do not set self.error_found = True.
             if self.repair and unused:
                 logger.info(
                     "Deleting %d orphaned and %d superseded objects..." % (len(orphaned), len(self.possibly_superseded))

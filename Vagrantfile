@@ -166,7 +166,7 @@ def install_pythons(boxname)
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
     pyenv install 3.12.0  # tests
-    pyenv install 3.11.8  # tests, binary build
+    pyenv install 3.11.9  # tests, binary build
     pyenv install 3.10.2  # tests
     pyenv install 3.9.4  # tests
     pyenv rehash
@@ -186,8 +186,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.11 release
-    pyenv global 3.11.8
-    pyenv virtualenv 3.11.8 borg-env
+    pyenv global 3.11.9
+    pyenv virtualenv 3.11.9 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -210,7 +210,7 @@ def install_pyinstaller()
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    pip install 'pyinstaller==6.5.0'
+    pip install 'pyinstaller==6.7.0'
   EOF
 end
 
@@ -233,8 +233,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.4 3.10.2 3.11.8 3.12.0
-      pyenv local 3.9.4 3.10.2 3.11.8 3.12.0
+      pyenv global 3.9.4 3.10.2 3.11.9 3.12.0
+      pyenv local 3.9.4 3.10.2 3.11.9 3.12.0
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:

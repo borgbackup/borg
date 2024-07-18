@@ -120,7 +120,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b8 (2024-02-20)
+Version 2.0.0b9 (2024-07-xx)
 ----------------------------
 
 Please note:
@@ -129,6 +129,43 @@ This is a beta release, only for testing - do not use for production repos.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- add BORG_CACHE_IMPL, default is "adhocwithfiles" to test the new cache
+  implementation, featuring an adhoc non-persistent chunks cache and a
+  persistent files cache. See the docs for other values.
+
+  Requires to run "borg check --repair --archives-only" to delete orphaned
+  chunks before running "borg compact" to free space! These orphans are
+  expected due to the simplified refcounting with the AdHocFilesCache.
+- add BORG_USE_CHUNKS_ARCHIVE env var, #8280
+- automatically rebuild cache on exception, #5213
+
+Bug fixes:
+
+- fix Ctrl-C / SIGINT behaviour for pyinstaller-made binaries, #8155
+- delete: fix error handling with Ctrl-C
+- rcompress: fix error handling with Ctrl-C
+- delete: fix error handling when no archive is specified, #8256
+- setup.py: fix import error reporting for cythonize import, see #8208
+- create: deal with EBUSY, #8123
+- benchmark: inherit options --rsh --remote-path, #8099
+- benchmark: fix return value, #8113
+
+Other changes:
+
+- setup.py: detect noexec build fs issue, see #8208
+- improve acl_get / acl_set error handling (forward port from 1.4-maint)
+- allow msgpack 1.1.0
+- vagrant: use pyinstaller 6.7.0
+- use Python 3.11.9 for binary builds
+- require Cython 3.0.3 at least, #8133
+- docs: add non-root deployment strategy
+
+
+Version 2.0.0b8 (2024-02-20)
+----------------------------
 
 New features:
 

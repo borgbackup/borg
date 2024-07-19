@@ -6,7 +6,7 @@ import pytest
 from ...constants import *  # NOQA
 from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPOKeyfileKey, Passphrase
 from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
-from ...helpers import EXIT_ERROR, CommandError
+from ...helpers import CommandError
 from ...helpers import bin_to_hex, hex_to_bin
 from ...helpers import msgpack
 from ...repository import Repository
@@ -171,7 +171,8 @@ def test_key_export_directory(archivers, request):
     os.mkdir(export_directory)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     if archiver.FORK_DEFAULT:
-        cmd(archiver, "key", "export", export_directory, exit_code=EXIT_ERROR)
+        expected_ec = CommandError().exit_code
+        cmd(archiver, "key", "export", export_directory, exit_code=expected_ec)
     else:
         with pytest.raises(CommandError):
             cmd(archiver, "key", "export", export_directory)
@@ -183,7 +184,8 @@ def test_key_export_qr_directory(archivers, request):
     os.mkdir(export_directory)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     if archiver.FORK_DEFAULT:
-        cmd(archiver, "key", "export", "--qr-html", export_directory, exit_code=EXIT_ERROR)
+        expected_ec = CommandError().exit_code
+        cmd(archiver, "key", "export", "--qr-html", export_directory, exit_code=expected_ec)
     else:
         with pytest.raises(CommandError):
             cmd(archiver, "key", "export", "--qr-html", export_directory)
@@ -194,7 +196,8 @@ def test_key_import_errors(archivers, request):
     export_file = archiver.output_path + "/exported"
     cmd(archiver, "rcreate", KF_ENCRYPTION)
     if archiver.FORK_DEFAULT:
-        cmd(archiver, "key", "import", export_file, exit_code=EXIT_ERROR)
+        expected_ec = CommandError().exit_code
+        cmd(archiver, "key", "import", export_file, exit_code=expected_ec)
     else:
         with pytest.raises(CommandError):
             cmd(archiver, "key", "import", export_file)
@@ -203,7 +206,8 @@ def test_key_import_errors(archivers, request):
         fd.write("something not a key\n")
 
     if archiver.FORK_DEFAULT:
-        cmd(archiver, "key", "import", export_file, exit_code=2)
+        expected_ec = NotABorgKeyFile().exit_code
+        cmd(archiver, "key", "import", export_file, exit_code=expected_ec)
     else:
         with pytest.raises(NotABorgKeyFile):
             cmd(archiver, "key", "import", export_file)
@@ -212,7 +216,8 @@ def test_key_import_errors(archivers, request):
         fd.write("BORG_KEY a0a0a0\n")
 
     if archiver.FORK_DEFAULT:
-        cmd(archiver, "key", "import", export_file, exit_code=2)
+        expected_ec = RepoIdMismatch().exit_code
+        cmd(archiver, "key", "import", export_file, exit_code=expected_ec)
     else:
         with pytest.raises(RepoIdMismatch):
             cmd(archiver, "key", "import", export_file)

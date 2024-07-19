@@ -120,7 +120,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b9 (2024-07-xx)
+Version 2.0.0b9 (2024-07-20)
 ----------------------------
 
 Please note:
@@ -139,6 +139,7 @@ New features:
   Requires to run "borg check --repair --archives-only" to delete orphaned
   chunks before running "borg compact" to free space! These orphans are
   expected due to the simplified refcounting with the AdHocFilesCache.
+- make BORG_EXIT_CODES="modern" the default, #8110
 - add BORG_USE_CHUNKS_ARCHIVE env var, #8280
 - automatically rebuild cache on exception, #5213
 
@@ -152,6 +153,7 @@ Bug fixes:
 - create: deal with EBUSY, #8123
 - benchmark: inherit options --rsh --remote-path, #8099
 - benchmark: fix return value, #8113
+- key export: fix crash when no path is given, fix exception handling
 
 Other changes:
 

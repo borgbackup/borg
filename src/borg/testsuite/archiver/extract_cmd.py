@@ -9,7 +9,7 @@ import pytest
 from ... import xattr
 from ...chunker import has_seek_hole
 from ...constants import *  # NOQA
-from ...helpers import EXIT_WARNING
+from ...helpers import EXIT_WARNING, BackupOSError
 from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
@@ -621,8 +621,11 @@ def test_overwrite(archivers, request):
     os.unlink("output/input/file1")
     os.mkdir("output/input/file1")
     os.mkdir("output/input/file1/dir")
+    expected_ec = BackupOSError("open", OSError(21, "is a directory")).exit_code  # WARNING code
+    if expected_ec == EXIT_ERROR:  # workaround, TODO: fix it
+        expected_ec = EXIT_WARNING
     with changedir("output"):
-        cmd(archiver, "extract", "test", exit_code=1)
+        cmd(archiver, "extract", "test", exit_code=expected_ec)
 
 
 # derived from test_extract_xattrs_errors()

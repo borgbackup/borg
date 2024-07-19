@@ -93,20 +93,19 @@ class KeysMixIn:
         """Export the repository key for backup"""
         manager = KeyManager(repository)
         manager.load_keyblob()
-        if args.paper:
-            manager.export_paperkey(args.path)
-        else:
-            try:
-                if args.path is not None and os.path.isdir(args.path):
-                    # on Windows, Python raises PermissionError instead of IsADirectoryError
-                    # (like on Unix) if the file to open is actually a directory.
-                    raise IsADirectoryError
-                if args.qr:
-                    manager.export_qr(args.path)
-                else:
-                    manager.export(args.path)
-            except IsADirectoryError:
-                raise CommandError(f"'{args.path}' must be a file, not a directory")
+        try:
+            if args.path is not None and os.path.isdir(args.path):
+                # on Windows, Python raises PermissionError instead of IsADirectoryError
+                # (like on Unix) if the file to open is actually a directory.
+                raise IsADirectoryError
+            if args.paper:
+                manager.export_paperkey(args.path)
+            elif args.qr:
+                manager.export_qr(args.path)
+            else:
+                manager.export(args.path)
+        except IsADirectoryError:
+            raise CommandError(f"'{args.path}' must be a file, not a directory")
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_import(self, args, repository):

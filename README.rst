@@ -3,11 +3,16 @@ This is borg2!
 
 Please note that this is the README for borg2 / master branch.
 
-borg2 is currently in beta testing.
-
 For the stable version's docs, please see there:
 
 https://borgbackup.readthedocs.io/en/stable/
+
+Borg2 is currently in beta testing and might get major and/or
+breaking changes between beta releases (and there is no beta to
+next-beta upgrade code, so you will have to delete and re-create repos).
+
+Thus, **DO NOT USE BORG2 FOR YOUR PRODUCTION BACKUPS!** Please help with
+testing it, but set it up *additionally* to your production backups.
 
 TODO: the screencasts need a remake using borg2, see there:
 

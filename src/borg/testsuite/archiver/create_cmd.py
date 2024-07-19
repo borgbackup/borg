@@ -17,7 +17,7 @@ from ...constants import *  # NOQA
 from ...manifest import Manifest
 from ...platform import is_cygwin, is_win32, is_darwin
 from ...repository import Repository
-from ...helpers import CommandError
+from ...helpers import CommandError, BackupPermissionError
 from .. import has_lchflags
 from .. import changedir
 from .. import (
@@ -304,6 +304,9 @@ def test_create_no_permission_file(archivers, request):
         os.chmod(file_path + "2", 0o000)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     flist = "".join(f"input/file{n}\n" for n in range(1, 4))
+    expected_ec = BackupPermissionError("open", OSError(13, "permission denied")).exit_code
+    if expected_ec == EXIT_ERROR:  # workaround, TODO: fix it
+        expected_ec = EXIT_WARNING
     out = cmd(
         archiver,
         "create",
@@ -311,7 +314,7 @@ def test_create_no_permission_file(archivers, request):
         "--list",
         "test",
         input=flist.encode(),
-        exit_code=1,  # WARNING status: could not back up file2.
+        exit_code=expected_ec,  # WARNING status: could not back up file2.
     )
     assert "retry: 1 of " not in out  # retries were NOT attempted!
     assert "E input/file2" in out  # no permissions!

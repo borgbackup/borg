@@ -2,6 +2,7 @@ import os
 
 from ...constants import *  # NOQA
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
+from ...helpers import CommandError
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -24,4 +25,5 @@ def test_with_lock_non_existent_command(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     command = ["non_existent_command"]
-    cmd(archiver, "with-lock", *command, fork=True, exit_code=EXIT_ERROR)
+    expected_ec = CommandError().exit_code
+    cmd(archiver, "with-lock", *command, fork=True, exit_code=expected_ec)

@@ -38,7 +38,8 @@ General:
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
     BORG_EXIT_CODES
         When set to "modern", the borg process will return more specific exit codes (rc).
-        Default is "legacy" and returns rc 2 for all errors, 1 for all warnings, 0 for success.
+        When set to "legacy", the borg process will return rc 2 for all errors, 1 for all warnings, 0 for success.
+        Default is "modern".
     BORG_HOST_ID
         Borg usually computes a host id from the FQDN plus the results of ``uuid.getnode()`` (which usually returns
         a unique id based on the MAC address of the network interface. Except if that MAC happens to be all-zero - in

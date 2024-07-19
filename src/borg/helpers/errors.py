@@ -5,7 +5,7 @@ from ..constants import *  # NOQA
 from ..crypto.low_level import IntegrityError as IntegrityErrorBase
 
 
-modern_ec = os.environ.get("BORG_EXIT_CODES", "legacy") == "modern"
+modern_ec = os.environ.get("BORG_EXIT_CODES", "modern") == "modern"  # "legacy" was used by borg < 2
 
 
 class ErrorBase(Exception):

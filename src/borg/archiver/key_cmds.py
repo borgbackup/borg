@@ -97,7 +97,9 @@ class KeysMixIn:
             manager.export_paperkey(args.path)
         else:
             try:
-                if os.path.isdir(args.path):
+                if args.path is not None and os.path.isdir(args.path):
+                    # on Windows, Python raises PermissionError instead of IsADirectoryError
+                    # (like on Unix) if the file to open is actually a directory.
                     raise IsADirectoryError
                 if args.qr:
                     manager.export_qr(args.path)

@@ -93,18 +93,19 @@ class KeysMixIn:
         """Export the repository key for backup"""
         manager = KeyManager(repository)
         manager.load_keyblob()
-        if args.paper:
-            manager.export_paperkey(args.path)
-        else:
-            try:
-                if os.path.isdir(args.path):
-                    raise IsADirectoryError
-                if args.qr:
-                    manager.export_qr(args.path)
-                else:
-                    manager.export(args.path)
-            except IsADirectoryError:
-                raise CommandError(f"'{args.path}' must be a file, not a directory")
+        try:
+            if args.path is not None and os.path.isdir(args.path):
+                # on Windows, Python raises PermissionError instead of IsADirectoryError
+                # (like on Unix) if the file to open is actually a directory.
+                raise IsADirectoryError
+            if args.paper:
+                manager.export_paperkey(args.path)
+            elif args.qr:
+                manager.export_qr(args.path)
+            else:
+                manager.export(args.path)
+        except IsADirectoryError:
+            raise CommandError(f"'{args.path}' must be a file, not a directory")
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_import(self, args, repository):
@@ -160,18 +161,6 @@ class KeysMixIn:
         repository in the config file. A backup is thus not strictly needed,
         but guards against the repository becoming inaccessible if the file
         is damaged for some reason.
-
-        Examples::
-
-            borg key export /path/to/repo > encrypted-key-backup
-            borg key export --paper /path/to/repo > encrypted-key-backup.txt
-            borg key export --qr-html /path/to/repo > encrypted-key-backup.html
-            # Or pass the output file as an argument instead of redirecting stdout:
-            borg key export /path/to/repo encrypted-key-backup
-            borg key export --paper /path/to/repo encrypted-key-backup.txt
-            borg key export --qr-html /path/to/repo encrypted-key-backup.html
-
-
         """
         )
         subparser = key_parsers.add_parser(

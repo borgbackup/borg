@@ -45,4 +45,16 @@ Fully automated using environment variables:
 
 .. include:: key_export.rst.inc
 
+Examples
+~~~~~~~~
+::
+
+    borg key export > encrypted-key-backup
+    borg key export --paper > encrypted-key-backup.txt
+    borg key export --qr-html > encrypted-key-backup.html
+    # Or pass the output file as an argument instead of redirecting stdout:
+    borg key export encrypted-key-backup
+    borg key export --paper encrypted-key-backup.txt
+    borg key export --qr-html encrypted-key-backup.html
+
 .. include:: key_import.rst.inc

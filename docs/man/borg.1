@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2024-02-20" "" "borg backup tool"
+.TH "BORG" 1 "2024-07-19" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -423,7 +423,8 @@ When set, use the value to answer the \(dqdisplay the passphrase for verificatio
 .TP
 .B BORG_EXIT_CODES
 When set to \(dqmodern\(dq, the borg process will return more specific exit codes (rc).
-Default is \(dqlegacy\(dq and returns rc 2 for all errors, 1 for all warnings, 0 for success.
+When set to \(dqlegacy\(dq, the borg process will return rc 2 for all errors, 1 for all warnings, 0 for success.
+Default is \(dqmodern\(dq.
 .TP
 .B BORG_HOST_ID
 Borg usually computes a host id from the FQDN plus the results of \fBuuid.getnode()\fP (which usually returns
@@ -460,6 +461,10 @@ When set to a numeric value, this determines the maximum \(dqtime to live\(dq fo
 entries (default: 20). The files cache is used to determine quickly whether a file is unchanged.
 The FAQ explains this more detailed in: \fIalways_chunking\fP
 .TP
+.B BORG_USE_CHUNKS_ARCHIVE
+When set to no (default: yes), the \fBchunks.archive.d\fP folder will not be used. This reduces
+disk space usage but slows down cache resyncs.
+.TP
 .B BORG_SHOW_SYSINFO
 When set to no (default: yes), system information (like OS, Python version, ...) in
 exceptions is not shown.
@@ -480,6 +485,24 @@ given order, e.g.:
 \fBllfuse\fP: only try to load llfuse
 .IP \(bu 2
 \fBnone\fP: do not try to load an implementation
+.UNINDENT
+.TP
+.B BORG_CACHE_IMPL
+Choose the implementation for the clientside cache, choose one of:
+.INDENT 7.0
+.IP \(bu 2
+\fBlocal\fP: uses a persistent chunks cache and keeps it in a perfect state (precise refcounts and
+sizes), requiring a potentially resource expensive cache sync in multi\-client scenarios.
+Also has a persistent files cache.
+.IP \(bu 2
+\fBadhoc\fP: builds a non\-persistent chunks cache by querying the repo. Chunks cache contents
+are somewhat sloppy for already existing chunks, concerning their refcount (\(dqinfinite\(dq) and
+size (0). No files cache (slow, will chunk all input files). DEPRECATED.
+.IP \(bu 2
+\fBadhocwithfiles\fP: Like \fBadhoc\fP, but with a persistent files cache. Default implementation.
+.IP \(bu 2
+\fBcli\fP: Determine the cache implementation from cli options. Without special options, will
+usually end up with the \fBlocal\fP implementation.
 .UNINDENT
 .TP
 .B BORG_SELFTEST

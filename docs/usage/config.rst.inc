@@ -19,7 +19,7 @@ borg config
     +-------------------------------------------------------+----------------------+----------------------------------------+
     |                                                       | ``VALUE``            | new value for key                      |
     +-------------------------------------------------------+----------------------+----------------------------------------+
-    | **options**                                                                                                           |
+    | **optional arguments**                                                                                                |
     +-------------------------------------------------------+----------------------+----------------------------------------+
     |                                                       | ``-c``, ``--cache``  | get and set values from the repo cache |
     +-------------------------------------------------------+----------------------+----------------------------------------+
@@ -48,7 +48,7 @@ borg config
         new value for key
 
 
-    options
+    optional arguments
         -c, --cache    get and set values from the repo cache
         -d, --delete    delete the key from the config file
         -l, --list     list the configuration of the repo
@@ -64,7 +64,7 @@ This command gets and sets options in a local repository or cache config file.
 For security reasons, this command only works on local repositories.
 
 To delete a config value entirely, use ``--delete``. To list the values
-of the configuration file or the default values, use ``--list``.  To get and existing
+of the configuration file or the default values, use ``--list``.  To get an existing
 key, pass only the key name. To set a key, pass both the key name and
 the new value. Keys can be specified in the format "section.name" or
 simply "name"; the section will default to "repository" and "cache" for

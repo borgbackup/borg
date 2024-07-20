@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-KEY-EXPORT" 1 "2024-02-20" "" "borg backup tool"
+.TH "BORG-KEY-EXPORT" 1 "2024-07-19" "" "borg backup tool"
 .SH NAME
 borg-key-export \- Export the repository key for backup
 .SH SYNOPSIS
@@ -56,24 +56,6 @@ For repositories using the repokey encryption the key is saved in the
 repository in the config file. A backup is thus not strictly needed,
 but guards against the repository becoming inaccessible if the file
 is damaged for some reason.
-.sp
-Examples:
-.INDENT 0.0
-.INDENT 3.5
-.sp
-.nf
-.ft C
-borg key export /path/to/repo > encrypted\-key\-backup
-borg key export \-\-paper /path/to/repo > encrypted\-key\-backup.txt
-borg key export \-\-qr\-html /path/to/repo > encrypted\-key\-backup.html
-# Or pass the output file as an argument instead of redirecting stdout:
-borg key export /path/to/repo encrypted\-key\-backup
-borg key export \-\-paper /path/to/repo encrypted\-key\-backup.txt
-borg key export \-\-qr\-html /path/to/repo encrypted\-key\-backup.html
-.ft P
-.fi
-.UNINDENT
-.UNINDENT
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -83,7 +65,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B PATH
 where to store the backup
 .UNINDENT
-.SS options
+.SS optional arguments
 .INDENT 0.0
 .TP
 .B  \-\-paper
@@ -91,6 +73,23 @@ Create an export suitable for printing and later type\-in
 .TP
 .B  \-\-qr\-html
 Create an html file suitable for printing and later type\-in or qr scan
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+borg key export > encrypted\-key\-backup
+borg key export \-\-paper > encrypted\-key\-backup.txt
+borg key export \-\-qr\-html > encrypted\-key\-backup.html
+# Or pass the output file as an argument instead of redirecting stdout:
+borg key export encrypted\-key\-backup
+borg key export \-\-paper encrypted\-key\-backup.txt
+borg key export \-\-qr\-html encrypted\-key\-backup.html
+.ft P
+.fi
+.UNINDENT
 .UNINDENT
 .SH SEE ALSO
 .sp

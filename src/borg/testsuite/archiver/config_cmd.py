@@ -52,7 +52,8 @@ def test_config(archivers, request):
 
     cmd(archiver, "config", "--list", "--delete", exit_code=2)
     if archiver.FORK_DEFAULT:
-        cmd(archiver, "config", exit_code=2)
+        expected_ec = CommandError().exit_code
+        cmd(archiver, "config", exit_code=expected_ec)
     else:
         with pytest.raises(CommandError):
             cmd(archiver, "config")

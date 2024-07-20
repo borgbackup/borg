@@ -56,7 +56,8 @@ def test_rcreate_nested_repositories(archivers, request):
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     archiver.repository_location += "/nested"
     if archiver.FORK_DEFAULT:
-        cmd(archiver, "rcreate", RK_ENCRYPTION, exit_code=2)
+        expected_ec = Repository.AlreadyExists().exit_code
+        cmd(archiver, "rcreate", RK_ENCRYPTION, exit_code=expected_ec)
     else:
         with pytest.raises(Repository.AlreadyExists):
             cmd(archiver, "rcreate", RK_ENCRYPTION)

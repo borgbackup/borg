@@ -366,7 +366,10 @@ def test_create_content_from_command_with_failed_command(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     if archiver.FORK_DEFAULT:
-        output = cmd(archiver, "create", "--content-from-command", "test", "--", "sh", "-c", "exit 73;", exit_code=2)
+        expected_ec = CommandError().exit_code
+        output = cmd(
+            archiver, "create", "--content-from-command", "test", "--", "sh", "-c", "exit 73;", exit_code=expected_ec
+        )
         assert output.endswith("Command 'sh' exited with status 73" + os.linesep)
     else:
         with pytest.raises(CommandError):
@@ -418,7 +421,10 @@ def test_create_paths_from_command_with_failed_command(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     if archiver.FORK_DEFAULT:
-        output = cmd(archiver, "create", "--paths-from-command", "test", "--", "sh", "-c", "exit 73;", exit_code=2)
+        expected_ec = CommandError().exit_code
+        output = cmd(
+            archiver, "create", "--paths-from-command", "test", "--", "sh", "-c", "exit 73;", exit_code=expected_ec
+        )
         assert output.endswith("Command 'sh' exited with status 73" + os.linesep)
     else:
         with pytest.raises(CommandError):

@@ -84,7 +84,8 @@ def test_recreate_target_rc(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     if archiver.FORK_DEFAULT:
-        output = cmd(archiver, "recreate", "--target=asdf", exit_code=2)
+        expected_ec = CommandError().exit_code
+        output = cmd(archiver, "recreate", "--target=asdf", exit_code=expected_ec)
         assert "Need to specify single archive" in output
     else:
         with pytest.raises(CommandError):

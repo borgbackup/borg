@@ -18,7 +18,8 @@ def test_delete_repo(archivers, request):
     cmd(archiver, "create", "test.2", "input")
     os.environ["BORG_DELETE_I_KNOW_WHAT_I_AM_DOING"] = "no"
     if archiver.FORK_DEFAULT:
-        cmd(archiver, "rdelete", exit_code=2)
+        expected_ec = CancelledByUser().exit_code
+        cmd(archiver, "rdelete", exit_code=expected_ec)
     else:
         with pytest.raises(CancelledByUser):
             cmd(archiver, "rdelete")

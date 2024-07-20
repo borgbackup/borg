@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2024-02-20" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2024-07-19" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -137,7 +137,7 @@ specify the archive name
 .B PATH
 paths to archive
 .UNINDENT
-.SS options
+.SS optional arguments
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -156,7 +156,13 @@ only display items with the given status characters (see description)
 output stats as JSON. Implies \fB\-\-stats\fP\&.
 .TP
 .B  \-\-no\-cache\-sync
-experimental: do not synchronize the cache. Implies not using the files cache.
+experimental: do not synchronize the chunks cache.
+.TP
+.B  \-\-no\-cache\-sync\-forced
+experimental: do not synchronize the chunks cache (forced).
+.TP
+.B  \-\-prefer\-adhoc\-cache
+experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).
 .TP
 .BI \-\-stdin\-name \ NAME
 use NAME in archive for stdin data (default: \(aqstdin\(aq)

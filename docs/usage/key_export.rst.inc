@@ -17,7 +17,7 @@ borg key export
     +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
     |                                                       | ``PATH``      | where to store the backup                                              |
     +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
-    | **options**                                                                                                                                    |
+    | **optional arguments**                                                                                                                         |
     +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
     |                                                       | ``--paper``   | Create an export suitable for printing and later type-in               |
     +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
@@ -42,7 +42,7 @@ borg key export
         where to store the backup
 
 
-    options
+    optional arguments
         --paper       Create an export suitable for printing and later type-in
         --qr-html     Create an html file suitable for printing and later type-in or qr scan
 
@@ -74,14 +74,3 @@ For repositories using the repokey encryption the key is saved in the
 repository in the config file. A backup is thus not strictly needed,
 but guards against the repository becoming inaccessible if the file
 is damaged for some reason.
-
-Examples::
-
-    borg key export /path/to/repo > encrypted-key-backup
-    borg key export --paper /path/to/repo > encrypted-key-backup.txt
-    borg key export --qr-html /path/to/repo > encrypted-key-backup.html
-    # Or pass the output file as an argument instead of redirecting stdout:
-    borg key export /path/to/repo encrypted-key-backup
-    borg key export --paper /path/to/repo encrypted-key-backup.txt
-    borg key export --qr-html /path/to/repo encrypted-key-backup.html
-

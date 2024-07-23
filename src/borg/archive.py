@@ -282,6 +282,8 @@ class DownloadPipeline:
             for item in items:
                 if 'chunks' in item:
                     item.chunks = [ChunkListEntry(*e) for e in item.chunks]
+                if 'chunks_healthy' in item:
+                    item.chunks_healthy = [ChunkListEntry(*e) for e in item.chunks_healthy]
 
             if filter:
                 items = [item for item in items if filter(item)]

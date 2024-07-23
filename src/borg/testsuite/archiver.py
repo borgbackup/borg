@@ -3959,14 +3959,20 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         self.cmd('check', self.repository_location, exit_code=0)
         output = self.cmd('list', '--format={health}#{path}{LF}', self.repository_location + '::archive1', exit_code=0)
         self.assert_in('broken#', output)
-        # check that the file in the old archives has now a different chunk list without the killed chunk
+        # check that the file in the old archives has now a different chunk list without the killed chunk.
+        # also check that the correct original chunks list is preserved in item.chunks_healthy.
         for archive_name in ('archive1', 'archive2'):
             archive, repository = self.open_archive(archive_name)
             with repository:
                 for item in archive.iter_items():
                     if item.path.endswith('testsuite/archiver.py'):
-                        self.assert_not_equal(valid_chunks, item.chunks)
+                        self.assert_equal(len(valid_chunks), len(item.chunks))
                         self.assert_not_in(killed_chunk, item.chunks)
+                        self.assert_not_equal(valid_chunks, item.chunks)
+                        self.assert_in('chunks_healthy', item)
+                        self.assert_equal(len(valid_chunks), len(item.chunks_healthy))
+                        self.assert_in(killed_chunk, item.chunks_healthy)
+                        self.assert_equal(valid_chunks, item.chunks_healthy)
                         break
                 else:
                     self.fail('should not happen')
@@ -3977,19 +3983,25 @@ class ArchiverCheckTestCase(ArchiverTestCaseBase):
         output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
         self.assert_in('Healed previously missing file chunk', output)
         self.assert_in('testsuite/archiver.py: Completely healed previously damaged file!', output)
-        # check that the file in the old archives has the correct chunks again
+        # check that the file in the old archives has the correct chunks again.
+        # also check that chunks_healthy list is removed as it is not needed any more.
         for archive_name in ('archive1', 'archive2'):
             archive, repository = self.open_archive(archive_name)
             with repository:
                 for item in archive.iter_items():
                     if item.path.endswith('testsuite/archiver.py'):
                         self.assert_equal(valid_chunks, item.chunks)
+                        self.assert_not_in('chunks_healthy', item)
                         break
                 else:
                     self.fail('should not happen')
         # list is also all-healthy again
         output = self.cmd('list', '--format={health}#{path}{LF}', self.repository_location + '::archive1', exit_code=0)
         self.assert_not_in('broken#', output)
+        # check should be fine now (and not show it has healed anything).
+        output = self.cmd('check', '-v', '--repair', self.repository_location, exit_code=0)
+        self.assert_not_in('Healed previously missing file chunk', output)
+        self.assert_not_in('testsuite/archiver.py: Completely healed previously damaged file!', output)
 
     def test_missing_archive_item_chunk(self):
         archive, repository = self.open_archive('archive1')

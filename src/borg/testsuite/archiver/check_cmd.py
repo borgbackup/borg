@@ -115,14 +115,20 @@ def test_missing_file_chunk(archivers, request):
     output = cmd(archiver, "list", "archive1", "--format={health}#{path}{NL}", exit_code=0)
     assert "broken#" in output
 
-    # check that the file in the old archives has now a different chunk list without the killed chunk
+    # check that the file in the old archives has now a different chunk list without the killed chunk.
+    # also check that the correct original chunks list is preserved in item.chunks_healthy.
     for archive_name in ("archive1", "archive2"):
         archive, repository = open_archive(archiver.repository_path, archive_name)
         with repository:
             for item in archive.iter_items():
                 if item.path.endswith(src_file):
-                    assert valid_chunks != item.chunks
+                    assert len(valid_chunks) == len(item.chunks)
                     assert killed_chunk not in item.chunks
+                    assert valid_chunks != item.chunks
+                    assert "chunks_healthy" in item
+                    assert len(valid_chunks) == len(item.chunks_healthy)
+                    assert killed_chunk in item.chunks_healthy
+                    assert valid_chunks == item.chunks_healthy
                     break
             else:
                 pytest.fail("should not happen")  # convert 'fail'
@@ -136,13 +142,15 @@ def test_missing_file_chunk(archivers, request):
     assert "Healed previously missing file chunk" in output
     assert f"{src_file}: Completely healed previously damaged file!" in output
 
-    # check that the file in the old archives has the correct chunks again
+    # check that the file in the old archives has the correct chunks again.
+    # also check that chunks_healthy list is removed as it is not needed any more.
     for archive_name in ("archive1", "archive2"):
         archive, repository = open_archive(archiver.repository_path, archive_name)
         with repository:
             for item in archive.iter_items():
                 if item.path.endswith(src_file):
                     assert valid_chunks == item.chunks
+                    assert "chunks_healthy" not in item
                     break
             else:
                 pytest.fail("should not happen")
@@ -150,6 +158,11 @@ def test_missing_file_chunk(archivers, request):
     # list is also all-healthy again
     output = cmd(archiver, "list", "archive1", "--format={health}#{path}{NL}", exit_code=0)
     assert "broken#" not in output
+
+    # check should be fine now (and not show it has healed anything).
+    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
+    assert "Healed previously missing file chunk" not in output
+    assert "testsuite/archiver.py: Completely healed previously damaged file!" not in output
 
 
 def test_missing_archive_item_chunk(archivers, request):

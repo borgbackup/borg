@@ -5209,7 +5209,6 @@ class Archiver:
         return result
 
     def parse_args(self, args=None):
-        # We can't use argparse for "serve" since we don't want it to show up in "Available commands"
         if args:
             args = self.preprocess_args(args)
         parser = self.build_parser()

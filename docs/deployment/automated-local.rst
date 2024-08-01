@@ -150,7 +150,7 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     fi
 
 Create the ``/etc/backups/autoeject`` file to have the script automatically eject the drive
-after creating the backup. Rename the file to something else (e.g. ``/etc/backup/autoeject-no``)
+after creating the backup. Rename the file to something else (e.g. ``/etc/backups/autoeject-no``)
 when you want to do something with the drive after creating backups (e.g running check).
 
 Create the ``/etc/backups/backup-suspend`` file if the machine should suspend after completing
@@ -177,7 +177,7 @@ Find the UUID of the file system that backups should be stored on::
 
     lsblk -o+uuid,label
 
-Note the UUID into the ``/etc/backup/backup.disks`` file.
+Note the UUID into the ``/etc/backups/backup.disks`` file.
 
 Mount the drive to /mnt/backup.
 
@@ -198,7 +198,7 @@ Security considerations
 -----------------------
 
 The script as shown above will mount any file system with an UUID listed in
-``/etc/backup/backup.disks``. The UUID check is a safety / annoyance-reduction
+``/etc/backups/backup.disks``. The UUID check is a safety / annoyance-reduction
 mechanism to keep the script from blowing up whenever a random USB thumb drive is connected.
 It is not meant as a security mechanism. Mounting file systems and reading repository
 data exposes additional attack surfaces (kernel file system drivers,

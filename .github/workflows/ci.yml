@@ -104,8 +104,7 @@ jobs:
         pip install -r requirements.d/development.txt
     - name: Install borgbackup
       run: |
-        # pip install -e .
-        python setup.py -v develop
+        pip install -e .
     - name: run tox env
       env:
         XDISTN: "4"

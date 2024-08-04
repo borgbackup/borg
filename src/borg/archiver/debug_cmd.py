@@ -15,7 +15,8 @@ from ..helpers import positive_int_validator, archivename_validator
 from ..helpers import CommandError, RTError
 from ..manifest import Manifest
 from ..platform import get_process_id
-from ..repository import Repository, LIST_SCAN_LIMIT, TAG_PUT, TAG_DELETE, TAG_COMMIT
+from ..repository import Repository, TAG_PUT, TAG_DELETE, TAG_COMMIT
+from ..repository3 import Repository3, LIST_SCAN_LIMIT
 from ..repoobj import RepoObj
 
 from ._common import with_repository, Highlander
@@ -330,7 +331,7 @@ class DebugMixIn:
                     repository.delete(id)
                     modified = True
                     print("object %s deleted." % hex_id)
-                except Repository.ObjectNotFound:
+                except Repository3.ObjectNotFound:
                     print("object %s not found." % hex_id)
         if modified:
             repository.commit(compact=False)
@@ -350,23 +351,6 @@ class DebugMixIn:
                     print("object %s has %d referrers [info from chunks cache]." % (hex_id, refcount))
                 except KeyError:
                     print("object %s not found [info from chunks cache]." % hex_id)
-
-    @with_repository(manifest=False, exclusive=True)
-    def do_debug_dump_hints(self, args, repository):
-        """dump repository hints"""
-        if not repository._active_txn:
-            repository.prepare_txn(repository.get_transaction_id())
-        try:
-            hints = dict(
-                segments=repository.segments,
-                compact=repository.compact,
-                storage_quota_use=repository.storage_quota_use,
-                shadow_index={bin_to_hex(k): v for k, v in repository.shadow_index.items()},
-            )
-            with dash_open(args.path, "w") as fd:
-                json.dump(hints, fd, indent=4)
-        finally:
-            repository.rollback()
 
     def do_debug_convert_profile(self, args):
         """convert Borg profile to Python profile"""
@@ -688,23 +672,6 @@ class DebugMixIn:
         )
         subparser.set_defaults(func=self.do_debug_refcount_obj)
         subparser.add_argument("ids", metavar="IDs", nargs="+", type=str, help="hex object ID(s) to show refcounts for")
-
-        debug_dump_hints_epilog = process_epilog(
-            """
-        This command dumps the repository hints data.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "dump-hints",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_dump_hints.__doc__,
-            epilog=debug_dump_hints_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="dump repo hints (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_dump_hints)
-        subparser.add_argument("path", metavar="PATH", type=str, help="file to dump data into")
 
         debug_convert_profile_epilog = process_epilog(
             """

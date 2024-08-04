@@ -32,7 +32,7 @@ from .locking import Lock
 from .manifest import Manifest
 from .platform import SaveFile
 from .remote import cache_if_remote
-from .repository import LIST_SCAN_LIMIT
+from .repository3 import LIST_SCAN_LIMIT
 
 # note: cmtime might be either a ctime or a mtime timestamp, chunks is a list of ChunkListEntry
 FileCacheEntry = namedtuple("FileCacheEntry", "age inode size cmtime chunks")
@@ -718,35 +718,27 @@ class ChunksMixin:
         return ChunkListEntry(id, size)
 
     def _load_chunks_from_repo(self):
-        # Explicitly set the initial usable hash table capacity to avoid performance issues
-        # due to hash table "resonance".
-        # Since we're creating an archive, add 10 % from the start.
-        num_chunks = len(self.repository)
-        chunks = ChunkIndex(usable=num_chunks * 1.1)
-        pi = ProgressIndicatorPercent(
-            total=num_chunks, msg="Downloading chunk list... %3.0f%%", msgid="cache.download_chunks"
-        )
+        chunks = ChunkIndex()
         t0 = perf_counter()
         num_requests = 0
+        num_chunks = 0
         marker = None
         while True:
             result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             num_requests += 1
             if not result:
                 break
-            pi.show(increase=len(result))
             marker = result[-1]
             # All chunks from the repository have a refcount of MAX_VALUE, which is sticky,
             # therefore we can't/won't delete them. Chunks we added ourselves in this transaction
             # (e.g. checkpoint archives) are tracked correctly.
             init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
             for id_ in result:
+                num_chunks += 1
                 chunks[id_] = init_entry
-        assert len(chunks) == num_chunks
         # LocalCache does not contain the manifest, either.
         del chunks[self.manifest.MANIFEST_ID]
         duration = perf_counter() - t0 or 0.01
-        pi.finish()
         logger.debug(
             "Cache: downloaded %d chunk IDs in %.2f s (%d requests), ~%s/s",
             num_chunks,

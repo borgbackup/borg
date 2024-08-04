@@ -1,7 +1,7 @@
 from ...archive import Archive
 from ...constants import *  # NOQA
 from ...manifest import Manifest
-from ...repository import Repository
+from ...repository3 import Repository3
 from . import cmd, create_regular_file, src_file, create_src_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -47,7 +47,7 @@ def test_delete_force(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", "--encryption=none")
     create_src_archive(archiver, "test")
-    with Repository(archiver.repository_path, exclusive=True) as repository:
+    with Repository3(archiver.repository_path, exclusive=True) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         archive = Archive(manifest, "test")
         for item in archive.iter_items():
@@ -69,7 +69,7 @@ def test_delete_double_force(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", "--encryption=none")
     create_src_archive(archiver, "test")
-    with Repository(archiver.repository_path, exclusive=True) as repository:
+    with Repository3(archiver.repository_path, exclusive=True) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         archive = Archive(manifest, "test")
         id = archive.metadata.items[0]

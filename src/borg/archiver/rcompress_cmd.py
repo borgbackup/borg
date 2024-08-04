@@ -24,14 +24,7 @@ def find_chunks(repository, repo_objs, stats, ctype, clevel, olevel):
     compr_keys = stats["compr_keys"] = set()
     compr_wanted = ctype, clevel, olevel
     state = None
-    chunks_count = len(repository)
-    chunks_limit = min(1000, max(100, chunks_count // 1000))
-    pi = ProgressIndicatorPercent(
-        total=chunks_count,
-        msg="Searching for recompression candidates %3.1f%%",
-        step=0.1,
-        msgid="rcompress.find_chunks",
-    )
+    chunks_limit = 1000
     while True:
         chunk_ids, state = repository.scan(limit=chunks_limit, state=state)
         if not chunk_ids:
@@ -44,8 +37,6 @@ def find_chunks(repository, repo_objs, stats, ctype, clevel, olevel):
             compr_keys.add(compr_found)
             stats[compr_found] += 1
             stats["checked_count"] += 1
-            pi.show(increase=1)
-    pi.finish()
     return recompress_ids
 
 

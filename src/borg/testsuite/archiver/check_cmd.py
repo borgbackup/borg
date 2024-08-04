@@ -8,7 +8,7 @@ from ...archive import ChunkBuffer
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack
 from ...manifest import Manifest
-from ...repository import Repository
+from ...repository3 import Repository3
 from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -28,12 +28,10 @@ def test_check_usage(archivers, request):
     output = cmd(archiver, "check", "-v", "--progress", exit_code=0)
     assert "Starting repository check" in output
     assert "Starting archive consistency check" in output
-    assert "Checking segments" in output
 
     output = cmd(archiver, "check", "-v", "--repository-only", exit_code=0)
     assert "Starting repository check" in output
     assert "Starting archive consistency check" not in output
-    assert "Checking segments" not in output
 
     output = cmd(archiver, "check", "-v", "--archives-only", exit_code=0)
     assert "Starting repository check" not in output
@@ -348,7 +346,7 @@ def test_extra_chunks(archivers, request):
         pytest.skip("only works locally")
     check_cmd_setup(archiver)
     cmd(archiver, "check", exit_code=0)
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with Repository3(archiver.repository_location, exclusive=True) as repository:
         repository.put(b"01234567890123456789012345678901", b"xxxx")
         repository.commit(compact=False)
     output = cmd(archiver, "check", "-v", exit_code=0)  # orphans are not considered warnings anymore
@@ -391,7 +389,7 @@ def test_empty_repository(archivers, request):
     if archiver.get_kind() == "remote":
         pytest.skip("only works locally")
     check_cmd_setup(archiver)
-    with Repository(archiver.repository_location, exclusive=True) as repository:
+    with Repository3(archiver.repository_location, exclusive=True) as repository:
         for id_ in repository.list():
             repository.delete(id_)
         repository.commit(compact=False)

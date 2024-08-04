@@ -3,7 +3,7 @@ import argparse
 from ._common import Highlander
 from ..constants import *  # NOQA
 from ..helpers import parse_storage_quota
-from ..remote import RepositoryServer
+from ..remote3 import RepositoryServer
 
 from ..logger import create_logger
 

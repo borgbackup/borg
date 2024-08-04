@@ -36,7 +36,7 @@ try:
     from ..helpers import ErrorIgnoringTextIOWrapper
     from ..helpers import msgpack
     from ..helpers import sig_int
-    from ..remote import RemoteRepository
+    from ..remote3 import RemoteRepository3
     from ..selftest import selftest
 except BaseException:
     # an unhandled exception in the try-block would cause the borg cli command to exit with rc 1 due to python's
@@ -68,7 +68,6 @@ def get_func(args):
 from .benchmark_cmd import BenchmarkMixIn
 from .check_cmd import CheckMixIn
 from .compact_cmd import CompactMixIn
-from .config_cmd import ConfigMixIn
 from .create_cmd import CreateMixIn
 from .debug_cmd import DebugMixIn
 from .delete_cmd import DeleteMixIn
@@ -98,7 +97,6 @@ class Archiver(
     BenchmarkMixIn,
     CheckMixIn,
     CompactMixIn,
-    ConfigMixIn,
     CreateMixIn,
     DebugMixIn,
     DeleteMixIn,
@@ -336,7 +334,6 @@ class Archiver(
         self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
         self.build_parser_check(subparsers, common_parser, mid_common_parser)
         self.build_parser_compact(subparsers, common_parser, mid_common_parser)
-        self.build_parser_config(subparsers, common_parser, mid_common_parser)
         self.build_parser_create(subparsers, common_parser, mid_common_parser)
         self.build_parser_debug(subparsers, common_parser, mid_common_parser)
         self.build_parser_delete(subparsers, common_parser, mid_common_parser)
@@ -412,22 +409,6 @@ class Archiver(
             elif not args.paths_from_stdin:
                 # need at least 1 path but args.paths may also be populated from patterns
                 parser.error("Need at least one PATH argument.")
-        if not getattr(args, "lock", True):  # Option --bypass-lock sets args.lock = False
-            bypass_allowed = {
-                self.do_check,
-                self.do_config,
-                self.do_diff,
-                self.do_export_tar,
-                self.do_extract,
-                self.do_info,
-                self.do_rinfo,
-                self.do_list,
-                self.do_rlist,
-                self.do_mount,
-                self.do_umount,
-            }
-            if func not in bypass_allowed:
-                raise Error("Not allowed to bypass locking mechanism for chosen command")
         # we can only have a complete knowledge of placeholder replacements we should do **after** arg parsing,
         # e.g. due to options like --timestamp that override the current time.
         # thus we have to initialize replace_placeholders here and process all args that need placeholder replacement.
@@ -581,7 +562,7 @@ def sig_trace_handler(sig_no, stack):  # pragma: no cover
 
 def format_tb(exc):
     qualname = type(exc).__qualname__
-    remote = isinstance(exc, RemoteRepository.RPCError)
+    remote = isinstance(exc, RemoteRepository3.RPCError)
     if remote:
         prefix = "Borg server: "
         trace_back = "\n".join(prefix + line for line in exc.exception_full.splitlines())
@@ -659,7 +640,7 @@ def main():  # pragma: no cover
             tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
             tb = format_tb(e)
             exit_code = e.exit_code
-        except RemoteRepository.RPCError as e:
+        except RemoteRepository3.RPCError as e:
             important = e.traceback
             msg = e.exception_full if important else e.get_message()
             msgid = e.exception_class

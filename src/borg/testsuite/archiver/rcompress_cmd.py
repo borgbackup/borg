@@ -1,7 +1,7 @@
 import os
 
 from ...constants import *  # NOQA
-from ...repository import Repository
+from ...repository3 import Repository3
 from ...manifest import Manifest
 from ...compress import ZSTD, ZLIB, LZ4, CNONE
 from ...helpers import bin_to_hex
@@ -12,7 +12,7 @@ from . import create_regular_file, cmd, RK_ENCRYPTION
 def test_rcompress(archiver):
     def check_compression(ctype, clevel, olevel):
         """check if all the chunks in the repo are compressed/obfuscated like expected"""
-        repository = Repository(archiver.repository_path, exclusive=True)
+        repository = Repository3(archiver.repository_path, exclusive=True)
         with repository:
             manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             state = None

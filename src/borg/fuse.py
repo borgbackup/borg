@@ -46,7 +46,7 @@ from .helpers.lrucache import LRUCache
 from .item import Item
 from .platform import uid2user, gid2group
 from .platformflags import is_darwin
-from .remote import RemoteRepository
+from .remote import RemoteRepository  # TODO 3
 
 
 def fuse_main():

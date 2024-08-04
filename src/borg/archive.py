@@ -51,7 +51,7 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import cache_if_remote
-from .repository import Repository, LIST_SCAN_LIMIT
+from .repository3 import Repository3, LIST_SCAN_LIMIT
 from .repoobj import RepoObj
 
 has_link = hasattr(os, "link")
@@ -1046,7 +1046,7 @@ Duration: {0.duration}
         def fetch_async_response(wait=True):
             try:
                 return self.repository.async_response(wait=wait)
-            except Repository.ObjectNotFound:
+            except Repository3.ObjectNotFound:
                 nonlocal error
                 # object not in repo - strange, but we wanted to delete it anyway.
                 if forced == 0:
@@ -1093,7 +1093,7 @@ Duration: {0.duration}
                     error = True
             if progress:
                 pi.finish()
-        except (msgpack.UnpackException, Repository.ObjectNotFound):
+        except (msgpack.UnpackException, Repository3.ObjectNotFound):
             # items metadata corrupted
             if forced == 0:
                 raise
@@ -1887,7 +1887,7 @@ class ArchiveChecker:
         # Explicitly set the initial usable hash table capacity to avoid performance issues
         # due to hash table "resonance".
         # Since reconstruction of archive items can add some new chunks, add 10 % headroom.
-        self.chunks = ChunkIndex(usable=len(self.repository) * 1.1)
+        self.chunks = ChunkIndex()
         marker = None
         while True:
             result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
@@ -1939,7 +1939,7 @@ class ArchiveChecker:
                 chunk_id = chunk_ids_revd.pop(-1)  # better efficiency
                 try:
                     encrypted_data = next(chunk_data_iter)
-                except (Repository.ObjectNotFound, IntegrityErrorBase) as err:
+                except (Repository3.ObjectNotFound, IntegrityErrorBase) as err:
                     self.error_found = True
                     errors += 1
                     logger.error("chunk %s: %s", bin_to_hex(chunk_id), err)

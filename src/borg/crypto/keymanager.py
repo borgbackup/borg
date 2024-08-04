@@ -5,7 +5,7 @@ from hashlib import sha256
 
 from ..helpers import Error, yes, bin_to_hex, hex_to_bin, dash_open
 from ..manifest import Manifest, NoManifestError
-from ..repository import Repository
+from ..repository3 import Repository3
 from ..repoobj import RepoObj
 
 
@@ -50,7 +50,7 @@ class KeyManager:
 
         try:
             manifest_chunk = self.repository.get(Manifest.MANIFEST_ID)
-        except Repository.ObjectNotFound:
+        except Repository3.ObjectNotFound:
             raise NoManifestError
 
         manifest_data = RepoObj.extract_crypted_data(manifest_chunk)

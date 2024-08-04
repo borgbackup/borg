@@ -13,24 +13,6 @@ from ...hashindex import ChunkIndex
 from ...cache import LocalCache
 
 
-def test_check_corrupted_repository(archiver):
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    create_src_archive(archiver, "test")
-    cmd(archiver, "extract", "test", "--dry-run")
-    cmd(archiver, "check")
-
-    name = sorted(os.listdir(os.path.join(archiver.tmpdir, "repository", "data", "0")), reverse=True)[1]
-    with open(os.path.join(archiver.tmpdir, "repository", "data", "0", name), "r+b") as fd:
-        fd.seek(100)
-        fd.write(b"XXXX")
-
-    if archiver.FORK_DEFAULT:
-        cmd(archiver, "check", exit_code=1)
-    else:
-        with pytest.raises(Error):
-            cmd(archiver, "check")
-
-
 def corrupt_archiver(archiver):
     create_test_files(archiver.input_path)
     cmd(archiver, "rcreate", RK_ENCRYPTION)

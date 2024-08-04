@@ -9,7 +9,7 @@ from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ...helpers import CommandError
 from ...helpers import bin_to_hex, hex_to_bin
 from ...helpers import msgpack
-from ...repository import Repository
+from ...repository3 import Repository3
 from .. import key
 from . import RK_ENCRYPTION, KF_ENCRYPTION, cmd, _extract_repository_id, _set_repository_id, generate_archiver_tests
 
@@ -129,7 +129,7 @@ def test_key_export_repokey(archivers, request):
 
     assert export_contents.startswith("BORG_KEY " + bin_to_hex(repo_id) + "\n")
 
-    with Repository(archiver.repository_path) as repository:
+    with Repository3(archiver.repository_path) as repository:
         repo_key = AESOCBRepoKey(repository)
         repo_key.load(None, Passphrase.env_passphrase())
 
@@ -138,12 +138,12 @@ def test_key_export_repokey(archivers, request):
 
     assert repo_key.crypt_key == backup_key.crypt_key
 
-    with Repository(archiver.repository_path) as repository:
+    with Repository3(archiver.repository_path) as repository:
         repository.save_key(b"")
 
     cmd(archiver, "key", "import", export_file)
 
-    with Repository(archiver.repository_path) as repository:
+    with Repository3(archiver.repository_path) as repository:
         repo_key2 = AESOCBRepoKey(repository)
         repo_key2.load(None, Passphrase.env_passphrase())
 
@@ -302,7 +302,7 @@ def test_init_defaults_to_argon2(archivers, request):
     """https://github.com/borgbackup/borg/issues/747#issuecomment-1076160401"""
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
-    with Repository(archiver.repository_path) as repository:
+    with Repository3(archiver.repository_path) as repository:
         key = msgpack.unpackb(binascii.a2b_base64(repository.load_key()))
         assert key["algorithm"] == "argon2 chacha20-poly1305"
 
@@ -313,7 +313,7 @@ def test_change_passphrase_does_not_change_algorithm_argon2(archivers, request):
     os.environ["BORG_NEW_PASSPHRASE"] = "newpassphrase"
     cmd(archiver, "key", "change-passphrase")
 
-    with Repository(archiver.repository_path) as repository:
+    with Repository3(archiver.repository_path) as repository:
         key = msgpack.unpackb(binascii.a2b_base64(repository.load_key()))
         assert key["algorithm"] == "argon2 chacha20-poly1305"
 
@@ -323,6 +323,6 @@ def test_change_location_does_not_change_algorithm_argon2(archivers, request):
     cmd(archiver, "rcreate", KF_ENCRYPTION)
     cmd(archiver, "key", "change-location", "repokey")
 
-    with Repository(archiver.repository_path) as repository:
+    with Repository3(archiver.repository_path) as repository:
         key = msgpack.unpackb(binascii.a2b_base64(repository.load_key()))
         assert key["algorithm"] == "argon2 chacha20-poly1305"

@@ -12,7 +12,7 @@ from ..cache import AdHocCache
 from ..crypto.key import AESOCBRepoKey
 from ..hashindex import ChunkIndex, CacheSynchronizer
 from ..manifest import Manifest
-from ..repository import Repository
+from ..repository3 import Repository3
 
 
 class TestCacheSynchronizer:
@@ -164,7 +164,7 @@ class TestAdHocCache:
     @pytest.fixture
     def repository(self, tmpdir):
         self.repository_location = os.path.join(str(tmpdir), "repository")
-        with Repository(self.repository_location, exclusive=True, create=True) as repository:
+        with Repository3(self.repository_location, exclusive=True, create=True) as repository:
             repository.put(H(1), b"1234")
             repository.put(Manifest.MANIFEST_ID, b"5678")
             yield repository
@@ -201,7 +201,7 @@ class TestAdHocCache:
         assert cache.seen_chunk(H(5)) == 1
         cache.chunk_decref(H(5), 1, Statistics())
         assert not cache.seen_chunk(H(5))
-        with pytest.raises(Repository.ObjectNotFound):
+        with pytest.raises(Repository3.ObjectNotFound):
             repository.get(H(5))
 
     def test_files_cache(self, cache):

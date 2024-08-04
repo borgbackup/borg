@@ -246,11 +246,11 @@ class Manifest:
     def load(cls, repository, operations, key=None, *, ro_cls=RepoObj):
         from .item import ManifestItem
         from .crypto.key import key_factory
-        from .repository import Repository
+        from .repository3 import Repository3
 
         try:
             cdata = repository.get(cls.MANIFEST_ID)
-        except Repository.ObjectNotFound:
+        except Repository3.ObjectNotFound:
             raise NoManifestError
         if not key:
             key = key_factory(repository, cdata, ro_cls=ro_cls)

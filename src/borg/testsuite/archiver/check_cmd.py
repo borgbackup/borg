@@ -9,6 +9,7 @@ from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack
 from ...manifest import Manifest
 from ...repository3 import Repository3
+from ..repository3 import fchunk
 from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -207,7 +208,7 @@ def test_corrupted_manifest(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         manifest = repository.get(Manifest.MANIFEST_ID)
-        corrupted_manifest = manifest + b"corrupted!"
+        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
         repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
         repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
@@ -257,7 +258,7 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         manifest = repository.get(Manifest.MANIFEST_ID)
-        corrupted_manifest = manifest + b"corrupted!"
+        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
         repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
         chunk = repository.get(archive.id)
         corrupted_chunk = chunk + b"corrupted!"
@@ -276,7 +277,7 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
     repo_objs = archive.repo_objs
     with repository:
         manifest = repository.get(Manifest.MANIFEST_ID)
-        corrupted_manifest = manifest + b"corrupted!"
+        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
         repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
         archive_dict = {
             "command_line": "",
@@ -307,7 +308,7 @@ def test_spoofed_archive(archivers, request):
     with repository:
         # attacker would corrupt or delete the manifest to trigger a rebuild of it:
         manifest = repository.get(Manifest.MANIFEST_ID)
-        corrupted_manifest = manifest + b"corrupted!"
+        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
         repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
         archive_dict = {
             "command_line": "",
@@ -347,7 +348,8 @@ def test_extra_chunks(archivers, request):
     check_cmd_setup(archiver)
     cmd(archiver, "check", exit_code=0)
     with Repository3(archiver.repository_location, exclusive=True) as repository:
-        repository.put(b"01234567890123456789012345678901", b"xxxx")
+        chunk = fchunk(b"xxxx")
+        repository.put(b"01234567890123456789012345678901", chunk)
         repository.commit(compact=False)
     output = cmd(archiver, "check", "-v", exit_code=0)  # orphans are not considered warnings anymore
     assert "1 orphaned (unused) objects found." in output
@@ -374,7 +376,7 @@ def test_verify_data(archivers, request, init_args):
                 repository.put(chunk.id, data)
                 break
         repository.commit(compact=False)
-    cmd(archiver, "check", exit_code=0)
+    cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "--verify-data", exit_code=1)
     assert bin_to_hex(chunk.id) + ", integrity error" in output
 

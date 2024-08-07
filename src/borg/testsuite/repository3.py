@@ -5,6 +5,7 @@ from typing import Optional
 
 import pytest
 
+from ..checksums import xxh64
 from ..helpers import Location
 from ..helpers import IntegrityError
 from ..platformflags import is_win32
@@ -57,19 +58,19 @@ def reopen(repository, exclusive: Optional[bool] = True, create=False):
 
 def fchunk(data, meta=b""):
     # format chunk: create a raw chunk that has valid RepoObj layout, but does not use encryption or compression.
-    meta_len = RepoObj.meta_len_hdr.pack(len(meta))
+    hdr = RepoObj.obj_header.pack(len(meta), len(data), xxh64(meta), xxh64(data))
     assert isinstance(data, bytes)
-    chunk = meta_len + meta + data
+    chunk = hdr + meta + data
     return chunk
 
 
 def pchunk(chunk):
     # parse chunk: parse data and meta from a raw chunk made by fchunk
-    meta_len_size = RepoObj.meta_len_hdr.size
-    meta_len = chunk[:meta_len_size]
-    meta_len = RepoObj.meta_len_hdr.unpack(meta_len)[0]
-    meta = chunk[meta_len_size : meta_len_size + meta_len]
-    data = chunk[meta_len_size + meta_len :]
+    hdr_size = RepoObj.obj_header.size
+    hdr = chunk[:hdr_size]
+    meta_size, data_size = RepoObj.obj_header.unpack(hdr)[0:2]
+    meta = chunk[hdr_size : hdr_size + meta_size]
+    data = chunk[hdr_size + meta_size : hdr_size + meta_size + data_size]
     return data, meta
 
 
@@ -99,9 +100,9 @@ def test_basic_operations(repo_fixtures, request):
 def test_read_data(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         meta, data = b"meta", b"data"
-        meta_len = RepoObj.meta_len_hdr.pack(len(meta))
-        chunk_complete = meta_len + meta + data
-        chunk_short = meta_len + meta
+        hdr = RepoObj.obj_header.pack(len(meta), len(data), xxh64(meta), xxh64(data))
+        chunk_complete = hdr + meta + data
+        chunk_short = hdr + meta
         repository.put(H(0), chunk_complete)
         assert repository.get(H(0)) == chunk_complete
         assert repository.get(H(0), read_data=True) == chunk_complete
@@ -152,7 +153,7 @@ def test_scan(repo_fixtures, request):
 
 def test_max_data_size(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
-        max_data = b"x" * (MAX_DATA_SIZE - RepoObj.meta_len_hdr.size)
+        max_data = b"x" * (MAX_DATA_SIZE - RepoObj.obj_header.size)
         repository.put(H(0), fchunk(max_data))
         assert pdchunk(repository.get(H(0))) == max_data
         with pytest.raises(IntegrityError):

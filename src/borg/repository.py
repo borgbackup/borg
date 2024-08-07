@@ -1837,25 +1837,24 @@ class LoggedIO:
                         # supporting separately encrypted metadata and data.
                         # In this case, we return enough bytes so the client can decrypt the metadata
                         # and seek over the rest (over the encrypted data).
-                        meta_len_size = RepoObj.meta_len_hdr.size
-                        meta_len = fd.read(meta_len_size)
-                        length -= meta_len_size
-                        if len(meta_len) != meta_len_size:
+                        hdr_size = RepoObj.obj_header.size
+                        hdr = fd.read(hdr_size)
+                        length -= hdr_size
+                        if len(hdr) != hdr_size:
                             raise IntegrityError(
                                 f"Segment entry meta length short read [segment {segment}, offset {offset}]: "
-                                f"expected {meta_len_size}, got {len(meta_len)} bytes"
+                                f"expected {hdr_size}, got {len(hdr)} bytes"
                             )
-                        ml = RepoObj.meta_len_hdr.unpack(meta_len)[0]
-                        meta = fd.read(ml)
-                        length -= ml
-                        if len(meta) != ml:
+                        meta_size = RepoObj.obj_header.unpack(hdr)[0]
+                        meta = fd.read(meta_size)
+                        length -= meta_size
+                        if len(meta) != meta_size:
                             raise IntegrityError(
                                 f"Segment entry meta short read [segment {segment}, offset {offset}]: "
-                                f"expected {ml}, got {len(meta)} bytes"
+                                f"expected {meta_size}, got {len(meta)} bytes"
                             )
-                        data = meta_len + meta  # shortened chunk - enough so the client can decrypt the metadata
-                        # we do not have a checksum for this data, but the client's AEAD crypto will check it.
-                    # in any case, we see over the remainder of the chunk
+                        data = hdr + meta  # shortened chunk - enough so the client can decrypt the metadata
+                    # in any case, we seek over the remainder of the chunk
                     oldpos = fd.tell()
                     seeked = fd.seek(length, os.SEEK_CUR) - oldpos
                     if seeked != length:

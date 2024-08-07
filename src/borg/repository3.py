@@ -3,6 +3,7 @@ import os
 from borgstore.store import Store
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
 
+from .checksums import xxh64
 from .constants import *  # NOQA
 from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
@@ -184,16 +185,46 @@ class Repository3:
         pass
 
     def check(self, repair=False, max_duration=0):
-        """Check repository consistency
+        """Check repository consistency"""
+        def log_error(msg):
+            nonlocal obj_corrupted
+            obj_corrupted = True
+            logger.error(f"Repo object {info.name} is corrupted: {msg}")
 
-        This method verifies all segment checksums and makes sure
-        the index is consistent with the data stored in the segments.
-        """
+        # TODO: implement repair, progress indicator, partial checks, ...
         mode = "full"
         logger.info("Starting repository check")
-        # XXX TODO
-        logger.info("Finished %s repository check, no problems found.", mode)
-        return True
+        objs_checked = objs_errors = 0
+        infos = self.store.list("data")
+        for info in infos:
+            obj_corrupted = False
+            key = "data/%s" % info.name
+            obj = self.store.load(key)
+            hdr_size = RepoObj.obj_header.size
+            obj_size = len(obj)
+            if obj_size >= hdr_size:
+                hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
+                meta = obj[hdr_size:hdr_size+hdr.meta_size]
+                if hdr.meta_size != len(meta):
+                    log_error("metadata size incorrect.")
+                elif hdr.meta_hash != xxh64(meta):
+                    log_error("metadata does not match checksum.")
+                data = obj[hdr_size+hdr.meta_size:hdr_size+hdr.meta_size+hdr.data_size]
+                if hdr.data_size != len(data):
+                    log_error("data size incorrect.")
+                elif hdr.data_hash != xxh64(data):
+                    log_error("data does not match checksum.")
+            else:
+                log_error("too small.")
+            objs_checked += 1
+            if obj_corrupted:
+                objs_errors += 1
+        logger.info(f"Checked {objs_checked} repository objects, {objs_errors} errors.")
+        if objs_errors == 0:
+            logger.info("Finished %s repository check, no problems found.", mode)
+        else:
+            logger.error("Finished %s repository check, errors found.", mode)
+        return objs_errors == 0 or repair
 
     def scan_low_level(self, segment=None, offset=None):
         raise NotImplementedError
@@ -244,25 +275,25 @@ class Repository3:
             else:
                 # RepoObj layout supports separately encrypted metadata and data.
                 # We return enough bytes so the client can decrypt the metadata.
-                meta_len_size = RepoObj.meta_len_hdr.size
-                extra_len = 1024 - meta_len_size  # load a bit more, 1024b, reduces round trips
-                obj = self.store.load(key, size=meta_len_size + extra_len)
-                meta_len = obj[0:meta_len_size]
-                if len(meta_len) != meta_len_size:
+                hdr_size = RepoObj.obj_header.size
+                extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
+                obj = self.store.load(key, size=hdr_size + extra_size)
+                hdr = obj[0:hdr_size]
+                if len(hdr) != hdr_size:
                     raise IntegrityError(
-                        f"Object too small [id {id_hex}]: expected {meta_len_size}, got {len(meta_len)} bytes"
+                        f"Object too small [id {id_hex}]: expected {hdr_size}, got {len(hdr)} bytes"
                     )
-                ml = RepoObj.meta_len_hdr.unpack(meta_len)[0]
-                if ml > extra_len:
+                meta_size = RepoObj.obj_header.unpack(hdr)[0]
+                if meta_size > extra_size:
                     # we did not get enough, need to load more, but not all.
                     # this should be rare, as chunk metadata is rather small usually.
-                    obj = self.store.load(key, size=meta_len_size + ml)
-                meta = obj[meta_len_size:meta_len_size + ml]
-                if len(meta) != ml:
+                    obj = self.store.load(key, size=hdr_size + meta_size)
+                meta = obj[hdr_size:hdr_size + meta_size]
+                if len(meta) != meta_size:
                     raise IntegrityError(
-                        f"Object too small [id {id_hex}]: expected {ml}, got {len(meta)} bytes"
+                        f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes"
                     )
-                return meta_len + meta
+                return hdr + meta
         except StoreObjectNotFound:
             raise self.ObjectNotFound(id, self.path) from None
 

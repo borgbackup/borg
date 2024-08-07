@@ -1,6 +1,8 @@
+from collections import namedtuple
 from struct import Struct
 
 from .constants import *  # NOQA
+from .checksums import xxh64
 from .helpers import msgpack, workarounds
 from .helpers.errors import IntegrityError
 from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
@@ -10,14 +12,17 @@ AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 
 class RepoObj:
-    meta_len_hdr = Struct("<H")  # 16bit unsigned int
+    # Object header format includes size infos for parsing the object into meta and data,
+    # as well as hashes to enable checking consistency without having the borg key.
+    obj_header = Struct("<II8s8s")  # meta size (32b), data size (32b), meta hash (64b), data hash (64b)
+    ObjHeader = namedtuple("ObjHeader", "meta_size data_size meta_hash data_hash")
 
     @classmethod
     def extract_crypted_data(cls, data: bytes) -> bytes:
         # used for crypto type detection
-        offs = cls.meta_len_hdr.size
-        meta_len = cls.meta_len_hdr.unpack(data[:offs])[0]
-        return data[offs + meta_len :]
+        hdr_size = cls.obj_header.size
+        hdr = cls.ObjHeader(*cls.obj_header.unpack(data[:hdr_size]))
+        return data[hdr_size + hdr.meta_size:]
 
     def __init__(self, key):
         self.key = key
@@ -61,8 +66,9 @@ class RepoObj:
         data_encrypted = self.key.encrypt(id, data_compressed)
         meta_packed = msgpack.packb(meta)
         meta_encrypted = self.key.encrypt(id, meta_packed)
-        hdr = self.meta_len_hdr.pack(len(meta_encrypted))
-        return hdr + meta_encrypted + data_encrypted
+        hdr = self.ObjHeader(len(meta_encrypted), len(data_encrypted), xxh64(meta_encrypted), xxh64(data_encrypted))
+        hdr_packed = self.obj_header.pack(*hdr)
+        return hdr_packed + meta_encrypted + data_encrypted
 
     def parse_meta(self, id: bytes, cdata: bytes, ro_type: str) -> dict:
         # when calling parse_meta, enough cdata needs to be supplied to contain completely the
@@ -71,11 +77,10 @@ class RepoObj:
         assert isinstance(cdata, bytes)
         assert isinstance(ro_type, str)
         obj = memoryview(cdata)
-        offs = self.meta_len_hdr.size
-        hdr = obj[:offs]
-        len_meta_encrypted = self.meta_len_hdr.unpack(hdr)[0]
-        assert offs + len_meta_encrypted <= len(obj)
-        meta_encrypted = obj[offs : offs + len_meta_encrypted]
+        hdr_size = self.obj_header.size
+        hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
+        assert hdr_size + hdr.meta_size <= len(obj)
+        meta_encrypted = obj[hdr_size:hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta = msgpack.unpackb(meta_packed)
         if ro_type != ROBJ_DONTCARE and meta["type"] != ro_type:
@@ -100,17 +105,16 @@ class RepoObj:
         assert isinstance(id, bytes)
         assert isinstance(cdata, bytes)
         obj = memoryview(cdata)
-        offs = self.meta_len_hdr.size
-        hdr = obj[:offs]
-        len_meta_encrypted = self.meta_len_hdr.unpack(hdr)[0]
-        assert offs + len_meta_encrypted <= len(obj)
-        meta_encrypted = obj[offs : offs + len_meta_encrypted]
-        offs += len_meta_encrypted
+        hdr_size = self.obj_header.size
+        hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
+        assert hdr_size + hdr.meta_size <= len(obj)
+        meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta_compressed = msgpack.unpackb(meta_packed)  # means: before adding more metadata in decompress block
         if ro_type != ROBJ_DONTCARE and meta_compressed["type"] != ro_type:
             raise IntegrityError(f"ro_type expected: {ro_type} got: {meta_compressed['type']}")
-        data_encrypted = obj[offs:]
+        assert hdr_size + hdr.meta_size + hdr.data_size <= len(obj)
+        data_encrypted = obj[hdr_size + hdr.meta_size:hdr_size + hdr.meta_size + hdr.data_size]
         data_compressed = self.key.decrypt(id, data_encrypted)  # does not include the type/level bytes
         if decompress:
             ctype = meta_compressed["ctype"]

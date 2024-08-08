@@ -172,6 +172,14 @@ class RCreateMixIn:
         keys to manage.
 
         Creating related repositories is useful e.g. if you want to use ``borg transfer`` later.
+
+        Creating a related repository for data migration from borg 1.2 or 1.4
+        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+        You can use ``borg rcreate --other-repo ORIG_REPO --from-borg1 ...`` to create a related
+        repository that uses the same secret key material as the given other/original repository.
+
+        Then use ``borg transfer --other-repo ORIG_REPO --from-borg1 ...`` to transfer the archives.
         """
         )
         subparser = subparsers.add_parser(
@@ -192,6 +200,9 @@ class RCreateMixIn:
             default=Location(other=True),
             action=Highlander,
             help="reuse the key material from the other repository",
+        )
+        subparser.add_argument(
+            "--from-borg1", dest="v1_or_v2", action="store_true", help="other repository is borg 1.x"
         )
         subparser.add_argument(
             "-e",

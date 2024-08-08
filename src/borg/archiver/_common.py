@@ -190,6 +190,8 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
             if not location.valid:  # nothing to do
                 return method(self, args, **kwargs)
 
+            v1_or_v2 = getattr(args, "v1_or_v2", False)
+
             repository = get_repository(
                 location,
                 create=False,
@@ -200,12 +202,14 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                 make_parent_dirs=False,
                 storage_quota=None,
                 args=args,
-                v1_or_v2=True
+                v1_or_v2=v1_or_v2,
             )
 
             with repository:
-                if repository.version not in (1, 2):
-                    raise Error("This borg version only accepts version 1 or 2 repos for --other-repo.")
+                acceptable_versions = (1, 2) if v1_or_v2 else (3,)
+                if repository.version not in acceptable_versions:
+                    raise Error(
+                        f"This borg version only accepts version {' or '.join(acceptable_versions)} repos for --other-repo.")
                 kwargs["other_repository"] = repository
                 if manifest or cache:
                     manifest_ = Manifest.load(

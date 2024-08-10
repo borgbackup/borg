@@ -8,6 +8,7 @@ from .constants import *  # NOQA
 from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
+from .locking3 import Lock
 from .logger import create_logger
 from .repoobj import RepoObj
 
@@ -82,7 +83,7 @@ class Repository3:
         path,
         create=False,
         exclusive=False,
-        lock_wait=None,
+        lock_wait=1.0,
         lock=True,
         append_only=False,
         storage_quota=None,
@@ -107,6 +108,10 @@ class Repository3:
         self.append_only = append_only  # XXX not implemented / not implementable
         self.storage_quota = storage_quota  # XXX not implemented
         self.storage_quota_use = 0  # XXX not implemented
+        self.lock = None
+        self.do_lock = lock
+        self.lock_wait = lock_wait
+        self.exclusive = exclusive
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.path}>"
@@ -116,7 +121,7 @@ class Repository3:
             self.do_create = False
             self.create()
             self.created = True
-        self.open()
+        self.open(exclusive=bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -143,6 +148,10 @@ class Repository3:
         self.id = id
         self.store.store("config/id", bin_to_hex(id).encode())
 
+    def _lock_refresh(self):
+        if self.lock is not None:
+            self.lock.refresh()
+
     def save_key(self, keydata):
         # note: saving an empty key means that there is no repokey anymore
         self.store.store("keys/repokey", keydata)
@@ -157,8 +166,13 @@ class Repository3:
         self.close()
         self.store.destroy()
 
-    def open(self):
+    def open(self, *, exclusive, lock_wait=None, lock=True):
+        assert lock_wait is not None
         self.store.open()
+        if lock:
+            self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
+        else:
+            self.lock = None
         readme = self.store.load("config/readme").decode()
         if readme != REPOSITORY_README:
             raise self.InvalidRepository(self.path)
@@ -173,6 +187,9 @@ class Repository3:
 
     def close(self):
         if self.opened:
+            if self.lock:
+                self.lock.release()
+                self.lock = None
             self.store.close()
             self.opened = False
 
@@ -197,6 +214,7 @@ class Repository3:
         objs_checked = objs_errors = 0
         infos = self.store.list("data")
         for info in infos:
+            self._lock_refresh()
             obj_corrupted = False
             key = "data/%s" % info.name
             obj = self.store.load(key)
@@ -241,6 +259,7 @@ class Repository3:
 
         if mask and value are given, only return IDs where flags & mask == value (default: all IDs).
         """
+        self._lock_refresh()
         infos = self.store.list("data")  # XXX we can only get the full list from the store
         ids = [hex_to_bin(info.name) for info in infos]
         if marker is not None:
@@ -266,6 +285,7 @@ class Repository3:
         return ids, state
 
     def get(self, id, read_data=True):
+        self._lock_refresh()
         id_hex = bin_to_hex(id)
         key = "data/" + id_hex
         try:
@@ -308,6 +328,7 @@ class Repository3:
         Note: when doing calls with wait=False this gets async and caller must
               deal with async results / exceptions later.
         """
+        self._lock_refresh()
         data_size = len(data)
         if data_size > MAX_DATA_SIZE:
             raise IntegrityError(f"More than allowed put data [{data_size} > {MAX_DATA_SIZE}]")
@@ -321,6 +342,7 @@ class Repository3:
         Note: when doing calls with wait=False this gets async and caller must
               deal with async results / exceptions later.
         """
+        self._lock_refresh()
         key = "data/" + bin_to_hex(id)
         try:
             self.store.delete(key)
@@ -342,4 +364,4 @@ class Repository3:
         """Preload objects (only applies to remote repositories)"""
 
     def break_lock(self):
-        pass
+        Lock(self.store).break_lock()

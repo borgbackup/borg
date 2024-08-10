@@ -577,7 +577,7 @@ class RemoteRepository3:
         location,
         create=False,
         exclusive=False,
-        lock_wait=None,
+        lock_wait=1.0,
         lock=True,
         append_only=False,
         make_parent_dirs=False,

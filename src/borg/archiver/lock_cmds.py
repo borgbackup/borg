@@ -5,7 +5,6 @@ from ._common import with_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import prepare_subprocess_env, set_ec, CommandError
-from ..manifest import Manifest
 
 from ..logger import create_logger
 
@@ -16,20 +15,6 @@ class LocksMixIn:
     @with_repository(manifest=False, exclusive=True)
     def do_with_lock(self, args, repository):
         """run a user specified command with the repository lock held"""
-        # for a new server, this will immediately take an exclusive lock.
-        # to support old servers, that do not have "exclusive" arg in open()
-        # RPC API, we also do it the old way:
-        # re-write manifest to start a repository transaction - this causes a
-        # lock upgrade to exclusive for remote (and also for local) repositories.
-        # by using manifest=False in the decorator, we avoid having to require
-        # the encryption key (and can operate just with encrypted data).
-        data = repository.get(Manifest.MANIFEST_ID)
-        repository.put(Manifest.MANIFEST_ID, data)
-        # usually, a 0 byte (open for writing) segment file would be visible in the filesystem here.
-        # we write and close this file, to rather have a valid segment file on disk, before invoking the subprocess.
-        # we can only do this for local repositories (with .io), though:
-        if hasattr(repository, "io"):
-            repository.io.close_segment()
         env = prepare_subprocess_env(system=True)
         try:
             # we exit with the return code we get from the subprocess
@@ -37,14 +22,6 @@ class LocksMixIn:
             set_ec(rc)
         except (FileNotFoundError, OSError, ValueError) as e:
             raise CommandError(f"Error while trying to run '{args.command}': {e}")
-        finally:
-            # we need to commit the "no change" operation we did to the manifest
-            # because it created a new segment file in the repository. if we would
-            # roll back, the same file would be later used otherwise (for other content).
-            # that would be bad if somebody uses rsync with ignore-existing (or
-            # any other mechanism relying on existing segment data not changing).
-            # see issue #1867.
-            repository.commit(compact=False)
 
     @with_repository(lock=False, manifest=False)
     def do_break_lock(self, args, repository):

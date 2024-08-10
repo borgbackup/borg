@@ -510,7 +510,7 @@ def define_common_options(add_common_option):
         metavar="SECONDS",
         dest="lock_wait",
         type=int,
-        default=int(os.environ.get("BORG_LOCK_WAIT", 1)),
+        default=int(os.environ.get("BORG_LOCK_WAIT", 10)),
         action=Highlander,
         help="wait at most SECONDS for acquiring a repository/cache lock (default: %(default)d).",
     )

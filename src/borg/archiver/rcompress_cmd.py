@@ -123,8 +123,8 @@ class RCompressMixIn:
 
         if not isinstance(repository, (Repository3, RemoteRepository3)):
             # start a new transaction
-            data = repository.get(Manifest.MANIFEST_ID)
-            repository.put(Manifest.MANIFEST_ID, data)
+            data = repository.get_manifest()
+            repository.put_manifest(data)
             uncommitted_chunks += 1
 
         pi = ProgressIndicatorPercent(

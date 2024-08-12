@@ -52,7 +52,7 @@ from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import cache_if_remote
 from .remote3 import RemoteRepository3
-from .repository3 import Repository3, LIST_SCAN_LIMIT
+from .repository3 import Repository3, LIST_SCAN_LIMIT, NoManifestError
 from .repoobj import RepoObj
 
 has_link = hasattr(os, "link")
@@ -1860,8 +1860,9 @@ class ArchiveChecker:
         self.repo_objs = RepoObj(self.key)
         if verify_data:
             self.verify_data()
-        if not isinstance(repository, (Repository3, RemoteRepository3)) and Manifest.MANIFEST_ID not in self.chunks:
-            logger.error("Repository manifest not found!")
+        try:
+            repository.get_manifest()
+        except NoManifestError:
             self.error_found = True
             self.manifest = self.rebuild_manifest()
         else:
@@ -1905,12 +1906,16 @@ class ArchiveChecker:
 
         #  try the manifest first!
         attempt += 1
-        cdata = repository.get_manifest()
         try:
-            return key_factory(repository, cdata)
-        except UnsupportedPayloadError:
-            # we get here, if the cdata we got has a corrupted key type byte
-            pass  # ignore it, just continue trying
+            cdata = repository.get_manifest()
+        except NoManifestError:
+            pass
+        else:
+            try:
+                return key_factory(repository, cdata)
+            except UnsupportedPayloadError:
+                # we get here, if the cdata we got has a corrupted key type byte
+                pass  # ignore it, just continue trying
 
         for chunkid, _ in self.chunks.iteritems():
             attempt += 1

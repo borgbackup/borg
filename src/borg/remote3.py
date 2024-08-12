@@ -32,6 +32,7 @@ from .helpers import prepare_subprocess_env, ignore_sigint
 from .helpers import get_socket_filename
 from .locking import LockTimeout, NotLocked, NotMyLock, LockFailed
 from .logger import create_logger, borg_serve_log_queue
+from .manifest import NoManifestError
 from .helpers import msgpack
 from .repository import Repository
 from .repository3 import Repository3
@@ -835,6 +836,8 @@ class RemoteRepository3:
                 raise NotLocked(args[0])
             elif error == "NotMyLock":
                 raise NotMyLock(args[0])
+            elif error == "NoManifestError":
+                raise NoManifestError
             else:
                 raise self.RPCError(unpacked)
 

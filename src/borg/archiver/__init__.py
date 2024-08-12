@@ -67,7 +67,6 @@ def get_func(args):
 
 from .benchmark_cmd import BenchmarkMixIn
 from .check_cmd import CheckMixIn
-from .compact_cmd import CompactMixIn
 from .create_cmd import CreateMixIn
 from .debug_cmd import DebugMixIn
 from .delete_cmd import DeleteMixIn
@@ -96,7 +95,6 @@ from .version_cmd import VersionMixIn
 class Archiver(
     BenchmarkMixIn,
     CheckMixIn,
-    CompactMixIn,
     CreateMixIn,
     DebugMixIn,
     DeleteMixIn,
@@ -333,7 +331,6 @@ class Archiver(
 
         self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
         self.build_parser_check(subparsers, common_parser, mid_common_parser)
-        self.build_parser_compact(subparsers, common_parser, mid_common_parser)
         self.build_parser_create(subparsers, common_parser, mid_common_parser)
         self.build_parser_debug(subparsers, common_parser, mid_common_parser)
         self.build_parser_delete(subparsers, common_parser, mid_common_parser)

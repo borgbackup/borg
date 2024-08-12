@@ -10,6 +10,7 @@ from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
 from .locking3 import Lock
 from .logger import create_logger
+from .manifest import NoManifestError
 from .repoobj import RepoObj
 
 logger = create_logger(__name__)
@@ -213,30 +214,38 @@ class Repository3:
         logger.info("Starting repository check")
         objs_checked = objs_errors = 0
         infos = self.store.list("data")
-        for info in infos:
-            self._lock_refresh()
-            obj_corrupted = False
-            key = "data/%s" % info.name
-            obj = self.store.load(key)
-            hdr_size = RepoObj.obj_header.size
-            obj_size = len(obj)
-            if obj_size >= hdr_size:
-                hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
-                meta = obj[hdr_size:hdr_size+hdr.meta_size]
-                if hdr.meta_size != len(meta):
-                    log_error("metadata size incorrect.")
-                elif hdr.meta_hash != xxh64(meta):
-                    log_error("metadata does not match checksum.")
-                data = obj[hdr_size+hdr.meta_size:hdr_size+hdr.meta_size+hdr.data_size]
-                if hdr.data_size != len(data):
-                    log_error("data size incorrect.")
-                elif hdr.data_hash != xxh64(data):
-                    log_error("data does not match checksum.")
-            else:
-                log_error("too small.")
-            objs_checked += 1
-            if obj_corrupted:
-                objs_errors += 1
+        try:
+            for info in infos:
+                self._lock_refresh()
+                obj_corrupted = False
+                key = "data/%s" % info.name
+                try:
+                    obj = self.store.load(key)
+                except StoreObjectNotFound:
+                    # looks like object vanished since store.list(), ignore that.
+                    continue
+                hdr_size = RepoObj.obj_header.size
+                obj_size = len(obj)
+                if obj_size >= hdr_size:
+                    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
+                    meta = obj[hdr_size:hdr_size+hdr.meta_size]
+                    if hdr.meta_size != len(meta):
+                        log_error("metadata size incorrect.")
+                    elif hdr.meta_hash != xxh64(meta):
+                        log_error("metadata does not match checksum.")
+                    data = obj[hdr_size+hdr.meta_size:hdr_size+hdr.meta_size+hdr.data_size]
+                    if hdr.data_size != len(data):
+                        log_error("data size incorrect.")
+                    elif hdr.data_hash != xxh64(data):
+                        log_error("data does not match checksum.")
+                else:
+                    log_error("too small.")
+                objs_checked += 1
+                if obj_corrupted:
+                    objs_errors += 1
+        except StoreObjectNotFound:
+            # it can be that there is no "data/" at all, then it crashes when iterating infos.
+            pass
         logger.info(f"Checked {objs_checked} repository objects, {objs_errors} errors.")
         if objs_errors == 0:
             logger.info("Finished %s repository check, no problems found.", mode)
@@ -261,7 +270,10 @@ class Repository3:
         """
         self._lock_refresh()
         infos = self.store.list("data")  # XXX we can only get the full list from the store
-        ids = [hex_to_bin(info.name) for info in infos]
+        try:
+            ids = [hex_to_bin(info.name) for info in infos]
+        except StoreObjectNotFound:
+            ids = []
         if marker is not None:
             idx = ids.index(marker)
             ids = ids[idx + 1:]
@@ -365,3 +377,27 @@ class Repository3:
 
     def break_lock(self):
         Lock(self.store).break_lock()
+
+    def get_manifest(self):
+        try:
+            return self.store.load("config/manifest")
+        except StoreObjectNotFound:
+            raise NoManifestError
+
+    def put_manifest(self, data):
+        return self.store.store("config/manifest", data)
+
+    def store_list(self, name):
+        try:
+            return list(self.store.list(name))
+        except StoreObjectNotFound:
+            return []
+
+    def store_load(self, name):
+        return self.store.load(name)
+
+    def store_store(self, name, value):
+        return self.store.store(name, value)
+
+    def store_delete(self, name):
+        return self.store.delete(name)

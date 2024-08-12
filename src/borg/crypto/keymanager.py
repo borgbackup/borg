@@ -3,9 +3,12 @@ import pkgutil
 import textwrap
 from hashlib import sha256
 
+from borgstore.store import ObjectNotFound as StoreObjectNotFound
+
 from ..helpers import Error, yes, bin_to_hex, hex_to_bin, dash_open
 from ..manifest import Manifest, NoManifestError
 from ..repository3 import Repository3
+from ..repository import Repository
 from ..repoobj import RepoObj
 
 
@@ -48,11 +51,7 @@ class KeyManager:
         self.keyblob = None
         self.keyblob_storage = None
 
-        try:
-            manifest_chunk = self.repository.get(Manifest.MANIFEST_ID)
-        except Repository3.ObjectNotFound:
-            raise NoManifestError
-
+        manifest_chunk = repository.get_manifest()
         manifest_data = RepoObj.extract_crypted_data(manifest_chunk)
         key = identify_key(manifest_data)
         self.keyblob_storage = key.STORAGE

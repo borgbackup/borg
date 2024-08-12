@@ -32,7 +32,8 @@ from .locking import Lock
 from .manifest import Manifest
 from .platform import SaveFile
 from .remote import cache_if_remote
-from .repository3 import LIST_SCAN_LIMIT
+from .remote3 import RemoteRepository3
+from .repository3 import LIST_SCAN_LIMIT, Repository3
 
 # note: cmtime might be either a ctime or a mtime timestamp, chunks is a list of ChunkListEntry
 FileCacheEntry = namedtuple("FileCacheEntry", "age inode size cmtime chunks")
@@ -737,7 +738,8 @@ class ChunksMixin:
                 num_chunks += 1
                 chunks[id_] = init_entry
         # LocalCache does not contain the manifest, either.
-        del chunks[self.manifest.MANIFEST_ID]
+        if not isinstance(self.repository, (Repository3, RemoteRepository3)):
+            del chunks[self.manifest.MANIFEST_ID]
         duration = perf_counter() - t0 or 0.01
         logger.debug(
             "Cache: downloaded %d chunk IDs in %.2f s (%d requests), ~%s/s",

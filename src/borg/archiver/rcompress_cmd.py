@@ -5,7 +5,8 @@ from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec, ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..helpers import sig_int, ProgressIndicatorPercent, Error
-
+from ..repository3 import Repository3
+from ..remote3 import RemoteRepository3
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -120,10 +121,11 @@ class RCompressMixIn:
         chunks_limit = min(1000, max(100, recompress_candidate_count // 1000))
         uncommitted_chunks = 0
 
-        # start a new transaction
-        data = repository.get(Manifest.MANIFEST_ID)
-        repository.put(Manifest.MANIFEST_ID, data)
-        uncommitted_chunks += 1
+        if not isinstance(repository, (Repository3, RemoteRepository3)):
+            # start a new transaction
+            data = repository.get(Manifest.MANIFEST_ID)
+            repository.put(Manifest.MANIFEST_ID, data)
+            uncommitted_chunks += 1
 
         pi = ProgressIndicatorPercent(
             total=len(recompress_ids), msg="Recompressing %3.1f%%", step=0.1, msgid="rcompress.process_chunks"

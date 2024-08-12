@@ -23,7 +23,7 @@ from .helpers import msgpack
 from .helpers.lrucache import LRUCache
 from .locking import Lock, LockError, LockErrorT
 from .logger import create_logger
-from .manifest import Manifest
+from .manifest import Manifest, NoManifestError
 from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
 from .repoobj import RepoObj
 from .checksums import crc32, StreamingXXH64
@@ -1395,6 +1395,15 @@ class Repository:
 
     def preload(self, ids):
         """Preload objects (only applies to remote repositories)"""
+
+    def get_manifest(self):
+        try:
+            return self.get(Manifest.MANIFEST_ID)
+        except self.ObjectNotFound:
+            raise NoManifestError
+
+    def put_manifest(self, data):
+        return self.put(Manifest.MANIFEST_ID, data)
 
 
 class LoggedIO:

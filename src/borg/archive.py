@@ -51,6 +51,7 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import cache_if_remote
+from .remote3 import RemoteRepository3
 from .repository3 import Repository3, LIST_SCAN_LIMIT
 from .repoobj import RepoObj
 
@@ -1852,14 +1853,14 @@ class ArchiveChecker:
         self.repair = repair
         self.repository = repository
         self.init_chunks()
-        if not self.chunks:
+        if not isinstance(repository, (Repository3, RemoteRepository3)) and not self.chunks:
             logger.error("Repository contains no apparent data at all, cannot continue check/repair.")
             return False
         self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)
         if verify_data:
             self.verify_data()
-        if Manifest.MANIFEST_ID not in self.chunks:
+        if not isinstance(repository, (Repository3, RemoteRepository3)) and Manifest.MANIFEST_ID not in self.chunks:
             logger.error("Repository manifest not found!")
             self.error_found = True
             self.manifest = self.rebuild_manifest()
@@ -1869,7 +1870,8 @@ class ArchiveChecker:
             except IntegrityErrorBase as exc:
                 logger.error("Repository manifest is corrupted: %s", exc)
                 self.error_found = True
-                del self.chunks[Manifest.MANIFEST_ID]
+                if not isinstance(repository, (Repository3, RemoteRepository3)):
+                    del self.chunks[Manifest.MANIFEST_ID]
                 self.manifest = self.rebuild_manifest()
         self.rebuild_refcounts(
             match=match, first=first, last=last, sort_by=sort_by, older=older, oldest=oldest, newer=newer, newest=newest
@@ -1900,6 +1902,16 @@ class ArchiveChecker:
 
     def make_key(self, repository):
         attempt = 0
+
+        #  try the manifest first!
+        attempt += 1
+        cdata = repository.get_manifest()
+        try:
+            return key_factory(repository, cdata)
+        except UnsupportedPayloadError:
+            # we get here, if the cdata we got has a corrupted key type byte
+            pass  # ignore it, just continue trying
+
         for chunkid, _ in self.chunks.iteritems():
             attempt += 1
             if attempt > 999:
@@ -2070,7 +2082,8 @@ class ArchiveChecker:
         Missing and/or incorrect data is repaired when detected
         """
         # Exclude the manifest from chunks (manifest entry might be already deleted from self.chunks)
-        self.chunks.pop(Manifest.MANIFEST_ID, None)
+        if not isinstance(self.repository, (Repository3, RemoteRepository3)):
+            self.chunks.pop(Manifest.MANIFEST_ID, None)
 
         def mark_as_possibly_superseded(id_):
             if self.chunks.get(id_, ChunkIndexEntry(0, 0)).refcount == 0:

@@ -5,13 +5,14 @@ from datetime import datetime, timedelta, timezone
 from operator import attrgetter
 from collections.abc import Sequence
 
-from .logger import create_logger
+from borgstore.store import ObjectNotFound, ItemInfo
 
+from .logger import create_logger
 logger = create_logger()
 
 from .constants import *  # NOQA
 from .helpers.datastruct import StableDict
-from .helpers.parseformat import bin_to_hex
+from .helpers.parseformat import bin_to_hex, hex_to_bin
 from .helpers.time import parse_timestamp, calculate_relative_offset, archive_ts_now
 from .helpers.errors import Error
 from .patterns import get_regex_from_pattern
@@ -246,12 +247,10 @@ class Manifest:
     def load(cls, repository, operations, key=None, *, ro_cls=RepoObj):
         from .item import ManifestItem
         from .crypto.key import key_factory
+        from .remote3 import RemoteRepository3
         from .repository3 import Repository3
 
-        try:
-            cdata = repository.get(cls.MANIFEST_ID)
-        except Repository3.ObjectNotFound:
-            raise NoManifestError
+        cdata = repository.get_manifest()
         if not key:
             key = key_factory(repository, cdata, ro_cls=ro_cls)
         manifest = cls(key, repository, ro_cls=ro_cls)
@@ -261,7 +260,24 @@ class Manifest:
         manifest.id = manifest.repo_objs.id_hash(data)
         if m.get("version") not in (1, 2):
             raise ValueError("Invalid manifest version")
-        manifest.archives.set_raw_dict(m.archives)
+
+        if isinstance(repository, (Repository3, RemoteRepository3)):
+            from .helpers import msgpack
+            archives = {}
+            try:
+                infos = list(repository.store_list("archives"))
+            except ObjectNotFound:
+                infos = []
+            for info in infos:
+                info = ItemInfo(*info)  # RPC does not give us a NamedTuple
+                value = repository.store_load(f"archives/{info.name}")
+                _, value = manifest.repo_objs.parse(hex_to_bin(info.name), value, ro_type=ROBJ_MANIFEST)
+                archive = msgpack.unpackb(value)
+                archives[archive["name"]] = dict(id=archive["id"], time=archive["time"])
+            manifest.archives.set_raw_dict(archives)
+        else:
+            manifest.archives.set_raw_dict(m.archives)
+
         manifest.timestamp = m.get("timestamp")
         manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
@@ -298,6 +314,8 @@ class Manifest:
 
     def write(self):
         from .item import ManifestItem
+        from .remote3 import RemoteRepository3
+        from .repository3 import Repository3
 
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
@@ -312,12 +330,39 @@ class Manifest:
         assert all(len(name) <= 255 for name in self.archives)
         assert len(self.item_keys) <= 100
         self.config["item_keys"] = tuple(sorted(self.item_keys))
+
+        if isinstance(self.repository, (Repository3, RemoteRepository3)):
+            valid_keys = set()
+            for name, info in self.archives.get_raw_dict().items():
+                archive = dict(name=name, id=info["id"], time=info["time"])
+                value = self.key.pack_metadata(archive)
+                id = self.repo_objs.id_hash(value)
+                key = bin_to_hex(id)
+                value = self.repo_objs.format(id, {}, value, ro_type=ROBJ_MANIFEST)
+                self.repository.store_store(f"archives/{key}", value)
+                valid_keys.add(key)
+            # now, delete all other keys in archives/ which are not in valid keys / in the manifest anymore.
+            # TODO: this is a dirty hack to simulate the old manifest behaviour closely, but also means
+            #       keeping its problems, like read-modify-write behaviour requiring an exclusive lock.
+            try:
+                infos = list(self.repository.store_list("archives"))
+            except ObjectNotFound:
+                infos = []
+            for info in infos:
+                info = ItemInfo(*info)  # RPC does not give us a NamedTuple
+                if info.name not in valid_keys:
+                    self.repository.store_delete(f"archives/{info.name}")
+            manifest_archives = {}
+        else:
+            manifest_archives = StableDict(self.archives.get_raw_dict())
+
         manifest = ManifestItem(
             version=2,
-            archives=StableDict(self.archives.get_raw_dict()),
+            archives=manifest_archives,
             timestamp=self.timestamp,
             config=StableDict(self.config),
         )
         data = self.key.pack_metadata(manifest.as_dict())
         self.id = self.repo_objs.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.repo_objs.format(self.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST))
+        robj = self.repo_objs.format(self.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST)
+        self.repository.put_manifest(robj)

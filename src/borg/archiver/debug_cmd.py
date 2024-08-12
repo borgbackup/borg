@@ -100,7 +100,8 @@ class DebugMixIn:
     def do_debug_dump_manifest(self, args, repository, manifest):
         """dump decoded repository manifest"""
         repo_objs = manifest.repo_objs
-        _, data = repo_objs.parse(manifest.MANIFEST_ID, repository.get(manifest.MANIFEST_ID), ro_type=ROBJ_MANIFEST)
+        cdata = repository.get_manifest()
+        _, data = repo_objs.parse(manifest.MANIFEST_ID, cdata, ro_type=ROBJ_MANIFEST)
 
         meta = prepare_dump_dict(msgpack.unpackb(data, object_hook=StableDict))
 

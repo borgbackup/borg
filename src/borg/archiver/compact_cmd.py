@@ -3,6 +3,8 @@ import argparse
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..manifest import Manifest
+from ..repository3 import Repository3
+from ..remote3 import RemoteRepository3
 
 from ..logger import create_logger
 
@@ -13,11 +15,12 @@ class CompactMixIn:
     @with_repository(manifest=False, exclusive=True)
     def do_compact(self, args, repository):
         """compact segment files in the repository"""
-        # see the comment in do_with_lock about why we do it like this:
-        data = repository.get(Manifest.MANIFEST_ID)
-        repository.put(Manifest.MANIFEST_ID, data)
-        threshold = args.threshold / 100
-        repository.commit(compact=True, threshold=threshold)
+        if not isinstance(repository, (Repository3, RemoteRepository3)):
+            # see the comment in do_with_lock about why we do it like this:
+            data = repository.get(Manifest.MANIFEST_ID)
+            repository.put(Manifest.MANIFEST_ID, data)
+            threshold = args.threshold / 100
+            repository.commit(compact=True, threshold=threshold)
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

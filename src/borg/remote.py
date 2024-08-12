@@ -156,6 +156,8 @@ class RepositoryServer:  # pragma: no cover
         "load_key",
         "break_lock",
         "inject_exception",
+        "get_manifest",
+        "put_manifest",
     )
 
     def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota, use_socket):
@@ -1045,6 +1047,14 @@ class RemoteRepository:
 
     def preload(self, ids):
         self.preload_ids += ids
+
+    @api(since=parse_version("2.0.0b8"))
+    def get_manifest(self):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"))
+    def put_manifest(self, data):
+        """actual remoting is done via self.call in the @api decorator"""
 
 
 class RepositoryNoCache:

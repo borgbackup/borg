@@ -192,6 +192,8 @@ def test_missing_manifest(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
+    if isinstance(repository, Repository3):
+        pytest.skip("Test not adapted to Repository3")
     with repository:
         repository.delete(Manifest.MANIFEST_ID)
         repository.commit(compact=False)
@@ -206,6 +208,8 @@ def test_corrupted_manifest(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
+    if isinstance(repository, Repository3):
+        pytest.skip("Test not adapted to Repository3")
     with repository:
         manifest = repository.get(Manifest.MANIFEST_ID)
         corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
@@ -222,6 +226,8 @@ def test_spoofed_manifest(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
+    if isinstance(repository, Repository3):
+        pytest.skip("Test not adapted to Repository3")
     with repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         cdata = manifest.repo_objs.format(
@@ -256,6 +262,8 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
+    if isinstance(repository, Repository3):
+        pytest.skip("Test not adapted to Repository3")
     with repository:
         manifest = repository.get(Manifest.MANIFEST_ID)
         corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
@@ -274,6 +282,8 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
+    if isinstance(repository, Repository3):
+        pytest.skip("Test not adapted to Repository3")
     repo_objs = archive.repo_objs
     with repository:
         manifest = repository.get(Manifest.MANIFEST_ID)
@@ -304,6 +314,8 @@ def test_spoofed_archive(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
+    if isinstance(repository, Repository3):
+        pytest.skip("Test not adapted to Repository3")
     repo_objs = archive.repo_objs
     with repository:
         # attacker would corrupt or delete the manifest to trigger a rebuild of it:

@@ -398,22 +398,7 @@ Total chunks: {0.total_chunks}
     Summary = namedtuple("Summary", ["total_size", "unique_size", "total_unique_chunks", "total_chunks"])
 
     def stats(self):
-        from .archive import Archive
-
-        if isinstance(self, AdHocCache) and getattr(self, "chunks", None) is None:
-            self.chunks = self._load_chunks_from_repo()  # AdHocCache usually only has .chunks after begin_txn.
-
-        # XXX: this should really be moved down to `hashindex.pyx`
-        total_size, unique_size, total_unique_chunks, total_chunks = self.chunks.summarize()
-        # since borg 1.2 we have new archive metadata telling the total size per archive,
-        # so we can just sum up all archives to get the "all archives" stats:
-        total_size = 0
-        for archive_name in self.manifest.archives:
-            archive = Archive(self.manifest, archive_name)
-            stats = archive.calc_stats(self, want_unique=False)
-            total_size += stats.osize
-        stats = self.Summary(total_size, unique_size, total_unique_chunks, total_chunks)._asdict()
-        return stats
+        return self.Summary(0, 0, 0, 0)._asdict()  # dummy to not cause crash with current code
 
     def format_tuple(self):
         stats = self.stats()

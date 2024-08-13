@@ -141,18 +141,6 @@ class HashIndexTestCase(BaseTestCase):
         assert idx1[H(3)] == (3, 300)
         assert idx1[H(4)] == (6, 400)
 
-    def test_chunkindex_summarize(self):
-        idx = ChunkIndex()
-        idx[H(1)] = 1, 1000
-        idx[H(2)] = 2, 2000
-        idx[H(3)] = 3, 3000
-
-        size, unique_size, unique_chunks, chunks = idx.summarize()
-        assert size == 1000 + 2 * 2000 + 3 * 3000
-        assert unique_size == 1000 + 2000 + 3000
-        assert chunks == 1 + 2 + 3
-        assert unique_chunks == 3
-
     def test_flags(self):
         idx = NSIndex()
         key = H(0)

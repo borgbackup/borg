@@ -463,65 +463,6 @@ cdef class ChunkIndex(IndexBase):
             iter.key = key - self.key_size
         return iter
 
-    def summarize(self):
-        cdef uint64_t size = 0, unique_size = 0, chunks = 0, unique_chunks = 0
-        cdef uint32_t *values
-        cdef uint32_t refcount
-        cdef unsigned char *key = NULL
-
-        while True:
-            key = hashindex_next_key(self.index, key)
-            if not key:
-                break
-            unique_chunks += 1
-            values = <uint32_t*> (key + self.key_size)
-            refcount = _le32toh(values[0])
-            assert refcount <= _MAX_VALUE, "invalid reference count"
-            chunks += refcount
-            unique_size += _le32toh(values[1])
-            size += <uint64_t> _le32toh(values[1]) * _le32toh(values[0])
-
-        return size, unique_size, unique_chunks, chunks
-
-    def stats_against(self, ChunkIndex master_index):
-        """
-        Calculate chunk statistics of this index against *master_index*.
-
-        A chunk is counted as unique if the number of references
-        in this index matches the number of references in *master_index*.
-
-        This index must be a subset of *master_index*.
-
-        Return the same statistics tuple as summarize:
-        size, unique_size, unique_chunks, chunks.
-        """
-        cdef uint64_t size = 0, unique_size = 0, chunks = 0, unique_chunks = 0
-        cdef uint32_t our_refcount, chunk_size
-        cdef const uint32_t *our_values
-        cdef const uint32_t *master_values
-        cdef const unsigned char *key = NULL
-        cdef HashIndex *master = master_index.index
-
-        while True:
-            key = hashindex_next_key(self.index, key)
-            if not key:
-                break
-            our_values = <const uint32_t*> (key + self.key_size)
-            master_values = <const uint32_t*> hashindex_get(master, key)
-            if not master_values:
-                raise ValueError('stats_against: key contained in self but not in master_index.')
-            our_refcount = _le32toh(our_values[0])
-            chunk_size = _le32toh(master_values[1])
-
-            chunks += our_refcount
-            size += <uint64_t> chunk_size * our_refcount
-            if our_values[0] == master_values[0]:
-                # our refcount equals the master's refcount, so this chunk is unique to us
-                unique_chunks += 1
-                unique_size += chunk_size
-
-        return size, unique_size, unique_chunks, chunks
-
     def add(self, key, refs, size):
         assert len(key) == self.key_size
         cdef uint32_t[2] data

@@ -355,12 +355,7 @@ def test_extra_chunks(archivers, request):
         chunk = fchunk(b"xxxx")
         repository.put(b"01234567890123456789012345678901", chunk)
         repository.commit(compact=False)
-    output = cmd(archiver, "check", "-v", exit_code=0)  # orphans are not considered warnings anymore
-    assert "1 orphaned (unused) objects found." in output
-    cmd(archiver, "check", "--repair", exit_code=0)
-    output = cmd(archiver, "check", "-v", exit_code=0)
-    assert "orphaned (unused) objects found." not in output
-    cmd(archiver, "extract", "archive1", "--dry-run", exit_code=0)
+    cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 
 @pytest.mark.parametrize("init_args", [["--encryption=repokey-aes-ocb"], ["--encryption", "none"]])

@@ -1877,7 +1877,6 @@ class ArchiveChecker:
         self.rebuild_refcounts(
             match=match, first=first, last=last, sort_by=sort_by, older=older, oldest=oldest, newer=newer, newest=newest
         )
-        self.orphan_chunks_check()
         self.finish()
         if self.error_found:
             logger.error("Archive consistency check complete, problems found.")
@@ -2345,25 +2344,6 @@ class ArchiveChecker:
                 add_reference(new_archive_id, len(data), cdata)
                 self.manifest.archives[info.name] = (new_archive_id, info.ts)
             pi.finish()
-
-    def orphan_chunks_check(self):
-        if self.check_all:
-            unused = {id_ for id_, entry in self.chunks.iteritems() if entry.refcount == 0}
-            orphaned = unused - self.possibly_superseded
-            if orphaned:
-                logger.info(f"{len(orphaned)} orphaned (unused) objects found.")
-                for chunk_id in orphaned:
-                    logger.debug(f"chunk {bin_to_hex(chunk_id)} is orphaned.")
-                # To support working with AdHocCache or AdHocWithFilesCache, we do not set self.error_found = True.
-            if self.repair and unused:
-                logger.info(
-                    "Deleting %d orphaned and %d superseded objects..." % (len(orphaned), len(self.possibly_superseded))
-                )
-                for id_ in unused:
-                    self.repository.delete(id_)
-                logger.info("Finished deleting orphaned/superseded objects.")
-        else:
-            logger.info("Orphaned objects check skipped (needs all archives checked).")
 
     def finish(self):
         if self.repair:

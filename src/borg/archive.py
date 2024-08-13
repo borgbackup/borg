@@ -29,7 +29,7 @@ from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .helpers import BackupError, BackupRaceConditionError
 from .helpers import BackupOSError, BackupPermissionError, BackupFileNotFoundError, BackupIOError
-from .hashindex import ChunkIndex, ChunkIndexEntry, CacheSynchronizer
+from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
@@ -711,34 +711,8 @@ Duration: {0.duration}
         return metadata
 
     def calc_stats(self, cache, want_unique=True):
-        if not want_unique:
-            unique_size = 0
-        else:
-
-            def add(id):
-                entry = cache.chunks[id]
-                archive_index.add(id, 1, entry.size)
-
-            archive_index = ChunkIndex()
-            sync = CacheSynchronizer(archive_index)
-            add(self.id)
-            # we must escape any % char in the archive name, because we use it in a format string, see #6500
-            arch_name_escd = self.name.replace("%", "%%")
-            pi = ProgressIndicatorPercent(
-                total=len(self.metadata.items),
-                msg="Calculating statistics for archive %s ... %%3.0f%%%%" % arch_name_escd,
-                msgid="archive.calc_stats",
-            )
-            for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
-                pi.show(increase=1)
-                add(id)
-                _, data = self.repo_objs.parse(id, chunk, ro_type=ROBJ_ARCHIVE_STREAM)
-                sync.feed(data)
-            unique_size = archive_index.stats_against(cache.chunks)[1]
-            pi.finish()
-
         stats = Statistics(iec=self.iec)
-        stats.usize = unique_size
+        stats.usize = 0  # this is expensive to compute
         stats.nfiles = self.metadata.nfiles
         stats.osize = self.metadata.size
         return stats

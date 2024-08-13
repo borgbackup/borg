@@ -1134,7 +1134,6 @@ The *digests* key contains a mapping of part names to their digests.
 Integrity data is generally stored by the upper layers, introduced below. An exception
 is the DetachedIntegrityCheckedFile, which automatically writes and reads it from
 a ".integrity" file next to the data file.
-It is used for archive chunks indexes in chunks.archive.d.
 
 Upper layer
 ~~~~~~~~~~~
@@ -1181,14 +1180,6 @@ easy to tell whether the checksums concern the current state of the cache.
 
 Integrity errors are fatal in these files, terminating the program,
 and are not automatically corrected at this time.
-
-.. rubric:: chunks.archive.d
-
-Indices in chunks.archive.d are not transacted and use DetachedIntegrityCheckedFile,
-which writes the integrity data to a separate ".integrity" file.
-
-Integrity errors result in deleting the affected index and rebuilding it.
-This logs a warning and increases the exit code to WARNING (1).
 
 .. _integrity_repo:
 

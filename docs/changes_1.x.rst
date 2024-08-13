@@ -3469,7 +3469,7 @@ Other changes:
   - archiver tests: add check_cache tool - lints refcounts
 
 - fixed cache sync performance regression from 1.1.0b1 onwards, #1940
-- syncing the cache without chunks.archive.d (see :ref:`disable_archive_chunks`)
+- syncing the cache without chunks.archive.d
   now avoids any merges and is thus faster, #1940
 - borg check --verify-data: faster due to linear on-disk-order scan
 - borg debug-xxx commands removed, we use "debug xxx" subcommands now, #1627

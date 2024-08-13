@@ -550,7 +550,7 @@ def test_create_pattern_intermediate_folders_first(archivers, request):
     assert out_list.index("d x/b") < out_list.index("- x/b/foo_b")
 
 
-@pytest.mark.skipif(get_cache_impl() in ("adhocwithfiles", "local"), reason="only works with AdHocCache")
+@pytest.mark.skipif(get_cache_impl() != "adhoc", reason="only works with AdHocCache")
 def test_create_no_cache_sync_adhoc(archivers, request):  # TODO: add test for AdHocWithFilesCache
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)

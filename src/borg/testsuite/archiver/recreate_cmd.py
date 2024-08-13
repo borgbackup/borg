@@ -16,7 +16,6 @@ from . import (
     _assert_test_keep_tagged,
     _extract_hardlinks_setup,
     generate_archiver_tests,
-    check_cache,
     cmd,
     create_regular_file,
     create_test_files,
@@ -96,12 +95,12 @@ def test_recreate_target(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "rcreate", RK_ENCRYPTION)
-    check_cache(archiver)
+    cmd(archiver, "check")
     cmd(archiver, "create", "test0", "input")
-    check_cache(archiver)
+    cmd(archiver, "check")
     original_archive = cmd(archiver, "rlist")
     cmd(archiver, "recreate", "test0", "input/dir2", "-e", "input/dir2/file3", "--target=new-archive")
-    check_cache(archiver)
+    cmd(archiver, "check")
 
     archives = cmd(archiver, "rlist")
     assert original_archive in archives
@@ -120,7 +119,7 @@ def test_recreate_basic(archivers, request):
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     cmd(archiver, "create", "test0", "input")
     cmd(archiver, "recreate", "test0", "input/dir2", "-e", "input/dir2/file3")
-    check_cache(archiver)
+    cmd(archiver, "check")
     listing = cmd(archiver, "list", "test0", "--short")
     assert "file1" not in listing
     assert "dir2/file2" in listing
@@ -134,7 +133,7 @@ def test_recreate_subtree_hardlinks(archivers, request):
     _extract_hardlinks_setup(archiver)
     cmd(archiver, "create", "test2", "input")
     cmd(archiver, "recreate", "-a", "test", "input/dir1")
-    check_cache(archiver)
+    cmd(archiver, "check")
     with changedir("output"):
         cmd(archiver, "extract", "test")
         assert os.stat("input/dir1/hardlink").st_nlink == 2
@@ -159,7 +158,7 @@ def test_recreate_rechunkify(archivers, request):
     # right now, the file is chunked differently
     assert num_chunks1 != num_chunks2
     cmd(archiver, "recreate", "--chunker-params", "default")
-    check_cache(archiver)
+    cmd(archiver, "check")
     num_chunks1 = int(cmd(archiver, "list", "test1", "input/large_file", "--format", "{num_chunks}"))
     num_chunks2 = int(cmd(archiver, "list", "test2", "input/large_file", "--format", "{num_chunks}"))
     # now the files are chunked in the same way
@@ -220,7 +219,7 @@ def test_recreate_dry_run(archivers, request):
     cmd(archiver, "create", "test", "input")
     archives_before = cmd(archiver, "list", "test")
     cmd(archiver, "recreate", "-n", "-e", "input/compressible")
-    check_cache(archiver)
+    cmd(archiver, "check")
     archives_after = cmd(archiver, "list", "test")
     assert archives_after == archives_before
 
@@ -232,7 +231,7 @@ def test_recreate_skips_nothing_to_do(archivers, request):
     cmd(archiver, "create", "test", "input")
     info_before = cmd(archiver, "info", "-a", "test")
     cmd(archiver, "recreate", "--chunker-params", "default")
-    check_cache(archiver)
+    cmd(archiver, "check")
     info_after = cmd(archiver, "info", "-a", "test")
     assert info_before == info_after  # includes archive ID
 
@@ -248,22 +247,22 @@ def test_recreate_list_output(archivers, request):
     cmd(archiver, "create", "test", "input")
 
     output = cmd(archiver, "recreate", "-a", "test", "--list", "--info", "-e", "input/file2")
-    check_cache(archiver)
+    cmd(archiver, "check")
     assert "input/file1" in output
     assert "- input/file2" in output
 
     output = cmd(archiver, "recreate", "-a", "test", "--list", "-e", "input/file3")
-    check_cache(archiver)
+    cmd(archiver, "check")
     assert "input/file1" in output
     assert "- input/file3" in output
 
     output = cmd(archiver, "recreate", "-a", "test", "-e", "input/file4")
-    check_cache(archiver)
+    cmd(archiver, "check")
     assert "input/file1" not in output
     assert "- input/file4" not in output
 
     output = cmd(archiver, "recreate", "-a", "test", "--info", "-e", "input/file5")
-    check_cache(archiver)
+    cmd(archiver, "check")
     assert "input/file1" not in output
     assert "- input/file5" not in output
 

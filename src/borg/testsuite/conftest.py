@@ -9,8 +9,7 @@ if hasattr(pytest, "register_assert_rewrite"):
     pytest.register_assert_rewrite("borg.testsuite")
 
 
-import borg.cache  # noqa: E402
-from borg.archiver import Archiver
+from borg.archiver import Archiver  # noqa: E402
 from borg.logger import setup_logging  # noqa: E402
 
 # Ensure that the loggers exist for all tests
@@ -54,28 +53,6 @@ def pytest_report_header(config, start_path):
     output = "Tests enabled: " + ", ".join(enabled) + "\n"
     output += "Tests disabled: " + ", ".join(disabled)
     return output
-
-
-class DefaultPatches:
-    def __init__(self, request):
-        self.org_cache_wipe_cache = borg.cache.LocalCache.wipe_cache
-
-        def wipe_should_not_be_called(*a, **kw):
-            raise AssertionError(
-                "Cache wipe was triggered, if this is part of the test add " "@pytest.mark.allow_cache_wipe"
-            )
-
-        if "allow_cache_wipe" not in request.keywords:
-            borg.cache.LocalCache.wipe_cache = wipe_should_not_be_called
-        request.addfinalizer(self.undo)
-
-    def undo(self):
-        borg.cache.LocalCache.wipe_cache = self.org_cache_wipe_cache
-
-
-@pytest.fixture(autouse=True)
-def default_patches(request):
-    return DefaultPatches(request)
 
 
 @pytest.fixture()

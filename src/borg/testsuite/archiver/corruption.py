@@ -2,15 +2,12 @@ import io
 import json
 import os
 from configparser import ConfigParser
-from unittest.mock import patch
 
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import bin_to_hex, Error
-from . import cmd, create_src_archive, create_test_files, RK_ENCRYPTION
-from ...hashindex import ChunkIndex
-from ...cache import LocalCache
+from ...helpers import bin_to_hex
+from . import cmd, create_test_files, RK_ENCRYPTION
 
 
 def corrupt_archiver(archiver):
@@ -27,40 +24,6 @@ def corrupt(file, amount=1):
         fd.write(corrupted)
 
 
-@pytest.mark.allow_cache_wipe
-def test_cache_chunks(archiver):
-    corrupt_archiver(archiver)
-    if archiver.cache_path is None:
-        pytest.skip("no cache path for this kind of Cache implementation")
-
-    create_src_archive(archiver, "test")
-    chunks_path = os.path.join(archiver.cache_path, "chunks")
-    if not os.path.exists(chunks_path):
-        pytest.skip("no persistent chunks index for this kind of Cache implementation")
-
-    chunks_before_corruption = set(ChunkIndex(path=chunks_path).iteritems())
-
-    corrupt(chunks_path)
-
-    assert not archiver.FORK_DEFAULT  # test does not support forking
-
-    chunks_in_memory = None
-    sync_chunks = LocalCache.sync
-
-    def sync_wrapper(cache):
-        nonlocal chunks_in_memory
-        sync_chunks(cache)
-        chunks_in_memory = set(cache.chunks.iteritems())
-
-    with patch.object(LocalCache, "sync", sync_wrapper):
-        out = cmd(archiver, "rinfo")
-
-    assert chunks_in_memory == chunks_before_corruption
-    assert "forcing a cache rebuild" in out
-    chunks_after_repair = set(ChunkIndex(path=chunks_path).iteritems())
-    assert chunks_after_repair == chunks_before_corruption
-
-
 def test_cache_files(archiver):
     corrupt_archiver(archiver)
     if archiver.cache_path is None:
@@ -71,42 +34,6 @@ def test_cache_files(archiver):
     out = cmd(archiver, "create", "test1", "input")
     # borg warns about the corrupt files cache, but then continues without files cache.
     assert "files cache is corrupted" in out
-
-
-def test_chunks_archive(archiver):
-    corrupt_archiver(archiver)
-    if archiver.cache_path is None:
-        pytest.skip("no cache path for this kind of Cache implementation")
-
-    cmd(archiver, "create", "test1", "input")
-    # Find ID of test1, so we can corrupt it later :)
-    target_id = cmd(archiver, "rlist", "--format={id}{NL}").strip()
-    cmd(archiver, "create", "test2", "input")
-
-    # Force cache sync, creating archive chunks of test1 and test2 in chunks.archive.d
-    cmd(archiver, "rdelete", "--cache-only")
-    cmd(archiver, "rinfo", "--json")
-
-    chunks_archive = os.path.join(archiver.cache_path, "chunks.archive.d")
-    if not os.path.exists(chunks_archive):
-        pytest.skip("Only LocalCache has a per-archive chunks index cache.")
-    assert len(os.listdir(chunks_archive)) == 4  # two archives, one chunks cache and one .integrity file each
-
-    corrupt(os.path.join(chunks_archive, target_id + ".compact"))
-
-    # Trigger cache sync by changing the manifest ID in the cache config
-    config_path = os.path.join(archiver.cache_path, "config")
-    config = ConfigParser(interpolation=None)
-    config.read(config_path)
-    config.set("cache", "manifest", bin_to_hex(bytes(32)))
-    with open(config_path, "w") as fd:
-        config.write(fd)
-
-    # Cache sync notices corrupted archive chunks, but automatically recovers.
-    out = cmd(archiver, "create", "-v", "test3", "input", exit_code=1)
-    assert "Reading cached archive chunk index for test1" in out
-    assert "Cached archive chunk index of test1 is corrupted" in out
-    assert "Fetching and building archive index for test1" in out
 
 
 def test_old_version_interfered(archiver):

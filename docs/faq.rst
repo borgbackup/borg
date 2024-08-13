@@ -704,38 +704,6 @@ serialized way in a single script, you need to give them ``--lock-wait N`` (with
 being a bit more than the time the server needs to terminate broken down
 connections and release the lock).
 
-.. _disable_archive_chunks:
-
-The borg cache eats way too much disk space, what can I do?
------------------------------------------------------------
-
-This may especially happen if borg needs to rebuild the local "chunks" index -
-either because it was removed, or because it was not coherent with the
-repository state any more (e.g. because another borg instance changed the
-repository).
-
-To optimize this rebuild process, borg caches per-archive information in the
-``chunks.archive.d/`` directory. It won't help the first time it happens, but it
-will make the subsequent rebuilds faster (because it needs to transfer less data
-from the repository). While being faster, the cache needs quite some disk space,
-which might be unwanted.
-
-You can disable the cached archive chunk indexes by setting the environment
-variable ``BORG_USE_CHUNKS_ARCHIVE`` to ``no``.
-
-This has some pros and cons, though:
-
-- much less disk space needs for ~/.cache/borg.
-- chunk cache resyncs will be slower as it will have to transfer chunk usage
-  metadata for all archives from the repository (which might be slow if your
-  repo connection is slow) and it will also have to build the hashtables from
-  that data.
-  chunk cache resyncs happen e.g. if your repo was written to by another
-  machine (if you share same backup repo between multiple machines) or if
-  your local chunks cache was lost somehow.
-
-The long term plan to improve this is called "borgception", see :issue:`474`.
-
 Can I back up my root partition (/) with Borg?
 ----------------------------------------------
 

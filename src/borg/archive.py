@@ -1038,84 +1038,11 @@ Duration: {0.duration}
         self.set_meta("name", name)
         del self.manifest.archives[oldname]
 
-    def delete(self, stats, progress=False, forced=False):
-        class ChunksIndexError(Error):
-            """Chunk ID {} missing from chunks index, corrupted chunks index - aborting transaction."""
-
-        exception_ignored = object()
-
-        def fetch_async_response(wait=True):
-            try:
-                return self.repository.async_response(wait=wait)
-            except Repository3.ObjectNotFound:
-                nonlocal error
-                # object not in repo - strange, but we wanted to delete it anyway.
-                if forced == 0:
-                    raise
-                error = True
-                return exception_ignored  # must not return None here
-
-        def chunk_decref(id, size, stats):
-            try:
-                self.cache.chunk_decref(id, size, stats, wait=False)
-            except KeyError:
-                nonlocal error
-                if forced == 0:
-                    cid = bin_to_hex(id)
-                    raise ChunksIndexError(cid)
-                error = True
-            else:
-                fetch_async_response(wait=False)
-
-        error = False
-        try:
-            unpacker = msgpack.Unpacker(use_list=False)
-            items_ids = self.metadata.items
-            pi = ProgressIndicatorPercent(
-                total=len(items_ids), msg="Decrementing references %3.0f%%", msgid="archive.delete"
-            )
-            for i, (items_id, data) in enumerate(zip(items_ids, self.repository.get_many(items_ids))):
-                if progress:
-                    pi.show(i)
-                _, data = self.repo_objs.parse(items_id, data, ro_type=ROBJ_ARCHIVE_STREAM)
-                unpacker.feed(data)
-                chunk_decref(items_id, 1, stats)
-                try:
-                    for item in unpacker:
-                        item = Item(internal_dict=item)
-                        if "chunks" in item:
-                            for chunk_id, size in item.chunks:
-                                chunk_decref(chunk_id, size, stats)
-                except (TypeError, ValueError):
-                    # if items metadata spans multiple chunks and one chunk got dropped somehow,
-                    # it could be that unpacker yields bad types
-                    if forced == 0:
-                        raise
-                    error = True
-            if progress:
-                pi.finish()
-        except (msgpack.UnpackException, Repository3.ObjectNotFound):
-            # items metadata corrupted
-            if forced == 0:
-                raise
-            error = True
-
-        # delete the blocks that store all the references that end up being loaded into metadata.items:
-        for id in self.metadata.item_ptrs:
-            chunk_decref(id, 1, stats)
-
-        # in forced delete mode, we try hard to delete at least the manifest entry,
-        # if possible also the archive superblock, even if processing the items raises
-        # some harmless exception.
-        chunk_decref(self.id, 1, stats)
+    def delete(self):
+        # quick and dirty: we just nuke the archive from the archives list - that will
+        # potentially orphan all chunks previously referenced by the archive, except the ones also
+        # referenced by other archives. In the end, "borg compact" will clean up and free space.
         del self.manifest.archives[self.name]
-        while fetch_async_response(wait=True) is not None:
-            # we did async deletes, process outstanding results (== exceptions),
-            # so there is nothing pending when we return and our caller wants to commit.
-            pass
-        if error:
-            logger.warning("forced deletion succeeded, but the deleted archive was corrupted.")
-            logger.warning("borg check --repair is required to free all space.")
 
     @staticmethod
     def compare_archives_iter(
@@ -2501,7 +2428,7 @@ class ArchiveRecreater:
 
         target.save(comment=comment, timestamp=self.timestamp, additional_metadata=additional_metadata)
         if replace_original:
-            archive.delete(Statistics(), progress=self.progress)
+            archive.delete()
             target.rename(archive.name)
         if self.stats:
             target.start = _start

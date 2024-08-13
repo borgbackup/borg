@@ -1,11 +1,9 @@
 import argparse
 import logging
 
-from ._common import with_repository, Highlander
-from ..archive import Archive, Statistics
-from ..cache import Cache
+from ._common import with_repository
 from ..constants import *  # NOQA
-from ..helpers import log_multi, format_archive, sig_int, CommandError, Error
+from ..helpers import format_archive, CommandError
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -29,67 +27,30 @@ class DeleteMixIn:
                 "or just delete the whole repository (might be much faster)."
             )
 
-        if args.forced == 2:
-            deleted = False
-            logger_list = logging.getLogger("borg.output.list")
-            for i, archive_name in enumerate(archive_names, 1):
-                try:
-                    current_archive = manifest.archives.pop(archive_name)
-                except KeyError:
-                    self.print_warning(f"Archive {archive_name} not found ({i}/{len(archive_names)}).")
-                else:
-                    deleted = True
-                    if self.output_list:
-                        msg = "Would delete: {} ({}/{})" if dry_run else "Deleted archive: {} ({}/{})"
-                        logger_list.info(msg.format(format_archive(current_archive), i, len(archive_names)))
-            if dry_run:
-                logger.info("Finished dry-run.")
-            elif deleted:
-                manifest.write()
-                # note: might crash in compact() after committing the repo
-                repository.commit(compact=False)
-                self.print_warning('Done. Run "borg check --repair" to clean up the mess.', wc=None)
+        deleted = False
+        logger_list = logging.getLogger("borg.output.list")
+        for i, archive_name in enumerate(archive_names, 1):
+            try:
+                # this does NOT use Archive.delete, so this code hopefully even works in cases a corrupt archive
+                # would make the code in class Archive crash, so the user can at least get rid of such archives.
+                current_archive = manifest.archives.pop(archive_name)
+            except KeyError:
+                self.print_warning(f"Archive {archive_name} not found ({i}/{len(archive_names)}).")
             else:
-                self.print_warning("Aborted.", wc=None)
-            return
+                deleted = True
+                if self.output_list:
+                    msg = "Would delete: {} ({}/{})" if dry_run else "Deleted archive: {} ({}/{})"
+                    logger_list.info(msg.format(format_archive(current_archive), i, len(archive_names)))
+        if dry_run:
+            logger.info("Finished dry-run.")
+        elif deleted:
+            manifest.write()
+            repository.commit(compact=False)
+            self.print_warning('Done. Run "borg compact" to free space.', wc=None)
+        else:
+            self.print_warning("Aborted.", wc=None)
+        return
 
-        stats = Statistics(iec=args.iec)
-        with Cache(repository, manifest, progress=args.progress, lock_wait=self.lock_wait, iec=args.iec) as cache:
-
-            def checkpoint_func():
-                manifest.write()
-                repository.commit(compact=False)
-                cache.commit()
-
-            msg_delete = "Would delete archive: {} ({}/{})" if dry_run else "Deleting archive: {} ({}/{})"
-            msg_not_found = "Archive {} not found ({}/{})."
-            logger_list = logging.getLogger("borg.output.list")
-            uncommitted_deletes = 0
-            for i, archive_name in enumerate(archive_names, 1):
-                if sig_int and sig_int.action_done():
-                    break
-                try:
-                    archive_info = manifest.archives[archive_name]
-                except KeyError:
-                    self.print_warning(msg_not_found.format(archive_name, i, len(archive_names)))
-                else:
-                    if self.output_list:
-                        logger_list.info(msg_delete.format(format_archive(archive_info), i, len(archive_names)))
-
-                    if not dry_run:
-                        archive = Archive(manifest, archive_name, cache=cache)
-                        archive.delete(stats, progress=args.progress, forced=args.forced)
-                        checkpointed = self.maybe_checkpoint(
-                            checkpoint_func=checkpoint_func, checkpoint_interval=args.checkpoint_interval
-                        )
-                        uncommitted_deletes = 0 if checkpointed else (uncommitted_deletes + 1)
-            if sig_int:
-                # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
-                raise Error("Got Ctrl-C / SIGINT.")
-            elif uncommitted_deletes > 0:
-                checkpoint_func()
-            if args.stats:
-                log_multi(str(stats), logger=logging.getLogger("borg.output.stats"))
 
     def build_parser_delete(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_archive_filters_group
@@ -103,16 +64,9 @@ class DeleteMixIn:
 
         When in doubt, use ``--dry-run --list`` to see what would be deleted.
 
-        When using ``--stats``, you will get some statistics about how much data was
-        deleted - the "Deleted data" deduplicated size there is most interesting as
-        that is how much your repository will shrink.
-        Please note that the "All archives" stats refer to the state after deletion.
-
         You can delete multiple archives by specifying a matching pattern,
         using the ``--match-archives PATTERN`` option (for more info on these patterns,
         see :ref:`borg_patterns`).
-
-        Always first use ``--dry-run --list`` to see what would be deleted.
         """
         )
         subparser = subparsers.add_parser(
@@ -134,25 +88,5 @@ class DeleteMixIn:
             action="store_true",
             dest="consider_checkpoints",
             help="consider checkpoint archives for deletion (default: not considered).",
-        )
-        subparser.add_argument(
-            "-s", "--stats", dest="stats", action="store_true", help="print statistics for the deleted archive"
-        )
-        subparser.add_argument(
-            "--force",
-            dest="forced",
-            action="count",
-            default=0,
-            help="force deletion of corrupted archives, " "use ``--force --force`` in case ``--force`` does not work.",
-        )
-        subparser.add_argument(
-            "-c",
-            "--checkpoint-interval",
-            metavar="SECONDS",
-            dest="checkpoint_interval",
-            type=int,
-            default=1800,
-            action=Highlander,
-            help="write checkpoint every SECONDS seconds (Default: 1800)",
         )
         define_archive_filters_group(subparser)

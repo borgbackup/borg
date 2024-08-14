@@ -84,3 +84,17 @@ class TestLock:
         assert len(lock_keys_b00) == 1
         assert len(lock_keys_b21) == 0  # stale lock was ignored
         assert len(list(lock.store.list("locks"))) == 0  # stale lock was removed from store
+
+    def test_migrate_lock(self, lockstore):
+        old_id, new_id = ID1, ID2
+        assert old_id[1] != new_id[1]  # different PIDs (like when doing daemonize())
+        lock = Lock(lockstore, id=old_id).acquire()
+        old_locks = lock._find_locks(only_mine=True)
+        assert lock.id == old_id  # lock is for old id / PID
+        lock.migrate_lock(old_id, new_id)  # fix the lock
+        assert lock.id == new_id  # lock corresponds to the new id / PID
+        new_locks = lock._find_locks(only_mine=True)
+        assert old_locks != new_locks
+        assert len(old_locks) == len(new_locks) == 1
+        assert old_locks[0]["hostid"] == old_id[0]
+        assert new_locks[0]["hostid"] == new_id[0]

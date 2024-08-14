@@ -379,6 +379,11 @@ class Repository3:
     def break_lock(self):
         Lock(self.store).break_lock()
 
+    def migrate_lock(self, old_id, new_id):
+        # note: only needed for local repos
+        if self.lock is not None:
+            self.lock.migrate_lock(old_id, new_id)
+
     def get_manifest(self):
         try:
             return self.store.load("config/manifest")

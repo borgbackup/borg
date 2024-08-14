@@ -46,7 +46,7 @@ from .helpers.lrucache import LRUCache
 from .item import Item
 from .platform import uid2user, gid2group
 from .platformflags import is_darwin
-from .remote import RemoteRepository  # TODO 3
+from .remote3 import RemoteRepository3
 
 
 def fuse_main():
@@ -546,7 +546,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         self._create_filesystem()
         llfuse.init(self, mountpoint, options)
         if not foreground:
-            if isinstance(self.repository_uncached, RemoteRepository):
+            if isinstance(self.repository_uncached, RemoteRepository3):
                 daemonize()
             else:
                 with daemonizing() as (old_id, new_id):

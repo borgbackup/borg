@@ -31,7 +31,9 @@ from ..logger import create_logger
 logger = create_logger(__name__)
 
 
-def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args, v1_or_v2):
+def get_repository(
+    location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args, v1_or_v2
+):
     if location.proto in ("ssh", "socket"):
         RemoteRepoCls = RemoteRepository if v1_or_v2 else RemoteRepository3
         repository = RemoteRepoCls(
@@ -209,7 +211,8 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                 acceptable_versions = (1, 2) if v1_or_v2 else (3,)
                 if repository.version not in acceptable_versions:
                     raise Error(
-                        f"This borg version only accepts version {' or '.join(acceptable_versions)} repos for --other-repo.")
+                        f"This borg version only accepts version {' or '.join(acceptable_versions)} repos for --other-repo."
+                    )
                 kwargs["other_repository"] = repository
                 if manifest or cache:
                     manifest_ = Manifest.load(

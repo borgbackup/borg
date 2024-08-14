@@ -832,6 +832,7 @@ class AdHocCache(ChunksMixin):
     Chunks that were not added during the current AdHocCache lifetime won't have correct size set
     (0 bytes) and will have an infinite reference count (MAX_VALUE).
     """
+
     def __init__(self, manifest, warn_if_unencrypted=True, lock_wait=None, iec=False):
         assert isinstance(manifest, Manifest)
         self.manifest = manifest

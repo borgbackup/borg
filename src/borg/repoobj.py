@@ -22,7 +22,7 @@ class RepoObj:
         # used for crypto type detection
         hdr_size = cls.obj_header.size
         hdr = cls.ObjHeader(*cls.obj_header.unpack(data[:hdr_size]))
-        return data[hdr_size + hdr.meta_size:]
+        return data[hdr_size + hdr.meta_size :]
 
     def __init__(self, key):
         self.key = key
@@ -80,7 +80,7 @@ class RepoObj:
         hdr_size = self.obj_header.size
         hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
         assert hdr_size + hdr.meta_size <= len(obj)
-        meta_encrypted = obj[hdr_size:hdr_size + hdr.meta_size]
+        meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta = msgpack.unpackb(meta_packed)
         if ro_type != ROBJ_DONTCARE and meta["type"] != ro_type:
@@ -114,7 +114,7 @@ class RepoObj:
         if ro_type != ROBJ_DONTCARE and meta_compressed["type"] != ro_type:
             raise IntegrityError(f"ro_type expected: {ro_type} got: {meta_compressed['type']}")
         assert hdr_size + hdr.meta_size + hdr.data_size <= len(obj)
-        data_encrypted = obj[hdr_size + hdr.meta_size:hdr_size + hdr.meta_size + hdr.data_size]
+        data_encrypted = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
         data_compressed = self.key.decrypt(id, data_encrypted)  # does not include the type/level bytes
         if decompress:
             ctype = meta_compressed["ctype"]

@@ -51,7 +51,6 @@ class DeleteMixIn:
             self.print_warning("Aborted.", wc=None)
         return
 
-
     def build_parser_delete(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_archive_filters_group
 

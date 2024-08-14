@@ -104,7 +104,7 @@ class Repository3:
         self._send_log = send_log_cb or (lambda: None)
         self.do_create = create
         self.created = False
-        self.acceptable_repo_versions = (3, )
+        self.acceptable_repo_versions = (3,)
         self.opened = False
         self.append_only = append_only  # XXX not implemented / not implementable
         self.storage_quota = storage_quota  # XXX not implemented
@@ -196,7 +196,13 @@ class Repository3:
 
     def info(self):
         """return some infos about the repo (must be opened first)"""
-        info = dict(id=self.id, version=self.version, storage_quota_use=self.storage_quota_use, storage_quota=self.storage_quota, append_only=self.append_only)
+        info = dict(
+            id=self.id,
+            version=self.version,
+            storage_quota_use=self.storage_quota_use,
+            storage_quota=self.storage_quota,
+            append_only=self.append_only,
+        )
         return info
 
     def commit(self, compact=True, threshold=0.1):
@@ -204,6 +210,7 @@ class Repository3:
 
     def check(self, repair=False, max_duration=0):
         """Check repository consistency"""
+
         def log_error(msg):
             nonlocal obj_corrupted
             obj_corrupted = True
@@ -228,12 +235,12 @@ class Repository3:
                 obj_size = len(obj)
                 if obj_size >= hdr_size:
                     hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
-                    meta = obj[hdr_size:hdr_size+hdr.meta_size]
+                    meta = obj[hdr_size : hdr_size + hdr.meta_size]
                     if hdr.meta_size != len(meta):
                         log_error("metadata size incorrect.")
                     elif hdr.meta_hash != xxh64(meta):
                         log_error("metadata does not match checksum.")
-                    data = obj[hdr_size+hdr.meta_size:hdr_size+hdr.meta_size+hdr.data_size]
+                    data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
                     if hdr.data_size != len(data):
                         log_error("data size incorrect.")
                     elif hdr.data_hash != xxh64(data):
@@ -276,11 +283,10 @@ class Repository3:
             ids = []
         if marker is not None:
             idx = ids.index(marker)
-            ids = ids[idx + 1:]
+            ids = ids[idx + 1 :]
         if limit is not None:
             return ids[:limit]
         return ids
-
 
     def scan(self, limit=None, state=None):
         """
@@ -312,23 +318,18 @@ class Repository3:
                 obj = self.store.load(key, size=hdr_size + extra_size)
                 hdr = obj[0:hdr_size]
                 if len(hdr) != hdr_size:
-                    raise IntegrityError(
-                        f"Object too small [id {id_hex}]: expected {hdr_size}, got {len(hdr)} bytes"
-                    )
+                    raise IntegrityError(f"Object too small [id {id_hex}]: expected {hdr_size}, got {len(hdr)} bytes")
                 meta_size = RepoObj.obj_header.unpack(hdr)[0]
                 if meta_size > extra_size:
                     # we did not get enough, need to load more, but not all.
                     # this should be rare, as chunk metadata is rather small usually.
                     obj = self.store.load(key, size=hdr_size + meta_size)
-                meta = obj[hdr_size:hdr_size + meta_size]
+                meta = obj[hdr_size : hdr_size + meta_size]
                 if len(meta) != meta_size:
-                    raise IntegrityError(
-                        f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes"
-                    )
+                    raise IntegrityError(f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes")
                 return hdr + meta
         except StoreObjectNotFound:
             raise self.ObjectNotFound(id, self.path) from None
-
 
     def get_many(self, ids, read_data=True, is_preloaded=False):
         for id_ in ids:

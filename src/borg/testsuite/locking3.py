@@ -4,11 +4,7 @@ import pytest
 
 from borgstore.store import Store
 
-from ..locking3 import (
-    Lock,
-    LockFailed,
-    NotLocked,
-)
+from ..locking3 import Lock, LockFailed, NotLocked
 
 ID1 = "foo", 1, 1
 ID2 = "bar", 2, 2

@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from borgstore.store import ObjectNotFound, ItemInfo
 
 from .logger import create_logger
+
 logger = create_logger()
 
 from .constants import *  # NOQA
@@ -263,6 +264,7 @@ class Manifest:
 
         if isinstance(repository, (Repository3, RemoteRepository3)):
             from .helpers import msgpack
+
             archives = {}
             try:
                 infos = list(repository.store_list("archives"))
@@ -357,10 +359,7 @@ class Manifest:
             manifest_archives = StableDict(self.archives.get_raw_dict())
 
         manifest = ManifestItem(
-            version=2,
-            archives=manifest_archives,
-            timestamp=self.timestamp,
-            config=StableDict(self.config),
+            version=2, archives=manifest_archives, timestamp=self.timestamp, config=StableDict(self.config)
         )
         data = self.key.pack_metadata(manifest.as_dict())
         self.id = self.repo_objs.id_hash(data)

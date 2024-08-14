@@ -11,6 +11,7 @@ from ..remote3 import RemoteRepository3
 from ..repository3 import Repository3
 
 from ..logger import create_logger
+
 logger = create_logger()
 
 
@@ -32,7 +33,13 @@ class ArchiveGarbageCollector:
         logger.info("Getting object IDs present in the repository...")
         self.repository_chunks = self.get_repository_chunks()
         logger.info("Computing object IDs used by archives...")
-        self.used_chunks, self.wanted_chunks, self.total_files, self.total_size, self.archives_count = self.analyze_archives()
+        (
+            self.used_chunks,
+            self.wanted_chunks,
+            self.total_files,
+            self.total_size,
+            self.archives_count,
+        ) = self.analyze_archives()
         self.report_and_delete()
         logger.info("Finished compaction / garbage collection...")
 
@@ -109,8 +116,7 @@ class ArchiveGarbageCollector:
         if unused:
             logger.info(f"Deleting {len(unused)} unused objects...")
             pi = ProgressIndicatorPercent(
-                total=len(unused), msg="Deleting unused objects %3.1f%%", step=0.1,
-                msgid="compact.report_and_delete"
+                total=len(unused), msg="Deleting unused objects %3.1f%%", step=0.1, msgid="compact.report_and_delete"
             )
             for i, id in enumerate(unused):
                 pi.show(i)

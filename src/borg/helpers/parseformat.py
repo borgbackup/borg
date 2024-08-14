@@ -1192,7 +1192,7 @@ class BorgJsonEncoder(json.JSONEncoder):
             return {"id": bin_to_hex(o.id), "location": o._location.canonical_path()}
         if isinstance(o, Archive):
             return o.info()
-        if isinstance(o, (AdHocWithFilesCache, )):
+        if isinstance(o, (AdHocWithFilesCache,)):
             return {"path": o.path}
         if isinstance(o, AdHocCache):
             return {}

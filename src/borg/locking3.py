@@ -65,7 +65,7 @@ class Lock:
     matter how (e.g. if an exception occurred).
     """
 
-    def __init__(self, store, exclusive=False, sleep=None, timeout=1.0, stale=30*60, id=None):
+    def __init__(self, store, exclusive=False, sleep=None, timeout=1.0, stale=30 * 60, id=None):
         self.store = store
         self.is_exclusive = exclusive
         self.sleep = sleep
@@ -75,7 +75,7 @@ class Lock:
         self.retry_delay_min = 1.0
         self.retry_delay_max = 5.0
         self.stale_td = datetime.timedelta(seconds=stale)  # ignore/delete it if older
-        self.refresh_td = datetime.timedelta(seconds=stale//2)  # don't refresh it if younger
+        self.refresh_td = datetime.timedelta(seconds=stale // 2)  # don't refresh it if younger
         self.last_refresh_dt = None
         self.id = id or platform.get_process_id()
         assert len(self.id) == 3
@@ -134,7 +134,9 @@ class Lock:
         found_locks = []
         for key in locks:
             lock = locks[key]
-            if (not only_exclusive or lock["exclusive"]) and (not only_mine or (lock["hostid"], lock["processid"], lock["threadid"]) == self.id):
+            if (not only_exclusive or lock["exclusive"]) and (
+                not only_mine or (lock["hostid"], lock["processid"], lock["threadid"]) == self.id
+            ):
                 found_locks.append(lock)
         return found_locks
 
@@ -150,7 +152,9 @@ class Lock:
                 key = self._create_lock(exclusive=self.is_exclusive)
                 # obviously we have a race condition here: other client(s) might have created exclusive
                 # lock(s) at the same time in parallel. thus we have to check again.
-                time.sleep(self.race_recheck_delay)  # give other clients time to notice our exclusive lock, stop creating theirs
+                time.sleep(
+                    self.race_recheck_delay
+                )  # give other clients time to notice our exclusive lock, stop creating theirs
                 exclusive_locks = self._find_locks(only_exclusive=True)
                 if self.is_exclusive:
                     if len(exclusive_locks) == 1 and exclusive_locks[0]["key"] == key:

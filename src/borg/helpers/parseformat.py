@@ -1193,9 +1193,9 @@ class BorgJsonEncoder(json.JSONEncoder):
         if isinstance(o, Archive):
             return o.info()
         if isinstance(o, (AdHocWithFilesCache, )):
-            return {"path": o.path, "stats": o.stats()}
+            return {"path": o.path}
         if isinstance(o, AdHocCache):
-            return {"stats": o.stats()}
+            return {}
         if callable(getattr(o, "to_json", None)):
             return o.to_json()
         return super().default(o)

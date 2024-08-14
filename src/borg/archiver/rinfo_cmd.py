@@ -64,7 +64,6 @@ class RInfoMixIn:
             output += "Security dir: {security_dir}\n".format(**info)
 
             print(output)
-            print(str(cache))
 
     def build_parser_rinfo(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

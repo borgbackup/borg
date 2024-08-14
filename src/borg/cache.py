@@ -381,32 +381,6 @@ class Cache:
         return adhoc() if prefer_adhoc_cache else adhocwithfiles()
 
 
-class CacheStatsMixin:
-    str_format = """\
-Original size: {0.total_size}
-Deduplicated size: {0.unique_size}
-Unique chunks: {0.total_unique_chunks}
-Total chunks: {0.total_chunks}
-"""
-
-    def __init__(self, iec=False):
-        self.iec = iec
-
-    def __str__(self):
-        return self.str_format.format(self.format_tuple())
-
-    Summary = namedtuple("Summary", ["total_size", "unique_size", "total_unique_chunks", "total_chunks"])
-
-    def stats(self):
-        return self.Summary(0, 0, 0, 0)._asdict()  # dummy to not cause crash with current code
-
-    def format_tuple(self):
-        stats = self.stats()
-        for field in ["total_size", "unique_size"]:
-            stats[field] = format_file_size(stats[field], iec=self.iec)
-        return self.Summary(**stats)
-
-
 class FilesCacheMixin:
     """
     Massively accelerate processing of unchanged files by caching their chunks list.
@@ -688,7 +662,7 @@ class ChunksMixin:
         return chunks
 
 
-class AdHocWithFilesCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
+class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     """
     Like AdHocCache, but with a files cache.
     """
@@ -708,7 +682,6 @@ class AdHocWithFilesCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
         :param lock_wait: timeout for lock acquisition (int [s] or None [wait forever])
         :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         """
-        CacheStatsMixin.__init__(self, iec=iec)
         FilesCacheMixin.__init__(self, cache_mode)
         assert isinstance(manifest, Manifest)
         self.manifest = manifest
@@ -850,7 +823,7 @@ class AdHocWithFilesCache(CacheStatsMixin, FilesCacheMixin, ChunksMixin):
         self.cache_config.mandatory_features.update(repo_features & my_features)
 
 
-class AdHocCache(CacheStatsMixin, ChunksMixin):
+class AdHocCache(ChunksMixin):
     """
     Ad-hoc, non-persistent cache.
 
@@ -859,15 +832,7 @@ class AdHocCache(CacheStatsMixin, ChunksMixin):
     Chunks that were not added during the current AdHocCache lifetime won't have correct size set
     (0 bytes) and will have an infinite reference count (MAX_VALUE).
     """
-
-    str_format = """\
-All archives:                unknown              unknown              unknown
-
-                       Unique chunks         Total chunks
-Chunk index:    {0.total_unique_chunks:20d}             unknown"""
-
     def __init__(self, manifest, warn_if_unencrypted=True, lock_wait=None, iec=False):
-        CacheStatsMixin.__init__(self, iec=iec)
         assert isinstance(manifest, Manifest)
         self.manifest = manifest
         self.repository = manifest.repository

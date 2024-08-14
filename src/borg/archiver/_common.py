@@ -1,4 +1,3 @@
-import argparse
 import functools
 import os
 import textwrap
@@ -211,7 +210,8 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                 acceptable_versions = (1, 2) if v1_or_v2 else (3,)
                 if repository.version not in acceptable_versions:
                     raise Error(
-                        f"This borg version only accepts version {' or '.join(acceptable_versions)} repos for --other-repo."
+                        f"This borg version only accepts version {' or '.join(acceptable_versions)} "
+                        f"repos for --other-repo."
                     )
                 kwargs["other_repository"] = repository
                 if manifest or cache:

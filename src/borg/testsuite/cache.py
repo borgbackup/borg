@@ -1,7 +1,4 @@
-import io
 import os.path
-
-from ..helpers.msgpack import packb
 
 import pytest
 

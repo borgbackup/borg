@@ -3,12 +3,7 @@ import pkgutil
 import textwrap
 from hashlib import sha256
 
-from borgstore.store import ObjectNotFound as StoreObjectNotFound
-
 from ..helpers import Error, yes, bin_to_hex, hex_to_bin, dash_open
-from ..manifest import Manifest, NoManifestError
-from ..repository3 import Repository3
-from ..repository import Repository
 from ..repoobj import RepoObj
 
 

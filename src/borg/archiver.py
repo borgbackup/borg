@@ -1122,7 +1122,16 @@ class Archiver:
         """Diff contents of two archives"""
 
         def print_json_output(diff, path):
-            print(json.dumps({"path": path, "changes": [j for j, str in diff]}, sort_keys=True, cls=BorgJsonEncoder))
+            def actual_change(j):
+                if j["type"] == "modified":
+                    # It's useful to show 0 added and 0 removed for text output
+                    # but for JSON this is essentially noise. Additionally, the
+                    # JSON key is "changes", and this is not actually a change.
+                    return not (j["added"] == 0 and j["removed"] == 0)
+                else:
+                    return True
+
+            print(json.dumps({"path": path, "changes": [j for j, str in diff if actual_change(j)]}, sort_keys=True, cls=BorgJsonEncoder))
 
         def print_text_output(diff, path):
             print("{:<19} {}".format(' '.join([str for j, str in diff]), path))

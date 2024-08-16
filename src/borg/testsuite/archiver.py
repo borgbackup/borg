@@ -23,6 +23,7 @@ from datetime import timedelta
 from hashlib import sha256
 from io import BytesIO, StringIO
 from unittest.mock import patch
+from pathlib import Path
 
 import pytest
 
@@ -4472,6 +4473,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file_removed', size=256)
         self.create_regular_file('file_removed2', size=512)
         self.create_regular_file('file_replaced', size=1024)
+        self.create_regular_file('file_touched', size=128)
         os.mkdir('input/dir_replaced_with_file')
         os.chmod('input/dir_replaced_with_file', stat.S_IFDIR | 0o755)
         os.mkdir('input/dir_removed')
@@ -4500,6 +4502,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file_replaced', contents=b'0' * 4096)
         os.unlink('input/file_removed')
         os.unlink('input/file_removed2')
+        Path('input/file_touched').touch()
         os.rmdir('input/dir_replaced_with_file')
         self.create_regular_file('dir_replaced_with_file', size=8192)
         os.chmod('input/dir_replaced_with_file', stat.S_IFREG | 0o755)
@@ -4562,6 +4565,13 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             change = '0 B' if can_compare_ids else '{:<19}'.format('modified')
             self.assert_line_exists(lines, f"{change}.*input/empty")
 
+            # Show a 0 byte change for a file whose contents weren't modified
+            # for text output.
+            if content_only:
+                assert "input/file_touched" not in output
+            else:
+                self.assert_line_exists(lines, f"{change}.*input/file_touched")
+
             if are_hardlinks_supported():
                 self.assert_line_exists(lines, f"{change}.*input/hardlink_contents_changed")
             if are_symlinks_supported():
@@ -4609,6 +4619,16 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
             # File unchanged
             assert not any(get_changes('input/file_unchanged', joutput))
+
+            # Do NOT show a 0 byte change for a file whose contents weren't
+            # modified for JSON output.
+            unexpected = {'type': 'modified', 'added': 0, 'removed': 0}
+            assert unexpected not in get_changes('input/file_touched', joutput)
+            if not content_only:
+                assert {"ctime", "mtime"}.issubset({c["type"] for c in get_changes('input/file_touched', joutput)})
+            else:
+                # And if we're doing content-only, don't show the file at all.
+                assert not any(get_changes('input/file_touched', joutput))
 
             # Directory replaced with a regular file
             if 'BORG_TESTS_IGNORE_MODES' not in os.environ and not content_only:

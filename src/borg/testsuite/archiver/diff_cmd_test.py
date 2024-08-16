@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 import stat
 import time
 
@@ -19,6 +20,7 @@ def test_basic_functionality(archivers, request):
     create_regular_file(archiver.input_path, "file_removed", size=256)
     create_regular_file(archiver.input_path, "file_removed2", size=512)
     create_regular_file(archiver.input_path, "file_replaced", size=1024)
+    create_regular_file(archiver.input_path, "file_touched", size=128)
     os.mkdir("input/dir_replaced_with_file")
     os.chmod("input/dir_replaced_with_file", stat.S_IFDIR | 0o755)
     os.mkdir("input/dir_removed")
@@ -44,6 +46,7 @@ def test_basic_functionality(archivers, request):
     create_regular_file(archiver.input_path, "file_replaced", contents=b"0" * 4096)
     os.unlink("input/file_removed")
     os.unlink("input/file_removed2")
+    Path("input/file_touched").touch()
     os.rmdir("input/dir_replaced_with_file")
     create_regular_file(archiver.input_path, "dir_replaced_with_file", size=8192)
     os.chmod("input/dir_replaced_with_file", stat.S_IFREG | 0o755)
@@ -107,6 +110,12 @@ def test_basic_functionality(archivers, request):
         if are_symlinks_supported():
             assert "input/link_target_contents_changed" not in output
 
+        # Show a 0 byte change for a file whose contents weren't modified for text output.
+        if content_only:
+            assert "input/file_touched" not in output
+        else:
+            assert_line_exists(lines, f"{change}.*input/file_touched")
+
         # Added a new file and a hard link to it. Both links to the same
         # inode should appear as separate files.
         assert "added:              2.05 kB input/file_added" in output
@@ -149,6 +158,15 @@ def test_basic_functionality(archivers, request):
 
         # File unchanged
         assert not any(get_changes("input/file_unchanged", joutput))
+
+        # Do NOT show a 0 byte change for a file whose contents weren't modified for JSON output.
+        unexpected = {"type": "modified", "added": 0, "removed": 0}
+        assert unexpected not in get_changes("input/file_touched", joutput)
+        if not content_only:
+            assert {"ctime", "mtime"}.issubset({c["type"] for c in get_changes("input/file_touched", joutput)})
+        else:
+            # And if we're doing content-only, don't show the file at all.
+            assert not any(get_changes("input/file_touched", joutput))
 
         # Directory replaced with a regular file
         if "BORG_TESTS_IGNORE_MODES" not in os.environ and not is_win32 and not content_only:

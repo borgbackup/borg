@@ -216,7 +216,26 @@ class Repository3:
             obj_corrupted = True
             logger.error(f"Repo object {info.name} is corrupted: {msg}")
 
-        # TODO: implement repair, progress indicator, partial checks, ...
+        def check_object(obj):
+            """Check if obj looks valid."""
+            hdr_size = RepoObj.obj_header.size
+            obj_size = len(obj)
+            if obj_size >= hdr_size:
+                hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
+                meta = obj[hdr_size : hdr_size + hdr.meta_size]
+                if hdr.meta_size != len(meta):
+                    log_error("metadata size incorrect.")
+                elif hdr.meta_hash != xxh64(meta):
+                    log_error("metadata does not match checksum.")
+                data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
+                if hdr.data_size != len(data):
+                    log_error("data size incorrect.")
+                elif hdr.data_hash != xxh64(data):
+                    log_error("data does not match checksum.")
+            else:
+                log_error("too small.")
+
+        # TODO: progress indicator, partial checks, ...
         mode = "full"
         logger.info("Starting repository check")
         objs_checked = objs_errors = 0
@@ -224,40 +243,43 @@ class Repository3:
         try:
             for info in infos:
                 self._lock_refresh()
-                obj_corrupted = False
                 key = "data/%s" % info.name
                 try:
                     obj = self.store.load(key)
                 except StoreObjectNotFound:
                     # looks like object vanished since store.list(), ignore that.
                     continue
-                hdr_size = RepoObj.obj_header.size
-                obj_size = len(obj)
-                if obj_size >= hdr_size:
-                    hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
-                    meta = obj[hdr_size : hdr_size + hdr.meta_size]
-                    if hdr.meta_size != len(meta):
-                        log_error("metadata size incorrect.")
-                    elif hdr.meta_hash != xxh64(meta):
-                        log_error("metadata does not match checksum.")
-                    data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
-                    if hdr.data_size != len(data):
-                        log_error("data size incorrect.")
-                    elif hdr.data_hash != xxh64(data):
-                        log_error("data does not match checksum.")
-                else:
-                    log_error("too small.")
+                obj_corrupted = False
+                check_object(obj)
                 objs_checked += 1
                 if obj_corrupted:
                     objs_errors += 1
+                    if repair:
+                        # if it is corrupted, we can't do much except getting rid of it.
+                        # but let's just retry loading it, in case the error goes away.
+                        try:
+                            obj = self.store.load(key)
+                        except StoreObjectNotFound:
+                            log_error("existing object vanished.")
+                        else:
+                            obj_corrupted = False
+                            check_object(obj)
+                            if obj_corrupted:
+                                log_error("reloading did not help, deleting it!")
+                                self.store.delete(key)
+                            else:
+                                log_error("reloading did help, inconsistent behaviour detected!")
         except StoreObjectNotFound:
             # it can be that there is no "data/" at all, then it crashes when iterating infos.
             pass
         logger.info(f"Checked {objs_checked} repository objects, {objs_errors} errors.")
         if objs_errors == 0:
-            logger.info("Finished %s repository check, no problems found.", mode)
+            logger.info(f"Finished {mode} repository check, no problems found.")
         else:
-            logger.error("Finished %s repository check, errors found.", mode)
+            if repair:
+                logger.info(f"Finished {mode} repository check, errors found and repaired.")
+            else:
+                logger.error(f"Finished {mode} repository check, errors found.")
         return objs_errors == 0 or repair
 
     def scan_low_level(self, segment=None, offset=None):

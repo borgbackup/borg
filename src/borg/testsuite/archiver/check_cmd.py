@@ -361,6 +361,55 @@ def test_extra_chunks(archivers, request):
 @pytest.mark.parametrize("init_args", [["--encryption=repokey-aes-ocb"], ["--encryption", "none"]])
 def test_verify_data(archivers, request, init_args):
     archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+
+    # it's tricky to test the cryptographic data verification, because usually already the
+    # repository-level xxh64 hash fails to verify. So we use a fake one that doesn't.
+    # note: it only works like tested here for a highly engineered data corruption attack,
+    # because with accidental corruption, usually already the xxh64 low-level check fails.
+    def fake_xxh64(data, seed=0):
+        return b"fakefake"
+
+    import borg.repoobj
+    import borg.repository3
+
+    with patch.object(borg.repoobj, "xxh64", fake_xxh64), patch.object(borg.repository3, "xxh64", fake_xxh64):
+        check_cmd_setup(archiver)
+        shutil.rmtree(archiver.repository_path)
+        cmd(archiver, "rcreate", *init_args)
+        create_src_archive(archiver, "archive1")
+        archive, repository = open_archive(archiver.repository_path, "archive1")
+        with repository:
+            for item in archive.iter_items():
+                if item.path.endswith(src_file):
+                    chunk = item.chunks[-1]
+                    data = repository.get(chunk.id)
+                    data = data[0:123] + b"x" + data[123:]
+                    repository.put(chunk.id, data)
+                    break
+            repository.commit(compact=False)
+
+        # the normal archives check does not read file content data.
+        cmd(archiver, "check", "--archives-only", exit_code=0)
+        # but with --verify-data, it does and notices the issue.
+        output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
+        assert f"{bin_to_hex(chunk.id)}, integrity error" in output
+
+        # repair (heal is tested in another test)
+        output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
+        assert f"{bin_to_hex(chunk.id)}, integrity error" in output
+        assert f"{src_file}: New missing file chunk detected" in output
+
+        # run with --verify-data again, all fine now (file was patched with a replacement chunk).
+        cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=0)
+
+
+@pytest.mark.parametrize("init_args", [["--encryption=repokey-aes-ocb"], ["--encryption", "none"]])
+def test_corrupted_file_chunk(archivers, request, init_args):
+    ## similar to test_verify_data, but here we let the low level repository-only checks discover the issue.
+
+    archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     shutil.rmtree(archiver.repository_path)
     cmd(archiver, "rcreate", *init_args)
@@ -371,18 +420,22 @@ def test_verify_data(archivers, request, init_args):
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
                 data = repository.get(chunk.id)
-                data = data[0:100] + b"x" + data[101:]
+                data = data[0:123] + b"x" + data[123:]
                 repository.put(chunk.id, data)
                 break
         repository.commit(compact=False)
-    cmd(archiver, "check", exit_code=1)
-    output = cmd(archiver, "check", "--verify-data", exit_code=1)
-    assert bin_to_hex(chunk.id) + ", integrity error" in output
+
+    # the normal check checks all repository objects and the xxh64 checksum fails.
+    output = cmd(archiver, "check", "--repository-only", exit_code=1)
+    assert f"{bin_to_hex(chunk.id)} is corrupted: data does not match checksum." in output
 
     # repair (heal is tested in another test)
-    output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
-    assert bin_to_hex(chunk.id) + ", integrity error" in output
+    output = cmd(archiver, "check", "--repair", exit_code=0)
+    assert f"{bin_to_hex(chunk.id)} is corrupted: data does not match checksum." in output
     assert f"{src_file}: New missing file chunk detected" in output
+
+    # run normal check again, all fine now (file was patched with a replacement chunk).
+    cmd(archiver, "check", "--repository-only", exit_code=0)
 
 
 def test_empty_repository(archivers, request):

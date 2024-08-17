@@ -282,9 +282,6 @@ class Repository3:
                 logger.error(f"Finished {mode} repository check, errors found.")
         return objs_errors == 0 or repair
 
-    def scan_low_level(self, segment=None, offset=None):
-        raise NotImplementedError
-
     def __len__(self):
         raise NotImplementedError
 

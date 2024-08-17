@@ -11,11 +11,11 @@ from ..helpers import sysinfo
 from ..helpers import bin_to_hex, hex_to_bin, prepare_dump_dict
 from ..helpers import dash_open
 from ..helpers import StableDict
-from ..helpers import positive_int_validator, archivename_validator
+from ..helpers import archivename_validator
 from ..helpers import CommandError, RTError
 from ..manifest import Manifest
 from ..platform import get_process_id
-from ..repository import Repository, TAG_PUT, TAG_DELETE, TAG_COMMIT
+from ..repository import Repository
 from ..repository3 import Repository3, LIST_SCAN_LIMIT
 from ..repoobj import RepoObj
 
@@ -127,40 +127,21 @@ class DebugMixIn:
             with open(filename, "wb") as fd:
                 fd.write(data)
 
-        if args.ghost:
-            # dump ghosty stuff from segment files: not yet committed objects, deleted / superseded objects, commit tags
-
-            # set up the key without depending on a manifest obj
-            for id, cdata, tag, segment, offset in repository.scan_low_level():
-                if tag == TAG_PUT:
-                    key = key_factory(repository, cdata)
-                    repo_objs = RepoObj(key)
-                    break
-            i = 0
-            for id, cdata, tag, segment, offset in repository.scan_low_level(segment=args.segment, offset=args.offset):
-                if tag == TAG_PUT:
-                    decrypt_dump(i, id, cdata, tag="put", segment=segment, offset=offset)
-                elif tag == TAG_DELETE:
-                    decrypt_dump(i, id, None, tag="del", segment=segment, offset=offset)
-                elif tag == TAG_COMMIT:
-                    decrypt_dump(i, None, None, tag="commit", segment=segment, offset=offset)
+        # set up the key without depending on a manifest obj
+        ids = repository.list(limit=1, marker=None)
+        cdata = repository.get(ids[0])
+        key = key_factory(repository, cdata)
+        repo_objs = RepoObj(key)
+        state = None
+        i = 0
+        while True:
+            ids, state = repository.scan(limit=LIST_SCAN_LIMIT, state=state)  # must use on-disk order scanning here
+            if not ids:
+                break
+            for id in ids:
+                cdata = repository.get(id)
+                decrypt_dump(i, id, cdata)
                 i += 1
-        else:
-            # set up the key without depending on a manifest obj
-            ids = repository.list(limit=1, marker=None)
-            cdata = repository.get(ids[0])
-            key = key_factory(repository, cdata)
-            repo_objs = RepoObj(key)
-            state = None
-            i = 0
-            while True:
-                ids, state = repository.scan(limit=LIST_SCAN_LIMIT, state=state)  # must use on-disk order scanning here
-                if not ids:
-                    break
-                for id in ids:
-                    cdata = repository.get(id)
-                    decrypt_dump(i, id, cdata)
-                    i += 1
         print("Done.")
 
     @with_repository(manifest=False)
@@ -469,30 +450,6 @@ class DebugMixIn:
             help="dump repo objects (debug)",
         )
         subparser.set_defaults(func=self.do_debug_dump_repo_objs)
-        subparser.add_argument(
-            "--ghost",
-            dest="ghost",
-            action="store_true",
-            help="dump all segment file contents, including deleted/uncommitted objects and commits.",
-        )
-        subparser.add_argument(
-            "--segment",
-            metavar="SEG",
-            dest="segment",
-            type=positive_int_validator,
-            default=None,
-            action=Highlander,
-            help="used together with --ghost: limit processing to given segment.",
-        )
-        subparser.add_argument(
-            "--offset",
-            metavar="OFFS",
-            dest="offset",
-            type=positive_int_validator,
-            default=None,
-            action=Highlander,
-            help="used together with --ghost: limit processing to given offset.",
-        )
 
         debug_search_repo_objs_epilog = process_epilog(
             """

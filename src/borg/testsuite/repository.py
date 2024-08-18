@@ -231,59 +231,6 @@ def test_max_data_size(repo_fixtures, request):
             repository.put(H(1), fchunk(max_data + b"x"))
 
 
-def test_set_flags(repo_fixtures, request):
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
-        id = H(0)
-        repository.put(id, fchunk(b""))
-        assert repository.flags(id) == 0x00000000  # init == all zero
-        repository.flags(id, mask=0x00000001, value=0x00000001)
-        assert repository.flags(id) == 0x00000001
-        repository.flags(id, mask=0x00000002, value=0x00000002)
-        assert repository.flags(id) == 0x00000003
-        repository.flags(id, mask=0x00000001, value=0x00000000)
-        assert repository.flags(id) == 0x00000002
-        repository.flags(id, mask=0x00000002, value=0x00000000)
-        assert repository.flags(id) == 0x00000000
-
-
-def test_get_flags(repo_fixtures, request):
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
-        id = H(0)
-        repository.put(id, fchunk(b""))
-        assert repository.flags(id) == 0x00000000  # init == all zero
-        repository.flags(id, mask=0xC0000003, value=0x80000001)
-        assert repository.flags(id, mask=0x00000001) == 0x00000001
-        assert repository.flags(id, mask=0x00000002) == 0x00000000
-        assert repository.flags(id, mask=0x40000008) == 0x00000000
-        assert repository.flags(id, mask=0x80000000) == 0x80000000
-
-
-def test_flags_many(repo_fixtures, request):
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
-        ids_flagged = [H(0), H(1)]
-        ids_default_flags = [H(2), H(3)]
-        [repository.put(id, fchunk(b"")) for id in ids_flagged + ids_default_flags]
-        repository.flags_many(ids_flagged, mask=0xFFFFFFFF, value=0xDEADBEEF)
-        assert list(repository.flags_many(ids_default_flags)) == [0x00000000, 0x00000000]
-        assert list(repository.flags_many(ids_flagged)) == [0xDEADBEEF, 0xDEADBEEF]
-        assert list(repository.flags_many(ids_flagged, mask=0xFFFF0000)) == [0xDEAD0000, 0xDEAD0000]
-        assert list(repository.flags_many(ids_flagged, mask=0x0000FFFF)) == [0x0000BEEF, 0x0000BEEF]
-
-
-def test_flags_persistence(repo_fixtures, request):
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
-        repository.put(H(0), fchunk(b"default"))
-        repository.put(H(1), fchunk(b"one one zero"))
-        # we do not set flags for H(0), so we can later check their default state.
-        repository.flags(H(1), mask=0x00000007, value=0x00000006)
-        repository.commit(compact=False)
-    with reopen(repository) as repository:
-        # we query all flags to check if the initial flags were all zero and
-        # only the ones we explicitly set to one are as expected.
-        assert repository.flags(H(0), mask=0xFFFFFFFF) == 0x00000000
-        assert repository.flags(H(1), mask=0xFFFFFFFF) == 0x00000006
-
-
 def _assert_sparse(repository):
     # the superseded 123456... PUT
     assert repository.compact[0] == 41 + 8 + len(fchunk(b"123456789"))

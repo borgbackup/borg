@@ -288,11 +288,9 @@ class Repository3:
     def __contains__(self, id):
         raise NotImplementedError
 
-    def list(self, limit=None, marker=None, mask=0, value=0):
+    def list(self, limit=None, marker=None):
         """
-        list <limit> IDs starting from after id <marker> - in index (pseudo-random) order.
-
-        if mask and value are given, only return IDs where flags & mask == value (default: all IDs).
+        list <limit> IDs starting from after id <marker>.
         """
         self._lock_refresh()
         infos = self.store.list("data")  # XXX we can only get the full list from the store

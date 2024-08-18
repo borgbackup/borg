@@ -86,7 +86,7 @@ class HashIndexTestCase(BaseTestCase):
 
     def test_nsindex(self):
         self._generic_test(
-            NSIndex, lambda x: (x, x, x), "0d7880dbe02b64f03c471e60e193a1333879b4f23105768b10c9222accfeac5e"
+            NSIndex, lambda x: (x, x, x), "640b909cf07884cc11fdf5431ffc27dee399770ceadecce31dffecd130a311a3"
         )
 
     def test_chunkindex(self):
@@ -102,7 +102,7 @@ class HashIndexTestCase(BaseTestCase):
             initial_size = os.path.getsize(filepath)
             self.assert_equal(len(idx), 0)
             for x in range(n):
-                idx[H(x)] = x, x, x, x
+                idx[H(x)] = x, x, x
             idx.write(filepath)
             assert initial_size < os.path.getsize(filepath)
             for x in range(n):
@@ -114,7 +114,7 @@ class HashIndexTestCase(BaseTestCase):
     def test_iteritems(self):
         idx = NSIndex()
         for x in range(100):
-            idx[H(x)] = x, x, x, x
+            idx[H(x)] = x, x, x
         iterator = idx.iteritems()
         all = list(iterator)
         self.assert_equal(len(all), 100)
@@ -140,70 +140,6 @@ class HashIndexTestCase(BaseTestCase):
         assert idx1[H(2)] == (7, 200)
         assert idx1[H(3)] == (3, 300)
         assert idx1[H(4)] == (6, 400)
-
-    def test_flags(self):
-        idx = NSIndex()
-        key = H(0)
-        self.assert_raises(KeyError, idx.flags, key, 0)
-        idx[key] = 0, 0, 0  # create entry
-        # check bit 0 and 1, should be both 0 after entry creation
-        self.assert_equal(idx.flags(key, mask=3), 0)
-        # set bit 0
-        idx.flags(key, mask=1, value=1)
-        self.assert_equal(idx.flags(key, mask=1), 1)
-        # set bit 1
-        idx.flags(key, mask=2, value=2)
-        self.assert_equal(idx.flags(key, mask=2), 2)
-        # check both bit 0 and 1, both should be set
-        self.assert_equal(idx.flags(key, mask=3), 3)
-        # clear bit 1
-        idx.flags(key, mask=2, value=0)
-        self.assert_equal(idx.flags(key, mask=2), 0)
-        # clear bit 0
-        idx.flags(key, mask=1, value=0)
-        self.assert_equal(idx.flags(key, mask=1), 0)
-        # check both bit 0 and 1, both should be cleared
-        self.assert_equal(idx.flags(key, mask=3), 0)
-
-    def test_flags_iteritems(self):
-        idx = NSIndex()
-        keys_flagged0 = {H(i) for i in (1, 2, 3, 42)}
-        keys_flagged1 = {H(i) for i in (11, 12, 13, 142)}
-        keys_flagged2 = {H(i) for i in (21, 22, 23, 242)}
-        keys_flagged3 = {H(i) for i in (31, 32, 33, 342)}
-        for key in keys_flagged0:
-            idx[key] = 0, 0, 0  # create entry
-            idx.flags(key, mask=3, value=0)  # not really necessary, unflagged is default
-        for key in keys_flagged1:
-            idx[key] = 0, 0, 0  # create entry
-            idx.flags(key, mask=3, value=1)
-        for key in keys_flagged2:
-            idx[key] = 0, 0, 0  # create entry
-            idx.flags(key, mask=3, value=2)
-        for key in keys_flagged3:
-            idx[key] = 0, 0, 0  # create entry
-            idx.flags(key, mask=3, value=3)
-        # check if we can iterate over all items
-        k_all = {k for k, v in idx.iteritems()}
-        self.assert_equal(k_all, keys_flagged0 | keys_flagged1 | keys_flagged2 | keys_flagged3)
-        # check if we can iterate over the flagged0 items
-        k0 = {k for k, v in idx.iteritems(mask=3, value=0)}
-        self.assert_equal(k0, keys_flagged0)
-        # check if we can iterate over the flagged1 items
-        k1 = {k for k, v in idx.iteritems(mask=3, value=1)}
-        self.assert_equal(k1, keys_flagged1)
-        # check if we can iterate over the flagged2 items
-        k1 = {k for k, v in idx.iteritems(mask=3, value=2)}
-        self.assert_equal(k1, keys_flagged2)
-        # check if we can iterate over the flagged3 items
-        k1 = {k for k, v in idx.iteritems(mask=3, value=3)}
-        self.assert_equal(k1, keys_flagged3)
-        # check if we can iterate over the flagged1 + flagged3 items
-        k1 = {k for k, v in idx.iteritems(mask=1, value=1)}
-        self.assert_equal(k1, keys_flagged1 | keys_flagged3)
-        # check if we can iterate over the flagged0 + flagged2 items
-        k1 = {k for k, v in idx.iteritems(mask=1, value=0)}
-        self.assert_equal(k1, keys_flagged0 | keys_flagged2)
 
 
 class HashIndexExtraTestCase(BaseTestCase):
@@ -553,9 +489,9 @@ class NSIndexTestCase(BaseTestCase):
     def test_nsindex_segment_limit(self):
         idx = NSIndex()
         with self.assert_raises(AssertionError):
-            idx[H(1)] = NSIndex.MAX_VALUE + 1, 0, 0, 0
+            idx[H(1)] = NSIndex.MAX_VALUE + 1, 0, 0
         assert H(1) not in idx
-        idx[H(2)] = NSIndex.MAX_VALUE, 0, 0, 0
+        idx[H(2)] = NSIndex.MAX_VALUE, 0, 0
         assert H(2) in idx
 
 
@@ -583,7 +519,7 @@ class IndexCorruptionTestCase(BaseTestCase):
         for y in range(700):  # stay below max load not to trigger resize
             idx[HH(0, y, 0)] = (0, y, 0)
 
-        assert idx.size() == 1024 + 1031 * 48  # header + 1031 buckets
+        assert idx.size() == 1024 + 1031 * 44  # header + 1031 buckets
 
         # delete lots of the collisions, creating lots of tombstones
         for y in range(400):  # stay above min load not to trigger resize

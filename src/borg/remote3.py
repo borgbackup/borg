@@ -143,8 +143,6 @@ class RepositoryServer:  # pragma: no cover
         "commit",
         "delete",
         "destroy",
-        "flags",
-        "flags_many",
         "get",
         "list",
         "negotiate",
@@ -1021,12 +1019,8 @@ class RemoteRepository3:
     def __len__(self):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(
-        since=parse_version("1.0.0"),
-        mask={"since": parse_version("2.0.0b2"), "previously": 0},
-        value={"since": parse_version("2.0.0b2"), "previously": 0},
-    )
-    def list(self, limit=None, marker=None, mask=0, value=0):
+    @api(since=parse_version("1.0.0"))
+    def list(self, limit=None, marker=None):
         """actual remoting is done via self.call in the @api decorator"""
 
     def get(self, id, read_data=True):

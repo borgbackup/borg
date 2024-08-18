@@ -78,7 +78,7 @@ BUFSIZE = 10 * 1024 * 1024
 # MAX_DATA_SIZE or it will trigger the check for that.
 MAX_ARCHIVES = 400000
 
-# repo.list() / .scan() result count limit the borg client uses
+# repo.list() result count limit the borg client uses
 LIST_SCAN_LIMIT = 100000
 
 FD_MAX_AGE = 4 * 60  # 4 minutes

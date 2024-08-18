@@ -110,19 +110,15 @@ class DebugMixIn:
 
     @with_repository(manifest=False)
     def do_debug_dump_repo_objs(self, args, repository):
-        """dump (decrypted, decompressed) repo objects, repo index MUST be current/correct"""
+        """dump (decrypted, decompressed) repo objects"""
         from ..crypto.key import key_factory
 
-        def decrypt_dump(i, id, cdata, tag=None, segment=None, offset=None):
+        def decrypt_dump(id, cdata):
             if cdata is not None:
                 _, data = repo_objs.parse(id, cdata, ro_type=ROBJ_DONTCARE)
             else:
                 _, data = {}, b""
-            tag_str = "" if tag is None else "_" + tag
-            segment_str = "_" + str(segment) if segment is not None else ""
-            offset_str = "_" + str(offset) if offset is not None else ""
-            id_str = "_" + bin_to_hex(id) if id is not None else ""
-            filename = "%08d%s%s%s%s.obj" % (i, segment_str, offset_str, tag_str, id_str)
+            filename = f"{bin_to_hex(id)}.obj"
             print("Dumping", filename)
             with open(filename, "wb") as fd:
                 fd.write(data)
@@ -132,16 +128,15 @@ class DebugMixIn:
         cdata = repository.get(ids[0])
         key = key_factory(repository, cdata)
         repo_objs = RepoObj(key)
-        state = None
-        i = 0
+        marker = None
         while True:
-            ids, state = repository.scan(limit=LIST_SCAN_LIMIT, state=state)  # must use on-disk order scanning here
+            ids = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not ids:
                 break
+            marker = ids[-1]
             for id in ids:
                 cdata = repository.get(id)
-                decrypt_dump(i, id, cdata)
-                i += 1
+                decrypt_dump(id, cdata)
         print("Done.")
 
     @with_repository(manifest=False)
@@ -179,14 +174,15 @@ class DebugMixIn:
         key = key_factory(repository, cdata)
         repo_objs = RepoObj(key)
 
-        state = None
+        marker = None
         last_data = b""
         last_id = None
         i = 0
         while True:
-            ids, state = repository.scan(limit=LIST_SCAN_LIMIT, state=state)  # must use on-disk order scanning here
+            ids = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not ids:
                 break
+            marker = ids[-1]
             for id in ids:
                 cdata = repository.get(id)
                 _, data = repo_objs.parse(id, cdata, ro_type=ROBJ_DONTCARE)

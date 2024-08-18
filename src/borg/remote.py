@@ -145,7 +145,6 @@ class RepositoryServer:  # pragma: no cover
         "flags_many",
         "get",
         "list",
-        "scan",
         "negotiate",
         "open",
         "close",
@@ -991,10 +990,6 @@ class RemoteRepository:
         value={"since": parse_version("2.0.0b2"), "previously": 0},
     )
     def list(self, limit=None, marker=None, mask=0, value=0):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b3"))
-    def scan(self, limit=None, state=None):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("2.0.0b2"))

@@ -45,7 +45,7 @@ def test_debug_dump_repo_objs(archivers, request):
     with changedir("output"):
         output = cmd(archiver, "debug", "dump-repo-objs")
     output_dir = sorted(os.listdir("output"))
-    assert len(output_dir) > 0 and output_dir[0].startswith("00000000_")
+    assert len(output_dir) > 0
     assert "Done." in output
 
 

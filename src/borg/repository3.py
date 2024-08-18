@@ -307,20 +307,6 @@ class Repository3:
             return ids[:limit]
         return ids
 
-    def scan(self, limit=None, state=None):
-        """
-        list (the next) <limit> chunk IDs from the repository.
-
-        state can either be None (initially, when starting to scan) or the object
-        returned from a previous scan call (meaning "continue scanning").
-
-        returns: list of chunk ids, state
-        """
-        # we only have store.list() anyway, so just call .list() from here.
-        ids = self.list(limit=limit, marker=state)
-        state = ids[-1] if ids else None
-        return ids, state
-
     def get(self, id, read_data=True):
         self._lock_refresh()
         id_hex = bin_to_hex(id)

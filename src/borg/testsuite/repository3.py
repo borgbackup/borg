@@ -137,20 +137,6 @@ def test_list(repo_fixtures, request):
         assert len(repository.list(limit=50)) == 50
 
 
-def test_scan(repo_fixtures, request):
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
-        for x in range(100):
-            repository.put(H(x), fchunk(b"SOMEDATA"))
-        ids, _ = repository.scan()
-        assert len(ids) == 100
-        first_half, state = repository.scan(limit=50)
-        assert len(first_half) == 50
-        assert first_half == ids[:50]
-        second_half, _ = repository.scan(state=state)
-        assert len(second_half) == 50
-        assert second_half == ids[50:]
-
-
 def test_max_data_size(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         max_data = b"x" * (MAX_DATA_SIZE - RepoObj.obj_header.size)

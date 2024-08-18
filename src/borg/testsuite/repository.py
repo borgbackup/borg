@@ -222,56 +222,6 @@ def test_list(repo_fixtures, request):
         assert len(repository.list(limit=50)) == 50
 
 
-def test_scan(repo_fixtures, request):
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
-        for x in range(100):
-            repository.put(H(x), fchunk(b"SOMEDATA"))
-        repository.commit(compact=False)
-        ids, _ = repository.scan()
-        assert len(ids) == 100
-        first_half, state = repository.scan(limit=50)
-        assert len(first_half) == 50
-        assert first_half == ids[:50]
-        second_half, _ = repository.scan(state=state)
-        assert len(second_half) == 50
-        assert second_half == ids[50:]
-        # check result order == on-disk order (which is hash order)
-        for x in range(100):
-            assert ids[x] == H(x)
-
-
-def test_scan_modify(repo_fixtures, request):
-    with get_repository_from_fixture(repo_fixtures, request) as repository:
-        for x in range(100):
-            repository.put(H(x), fchunk(b"ORIGINAL"))
-        repository.commit(compact=False)
-        # now we scan, read and modify chunks at the same time
-        count = 0
-        ids, _ = repository.scan()
-        for id in ids:
-            # scan results are in same order as we put the chunks into the repo (into the segment file)
-            assert id == H(count)
-            chunk = repository.get(id)
-            # check that we **only** get data that was committed when we started scanning
-            # and that we do not run into the new data we put into the repo.
-            assert pdchunk(chunk) == b"ORIGINAL"
-            count += 1
-            repository.put(id, fchunk(b"MODIFIED"))
-        assert count == 100
-        repository.commit()
-
-        # now we have committed all the modified chunks, and **only** must get the modified ones.
-        count = 0
-        ids, _ = repository.scan()
-        for id in ids:
-            # scan results are in same order as we put the chunks into the repo (into the segment file)
-            assert id == H(count)
-            chunk = repository.get(id)
-            assert pdchunk(chunk) == b"MODIFIED"
-            count += 1
-        assert count == 100
-
-
 def test_max_data_size(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         max_data = b"x" * (MAX_DATA_SIZE - RepoObj.obj_header.size)

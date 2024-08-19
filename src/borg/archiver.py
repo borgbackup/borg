@@ -1121,20 +1121,22 @@ class Archiver:
     def do_diff(self, args, repository, manifest, key, archive):
         """Diff contents of two archives"""
 
-        def print_json_output(diff, path):
-            def actual_change(j):
-                if j["type"] == "modified":
-                    # It's useful to show 0 added and 0 removed for text output
-                    # but for JSON this is essentially noise. Additionally, the
-                    # JSON key is "changes", and this is not actually a change.
-                    return not (j["added"] == 0 and j["removed"] == 0)
-                else:
-                    return True
+        def actual_change(j):
+            if j["type"] == "modified":
+                # Added/removed keys will not exist if chunker params differ
+                # between the two archives. Err on the side of caution and assume
+                # a real modification in this case (short-circuiting retrieving
+                # non-existent keys).
+                return not {"added", "removed"} <= j.keys() or not (j["added"] == 0 and j["removed"] == 0)
+            else:
+                # All other change types are indeed changes.
+                return True
 
+        def print_json_output(diff, path):
             print(json.dumps({"path": path, "changes": [j for j, str in diff if actual_change(j)]}, sort_keys=True, cls=BorgJsonEncoder))
 
         def print_text_output(diff, path):
-            print("{:<19} {}".format(' '.join([str for j, str in diff]), path))
+            print("{:<19} {}".format(' '.join([str for j, str in diff if actual_change(j)]), path))
 
         print_output = print_json_output if args.json_lines else print_text_output
 

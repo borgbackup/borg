@@ -4565,12 +4565,14 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             change = '0 B' if can_compare_ids else '{:<19}'.format('modified')
             self.assert_line_exists(lines, f"{change}.*input/empty")
 
-            # Show a 0 byte change for a file whose contents weren't modified
-            # for text output.
-            if content_only:
-                assert "input/file_touched" not in output
+            # Do not show a 0 byte change for a file whose contents weren't
+            # modified.
+            self.assert_line_not_exists(lines, '0 B.*input/file_touched')
+            if not content_only:
+                self.assert_line_exists(lines, "[cm]time:.*input/file_touched")
             else:
-                self.assert_line_exists(lines, f"{change}.*input/file_touched")
+                # And if we're doing content-only, don't show the file at all.
+                assert "input/file_touched" not in output
 
             if are_hardlinks_supported():
                 self.assert_line_exists(lines, f"{change}.*input/hardlink_contents_changed")
@@ -4620,8 +4622,8 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             # File unchanged
             assert not any(get_changes('input/file_unchanged', joutput))
 
-            # Do NOT show a 0 byte change for a file whose contents weren't
-            # modified for JSON output.
+            # Do not show a 0 byte change for a file whose contents weren't
+            # modified.
             unexpected = {'type': 'modified', 'added': 0, 'removed': 0}
             assert unexpected not in get_changes('input/file_touched', joutput)
             if not content_only:

@@ -100,3 +100,27 @@ example simple. They all work in basically the same way.
 
 The weekly rule is easy to understand roughly, but hard to understand in all
 details. If interested, read "ISO 8601:2000 standard week-based year".
+
+The 13weekly and 3monthly rules are two different strategies for keeping one
+every quarter of a year. There are `multiple ways` to define a quarter-year;
+borg prune recognizes two:
+
+* --keep-13weekly keeps one backup every 13 weeks using ISO 8601:2000's
+  definition of the week-based year. January 4th is always included in the
+  first week of a year, and January 1st to 3rd may be in week 52 or 53 of the
+  previous year. Week 53 is also in the fourth quarter of the year.
+* --keep-3monthly keeps one backup every 3 months. January 1st to
+  March 31, April 1st to June 30th, July 1st to September 30th, and October 1st
+  to December 31st form the quarters.
+
+If the subtleties of the definition of a quarter year don't matter to you, a
+short summary of behavior is:
+
+* --keep-13weekly favors keeping backups at the beginning of Jan, Apr, July,
+  and Oct.
+* --keep-3monthly favors keeping backups at the end of Dec, Mar, Jun, and Sept.
+* Both strategies will have some overlap in which backups are kept.
+* The differences are negligible unless backups considered for deletion were
+  created weekly or more frequently.
+
+.. _multiple ways: https://en.wikipedia.org/wiki/Calendar_year#Quarter_year

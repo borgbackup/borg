@@ -628,6 +628,7 @@ class ChunksMixin:
         return ChunkListEntry(id, size)
 
     def _load_chunks_from_repo(self):
+        logger.debug("Cache: querying the chunk IDs list from the repo...")
         chunks = ChunkIndex()
         t0 = perf_counter()
         num_requests = 0
@@ -651,7 +652,7 @@ class ChunksMixin:
             del chunks[self.manifest.MANIFEST_ID]
         duration = perf_counter() - t0 or 0.01
         logger.debug(
-            "Cache: downloaded %d chunk IDs in %.2f s (%d requests), ~%s/s",
+            "Cache: queried %d chunk IDs in %.2f s (%d requests), ~%s/s",
             num_chunks,
             duration,
             num_requests,

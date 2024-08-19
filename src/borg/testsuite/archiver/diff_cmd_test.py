@@ -7,7 +7,14 @@ import time
 from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported
 from ...platformflags import is_win32, is_darwin
-from . import cmd, create_regular_file, RK_ENCRYPTION, assert_line_exists, generate_archiver_tests
+from . import (
+    cmd,
+    create_regular_file,
+    RK_ENCRYPTION,
+    assert_line_exists,
+    generate_archiver_tests,
+    assert_line_not_exists,
+)
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -105,16 +112,19 @@ def test_basic_functionality(archivers, request):
         # pointing to the file is not changed.
         change = "modified.*0 B" if can_compare_ids else r"modified:  \(can't get size\)"
         assert_line_exists(lines, f"{change}.*input/empty")
+
+        # Do not show a 0 byte change for a file whose contents weren't modified.
+        assert_line_not_exists(lines, "0 B.*input/file_touched")
+        if not content_only:
+            assert_line_exists(lines, "[cm]time:.*input/file_touched")
+        else:
+            # And if we're doing content-only, don't show the file at all.
+            assert "input/file_touched" not in output
+
         if are_hardlinks_supported():
             assert_line_exists(lines, f"{change}.*input/hardlink_contents_changed")
         if are_symlinks_supported():
             assert "input/link_target_contents_changed" not in output
-
-        # Show a 0 byte change for a file whose contents weren't modified for text output.
-        if content_only:
-            assert "input/file_touched" not in output
-        else:
-            assert_line_exists(lines, f"{change}.*input/file_touched")
 
         # Added a new file and a hard link to it. Both links to the same
         # inode should appear as separate files.
@@ -159,7 +169,7 @@ def test_basic_functionality(archivers, request):
         # File unchanged
         assert not any(get_changes("input/file_unchanged", joutput))
 
-        # Do NOT show a 0 byte change for a file whose contents weren't modified for JSON output.
+        # Do not show a 0 byte change for a file whose contents weren't modified.
         unexpected = {"type": "modified", "added": 0, "removed": 0}
         assert unexpected not in get_changes("input/file_touched", joutput)
         if not content_only:

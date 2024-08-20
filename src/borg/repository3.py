@@ -293,16 +293,25 @@ class Repository3:
         list <limit> IDs starting from after id <marker>.
         """
         self._lock_refresh()
-        infos = self.store.list("data")  # XXX we can only get the full list from the store
-        try:
-            ids = [hex_to_bin(info.name) for info in infos]
-        except StoreObjectNotFound:
-            ids = []
-        if marker is not None:
-            idx = ids.index(marker)
-            ids = ids[idx + 1 :]
-        if limit is not None:
-            return ids[:limit]
+        collect = True if marker is None else False
+        ids = []
+        infos = self.store.list("data")  # generator yielding ItemInfos
+        while True:
+            try:
+                info = next(infos)
+            except StoreObjectNotFound:
+                break  # can happen e.g. if "data" does not exist, pointless to continue in that case
+            except StopIteration:
+                break
+            else:
+                id = hex_to_bin(info.name)
+                if collect:
+                    ids.append(id)
+                    if len(ids) == limit:
+                        break
+                elif id == marker:
+                    collect = True
+                    # note: do not collect the marker id
         return ids
 
     def get(self, id, read_data=True):

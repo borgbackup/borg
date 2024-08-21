@@ -1529,10 +1529,12 @@ class Archiver:
     def do_prune(self, args, repository, manifest, key):
         """Prune repository archives according to specified rules"""
         if not any((args.secondly, args.minutely, args.hourly, args.daily,
-                    args.weekly, args.monthly, args.yearly, args.within)):
+                    args.weekly, args.monthly, args.quarterly_13weekly,
+                    args.quarterly_3monthly, args.yearly, args.within)):
             raise CommandError('At least one of the "keep-within", "keep-last", '
                                '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
-                               '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.')
+                               '"keep-weekly", "keep-monthly", "keep-13weekly", "keep-3monthly", '
+                               'or "keep-yearly" settings must be specified.')
         if args.prefix is not None:
             args.glob_archives = args.prefix + '*'
         checkpoint_re = r'\.checkpoint(\.\d+)?'
@@ -4684,9 +4686,13 @@ class Archiver:
         the local timezone, and weeks go from Monday to Sunday. Specifying a
         negative number of archives to keep means that there is no limit. As of borg
         1.2.0, borg will retain the oldest archive if any of the secondly, minutely,
-        hourly, daily, weekly, monthly, or yearly rules was not otherwise able to meet
-        its retention target. This enables the first chronological archive to continue
-        aging until it is replaced by a newer archive that meets the retention criteria.
+        hourly, daily, weekly, monthly, quarterly, or yearly rules was not otherwise
+        able to meet its retention target. This enables the first chronological archive
+        to continue aging until it is replaced by a newer archive that meets the
+        retention criteria.
+
+        The ``--keep-13weekly`` and ``--keep-3monthly`` rules are two different
+        strategies for keeping archives every quarter year.
 
         The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
         keep the last N archives under the assumption that you do not create more than one
@@ -4726,6 +4732,11 @@ class Archiver:
                                help='number of weekly archives to keep')
         subparser.add_argument('-m', '--keep-monthly', dest='monthly', type=int, default=0,
                                help='number of monthly archives to keep')
+        quarterly_group = subparser.add_mutually_exclusive_group()
+        quarterly_group.add_argument('--keep-13weekly', dest='quarterly_13weekly', type=int, default=0,
+                                     help='number of quarterly archives to keep (13 week strategy)')
+        quarterly_group.add_argument('--keep-3monthly', dest='quarterly_3monthly', type=int, default=0,
+                                     help='number of quarterly archives to keep (3 month strategy)')
         subparser.add_argument('-y', '--keep-yearly', dest='yearly', type=int, default=0,
                                help='number of yearly archives to keep')
         define_archive_filters_group(subparser, sort_by=False, first_last=False)

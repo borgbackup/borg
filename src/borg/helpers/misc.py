@@ -31,21 +31,67 @@ def prune_within(archives, hours, kept_because):
     return result
 
 
+def default_period_func(pattern):
+    def inner(a):
+        return to_localtime(a.ts).strftime(pattern)
+
+    return inner
+
+
+def quarterly_13weekly_period_func(a):
+    (year, week, _) = to_localtime(a.ts).isocalendar()
+    if week <= 13:
+        # Weeks containing Jan 4th to Mar 28th (leap year) or 29th- 91 (13*7)
+        # days later.
+        return (year, 1)
+    elif 14 <= week <= 26:
+        # Weeks containing Apr 4th (leap year) or 5th to Jun 27th or 28th- 91
+        # days later.
+        return (year, 2)
+    elif 27 <= week <= 39:
+        # Weeks containing Jul 4th (leap year) or 5th to Sep 26th or 27th-
+        # at least 91 days later.
+        return (year, 3)
+    else:
+        # Everything else, Oct 3rd (leap year) or 4th onward, will always
+        # include week of Dec 26th (leap year) or Dec 27th, may also include
+        # up to possibly Jan 3rd of next year.
+        return (year, 4)
+
+
+def quarterly_3monthly_period_func(a):
+    lt = to_localtime(a.ts)
+    if lt.month <= 3:
+        # 1-1 to 3-31
+        return (lt.year, 1)
+    elif 4 <= lt.month <= 6:
+        # 4-1 to 6-30
+        return (lt.year, 2)
+    elif 7 <= lt.month <= 9:
+        # 7-1 to 9-30
+        return (lt.year, 3)
+    else:
+        # 10-1 to 12-31
+        return (lt.year, 4)
+
+
 PRUNING_PATTERNS = OrderedDict([
-    ("secondly", '%Y-%m-%d %H:%M:%S'),
-    ("minutely", '%Y-%m-%d %H:%M'),
-    ("hourly", '%Y-%m-%d %H'),
-    ("daily", '%Y-%m-%d'),
-    ("weekly", '%G-%V'),
-    ("monthly", '%Y-%m'),
-    ("yearly", '%Y'),
+    ("secondly", default_period_func('%Y-%m-%d %H:%M:%S')),
+    ("minutely", default_period_func('%Y-%m-%d %H:%M')),
+    ("hourly", default_period_func('%Y-%m-%d %H')),
+    ("daily", default_period_func('%Y-%m-%d')),
+    ("weekly", default_period_func('%G-%V')),
+    ("monthly", default_period_func('%Y-%m')),
+    ("quarterly_13weekly", quarterly_13weekly_period_func),
+    ("quarterly_3monthly", quarterly_3monthly_period_func),
+    ("yearly", default_period_func('%Y')),
 ])
 
 
 def prune_split(archives, rule, n, kept_because=None):
     last = None
     keep = []
-    pattern = PRUNING_PATTERNS[rule]
+    period_func = PRUNING_PATTERNS[rule]
     if kept_because is None:
         kept_because = {}
     if n == 0:
@@ -53,7 +99,7 @@ def prune_split(archives, rule, n, kept_because=None):
 
     a = None
     for a in sorted(archives, key=attrgetter('ts'), reverse=True):
-        period = to_localtime(a.ts).strftime(pattern)
+        period = period_func(a)
         if period != last:
             last = period
             if a.id not in kept_because:

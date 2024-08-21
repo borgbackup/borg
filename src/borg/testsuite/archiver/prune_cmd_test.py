@@ -100,6 +100,77 @@ def test_prune_repository_example(archivers, request):
         assert "test%02d" % i not in output
 
 
+def test_prune_quarterly(archivers, request):
+    # Example worked through by hand when developing quarterly
+    # strategy, based upon existing backups where quarterly strategy
+    # is desired. Weekly/monthly backups that don't affect results were
+    # trimmed to speed up the test.
+    #
+    # Week number is shown in comment for every row in the below list.
+    # Year is also shown when it doesn't match the year given in the
+    # date tuple.
+    archiver = request.getfixturevalue(archivers)
+    test_dates = [
+        (2020, 12, 6),
+        (2021, 1, 3),  # 49, 2020-53
+        (2021, 3, 28),
+        (2021, 4, 25),  # 12, 16
+        (2021, 6, 27),
+        (2021, 7, 4),  # 25, 26
+        (2021, 9, 26),
+        (2021, 10, 3),  # 38, 39
+        (2021, 12, 26),
+        (2022, 1, 2),  # 51, 2021-52
+    ]
+
+    def mk_name(tup):
+        (y, m, d) = tup
+        suff = datetime(y, m, d).strftime("%Y-%m-%d")
+        return f"test-{suff}"
+
+    # The kept repos are based on working on an example by hand,
+    # archives made on the following dates should be kept:
+    EXPECTED_KEPT = {
+        "13weekly": [(2020, 12, 6), (2021, 1, 3), (2021, 3, 28), (2021, 7, 4), (2021, 10, 3), (2022, 1, 2)],
+        "3monthly": [(2020, 12, 6), (2021, 3, 28), (2021, 6, 27), (2021, 9, 26), (2021, 12, 26), (2022, 1, 2)],
+    }
+
+    for strat, to_keep in EXPECTED_KEPT.items():
+        # Initialize our repo.
+        cmd(archiver, "repo-create", RK_ENCRYPTION)
+        for a, (y, m, d) in zip(map(mk_name, test_dates), test_dates):
+            _create_archive_ts(archiver, a, y, m, d)
+
+        to_prune = list(set(test_dates) - set(to_keep))
+
+        # Use 99 instead of -1 to test that oldest backup is kept.
+        output = cmd(archiver, "prune", "--list", "--dry-run", f"--keep-{strat}=99")
+        for a in map(mk_name, to_prune):
+            assert re.search(rf"Would prune:\s+{a}", output)
+
+        oldest = r"\[oldest\]" if strat in ("13weekly") else ""
+        assert re.search(rf"Keeping archive \(rule: quarterly_{strat}{oldest} #\d+\):\s+test-2020-12-06", output)
+        for a in map(mk_name, to_keep[1:]):
+            assert re.search(rf"Keeping archive \(rule: quarterly_{strat} #\d+\):\s+{a}", output)
+
+        output = cmd(archiver, "repo-list")
+        # Nothing pruned after dry run
+        for a in map(mk_name, test_dates):
+            assert a in output
+
+        cmd(archiver, "prune", f"--keep-{strat}=99")
+        output = cmd(archiver, "repo-list")
+        # All matching backups plus oldest kept
+        for a in map(mk_name, to_keep):
+            assert a in output
+        # Other backups have been pruned
+        for a in map(mk_name, to_prune):
+            assert a not in output
+
+        # Delete repo and begin anew
+        cmd(archiver, "repo-delete")
+
+
 # With an initial and daily backup, prune daily until oldest is replaced by a monthly backup
 def test_prune_retain_and_expire_oldest(archivers, request):
     archiver = request.getfixturevalue(archivers)

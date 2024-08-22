@@ -32,7 +32,6 @@ class RCreateMixIn:
         manifest = Manifest(key, repository)
         manifest.key = key
         manifest.write()
-        repository.commit(compact=False)
         with Cache(repository, manifest, warn_if_unencrypted=False):
             pass
         if key.NAME != "plaintext":

@@ -137,7 +137,6 @@ class RCompressMixIn:
         else:
             while repository.async_response(wait=True) is not None:
                 pass
-            repository.commit(compact=True)
         if args.stats:
             print()
             print("Recompression stats:")

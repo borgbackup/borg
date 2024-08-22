@@ -73,7 +73,6 @@ class KeysMixIn:
         manifest.key = key_new
         manifest.repo_objs.key = key_new
         manifest.write()
-        repository.commit(compact=False)
 
         # we need to rewrite cache config and security key-type info,
         # so that the cached key-type will match the repo key-type.

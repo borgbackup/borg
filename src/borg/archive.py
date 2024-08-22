@@ -661,7 +661,6 @@ Duration: {0.duration}
             pass
         self.manifest.archives[name] = (self.id, metadata.time)
         self.manifest.write()
-        self.repository.commit(compact=False)
         self.cache.commit()
         return metadata
 
@@ -2155,7 +2154,6 @@ class ArchiveChecker:
             logger.info("Writing Manifest.")
             self.manifest.write()
             logger.info("Committing repo.")
-            self.repository.commit(compact=False)
 
 
 class ArchiveRecreater:

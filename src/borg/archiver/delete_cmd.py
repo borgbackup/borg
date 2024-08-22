@@ -45,7 +45,6 @@ class DeleteMixIn:
             logger.info("Finished dry-run.")
         elif deleted:
             manifest.write()
-            repository.commit(compact=False)
             self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         else:
             self.print_warning("Aborted.", wc=None)

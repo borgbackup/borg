@@ -29,7 +29,6 @@ def add_unknown_feature(repo_path, operation):
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         manifest.config["feature_flags"] = {operation.value: {"mandatory": ["unknown-feature"]}}
         manifest.write()
-        repository.commit(compact=False)
 
 
 def cmd_raises_unknown_feature(archiver, args):

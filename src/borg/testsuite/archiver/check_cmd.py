@@ -105,7 +105,6 @@ def test_missing_file_chunk(archivers, request):
                 break
         else:
             pytest.fail("should not happen")  # convert 'fail'
-        repository.commit(compact=False)
 
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "--repair", exit_code=0)
@@ -171,7 +170,6 @@ def test_missing_archive_item_chunk(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         repository.delete(archive.metadata.items[0])
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
@@ -183,7 +181,6 @@ def test_missing_archive_metadata(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         repository.delete(archive.id)
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
@@ -198,7 +195,6 @@ def test_missing_manifest(archivers, request):
             repository.store_delete("config/manifest")
         else:
             repository.delete(Manifest.MANIFEST_ID)
-            repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "archive1" in output
@@ -214,7 +210,6 @@ def test_corrupted_manifest(archivers, request):
         manifest = repository.get_manifest()
         corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
         repository.put_manifest(corrupted_manifest)
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "archive1" in output
@@ -246,7 +241,6 @@ def test_spoofed_manifest(archivers, request):
         # maybe a repo-side attacker could manage to move the fake manifest file chunk over to the manifest ID.
         # we simulate this here by directly writing the fake manifest data to the manifest ID.
         repository.put_manifest(cdata)
-        repository.commit(compact=False)
     # borg should notice that the manifest has the wrong ro_type.
     cmd(archiver, "check", exit_code=1)
     # borg check --repair should remove the corrupted manifest and rebuild a new one.
@@ -267,7 +261,6 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
         chunk = repository.get(archive.id)
         corrupted_chunk = chunk + b"corrupted!"
         repository.put(archive.id, corrupted_chunk)
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "archive2" in output
@@ -295,7 +288,6 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
         archive = repo_objs.key.pack_metadata(archive_dict)
         archive_id = repo_objs.id_hash(archive)
         repository.put(archive_id, repo_objs.format(archive_id, {}, archive, ro_type=ROBJ_ARCHIVE_META))
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     output = cmd(archiver, "rlist")
@@ -336,7 +328,6 @@ def test_spoofed_archive(archivers, request):
                 ro_type=ROBJ_FILE_STREAM,  # a real archive is stored with ROBJ_ARCHIVE_META
             ),
         )
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", "--debug", exit_code=0)
     output = cmd(archiver, "rlist")
@@ -354,7 +345,6 @@ def test_extra_chunks(archivers, request):
     with Repository3(archiver.repository_location, exclusive=True) as repository:
         chunk = fchunk(b"xxxx")
         repository.put(b"01234567890123456789012345678901", chunk)
-        repository.commit(compact=False)
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 
@@ -388,7 +378,6 @@ def test_verify_data(archivers, request, init_args):
                     data = data[0:123] + b"x" + data[123:]
                     repository.put(chunk.id, data)
                     break
-            repository.commit(compact=False)
 
         # the normal archives check does not read file content data.
         cmd(archiver, "check", "--archives-only", exit_code=0)
@@ -423,7 +412,6 @@ def test_corrupted_file_chunk(archivers, request, init_args):
                 data = data[0:123] + b"x" + data[123:]
                 repository.put(chunk.id, data)
                 break
-        repository.commit(compact=False)
 
     # the normal check checks all repository objects and the xxh64 checksum fails.
     output = cmd(archiver, "check", "--repository-only", exit_code=1)
@@ -446,5 +434,4 @@ def test_empty_repository(archivers, request):
     with Repository3(archiver.repository_location, exclusive=True) as repository:
         for id_ in repository.list():
             repository.delete(id_)
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)

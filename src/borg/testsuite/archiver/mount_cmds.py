@@ -213,7 +213,6 @@ def test_fuse_allow_damaged_files(archivers, request):
                 break
         else:
             assert False  # missed the file
-        repository.commit(compact=False)
     cmd(archiver, "check", "--repair", exit_code=0)
 
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")

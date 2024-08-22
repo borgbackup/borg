@@ -205,9 +205,6 @@ class Repository3:
         )
         return info
 
-    def commit(self, compact=True, threshold=0.1):
-        pass
-
     def check(self, repair=False, max_duration=0):
         """Check repository consistency"""
 

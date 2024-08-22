@@ -293,12 +293,10 @@ class DebugMixIn:
 
         repository.put(id, data)
         print("object %s put." % hex_id)
-        repository.commit(compact=False)
 
     @with_repository(manifest=False, exclusive=True)
     def do_debug_delete_obj(self, args, repository):
         """delete the objects with the given IDs from the repo"""
-        modified = False
         for hex_id in args.ids:
             try:
                 id = hex_to_bin(hex_id, length=32)
@@ -307,12 +305,9 @@ class DebugMixIn:
             else:
                 try:
                     repository.delete(id)
-                    modified = True
                     print("object %s deleted." % hex_id)
                 except Repository3.ObjectNotFound:
                     print("object %s not found." % hex_id)
-        if modified:
-            repository.commit(compact=False)
         print("Done.")
 
     @with_repository(manifest=False, exclusive=True, cache=True, compatibility=Manifest.NO_OPERATION_CHECK)

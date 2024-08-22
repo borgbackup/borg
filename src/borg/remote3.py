@@ -160,7 +160,6 @@ class RepositoryServer:  # pragma: no cover
     _rpc_methods3 = (
         "__len__",
         "check",
-        "commit",
         "delete",
         "destroy",
         "get",

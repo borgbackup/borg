@@ -110,23 +110,16 @@ class RCompressMixIn:
         repo_objs = manifest.repo_objs
         ctype, clevel, olevel = get_csettings(repo_objs.compressor)  # desired compression set by --compression
 
-        def checkpoint_func():
-            while repository.async_response(wait=True) is not None:
-                pass
-            repository.commit(compact=True)
-
         stats_find = defaultdict(int)
         stats_process = defaultdict(int)
         recompress_ids = find_chunks(repository, repo_objs, stats_find, ctype, clevel, olevel)
         recompress_candidate_count = len(recompress_ids)
         chunks_limit = min(1000, max(100, recompress_candidate_count // 1000))
-        uncommitted_chunks = 0
 
         if not isinstance(repository, (Repository3, RemoteRepository3)):
             # start a new transaction
             data = repository.get_manifest()
             repository.put_manifest(data)
-            uncommitted_chunks += 1
 
         pi = ProgressIndicatorPercent(
             total=len(recompress_ids), msg="Recompressing %3.1f%%", step=0.1, msgid="rcompress.process_chunks"
@@ -137,16 +130,14 @@ class RCompressMixIn:
             ids, recompress_ids = recompress_ids[:chunks_limit], recompress_ids[chunks_limit:]
             process_chunks(repository, repo_objs, stats_process, ids, olevel)
             pi.show(increase=len(ids))
-            checkpointed = self.maybe_checkpoint(
-                checkpoint_func=checkpoint_func, checkpoint_interval=args.checkpoint_interval
-            )
-            uncommitted_chunks = 0 if checkpointed else (uncommitted_chunks + len(ids))
         pi.finish()
         if sig_int:
-            # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
+            # Ctrl-C / SIGINT: do not commit
             raise Error("Got Ctrl-C / SIGINT.")
-        elif uncommitted_chunks > 0:
-            checkpoint_func()
+        else:
+            while repository.async_response(wait=True) is not None:
+                pass
+            repository.commit(compact=True)
         if args.stats:
             print()
             print("Recompression stats:")
@@ -188,11 +179,6 @@ class RCompressMixIn:
         Please note that the outcome might not always be the desired compression
         type/level - if no compression gives a shorter output, that might be chosen.
 
-        Every ``--checkpoint-interval``, progress is committed to the repository and
-        the repository is compacted (this is to keep temporary repo space usage in bounds).
-        A lower checkpoint interval means lower temporary repo space usage, but also
-        slower progress due to higher overhead (and vice versa).
-
         Please note that this command can not work in low (or zero) free disk space
         conditions.
 
@@ -228,14 +214,3 @@ class RCompressMixIn:
         )
 
         subparser.add_argument("-s", "--stats", dest="stats", action="store_true", help="print statistics")
-
-        subparser.add_argument(
-            "-c",
-            "--checkpoint-interval",
-            metavar="SECONDS",
-            dest="checkpoint_interval",
-            type=int,
-            default=1800,
-            action=Highlander,
-            help="write checkpoint every SECONDS seconds (Default: 1800)",
-        )

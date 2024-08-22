@@ -14,7 +14,6 @@ try:
     import os
     import shlex
     import signal
-    import time
     from datetime import datetime, timezone
 
     from ..logger import create_logger, setup_logging
@@ -124,7 +123,6 @@ class Archiver(
     def __init__(self, lock_wait=None, prog=None):
         self.lock_wait = lock_wait
         self.prog = prog
-        self.last_checkpoint = time.monotonic()
 
     def print_warning(self, msg, *args, **kw):
         warning_code = kw.get("wc", EXIT_WARNING)  # note: wc=None can be used to not influence exit code
@@ -454,20 +452,6 @@ class Archiver(
                 topic = "borg.debug." + topic
             logger.debug("Enabling debug topic %s", topic)
             logging.getLogger(topic).setLevel("DEBUG")
-
-    def maybe_checkpoint(self, *, checkpoint_func, checkpoint_interval):
-        checkpointed = False
-        sig_int_triggered = sig_int and sig_int.action_triggered()
-        if sig_int_triggered or checkpoint_interval and time.monotonic() - self.last_checkpoint > checkpoint_interval:
-            if sig_int_triggered:
-                logger.info("checkpoint requested: starting checkpoint creation...")
-            checkpoint_func()
-            checkpointed = True
-            self.last_checkpoint = time.monotonic()
-            if sig_int_triggered:
-                sig_int.action_completed()
-                logger.info("checkpoint requested: finished checkpoint creation!")
-        return checkpointed
 
     def run(self, args):
         os.umask(args.umask)  # early, before opening files

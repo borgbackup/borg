@@ -584,7 +584,6 @@ class RemoteRepository:
                 borg_cmd = self.ssh_cmd(location) + borg_cmd
             logger.debug("SSH command line: %s", borg_cmd)
             # we do not want the ssh getting killed by Ctrl-C/SIGINT because it is needed for clean shutdown of borg.
-            # borg's SIGINT handler tries to write a checkpoint and requires the remote repo connection.
             self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, preexec_fn=ignore_sigint)
             self.stdin_fd = self.p.stdin.fileno()
             self.stdout_fd = self.p.stdout.fileno()

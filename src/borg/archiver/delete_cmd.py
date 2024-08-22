@@ -82,10 +82,4 @@ class DeleteMixIn:
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output verbose list of archives"
         )
-        subparser.add_argument(
-            "--consider-checkpoints",
-            action="store_true",
-            dest="consider_checkpoints",
-            help="consider checkpoint archives for deletion (default: not considered).",
-        )
         define_archive_filters_group(subparser)

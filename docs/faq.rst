@@ -124,23 +124,14 @@ Are there other known limitations?
   remove files which are in the destination, but not in the archive.
   See :issue:`4598` for a workaround and more details.
 
-.. _checkpoints_parts:
+.. _interrupted_backup:
 
 If a backup stops mid-way, does the already-backed-up data stay there?
 ----------------------------------------------------------------------
 
-Yes, Borg supports resuming backups.
-
-During a backup, a special checkpoint archive named ``<archive-name>.checkpoint``
-is saved at every checkpoint interval (the default value for this is 30
-minutes) containing all the data backed-up until that point.
-
-This checkpoint archive is a valid archive, but it is only a partial backup
-(not all files that you wanted to back up are contained in it and the last file
-in it might be a partial file). Having it in the repo until a successful, full
-backup is completed is useful because it references all the transmitted chunks up
-to the checkpoint. This means that in case of an interruption, you only need to
-retransfer the data since the last checkpoint.
+Yes, the data transferred into the repo stays there - just avoid running
+``borg compact`` before you completed the backup, because that would remove
+unused chunks.
 
 If a backup was interrupted, you normally do not need to do anything special,
 just invoke ``borg create`` as you always do. If the repository is still locked,
@@ -150,24 +141,14 @@ include the current datetime), it does not matter.
 
 Borg always does full single-pass backups, so it will start again
 from the beginning - but it will be much faster, because some of the data was
-already stored into the repo (and is still referenced by the checkpoint
-archive), so it does not need to get transmitted and stored again.
-
-Once your backup has finished successfully, you can delete all
-``<archive-name>.checkpoint`` archives. If you run ``borg prune``, it will
-also care for deleting unneeded checkpoints.
-
-Note: the checkpointing mechanism may create a partial (truncated) last file
-in a checkpoint archive named ``<filename>.borg_part``. Such partial files
-won't be contained in the final archive.
-This is done so that checkpoints work cleanly and promptly while a big
-file is being processed.
+already stored into the repo, so it does not need to get transmitted and stored
+again.
 
 
 How can I back up huge file(s) over a unstable connection?
 ----------------------------------------------------------
 
-Yes. For more details, see :ref:`checkpoints_parts`.
+Yes. For more details, see :ref:`interrupted_backup`.
 
 How can I restore huge file(s) over an unstable connection?
 -----------------------------------------------------------
@@ -794,10 +775,9 @@ If you feel your Borg backup is too slow somehow, here is what you can do:
 - Don't use any expensive compression. The default is lz4 and super fast.
   Uncompressed is often slower than lz4.
 - Just wait. You can also interrupt it and start it again as often as you like,
-  it will converge against a valid "completed" state (see ``--checkpoint-interval``,
-  maybe use the default, but in any case don't make it too short). It is starting
+  it will converge against a valid "completed" state. It is starting
   from the beginning each time, but it is still faster then as it does not store
-  data into the repo which it already has there from last checkpoint.
+  data into the repo which it already has there.
 - If you don’t need additional file attributes, you can disable them with ``--noflags``,
   ``--noacls``, ``--noxattrs``. This can lead to noticeable performance improvements
   when your backup consists of many small files.
@@ -1127,11 +1107,6 @@ conditions, but generally this should be avoided. If your backup disk is already
 full when Borg starts a write command like `borg create`, it will abort
 immediately and the repository will stay as-is.
 
-If you run a backup that stops due to a disk running full, Borg will roll back,
-delete the new segment file and thus freeing disk space automatically. There
-may be a checkpoint archive left that has been saved before the disk got full.
-You can keep it to speed up the next backup or delete it to get back more disk
-space.
 
 Miscellaneous
 #############

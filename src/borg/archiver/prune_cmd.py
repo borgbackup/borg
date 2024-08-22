@@ -4,7 +4,6 @@ from datetime import datetime, timezone, timedelta
 import logging
 from operator import attrgetter
 import os
-import re
 
 from ._common import with_repository, Highlander
 from ..archive import Archive
@@ -91,25 +90,7 @@ class PruneMixIn:
             format = os.environ.get("BORG_PRUNE_FORMAT", "{archive:<36} {time} [{id}]")
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
-        checkpoint_re = r"\.checkpoint(\.\d+)?"
-        archives_checkpoints = manifest.archives.list(
-            match=args.match_archives,
-            consider_checkpoints=True,
-            match_end=r"(%s)?\Z" % checkpoint_re,
-            sort_by=["ts"],
-            reverse=True,
-        )
-        is_checkpoint = re.compile(r"(%s)\Z" % checkpoint_re).search
-        checkpoints = [arch for arch in archives_checkpoints if is_checkpoint(arch.name)]
-        # keep the latest checkpoint, if there is no later non-checkpoint archive
-        if archives_checkpoints and checkpoints and archives_checkpoints[0] is checkpoints[0]:
-            keep_checkpoints = checkpoints[:1]
-        else:
-            keep_checkpoints = []
-        checkpoints = set(checkpoints)
-        # ignore all checkpoint archives to avoid keeping one (which is an incomplete backup)
-        # that is newer than a successfully completed backup - and killing the successful backup.
-        archives = [arch for arch in archives_checkpoints if arch not in checkpoints]
+        archives = manifest.archives.list(match=args.match_archives, sort_by=["ts"], reverse=True)
         keep = []
         # collect the rule responsible for the keeping of each archive in this dict
         # keys are archive ids, values are a tuple
@@ -126,7 +107,7 @@ class PruneMixIn:
             if num is not None:
                 keep += prune_split(archives, rule, num, kept_because)
 
-        to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
+        to_delete = set(archives) - set(keep)
         with Cache(repository, manifest, lock_wait=self.lock_wait, iec=args.iec) as cache:
             list_logger = logging.getLogger("borg.output.list")
             # set up counters for the progress display
@@ -134,7 +115,7 @@ class PruneMixIn:
             archives_deleted = 0
             uncommitted_deletes = 0
             pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
-            for archive in archives_checkpoints:
+            for archive in archives:
                 if sig_int and sig_int.action_done():
                     break
                 if archive in to_delete:
@@ -148,12 +129,9 @@ class PruneMixIn:
                         archive.delete()
                         uncommitted_deletes += 1
                 else:
-                    if is_checkpoint(archive.name):
-                        log_message = "Keeping checkpoint archive:"
-                    else:
-                        log_message = "Keeping archive (rule: {rule} #{num}):".format(
-                            rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
-                        )
+                    log_message = "Keeping archive (rule: {rule} #{num}):".format(
+                        rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
+                    )
                 if (
                     args.output_list
                     or (args.list_pruned and archive in to_delete)
@@ -183,11 +161,6 @@ class PruneMixIn:
         certain number of historic backups. This retention policy is commonly referred to as
         `GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>`_
         (Grandfather-father-son) backup rotation scheme.
-
-        Also, prune automatically removes checkpoint archives (incomplete archives left
-        behind by interrupted backup runs) except if the checkpoint is the latest
-        archive (and thus still needed). Checkpoint archives are not considered when
-        comparing archive counts against the retention limits (``--keep-X``).
 
         If you use --match-archives (-a), then only archives that match the pattern are
         considered for deletion and only those archives count towards the totals

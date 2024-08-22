@@ -18,7 +18,6 @@ class InfoMixIn:
     def do_info(self, args, repository, manifest, cache):
         """Show archive details such as disk space used"""
 
-        args.consider_checkpoints = True
         archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
 
         output_data = []

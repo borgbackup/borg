@@ -110,7 +110,6 @@ class Archives(abc.MutableMapping):
     def list(
         self,
         *,
-        consider_checkpoints=True,
         match=None,
         match_end=r"\Z",
         sort_by=(),
@@ -149,8 +148,6 @@ class Archives(abc.MutableMapping):
 
         if any([oldest, newest, older, newer]):
             archives = filter_archives_by_date(archives, oldest=oldest, newest=newest, newer=newer, older=older)
-        if not consider_checkpoints:
-            archives = [x for x in archives if ".checkpoint" not in x.name]
         for sortkey in reversed(sort_by):
             archives.sort(key=attrgetter(sortkey))
         if first:
@@ -163,18 +160,15 @@ class Archives(abc.MutableMapping):
 
     def list_considering(self, args):
         """
-        get a list of archives, considering --first/last/prefix/match-archives/sort/consider-checkpoints cmdline args
+        get a list of archives, considering --first/last/prefix/match-archives/sort cmdline args
         """
         name = getattr(args, "name", None)
-        consider_checkpoints = getattr(args, "consider_checkpoints", None)
         if name is not None:
             raise Error(
-                "Giving a specific name is incompatible with options --first, --last, "
-                "-a / --match-archives, and --consider-checkpoints."
+                "Giving a specific name is incompatible with options --first, --last " "and -a / --match-archives."
             )
         return self.list(
             sort_by=args.sort_by.split(","),
-            consider_checkpoints=consider_checkpoints,
             match=args.match_archives,
             first=getattr(args, "first", None),
             last=getattr(args, "last", None),

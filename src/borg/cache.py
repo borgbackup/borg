@@ -642,7 +642,7 @@ class ChunksMixin:
             marker = result[-1]
             # All chunks from the repository have a refcount of MAX_VALUE, which is sticky,
             # therefore we can't/won't delete them. Chunks we added ourselves in this transaction
-            # (e.g. checkpoint archives) are tracked correctly.
+            # are tracked correctly.
             init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
             for id_ in result:
                 num_chunks += 1

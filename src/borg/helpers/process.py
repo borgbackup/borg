@@ -244,8 +244,7 @@ class SigIntManager:
             self.ctx = None
 
 
-# global flag which might trigger some special behaviour on first ctrl-c / SIGINT,
-# e.g. if this is interrupting "borg create", it shall try to create a checkpoint.
+# global flag which might trigger some special behaviour on first ctrl-c / SIGINT.
 sig_int = SigIntManager()
 
 

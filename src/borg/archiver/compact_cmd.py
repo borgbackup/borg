@@ -25,7 +25,7 @@ class ArchiveGarbageCollector:
         self.wanted_chunks = None  # chunks that would be nice to have for next borg check --repair
         self.total_files = None  # overall number of source files written to all archives in this repo
         self.total_size = None  # overall size of source file content data written to all archives
-        self.archives_count = None  # number of archives (including checkpoint archives)
+        self.archives_count = None  # number of archives
 
     def garbage_collect(self):
         """Removes unused chunks from a repository."""
@@ -60,7 +60,7 @@ class ArchiveGarbageCollector:
         """Iterate over all items in all archives, create the dicts id -> size of all used/wanted chunks."""
         used_chunks = {}  # chunks referenced by item.chunks
         wanted_chunks = {}  # additional "wanted" chunks seen in item.chunks_healthy
-        archive_infos = self.manifest.archives.list(consider_checkpoints=True)
+        archive_infos = self.manifest.archives.list()
         num_archives = len(archive_infos)
         pi = ProgressIndicatorPercent(
             total=num_archives, msg="Computing used/wanted chunks %3.1f%%", step=0.1, msgid="compact.analyze_archives"

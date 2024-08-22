@@ -93,12 +93,6 @@ class RListMixIn:
         )
         subparser.set_defaults(func=self.do_rlist)
         subparser.add_argument(
-            "--consider-checkpoints",
-            action="store_true",
-            dest="consider_checkpoints",
-            help="Show checkpoint archives in the repository contents list (default: hidden).",
-        )
-        subparser.add_argument(
             "--short", dest="short", action="store_true", help="only print the archive names, nothing else"
         )
         subparser.add_argument(

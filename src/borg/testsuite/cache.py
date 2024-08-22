@@ -47,7 +47,6 @@ class TestAdHocCache:
         assert cache.add_chunk(H(1), {}, b"5678", stats=Statistics()) == (H(1), 4)
 
     def test_deletes_chunks_during_lifetime(self, cache, repository):
-        """E.g. checkpoint archives"""
         cache.add_chunk(H(5), {}, b"1010", stats=Statistics())
         assert cache.seen_chunk(H(5)) == 1
         cache.chunk_decref(H(5), 1, Statistics())

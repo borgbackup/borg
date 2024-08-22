@@ -33,7 +33,6 @@ class TransferMixIn:
             )
 
         dry_run = args.dry_run
-        args.consider_checkpoints = True
         archive_names = tuple(x.name for x in other_manifest.archives.list_considering(args))
         if not archive_names:
             return
@@ -193,7 +192,7 @@ class TransferMixIn:
         If you want to globally change compression while transferring archives to the DST_REPO,
         give ``--compress=WANTED_COMPRESSION --recompress=always``.
 
-        The default is to transfer all archives, including checkpoint archives.
+        The default is to transfer all archives.
 
         You could use the misc. archive filter options to limit which archives it will
         transfer, e.g. using the ``-a`` option. This is recommended for big

@@ -56,8 +56,8 @@ class RCreateMixIn:
 
         rcreate_epilog = process_epilog(
             """
-        This command creates a new, empty repository. A repository is a filesystem
-        directory containing the deduplicated data from zero or more archives.
+        This command creates a new, empty repository. A repository is a ``borgstore`` store
+        containing the deduplicated data from zero or more archives.
 
         Encryption mode TLDR
         ++++++++++++++++++++

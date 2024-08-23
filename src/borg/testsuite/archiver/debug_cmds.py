@@ -158,24 +158,6 @@ def test_debug_dump_archive(archivers, request):
     assert "_items" in result
 
 
-def test_debug_refcount_obj(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    output = cmd(archiver, "debug", "refcount-obj", "0" * 64).strip()
-    info = "object 0000000000000000000000000000000000000000000000000000000000000000 not found [info from chunks cache]."
-    assert output == info
-
-    create_json = json.loads(cmd(archiver, "create", "--json", "test", "input"))
-    archive_id = create_json["archive"]["id"]
-    output = cmd(archiver, "debug", "refcount-obj", archive_id).strip()
-    # AdHocCache or AdHocWithFilesCache don't do precise refcounting, we'll get ChunkIndex.MAX_VALUE as refcount.
-    assert output == f"object {archive_id} has 4294966271 referrers [info from chunks cache]."
-
-    # Invalid IDs do not abort or return an error
-    output = cmd(archiver, "debug", "refcount-obj", "124", "xyza").strip()
-    assert output == f"object id 124 is invalid.{os.linesep}object id xyza is invalid."
-
-
 def test_debug_info(archivers, request):
     archiver = request.getfixturevalue(archivers)
     output = cmd(archiver, "debug", "info")

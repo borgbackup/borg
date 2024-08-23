@@ -310,21 +310,6 @@ class DebugMixIn:
                     print("object %s not found." % hex_id)
         print("Done.")
 
-    @with_repository(manifest=False, exclusive=True, cache=True, compatibility=Manifest.NO_OPERATION_CHECK)
-    def do_debug_refcount_obj(self, args, repository, manifest, cache):
-        """display refcounts for the objects with the given IDs"""
-        for hex_id in args.ids:
-            try:
-                id = hex_to_bin(hex_id, length=32)
-            except ValueError:
-                print("object id %s is invalid." % hex_id)
-            else:
-                try:
-                    refcount = cache.chunks[id][0]
-                    print("object %s has %d referrers [info from chunks cache]." % (hex_id, refcount))
-                except KeyError:
-                    print("object %s not found [info from chunks cache]." % hex_id)
-
     def do_debug_convert_profile(self, args):
         """convert Borg profile to Python profile"""
         import marshal
@@ -604,23 +589,6 @@ class DebugMixIn:
         subparser.add_argument(
             "ids", metavar="IDs", nargs="+", type=str, help="hex object ID(s) to delete from the repo"
         )
-
-        debug_refcount_obj_epilog = process_epilog(
-            """
-        This command displays the reference count for objects from the repository.
-        """
-        )
-        subparser = debug_parsers.add_parser(
-            "refcount-obj",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_debug_refcount_obj.__doc__,
-            epilog=debug_refcount_obj_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="show refcount for object from repository (debug)",
-        )
-        subparser.set_defaults(func=self.do_debug_refcount_obj)
-        subparser.add_argument("ids", metavar="IDs", nargs="+", type=str, help="hex object ID(s) to show refcounts for")
 
         debug_convert_profile_epilog = process_epilog(
             """

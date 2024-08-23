@@ -11,7 +11,7 @@ import shlex
 import stat
 import uuid
 from typing import Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING, Literal
-from collections import Counter, OrderedDict
+from collections import OrderedDict
 from datetime import datetime, timezone
 from functools import partial
 from string import Formatter
@@ -837,9 +837,7 @@ class ItemFormatter(BaseFormatter):
         "flags": "file flags",
         "extra": 'prepends {target} with " -> " for soft links and " link to " for hard links',
         "size": "file size",
-        "dsize": "deduplicated size",
         "num_chunks": "number of chunks in this file",
-        "unique_chunks": "number of unique chunks in this file",
         "mtime": "file modification time",
         "ctime": "file change time",
         "atime": "file access time",
@@ -853,14 +851,14 @@ class ItemFormatter(BaseFormatter):
     }
     KEY_GROUPS = (
         ("type", "mode", "uid", "gid", "user", "group", "path", "target", "hlid", "flags"),
-        ("size", "dsize", "num_chunks", "unique_chunks"),
+        ("size", "num_chunks"),
         ("mtime", "ctime", "atime", "isomtime", "isoctime", "isoatime"),
         tuple(sorted(hash_algorithms)),
         ("archiveid", "archivename", "extra"),
         ("health",),
     )
 
-    KEYS_REQUIRING_CACHE = ("dsize", "unique_chunks")
+    KEYS_REQUIRING_CACHE = ()
 
     @classmethod
     def format_needs_cache(cls, format):
@@ -878,9 +876,7 @@ class ItemFormatter(BaseFormatter):
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             "size": self.calculate_size,
-            "dsize": partial(self.sum_unique_chunks_metadata, lambda chunk: chunk.size),
             "num_chunks": self.calculate_num_chunks,
-            "unique_chunks": partial(self.sum_unique_chunks_metadata, lambda chunk: 1),
             "isomtime": partial(self.format_iso_time, "mtime"),
             "isoctime": partial(self.format_iso_time, "ctime"),
             "isoatime": partial(self.format_iso_time, "atime"),
@@ -924,20 +920,6 @@ class ItemFormatter(BaseFormatter):
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data
-
-    def sum_unique_chunks_metadata(self, metadata_func, item):
-        """
-        sum unique chunks metadata, a unique chunk is a chunk which is referenced globally as often as it is in the
-        item
-
-        item: The item to sum its unique chunks' metadata
-        metadata_func: A function that takes a parameter of type ChunkIndexEntry and returns a number, used to return
-        the metadata needed from the chunk
-        """
-        chunk_index = self.archive.cache.chunks
-        chunks = item.get("chunks", [])
-        chunks_counter = Counter(c.id for c in chunks)
-        return sum(metadata_func(c) for c in chunks if chunk_index[c.id].refcount == chunks_counter[c.id])
 
     def calculate_num_chunks(self, item):
         return len(item.get("chunks", []))

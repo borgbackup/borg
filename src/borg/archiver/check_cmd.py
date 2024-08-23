@@ -38,9 +38,7 @@ class CheckMixIn:
         if args.repair and args.max_duration:
             raise CommandError("--repair does not allow --max-duration argument.")
         if args.max_duration and not args.repo_only:
-            # when doing a partial repo check, we can only check crc32 checksums in segment files,
-            # we can't build a fresh repo index in memory to verify the on-disk index against it.
-            # thus, we should not do an archives check based on a unknown-quality on-disk repo index.
+            # when doing a partial repo check, we can only check xxh64 hashes in repository files.
             # also, there is no max_duration support in the archives check code anyway.
             raise CommandError("--repository-only is required for --max-duration support.")
         if not args.archives_only:
@@ -72,8 +70,8 @@ class CheckMixIn:
         It consists of two major steps:
 
         1. Checking the consistency of the repository itself. This includes checking
-           the segment magic headers, and both the metadata and data of all objects in
-           the segments. The read data is checked by size and CRC. Bit rot and other
+           the file magic headers, and both the metadata and data of all objects in
+           the repository. The read data is checked by size and hash. Bit rot and other
            types of accidental damage can be detected this way. Running the repository
            check can be split into multiple partial checks using ``--max-duration``.
            When checking a remote repository, please note that the checks run on the
@@ -108,13 +106,12 @@ class CheckMixIn:
 
         **Warning:** Please note that partial repository checks (i.e. running it with
         ``--max-duration``) can only perform non-cryptographic checksum checks on the
-        segment files. A full repository check (i.e. without ``--max-duration``) can
-        also do a repository index check. Enabling partial repository checks excepts
-        archive checks for the same reason. Therefore partial checks may be useful with
-        very large repositories only where a full check would take too long.
+        repository files. Enabling partial repository checks excepts archive checks
+        for the same reason. Therefore partial checks may be useful with very large
+        repositories only where a full check would take too long.
 
         The ``--verify-data`` option will perform a full integrity verification (as
-        opposed to checking the CRC32 of the segment) of data, which means reading the
+        opposed to checking just the xxh64) of data, which means reading the
         data from the repository, decrypting and decompressing it. It is a complete
         cryptographic verification and hence very time consuming, but will detect any
         accidental and malicious corruption. Tamper-resistance is only guaranteed for
@@ -151,17 +148,15 @@ class CheckMixIn:
 
         In practice, repair mode hooks into both the repository and archive checks:
 
-        1. When checking the repository's consistency, repair mode will try to recover
-           as many objects from segments with integrity errors as possible, and ensure
-           that the index is consistent with the data stored in the segments.
+        1. When checking the repository's consistency, repair mode removes corrupted
+           objects from the repository after it did a 2nd try to read them correctly.
 
         2. When checking the consistency and correctness of archives, repair mode might
            remove whole archives from the manifest if their archive metadata chunk is
            corrupt or lost. On a chunk level (i.e. the contents of files), repair mode
            will replace corrupt or lost chunks with a same-size replacement chunk of
            zeroes. If a previously zeroed chunk reappears, repair mode will restore
-           this lost chunk using the new chunk. Lastly, repair mode will also delete
-           orphaned chunks (e.g. caused by read errors while creating the archive).
+           this lost chunk using the new chunk.
 
         Most steps taken by repair mode have a one-time effect on the repository, like
         removing a lost archive from the repository. However, replacing a corrupt or

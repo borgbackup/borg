@@ -15,8 +15,7 @@ from ..helpers import archivename_validator
 from ..helpers import CommandError, RTError
 from ..manifest import Manifest
 from ..platform import get_process_id
-from ..repository import Repository
-from ..repository3 import Repository3, LIST_SCAN_LIMIT
+from ..repository import Repository, LIST_SCAN_LIMIT
 from ..repoobj import RepoObj
 
 from ._common import with_repository, Highlander
@@ -306,7 +305,7 @@ class DebugMixIn:
                 try:
                     repository.delete(id)
                     print("object %s deleted." % hex_id)
-                except Repository3.ObjectNotFound:
+                except Repository.ObjectNotFound:
                     print("object %s not found." % hex_id)
         print("Done.")
 

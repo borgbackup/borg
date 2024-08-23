@@ -7,7 +7,7 @@ import pytest
 
 from ... import xattr, platform
 from ...constants import *  # NOQA
-from ...locking3 import Lock
+from ...storelocking import Lock
 from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, llfuse
 from .. import changedir, no_selinux, same_ts_ns

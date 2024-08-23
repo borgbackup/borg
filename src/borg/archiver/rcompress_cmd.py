@@ -5,8 +5,8 @@ from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec, ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..helpers import sig_int, ProgressIndicatorPercent, Error
-from ..repository3 import Repository3
-from ..remote3 import RemoteRepository3
+from ..repository import Repository
+from ..remote import RemoteRepository
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -111,7 +111,7 @@ class RCompressMixIn:
         recompress_candidate_count = len(recompress_ids)
         chunks_limit = min(1000, max(100, recompress_candidate_count // 1000))
 
-        if not isinstance(repository, (Repository3, RemoteRepository3)):
+        if not isinstance(repository, (Repository, RemoteRepository)):
             # start a new transaction
             data = repository.get_manifest()
             repository.put_manifest(data)

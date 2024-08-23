@@ -1,6 +1,6 @@
 from ...constants import *  # NOQA
 from ...manifest import Manifest
-from ...repository3 import Repository3
+from ...repository import Repository
 from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -21,7 +21,7 @@ def test_rename(archivers, request):
     cmd(archiver, "extract", "test.3", "--dry-run")
     cmd(archiver, "extract", "test.4", "--dry-run")
     # Make sure both archives have been renamed
-    with Repository3(archiver.repository_path) as repository:
+    with Repository(archiver.repository_path) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
     assert len(manifest.archives) == 2
     assert "test.3" in manifest.archives

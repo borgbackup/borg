@@ -49,9 +49,8 @@ from .manifest import Manifest
 from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
-from .remote import cache_if_remote
-from .remote3 import RemoteRepository3
-from .repository3 import Repository3, LIST_SCAN_LIMIT, NoManifestError
+from .remote import RemoteRepository, cache_if_remote
+from .repository import Repository, LIST_SCAN_LIMIT, NoManifestError
 from .repoobj import RepoObj
 
 has_link = hasattr(os, "link")
@@ -1655,7 +1654,7 @@ class ArchiveChecker:
         self.repair = repair
         self.repository = repository
         self.init_chunks()
-        if not isinstance(repository, (Repository3, RemoteRepository3)) and not self.chunks:
+        if not isinstance(repository, (Repository, RemoteRepository)) and not self.chunks:
             logger.error("Repository contains no apparent data at all, cannot continue check/repair.")
             return False
         self.key = self.make_key(repository)
@@ -1673,7 +1672,7 @@ class ArchiveChecker:
             except IntegrityErrorBase as exc:
                 logger.error("Repository manifest is corrupted: %s", exc)
                 self.error_found = True
-                if not isinstance(repository, (Repository3, RemoteRepository3)):
+                if not isinstance(repository, (Repository, RemoteRepository)):
                     del self.chunks[Manifest.MANIFEST_ID]
                 self.manifest = self.rebuild_manifest()
         self.rebuild_refcounts(
@@ -1758,7 +1757,7 @@ class ArchiveChecker:
                 chunk_id = chunk_ids_revd.pop(-1)  # better efficiency
                 try:
                     encrypted_data = next(chunk_data_iter)
-                except (Repository3.ObjectNotFound, IntegrityErrorBase) as err:
+                except (Repository.ObjectNotFound, IntegrityErrorBase) as err:
                     self.error_found = True
                     errors += 1
                     logger.error("chunk %s: %s", bin_to_hex(chunk_id), err)
@@ -1889,7 +1888,7 @@ class ArchiveChecker:
         Missing and/or incorrect data is repaired when detected
         """
         # Exclude the manifest from chunks (manifest entry might be already deleted from self.chunks)
-        if not isinstance(self.repository, (Repository3, RemoteRepository3)):
+        if not isinstance(self.repository, (Repository, RemoteRepository)):
             self.chunks.pop(Manifest.MANIFEST_ID, None)
 
         def mark_as_possibly_superseded(id_):

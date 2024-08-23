@@ -7,8 +7,8 @@ from ..constants import *  # NOQA
 from ..helpers import set_ec, EXIT_WARNING, EXIT_ERROR, format_file_size
 from ..helpers import ProgressIndicatorPercent
 from ..manifest import Manifest
-from ..remote3 import RemoteRepository3
-from ..repository3 import Repository3
+from ..remote import RemoteRepository
+from ..repository import Repository
 
 from ..logger import create_logger
 
@@ -18,7 +18,7 @@ logger = create_logger()
 class ArchiveGarbageCollector:
     def __init__(self, repository, manifest):
         self.repository = repository
-        assert isinstance(repository, (Repository3, RemoteRepository3))
+        assert isinstance(repository, (Repository, RemoteRepository))
         self.manifest = manifest
         self.repository_chunks = None  # what we have in the repository
         self.used_chunks = None  # what archives currently reference

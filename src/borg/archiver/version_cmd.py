@@ -2,7 +2,7 @@ import argparse
 
 from .. import __version__
 from ..constants import *  # NOQA
-from ..remote3 import RemoteRepository3
+from ..remote import RemoteRepository
 
 from ..logger import create_logger
 
@@ -16,7 +16,7 @@ class VersionMixIn:
 
         client_version = parse_version(__version__)
         if args.location.proto in ("ssh", "socket"):
-            with RemoteRepository3(args.location, lock=False, args=args) as repository:
+            with RemoteRepository(args.location, lock=False, args=args) as repository:
                 server_version = repository.server_version
         else:
             server_version = client_version

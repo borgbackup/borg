@@ -12,10 +12,10 @@ from ..helpers import Highlander
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
+from ..legacyremote import LegacyRemoteRepository
 from ..remote import RemoteRepository
-from ..remote3 import RemoteRepository3
+from ..legacyrepository import LegacyRepository
 from ..repository import Repository
-from ..repository3 import Repository3
 from ..repoobj import RepoObj, RepoObj1
 from ..patterns import (
     ArgparsePatternAction,
@@ -34,7 +34,7 @@ def get_repository(
     location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args, v1_or_v2
 ):
     if location.proto in ("ssh", "socket"):
-        RemoteRepoCls = RemoteRepository if v1_or_v2 else RemoteRepository3
+        RemoteRepoCls = LegacyRemoteRepository if v1_or_v2 else RemoteRepository
         repository = RemoteRepoCls(
             location,
             create=create,
@@ -47,7 +47,7 @@ def get_repository(
         )
 
     else:
-        RepoCls = Repository if v1_or_v2 else Repository3
+        RepoCls = LegacyRepository if v1_or_v2 else Repository
         repository = RepoCls(
             location.path,
             create=create,

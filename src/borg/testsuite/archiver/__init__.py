@@ -24,8 +24,8 @@ from ...helpers import init_ec_warnings
 from ...logger import flush_logging
 from ...manifest import Manifest
 from ...platform import get_flags
-from ...remote3 import RemoteRepository3
-from ...repository3 import Repository3
+from ...remote import RemoteRepository
+from ...repository import Repository
 from .. import has_lchflags, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, no_selinux
 from .. import changedir
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
@@ -166,7 +166,7 @@ def create_src_archive(archiver, name, ts=None):
 
 
 def open_archive(repo_path, name):
-    repository = Repository3(repo_path, exclusive=True)
+    repository = Repository(repo_path, exclusive=True)
     with repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         archive = Archive(manifest, name)
@@ -175,9 +175,9 @@ def open_archive(repo_path, name):
 
 def open_repository(archiver):
     if archiver.get_kind() == "remote":
-        return RemoteRepository3(Location(archiver.repository_location))
+        return RemoteRepository(Location(archiver.repository_location))
     else:
-        return Repository3(archiver.repository_path, exclusive=True)
+        return Repository(archiver.repository_path, exclusive=True)
 
 
 def create_regular_file(input_path, name, size=0, contents=None):
@@ -253,12 +253,12 @@ def create_test_files(input_path, create_hardlinks=True):
 
 
 def _extract_repository_id(repo_path):
-    with Repository3(repo_path) as repository:
+    with Repository(repo_path) as repository:
         return repository.id
 
 
 def _set_repository_id(repo_path, id):
-    with Repository3(repo_path) as repository:
+    with Repository(repo_path) as repository:
         repository._set_id(id)
         return repository.id
 

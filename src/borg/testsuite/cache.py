@@ -9,14 +9,14 @@ from ..cache import AdHocCache
 from ..crypto.key import AESOCBRepoKey
 from ..hashindex import ChunkIndex
 from ..manifest import Manifest
-from ..repository3 import Repository3
+from ..repository import Repository
 
 
 class TestAdHocCache:
     @pytest.fixture
     def repository(self, tmpdir):
         self.repository_location = os.path.join(str(tmpdir), "repository")
-        with Repository3(self.repository_location, exclusive=True, create=True) as repository:
+        with Repository(self.repository_location, exclusive=True, create=True) as repository:
             repository.put(H(1), b"1234")
             yield repository
 
@@ -51,7 +51,7 @@ class TestAdHocCache:
         assert cache.seen_chunk(H(5)) == 1
         cache.chunk_decref(H(5), 1, Statistics())
         assert not cache.seen_chunk(H(5))
-        with pytest.raises(Repository3.ObjectNotFound):
+        with pytest.raises(Repository.ObjectNotFound):
             repository.get(H(5))
 
     def test_files_cache(self, cache):

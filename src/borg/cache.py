@@ -25,11 +25,11 @@ from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
 from .crypto.key import PlaintextKey
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
-from .locking import Lock
+from .fslocking import Lock
 from .manifest import Manifest
 from .platform import SaveFile
-from .remote3 import RemoteRepository3
-from .repository3 import LIST_SCAN_LIMIT, Repository3
+from .remote import RemoteRepository
+from .repository import LIST_SCAN_LIMIT, Repository
 
 # note: cmtime might be either a ctime or a mtime timestamp, chunks is a list of ChunkListEntry
 FileCacheEntry = namedtuple("FileCacheEntry", "age inode size cmtime chunks")
@@ -648,7 +648,7 @@ class ChunksMixin:
                 num_chunks += 1
                 chunks[id_] = init_entry
         # Cache does not contain the manifest.
-        if not isinstance(self.repository, (Repository3, RemoteRepository3)):
+        if not isinstance(self.repository, (Repository, RemoteRepository)):
             del chunks[self.manifest.MANIFEST_ID]
         duration = perf_counter() - t0 or 0.01
         logger.debug(

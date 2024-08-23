@@ -8,9 +8,9 @@ from ...archive import ChunkBuffer
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack
 from ...manifest import Manifest
-from ...remote3 import RemoteRepository3
-from ...repository3 import Repository3
-from ..repository3 import fchunk
+from ...remote import RemoteRepository
+from ...repository import Repository
+from ..repository import fchunk
 from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -191,7 +191,7 @@ def test_missing_manifest(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        if isinstance(repository, (Repository3, RemoteRepository3)):
+        if isinstance(repository, (Repository, RemoteRepository)):
             repository.store_delete("config/manifest")
         else:
             repository.delete(Manifest.MANIFEST_ID)
@@ -342,7 +342,7 @@ def test_extra_chunks(archivers, request):
         pytest.skip("only works locally")
     check_cmd_setup(archiver)
     cmd(archiver, "check", exit_code=0)
-    with Repository3(archiver.repository_location, exclusive=True) as repository:
+    with Repository(archiver.repository_location, exclusive=True) as repository:
         chunk = fchunk(b"xxxx")
         repository.put(b"01234567890123456789012345678901", chunk)
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
@@ -362,9 +362,9 @@ def test_verify_data(archivers, request, init_args):
         return b"fakefake"
 
     import borg.repoobj
-    import borg.repository3
+    import borg.repository
 
-    with patch.object(borg.repoobj, "xxh64", fake_xxh64), patch.object(borg.repository3, "xxh64", fake_xxh64):
+    with patch.object(borg.repoobj, "xxh64", fake_xxh64), patch.object(borg.repository, "xxh64", fake_xxh64):
         check_cmd_setup(archiver)
         shutil.rmtree(archiver.repository_path)
         cmd(archiver, "rcreate", *init_args)
@@ -431,7 +431,7 @@ def test_empty_repository(archivers, request):
     if archiver.get_kind() == "remote":
         pytest.skip("only works locally")
     check_cmd_setup(archiver)
-    with Repository3(archiver.repository_location, exclusive=True) as repository:
+    with Repository(archiver.repository_location, exclusive=True) as repository:
         for id_ in repository.list():
             repository.delete(id_)
     cmd(archiver, "check", exit_code=1)

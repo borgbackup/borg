@@ -3,14 +3,14 @@ import pytest
 from ..constants import ROBJ_FILE_STREAM, ROBJ_MANIFEST, ROBJ_ARCHIVE_META
 from ..crypto.key import PlaintextKey
 from ..helpers.errors import IntegrityError
-from ..repository3 import Repository3
+from ..repository import Repository
 from ..repoobj import RepoObj, RepoObj1
 from ..compress import LZ4
 
 
 @pytest.fixture
 def repository(tmpdir):
-    return Repository3(tmpdir, create=True)
+    return Repository(tmpdir, create=True)
 
 
 @pytest.fixture

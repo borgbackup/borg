@@ -9,8 +9,8 @@ from ...constants import *  # NOQA
 from ...helpers import Location, get_security_dir, bin_to_hex
 from ...helpers import EXIT_ERROR
 from ...manifest import Manifest, MandatoryFeatureUnsupported
-from ...remote3 import RemoteRepository3, PathNotAllowed
-from ...repository3 import Repository3
+from ...remote import RemoteRepository, PathNotAllowed
+from ...repository import Repository
 from .. import llfuse
 from .. import changedir
 from . import cmd, _extract_repository_id, create_test_files
@@ -25,7 +25,7 @@ def get_security_directory(repo_path):
 
 
 def add_unknown_feature(repo_path, operation):
-    with Repository3(repo_path, exclusive=True) as repository:
+    with Repository(repo_path, exclusive=True) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         manifest.config["feature_flags"] = {operation.value: {"mandatory": ["unknown-feature"]}}
         manifest.write()
@@ -259,7 +259,7 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
     remote_repo = archiver.get_kind() == "remote"
     print(cmd(archiver, "rcreate", RK_ENCRYPTION))
 
-    with Repository3(archiver.repository_path, exclusive=True) as repository:
+    with Repository(archiver.repository_path, exclusive=True) as repository:
         if remote_repo:
             repository._location = Location(archiver.repository_location)
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -271,7 +271,7 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
     if archiver.FORK_DEFAULT:
         cmd(archiver, "create", "test", "input")
 
-    with Repository3(archiver.repository_path, exclusive=True) as repository:
+    with Repository(archiver.repository_path, exclusive=True) as repository:
         if remote_repo:
             repository._location = Location(archiver.repository_location)
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -283,26 +283,26 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
 def test_remote_repo_restrict_to_path(remote_archiver):
     original_location, repo_path = remote_archiver.repository_location, remote_archiver.repository_path
     # restricted to repo directory itself:
-    with patch.object(RemoteRepository3, "extra_test_args", ["--restrict-to-path", repo_path]):
+    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", repo_path]):
         cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
     # restricted to repo directory itself, fail for other directories with same prefix:
-    with patch.object(RemoteRepository3, "extra_test_args", ["--restrict-to-path", repo_path]):
+    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", repo_path]):
         with pytest.raises(PathNotAllowed):
             remote_archiver.repository_location = original_location + "_0"
             cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
     # restricted to a completely different path:
-    with patch.object(RemoteRepository3, "extra_test_args", ["--restrict-to-path", "/foo"]):
+    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", "/foo"]):
         with pytest.raises(PathNotAllowed):
             remote_archiver.repository_location = original_location + "_1"
             cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
     path_prefix = os.path.dirname(repo_path)
     # restrict to repo directory's parent directory:
-    with patch.object(RemoteRepository3, "extra_test_args", ["--restrict-to-path", path_prefix]):
+    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", path_prefix]):
         remote_archiver.repository_location = original_location + "_2"
         cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
     # restrict to repo directory's parent directory and another directory:
     with patch.object(
-        RemoteRepository3, "extra_test_args", ["--restrict-to-path", "/foo", "--restrict-to-path", path_prefix]
+        RemoteRepository, "extra_test_args", ["--restrict-to-path", "/foo", "--restrict-to-path", path_prefix]
     ):
         remote_archiver.repository_location = original_location + "_3"
         cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
@@ -311,10 +311,10 @@ def test_remote_repo_restrict_to_path(remote_archiver):
 def test_remote_repo_restrict_to_repository(remote_archiver):
     repo_path = remote_archiver.repository_path
     # restricted to repo directory itself:
-    with patch.object(RemoteRepository3, "extra_test_args", ["--restrict-to-repository", repo_path]):
+    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-repository", repo_path]):
         cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
     parent_path = os.path.join(repo_path, "..")
-    with patch.object(RemoteRepository3, "extra_test_args", ["--restrict-to-repository", parent_path]):
+    with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-repository", parent_path]):
         with pytest.raises(PathNotAllowed):
             cmd(remote_archiver, "rcreate", RK_ENCRYPTION)
 

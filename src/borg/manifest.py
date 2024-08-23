@@ -242,8 +242,8 @@ class Manifest:
     def load(cls, repository, operations, key=None, *, ro_cls=RepoObj):
         from .item import ManifestItem
         from .crypto.key import key_factory
-        from .remote3 import RemoteRepository3
-        from .repository3 import Repository3
+        from .remote import RemoteRepository
+        from .repository import Repository
 
         cdata = repository.get_manifest()
         if not key:
@@ -256,7 +256,7 @@ class Manifest:
         if m.get("version") not in (1, 2):
             raise ValueError("Invalid manifest version")
 
-        if isinstance(repository, (Repository3, RemoteRepository3)):
+        if isinstance(repository, (Repository, RemoteRepository)):
             from .helpers import msgpack
 
             archives = {}
@@ -310,8 +310,8 @@ class Manifest:
 
     def write(self):
         from .item import ManifestItem
-        from .remote3 import RemoteRepository3
-        from .repository3 import Repository3
+        from .remote import RemoteRepository
+        from .repository import Repository
 
         # self.timestamp needs to be strictly monotonically increasing. Clocks often are not set correctly
         if self.timestamp is None:
@@ -327,7 +327,7 @@ class Manifest:
         assert len(self.item_keys) <= 100
         self.config["item_keys"] = tuple(sorted(self.item_keys))
 
-        if isinstance(self.repository, (Repository3, RemoteRepository3)):
+        if isinstance(self.repository, (Repository, RemoteRepository)):
             valid_keys = set()
             for name, info in self.archives.get_raw_dict().items():
                 archive = dict(name=name, id=info["id"], time=info["time"])

@@ -100,8 +100,8 @@ class TransferMixIn:
                     if "chunks" in item:
                         chunks = []
                         for chunk_id, size in item.chunks:
-                            refcount = cache.seen_chunk(chunk_id, size)
-                            if refcount == 0:  # target repo does not yet have this chunk
+                            chunk_present = cache.seen_chunk(chunk_id, size) != 0
+                            if not chunk_present:  # target repo does not yet have this chunk
                                 if not dry_run:
                                     cdata = other_repository.get(chunk_id)
                                     if args.recompress == "never":

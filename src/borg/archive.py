@@ -123,7 +123,6 @@ Bytes sent to remote: {stats.tx_bytes}
     def as_dict(self):
         return {
             "original_size": FileSize(self.osize, iec=self.iec),
-            "deduplicated_size": FileSize(self.usize, iec=self.iec),
             "nfiles": self.nfiles,
             "hashing_time": self.hashing_time,
             "chunking_time": self.chunking_time,

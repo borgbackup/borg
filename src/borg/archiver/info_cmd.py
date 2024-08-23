@@ -43,7 +43,6 @@ class InfoMixIn:
                 Command line: {command_line}
                 Number of files: {stats[nfiles]}
                 Original size: {stats[original_size]}
-                Deduplicated size: {stats[deduplicated_size]}
                 """
                     )
                     .strip()

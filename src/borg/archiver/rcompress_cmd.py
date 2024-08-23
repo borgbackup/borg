@@ -16,11 +16,6 @@ logger = create_logger()
 
 def find_chunks(repository, repo_objs, stats, ctype, clevel, olevel):
     """find chunks that need processing (usually: recompression)."""
-    # to do it this way is maybe not obvious, thus keeping the essential design criteria here:
-    # - determine the chunk ids at one point in time (== do a **full** scan in one go) **before**
-    # writing to the repo (and especially before doing a compaction, which moves segment files around)
-    # - get the chunk ids in **on-disk order** (so we can efficiently compact while processing the chunks)
-    # - only put the ids into the list that actually need recompression (keeps it a little shorter in some cases)
     recompress_ids = []
     compr_keys = stats["compr_keys"] = set()
     compr_wanted = ctype, clevel, olevel
@@ -169,9 +164,8 @@ class RCompressMixIn:
             """
         Repository (re-)compression (and/or re-obfuscation).
 
-        Reads all chunks in the repository (in on-disk order, this is important for
-        compaction) and recompresses them if they are not already using the compression
-        type/level and obfuscation level given via ``--compression``.
+        Reads all chunks in the repository and recompresses them if they are not already
+        using the compression type/level and obfuscation level given via ``--compression``.
 
         If the outcome of the chunk processing indicates a change in compression
         type/level or obfuscation level, the processed chunk is written to the repository.

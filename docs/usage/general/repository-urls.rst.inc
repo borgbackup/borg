@@ -20,6 +20,9 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 
 ``ssh://user@host:port/~/path/to/repo`` - path relative to user's home directory
 
+**Remote repositories** accessed via sftp:
+
+``sftp://user@host:port/path/to/repo`` - absolute path`
 
 If you frequently need the same repo URL, it is a good idea to set the
 ``BORG_REPO`` environment variable to set a default for the repo URL:

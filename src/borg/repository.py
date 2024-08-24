@@ -286,12 +286,6 @@ class Repository:
                 logger.error(f"Finished {mode} repository check, errors found.")
         return objs_errors == 0 or repair
 
-    def __len__(self):
-        raise NotImplementedError
-
-    def __contains__(self, id):
-        raise NotImplementedError
-
     def list(self, limit=None, marker=None):
         """
         list <limit> IDs starting from after id <marker>.

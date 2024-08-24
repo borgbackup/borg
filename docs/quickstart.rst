@@ -270,7 +270,7 @@ A passphrase should be a single line of text. Any trailing linefeed will be
 stripped.
 
 Do not use empty passphrases, as these can be trivially guessed, which does not
-leave any encrypted data secure. 
+leave any encrypted data secure.
 
 Avoid passphrases containing non-ASCII characters.
 Borg can process any unicode text, but problems may arise at input due to text
@@ -420,6 +420,15 @@ You can also use other remote filesystems in a similar way. Just be careful,
 not all filesystems out there are really stable and working good enough to
 be acceptable for backup usage.
 
+Other kinds of repositories
+---------------------------
+
+Due to using the `borgstore` project, borg now also supports other kinds of
+(remote) repositories besides `file:` and `ssh:`:
+
+- sftp: the borg client will directly talk to an sftp server.
+  This does not require borg being installed on the sftp server.
+- Others may come in the future, adding backends to `borgstore` is rather simple.
 
 Restoring a backup
 ------------------

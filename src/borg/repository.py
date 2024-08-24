@@ -100,10 +100,9 @@ class Repository:
         else:
             url = "file://%s" % os.path.abspath(path_or_location)
             location = Location(url)
-        self.location = location
+        self._location = location
         # use a Store with flat config storage and 2-levels-nested data storage
         self.store = Store(url, levels={"config/": [0], "data/": [2]})
-        self._location = Location(url)
         self.version = None
         # long-running repository methods which emit log or progress output are responsible for calling
         # the ._send_log method periodically to get log and progress output transferred to the borg client
@@ -123,7 +122,7 @@ class Repository:
         self.exclusive = exclusive
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} {self.location}>"
+        return f"<{self.__class__.__name__} {self._location}>"
 
     def __enter__(self):
         if self.do_create:
@@ -184,12 +183,12 @@ class Repository:
             self.lock = None
         readme = self.store.load("config/readme").decode()
         if readme != REPOSITORY_README:
-            raise self.InvalidRepository(str(self.location))
+            raise self.InvalidRepository(str(self._location))
         self.version = int(self.store.load("config/version").decode())
         if self.version not in self.acceptable_repo_versions:
             self.close()
             raise self.InvalidRepositoryConfig(
-                str(self.location), "repository version %d is not supported by this borg version" % self.version
+                str(self._location), "repository version %d is not supported by this borg version" % self.version
             )
         self.id = hex_to_bin(self.store.load("config/id").decode(), length=32)
         self.opened = True
@@ -346,7 +345,7 @@ class Repository:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes")
                 return hdr + meta
         except StoreObjectNotFound:
-            raise self.ObjectNotFound(id, str(self.location)) from None
+            raise self.ObjectNotFound(id, str(self._location)) from None
 
     def get_many(self, ids, read_data=True, is_preloaded=False):
         for id_ in ids:
@@ -377,7 +376,7 @@ class Repository:
         try:
             self.store.delete(key)
         except StoreObjectNotFound:
-            raise self.ObjectNotFound(id, str(self.location)) from None
+            raise self.ObjectNotFound(id, str(self._location)) from None
 
     def async_response(self, wait=True):
         """Get one async result (only applies to remote repositories).

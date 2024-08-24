@@ -454,6 +454,19 @@ class Location:
         re.VERBOSE,
     )  # path
 
+    sftp_re = re.compile(
+        r"""
+        (?P<proto>sftp)://                                      # sftp://
+        """
+        + optional_user_re
+        + host_re
+        + r"""                 # user@  (optional), host name or address
+        (?::(?P<port>\d+))?                                     # :port (optional)
+        """
+        + abs_path_re,
+        re.VERBOSE,
+    )  # path
+
     socket_re = re.compile(
         r"""
         (?P<proto>socket)://                                    # socket://
@@ -518,6 +531,14 @@ class Location:
             return ("/." + p) if relative else p
 
         m = self.ssh_re.match(text)
+        if m:
+            self.proto = m.group("proto")
+            self.user = m.group("user")
+            self._host = m.group("host")
+            self.port = m.group("port") and int(m.group("port")) or None
+            self.path = normpath_special(m.group("path"))
+            return True
+        m = self.sftp_re.match(text)
         if m:
             self.proto = m.group("proto")
             self.user = m.group("user")

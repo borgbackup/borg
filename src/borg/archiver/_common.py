@@ -46,6 +46,18 @@ def get_repository(
             args=args,
         )
 
+    elif location.proto in ("sftp", "file") and not v1_or_v2:  # stuff directly supported by borgstore
+        repository = Repository(
+            location,
+            create=create,
+            exclusive=exclusive,
+            lock_wait=lock_wait,
+            lock=lock,
+            append_only=append_only,
+            make_parent_dirs=make_parent_dirs,
+            storage_quota=storage_quota,
+        )
+
     else:
         RepoCls = LegacyRepository if v1_or_v2 else Repository
         repository = RepoCls(

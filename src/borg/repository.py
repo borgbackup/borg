@@ -81,7 +81,7 @@ class Repository:
 
     def __init__(
         self,
-        path,
+        path_or_location,
         create=False,
         exclusive=False,
         lock_wait=1.0,
@@ -91,8 +91,16 @@ class Repository:
         make_parent_dirs=False,
         send_log_cb=None,
     ):
-        self.path = os.path.abspath(path)
-        url = "file://%s" % self.path
+        if isinstance(path_or_location, Location):
+            location = path_or_location
+            if location.proto == "file":
+                url = f"file://{location.path}"  # frequently users give without file:// prefix
+            else:
+                url = location.processed  # location as given by user, processed placeholders
+        else:
+            url = "file://%s" % os.path.abspath(path_or_location)
+            location = Location(url)
+        self.location = location
         # use a Store with flat config storage and 2-levels-nested data storage
         self.store = Store(url, levels={"config/": [0], "data/": [2]})
         self._location = Location(url)
@@ -115,7 +123,7 @@ class Repository:
         self.exclusive = exclusive
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} {self.path}>"
+        return f"<{self.__class__.__name__} {self.location}>"
 
     def __enter__(self):
         if self.do_create:
@@ -176,12 +184,12 @@ class Repository:
             self.lock = None
         readme = self.store.load("config/readme").decode()
         if readme != REPOSITORY_README:
-            raise self.InvalidRepository(self.path)
+            raise self.InvalidRepository(str(self.location))
         self.version = int(self.store.load("config/version").decode())
         if self.version not in self.acceptable_repo_versions:
             self.close()
             raise self.InvalidRepositoryConfig(
-                self.path, "repository version %d is not supported by this borg version" % self.version
+                str(self.location), "repository version %d is not supported by this borg version" % self.version
             )
         self.id = hex_to_bin(self.store.load("config/id").decode(), length=32)
         self.opened = True
@@ -338,7 +346,7 @@ class Repository:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes")
                 return hdr + meta
         except StoreObjectNotFound:
-            raise self.ObjectNotFound(id, self.path) from None
+            raise self.ObjectNotFound(id, str(self.location)) from None
 
     def get_many(self, ids, read_data=True, is_preloaded=False):
         for id_ in ids:
@@ -369,7 +377,7 @@ class Repository:
         try:
             self.store.delete(key)
         except StoreObjectNotFound:
-            raise self.ObjectNotFound(id, self.path) from None
+            raise self.ObjectNotFound(id, str(self.location)) from None
 
     def async_response(self, wait=True):
         """Get one async result (only applies to remote repositories).

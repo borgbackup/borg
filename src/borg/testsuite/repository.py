@@ -44,7 +44,7 @@ def reopen(repository, exclusive: Optional[bool] = True, create=False):
     if isinstance(repository, Repository):
         if repository.opened:
             raise RuntimeError("Repo must be closed before a reopen. Cannot support nested repository contexts.")
-        return Repository(repository.path, exclusive=exclusive, create=create)
+        return Repository(repository.location, exclusive=exclusive, create=create)
 
     if isinstance(repository, RemoteRepository):
         if repository.p is not None or repository.sock is not None:

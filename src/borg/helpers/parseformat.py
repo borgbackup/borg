@@ -512,7 +512,7 @@ class Location:
         if not text:
             # we did not get a text to parse, so we try to fetch from the environment
             text = os.environ.get(self.repo_env_var)
-            if text is None:
+            if not text:  # None or ""
                 return
 
         self.raw = text  # as given by user, might contain placeholders

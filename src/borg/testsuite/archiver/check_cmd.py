@@ -432,6 +432,6 @@ def test_empty_repository(archivers, request):
         pytest.skip("only works locally")
     check_cmd_setup(archiver)
     with Repository(archiver.repository_location, exclusive=True) as repository:
-        for id_ in repository.list():
-            repository.delete(id_)
+        for id, _ in repository.list():
+            repository.delete(id)
     cmd(archiver, "check", exit_code=1)

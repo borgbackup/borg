@@ -20,12 +20,12 @@ def find_chunks(repository, repo_objs, stats, ctype, clevel, olevel):
     compr_keys = stats["compr_keys"] = set()
     compr_wanted = ctype, clevel, olevel
     marker = None
-    chunks_limit = 1000
     while True:
-        chunk_ids = repository.list(limit=chunks_limit, marker=marker)
-        if not chunk_ids:
+        result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+        if not result:
             break
-        marker = chunk_ids[-1]
+        marker = result[-1][0]
+        chunk_ids = [id for id, _ in result]
         for id, chunk_no_data in zip(chunk_ids, repository.get_many(chunk_ids, read_data=False)):
             meta = repo_objs.parse_meta(id, chunk_no_data, ro_type=ROBJ_DONTCARE)
             compr_found = meta["ctype"], meta["clevel"], meta.get("olevel", -1)

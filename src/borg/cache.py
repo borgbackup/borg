@@ -639,14 +639,14 @@ class ChunksMixin:
             num_requests += 1
             if not result:
                 break
-            marker = result[-1]
+            marker = result[-1][0]
             # All chunks from the repository have a refcount of MAX_VALUE, which is sticky,
             # therefore we can't/won't delete them. Chunks we added ourselves in this transaction
             # are tracked correctly.
-            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
-            for id_ in result:
+            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)  # plaintext size
+            for id, stored_size in result:
                 num_chunks += 1
-                chunks[id_] = init_entry
+                chunks[id] = init_entry
         # Cache does not contain the manifest.
         if not isinstance(self.repository, (Repository, RemoteRepository)):
             del chunks[self.manifest.MANIFEST_ID]

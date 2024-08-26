@@ -1696,10 +1696,10 @@ class ArchiveChecker:
             result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not result:
                 break
-            marker = result[-1]
-            init_entry = ChunkIndexEntry(refcount=0, size=0)
-            for id_ in result:
-                self.chunks[id_] = init_entry
+            marker = result[-1][0]
+            init_entry = ChunkIndexEntry(refcount=0, size=0)  # unknown plaintext size (!= stored size!)
+            for id, stored_size in result:
+                self.chunks[id] = init_entry
 
     def make_key(self, repository):
         attempt = 0
@@ -1737,7 +1737,7 @@ class ArchiveChecker:
     def verify_data(self):
         logger.info("Starting cryptographic data integrity verification...")
         chunks_count_index = len(self.chunks)
-        chunks_count_segments = 0
+        chunks_count_repo = 0
         errors = 0
         defect_chunks = []
         pi = ProgressIndicatorPercent(
@@ -1745,16 +1745,16 @@ class ArchiveChecker:
         )
         marker = None
         while True:
-            chunk_ids = self.repository.list(limit=100, marker=marker)
-            if not chunk_ids:
+            result = self.repository.list(limit=100, marker=marker)
+            if not result:
                 break
-            marker = chunk_ids[-1]
-            chunks_count_segments += len(chunk_ids)
-            chunk_data_iter = self.repository.get_many(chunk_ids)
-            chunk_ids_revd = list(reversed(chunk_ids))
-            while chunk_ids_revd:
+            marker = result[-1][0]
+            chunks_count_repo += len(result)
+            chunk_data_iter = self.repository.get_many(id for id, _ in result)
+            result_revd = list(reversed(result))
+            while result_revd:
                 pi.show()
-                chunk_id = chunk_ids_revd.pop(-1)  # better efficiency
+                chunk_id, _ = result_revd.pop(-1)  # better efficiency
                 try:
                     encrypted_data = next(chunk_data_iter)
                 except (Repository.ObjectNotFound, IntegrityErrorBase) as err:
@@ -1764,9 +1764,9 @@ class ArchiveChecker:
                     if isinstance(err, IntegrityErrorBase):
                         defect_chunks.append(chunk_id)
                     # as the exception killed our generator, make a new one for remaining chunks:
-                    if chunk_ids_revd:
-                        chunk_ids = list(reversed(chunk_ids_revd))
-                        chunk_data_iter = self.repository.get_many(chunk_ids)
+                    if result_revd:
+                        result = list(reversed(result_revd))
+                        chunk_data_iter = self.repository.get_many(id for id, _ in result)
                 else:
                     try:
                         # we must decompress, so it'll call assert_id() in there:
@@ -1777,10 +1777,10 @@ class ArchiveChecker:
                         logger.error("chunk %s, integrity error: %s", bin_to_hex(chunk_id), integrity_error)
                         defect_chunks.append(chunk_id)
         pi.finish()
-        if chunks_count_index != chunks_count_segments:
-            logger.error("Repo/Chunks index object count vs. segment files object count mismatch.")
+        if chunks_count_index != chunks_count_repo:
+            logger.error("Chunks index object count vs. repository object count mismatch.")
             logger.error(
-                "Repo/Chunks index: %d objects != segment files: %d objects", chunks_count_index, chunks_count_segments
+                "Chunks index: %d objects != Chunks repository: %d objects", chunks_count_index, chunks_count_repo
             )
         if defect_chunks:
             if self.repair:
@@ -1820,7 +1820,7 @@ class ArchiveChecker:
         log = logger.error if errors else logger.info
         log(
             "Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.",
-            chunks_count_segments,
+            chunks_count_repo,
             errors,
         )
 

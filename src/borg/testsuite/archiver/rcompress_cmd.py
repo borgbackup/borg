@@ -17,11 +17,11 @@ def test_rcompress(archiver):
             manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
             marker = None
             while True:
-                ids = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-                if not ids:
+                result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+                if not result:
                     break
-                marker = ids[-1]
-                for id in ids:
+                marker = result[-1][0]
+                for id, _ in result:
                     chunk = repository.get(id, read_data=True)
                     meta, data = manifest.repo_objs.parse(
                         id, chunk, ro_type=ROBJ_DONTCARE

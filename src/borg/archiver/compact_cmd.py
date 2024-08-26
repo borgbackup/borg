@@ -51,9 +51,9 @@ class ArchiveGarbageCollector:
             result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
             if not result:
                 break
-            marker = result[-1]
-            for chunk_id in result:
-                repository_chunks[chunk_id] = 0  # plaintext size unknown
+            marker = result[-1][0]
+            for id, stored_size in result:
+                repository_chunks[id] = 0  # plaintext size unknown
         return repository_chunks
 
     def analyze_archives(self) -> Tuple[Dict[bytes, int], Dict[bytes, int], int, int, int]:

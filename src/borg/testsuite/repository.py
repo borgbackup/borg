@@ -131,7 +131,7 @@ def test_list(repo_fixtures, request):
         first_half = repository.list(limit=50)
         assert len(first_half) == 50
         assert first_half == repo_list[:50]
-        second_half = repository.list(marker=first_half[-1])
+        second_half = repository.list(marker=first_half[-1][0])
         assert len(second_half) == 50
         assert second_half == repo_list[50:]
         assert len(repository.list(limit=50)) == 50

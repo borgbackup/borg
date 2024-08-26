@@ -288,11 +288,12 @@ class Repository:
 
     def list(self, limit=None, marker=None):
         """
-        list <limit> IDs starting from after id <marker>.
+        list <limit> infos starting from after id <marker>.
+        each info is a tuple (id, storage_size).
         """
         self._lock_refresh()
         collect = True if marker is None else False
-        ids = []
+        result = []
         infos = self.store.list("data")  # generator yielding ItemInfos
         while True:
             try:
@@ -304,13 +305,13 @@ class Repository:
             else:
                 id = hex_to_bin(info.name)
                 if collect:
-                    ids.append(id)
-                    if len(ids) == limit:
+                    result.append((id, info.size))
+                    if len(result) == limit:
                         break
                 elif id == marker:
                     collect = True
                     # note: do not collect the marker id
-        return ids
+        return result
 
     def get(self, id, read_data=True):
         self._lock_refresh()

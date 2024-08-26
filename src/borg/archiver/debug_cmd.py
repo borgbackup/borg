@@ -123,17 +123,18 @@ class DebugMixIn:
                 fd.write(data)
 
         # set up the key without depending on a manifest obj
-        ids = repository.list(limit=1, marker=None)
-        cdata = repository.get(ids[0])
+        result = repository.list(limit=1, marker=None)
+        id, _ = result[0]
+        cdata = repository.get(id)
         key = key_factory(repository, cdata)
         repo_objs = RepoObj(key)
         marker = None
         while True:
-            ids = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-            if not ids:
+            result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+            if not result:
                 break
-            marker = ids[-1]
-            for id in ids:
+            marker = result[-1][0]
+            for id, stored_size in result:
                 cdata = repository.get(id)
                 decrypt_dump(id, cdata)
         print("Done.")
@@ -168,8 +169,9 @@ class DebugMixIn:
         from ..crypto.key import key_factory
 
         # set up the key without depending on a manifest obj
-        ids = repository.list(limit=1, marker=None)
-        cdata = repository.get(ids[0])
+        result = repository.list(limit=1, marker=None)
+        id, _ = result[0]
+        cdata = repository.get(id)
         key = key_factory(repository, cdata)
         repo_objs = RepoObj(key)
 
@@ -178,11 +180,11 @@ class DebugMixIn:
         last_id = None
         i = 0
         while True:
-            ids = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-            if not ids:
+            result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+            if not result:
                 break
-            marker = ids[-1]
-            for id in ids:
+            marker = result[-1][0]
+            for id, stored_size in result:
                 cdata = repository.get(id)
                 _, data = repo_objs.parse(id, cdata, ro_type=ROBJ_DONTCARE)
 

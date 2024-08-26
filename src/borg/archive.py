@@ -1038,7 +1038,7 @@ Utilization of max. archive size: {csize_max:.0%}
             logger.warning('borg check --repair is required to free all space.')
 
     @staticmethod
-    def compare_archives_iter(archive1, archive2, matcher=None, can_compare_chunk_ids=False, content_only=False):
+    def compare_archives_iter(print_warning, archive1, archive2, matcher=None, can_compare_chunk_ids=False, content_only=False):
         """
         Yields tuples with a path and an ItemDiff instance describing changes/indicating equality.
 
@@ -1117,10 +1117,16 @@ Utilization of max. archive size: {csize_max:.0%}
             update_hardlink_masters(deleted, deleted_item)
             yield (path, compare_items(deleted, deleted_item))
         for item1, item2 in deferred:
-            assert hardlink_master_seen(item1)
-            assert hardlink_master_seen(item2)
             assert item1.path == item2.path, "Deferred items have different paths"
-            yield (item1.path, compare_items(item1, item2))
+            hl_found1 = hardlink_master_seen(item1)
+            hl_found2 = hardlink_master_seen(item2)
+            if hl_found1 and hl_found2:
+                yield (item1.path, compare_items(item1, item2))
+            else:
+                if not hl_found1:
+                    print_warning(f"cannot find hardlink source for {item1.path} ({item1.source}), skipping compare.")
+                if not hl_found2:
+                    print_warning(f"cannot find hardlink source for {item2.path} ({item2.source}), skipping compare.")
 
 
 class MetadataCollector:

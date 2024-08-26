@@ -1162,7 +1162,7 @@ class Archiver:
 
         matcher = self.build_matcher(args.patterns, args.paths)
 
-        diffs = Archive.compare_archives_iter(archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids, content_only=args.content_only)
+        diffs = Archive.compare_archives_iter(self.print_warning, archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids, content_only=args.content_only)
         # Conversion to string and filtering for diff.equal to save memory if sorting
         diffs = ((path, diff.changes()) for path, diff in diffs if not diff.equal)
 

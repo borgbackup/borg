@@ -20,12 +20,18 @@ class ArchiveGarbageCollector:
         self.repository = repository
         assert isinstance(repository, (Repository, RemoteRepository))
         self.manifest = manifest
-        self.repository_chunks = None  # what we have in the repository
+        self.repository_chunks = None  # what we have in the repository, id -> stored_size
         self.used_chunks = None  # what archives currently reference
         self.wanted_chunks = None  # chunks that would be nice to have for next borg check --repair
         self.total_files = None  # overall number of source files written to all archives in this repo
         self.total_size = None  # overall size of source file content data written to all archives
         self.archives_count = None  # number of archives
+
+    @property
+    def repository_size(self):
+        if self.repository_chunks is None:
+            return None
+        return sum(self.repository_chunks.values())  # sum of stored sizes
 
     def garbage_collect(self):
         """Removes unused chunks from a repository."""
@@ -53,7 +59,7 @@ class ArchiveGarbageCollector:
                 break
             marker = result[-1][0]
             for id, stored_size in result:
-                repository_chunks[id] = 0  # plaintext size unknown
+                repository_chunks[id] = stored_size
         return repository_chunks
 
     def analyze_archives(self) -> Tuple[Dict[bytes, int], Dict[bytes, int], int, int, int]:
@@ -110,6 +116,7 @@ class ArchiveGarbageCollector:
             logger.warning(f"{len(missing_found)} previously missing objects re-appeared!" + run_repair)
             set_ec(EXIT_WARNING)
 
+        repo_size_before = self.repository_size
         referenced_chunks = set(self.used_chunks) | set(self.wanted_chunks)
         unused = set(self.repository_chunks) - referenced_chunks
         logger.info(f"Repository has {len(unused)} objects to delete.")
@@ -123,15 +130,18 @@ class ArchiveGarbageCollector:
                 self.repository.delete(id)
                 del self.repository_chunks[id]
             pi.finish()
+        repo_size_after = self.repository_size
 
         count = len(self.repository_chunks)
-        logger.info(f"Repository has {count} objects now.")
-
         logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
-        logger.info(f"Source files count (before deduplication): {self.total_files}")
-        logger.info(f"Source files size (before deduplication): {format_file_size(self.total_size, precision=0)}")
+        logger.info(f"Source data size was {format_file_size(self.total_size, precision=0)} in {self.total_files} files.")
         dsize = sum(self.used_chunks[id] for id in self.repository_chunks)
-        logger.info(f"Deduplicated size (before compression, encryption): {format_file_size(dsize, precision=0)}")
+        logger.info(f"Repository size is {format_file_size(self.repository_size, precision=0)} in {count} objects.")
+        if self.total_size != 0:
+            logger.info(f"Space reduction factor due to deduplication: {dsize / self.total_size:.3f}")
+        if dsize != 0:
+            logger.info(f"Space reduction factor due to compression: {self.repository_size / dsize:.3f}")
+        logger.info(f"Compaction saved {format_file_size(repo_size_before - repo_size_after, precision=0)}.")
 
 
 class CompactMixIn:

@@ -11,7 +11,7 @@ def test_compact_empty_repository(archivers, request):
 
     output = cmd(archiver, "compact", "-v", exit_code=0)
     assert "Starting compaction" in output
-    assert "Repository has 0 objects now." in output
+    assert "Repository size is 0 B in 0 objects." in output
     assert "Finished compaction" in output
 
 
@@ -25,7 +25,7 @@ def test_compact_after_deleting_all_archives(archivers, request):
     output = cmd(archiver, "compact", "-v", exit_code=0)
     assert "Starting compaction" in output
     assert "Deleting " in output
-    assert "Repository has 0 objects now." in output
+    assert "Repository size is 0 B in 0 objects." in output
     assert "Finished compaction" in output
 
 
@@ -40,5 +40,5 @@ def test_compact_after_deleting_some_archives(archivers, request):
     output = cmd(archiver, "compact", "-v", exit_code=0)
     assert "Starting compaction" in output
     assert "Deleting " in output
-    assert "Repository has 0 objects now, using approx. 0 B." not in output
+    assert "Repository size is 0 B in 0 objects." not in output
     assert "Finished compaction" in output

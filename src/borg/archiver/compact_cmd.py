@@ -39,13 +39,9 @@ class ArchiveGarbageCollector:
         logger.info("Getting object IDs present in the repository...")
         self.repository_chunks = self.get_repository_chunks()
         logger.info("Computing object IDs used by archives...")
-        (
-            self.used_chunks,
-            self.wanted_chunks,
-            self.total_files,
-            self.total_size,
-            self.archives_count,
-        ) = self.analyze_archives()
+        (self.used_chunks, self.wanted_chunks, self.total_files, self.total_size, self.archives_count) = (
+            self.analyze_archives()
+        )
         self.report_and_delete()
         logger.info("Finished compaction / garbage collection...")
 
@@ -134,7 +130,9 @@ class ArchiveGarbageCollector:
 
         count = len(self.repository_chunks)
         logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
-        logger.info(f"Source data size was {format_file_size(self.total_size, precision=0)} in {self.total_files} files.")
+        logger.info(
+            f"Source data size was {format_file_size(self.total_size, precision=0)} in {self.total_files} files."
+        )
         dsize = sum(self.used_chunks[id] for id in self.repository_chunks)
         logger.info(f"Repository size is {format_file_size(self.repository_size, precision=0)} in {count} objects.")
         if self.total_size != 0:

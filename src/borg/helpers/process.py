@@ -82,9 +82,11 @@ def daemonizing(*, timeout=5):
             logger.debug("Daemonizing: Foreground process (%s, %s, %s) is waiting for background process..." % old_id)
             exit_code = EXIT_SUCCESS
             # Indeed, SIGHUP and SIGTERM handlers should have been set on archiver.run(). Just in case...
-            with signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)), signal_handler(
-                "SIGHUP", raising_signal_handler(SigHup)
-            ), signal_handler("SIGTERM", raising_signal_handler(SigTerm)):
+            with (
+                signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)),
+                signal_handler("SIGHUP", raising_signal_handler(SigHup)),
+                signal_handler("SIGTERM", raising_signal_handler(SigTerm)),
+            ):
                 try:
                     if timeout > 0:
                         time.sleep(timeout)

@@ -582,14 +582,13 @@ def main():  # pragma: no cover
 
     # Register fault handler for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL.
     faulthandler.enable()
-    with signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)), signal_handler(
-        "SIGHUP", raising_signal_handler(SigHup)
-    ), signal_handler("SIGTERM", raising_signal_handler(SigTerm)), signal_handler(
-        "SIGUSR1", sig_info_handler
-    ), signal_handler(
-        "SIGUSR2", sig_trace_handler
-    ), signal_handler(
-        "SIGINFO", sig_info_handler
+    with (
+        signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)),
+        signal_handler("SIGHUP", raising_signal_handler(SigHup)),
+        signal_handler("SIGTERM", raising_signal_handler(SigTerm)),
+        signal_handler("SIGUSR1", sig_info_handler),
+        signal_handler("SIGUSR2", sig_trace_handler),
+        signal_handler("SIGINFO", sig_info_handler),
     ):
         archiver = Archiver()
         msg = msgid = tb = None

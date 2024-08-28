@@ -59,15 +59,6 @@ class TestAdHocCache:
         assert cache.cache_mode == "d"
         assert cache.files is None
 
-    def test_txn(self, cache):
-        assert not cache._txn_active
-        cache.seen_chunk(H(5))
-        assert cache._txn_active
-        assert cache.chunks
-        cache.rollback()
-        assert not cache._txn_active
-        assert not hasattr(cache, "chunks")
-
     def test_incref_after_add_chunk(self, cache):
         assert cache.add_chunk(H(3), {}, b"5678", stats=Statistics()) == (H(3), 4)
         assert cache.chunk_incref(H(3), 4, Statistics()) == (H(3), 4)

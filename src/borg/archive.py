@@ -659,7 +659,6 @@ Duration: {0.duration}
             pass
         self.manifest.archives[name] = (self.id, metadata.time)
         self.manifest.write()
-        self.cache.commit()
         return metadata
 
     def calc_stats(self, cache, want_unique=True):

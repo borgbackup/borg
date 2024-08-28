@@ -74,11 +74,7 @@ class KeysMixIn:
         manifest.repo_objs.key = key_new
         manifest.write()
 
-        # we need to rewrite cache config and security key-type info,
-        # so that the cached key-type will match the repo key-type.
-        cache.begin_txn()  # need to start a cache transaction, otherwise commit() does nothing.
         cache.key = key_new
-        cache.commit()
 
         loc = key_new.find_key() if hasattr(key_new, "find_key") else None
         if args.keep:

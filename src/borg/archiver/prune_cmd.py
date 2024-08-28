@@ -143,7 +143,6 @@ class PruneMixIn:
                 raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
                 manifest.write()
-                cache.commit()
 
     def build_parser_prune(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

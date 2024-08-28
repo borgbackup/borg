@@ -49,7 +49,6 @@ class RecreateMixIn:
                 logger.info("Skipped archive %s: Nothing to do. Archive was not processed.", name)
         if not args.dry_run:
             manifest.write()
-            cache.commit()
 
     def build_parser_recreate(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

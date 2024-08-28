@@ -264,9 +264,7 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
             repository._location = Location(archiver.repository_location)
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
         with Cache(repository, manifest) as cache:
-            cache.begin_txn()
             cache.cache_config.mandatory_features = {"unknown-feature"}
-            cache.commit()
 
     if archiver.FORK_DEFAULT:
         cmd(archiver, "create", "test", "input")

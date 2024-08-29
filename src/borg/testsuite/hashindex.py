@@ -124,23 +124,6 @@ class HashIndexTestCase(BaseTestCase):
         self.assert_equal(len(second_half), 50)
         self.assert_equal(second_half, all[50:])
 
-    def test_chunkindex_merge(self):
-        idx1 = ChunkIndex()
-        idx1[H(1)] = 1, 100
-        idx1[H(2)] = 2, 200
-        idx1[H(3)] = 3, 300
-        # no H(4) entry
-        idx2 = ChunkIndex()
-        idx2[H(1)] = 4, 100
-        idx2[H(2)] = 5, 200
-        # no H(3) entry
-        idx2[H(4)] = 6, 400
-        idx1.merge(idx2)
-        assert idx1[H(1)] == (5, 100)
-        assert idx1[H(2)] == (7, 200)
-        assert idx1[H(3)] == (3, 300)
-        assert idx1[H(4)] == (6, 400)
-
 
 class HashIndexExtraTestCase(BaseTestCase):
     """These tests are separate because they should not become part of the selftest."""
@@ -189,42 +172,6 @@ class HashIndexSizeTestCase(BaseTestCase):
 
 
 class HashIndexRefcountingTestCase(BaseTestCase):
-    def _merge(self, refcounta, refcountb):
-        def merge(refcount1, refcount2):
-            idx1 = ChunkIndex()
-            idx1[H(1)] = refcount1, 1
-            idx2 = ChunkIndex()
-            idx2[H(1)] = refcount2, 1
-            idx1.merge(idx2)
-            refcount, *_ = idx1[H(1)]
-            return refcount
-
-        result = merge(refcounta, refcountb)
-        # check for commutativity
-        assert result == merge(refcountb, refcounta)
-        return result
-
-    def test_chunkindex_merge_limit1(self):
-        # Check that it does *not* limit at MAX_VALUE - 1
-        # (MAX_VALUE is odd)
-        half = ChunkIndex.MAX_VALUE // 2
-        assert self._merge(half, half) == ChunkIndex.MAX_VALUE - 1
-
-    def test_chunkindex_merge_limit2(self):
-        # 3000000000 + 2000000000 > MAX_VALUE
-        assert self._merge(3000000000, 2000000000) == ChunkIndex.MAX_VALUE
-
-    def test_chunkindex_merge_limit3(self):
-        # Crossover point: both addition and limit semantics will yield the same result
-        half = ChunkIndex.MAX_VALUE // 2
-        assert self._merge(half + 1, half) == ChunkIndex.MAX_VALUE
-
-    def test_chunkindex_merge_limit4(self):
-        # Beyond crossover, result of addition would be 2**31
-        half = ChunkIndex.MAX_VALUE // 2
-        assert self._merge(half + 2, half) == ChunkIndex.MAX_VALUE
-        assert self._merge(half + 1, half + 1) == ChunkIndex.MAX_VALUE
-
     def test_chunkindex_add(self):
         idx1 = ChunkIndex()
         idx1.add(H(1), 5, 6)
@@ -282,17 +229,6 @@ class HashIndexDataTestCase(BaseTestCase):
 
         serialized = self._serialize_hashindex(idx1)
         assert self._unpack(serialized) == self._unpack(self.HASHINDEX)
-
-    def test_read_known_good(self):
-        idx1 = self._deserialize_hashindex(self.HASHINDEX)
-        assert idx1[H(1)] == (1, 2)
-        assert idx1[H(2)] == (2**31 - 1, 0)
-        assert idx1[H(3)] == (4294962296, 0)
-
-        idx2 = ChunkIndex()
-        idx2[H(3)] = 2**32 - 123456, 6
-        idx1.merge(idx2)
-        assert idx1[H(3)] == (ChunkIndex.MAX_VALUE, 6)
 
 
 class HashIndexIntegrityTestCase(HashIndexDataTestCase):
@@ -426,17 +362,6 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         self.compare_compact("DED***")
         self.compare_compact("ED****")
         self.compare_compact("D*****")
-
-    def test_merge(self):
-        master = ChunkIndex()
-        idx1 = ChunkIndex()
-        idx1[H(1)] = 1, 100
-        idx1[H(2)] = 2, 200
-        idx1[H(3)] = 3, 300
-        idx1.compact()
-        assert idx1.size() == 1024 + 3 * (32 + 2 * 4)
-        master.merge(idx1)
-        self.compare_indexes(idx1, master)
 
 
 class NSIndexTestCase(BaseTestCase):

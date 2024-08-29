@@ -428,15 +428,6 @@ cdef class ChunkIndex(IndexBase):
             if not hashindex_set(self.index, key, data):
                 raise Exception('hashindex_set failed')
 
-    def merge(self, ChunkIndex other):
-        cdef unsigned char *key = NULL
-
-        while True:
-            key = hashindex_next_key(other.index, key)
-            if not key:
-                break
-            self._add(key, <uint32_t*> (key + self.key_size))
-
 
 cdef class ChunkKeyIterator:
     cdef ChunkIndex idx

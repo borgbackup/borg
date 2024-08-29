@@ -102,6 +102,9 @@ class RCompressMixIn:
             ctype, clevel, olevel = c.ID, c.level, -1
             return ctype, clevel, olevel
 
+        if not isinstance(repository, (Repository, RemoteRepository)):
+            raise Error("rcompress not supported for legacy repositories.")
+
         repo_objs = manifest.repo_objs
         ctype, clevel, olevel = get_csettings(repo_objs.compressor)  # desired compression set by --compression
 
@@ -110,11 +113,6 @@ class RCompressMixIn:
         recompress_ids = find_chunks(repository, repo_objs, stats_find, ctype, clevel, olevel)
         recompress_candidate_count = len(recompress_ids)
         chunks_limit = min(1000, max(100, recompress_candidate_count // 1000))
-
-        if not isinstance(repository, (Repository, RemoteRepository)):
-            # start a new transaction
-            data = repository.get_manifest()
-            repository.put_manifest(data)
 
         pi = ProgressIndicatorPercent(
             total=len(recompress_ids), msg="Recompressing %3.1f%%", step=0.1, msgid="rcompress.process_chunks"

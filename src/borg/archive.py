@@ -1594,7 +1594,6 @@ class RobustUnpacker:
 class ArchiveChecker:
     def __init__(self):
         self.error_found = False
-        self.possibly_superseded = set()
 
     def check(
         self,
@@ -1842,10 +1841,6 @@ class ArchiveChecker:
         if not isinstance(self.repository, (Repository, RemoteRepository)):
             self.chunks.pop(Manifest.MANIFEST_ID, None)
 
-        def mark_as_possibly_superseded(id_):
-            if self.chunks.get(id_, ChunkIndexEntry(0, 0)).refcount == 0:
-                self.possibly_superseded.add(id_)
-
         def add_callback(chunk):
             id_ = self.key.id_hash(chunk)
             cdata = self.repo_objs.format(id_, {}, chunk, ro_type=ROBJ_ARCHIVE_STREAM)
@@ -1931,7 +1926,6 @@ class ArchiveChecker:
                             )
                         )
                         add_reference(chunk_id, size)
-                        mark_as_possibly_superseded(chunk_current[0])  # maybe orphaned the all-zero replacement chunk
                 chunk_list.append([chunk_id, size])  # list-typed element as chunks_healthy is list-of-lists
                 offset += size
             if chunks_replaced and not has_chunks_healthy:
@@ -2062,7 +2056,6 @@ class ArchiveChecker:
                     self.error_found = True
                     del self.manifest.archives[info.name]
                     continue
-                mark_as_possibly_superseded(archive_id)
                 cdata = self.repository.get(archive_id)
                 try:
                     _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
@@ -2082,12 +2075,6 @@ class ArchiveChecker:
                         verify_file_chunks(info.name, item)
                     items_buffer.add(item)
                 items_buffer.flush(flush=True)
-                for previous_item_id in archive_get_items(
-                    archive, repo_objs=self.repo_objs, repository=self.repository
-                ):
-                    mark_as_possibly_superseded(previous_item_id)
-                for previous_item_ptr in archive.item_ptrs:
-                    mark_as_possibly_superseded(previous_item_ptr)
                 archive.item_ptrs = archive_put_items(
                     items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
                 )
@@ -2102,7 +2089,6 @@ class ArchiveChecker:
         if self.repair:
             logger.info("Writing Manifest.")
             self.manifest.write()
-            logger.info("Committing repo.")
 
 
 class ArchiveRecreater:

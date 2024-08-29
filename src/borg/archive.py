@@ -1645,7 +1645,7 @@ class ArchiveChecker:
                 if not isinstance(repository, (Repository, RemoteRepository)):
                     del self.chunks[Manifest.MANIFEST_ID]
                 self.manifest = self.rebuild_manifest()
-        self.rebuild_refcounts(
+        self.rebuild_archives(
             match=match, first=first, last=last, sort_by=sort_by, older=older, oldest=oldest, newer=newer, newest=newest
         )
         self.finish()
@@ -1830,13 +1830,10 @@ class ArchiveChecker:
         logger.info("Manifest rebuild complete.")
         return manifest
 
-    def rebuild_refcounts(
+    def rebuild_archives(
         self, first=0, last=0, sort_by="", match=None, older=None, newer=None, oldest=None, newest=None
     ):
-        """Rebuild object reference counts by walking the metadata
-
-        Missing and/or incorrect data is repaired when detected
-        """
+        """Analyze and rebuild archives, expecting some damage and trying to make stuff consistent again."""
         # Exclude the manifest from chunks (manifest entry might be already deleted from self.chunks)
         if not isinstance(self.repository, (Repository, RemoteRepository)):
             self.chunks.pop(Manifest.MANIFEST_ID, None)
@@ -2044,7 +2041,7 @@ class ArchiveChecker:
         num_archives = len(archive_infos)
 
         pi = ProgressIndicatorPercent(
-            total=num_archives, msg="Checking archives %3.1f%%", step=0.1, msgid="check.rebuild_refcounts"
+            total=num_archives, msg="Checking archives %3.1f%%", step=0.1, msgid="check.rebuild_archives"
         )
         with cache_if_remote(self.repository) as repository:
             for i, info in enumerate(archive_infos):

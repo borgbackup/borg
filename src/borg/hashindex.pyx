@@ -394,19 +394,6 @@ cdef class ChunkIndex(IndexBase):
             assert _le32toh(data[0]) <= _MAX_VALUE, "invalid reference count"
         return data != NULL
 
-    def incref(self, key):
-        """Increase refcount for 'key', return (refcount, size)"""
-        assert len(key) == self.key_size
-        data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
-        if not data:
-            raise KeyError(key)
-        cdef uint32_t refcount = _le32toh(data[0])
-        assert refcount <= _MAX_VALUE, "invalid reference count"
-        if refcount != _MAX_VALUE:
-            refcount += 1
-        data[0] = _htole32(refcount)
-        return refcount, _le32toh(data[1])
-
     def iteritems(self, marker=None):
         cdef const unsigned char *key
         iter = ChunkKeyIterator(self.key_size)

@@ -22,7 +22,7 @@ logger = create_logger()
 
 from . import xattr
 from .chunker import get_chunker, Chunk
-from .cache import ChunkListEntry
+from .cache import ChunkListEntry, build_chunkindex_from_repo
 from .crypto.key import key_factory, UnsupportedPayloadError
 from .compress import CompressionSpec
 from .constants import *  # NOQA
@@ -50,7 +50,7 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import RemoteRepository, cache_if_remote
-from .repository import Repository, LIST_SCAN_LIMIT, NoManifestError
+from .repository import Repository, NoManifestError
 from .repoobj import RepoObj
 
 has_link = hasattr(os, "link")
@@ -1626,7 +1626,7 @@ class ArchiveChecker:
         self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
         self.repository = repository
-        self.init_chunks()
+        self.chunks = build_chunkindex_from_repo(self.repository)
         self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)
         if verify_data:
@@ -1652,23 +1652,6 @@ class ArchiveChecker:
         else:
             logger.info("Archive consistency check complete, no problems found.")
         return self.repair or not self.error_found
-
-    def init_chunks(self):
-        """Fetch a list of all object keys from repository and initialize self.chunks"""
-        self.chunks = ChunkIndex()
-        marker = None
-        while True:
-            result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-            if not result:
-                break
-            marker = result[-1][0]
-            # the repo says it has these chunks, so we assume they are referenced chunks.
-            # we do not care for refcounting or garbage collection here, so we just set refcount = MAX_VALUE.
-            # borg compact will deal with any unused/orphan chunks.
-            # we do not know the plaintext size (!= stored_size), thus we set size = 0.
-            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
-            for id, stored_size in result:
-                self.chunks[id] = init_entry
 
     def make_key(self, repository):
         attempt = 0

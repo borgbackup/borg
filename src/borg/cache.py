@@ -565,6 +565,37 @@ class FilesCacheMixin:
         )
 
 
+def build_chunkindex_from_repo(repository):
+    logger.debug("querying the chunk IDs list from the repo...")
+    chunks = ChunkIndex()
+    t0 = perf_counter()
+    num_requests = 0
+    num_chunks = 0
+    marker = None
+    while True:
+        result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+        num_requests += 1
+        if not result:
+            break
+        marker = result[-1][0]
+        # The repo says it has these chunks, so we assume they are referenced chunks.
+        # We do not care for refcounting anymore, so we just set refcount = MAX_VALUE.
+        # We do not know the plaintext size (!= stored_size), thus we set size = 0.
+        init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
+        for id, stored_size in result:
+            num_chunks += 1
+            chunks[id] = init_entry
+    # Cache does not contain the manifest.
+    if not isinstance(repository, (Repository, RemoteRepository)):
+        del chunks[Manifest.MANIFEST_ID]
+    duration = perf_counter() - t0 or 0.001
+    # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.
+    # Protocol overhead is neglected in this calculation.
+    speed = format_file_size(num_chunks * 34 / duration)
+    logger.debug(f"queried {num_chunks} chunk IDs in {duration} s ({num_requests} requests), ~{speed}/s")
+    return chunks
+
+
 class ChunksMixin:
     """
     Chunks index related code for misc. Cache implementations.
@@ -576,7 +607,7 @@ class ChunksMixin:
     @property
     def chunks(self):
         if self._chunks is None:
-            self._chunks = self._load_chunks_from_repo()
+            self._chunks = build_chunkindex_from_repo(self.repository)
         return self._chunks
 
     def seen_chunk(self, id, size=None):
@@ -624,39 +655,6 @@ class ChunksMixin:
         self.chunks.add(id, ChunkIndex.MAX_VALUE, size)
         stats.update(size, not exists)
         return ChunkListEntry(id, size)
-
-    def _load_chunks_from_repo(self):
-        logger.debug("Cache: querying the chunk IDs list from the repo...")
-        chunks = ChunkIndex()
-        t0 = perf_counter()
-        num_requests = 0
-        num_chunks = 0
-        marker = None
-        while True:
-            result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-            num_requests += 1
-            if not result:
-                break
-            marker = result[-1][0]
-            # All chunks have a refcount of MAX_VALUE, which is sticky, therefore we can't/won't delete them.
-            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)  # plaintext size
-            for id, stored_size in result:
-                num_chunks += 1
-                chunks[id] = init_entry
-        # Cache does not contain the manifest.
-        if not isinstance(self.repository, (Repository, RemoteRepository)):
-            del chunks[self.manifest.MANIFEST_ID]
-        duration = perf_counter() - t0 or 0.01
-        logger.debug(
-            "Cache: queried %d chunk IDs in %.2f s (%d requests), ~%s/s",
-            num_chunks,
-            duration,
-            num_requests,
-            format_file_size(num_chunks * 34 / duration),
-        )
-        # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.
-        # Protocol overhead is neglected in this calculation.
-        return chunks
 
 
 class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):

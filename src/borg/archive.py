@@ -1707,52 +1707,32 @@ class ArchiveChecker:
 
     def verify_data(self):
         logger.info("Starting cryptographic data integrity verification...")
-        chunks_count_index = len(self.chunks)
-        chunks_count_repo = 0
+        chunks_count = len(self.chunks)
         errors = 0
         defect_chunks = []
         pi = ProgressIndicatorPercent(
-            total=chunks_count_index, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
+            total=chunks_count, msg="Verifying data %6.2f%%", step=0.01, msgid="check.verify_data"
         )
-        marker = None
-        while True:
-            result = self.repository.list(limit=100, marker=marker)
-            if not result:
-                break
-            marker = result[-1][0]
-            chunks_count_repo += len(result)
-            chunk_data_iter = self.repository.get_many(id for id, _ in result)
-            result_revd = list(reversed(result))
-            while result_revd:
-                pi.show()
-                chunk_id, _ = result_revd.pop(-1)  # better efficiency
+        for chunk_id, _ in self.chunks.iteritems():
+            pi.show()
+            try:
+                encrypted_data = self.repository.get(chunk_id)
+            except (Repository.ObjectNotFound, IntegrityErrorBase) as err:
+                self.error_found = True
+                errors += 1
+                logger.error("chunk %s: %s", bin_to_hex(chunk_id), err)
+                if isinstance(err, IntegrityErrorBase):
+                    defect_chunks.append(chunk_id)
+            else:
                 try:
-                    encrypted_data = next(chunk_data_iter)
-                except (Repository.ObjectNotFound, IntegrityErrorBase) as err:
+                    # we must decompress, so it'll call assert_id() in there:
+                    self.repo_objs.parse(chunk_id, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
+                except IntegrityErrorBase as integrity_error:
                     self.error_found = True
                     errors += 1
-                    logger.error("chunk %s: %s", bin_to_hex(chunk_id), err)
-                    if isinstance(err, IntegrityErrorBase):
-                        defect_chunks.append(chunk_id)
-                    # as the exception killed our generator, make a new one for remaining chunks:
-                    if result_revd:
-                        result = list(reversed(result_revd))
-                        chunk_data_iter = self.repository.get_many(id for id, _ in result)
-                else:
-                    try:
-                        # we must decompress, so it'll call assert_id() in there:
-                        self.repo_objs.parse(chunk_id, encrypted_data, decompress=True, ro_type=ROBJ_DONTCARE)
-                    except IntegrityErrorBase as integrity_error:
-                        self.error_found = True
-                        errors += 1
-                        logger.error("chunk %s, integrity error: %s", bin_to_hex(chunk_id), integrity_error)
-                        defect_chunks.append(chunk_id)
+                    logger.error("chunk %s, integrity error: %s", bin_to_hex(chunk_id), integrity_error)
+                    defect_chunks.append(chunk_id)
         pi.finish()
-        if chunks_count_index != chunks_count_repo:
-            logger.error("Chunks index object count vs. repository object count mismatch.")
-            logger.error(
-                "Chunks index: %d objects != Chunks repository: %d objects", chunks_count_index, chunks_count_repo
-            )
         if defect_chunks:
             if self.repair:
                 # if we kill the defect chunk here, subsequent actions within this "borg check"
@@ -1791,7 +1771,7 @@ class ArchiveChecker:
         log = logger.error if errors else logger.info
         log(
             "Finished cryptographic data integrity verification, verified %d chunks with %d integrity errors.",
-            chunks_count_repo,
+            chunks_count,
             errors,
         )
 

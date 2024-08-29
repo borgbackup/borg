@@ -1619,14 +1619,14 @@ class ArchiveChecker:
         :param oldest/newest: only check archives older/newer than timedelta from oldest/newest archive timestamp
         :param verify_data: integrity verification of data referenced by archives
         """
+        if not isinstance(repository, (Repository, RemoteRepository)):
+            logger.error("Checking legacy repositories is not supported.")
+            return False
         logger.info("Starting archive consistency check...")
         self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
         self.repository = repository
         self.init_chunks()
-        if not isinstance(repository, (Repository, RemoteRepository)) and not self.chunks:
-            logger.error("Repository contains no apparent data at all, cannot continue check/repair.")
-            return False
         self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)
         if verify_data:
@@ -1642,8 +1642,6 @@ class ArchiveChecker:
             except IntegrityErrorBase as exc:
                 logger.error("Repository manifest is corrupted: %s", exc)
                 self.error_found = True
-                if not isinstance(repository, (Repository, RemoteRepository)):
-                    del self.chunks[Manifest.MANIFEST_ID]
                 self.manifest = self.rebuild_manifest()
         self.rebuild_archives(
             match=match, first=first, last=last, sort_by=sort_by, older=older, oldest=oldest, newer=newer, newest=newest
@@ -1656,10 +1654,7 @@ class ArchiveChecker:
         return self.repair or not self.error_found
 
     def init_chunks(self):
-        """Fetch a list of all object keys from repository"""
-        # Explicitly set the initial usable hash table capacity to avoid performance issues
-        # due to hash table "resonance".
-        # Since reconstruction of archive items can add some new chunks, add 10 % headroom.
+        """Fetch a list of all object keys from repository and initialize self.chunks"""
         self.chunks = ChunkIndex()
         marker = None
         while True:
@@ -1667,7 +1662,11 @@ class ArchiveChecker:
             if not result:
                 break
             marker = result[-1][0]
-            init_entry = ChunkIndexEntry(refcount=0, size=0)  # unknown plaintext size (!= stored size!)
+            # the repo says it has these chunks, so we assume they are referenced chunks.
+            # we do not care for refcounting or garbage collection here, so we just set refcount = MAX_VALUE.
+            # borg compact will deal with any unused/orphan chunks.
+            # we do not know the plaintext size (!= stored_size), thus we set size = 0.
+            init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
             for id, stored_size in result:
                 self.chunks[id] = init_entry
 
@@ -1834,9 +1833,6 @@ class ArchiveChecker:
         self, first=0, last=0, sort_by="", match=None, older=None, newer=None, oldest=None, newest=None
     ):
         """Analyze and rebuild archives, expecting some damage and trying to make stuff consistent again."""
-        # Exclude the manifest from chunks (manifest entry might be already deleted from self.chunks)
-        if not isinstance(self.repository, (Repository, RemoteRepository)):
-            self.chunks.pop(Manifest.MANIFEST_ID, None)
 
         def add_callback(chunk):
             id_ = self.key.id_hash(chunk)
@@ -1844,12 +1840,11 @@ class ArchiveChecker:
             add_reference(id_, len(chunk), cdata)
             return id_
 
-        def add_reference(id_, size, cdata=None):
-            try:
-                self.chunks.incref(id_)
-            except KeyError:
+        def add_reference(id_, size, cdata):
+            # either we already have this chunk in repo and chunks index or we add it now
+            if id_ not in self.chunks:
                 assert cdata is not None
-                self.chunks[id_] = ChunkIndexEntry(refcount=1, size=size)
+                self.chunks[id_] = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=size)
                 if self.repair:
                     self.repository.put(id_, cdata)
 
@@ -1900,9 +1895,7 @@ class ArchiveChecker:
                             )
                         )
                         chunk_id, size = chunk_current
-                        if chunk_id in self.chunks:
-                            add_reference(chunk_id, size)
-                        else:
+                        if chunk_id not in self.chunks:
                             logger.warning(
                                 "{}: {}: Missing all-zero replacement chunk detected (Byte {}-{}, Chunk {}). "
                                 "Generating new replacement chunk.".format(
@@ -1914,15 +1907,13 @@ class ArchiveChecker:
                             add_reference(chunk_id, size, cdata)
                 else:
                     if chunk_current == chunk_healthy:
-                        # normal case, all fine.
-                        add_reference(chunk_id, size)
+                        pass  # normal case, all fine.
                     else:
                         logger.info(
                             "{}: {}: Healed previously missing file chunk! (Byte {}-{}, Chunk {}).".format(
                                 archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)
                             )
                         )
-                        add_reference(chunk_id, size)
                 chunk_list.append([chunk_id, size])  # list-typed element as chunks_healthy is list-of-lists
                 offset += size
             if chunks_replaced and not has_chunks_healthy:

@@ -952,7 +952,6 @@ Duration: {0.duration}
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, {}, data, stats=self.stats, ro_type=ROBJ_ARCHIVE_META)
         self.manifest.archives[self.name] = (new_id, metadata.time)
-        self.cache.chunk_decref(self.id, 1, self.stats)
         self.id = new_id
 
     def rename(self, name):
@@ -1309,20 +1308,11 @@ class FilesystemObjectProcessors:
             item.uid = uid
         if gid is not None:
             item.gid = gid
-        try:
-            self.process_file_chunks(
-                item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd))
-            )
-        except BackupOSError:
-            # see comments in process_file's exception handler, same issue here.
-            for chunk in item.get("chunks", []):
-                cache.chunk_decref(chunk.id, chunk.size, self.stats, wait=False)
-            raise
-        else:
-            item.get_size(memorize=True)
-            self.stats.nfiles += 1
-            self.add_item(item, stats=self.stats)
-            return status
+        self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd)))
+        item.get_size(memorize=True)
+        self.stats.nfiles += 1
+        self.add_item(item, stats=self.stats)
+        return status
 
     def process_file(self, *, path, parent_fd, name, st, cache, flags=flags_normal, last_try=False, strip_prefix):
         with self.create_helper(path, st, None, strip_prefix=strip_prefix) as (
@@ -1343,93 +1333,81 @@ class FilesystemObjectProcessors:
                     # so it can be extracted / accessed in FUSE mount like a regular file.
                     # this needs to be done early, so that part files also get the patched mode.
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
-                # we begin processing chunks now (writing or incref'ing them to the repository),
-                # which might require cleanup (see except-branch):
-                try:
-                    if hl_chunks is not None:  # create_helper gave us chunks from a previous hardlink
-                        item.chunks = []
-                        for chunk_id, chunk_size in hl_chunks:
-                            # process one-by-one, so we will know in item.chunks how far we got
-                            chunk_entry = cache.chunk_incref(chunk_id, chunk_size, self.stats)
-                            item.chunks.append(chunk_entry)
-                    else:  # normal case, no "2nd+" hardlink
-                        if not is_special_file:
-                            hashed_path = safe_encode(os.path.join(self.cwd, path))
-                            started_hashing = time.monotonic()
-                            path_hash = self.key.id_hash(hashed_path)
-                            self.stats.hashing_time += time.monotonic() - started_hashing
-                            known, chunks = cache.file_known_and_unchanged(hashed_path, path_hash, st)
+                # we begin processing chunks now.
+                if hl_chunks is not None:  # create_helper gave us chunks from a previous hardlink
+                    item.chunks = []
+                    for chunk_id, chunk_size in hl_chunks:
+                        # process one-by-one, so we will know in item.chunks how far we got
+                        chunk_entry = cache.chunk_incref(chunk_id, chunk_size, self.stats)
+                        item.chunks.append(chunk_entry)
+                else:  # normal case, no "2nd+" hardlink
+                    if not is_special_file:
+                        hashed_path = safe_encode(os.path.join(self.cwd, path))
+                        started_hashing = time.monotonic()
+                        path_hash = self.key.id_hash(hashed_path)
+                        self.stats.hashing_time += time.monotonic() - started_hashing
+                        known, chunks = cache.file_known_and_unchanged(hashed_path, path_hash, st)
+                    else:
+                        # in --read-special mode, we may be called for special files.
+                        # there should be no information in the cache about special files processed in
+                        # read-special mode, but we better play safe as this was wrong in the past:
+                        hashed_path = path_hash = None
+                        known, chunks = False, None
+                    if chunks is not None:
+                        # Make sure all ids are available
+                        for chunk in chunks:
+                            if not cache.seen_chunk(chunk.id):
+                                # cache said it is unmodified, but we lost a chunk: process file like modified
+                                status = "M"
+                                break
                         else:
-                            # in --read-special mode, we may be called for special files.
-                            # there should be no information in the cache about special files processed in
-                            # read-special mode, but we better play safe as this was wrong in the past:
-                            hashed_path = path_hash = None
-                            known, chunks = False, None
-                        if chunks is not None:
-                            # Make sure all ids are available
+                            item.chunks = []
                             for chunk in chunks:
-                                if not cache.seen_chunk(chunk.id):
-                                    # cache said it is unmodified, but we lost a chunk: process file like modified
-                                    status = "M"
-                                    break
+                                # process one-by-one, so we will know in item.chunks how far we got
+                                cache.chunk_incref(chunk.id, chunk.size, self.stats)
+                                item.chunks.append(chunk)
+                            status = "U"  # regular file, unchanged
+                    else:
+                        status = "M" if known else "A"  # regular file, modified or added
+                    self.print_file_status(status, path)
+                    # Only chunkify the file if needed
+                    changed_while_backup = False
+                    if "chunks" not in item:
+                        with backup_io("read"):
+                            self.process_file_chunks(
+                                item,
+                                cache,
+                                self.stats,
+                                self.show_progress,
+                                backup_io_iter(self.chunker.chunkify(None, fd)),
+                            )
+                            self.stats.chunking_time = self.chunker.chunking_time
+                        if not is_win32:  # TODO for win32
+                            with backup_io("fstat2"):
+                                st2 = os.fstat(fd)
+                            # special files:
+                            # - fifos change naturally, because they are fed from the other side. no problem.
+                            # - blk/chr devices don't change ctime anyway.
+                            changed_while_backup = not is_special_file and st.st_ctime_ns != st2.st_ctime_ns
+                        if changed_while_backup:
+                            # regular file changed while we backed it up, might be inconsistent/corrupt!
+                            if last_try:
+                                status = "C"  # crap! retries did not help.
                             else:
-                                item.chunks = []
-                                for chunk in chunks:
-                                    # process one-by-one, so we will know in item.chunks how far we got
-                                    cache.chunk_incref(chunk.id, chunk.size, self.stats)
-                                    item.chunks.append(chunk)
-                                status = "U"  # regular file, unchanged
-                        else:
-                            status = "M" if known else "A"  # regular file, modified or added
-                        self.print_file_status(status, path)
-                        # Only chunkify the file if needed
-                        changed_while_backup = False
-                        if "chunks" not in item:
-                            with backup_io("read"):
-                                self.process_file_chunks(
-                                    item,
-                                    cache,
-                                    self.stats,
-                                    self.show_progress,
-                                    backup_io_iter(self.chunker.chunkify(None, fd)),
-                                )
-                                self.stats.chunking_time = self.chunker.chunking_time
-                            if not is_win32:  # TODO for win32
-                                with backup_io("fstat2"):
-                                    st2 = os.fstat(fd)
-                                # special files:
-                                # - fifos change naturally, because they are fed from the other side. no problem.
-                                # - blk/chr devices don't change ctime anyway.
-                                changed_while_backup = not is_special_file and st.st_ctime_ns != st2.st_ctime_ns
-                            if changed_while_backup:
-                                # regular file changed while we backed it up, might be inconsistent/corrupt!
-                                if last_try:
-                                    status = "C"  # crap! retries did not help.
-                                else:
-                                    raise BackupError("file changed while we read it!")
-                            if not is_special_file and not changed_while_backup:
-                                # we must not memorize special files, because the contents of e.g. a
-                                # block or char device will change without its mtime/size/inode changing.
-                                # also, we must not memorize a potentially inconsistent/corrupt file that
-                                # changed while we backed it up.
-                                cache.memorize_file(hashed_path, path_hash, st, item.chunks)
-                        self.stats.files_stats[status] += 1  # must be done late
-                        if not changed_while_backup:
-                            status = None  # we already called print_file_status
-                    self.stats.nfiles += 1
-                    item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
-                    item.get_size(memorize=True)
-                    return status
-                except BackupOSError:
-                    # Something went wrong and we might need to clean up a bit.
-                    # Maybe we have already incref'ed some file content chunks in the repo -
-                    # but we will not add an item (see add_item in create_helper) and thus
-                    # they would be orphaned chunks in case that we commit the transaction.
-                    for chunk in item.get("chunks", []):
-                        cache.chunk_decref(chunk.id, chunk.size, self.stats, wait=False)
-                    # Now that we have cleaned up the chunk references, we can re-raise the exception.
-                    # This will skip processing of this file, but might retry or continue with the next one.
-                    raise
+                                raise BackupError("file changed while we read it!")
+                        if not is_special_file and not changed_while_backup:
+                            # we must not memorize special files, because the contents of e.g. a
+                            # block or char device will change without its mtime/size/inode changing.
+                            # also, we must not memorize a potentially inconsistent/corrupt file that
+                            # changed while we backed it up.
+                            cache.memorize_file(hashed_path, path_hash, st, item.chunks)
+                    self.stats.files_stats[status] += 1  # must be done late
+                    if not changed_while_backup:
+                        status = None  # we already called print_file_status
+                self.stats.nfiles += 1
+                item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
+                item.get_size(memorize=True)
+                return status
 
 
 class TarfileObjectProcessors:
@@ -1524,21 +1502,15 @@ class TarfileObjectProcessors:
         with self.create_helper(tarinfo, status, type) as (item, status):
             self.print_file_status(status, tarinfo.name)
             status = None  # we already printed the status
-            try:
-                fd = tar.extractfile(tarinfo)
-                self.process_file_chunks(
-                    item, self.cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd))
-                )
-                item.get_size(memorize=True, from_chunks=True)
-                self.stats.nfiles += 1
-                # we need to remember ALL files, see HardLinkManager.__doc__
-                self.hlm.remember(id=tarinfo.name, info=item.chunks)
-                return status
-            except BackupOSError:
-                # see comment in FilesystemObjectProcessors.process_file, same issue here.
-                for chunk in item.get("chunks", []):
-                    self.cache.chunk_decref(chunk.id, chunk.size, self.stats, wait=False)
-                raise
+            fd = tar.extractfile(tarinfo)
+            self.process_file_chunks(
+                item, self.cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd))
+            )
+            item.get_size(memorize=True, from_chunks=True)
+            self.stats.nfiles += 1
+            # we need to remember ALL files, see HardLinkManager.__doc__
+            self.hlm.remember(id=tarinfo.name, info=item.chunks)
+            return status
 
 
 def valid_msgpacked_dict(d, keys_serialized):

@@ -198,9 +198,6 @@ class HashIndexRefcountingTestCase(BaseTestCase):
             # first incref to move it to the limit
             refcount, *_ = idx.incref(H(1))
             assert refcount == ChunkIndex.MAX_VALUE
-        for i in range(5):
-            refcount, *_ = idx.decref(H(1))
-            assert refcount == ChunkIndex.MAX_VALUE
 
     def _merge(self, refcounta, refcountb):
         def merge(refcount1, refcount2):
@@ -252,27 +249,12 @@ class HashIndexRefcountingTestCase(BaseTestCase):
         refcount, *_ = idx1[H(1)]
         assert refcount == ChunkIndex.MAX_VALUE
 
-    def test_decref_limit(self):
-        idx1 = ChunkIndex()
-        idx1[H(1)] = ChunkIndex.MAX_VALUE, 6
-        idx1.decref(H(1))
-        refcount, *_ = idx1[H(1)]
-        assert refcount == ChunkIndex.MAX_VALUE
-
-    def test_decref_zero(self):
-        idx1 = ChunkIndex()
-        idx1[H(1)] = 0, 0
-        with self.assert_raises(AssertionError):
-            idx1.decref(H(1))
-
-    def test_incref_decref(self):
+    def test_incref(self):
         idx1 = ChunkIndex()
         idx1.add(H(1), 5, 6)
         assert idx1[H(1)] == (5, 6)
         idx1.incref(H(1))
         assert idx1[H(1)] == (6, 6)
-        idx1.decref(H(1))
-        assert idx1[H(1)] == (5, 6)
 
     def test_setitem_raises(self):
         idx1 = ChunkIndex()
@@ -283,8 +265,6 @@ class HashIndexRefcountingTestCase(BaseTestCase):
         idx = ChunkIndex()
         with self.assert_raises(KeyError):
             idx.incref(H(1))
-        with self.assert_raises(KeyError):
-            idx.decref(H(1))
         with self.assert_raises(KeyError):
             idx[H(1)]
         with self.assert_raises(OverflowError):

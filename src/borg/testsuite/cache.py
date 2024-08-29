@@ -7,7 +7,6 @@ from .key import TestKey
 from ..archive import Statistics
 from ..cache import AdHocCache
 from ..crypto.key import AESOCBRepoKey
-from ..hashindex import ChunkIndex
 from ..manifest import Manifest
 from ..repository import Repository
 
@@ -38,21 +37,8 @@ class TestAdHocCache:
     def test_does_not_contain_manifest(self, cache):
         assert not cache.seen_chunk(Manifest.MANIFEST_ID)
 
-    def test_does_not_delete_existing_chunks(self, repository, cache):
-        assert cache.seen_chunk(H(1)) == ChunkIndex.MAX_VALUE
-        cache.chunk_decref(H(1), 1, Statistics())
-        assert repository.get(H(1)) == b"1234"
-
     def test_seen_chunk_add_chunk_size(self, cache):
         assert cache.add_chunk(H(1), {}, b"5678", stats=Statistics()) == (H(1), 4)
-
-    def test_deletes_chunks_during_lifetime(self, cache, repository):
-        cache.add_chunk(H(5), {}, b"1010", stats=Statistics())
-        assert cache.seen_chunk(H(5)) == 1
-        cache.chunk_decref(H(5), 1, Statistics())
-        assert not cache.seen_chunk(H(5))
-        with pytest.raises(Repository.ObjectNotFound):
-            repository.get(H(5))
 
     def test_files_cache(self, cache):
         assert cache.file_known_and_unchanged(b"foo", bytes(32), None) == (False, None)

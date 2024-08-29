@@ -585,16 +585,6 @@ class ChunksMixin:
         stats.update(size, False)
         return ChunkListEntry(id, size)
 
-    def chunk_decref(self, id, size, stats, wait=True):
-        assert isinstance(size, int) and size > 0
-        count, _size = self.chunks.decref(id)
-        if count == 0:
-            del self.chunks[id]
-            self.repository.delete(id, wait=wait)
-            stats.update(-size, True)
-        else:
-            stats.update(-size, False)
-
     def seen_chunk(self, id, size=None):
         entry = self.chunks.get(id, ChunkIndexEntry(0, None))
         if entry.refcount and size is not None:

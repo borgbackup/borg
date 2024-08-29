@@ -579,12 +579,6 @@ class ChunksMixin:
             self._chunks = self._load_chunks_from_repo()
         return self._chunks
 
-    def chunk_incref(self, id, size, stats):
-        assert isinstance(size, int) and size > 0
-        count, _size = self.chunks.incref(id)
-        stats.update(size, False)
-        return ChunkListEntry(id, size)
-
     def seen_chunk(self, id, size=None):
         entry = self.chunks.get(id, ChunkIndexEntry(0, None))
         if entry.refcount and size is not None:
@@ -593,7 +587,12 @@ class ChunksMixin:
                 # AdHocWithFilesCache / AdHocCache:
                 # Here *size* is used to update the chunk's size information, which will be zero for existing chunks.
                 self.chunks[id] = entry._replace(size=size)
-        return entry.refcount
+        return entry.refcount != 0
+
+    def reuse_chunk(self, id, size, stats):
+        assert isinstance(size, int) and size > 0
+        stats.update(size, False)
+        return ChunkListEntry(id, size)
 
     def add_chunk(
         self,
@@ -615,15 +614,15 @@ class ChunksMixin:
                 size = len(data)  # data is still uncompressed
             else:
                 raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
-        refcount = self.seen_chunk(id, size)
-        if refcount:
-            return self.chunk_incref(id, size, stats)
+        exists = self.seen_chunk(id, size)
+        if exists:
+            return self.reuse_chunk(id, size, stats)
         cdata = self.repo_objs.format(
             id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
         )
         self.repository.put(id, cdata, wait=wait)
-        self.chunks.add(id, 1, size)
-        stats.update(size, not refcount)
+        self.chunks.add(id, ChunkIndex.MAX_VALUE, size)
+        stats.update(size, not exists)
         return ChunkListEntry(id, size)
 
     def _load_chunks_from_repo(self):
@@ -639,9 +638,7 @@ class ChunksMixin:
             if not result:
                 break
             marker = result[-1][0]
-            # All chunks from the repository have a refcount of MAX_VALUE, which is sticky,
-            # therefore we can't/won't delete them. Chunks we added ourselves in this borg run
-            # are tracked correctly.
+            # All chunks have a refcount of MAX_VALUE, which is sticky, therefore we can't/won't delete them.
             init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)  # plaintext size
             for id, stored_size in result:
                 num_chunks += 1

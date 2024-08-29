@@ -1338,7 +1338,7 @@ class FilesystemObjectProcessors:
                     item.chunks = []
                     for chunk_id, chunk_size in hl_chunks:
                         # process one-by-one, so we will know in item.chunks how far we got
-                        chunk_entry = cache.chunk_incref(chunk_id, chunk_size, self.stats)
+                        chunk_entry = cache.reuse_chunk(chunk_id, chunk_size, self.stats)
                         item.chunks.append(chunk_entry)
                 else:  # normal case, no "2nd+" hardlink
                     if not is_special_file:
@@ -1364,7 +1364,7 @@ class FilesystemObjectProcessors:
                             item.chunks = []
                             for chunk in chunks:
                                 # process one-by-one, so we will know in item.chunks how far we got
-                                cache.chunk_incref(chunk.id, chunk.size, self.stats)
+                                cache.reuse_chunk(chunk.id, chunk.size, self.stats)
                                 item.chunks.append(chunk)
                             status = "U"  # regular file, unchanged
                     else:
@@ -2169,7 +2169,7 @@ class ArchiveRecreater:
     def process_chunks(self, archive, target, item):
         if not target.recreate_rechunkify:
             for chunk_id, size in item.chunks:
-                self.cache.chunk_incref(chunk_id, size, target.stats)
+                self.cache.reuse_chunk(chunk_id, size, target.stats)
             return item.chunks
         chunk_iterator = self.iter_chunks(archive, target, list(item.chunks))
         chunk_processor = partial(self.chunk_processor, target)
@@ -2179,7 +2179,7 @@ class ArchiveRecreater:
         chunk_id, data = cached_hash(chunk, self.key.id_hash)
         size = len(data)
         if chunk_id in self.seen_chunks:
-            return self.cache.chunk_incref(chunk_id, size, target.stats)
+            return self.cache.reuse_chunk(chunk_id, size, target.stats)
         chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, wait=False, ro_type=ROBJ_FILE_STREAM)
         self.cache.repository.async_response(wait=False)
         self.seen_chunks.add(chunk_entry.id)

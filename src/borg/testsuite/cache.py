@@ -45,11 +45,10 @@ class TestAdHocCache:
         assert cache.cache_mode == "d"
         assert cache.files is None
 
-    def test_incref_after_add_chunk(self, cache):
+    def test_reuse_after_add_chunk(self, cache):
         assert cache.add_chunk(H(3), {}, b"5678", stats=Statistics()) == (H(3), 4)
-        assert cache.chunk_incref(H(3), 4, Statistics()) == (H(3), 4)
+        assert cache.reuse_chunk(H(3), 4, Statistics()) == (H(3), 4)
 
-    def test_existing_incref_after_add_chunk(self, cache):
-        """This case occurs with part files, see Archive.chunk_file."""
+    def test_existing_reuse_after_add_chunk(self, cache):
         assert cache.add_chunk(H(1), {}, b"5678", stats=Statistics()) == (H(1), 4)
-        assert cache.chunk_incref(H(1), 4, Statistics()) == (H(1), 4)
+        assert cache.reuse_chunk(H(1), 4, Statistics()) == (H(1), 4)

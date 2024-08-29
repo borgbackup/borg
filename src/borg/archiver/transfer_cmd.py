@@ -100,7 +100,7 @@ class TransferMixIn:
                     if "chunks" in item:
                         chunks = []
                         for chunk_id, size in item.chunks:
-                            chunk_present = cache.seen_chunk(chunk_id, size) != 0
+                            chunk_present = cache.seen_chunk(chunk_id, size)
                             if not chunk_present:  # target repo does not yet have this chunk
                                 if not dry_run:
                                     cdata = other_repository.get(chunk_id)
@@ -147,7 +147,7 @@ class TransferMixIn:
                                 transfer_size += size
                             else:
                                 if not dry_run:
-                                    chunk_entry = cache.chunk_incref(chunk_id, size, archive.stats)
+                                    chunk_entry = cache.reuse_chunk(chunk_id, size, archive.stats)
                                     chunks.append(chunk_entry)
                                 present_size += size
                         if not dry_run:

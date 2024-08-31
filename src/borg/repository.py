@@ -203,6 +203,8 @@ class Repository:
 
     def info(self):
         """return some infos about the repo (must be opened first)"""
+        # note: don't do anything expensive here or separate the lock refresh into a separate method.
+        self._lock_refresh()  # do not remove, see do_with_lock()
         info = dict(
             id=self.id,
             version=self.version,

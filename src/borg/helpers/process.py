@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import time
+import threading
 import traceback
 
 from .. import __version__
@@ -398,3 +399,50 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
             if borg_succeeded and rc:
                 # if borg did not succeed, we know that we killed the filter process
                 raise Error("filter %s failed, rc=%d" % (cmd, rc))
+
+
+class ThreadRunner:
+    def __init__(self, sleep_interval, target, *args, **kwargs):
+        """
+        Initialize the ThreadRunner with a target function and its arguments.
+
+        :param sleep_interval: The interval (in seconds) to sleep between executions of the target function.
+        :param target: The target function to be run in the thread.
+        :param args: The positional arguments to be passed to the target function.
+        :param kwargs: The keyword arguments to be passed to the target function.
+        """
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs
+        self._sleep_interval = sleep_interval
+        self._thread = None
+        self._keep_running = threading.Event()
+        self._keep_running.set()
+
+    def _run_with_termination(self):
+        """
+        Wrapper function to check if the thread should keep running.
+        """
+        while self._keep_running.is_set():
+            self._target(*self._args, **self._kwargs)
+            # sleep up to self._sleep_interval, but end the sleep early if we shall not keep running:
+            count = 1000
+            micro_sleep = float(self._sleep_interval) / count
+            while self._keep_running.is_set() and count > 0:
+                time.sleep(micro_sleep)
+                count -= 1
+
+    def start(self):
+        """
+        Start the thread.
+        """
+        self._thread = threading.Thread(target=self._run_with_termination)
+        self._thread.start()
+
+    def terminate(self):
+        """
+        Signal the thread to stop and wait for it to finish.
+        """
+        if self._thread is not None:
+            self._keep_running.clear()
+            self._thread.join()

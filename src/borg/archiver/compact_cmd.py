@@ -4,7 +4,7 @@ from typing import Tuple, Dict
 from ._common import with_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import set_ec, EXIT_WARNING, EXIT_ERROR, format_file_size
+from ..helpers import set_ec, EXIT_WARNING, EXIT_ERROR, format_file_size, bin_to_hex
 from ..helpers import ProgressIndicatorPercent
 from ..manifest import Manifest
 from ..remote import RemoteRepository
@@ -133,7 +133,14 @@ class ArchiveGarbageCollector:
         logger.info(
             f"Source data size was {format_file_size(self.total_size, precision=0)} in {self.total_files} files."
         )
-        dsize = sum(self.used_chunks[id] for id in self.repository_chunks)
+        dsize = 0
+        for id in self.repository_chunks:
+            if id in self.used_chunks:
+                dsize += self.used_chunks[id]
+            elif id in self.wanted_chunks:
+                dsize += self.wanted_chunks[id]
+            else:
+                raise KeyError(bin_to_hex(id))
         logger.info(f"Repository size is {format_file_size(self.repository_size, precision=0)} in {count} objects.")
         if self.total_size != 0:
             logger.info(f"Space reduction factor due to deduplication: {dsize / self.total_size:.3f}")

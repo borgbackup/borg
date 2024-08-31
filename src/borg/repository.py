@@ -1,4 +1,5 @@
 import os
+import time
 
 from borgstore.store import Store
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
@@ -241,15 +242,38 @@ class Repository:
             else:
                 log_error("too small.")
 
-        # TODO: progress indicator, partial checks, ...
-        mode = "full"
-        logger.info("Starting repository check")
+        # TODO: progress indicator, ...
+        partial = bool(max_duration)
+        assert not (repair and partial)
+        mode = "partial" if partial else "full"
+        logger.info(f"Starting {mode} repository check")
+        if partial:
+            # continue a past partial check (if any) or from a checkpoint or start one from beginning
+            try:
+                last_key_checked = self.store.load("config/last-key-checked").decode()
+            except StoreObjectNotFound:
+                last_key_checked = ""
+        else:
+            # start from the beginning and also forget about any potential past partial checks
+            last_key_checked = ""
+            try:
+                self.store.delete("config/last-key-checked")
+            except StoreObjectNotFound:
+                pass
+        if last_key_checked:
+            logger.info(f"Skipping to keys after {last_key_checked}.")
+        else:
+            logger.info("Starting from beginning.")
+        t_start = time.monotonic()
+        t_last_checkpoint = t_start
         objs_checked = objs_errors = 0
         infos = self.store.list("data")
         try:
             for info in infos:
                 self._lock_refresh()
                 key = "data/%s" % info.name
+                if key <= last_key_checked:  # needs sorted keys
+                    continue
                 try:
                     obj = self.store.load(key)
                 except StoreObjectNotFound:
@@ -275,6 +299,21 @@ class Repository:
                                 self.store.delete(key)
                             else:
                                 log_error("reloading did help, inconsistent behaviour detected!")
+                now = time.monotonic()
+                if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
+                    t_last_checkpoint = now
+                    logger.info(f"Checkpointing at key {key}.")
+                    self.store.store("config/last-key-checked", key.encode())
+                if partial and now > t_start + max_duration:
+                    logger.info(f"Finished partial repository check, last key checked is {key}.")
+                    self.store.store("config/last-key-checked", key.encode())
+                    break
+            else:
+                logger.info("Finished repository check.")
+                try:
+                    self.store.delete("config/last-key-checked")
+                except StoreObjectNotFound:
+                    pass
         except StoreObjectNotFound:
             # it can be that there is no "data/" at all, then it crashes when iterating infos.
             pass

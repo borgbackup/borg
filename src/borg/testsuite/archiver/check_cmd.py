@@ -28,15 +28,15 @@ def test_check_usage(archivers, request):
     check_cmd_setup(archiver)
 
     output = cmd(archiver, "check", "-v", "--progress", exit_code=0)
-    assert "Starting repository check" in output
+    assert "Starting full repository check" in output
     assert "Starting archive consistency check" in output
 
     output = cmd(archiver, "check", "-v", "--repository-only", exit_code=0)
-    assert "Starting repository check" in output
+    assert "Starting full repository check" in output
     assert "Starting archive consistency check" not in output
 
     output = cmd(archiver, "check", "-v", "--archives-only", exit_code=0)
-    assert "Starting repository check" not in output
+    assert "Starting full repository check" not in output
     assert "Starting archive consistency check" in output
 
     output = cmd(archiver, "check", "-v", "--archives-only", "--match-archives=archive2", exit_code=0)

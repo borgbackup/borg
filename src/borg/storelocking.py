@@ -107,8 +107,17 @@ class Lock:
             if not ignore_not_found:
                 raise
 
-    def _get_locks(self):
+    def _is_stale_lock(self, lock):
         now = datetime.datetime.now(datetime.timezone.utc)
+        if lock["dt"] < now - self.stale_td:
+            # lock is too old, it was not refreshed.
+            return True
+        if not platform.process_alive(lock["hostid"], lock["processid"], lock["threadid"]):
+            # we KNOW that the lock owning process is dead.
+            return True
+        return False
+
+    def _get_locks(self):
         locks = {}
         try:
             infos = list(self.store.list("locks"))
@@ -118,14 +127,12 @@ class Lock:
             key = info.name
             content = self.store.load(f"locks/{key}")
             lock = json.loads(content.decode("utf-8"))
-            dt = datetime.datetime.fromisoformat(lock["time"])
-            stale = dt < now - self.stale_td
-            if stale:
+            lock["key"] = key
+            lock["dt"] = datetime.datetime.fromisoformat(lock["time"])
+            if self._is_stale_lock(lock):
                 # ignore it and delete it (even if it is not from us)
                 self._delete_lock(key, ignore_not_found=True)
             else:
-                lock["key"] = key
-                lock["dt"] = dt
                 locks[key] = lock
         return locks
 

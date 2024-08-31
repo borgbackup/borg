@@ -225,7 +225,18 @@ class Lock:
         now = datetime.datetime.now(datetime.timezone.utc)
         if self.last_refresh_dt is not None and now > self.last_refresh_dt + self.refresh_td:
             old_locks = self._find_locks(only_mine=True)
-            assert len(old_locks) == 1
+            if len(old_locks) == 0:
+                # crap, my lock has been removed. :-(
+                # this can happen e.g. if my machine has been suspended while doing a backup, so that the
+                # lock will auto-expire. a borg client on another machine might then kill that lock.
+                # if my machine then wakes up again, the lock will have vanished and we get here.
+                # in this case, we need to abort the operation, because the other borg might have removed
+                # repo objects we have written, but the referential tree was not yet full present, e.g.
+                # no archive has been added yet to the manifest, thus all objects looked unused/orphaned.
+                # another scenario when this can happen is a careless user running break-lock on another
+                # machine without making sure there is no borg activity in that repo.
+                raise LockTimeout(str(self.store))  # our lock was killed, there is no safe way to continue.
+            assert len(old_locks) == 1  # there shouldn't be more than 1
             old_lock = old_locks[0]
             if old_lock["dt"] < now - self.refresh_td:
                 self._create_lock(exclusive=old_lock["exclusive"])

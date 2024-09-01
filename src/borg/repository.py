@@ -3,6 +3,7 @@ import time
 
 from borgstore.store import Store
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
+from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
 
 from .checksums import xxh64
 from .constants import *  # NOQA
@@ -177,7 +178,10 @@ class Repository:
 
     def open(self, *, exclusive, lock_wait=None, lock=True):
         assert lock_wait is not None
-        self.store.open()
+        try:
+            self.store.open()
+        except StoreBackendDoesNotExist:
+            raise self.DoesNotExist(str(self._location)) from None
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         else:

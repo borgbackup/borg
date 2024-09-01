@@ -86,6 +86,7 @@ from .rcreate_cmd import RCreateMixIn
 from .rinfo_cmd import RInfoMixIn
 from .rdelete_cmd import RDeleteMixIn
 from .rlist_cmd import RListMixIn
+from .rspace_cmd import RSpaceMixIn
 from .serve_cmd import ServeMixIn
 from .tar_cmds import TarMixIn
 from .transfer_cmd import TransferMixIn
@@ -115,6 +116,7 @@ class Archiver(
     RDeleteMixIn,
     RInfoMixIn,
     RListMixIn,
+    RSpaceMixIn,
     ServeMixIn,
     TarMixIn,
     TransferMixIn,
@@ -351,6 +353,7 @@ class Archiver(
         self.build_parser_rlist(subparsers, common_parser, mid_common_parser)
         self.build_parser_recreate(subparsers, common_parser, mid_common_parser)
         self.build_parser_rename(subparsers, common_parser, mid_common_parser)
+        self.build_parser_rspace(subparsers, common_parser, mid_common_parser)
         self.build_parser_serve(subparsers, common_parser, mid_common_parser)
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)

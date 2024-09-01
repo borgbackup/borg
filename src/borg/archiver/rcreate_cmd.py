@@ -48,8 +48,14 @@ class RCreateMixIn:
                 "   borg key export -r REPOSITORY           encrypted-key-backup\n"
                 "   borg key export -r REPOSITORY --paper   encrypted-key-backup.txt\n"
                 "   borg key export -r REPOSITORY --qr-html encrypted-key-backup.html\n"
-                "2. Write down the borg key passphrase and store it at safe place.\n"
+                "2. Write down the borg key passphrase and store it at safe place."
             )
+        logger.warning(
+            "\n"
+            "Reserve some repository storage space now for emergencies like 'disk full'\n"
+            "by running:\n"
+            "    borg rspace --reserve 1G"
+        )
 
     def build_parser_rcreate(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

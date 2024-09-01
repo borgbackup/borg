@@ -69,7 +69,7 @@ Main features
 **Speed**
   * performance-critical code (chunking, compression, encryption) is
     implemented in C/Cython
-  * local caching of files/chunks index data
+  * local caching
   * quick detection of unmodified files
 
 **Data encryption**

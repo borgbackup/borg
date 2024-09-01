@@ -31,14 +31,14 @@ deleted between attacks).
 Under these circumstances Borg guarantees that the attacker cannot
 
 1. modify the data of any archive without the client detecting the change
-2. rename, remove or add an archive without the client detecting the change
+2. rename or add an archive without the client detecting the change
 3. recover plain-text data
 4. recover definite (heuristics based on access patterns are possible)
    structural information such as the object graph (which archives
    refer to what chunks)
 
 The attacker can always impose a denial of service per definition (he could
-forbid connections to the repository, or delete it entirely).
+forbid connections to the repository, or delete it partly or entirely).
 
 
 .. _security_structural_auth:
@@ -47,12 +47,12 @@ Structural Authentication
 -------------------------
 
 Borg is fundamentally based on an object graph structure (see :ref:`internals`),
-where the root object is called the manifest.
+where the root objects are the archives.
 
 Borg follows the `Horton principle`_, which states that
 not only the message must be authenticated, but also its meaning (often
 expressed through context), because every object used is referenced by a
-parent object through its object ID up to the manifest. The object ID in
+parent object through its object ID up to the archive list entry. The object ID in
 Borg is a MAC of the object's plaintext, therefore this ensures that
 an attacker cannot change the context of an object without forging the MAC.
 
@@ -64,8 +64,8 @@ represent packed file metadata. On their own, it's not clear that these objects
 would represent what they do, but by the archive item referring to them
 in a particular part of its own data structure assigns this meaning.
 
-This results in a directed acyclic graph of authentication from the manifest
-to the data chunks of individual files.
+This results in a directed acyclic graph of authentication from the archive
+list entry to the data chunks of individual files.
 
 Above used to be all for borg 1.x and was the reason why it needed the
 tertiary authentication mechanism (TAM) for manifest and archives.
@@ -80,10 +80,22 @@ the object ID (via giving the ID as AAD), there is no way an attacker (without
 access to the borg key) could change the type of the object or move content
 to a different object ID.
 
-This effectively 'anchors' the manifest (and also other metadata, like archives)
-to the key, which is controlled by the client, thereby anchoring the entire DAG,
-making it impossible for an attacker to add, remove or modify any part of the
+This effectively 'anchors' each archive to the key, which is controlled by the
+client, thereby anchoring the DAG starting from the archives list entry,
+making it impossible for an attacker to add or modify any part of the
 DAG without Borg being able to detect the tampering.
+
+Please note that removing an archive by removing an entry from archives/*
+is possible and is done by ``borg delete`` and ``borg prune`` within their
+normal operation. An attacker could also remove some entries there, but, due to
+encryption, would not know what exactly they are removing. An attacker with
+repository access could also remove other parts of the repository or the whole
+repository, so there is not much point in protecting against archive removal.
+
+The borg 1.x way of having the archives list within the manifest chunk was
+problematic as it required a read-modify-write operation on the manifest,
+requiring a lock on the repository. We want to try less locking and more
+parallelism in future.
 
 Passphrase notes
 ----------------

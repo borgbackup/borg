@@ -1,6 +1,6 @@
 import enum
 import re
-from collections import abc, namedtuple
+from collections import namedtuple
 from datetime import datetime, timedelta, timezone
 from operator import attrgetter
 from collections.abc import Sequence
@@ -68,11 +68,13 @@ def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newes
     return archives
 
 
-class Archives(abc.MutableMapping):
+class Archives:
     """
-    Nice wrapper around the archives dict, making sure only valid types/values get in
-    and we can deal with str keys (and it internally encodes to byte keys) and either
-    str timestamps or datetime timestamps.
+    Manage the list of archives.
+
+    We still need to support the borg 1.x manifest-with-list-of-archives,
+    so borg transfer can work.
+    borg2 has separate items archives/* in the borgstore.
     """
 
     def __init__(self, repository):
@@ -88,20 +90,20 @@ class Archives(abc.MutableMapping):
     def prepare(self, manifest, m):
         self.manifest = manifest
         if not self.legacy:
-            self.load()
+            self._load()
         else:
-            self.set_raw_dict(m.archives)
+            self._set_raw_dict(m.archives)
 
     def finish(self, manifest):
         self.manifest = manifest  # note: .prepare is not always called
         if not self.legacy:
-            self.save()
+            self._save()
             manifest_archives = {}
         else:
-            manifest_archives = StableDict(self.get_raw_dict())
+            manifest_archives = StableDict(self._get_raw_dict())
         return manifest_archives
 
-    def load(self):
+    def _load(self):
         # load archives list from store
         from .helpers import msgpack
 
@@ -116,12 +118,12 @@ class Archives(abc.MutableMapping):
             _, value = self.manifest.repo_objs.parse(hex_to_bin(info.name), value, ro_type=ROBJ_MANIFEST)
             archive = msgpack.unpackb(value)
             archives[archive["name"]] = dict(id=archive["id"], time=archive["time"])
-        self.set_raw_dict(archives)
+        self._set_raw_dict(archives)
 
-    def save(self):
+    def _save(self):
         # save archives list to store
         valid_keys = set()
-        for name, info in self.get_raw_dict().items():
+        for name, info in self._get_raw_dict().items():
             archive = dict(name=name, id=info["id"], time=info["time"])
             value = self.manifest.key.pack_metadata(archive)  #
             id = self.manifest.repo_objs.id_hash(value)
@@ -141,33 +143,44 @@ class Archives(abc.MutableMapping):
             if info.name not in valid_keys:
                 self.repository.store_delete(f"archives/{info.name}")
 
-    def __len__(self):
+    def count(self):
+        # return the count of archives in the repo
         return len(self._archives)
 
-    def __iter__(self):
-        return iter(self._archives)
+    def exists(self, name):
+        # check if an archive with this name exists
+        assert isinstance(name, str)
+        return name in self._archives
 
-    def __getitem__(self, name):
+    def names(self):
+        # yield the names of all archives
+        yield from self._archives
+
+    def get(self, name, raw=False):
         assert isinstance(name, str)
         values = self._archives.get(name)
         if values is None:
             raise KeyError
-        ts = parse_timestamp(values["time"])
-        return ArchiveInfo(name=name, id=values["id"], ts=ts)
+        if not raw:
+            ts = parse_timestamp(values["time"])
+            return ArchiveInfo(name=name, id=values["id"], ts=ts)
+        else:
+            return dict(name=name, id=values["id"], time=values["time"])
 
-    def __setitem__(self, name, info):
+    def create(self, name, id, ts, *, overwrite=False):
         assert isinstance(name, str)
-        assert isinstance(info, tuple)
-        id, ts = info
         assert isinstance(id, bytes)
         if isinstance(ts, datetime):
             ts = ts.isoformat(timespec="microseconds")
         assert isinstance(ts, str)
+        if name in self._archives and not overwrite:
+            raise KeyError("archive already exists")
         self._archives[name] = {"id": id, "time": ts}
 
-    def __delitem__(self, name):
+    def delete(self, name):
+        # delete an archive
         assert isinstance(name, str)
-        del self._archives[name]
+        self._archives.pop(name)
 
     def list(
         self,
@@ -203,7 +216,7 @@ class Archives(abc.MutableMapping):
         if isinstance(sort_by, (str, bytes)):
             raise TypeError("sort_by must be a sequence of str")
 
-        archives = self.values()
+        archives = [self.get(name) for name in self.names()]
         regex = get_regex_from_pattern(match or "re:.*")
         regex = re.compile(regex + match_end)
         archives = [x for x in archives if regex.match(x.name) is not None]
@@ -240,14 +253,14 @@ class Archives(abc.MutableMapping):
             newest=getattr(args, "newest", None),
         )
 
-    def set_raw_dict(self, d):
+    def _set_raw_dict(self, d):
         """set the dict we get from the msgpack unpacker"""
         for k, v in d.items():
             assert isinstance(k, str)
             assert isinstance(v, dict) and "id" in v and "time" in v
             self._archives[k] = v
 
-    def get_raw_dict(self):
+    def _get_raw_dict(self):
         """get the dict we can give to the msgpack packer"""
         return self._archives
 
@@ -362,8 +375,8 @@ class Manifest:
             max_ts = max(incremented_ts, now_ts)
             self.timestamp = max_ts.isoformat(timespec="microseconds")
         # include checks for limits as enforced by limited unpacker (used by load())
-        assert len(self.archives) <= MAX_ARCHIVES
-        assert all(len(name) <= 255 for name in self.archives)
+        assert self.archives.count() <= MAX_ARCHIVES
+        assert all(len(name) <= 255 for name in self.archives.names())
         assert len(self.item_keys) <= 100
         self.config["item_keys"] = tuple(sorted(self.item_keys))
         manifest_archives = self.archives.finish(self)

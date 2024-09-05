@@ -492,7 +492,7 @@ class Archive:
         self.create = create
         if self.create:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
-            if name in manifest.archives:
+            if manifest.archives.exists(name):
                 raise self.AlreadyExists(name)
         else:
             info = self.manifest.archives.get(name)
@@ -610,7 +610,7 @@ Duration: {0.duration}
 
     def save(self, name=None, comment=None, timestamp=None, stats=None, additional_metadata=None):
         name = name or self.name
-        if name in self.manifest.archives:
+        if self.manifest.archives.exists(name):
             raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
         item_ptrs = archive_put_items(
@@ -657,7 +657,7 @@ Duration: {0.duration}
                 raise
         while self.repository.async_response(wait=True) is not None:
             pass
-        self.manifest.archives[name] = (self.id, metadata.time)
+        self.manifest.archives.create(name, self.id, metadata.time)
         self.manifest.write()
         return metadata
 
@@ -951,22 +951,22 @@ Duration: {0.duration}
         data = self.key.pack_metadata(metadata.as_dict())
         new_id = self.key.id_hash(data)
         self.cache.add_chunk(new_id, {}, data, stats=self.stats, ro_type=ROBJ_ARCHIVE_META)
-        self.manifest.archives[self.name] = (new_id, metadata.time)
+        self.manifest.archives.create(self.name, new_id, metadata.time, overwrite=True)
         self.id = new_id
 
     def rename(self, name):
-        if name in self.manifest.archives:
+        if self.manifest.archives.exists(name):
             raise self.AlreadyExists(name)
         oldname = self.name
         self.name = name
         self.set_meta("name", name)
-        del self.manifest.archives[oldname]
+        self.manifest.archives.delete(oldname)
 
     def delete(self):
         # quick and dirty: we just nuke the archive from the archives list - that will
         # potentially orphan all chunks previously referenced by the archive, except the ones also
         # referenced by other archives. In the end, "borg compact" will clean up and free space.
-        del self.manifest.archives[self.name]
+        self.manifest.archives.delete(self.name)
 
     @staticmethod
     def compare_archives_iter(
@@ -1798,16 +1798,16 @@ class ArchiveChecker:
                 archive = ArchiveItem(internal_dict=archive)
                 name = archive.name
                 logger.info("Found archive %s", name)
-                if name in manifest.archives:
+                if manifest.archives.exists(name):
                     i = 1
                     while True:
                         new_name = "%s.%d" % (name, i)
-                        if new_name not in manifest.archives:
+                        if not manifest.archives.exists(new_name):
                             break
                         i += 1
                     logger.warning("Duplicate archive name %s, storing as %s", name, new_name)
                     name = new_name
-                manifest.archives[name] = (chunk_id, archive.time)
+                manifest.archives.create(name, chunk_id, archive.time)
         pi.finish()
         logger.info("Manifest rebuild complete.")
         return manifest
@@ -2025,7 +2025,7 @@ class ArchiveChecker:
                 if archive_id not in self.chunks:
                     logger.error("Archive metadata block %s is missing!", bin_to_hex(archive_id))
                     self.error_found = True
-                    del self.manifest.archives[info.name]
+                    self.manifest.archives.delete(info.name)
                     continue
                 cdata = self.repository.get(archive_id)
                 try:
@@ -2033,7 +2033,7 @@ class ArchiveChecker:
                 except IntegrityError as integrity_error:
                     logger.error("Archive metadata block %s is corrupted: %s", bin_to_hex(archive_id), integrity_error)
                     self.error_found = True
-                    del self.manifest.archives[info.name]
+                    self.manifest.archives.delete(info.name)
                     continue
                 archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)
@@ -2053,7 +2053,7 @@ class ArchiveChecker:
                 new_archive_id = self.key.id_hash(data)
                 cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
                 add_reference(new_archive_id, len(data), cdata)
-                self.manifest.archives[info.name] = (new_archive_id, info.ts)
+                self.manifest.archives.create(info.name, new_archive_id, info.ts, overwrite=True)
             pi.finish()
 
     def finish(self):

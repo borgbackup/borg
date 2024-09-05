@@ -46,7 +46,7 @@ class DebugMixIn:
         """dump decoded archive metadata (not: data)"""
         repo_objs = manifest.repo_objs
         try:
-            archive_meta_orig = manifest.archives.get_raw_dict()[args.name]
+            archive_meta_orig = manifest.archives.get(args.name, raw=True)
         except KeyError:
             raise Archive.DoesNotExist(args.name)
 

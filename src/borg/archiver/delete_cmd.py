@@ -33,7 +33,7 @@ class DeleteMixIn:
             try:
                 # this does NOT use Archive.delete, so this code hopefully even works in cases a corrupt archive
                 # would make the code in class Archive crash, so the user can at least get rid of such archives.
-                current_archive = manifest.archives.pop(archive_name)
+                current_archive = manifest.archives.delete(archive_name)
             except KeyError:
                 self.print_warning(f"Archive {archive_name} not found ({i}/{len(archive_names)}).")
             else:

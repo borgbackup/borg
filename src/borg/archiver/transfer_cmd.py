@@ -78,7 +78,7 @@ class TransferMixIn:
         for name in archive_names:
             transfer_size = 0
             present_size = 0
-            if name in manifest.archives and not dry_run:
+            if manifest.archives.exists(name) and not dry_run:
                 print(f"{name}: archive is already present in destination repo, skipping.")
             else:
                 if not dry_run:

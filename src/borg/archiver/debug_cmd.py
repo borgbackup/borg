@@ -281,7 +281,7 @@ class DebugMixIn:
         with open(args.object_path, "wb") as f:
             f.write(data_encrypted)
 
-    @with_repository(manifest=False, exclusive=True)
+    @with_repository(manifest=False)
     def do_debug_put_obj(self, args, repository):
         """put file contents into the repository"""
         with open(args.path, "rb") as f:

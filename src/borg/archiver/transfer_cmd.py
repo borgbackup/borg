@@ -17,7 +17,7 @@ logger = create_logger()
 
 class TransferMixIn:
     @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
-    @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(manifest=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
     def do_transfer(self, args, *, repository, manifest, cache, other_repository=None, other_manifest=None):
         """archives transfer from other repository, optionally upgrade data format"""
         key = manifest.key

@@ -41,7 +41,7 @@ logger = create_logger()
 
 
 class CreateMixIn:
-    @with_repository(exclusive=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest):
         """Create new archive"""
         key = manifest.key

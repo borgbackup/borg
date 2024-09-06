@@ -70,7 +70,7 @@ def prune_split(archives, rule, n, kept_because=None):
 
 
 class PruneMixIn:
-    @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
+    @with_repository(compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest):
         """Prune repository archives according to specified rules"""
         if not any(

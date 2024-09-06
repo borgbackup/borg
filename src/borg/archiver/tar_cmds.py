@@ -240,7 +240,7 @@ class TarMixIn:
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
 
-    @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(cache=True, compatibility=(Manifest.Operation.WRITE,))
     def do_import_tar(self, args, repository, manifest, cache):
         """Create a backup archive from a tarball"""
         self.output_filter = args.output_filter

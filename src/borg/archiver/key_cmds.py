@@ -83,7 +83,7 @@ class KeysMixIn:
             key.remove(key.target)  # remove key from current location
             logger.info(f"Key moved to {loc}")
 
-    @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
+    @with_repository(lock=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
         """Export the repository key for backup"""
         manager = KeyManager(repository)
@@ -102,7 +102,7 @@ class KeysMixIn:
         except IsADirectoryError:
             raise CommandError(f"'{args.path}' must be a file, not a directory")
 
-    @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
+    @with_repository(lock=False, manifest=False, cache=False)
     def do_key_import(self, args, repository):
         """Import the repository key from backup"""
         manager = KeyManager(repository)

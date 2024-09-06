@@ -88,7 +88,7 @@ def format_compression_spec(ctype, clevel, olevel):
 
 
 class RCompressMixIn:
-    @with_repository(cache=False, manifest=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(cache=False, manifest=True, compatibility=(Manifest.Operation.CHECK,))
     def do_rcompress(self, args, repository, manifest):
         """Repository (re-)compression"""
 

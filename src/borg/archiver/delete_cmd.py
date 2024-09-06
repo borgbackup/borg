@@ -12,7 +12,7 @@ logger = create_logger()
 
 
 class DeleteMixIn:
-    @with_repository(exclusive=True, manifest=False)
+    @with_repository(manifest=False)
     def do_delete(self, args, repository):
         """Delete archives"""
         self.output_list = args.output_list

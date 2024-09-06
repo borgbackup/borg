@@ -2025,7 +2025,11 @@ class ArchiveChecker:
                 if archive_id not in self.chunks:
                     logger.error("Archive metadata block %s is missing!", bin_to_hex(archive_id))
                     self.error_found = True
-                    self.manifest.archives.delete(info.name)
+                    if self.repair:
+                        logger.error(f"Deleting broken archive {info.name}.")
+                        self.manifest.archives.delete(info.name)
+                    else:
+                        logger.error(f"Would delete broken archive {info.name}.")
                     continue
                 cdata = self.repository.get(archive_id)
                 try:
@@ -2033,7 +2037,11 @@ class ArchiveChecker:
                 except IntegrityError as integrity_error:
                     logger.error("Archive metadata block %s is corrupted: %s", bin_to_hex(archive_id), integrity_error)
                     self.error_found = True
-                    self.manifest.archives.delete(info.name)
+                    if self.repair:
+                        logger.error(f"Deleting broken archive {info.name}.")
+                        self.manifest.archives.delete(info.name)
+                    else:
+                        logger.error(f"Would delete broken archive {info.name}.")
                     continue
                 archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)
@@ -2046,14 +2054,17 @@ class ArchiveChecker:
                         verify_file_chunks(info.name, item)
                     items_buffer.add(item)
                 items_buffer.flush(flush=True)
-                archive.item_ptrs = archive_put_items(
-                    items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
-                )
-                data = self.key.pack_metadata(archive.as_dict())
-                new_archive_id = self.key.id_hash(data)
-                cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
-                add_reference(new_archive_id, len(data), cdata)
-                self.manifest.archives.create(info.name, new_archive_id, info.ts, overwrite=True)
+                if self.repair:
+                    archive.item_ptrs = archive_put_items(
+                        items_buffer.chunks, repo_objs=self.repo_objs, add_reference=add_reference
+                    )
+                    data = self.key.pack_metadata(archive.as_dict())
+                    new_archive_id = self.key.id_hash(data)
+                    logger.debug(f"archive id old: {bin_to_hex(archive_id)}")
+                    logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
+                    cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
+                    add_reference(new_archive_id, len(data), cdata)
+                    self.manifest.archives.create(info.name, new_archive_id, info.ts, overwrite=True)
             pi.finish()
 
     def finish(self):

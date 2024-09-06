@@ -23,6 +23,6 @@ def test_rename(archivers, request):
     # Make sure both archives have been renamed
     with Repository(archiver.repository_path) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-    assert manifest.archives.count() == 2
-    assert manifest.archives.exists("test.3")
-    assert manifest.archives.exists("test.4")
+        assert manifest.archives.count() == 2
+        assert manifest.archives.exists("test.3")
+        assert manifest.archives.exists("test.4")

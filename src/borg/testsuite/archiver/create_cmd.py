@@ -646,7 +646,7 @@ def test_create_dry_run(archivers, request):
     # Make sure no archive has been created
     with Repository(archiver.repository_path) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-    assert manifest.archives.count() == 0
+        assert manifest.archives.count() == 0
 
 
 def test_progress_on(archivers, request):

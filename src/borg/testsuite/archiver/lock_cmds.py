@@ -37,7 +37,7 @@ def test_with_lock(tmp_path):
             out, err_out = p2.communicate()
             assert "second command" not in out  # command2 is "locked out"
             assert "Failed to create/acquire the lock" in err_out
-            assert p2.returncode == 72  # LockTimeout: could not acquire the lock, p1 already has it
+            assert p2.returncode == 73  # LockTimeout: could not acquire the lock, p1 already has it
         out, err_out = p1.communicate()
         assert "first command" in out  # command1 was executed and had the lock
         assert not err_out

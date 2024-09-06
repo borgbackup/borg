@@ -4,7 +4,7 @@ import pytest
 
 from borgstore.store import Store
 
-from ..storelocking import Lock, LockFailed, NotLocked
+from ..storelocking import Lock, NotLocked, LockTimeout
 
 ID1 = "foo", 1, 1
 ID2 = "bar", 2, 2
@@ -37,11 +37,11 @@ class TestLock:
     def test_exclusive_lock(self, lockstore):
         # there must not be 2 exclusive locks
         with Lock(lockstore, exclusive=True, id=ID1):
-            with pytest.raises(LockFailed):
+            with pytest.raises(LockTimeout):
                 Lock(lockstore, exclusive=True, id=ID2).acquire()
         # acquiring an exclusive lock will time out if the non-exclusive does not go away
         with Lock(lockstore, exclusive=False, id=ID1):
-            with pytest.raises(LockFailed):
+            with pytest.raises(LockTimeout):
                 Lock(lockstore, exclusive=True, id=ID2).acquire()
 
     def test_double_nonexclusive_lock_succeeds(self, lockstore):

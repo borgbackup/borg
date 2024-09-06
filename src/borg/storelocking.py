@@ -186,8 +186,7 @@ class Lock:
                         self._delete_lock(key, ignore_not_found=True)
             # wait a random bit before retrying
             time.sleep(self.retry_delay_min + (self.retry_delay_max - self.retry_delay_min) * random.random())
-        # timeout
-        raise LockFailed(str(self.store), "timeout")
+        raise LockTimeout(str(self.store))
 
     def release(self):
         locks = self._find_locks(only_mine=True)

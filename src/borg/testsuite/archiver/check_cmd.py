@@ -289,7 +289,11 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
         archive_id = repo_objs.id_hash(archive)
         repository.put(archive_id, repo_objs.format(archive_id, {}, archive, ro_type=ROBJ_ARCHIVE_META))
     cmd(archiver, "check", exit_code=1)
-    cmd(archiver, "check", "--repair", exit_code=0)
+    # when undeleting archives, borg check will discover both the original archive1 as well as
+    # the fake archive1 we created above. for the fake one, a new archives directory entry
+    # named archive1.1 will be created because we request undeleting archives and there
+    # is no archives directory entry for the fake archive yet.
+    cmd(archiver, "check", "--repair", "--undelete-archives", exit_code=0)
     output = cmd(archiver, "rlist")
     assert "archive1" in output
     assert "archive1.1" in output

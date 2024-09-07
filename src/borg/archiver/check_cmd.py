@@ -37,6 +37,8 @@ class CheckMixIn:
             )
         if args.repair and args.max_duration:
             raise CommandError("--repair does not allow --max-duration argument.")
+        if args.undelete_archives and not args.repair:
+            raise CommandError("--undelete-archives requires --repair argument.")
         if args.max_duration and not args.repo_only:
             # when doing a partial repo check, we can only check xxh64 hashes in repository files.
             # also, there is no max_duration support in the archives check code anyway.
@@ -48,6 +50,7 @@ class CheckMixIn:
             repository,
             verify_data=args.verify_data,
             repair=args.repair,
+            undelete_archives=args.undelete_archives,
             match=args.match_archives,
             sort_by=args.sort_by or "ts",
             first=args.first,
@@ -175,6 +178,12 @@ class CheckMixIn:
         chunks of a "zero-patched" file reappear, this effectively "heals" the file.
         Consequently, if lost chunks were repaired earlier, it is advised to run
         ``--repair`` a second time after creating some new backups.
+
+        If ``--repair --undelete-archives`` is given, Borg will scan the repository
+        for archive metadata and if it finds some where no corresponding archives
+        directory entry exists, it will create the entries. This is basically undoing
+        ``borg delete archive`` or ``borg prune ...`` commands and only possible before
+        ``borg compact`` would remove the archives' data completely.
         """
         )
         subparser = subparsers.add_parser(
@@ -201,6 +210,12 @@ class CheckMixIn:
         )
         subparser.add_argument(
             "--repair", dest="repair", action="store_true", help="attempt to repair any inconsistencies found"
+        )
+        subparser.add_argument(
+            "--undelete-archives",
+            dest="undelete_archives",
+            action="store_true",
+            help="attempt to undelete archives (use with --repair)",
         )
         subparser.add_argument(
             "--max-duration",

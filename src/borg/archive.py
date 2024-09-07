@@ -1601,6 +1601,7 @@ class ArchiveChecker:
         *,
         verify_data=False,
         repair=False,
+        undelete_archives=False,
         match=None,
         sort_by="",
         first=0,
@@ -1613,6 +1614,7 @@ class ArchiveChecker:
         """Perform a set of checks on 'repository'
 
         :param repair: enable repair mode, write updated or corrected data into repository
+        :param undelete_archives: create archive directory entries that are missing
         :param first/last/sort_by: only check this number of first/last archives ordered by sort_by
         :param match: only check archives matching this pattern
         :param older/newer: only check archives older/newer than timedelta from now
@@ -1631,18 +1633,24 @@ class ArchiveChecker:
         self.repo_objs = RepoObj(self.key)
         if verify_data:
             self.verify_data()
+        rebuild_manifest = False
         try:
             repository.get_manifest()
         except NoManifestError:
+            logger.error("Repository manifest is missing.")
             self.error_found = True
-            self.manifest = self.rebuild_manifest()
+            rebuild_manifest = True
         else:
             try:
                 self.manifest = Manifest.load(repository, (Manifest.Operation.CHECK,), key=self.key)
             except IntegrityErrorBase as exc:
                 logger.error("Repository manifest is corrupted: %s", exc)
                 self.error_found = True
-                self.manifest = self.rebuild_manifest()
+                rebuild_manifest = True
+        if rebuild_manifest:
+            self.manifest = self.rebuild_manifest()
+        if undelete_archives:
+            self.rebuild_archives_directory()
         self.rebuild_archives(
             match=match, first=first, last=last, sort_by=sort_by, older=older, oldest=oldest, newer=newer, newest=newest
         )
@@ -1757,9 +1765,22 @@ class ArchiveChecker:
         )
 
     def rebuild_manifest(self):
-        """Rebuild the manifest object and the archives list.
+        """Rebuild the manifest object."""
+
+        logger.info("Rebuilding missing/corrupted manifest.")
+        # as we have lost the manifest, we do not know any more what valid item keys we had.
+        # collecting any key we encounter in a damaged repo seems unwise, thus we just use
+        # the hardcoded list from the source code. thus, it is not recommended to rebuild a
+        # lost manifest on a older borg version than the most recent one that was ever used
+        # within this repository (assuming that newer borg versions support more item keys).
+        return Manifest(self.key, self.repository)
+
+    def rebuild_archives_directory(self):
+        """Rebuild the archives directory, undeleting archives.
 
         Iterates through all objects in the repository looking for archive metadata blocks.
+        When finding some that do not have a corresponding archives directory entry, it will
+        create that entry (undeleting all archives).
         """
 
         def valid_archive(obj):
@@ -1767,18 +1788,12 @@ class ArchiveChecker:
                 return False
             return REQUIRED_ARCHIVE_KEYS.issubset(obj)
 
-        logger.info("Rebuilding missing manifest and missing archives directory entries, this might take some time...")
-        # as we have lost the manifest, we do not know any more what valid item keys we had.
-        # collecting any key we encounter in a damaged repo seems unwise, thus we just use
-        # the hardcoded list from the source code. thus, it is not recommended to rebuild a
-        # lost manifest on a older borg version than the most recent one that was ever used
-        # within this repository (assuming that newer borg versions support more item keys).
-        manifest = Manifest(self.key, self.repository)
+        logger.info("Rebuilding missing archives directory entries, this might take some time...")
         pi = ProgressIndicatorPercent(
             total=len(self.chunks),
-            msg="Rebuilding manifest and archives directory %6.2f%%",
+            msg="Rebuilding missing archives directory entries %6.2f%%",
             step=0.01,
-            msgid="check.rebuild_manifest",
+            msgid="check.rebuild_archives_directory",
         )
         for chunk_id, _ in self.chunks.iteritems():
             pi.show()
@@ -1801,25 +1816,24 @@ class ArchiveChecker:
                 archive = ArchiveItem(internal_dict=archive)
                 name = archive.name
                 logger.info(f"Found archive {name}, id {bin_to_hex(chunk_id)}.")
-                if manifest.archives.exists_name_and_id(name, chunk_id):
+                if self.manifest.archives.exists_name_and_id(name, chunk_id):
                     logger.info("We already have an archives directory entry for this.")
-                elif not manifest.archives.exists(name):
+                elif not self.manifest.archives.exists(name):
                     # no archives list entry yet and name is not taken yet, create an entry
                     logger.warning(f"Creating archives directory entry for {name}.")
-                    manifest.archives.create(name, chunk_id, archive.time)
+                    self.manifest.archives.create(name, chunk_id, archive.time)
                 else:
                     # we don't have an entry yet, but the name is taken by something else
                     i = 1
                     while True:
                         new_name = "%s.%d" % (name, i)
-                        if not manifest.archives.exists(new_name):
+                        if not self.manifest.archives.exists(new_name):
                             break
                         i += 1
                     logger.warning(f"Creating archives directory entry using {new_name}.")
-                    manifest.archives.create(new_name, chunk_id, archive.time)
+                    self.manifest.archives.create(new_name, chunk_id, archive.time)
         pi.finish()
-        logger.info("Manifest and archives directory rebuild complete.")
-        return manifest
+        logger.info("Rebuilding missing archives directory entries completed.")
 
     def rebuild_archives(
         self, first=0, last=0, sort_by="", match=None, older=None, newer=None, oldest=None, newest=None

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RINFO" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-RINFO" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
 borg-rinfo \- Show repository infos
 .SH SYNOPSIS
@@ -36,15 +36,6 @@ borg [common options] rinfo [options]
 .SH DESCRIPTION
 .sp
 This command displays detailed information about the repository.
-.sp
-Please note that the deduplicated sizes of the individual archives do not add
-up to the deduplicated size of the repository (\(dqall archives\(dq), because the two
-are meaning different things:
-.sp
-This archive / deduplicated size = amount of data stored ONLY for this archive
-= unique chunks of this archive.
-All archives / deduplicated size = amount of data stored in the repo
-= all chunks in the repository.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

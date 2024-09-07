@@ -12,15 +12,11 @@ borg compact
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
-    | **optional arguments**                                                                                                                           |
-    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
-    |                                                       | ``--threshold PERCENT`` | set minimum threshold for saved space in PERCENT (Default: 10) |
-    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                                                                   |
-    |                                                                                                                                                  |
-    | :ref:`common_options`                                                                                                                            |
-    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
+    +-------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                        |
+    |                                                       |
+    | :ref:`common_options`                                 |
+    +-------------------------------------------------------+
 
     .. raw:: html
 
@@ -34,30 +30,17 @@ borg compact
 
 
 
-    optional arguments
-        --threshold PERCENT     set minimum threshold for saved space in PERCENT (Default: 10)
-
-
     :ref:`common_options`
         |
 
 Description
 ~~~~~~~~~~~
 
-This command frees repository space by compacting segments.
+Free repository space by deleting unused chunks.
 
-Use this regularly to avoid running out of space - you do not need to use this
-after each borg command though. It is especially useful after deleting archives,
-because only compaction will really free repository space.
+borg compact analyzes all existing archives to find out which chunks are
+actually used. There might be unused chunks resulting from borg delete or prune,
+which can be removed to free space in the repository.
 
-borg compact does not need a key, so it is possible to invoke it from the
-client or also from the server.
-
-Depending on the amount of segments that need compaction, it may take a while,
-so consider using the ``--progress`` option.
-
-A segment is compacted if the amount of saved space is above the percentage value
-given by the ``--threshold`` option. If omitted, a threshold of 10% is used.
-When using ``--verbose``, borg will output an estimate of the freed space.
-
-See :ref:`separate_compaction` in Additional Notes for more details.
+Differently than borg 1.x, borg2's compact needs the borg key if the repo is
+encrypted.

@@ -127,9 +127,7 @@ Keys available only when listing files in an archive:
 - flags: file flags
 
 - size: file size
-- dsize: deduplicated size
 - num_chunks: number of chunks in this file
-- unique_chunks: number of unique chunks in this file
 
 - mtime: file modification time
 - ctime: file change time

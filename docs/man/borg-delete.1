@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-DELETE" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete archives
 .SH SYNOPSIS
@@ -42,16 +42,9 @@ you run \fBborg compact\fP\&.
 .sp
 When in doubt, use \fB\-\-dry\-run \-\-list\fP to see what would be deleted.
 .sp
-When using \fB\-\-stats\fP, you will get some statistics about how much data was
-deleted \- the \(dqDeleted data\(dq deduplicated size there is most interesting as
-that is how much your repository will shrink.
-Please note that the \(dqAll archives\(dq stats refer to the state after deletion.
-.sp
 You can delete multiple archives by specifying a matching pattern,
 using the \fB\-\-match\-archives PATTERN\fP option (for more info on these patterns,
 see \fIborg_patterns\fP).
-.sp
-Always first use \fB\-\-dry\-run \-\-list\fP to see what would be deleted.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -63,18 +56,6 @@ do not change repository
 .TP
 .B  \-\-list
 output verbose list of archives
-.TP
-.B  \-\-consider\-checkpoints
-consider checkpoint archives for deletion (default: not considered).
-.TP
-.B  \-s\fP,\fB  \-\-stats
-print statistics for the deleted archive
-.TP
-.B  \-\-force
-force deletion of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-\-force\fP does not work.
-.TP
-.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
-write checkpoint every SECONDS seconds (Default: 1800)
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -237,6 +237,10 @@ Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style
 \fBssh://user@host:port/./path/to/repo\fP \- path relative to current directory
 .sp
 \fBssh://user@host:port/~/path/to/repo\fP \- path relative to user\(aqs home directory
+.sp
+\fBRemote repositories\fP accessed via sftp:
+.sp
+\fBsftp://user@host:port/path/to/repo\fP \- absolute path\(ga
 .sp
 If you frequently need the same repo URL, it is a good idea to set the
 \fBBORG_REPO\fP environment variable to set a default for the repo URL:
@@ -491,10 +495,6 @@ given order, e.g.:
 Choose the implementation for the clientside cache, choose one of:
 .INDENT 7.0
 .IP \(bu 2
-\fBlocal\fP: uses a persistent chunks cache and keeps it in a perfect state (precise refcounts and
-sizes), requiring a potentially resource expensive cache sync in multi\-client scenarios.
-Also has a persistent files cache.
-.IP \(bu 2
 \fBadhoc\fP: builds a non\-persistent chunks cache by querying the repo. Chunks cache contents
 are somewhat sloppy for already existing chunks, concerning their refcount (\(dqinfinite\(dq) and
 size (0). No files cache (slow, will chunk all input files). DEPRECATED.
@@ -698,38 +698,48 @@ mode 600, root:root).
 .UNINDENT
 .SS File systems
 .sp
-We strongly recommend against using Borg (or any other database\-like
-software) on non\-journaling file systems like FAT, since it is not
-possible to assume any consistency in case of power failures (or a
-sudden disconnect of an external drive or similar failures).
+We recommend using a reliable, scalable journaling filesystem for the
+repository, e.g. zfs, btrfs, ext4, apfs.
 .sp
-While Borg uses a data store that is resilient against these failures
-when used on journaling file systems, it is not possible to guarantee
-this with some hardware \-\- independent of the software used. We don\(aqt
-know a list of affected hardware.
+Borg now uses the \fBborgstore\fP package to implement the key/value store it
+uses for the repository.
 .sp
-If you are suspicious whether your Borg repository is still consistent
-and readable after one of the failures mentioned above occurred, run
-\fBborg check \-\-verify\-data\fP to make sure it is consistent.
-Requirements for Borg repository file systems
+It currently uses the \fBfile:\fP Store (posixfs backend) either with a local
+directory or via ssh and a remote \fBborg serve\fP agent using borgstore on the
+remote side.
+.sp
+This means that it will store each chunk into a separate filesystem file
+(for more details, see the \fBborgstore\fP project).
+.sp
+This has some pros and cons (compared to legacy borg 1.x\(aqs segment files):
+.sp
+Pros:
 .INDENT 0.0
 .IP \(bu 2
-Long file names
+Simplicity and better maintainability of the borg code.
 .IP \(bu 2
-At least three directory levels with short names
+Sometimes faster, less I/O, better scalability: e.g. borg compact can just
+remove unused chunks by deleting a single file and does not need to read
+and re\-write segment files to free space.
 .IP \(bu 2
-Typically, file sizes up to a few hundred MB.
-Large repositories may require large files (>2 GB).
+In future, easier to adapt to other kinds of storage:
+borgstore\(aqs backends are quite simple to implement.
+A \fBsftp:\fP backend already exists, cloud storage might be easy to add.
 .IP \(bu 2
-Up to 1000 files per directory.
+Parallel repository access with less locking is easier to implement.
+.UNINDENT
+.sp
+Cons:
+.INDENT 0.0
 .IP \(bu 2
-rename(2) / MoveFile(Ex) should work as specified, i.e. on the same file system
-it should be a move (not a copy) operation, and in case of a directory
-it should fail if the destination exists and is not an empty directory,
-since this is used for locking.
+The repository filesystem will have to deal with a big amount of files (there
+are provisions in borgstore against having too many files in a single directory
+by using a nested directory structure).
 .IP \(bu 2
-Also hardlinks are used for more safe and secure file updating (e.g. of the repo
-config file), but the code tries to work also if hardlinks are not supported.
+Bigger fs space usage overhead (will depend on allocation block size \- modern
+filesystems like zfs are rather clever here using a variable block size).
+.IP \(bu 2
+Sometimes slower, due to less sequential / more random access operations.
 .UNINDENT
 .SS Units
 .sp
@@ -747,6 +757,10 @@ For more information about that, see: \fI\%https://xkcd.com/1179/\fP
 .sp
 Unless otherwise noted, we display local date and time.
 Internally, we store and process date and time as UTC.
+TIMESPAN
+.sp
+Some options accept a TIMESPAN parameter, which can be given as a
+number of days (e.g. \fB7d\fP) or months (e.g. \fB12m\fP).
 .SS Resource Usage
 .sp
 Borg might use a lot of resources depending on the size of the data set it is dealing with.

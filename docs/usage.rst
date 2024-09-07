@@ -37,6 +37,7 @@ Usage
    usage/general
 
    usage/rcreate
+   usage/rspace
    usage/rlist
    usage/rinfo
    usage/rcompress

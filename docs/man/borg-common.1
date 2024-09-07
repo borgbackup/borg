@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-COMMON" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-COMMON" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
 borg-common \- Common options of Borg commands
 .SH SYNOPSIS
@@ -64,10 +64,7 @@ format using IEC units (1KiB = 1024B)
 Output one JSON object per log line instead of formatted text.
 .TP
 .BI \-\-lock\-wait \ SECONDS
-wait at most SECONDS for acquiring a repository/cache lock (default: 1).
-.TP
-.B  \-\-bypass\-lock
-Bypass locking mechanism
+wait at most SECONDS for acquiring a repository/cache lock (default: 10).
 .TP
 .B  \-\-show\-version
 show/log the borg version

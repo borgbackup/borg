@@ -67,10 +67,6 @@ borg recreate
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--target TARGET``                               | create a new archive with the name ARCHIVE, do not replace existing archive (only applies for a single archive)                                                                                   |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-c SECONDS``, ``--checkpoint-interval SECONDS`` | write checkpoint every SECONDS seconds (Default: 1800)                                                                                                                                            |
-    +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--checkpoint-volume BYTES``                     | write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)                                                                                                            |
-    +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--comment COMMENT``                             | add a comment text to the archive                                                                                                                                                                 |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--timestamp TIMESTAMP``                         | manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory. |
@@ -115,21 +111,19 @@ borg recreate
 
 
     Archive filters
-        -a PATTERN, --match-archives PATTERN          only consider archive names matching the pattern. see "borg help match-archives".
-        --sort-by KEYS                                Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp
-        --first N                                     consider first N archives after other filters were applied
-        --last N                                      consider last N archives after other filters were applied
-        --oldest TIMESPAN                             consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
-        --newest TIMESPAN                             consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.
-        --older TIMESPAN                              consider archives older than (now - TIMESPAN), e.g. 7d or 12m.
-        --newer TIMESPAN                              consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.
-        --target TARGET                               create a new archive with the name ARCHIVE, do not replace existing archive (only applies for a single archive)
-        -c SECONDS, --checkpoint-interval SECONDS     write checkpoint every SECONDS seconds (Default: 1800)
-        --checkpoint-volume BYTES                     write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)
-        --comment COMMENT                             add a comment text to the archive
-        --timestamp TIMESTAMP                         manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
-        -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
-        --chunker-params PARAMS                       rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. default: do not rechunk
+        -a PATTERN, --match-archives PATTERN     only consider archive names matching the pattern. see "borg help match-archives".
+        --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp
+        --first N                                consider first N archives after other filters were applied
+        --last N                                 consider last N archives after other filters were applied
+        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.
+        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g. 7d or 12m.
+        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.
+        --target TARGET                          create a new archive with the name ARCHIVE, do not replace existing archive (only applies for a single archive)
+        --comment COMMENT                        add a comment text to the archive
+        --timestamp TIMESTAMP                    manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
+        -C COMPRESSION, --compression COMPRESSION    select compression algorithm, see the output of the "borg help compression" command for details.
+        --chunker-params PARAMS                  rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. default: do not rechunk
 
 
 Description

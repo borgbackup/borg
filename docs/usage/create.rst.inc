@@ -31,10 +31,6 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--json``                                        | output stats as JSON. Implies ``--stats``.                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--no-cache-sync``                               | experimental: do not synchronize the chunks cache.                                                                                                                                                |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--no-cache-sync-forced``                        | experimental: do not synchronize the chunks cache (forced).                                                                                                                                       |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--prefer-adhoc-cache``                          | experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).                                                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdin-name NAME``                             | use NAME in archive for stdin data (default: 'stdin')                                                                                                                                             |
@@ -105,10 +101,6 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--timestamp TIMESTAMP``                         | manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory. |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``-c SECONDS``, ``--checkpoint-interval SECONDS`` | write checkpoint every SECONDS seconds (Default: 1800)                                                                                                                                            |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--checkpoint-volume BYTES``                     | write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)                                                                                                            |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--chunker-params PARAMS``                       | specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details.                                                                                                  |
@@ -136,8 +128,6 @@ borg create
         --list          output verbose list of items (files, dirs, ...)
         --filter STATUSCHARS    only display items with the given status characters (see description)
         --json          output stats as JSON. Implies ``--stats``.
-        --no-cache-sync    experimental: do not synchronize the chunks cache.
-        --no-cache-sync-forced    experimental: do not synchronize the chunks cache (forced).
         --prefer-adhoc-cache    experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).
         --stdin-name NAME    use NAME in archive for stdin data (default: 'stdin')
         --stdin-user USER    set user USER in archive for stdin data (default: do not store user/uid)
@@ -180,8 +170,6 @@ borg create
     Archive options
         --comment COMMENT                             add a comment text to the archive
         --timestamp TIMESTAMP                         manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
-        -c SECONDS, --checkpoint-interval SECONDS     write checkpoint every SECONDS seconds (Default: 1800)
-        --checkpoint-volume BYTES                     write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)
         --chunker-params PARAMS                       specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
         -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
 
@@ -207,9 +195,7 @@ stdin* below for details.
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
 
-The archive name needs to be unique. It must not end in '.checkpoint' or
-'.checkpoint.N' (with N being a number), because these names are used for
-checkpoints and treated in special ways.
+The archive name needs to be unique.
 
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.

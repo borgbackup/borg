@@ -119,6 +119,19 @@ class Archives:
         else:
             return name in self._archives
 
+    def exists_name_and_id(self, name, id):
+        # check if an archive with this name AND id exists
+        assert isinstance(name, str)
+        assert isinstance(id, bytes)
+        if not self.legacy:
+            for _, archive_info in self._infos():
+                if archive_info["name"] == name and archive_info["id"] == id:
+                    return True
+            else:
+                return False
+        else:
+            raise NotImplementedError
+
     def _infos(self):
         # yield the infos of all archives: (store_key, archive_info)
         from .helpers import msgpack

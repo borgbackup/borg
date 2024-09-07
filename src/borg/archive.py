@@ -1757,7 +1757,7 @@ class ArchiveChecker:
         )
 
     def rebuild_manifest(self):
-        """Rebuild the manifest object if it is missing
+        """Rebuild the manifest object and the archives list.
 
         Iterates through all objects in the repository looking for archive metadata blocks.
         """
@@ -1767,7 +1767,7 @@ class ArchiveChecker:
                 return False
             return REQUIRED_ARCHIVE_KEYS.issubset(obj)
 
-        logger.info("Rebuilding missing manifest, this might take some time...")
+        logger.info("Rebuilding missing manifest and missing archives directory entries, this might take some time...")
         # as we have lost the manifest, we do not know any more what valid item keys we had.
         # collecting any key we encounter in a damaged repo seems unwise, thus we just use
         # the hardcoded list from the source code. thus, it is not recommended to rebuild a
@@ -1775,7 +1775,10 @@ class ArchiveChecker:
         # within this repository (assuming that newer borg versions support more item keys).
         manifest = Manifest(self.key, self.repository)
         pi = ProgressIndicatorPercent(
-            total=len(self.chunks), msg="Rebuilding manifest %6.2f%%", step=0.01, msgid="check.rebuild_manifest"
+            total=len(self.chunks),
+            msg="Rebuilding manifest and archives directory %6.2f%%",
+            step=0.01,
+            msgid="check.rebuild_manifest",
         )
         for chunk_id, _ in self.chunks.iteritems():
             pi.show()
@@ -1797,19 +1800,25 @@ class ArchiveChecker:
                 archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)
                 name = archive.name
-                logger.info("Found archive %s", name)
-                if manifest.archives.exists(name):
+                logger.info(f"Found archive {name}, id {bin_to_hex(chunk_id)}.")
+                if manifest.archives.exists_name_and_id(name, chunk_id):
+                    logger.info("We already have an archives directory entry for this.")
+                elif not manifest.archives.exists(name):
+                    # no archives list entry yet and name is not taken yet, create an entry
+                    logger.warning(f"Creating archives directory entry for {name}.")
+                    manifest.archives.create(name, chunk_id, archive.time)
+                else:
+                    # we don't have an entry yet, but the name is taken by something else
                     i = 1
                     while True:
                         new_name = "%s.%d" % (name, i)
                         if not manifest.archives.exists(new_name):
                             break
                         i += 1
-                    logger.warning("Duplicate archive name %s, storing as %s", name, new_name)
-                    name = new_name
-                manifest.archives.create(name, chunk_id, archive.time)
+                    logger.warning(f"Creating archives directory entry using {new_name}.")
+                    manifest.archives.create(new_name, chunk_id, archive.time)
         pi.finish()
-        logger.info("Manifest rebuild complete.")
+        logger.info("Manifest and archives directory rebuild complete.")
         return manifest
 
     def rebuild_archives(

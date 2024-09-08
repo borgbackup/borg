@@ -60,7 +60,7 @@ Before a backup can be made, a repository has to be initialized:
 .sp
 .nf
 .ft C
-$ borg \-r /path/to/repo rcreate \-\-encryption=repokey\-aes\-ocb
+$ borg \-r /path/to/repo repo\-create \-\-encryption=repokey\-aes\-ocb
 .ft P
 .fi
 .UNINDENT
@@ -121,7 +121,7 @@ List all archives in the repository:
 .sp
 .nf
 .ft C
-$ borg \-r /path/to/repo rlist
+$ borg \-r /path/to/repo repo\-list
 Monday                               Sat, 2022\-06\-25 20:21:14 [b80e24d2...b179f298]
 Tuesday                              Sat, 2022\-06\-25 20:21:43 [bcd1b53f...1877718d]
 .ft P
@@ -571,10 +571,10 @@ Now you can init a fresh repo. Make sure you do not use the workaround any more.
 .INDENT 7.0
 .TP
 .B BORG_LIST_FORMAT
-Giving the default value for \fBborg list \-\-format=X\fP\&.
+Giving the default value for \fBborg repo\-list \-\-format=X\fP\&.
 .TP
 .B BORG_RLIST_FORMAT
-Giving the default value for \fBborg rlist \-\-format=X\fP\&.
+Giving the default value for \fBborg repo\-list \-\-format=X\fP\&.
 .TP
 .B BORG_PRUNE_FORMAT
 Giving the default value for \fBborg prune \-\-format=X\fP\&.
@@ -656,7 +656,7 @@ all directories in the given path must exist.
 .IP \(bu 2
 this setting forces borg to use the key file at the given location.
 .IP \(bu 2
-the key file must either exist (for most commands) or will be created (\fBborg rcreate\fP).
+the key file must either exist (for most commands) or will be created (\fBborg repo\-create\fP).
 .IP \(bu 2
 you need to give a different path for different repositories.
 .IP \(bu 2

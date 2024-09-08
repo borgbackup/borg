@@ -27,12 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RCOMPRESS" 1 "2024-09-08" "" "borg backup tool"
+.TH "BORG-REPO-COMPRESS" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
-borg-rcompress \- Repository (re-)compression
+borg-repo-compress \- Repository (re-)compression
 .SH SYNOPSIS
 .sp
-borg [common options] rcompress [options]
+borg [common options] repo\-compress [options]
 .SH DESCRIPTION
 .sp
 Repository (re\-)compression (and/or re\-obfuscation).
@@ -48,13 +48,13 @@ type/level \- if no compression gives a shorter output, that might be chosen.
 Please note that this command can not work in low (or zero) free disk space
 conditions.
 .sp
-If the \fBborg rcompress\fP process receives a SIGINT signal (Ctrl\-C), the repo
+If the \fBborg repo\-compress\fP process receives a SIGINT signal (Ctrl\-C), the repo
 will be committed and compacted and borg will terminate cleanly afterwards.
 .sp
-Both \fB\-\-progress\fP and \fB\-\-stats\fP are recommended when \fBborg rcompress\fP
+Both \fB\-\-progress\fP and \fB\-\-stats\fP are recommended when \fBborg repo\-compress\fP
 is used interactively.
 .sp
-You do \fBnot\fP need to run \fBborg compact\fP after \fBborg rcompress\fP\&.
+You do \fBnot\fP need to run \fBborg compact\fP after \fBborg repo\-compress\fP\&.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -74,10 +74,10 @@ print statistics
 .nf
 .ft C
 # recompress repo contents
-$ borg rcompress \-\-progress \-\-compression=zstd,3
+$ borg repo\-compress \-\-progress \-\-compression=zstd,3
 
 # recompress and obfuscate repo contents
-$ borg rcompress \-\-progress \-\-compression=obfuscate,1,zstd,3
+$ borg repo\-compress \-\-progress \-\-compression=obfuscate,1,zstd,3
 .ft P
 .fi
 .UNINDENT

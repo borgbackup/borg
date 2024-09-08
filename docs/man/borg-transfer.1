@@ -61,7 +61,7 @@ Transfer borg2 archives into a related other borg2 repository:
 .ft C
 # create a related DST_REPO (reusing key material from SRC_REPO), so that
 # chunking and chunk id generation will work in the same way as before.
-borg \-\-repo=DST_REPO rcreate \-\-encryption=DST_ENC \-\-other\-repo=SRC_REPO
+borg \-\-repo=DST_REPO repo\-create \-\-encryption=DST_ENC \-\-other\-repo=SRC_REPO
 
 # transfer archives from SRC_REPO to DST_REPO
 borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-dry\-run  # check what it would do
@@ -80,7 +80,7 @@ to the above, but you need the \fB\-\-from\-borg1\fP option:
 .sp
 .nf
 .ft C
-borg \-\-repo=DST_REPO rcreate \-\-encryption=DST_ENC \-\-other\-repo=SRC_REPO \-\-from\-borg1
+borg \-\-repo=DST_REPO repocreate \-\-encryption=DST_ENC \-\-other\-repo=SRC_REPO \-\-from\-borg1
 
 # to continue using lz4 compression as you did in SRC_REPO:
 borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-from\-borg1 \e
@@ -161,7 +161,7 @@ consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
 # the AEAD cipher does not matter (everything must be re\-encrypted and
 # re\-authenticated anyway), you could also choose repokey\-blake2\-chacha20\-poly1305.
 # in case your old borg repo did not use blake2, just remove the \(dq\-blake2\(dq.
-$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 rcreate \e
+$ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 repo\-create \e
        \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-e repokey\-blake2\-aes\-ocb
 
 # 2. Check what and how much it would transfer:

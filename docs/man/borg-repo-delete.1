@@ -27,12 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RDELETE" 1 "2024-09-08" "" "borg backup tool"
+.TH "BORG-REPO-DELETE" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
-borg-rdelete \- Delete a repository
+borg-repo-delete \- Delete a repository
 .SH SYNOPSIS
 .sp
-borg [common options] rdelete [options]
+borg [common options] repo\-delete [options]
 .SH DESCRIPTION
 .sp
 This command deletes the complete repository.
@@ -71,7 +71,7 @@ keep the local security info when deleting a repository
 .nf
 .ft C
 # delete the whole repository and the related local cache:
-$ borg rdelete
+$ borg repo\-delete
 You requested to DELETE the repository completely *including* all archives it contains:
 repo                                 Mon, 2016\-02\-15 19:26:54
 root\-2016\-02\-15                      Mon, 2016\-02\-15 19:36:29

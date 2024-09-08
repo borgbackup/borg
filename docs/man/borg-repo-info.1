@@ -27,12 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RINFO" 1 "2024-09-08" "" "borg backup tool"
+.TH "BORG-REPO-INFO" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
-borg-rinfo \- Show repository infos
+borg-repo-info \- Show repository infos
 .SH SYNOPSIS
 .sp
-borg [common options] rinfo [options]
+borg [common options] repo\-info [options]
 .SH DESCRIPTION
 .sp
 This command displays detailed information about the repository.
@@ -51,7 +51,7 @@ format output as JSON
 .sp
 .nf
 .ft C
-$ borg rinfo
+$ borg repo\-info
 Repository ID: 0e85a7811022326c067acb2a7181d5b526b7d2f61b34470fb8670c440a67f1a9
 Location: /Users/tw/w/borg/path/to/repo
 Encrypted: Yes (repokey AES\-OCB)

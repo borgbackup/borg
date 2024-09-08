@@ -16,7 +16,7 @@ logger = create_logger()
 
 class RepoDeleteMixIn:
     @with_repository(exclusive=True, manifest=False)
-    def do_rdelete(self, args, repository):
+    def do_repo_delete(self, args, repository):
         """Delete a repository"""
         self.output_list = args.output_list
         dry_run = args.dry_run
@@ -106,12 +106,12 @@ class RepoDeleteMixIn:
             "rdelete",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rdelete.__doc__,
+            description=self.do_repo_delete.__doc__,
             epilog=rdelete_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="delete repository",
         )
-        subparser.set_defaults(func=self.do_rdelete)
+        subparser.set_defaults(func=self.do_repo_delete)
         subparser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository")
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output verbose list of archives"

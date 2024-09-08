@@ -15,7 +15,7 @@ logger = create_logger()
 
 class RepoListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
-    def do_rlist(self, args, repository, manifest):
+    def do_repo_list(self, args, repository, manifest):
         """List the archives contained in a repository"""
         if args.format is not None:
             format = args.format
@@ -86,12 +86,12 @@ class RepoListMixIn:
             "rlist",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rlist.__doc__,
+            description=self.do_repo_list.__doc__,
             epilog=rlist_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="list repository contents",
         )
-        subparser.set_defaults(func=self.do_rlist)
+        subparser.set_defaults(func=self.do_repo_list)
         subparser.add_argument(
             "--short", dest="short", action="store_true", help="only print the archive names, nothing else"
         )

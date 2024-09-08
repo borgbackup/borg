@@ -13,7 +13,7 @@ logger = create_logger()
 
 class RepoSpaceMixIn:
     @with_repository(lock=False, manifest=False)
-    def do_rspace(self, args, repository):
+    def do_repo_space(self, args, repository):
         """Manage reserved space in repository"""
         # we work without locking here because locks don't work with full disk.
         if args.reserve_space > 0:
@@ -87,12 +87,12 @@ class RepoSpaceMixIn:
             "rspace",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rspace.__doc__,
+            description=self.do_repo_space.__doc__,
             epilog=rspace_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="manage reserved space in a repository",
         )
-        subparser.set_defaults(func=self.do_rspace)
+        subparser.set_defaults(func=self.do_repo_space)
         subparser.add_argument(
             "--reserve",
             metavar="SPACE",

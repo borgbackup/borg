@@ -13,7 +13,7 @@ logger = create_logger()
 
 class RepoInfoMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
-    def do_rinfo(self, args, repository, manifest, cache):
+    def do_repo_info(self, args, repository, manifest, cache):
         """Show repository infos"""
         key = manifest.key
         info = basic_json_data(manifest, cache=cache, extra={"security_dir": cache.security_manager.dir})
@@ -77,10 +77,10 @@ class RepoInfoMixIn:
             "rinfo",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rinfo.__doc__,
+            description=self.do_repo_info.__doc__,
             epilog=rinfo_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="show repository information",
         )
-        subparser.set_defaults(func=self.do_rinfo)
+        subparser.set_defaults(func=self.do_repo_info)
         subparser.add_argument("--json", action="store_true", help="format output as JSON")

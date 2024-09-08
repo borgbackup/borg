@@ -89,7 +89,7 @@ def format_compression_spec(ctype, clevel, olevel):
 
 class RepoCompressMixIn:
     @with_repository(cache=False, manifest=True, compatibility=(Manifest.Operation.CHECK,))
-    def do_rcompress(self, args, repository, manifest):
+    def do_repo_compress(self, args, repository, manifest):
         """Repository (re-)compression"""
 
         def get_csettings(c):
@@ -186,12 +186,12 @@ class RepoCompressMixIn:
             "rcompress",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rcompress.__doc__,
+            description=self.do_repo_compress.__doc__,
             epilog=rcompress_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help=self.do_rcompress.__doc__,
+            help=self.do_repo_compress.__doc__,
         )
-        subparser.set_defaults(func=self.do_rcompress)
+        subparser.set_defaults(func=self.do_repo_compress)
 
         subparser.add_argument(
             "-C",

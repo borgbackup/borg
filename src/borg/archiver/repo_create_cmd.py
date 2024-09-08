@@ -17,7 +17,7 @@ logger = create_logger()
 class RepoCreateMixIn:
     @with_repository(create=True, exclusive=True, manifest=False)
     @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
-    def do_rcreate(self, args, repository, *, other_repository=None, other_manifest=None):
+    def do_repo_create(self, args, repository, *, other_repository=None, other_manifest=None):
         """Create a new, empty repository"""
         if args.storage_quota is not None:
             raise CommandError("storage-quota is not supported (yet?)")
@@ -195,12 +195,12 @@ class RepoCreateMixIn:
             "rcreate",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rcreate.__doc__,
+            description=self.do_repo_create.__doc__,
             epilog=rcreate_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="create a new, empty repository",
         )
-        subparser.set_defaults(func=self.do_rcreate)
+        subparser.set_defaults(func=self.do_repo_create)
         subparser.add_argument(
             "--other-repo",
             metavar="SRC_REPOSITORY",

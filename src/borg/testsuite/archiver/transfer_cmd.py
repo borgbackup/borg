@@ -75,8 +75,8 @@ def test_transfer_upgrade(archivers, request):
     assert os.environ.get("BORG_PASSPHRASE") == "waytooeasyonlyfortests"
     os.environ["BORG_TESTONLY_WEAKEN_KDF"] = "0"  # must use the strong kdf here or it can't decrypt the key
 
-    cmd(archiver, "rcreate", RK_ENCRYPTION, other_repo1)
-    cmd(archiver, "transfer", other_repo1, "--upgrader=From12To20")
+    cmd(archiver, "rcreate", RK_ENCRYPTION, other_repo1, "--from-borg1")
+    cmd(archiver, "transfer", other_repo1, "--from-borg1")
     cmd(archiver, "check")
 
     # check list of archives / manifest

@@ -41,7 +41,7 @@ logger = create_logger()
 
 
 class CreateMixIn:
-    @with_repository(exclusive=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest):
         """Create new archive"""
         key = manifest.key
@@ -196,8 +196,7 @@ class CreateMixIn:
                 archive.stats.rx_bytes = getattr(repository, "rx_bytes", 0)
                 archive.stats.tx_bytes = getattr(repository, "tx_bytes", 0)
                 if sig_int:
-                    # do not save the archive if the user ctrl-c-ed - it is valid, but incomplete.
-                    # we already have a checkpoint archive in this case.
+                    # do not save the archive if the user ctrl-c-ed.
                     raise Error("Got Ctrl-C / SIGINT.")
                 else:
                     archive.save(comment=args.comment, timestamp=args.timestamp)
@@ -224,8 +223,6 @@ class CreateMixIn:
                 manifest,
                 progress=args.progress,
                 lock_wait=self.lock_wait,
-                no_cache_sync_permitted=args.no_cache_sync,
-                no_cache_sync_forced=args.no_cache_sync_forced,
                 prefer_adhoc_cache=args.prefer_adhoc_cache,
                 cache_mode=args.files_cache_mode,
                 iec=args.iec,
@@ -254,16 +251,7 @@ class CreateMixIn:
                     numeric_ids=args.numeric_ids,
                     nobirthtime=args.nobirthtime,
                 )
-                cp = ChunksProcessor(
-                    cache=cache,
-                    key=key,
-                    add_item=archive.add_item,
-                    prepare_checkpoint=archive.prepare_checkpoint,
-                    write_checkpoint=archive.write_checkpoint,
-                    checkpoint_interval=args.checkpoint_interval,
-                    checkpoint_volume=args.checkpoint_volume,
-                    rechunkify=False,
-                )
+                cp = ChunksProcessor(cache=cache, key=key, add_item=archive.add_item, rechunkify=False)
                 fso = FilesystemObjectProcessors(
                     metadata_collector=metadata_collector,
                     cache=cache,
@@ -587,9 +575,7 @@ class CreateMixIn:
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
 
-        The archive name needs to be unique. It must not end in '.checkpoint' or
-        '.checkpoint.N' (with N being a number), because these names are used for
-        checkpoints and treated in special ways.
+        The archive name needs to be unique.
 
         In the archive name, you may use the following placeholders:
         {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
@@ -800,18 +786,6 @@ class CreateMixIn:
         )
         subparser.add_argument("--json", action="store_true", help="output stats as JSON. Implies ``--stats``.")
         subparser.add_argument(
-            "--no-cache-sync",
-            dest="no_cache_sync",
-            action="store_true",
-            help="experimental: do not synchronize the chunks cache.",
-        )
-        subparser.add_argument(
-            "--no-cache-sync-forced",
-            dest="no_cache_sync_forced",
-            action="store_true",
-            help="experimental: do not synchronize the chunks cache (forced).",
-        )
-        subparser.add_argument(
             "--prefer-adhoc-cache",
             dest="prefer_adhoc_cache",
             action="store_true",
@@ -955,25 +929,6 @@ class CreateMixIn:
             action=Highlander,
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
             "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
-        )
-        archive_group.add_argument(
-            "-c",
-            "--checkpoint-interval",
-            metavar="SECONDS",
-            dest="checkpoint_interval",
-            type=int,
-            default=1800,
-            action=Highlander,
-            help="write checkpoint every SECONDS seconds (Default: 1800)",
-        )
-        archive_group.add_argument(
-            "--checkpoint-volume",
-            metavar="BYTES",
-            dest="checkpoint_volume",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
         )
         archive_group.add_argument(
             "--chunker-params",

@@ -35,18 +35,6 @@ of free space on the destination filesystem that has your backup repository
 (and also on ~/.cache). A few GB should suffice for most hard-drive sized
 repositories. See also :ref:`cache-memory-usage`.
 
-Borg doesn't use space reserved for root on repository disks (even when run as root).
-On file systems which do not support this mechanism (e.g. XFS) we recommend to reserve
-some space in Borg itself just to be safe by adjusting the ``additional_free_space``
-setting (a good starting point is ``2G``)::
-
-    borg config additional_free_space 2G
-
-If Borg runs out of disk space, it tries to free as much space as it
-can while aborting the current operation safely, which allows the user to free more space
-by deleting/pruning archives. This mechanism is not bullet-proof in some
-circumstances [1]_.
-
 If you do run out of disk space, it can be hard or impossible to free space,
 because Borg needs free space to operate - even to delete backup archives.
 
@@ -55,18 +43,13 @@ in your backup log files (you check them regularly anyway, right?).
 
 Also helpful:
 
-- create a big file as a "space reserve", that you can delete to free space
+- use `borg rspace` to reserve some disk space that can be freed when the fs
+  does not have free space any more.
 - if you use LVM: use a LV + a filesystem that you can resize later and have
   some unallocated PEs you can add to the LV.
 - consider using quotas
 - use `prune` and `compact` regularly
 
-.. [1] This failsafe can fail in these circumstances:
-
-    - The underlying file system doesn't support statvfs(2), or returns incorrect
-      data, or the repository doesn't reside on a single file system
-    - Other tasks fill the disk simultaneously
-    - Hard quotas (which may not be reflected in statvfs(2))
 
 Important note about permissions
 --------------------------------
@@ -270,7 +253,7 @@ A passphrase should be a single line of text. Any trailing linefeed will be
 stripped.
 
 Do not use empty passphrases, as these can be trivially guessed, which does not
-leave any encrypted data secure. 
+leave any encrypted data secure.
 
 Avoid passphrases containing non-ASCII characters.
 Borg can process any unicode text, but problems may arise at input due to text
@@ -420,6 +403,15 @@ You can also use other remote filesystems in a similar way. Just be careful,
 not all filesystems out there are really stable and working good enough to
 be acceptable for backup usage.
 
+Other kinds of repositories
+---------------------------
+
+Due to using the `borgstore` project, borg now also supports other kinds of
+(remote) repositories besides `file:` and `ssh:`:
+
+- sftp: the borg client will directly talk to an sftp server.
+  This does not require borg being installed on the sftp server.
+- Others may come in the future, adding backends to `borgstore` is rather simple.
 
 Restoring a backup
 ------------------

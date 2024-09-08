@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RCREATE" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-RCREATE" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
 borg-rcreate \- Create a new, empty repository
 .SH SYNOPSIS
@@ -35,8 +35,8 @@ borg-rcreate \- Create a new, empty repository
 borg [common options] rcreate [options]
 .SH DESCRIPTION
 .sp
-This command creates a new, empty repository. A repository is a filesystem
-directory containing the deduplicated data from zero or more archives.
+This command creates a new, empty repository. A repository is a \fBborgstore\fP store
+containing the deduplicated data from zero or more archives.
 .SS Encryption mode TLDR
 .sp
 The encryption mode can only be configured when creating a new repository \- you can
@@ -226,6 +226,12 @@ Optionally, if you use \fB\-\-copy\-crypt\-key\fP you can also keep the same cry
 keys to manage.
 .sp
 Creating related repositories is useful e.g. if you want to use \fBborg transfer\fP later.
+.SS Creating a related repository for data migration from borg 1.2 or 1.4
+.sp
+You can use \fBborg rcreate \-\-other\-repo ORIG_REPO \-\-from\-borg1 ...\fP to create a related
+repository that uses the same secret key material as the given other/original repository.
+.sp
+Then use \fBborg transfer \-\-other\-repo ORIG_REPO \-\-from\-borg1 ...\fP to transfer the archives.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -234,6 +240,9 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .TP
 .BI \-\-other\-repo \ SRC_REPOSITORY
 reuse the key material from the other repository
+.TP
+.B  \-\-from\-borg1
+other repository is borg 1.x
 .TP
 .BI \-e \ MODE\fR,\fB \ \-\-encryption \ MODE
 select encryption key mode \fB(required)\fP

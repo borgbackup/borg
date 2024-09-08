@@ -7,7 +7,7 @@ import pytest
 
 from ... import xattr, platform
 from ...constants import *  # NOQA
-from ...locking import Lock
+from ...storelocking import Lock
 from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, llfuse
 from .. import changedir, no_selinux, same_ts_ns
@@ -32,16 +32,18 @@ def test_fuse_mount_hardlinks(archivers, request):
         ignore_perms = ["-o", "ignore_permissions,defer_permissions"]
     else:
         ignore_perms = ["-o", "ignore_permissions"]
-    with fuse_mount(archiver, mountpoint, "-a", "test", "--strip-components=2", *ignore_perms), changedir(
-        os.path.join(mountpoint, "test")
+    with (
+        fuse_mount(archiver, mountpoint, "-a", "test", "--strip-components=2", *ignore_perms),
+        changedir(os.path.join(mountpoint, "test")),
     ):
         assert os.stat("hardlink").st_nlink == 2
         assert os.stat("subdir/hardlink").st_nlink == 2
         assert open("subdir/hardlink", "rb").read() == b"123456"
         assert os.stat("aaaa").st_nlink == 2
         assert os.stat("source2").st_nlink == 2
-    with fuse_mount(archiver, mountpoint, "input/dir1", "-a", "test", *ignore_perms), changedir(
-        os.path.join(mountpoint, "test")
+    with (
+        fuse_mount(archiver, mountpoint, "input/dir1", "-a", "test", *ignore_perms),
+        changedir(os.path.join(mountpoint, "test")),
     ):
         assert os.stat("input/dir1/hardlink").st_nlink == 2
         assert os.stat("input/dir1/subdir/hardlink").st_nlink == 2
@@ -213,7 +215,6 @@ def test_fuse_allow_damaged_files(archivers, request):
                 break
         else:
             assert False  # missed the file
-        repository.commit(compact=False)
     cmd(archiver, "check", "--repair", exit_code=0)
 
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")

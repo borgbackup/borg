@@ -45,7 +45,7 @@ def test_debug_dump_repo_objs(archivers, request):
     with changedir("output"):
         output = cmd(archiver, "debug", "dump-repo-objs")
     output_dir = sorted(os.listdir("output"))
-    assert len(output_dir) > 0 and output_dir[0].startswith("00000000_")
+    assert len(output_dir) > 0
     assert "Done." in output
 
 
@@ -156,28 +156,6 @@ def test_debug_dump_archive(archivers, request):
     assert "_manifest_entry" in result
     assert "_meta" in result
     assert "_items" in result
-
-
-def test_debug_refcount_obj(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    output = cmd(archiver, "debug", "refcount-obj", "0" * 64).strip()
-    info = "object 0000000000000000000000000000000000000000000000000000000000000000 not found [info from chunks cache]."
-    assert output == info
-
-    create_json = json.loads(cmd(archiver, "create", "--json", "test", "input"))
-    archive_id = create_json["archive"]["id"]
-    output = cmd(archiver, "debug", "refcount-obj", archive_id).strip()
-    # LocalCache does precise refcounting, so we'll get 1 reference for the archive.
-    # AdHocCache or AdHocWithFilesCache doesn't, we'll get ChunkIndex.MAX_VALUE as refcount.
-    assert (
-        output == f"object {archive_id} has 1 referrers [info from chunks cache]."
-        or output == f"object {archive_id} has 4294966271 referrers [info from chunks cache]."
-    )
-
-    # Invalid IDs do not abort or return an error
-    output = cmd(archiver, "debug", "refcount-obj", "124", "xyza").strip()
-    assert output == f"object id 124 is invalid.{os.linesep}object id xyza is invalid."
 
 
 def test_debug_info(archivers, request):

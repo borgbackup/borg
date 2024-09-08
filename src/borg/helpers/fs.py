@@ -416,7 +416,7 @@ def safe_unlink(path):
     Use this when deleting potentially large files when recovering
     from a VFS error such as ENOSPC. It can help a full file system
     recover. Refer to the "File system interaction" section
-    in repository.py for further explanations.
+    in legacyrepository.py for further explanations.
     """
     try:
         os.unlink(path)

@@ -2,7 +2,7 @@ import argparse
 
 from ._common import Highlander
 from ..constants import *  # NOQA
-from ..helpers import parse_storage_quota
+from ..helpers import parse_storage_quota, CommandError
 from ..remote import RepositoryServer
 
 from ..logger import create_logger
@@ -13,6 +13,10 @@ logger = create_logger()
 class ServeMixIn:
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually."""
+        if args.append_only:
+            raise CommandError("append-only is not supported (yet?)")
+        if args.storage_quota is not None:
+            raise CommandError("storage-quota is not supported (yet?)")
         RepositoryServer(
             restrict_to_paths=args.restrict_to_paths,
             restrict_to_repositories=args.restrict_to_repositories,

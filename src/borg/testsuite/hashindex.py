@@ -86,7 +86,7 @@ class HashIndexTestCase(BaseTestCase):
 
     def test_nsindex(self):
         self._generic_test(
-            NSIndex, lambda x: (x, x, x), "0d7880dbe02b64f03c471e60e193a1333879b4f23105768b10c9222accfeac5e"
+            NSIndex, lambda x: (x, x, x), "640b909cf07884cc11fdf5431ffc27dee399770ceadecce31dffecd130a311a3"
         )
 
     def test_chunkindex(self):
@@ -102,7 +102,7 @@ class HashIndexTestCase(BaseTestCase):
             initial_size = os.path.getsize(filepath)
             self.assert_equal(len(idx), 0)
             for x in range(n):
-                idx[H(x)] = x, x, x, x
+                idx[H(x)] = x, x, x
             idx.write(filepath)
             assert initial_size < os.path.getsize(filepath)
             for x in range(n):
@@ -114,7 +114,7 @@ class HashIndexTestCase(BaseTestCase):
     def test_iteritems(self):
         idx = NSIndex()
         for x in range(100):
-            idx[H(x)] = x, x, x, x
+            idx[H(x)] = x, x, x
         iterator = idx.iteritems()
         all = list(iterator)
         self.assert_equal(len(all), 100)
@@ -123,99 +123,6 @@ class HashIndexTestCase(BaseTestCase):
         second_half = list(idx.iteritems(marker=all[49][0]))
         self.assert_equal(len(second_half), 50)
         self.assert_equal(second_half, all[50:])
-
-    def test_chunkindex_merge(self):
-        idx1 = ChunkIndex()
-        idx1[H(1)] = 1, 100
-        idx1[H(2)] = 2, 200
-        idx1[H(3)] = 3, 300
-        # no H(4) entry
-        idx2 = ChunkIndex()
-        idx2[H(1)] = 4, 100
-        idx2[H(2)] = 5, 200
-        # no H(3) entry
-        idx2[H(4)] = 6, 400
-        idx1.merge(idx2)
-        assert idx1[H(1)] == (5, 100)
-        assert idx1[H(2)] == (7, 200)
-        assert idx1[H(3)] == (3, 300)
-        assert idx1[H(4)] == (6, 400)
-
-    def test_chunkindex_summarize(self):
-        idx = ChunkIndex()
-        idx[H(1)] = 1, 1000
-        idx[H(2)] = 2, 2000
-        idx[H(3)] = 3, 3000
-
-        size, unique_size, unique_chunks, chunks = idx.summarize()
-        assert size == 1000 + 2 * 2000 + 3 * 3000
-        assert unique_size == 1000 + 2000 + 3000
-        assert chunks == 1 + 2 + 3
-        assert unique_chunks == 3
-
-    def test_flags(self):
-        idx = NSIndex()
-        key = H(0)
-        self.assert_raises(KeyError, idx.flags, key, 0)
-        idx[key] = 0, 0, 0  # create entry
-        # check bit 0 and 1, should be both 0 after entry creation
-        self.assert_equal(idx.flags(key, mask=3), 0)
-        # set bit 0
-        idx.flags(key, mask=1, value=1)
-        self.assert_equal(idx.flags(key, mask=1), 1)
-        # set bit 1
-        idx.flags(key, mask=2, value=2)
-        self.assert_equal(idx.flags(key, mask=2), 2)
-        # check both bit 0 and 1, both should be set
-        self.assert_equal(idx.flags(key, mask=3), 3)
-        # clear bit 1
-        idx.flags(key, mask=2, value=0)
-        self.assert_equal(idx.flags(key, mask=2), 0)
-        # clear bit 0
-        idx.flags(key, mask=1, value=0)
-        self.assert_equal(idx.flags(key, mask=1), 0)
-        # check both bit 0 and 1, both should be cleared
-        self.assert_equal(idx.flags(key, mask=3), 0)
-
-    def test_flags_iteritems(self):
-        idx = NSIndex()
-        keys_flagged0 = {H(i) for i in (1, 2, 3, 42)}
-        keys_flagged1 = {H(i) for i in (11, 12, 13, 142)}
-        keys_flagged2 = {H(i) for i in (21, 22, 23, 242)}
-        keys_flagged3 = {H(i) for i in (31, 32, 33, 342)}
-        for key in keys_flagged0:
-            idx[key] = 0, 0, 0  # create entry
-            idx.flags(key, mask=3, value=0)  # not really necessary, unflagged is default
-        for key in keys_flagged1:
-            idx[key] = 0, 0, 0  # create entry
-            idx.flags(key, mask=3, value=1)
-        for key in keys_flagged2:
-            idx[key] = 0, 0, 0  # create entry
-            idx.flags(key, mask=3, value=2)
-        for key in keys_flagged3:
-            idx[key] = 0, 0, 0  # create entry
-            idx.flags(key, mask=3, value=3)
-        # check if we can iterate over all items
-        k_all = {k for k, v in idx.iteritems()}
-        self.assert_equal(k_all, keys_flagged0 | keys_flagged1 | keys_flagged2 | keys_flagged3)
-        # check if we can iterate over the flagged0 items
-        k0 = {k for k, v in idx.iteritems(mask=3, value=0)}
-        self.assert_equal(k0, keys_flagged0)
-        # check if we can iterate over the flagged1 items
-        k1 = {k for k, v in idx.iteritems(mask=3, value=1)}
-        self.assert_equal(k1, keys_flagged1)
-        # check if we can iterate over the flagged2 items
-        k1 = {k for k, v in idx.iteritems(mask=3, value=2)}
-        self.assert_equal(k1, keys_flagged2)
-        # check if we can iterate over the flagged3 items
-        k1 = {k for k, v in idx.iteritems(mask=3, value=3)}
-        self.assert_equal(k1, keys_flagged3)
-        # check if we can iterate over the flagged1 + flagged3 items
-        k1 = {k for k, v in idx.iteritems(mask=1, value=1)}
-        self.assert_equal(k1, keys_flagged1 | keys_flagged3)
-        # check if we can iterate over the flagged0 + flagged2 items
-        k1 = {k for k, v in idx.iteritems(mask=1, value=0)}
-        self.assert_equal(k1, keys_flagged0 | keys_flagged2)
 
 
 class HashIndexExtraTestCase(BaseTestCase):
@@ -265,90 +172,12 @@ class HashIndexSizeTestCase(BaseTestCase):
 
 
 class HashIndexRefcountingTestCase(BaseTestCase):
-    def test_chunkindex_limit(self):
-        idx = ChunkIndex()
-        idx[H(1)] = ChunkIndex.MAX_VALUE - 1, 1
-
-        # 5 is arbitrary, any number of incref/decrefs shouldn't move it once it's limited
-        for i in range(5):
-            # first incref to move it to the limit
-            refcount, *_ = idx.incref(H(1))
-            assert refcount == ChunkIndex.MAX_VALUE
-        for i in range(5):
-            refcount, *_ = idx.decref(H(1))
-            assert refcount == ChunkIndex.MAX_VALUE
-
-    def _merge(self, refcounta, refcountb):
-        def merge(refcount1, refcount2):
-            idx1 = ChunkIndex()
-            idx1[H(1)] = refcount1, 1
-            idx2 = ChunkIndex()
-            idx2[H(1)] = refcount2, 1
-            idx1.merge(idx2)
-            refcount, *_ = idx1[H(1)]
-            return refcount
-
-        result = merge(refcounta, refcountb)
-        # check for commutativity
-        assert result == merge(refcountb, refcounta)
-        return result
-
-    def test_chunkindex_merge_limit1(self):
-        # Check that it does *not* limit at MAX_VALUE - 1
-        # (MAX_VALUE is odd)
-        half = ChunkIndex.MAX_VALUE // 2
-        assert self._merge(half, half) == ChunkIndex.MAX_VALUE - 1
-
-    def test_chunkindex_merge_limit2(self):
-        # 3000000000 + 2000000000 > MAX_VALUE
-        assert self._merge(3000000000, 2000000000) == ChunkIndex.MAX_VALUE
-
-    def test_chunkindex_merge_limit3(self):
-        # Crossover point: both addition and limit semantics will yield the same result
-        half = ChunkIndex.MAX_VALUE // 2
-        assert self._merge(half + 1, half) == ChunkIndex.MAX_VALUE
-
-    def test_chunkindex_merge_limit4(self):
-        # Beyond crossover, result of addition would be 2**31
-        half = ChunkIndex.MAX_VALUE // 2
-        assert self._merge(half + 2, half) == ChunkIndex.MAX_VALUE
-        assert self._merge(half + 1, half + 1) == ChunkIndex.MAX_VALUE
-
     def test_chunkindex_add(self):
         idx1 = ChunkIndex()
         idx1.add(H(1), 5, 6)
         assert idx1[H(1)] == (5, 6)
         idx1.add(H(1), 1, 2)
         assert idx1[H(1)] == (6, 2)
-
-    def test_incref_limit(self):
-        idx1 = ChunkIndex()
-        idx1[H(1)] = ChunkIndex.MAX_VALUE, 6
-        idx1.incref(H(1))
-        refcount, *_ = idx1[H(1)]
-        assert refcount == ChunkIndex.MAX_VALUE
-
-    def test_decref_limit(self):
-        idx1 = ChunkIndex()
-        idx1[H(1)] = ChunkIndex.MAX_VALUE, 6
-        idx1.decref(H(1))
-        refcount, *_ = idx1[H(1)]
-        assert refcount == ChunkIndex.MAX_VALUE
-
-    def test_decref_zero(self):
-        idx1 = ChunkIndex()
-        idx1[H(1)] = 0, 0
-        with self.assert_raises(AssertionError):
-            idx1.decref(H(1))
-
-    def test_incref_decref(self):
-        idx1 = ChunkIndex()
-        idx1.add(H(1), 5, 6)
-        assert idx1[H(1)] == (5, 6)
-        idx1.incref(H(1))
-        assert idx1[H(1)] == (6, 6)
-        idx1.decref(H(1))
-        assert idx1[H(1)] == (5, 6)
 
     def test_setitem_raises(self):
         idx1 = ChunkIndex()
@@ -357,10 +186,6 @@ class HashIndexRefcountingTestCase(BaseTestCase):
 
     def test_keyerror(self):
         idx = ChunkIndex()
-        with self.assert_raises(KeyError):
-            idx.incref(H(1))
-        with self.assert_raises(KeyError):
-            idx.decref(H(1))
         with self.assert_raises(KeyError):
             idx[H(1)]
         with self.assert_raises(OverflowError):
@@ -404,17 +229,6 @@ class HashIndexDataTestCase(BaseTestCase):
 
         serialized = self._serialize_hashindex(idx1)
         assert self._unpack(serialized) == self._unpack(self.HASHINDEX)
-
-    def test_read_known_good(self):
-        idx1 = self._deserialize_hashindex(self.HASHINDEX)
-        assert idx1[H(1)] == (1, 2)
-        assert idx1[H(2)] == (2**31 - 1, 0)
-        assert idx1[H(3)] == (4294962296, 0)
-
-        idx2 = ChunkIndex()
-        idx2[H(3)] = 2**32 - 123456, 6
-        idx1.merge(idx2)
-        assert idx1[H(3)] == (ChunkIndex.MAX_VALUE, 6)
 
 
 class HashIndexIntegrityTestCase(HashIndexDataTestCase):
@@ -549,25 +363,14 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
         self.compare_compact("ED****")
         self.compare_compact("D*****")
 
-    def test_merge(self):
-        master = ChunkIndex()
-        idx1 = ChunkIndex()
-        idx1[H(1)] = 1, 100
-        idx1[H(2)] = 2, 200
-        idx1[H(3)] = 3, 300
-        idx1.compact()
-        assert idx1.size() == 1024 + 3 * (32 + 2 * 4)
-        master.merge(idx1)
-        self.compare_indexes(idx1, master)
-
 
 class NSIndexTestCase(BaseTestCase):
     def test_nsindex_segment_limit(self):
         idx = NSIndex()
         with self.assert_raises(AssertionError):
-            idx[H(1)] = NSIndex.MAX_VALUE + 1, 0, 0, 0
+            idx[H(1)] = NSIndex.MAX_VALUE + 1, 0, 0
         assert H(1) not in idx
-        idx[H(2)] = NSIndex.MAX_VALUE, 0, 0, 0
+        idx[H(2)] = NSIndex.MAX_VALUE, 0, 0
         assert H(2) in idx
 
 
@@ -595,7 +398,7 @@ class IndexCorruptionTestCase(BaseTestCase):
         for y in range(700):  # stay below max load not to trigger resize
             idx[HH(0, y, 0)] = (0, y, 0)
 
-        assert idx.size() == 1024 + 1031 * 48  # header + 1031 buckets
+        assert idx.size() == 1024 + 1031 * 44  # header + 1031 buckets
 
         # delete lots of the collisions, creating lots of tombstones
         for y in range(400):  # stay above min load not to trigger resize

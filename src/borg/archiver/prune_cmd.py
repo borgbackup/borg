@@ -4,13 +4,12 @@ from datetime import datetime, timezone, timedelta
 import logging
 from operator import attrgetter
 import os
-import re
 
 from ._common import with_repository, Highlander
-from ..archive import Archive, Statistics
+from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import ArchiveFormatter, interval, sig_int, log_multi, ProgressIndicatorPercent, CommandError, Error
+from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -71,7 +70,7 @@ def prune_split(archives, rule, n, kept_because=None):
 
 
 class PruneMixIn:
-    @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
+    @with_repository(compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest):
         """Prune repository archives according to specified rules"""
         if not any(
@@ -91,25 +90,7 @@ class PruneMixIn:
             format = os.environ.get("BORG_PRUNE_FORMAT", "{archive:<36} {time} [{id}]")
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
-        checkpoint_re = r"\.checkpoint(\.\d+)?"
-        archives_checkpoints = manifest.archives.list(
-            match=args.match_archives,
-            consider_checkpoints=True,
-            match_end=r"(%s)?\Z" % checkpoint_re,
-            sort_by=["ts"],
-            reverse=True,
-        )
-        is_checkpoint = re.compile(r"(%s)\Z" % checkpoint_re).search
-        checkpoints = [arch for arch in archives_checkpoints if is_checkpoint(arch.name)]
-        # keep the latest checkpoint, if there is no later non-checkpoint archive
-        if archives_checkpoints and checkpoints and archives_checkpoints[0] is checkpoints[0]:
-            keep_checkpoints = checkpoints[:1]
-        else:
-            keep_checkpoints = []
-        checkpoints = set(checkpoints)
-        # ignore all checkpoint archives to avoid keeping one (which is an incomplete backup)
-        # that is newer than a successfully completed backup - and killing the successful backup.
-        archives = [arch for arch in archives_checkpoints if arch not in checkpoints]
+        archives = manifest.archives.list(match=args.match_archives, sort_by=["ts"], reverse=True)
         keep = []
         # collect the rule responsible for the keeping of each archive in this dict
         # keys are archive ids, values are a tuple
@@ -126,22 +107,15 @@ class PruneMixIn:
             if num is not None:
                 keep += prune_split(archives, rule, num, kept_because)
 
-        to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
-        stats = Statistics(iec=args.iec)
+        to_delete = set(archives) - set(keep)
         with Cache(repository, manifest, lock_wait=self.lock_wait, iec=args.iec) as cache:
-
-            def checkpoint_func():
-                manifest.write()
-                repository.commit(compact=False)
-                cache.commit()
-
             list_logger = logging.getLogger("borg.output.list")
             # set up counters for the progress display
             to_delete_len = len(to_delete)
             archives_deleted = 0
             uncommitted_deletes = 0
             pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
-            for archive in archives_checkpoints:
+            for archive in archives:
                 if sig_int and sig_int.action_done():
                     break
                 if archive in to_delete:
@@ -152,18 +126,12 @@ class PruneMixIn:
                         archives_deleted += 1
                         log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
                         archive = Archive(manifest, archive.name, cache)
-                        archive.delete(stats, forced=args.forced)
-                        checkpointed = self.maybe_checkpoint(
-                            checkpoint_func=checkpoint_func, checkpoint_interval=args.checkpoint_interval
-                        )
-                        uncommitted_deletes = 0 if checkpointed else (uncommitted_deletes + 1)
+                        archive.delete()
+                        uncommitted_deletes += 1
                 else:
-                    if is_checkpoint(archive.name):
-                        log_message = "Keeping checkpoint archive:"
-                    else:
-                        log_message = "Keeping archive (rule: {rule} #{num}):".format(
-                            rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
-                        )
+                    log_message = "Keeping archive (rule: {rule} #{num}):".format(
+                        rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
+                    )
                 if (
                     args.output_list
                     or (args.list_pruned and archive in to_delete)
@@ -172,12 +140,9 @@ class PruneMixIn:
                     list_logger.info(f"{log_message:<44} {formatter.format_item(archive, jsonline=False)}")
             pi.finish()
             if sig_int:
-                # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
                 raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
-                checkpoint_func()
-            if args.stats:
-                log_multi(str(stats), logger=logging.getLogger("borg.output.stats"))
+                manifest.write()
 
     def build_parser_prune(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -194,11 +159,6 @@ class PruneMixIn:
         certain number of historic backups. This retention policy is commonly referred to as
         `GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>`_
         (Grandfather-father-son) backup rotation scheme.
-
-        Also, prune automatically removes checkpoint archives (incomplete archives left
-        behind by interrupted backup runs) except if the checkpoint is the latest
-        archive (and thus still needed). Checkpoint archives are not considered when
-        comparing archive counts against the retention limits (``--keep-X``).
 
         If you use --match-archives (-a), then only archives that match the pattern are
         considered for deletion and only those archives count towards the totals
@@ -235,11 +195,6 @@ class PruneMixIn:
         keep the last N archives under the assumption that you do not create more than one
         backup archive in the same second).
 
-        When using ``--stats``, you will get some statistics about how much data was
-        deleted - the "Deleted data" deduplicated size there is most interesting as
-        that is how much your repository will shrink.
-        Please note that the "All archives" stats refer to the state after pruning.
-
         You can influence how the ``--list`` output is formatted by using the ``--short``
         option (less wide output) or by giving a custom format using ``--format`` (see
         the ``borg rlist`` description for more details about the format string).
@@ -256,15 +211,6 @@ class PruneMixIn:
         )
         subparser.set_defaults(func=self.do_prune)
         subparser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository")
-        subparser.add_argument(
-            "--force",
-            dest="forced",
-            action="store_true",
-            help="force pruning of corrupted archives, " "use ``--force --force`` in case ``--force`` does not work.",
-        )
-        subparser.add_argument(
-            "-s", "--stats", dest="stats", action="store_true", help="print statistics for the deleted archive"
-        )
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output verbose list of archives it keeps/prunes"
         )
@@ -353,13 +299,3 @@ class PruneMixIn:
             help="number of yearly archives to keep",
         )
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
-        subparser.add_argument(
-            "-c",
-            "--checkpoint-interval",
-            metavar="SECONDS",
-            dest="checkpoint_interval",
-            type=int,
-            default=1800,
-            action=Highlander,
-            help="write checkpoint every SECONDS seconds (Default: 1800)",
-        )

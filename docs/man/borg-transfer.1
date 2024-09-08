@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-TRANSFER" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-TRANSFER" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
 borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
@@ -46,7 +46,14 @@ any case) and keep data compressed \(dqas is\(dq (saves time as no data compress
 If you want to globally change compression while transferring archives to the DST_REPO,
 give \fB\-\-compress=WANTED_COMPRESSION \-\-recompress=always\fP\&.
 .sp
-Suggested use for general purpose archive transfer (not repo upgrades):
+The default is to transfer all archives.
+.sp
+You could use the misc. archive filter options to limit which archives it will
+transfer, e.g. using the \fB\-a\fP option. This is recommended for big
+repositories with multiple data sets to keep the runtime per invocation lower.
+.SS General purpose archive transfer
+.sp
+Transfer borg2 archives into a related other borg2 repository:
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -54,7 +61,7 @@ Suggested use for general purpose archive transfer (not repo upgrades):
 .ft C
 # create a related DST_REPO (reusing key material from SRC_REPO), so that
 # chunking and chunk id generation will work in the same way as before.
-borg \-\-repo=DST_REPO rcreate \-\-other\-repo=SRC_REPO \-\-encryption=DST_ENC
+borg \-\-repo=DST_REPO rcreate \-\-encryption=DST_ENC \-\-other\-repo=SRC_REPO
 
 # transfer archives from SRC_REPO to DST_REPO
 borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-dry\-run  # check what it would do
@@ -64,26 +71,23 @@ borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-dry\-run  # check! 
 .fi
 .UNINDENT
 .UNINDENT
+.SS Data migration / upgrade from borg 1.x
 .sp
-The default is to transfer all archives, including checkpoint archives.
-.sp
-You could use the misc. archive filter options to limit which archives it will
-transfer, e.g. using the \fB\-a\fP option. This is recommended for big
-repositories with multiple data sets to keep the runtime per invocation lower.
-.sp
-For repository upgrades (e.g. from a borg 1.2 repo to a related borg 2.0 repo), usage is
-quite similar to the above:
+To migrate your borg 1.x archives into a related, new borg2 repository, usage is quite similar
+to the above, but you need the \fB\-\-from\-borg1\fP option:
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-# fast: compress metadata with zstd,3, but keep data chunks compressed as they are:
-borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-upgrader=From12To20 \e
-     \-\-compress=zstd,3 \-\-recompress=never
+borg \-\-repo=DST_REPO rcreate \-\-encryption=DST_ENC \-\-other\-repo=SRC_REPO \-\-from\-borg1
 
-# compress metadata and recompress data with zstd,3
-borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-upgrader=From12To20 \e
+# to continue using lz4 compression as you did in SRC_REPO:
+borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-from\-borg1 \e
+     \-\-compress=lz4 \-\-recompress=never
+
+# alternatively, to recompress everything to zstd,3:
+borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-from\-borg1 \e
      \-\-compress=zstd,3 \-\-recompress=always
 .ft P
 .fi
@@ -100,6 +104,9 @@ do not change repository, just check
 .TP
 .BI \-\-other\-repo \ SRC_REPOSITORY
 transfer archives from the other repository
+.TP
+.B  \-\-from\-borg1
+other repository is borg 1.x
 .TP
 .BI \-\-upgrader \ UPGRADER
 use the upgrader to convert transferred data (default: no conversion)

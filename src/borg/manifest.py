@@ -1,9 +1,11 @@
 import enum
 import re
-from collections import abc, namedtuple
+from collections import namedtuple
 from datetime import datetime, timedelta, timezone
 from operator import attrgetter
 from collections.abc import Sequence
+
+from borgstore.store import ObjectNotFound, ItemInfo
 
 from .logger import create_logger
 
@@ -11,7 +13,7 @@ logger = create_logger()
 
 from .constants import *  # NOQA
 from .helpers.datastruct import StableDict
-from .helpers.parseformat import bin_to_hex
+from .helpers.parseformat import bin_to_hex, hex_to_bin
 from .helpers.time import parse_timestamp, calculate_relative_offset, archive_ts_now
 from .helpers.errors import Error
 from .patterns import get_regex_from_pattern
@@ -66,49 +68,169 @@ def filter_archives_by_date(archives, older=None, newer=None, oldest=None, newes
     return archives
 
 
-class Archives(abc.MutableMapping):
+class Archives:
     """
-    Nice wrapper around the archives dict, making sure only valid types/values get in
-    and we can deal with str keys (and it internally encodes to byte keys) and either
-    str timestamps or datetime timestamps.
+    Manage the list of archives.
+
+    We still need to support the borg 1.x manifest-with-list-of-archives,
+    so borg transfer can work.
+    borg2 has separate items archives/* in the borgstore.
     """
 
-    def __init__(self):
+    def __init__(self, repository, manifest):
+        from .repository import Repository
+        from .remote import RemoteRepository
+
+        self.repository = repository
+        self.legacy = not isinstance(repository, (Repository, RemoteRepository))
         # key: str archive name, value: dict('id': bytes_id, 'time': str_iso_ts)
         self._archives = {}
+        self.manifest = manifest
 
-    def __len__(self):
-        return len(self._archives)
+    def prepare(self, manifest, m):
+        if not self.legacy:
+            pass
+        else:
+            self._set_raw_dict(m.archives)
 
-    def __iter__(self):
-        return iter(self._archives)
+    def finish(self, manifest):
+        if not self.legacy:
+            manifest_archives = {}
+        else:
+            manifest_archives = StableDict(self._get_raw_dict())
+        return manifest_archives
 
-    def __getitem__(self, name):
+    def count(self):
+        # return the count of archives in the repo
+        if not self.legacy:
+            try:
+                infos = list(self.repository.store_list("archives"))
+            except ObjectNotFound:
+                infos = []
+            return len(infos)  # we do not check here if entries are valid
+        else:
+            return len(self._archives)
+
+    def exists(self, name):
+        # check if an archive with this name exists
         assert isinstance(name, str)
-        values = self._archives.get(name)
-        if values is None:
-            raise KeyError
-        ts = parse_timestamp(values["time"])
-        return ArchiveInfo(name=name, id=values["id"], ts=ts)
+        if not self.legacy:
+            return name in self.names()
+        else:
+            return name in self._archives
 
-    def __setitem__(self, name, info):
+    def exists_name_and_id(self, name, id):
+        # check if an archive with this name AND id exists
         assert isinstance(name, str)
-        assert isinstance(info, tuple)
-        id, ts = info
+        assert isinstance(id, bytes)
+        if not self.legacy:
+            for _, archive_info in self._infos():
+                if archive_info["name"] == name and archive_info["id"] == id:
+                    return True
+            else:
+                return False
+        else:
+            raise NotImplementedError
+
+    def _infos(self):
+        # yield the infos of all archives: (store_key, archive_info)
+        from .helpers import msgpack
+
+        if not self.legacy:
+            try:
+                infos = list(self.repository.store_list("archives"))
+            except ObjectNotFound:
+                infos = []
+            for info in infos:
+                info = ItemInfo(*info)  # RPC does not give us a NamedTuple
+                value = self.repository.store_load(f"archives/{info.name}")
+                _, value = self.manifest.repo_objs.parse(hex_to_bin(info.name), value, ro_type=ROBJ_MANIFEST)
+                archive_info = msgpack.unpackb(value)
+                yield info.name, archive_info
+        else:
+            for name in self._archives:
+                archive_info = dict(name=name, id=self._archives[name]["id"], time=self._archives[name]["time"])
+                yield None, archive_info
+
+    def _lookup_name(self, name, raw=False):
+        assert isinstance(name, str)
+        assert not self.legacy
+        for store_key, archive_info in self._infos():
+            if archive_info["name"] == name:
+                if not raw:
+                    ts = parse_timestamp(archive_info["time"])
+                    return store_key, ArchiveInfo(name=name, id=archive_info["id"], ts=ts)
+                else:
+                    return store_key, archive_info
+        else:
+            raise KeyError(name)
+
+    def names(self):
+        # yield the names of all archives
+        if not self.legacy:
+            for _, archive_info in self._infos():
+                yield archive_info["name"]
+        else:
+            yield from self._archives
+
+    def get(self, name, raw=False):
+        assert isinstance(name, str)
+        if not self.legacy:
+            try:
+                store_key, archive_info = self._lookup_name(name, raw=raw)
+                return archive_info
+            except KeyError:
+                return None
+        else:
+            values = self._archives.get(name)
+            if values is None:
+                return None
+            if not raw:
+                ts = parse_timestamp(values["time"])
+                return ArchiveInfo(name=name, id=values["id"], ts=ts)
+            else:
+                return dict(name=name, id=values["id"], time=values["time"])
+
+    def create(self, name, id, ts, *, overwrite=False):
+        assert isinstance(name, str)
         assert isinstance(id, bytes)
         if isinstance(ts, datetime):
             ts = ts.isoformat(timespec="microseconds")
         assert isinstance(ts, str)
-        self._archives[name] = {"id": id, "time": ts}
+        if not self.legacy:
+            try:
+                store_key, _ = self._lookup_name(name)
+            except KeyError:
+                pass
+            else:
+                # looks like we already have an archive list entry with that name
+                if not overwrite:
+                    raise KeyError("archive already exists")
+                else:
+                    self.repository.store_delete(f"archives/{store_key}")
+            archive = dict(name=name, id=id, time=ts)
+            value = self.manifest.key.pack_metadata(archive)
+            id = self.manifest.repo_objs.id_hash(value)
+            key = bin_to_hex(id)
+            value = self.manifest.repo_objs.format(id, {}, value, ro_type=ROBJ_MANIFEST)
+            self.repository.store_store(f"archives/{key}", value)
+        else:
+            if self.exists(name) and not overwrite:
+                raise KeyError("archive already exists")
+            self._archives[name] = {"id": id, "time": ts}
 
-    def __delitem__(self, name):
+    def delete(self, name):
+        # delete an archive
         assert isinstance(name, str)
-        del self._archives[name]
+        if not self.legacy:
+            store_key, archive_info = self._lookup_name(name)
+            self.repository.store_delete(f"archives/{store_key}")
+        else:
+            self._archives.pop(name)
 
     def list(
         self,
         *,
-        consider_checkpoints=True,
         match=None,
         match_end=r"\Z",
         sort_by=(),
@@ -140,15 +262,13 @@ class Archives(abc.MutableMapping):
         if isinstance(sort_by, (str, bytes)):
             raise TypeError("sort_by must be a sequence of str")
 
-        archives = self.values()
+        archives = [self.get(name) for name in self.names()]
         regex = get_regex_from_pattern(match or "re:.*")
         regex = re.compile(regex + match_end)
         archives = [x for x in archives if regex.match(x.name) is not None]
 
         if any([oldest, newest, older, newer]):
             archives = filter_archives_by_date(archives, oldest=oldest, newest=newest, newer=newer, older=older)
-        if not consider_checkpoints:
-            archives = [x for x in archives if ".checkpoint" not in x.name]
         for sortkey in reversed(sort_by):
             archives.sort(key=attrgetter(sortkey))
         if first:
@@ -161,18 +281,15 @@ class Archives(abc.MutableMapping):
 
     def list_considering(self, args):
         """
-        get a list of archives, considering --first/last/prefix/match-archives/sort/consider-checkpoints cmdline args
+        get a list of archives, considering --first/last/prefix/match-archives/sort cmdline args
         """
         name = getattr(args, "name", None)
-        consider_checkpoints = getattr(args, "consider_checkpoints", None)
         if name is not None:
             raise Error(
-                "Giving a specific name is incompatible with options --first, --last, "
-                "-a / --match-archives, and --consider-checkpoints."
+                "Giving a specific name is incompatible with options --first, --last " "and -a / --match-archives."
             )
         return self.list(
             sort_by=args.sort_by.split(","),
-            consider_checkpoints=consider_checkpoints,
             match=args.match_archives,
             first=getattr(args, "first", None),
             last=getattr(args, "last", None),
@@ -182,14 +299,14 @@ class Archives(abc.MutableMapping):
             newest=getattr(args, "newest", None),
         )
 
-    def set_raw_dict(self, d):
+    def _set_raw_dict(self, d):
         """set the dict we get from the msgpack unpacker"""
         for k, v in d.items():
             assert isinstance(k, str)
             assert isinstance(v, dict) and "id" in v and "time" in v
             self._archives[k] = v
 
-    def get_raw_dict(self):
+    def _get_raw_dict(self):
         """get the dict we can give to the msgpack packer"""
         return self._archives
 
@@ -226,7 +343,7 @@ class Manifest:
     MANIFEST_ID = b"\0" * 32
 
     def __init__(self, key, repository, item_keys=None, ro_cls=RepoObj):
-        self.archives = Archives()
+        self.archives = Archives(repository, self)
         self.config = {}
         self.key = key
         self.repo_objs = ro_cls(key)
@@ -246,12 +363,8 @@ class Manifest:
     def load(cls, repository, operations, key=None, *, ro_cls=RepoObj):
         from .item import ManifestItem
         from .crypto.key import key_factory
-        from .repository import Repository
 
-        try:
-            cdata = repository.get(cls.MANIFEST_ID)
-        except Repository.ObjectNotFound:
-            raise NoManifestError
+        cdata = repository.get_manifest()
         if not key:
             key = key_factory(repository, cdata, ro_cls=ro_cls)
         manifest = cls(key, repository, ro_cls=ro_cls)
@@ -261,7 +374,7 @@ class Manifest:
         manifest.id = manifest.repo_objs.id_hash(data)
         if m.get("version") not in (1, 2):
             raise ValueError("Invalid manifest version")
-        manifest.archives.set_raw_dict(m.archives)
+        manifest.archives.prepare(manifest, m)
         manifest.timestamp = m.get("timestamp")
         manifest.config = m.config
         # valid item keys are whatever is known in the repo or every key we know
@@ -308,16 +421,15 @@ class Manifest:
             max_ts = max(incremented_ts, now_ts)
             self.timestamp = max_ts.isoformat(timespec="microseconds")
         # include checks for limits as enforced by limited unpacker (used by load())
-        assert len(self.archives) <= MAX_ARCHIVES
-        assert all(len(name) <= 255 for name in self.archives)
+        assert self.archives.count() <= MAX_ARCHIVES
+        assert all(len(name) <= 255 for name in self.archives.names())
         assert len(self.item_keys) <= 100
         self.config["item_keys"] = tuple(sorted(self.item_keys))
+        manifest_archives = self.archives.finish(self)
         manifest = ManifestItem(
-            version=2,
-            archives=StableDict(self.archives.get_raw_dict()),
-            timestamp=self.timestamp,
-            config=StableDict(self.config),
+            version=2, archives=manifest_archives, timestamp=self.timestamp, config=StableDict(self.config)
         )
         data = self.key.pack_metadata(manifest.as_dict())
         self.id = self.repo_objs.id_hash(data)
-        self.repository.put(self.MANIFEST_ID, self.repo_objs.format(self.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST))
+        robj = self.repo_objs.format(self.MANIFEST_ID, {}, data, ro_type=ROBJ_MANIFEST)
+        self.repository.put_manifest(robj)

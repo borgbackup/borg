@@ -240,7 +240,7 @@ class TarMixIn:
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
 
-    @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(cache=True, compatibility=(Manifest.Operation.WRITE,))
     def do_import_tar(self, args, repository, manifest, cache):
         """Create a backup archive from a tarball"""
         self.output_filter = args.output_filter
@@ -269,16 +269,7 @@ class TarMixIn:
             start_monotonic=t0_monotonic,
             log_json=args.log_json,
         )
-        cp = ChunksProcessor(
-            cache=cache,
-            key=key,
-            add_item=archive.add_item,
-            prepare_checkpoint=archive.prepare_checkpoint,
-            write_checkpoint=archive.write_checkpoint,
-            checkpoint_interval=args.checkpoint_interval,
-            checkpoint_volume=args.checkpoint_volume,
-            rechunkify=False,
-        )
+        cp = ChunksProcessor(cache=cache, key=key, add_item=archive.add_item, rechunkify=False)
         tfo = TarfileObjectProcessors(
             cache=cache,
             key=key,
@@ -523,25 +514,6 @@ class TarMixIn:
             metavar="TIMESTAMP",
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
             "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
-        )
-        archive_group.add_argument(
-            "-c",
-            "--checkpoint-interval",
-            dest="checkpoint_interval",
-            type=int,
-            default=1800,
-            action=Highlander,
-            metavar="SECONDS",
-            help="write checkpoint every SECONDS seconds (Default: 1800)",
-        )
-        archive_group.add_argument(
-            "--checkpoint-volume",
-            metavar="BYTES",
-            dest="checkpoint_volume",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
         )
         archive_group.add_argument(
             "--chunker-params",

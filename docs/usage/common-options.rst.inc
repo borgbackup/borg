@@ -8,8 +8,7 @@
 -p, --progress           show progress information
 --iec                    format using IEC units (1KiB = 1024B)
 --log-json               Output one JSON object per log line instead of formatted text.
---lock-wait SECONDS      wait at most SECONDS for acquiring a repository/cache lock (default: 1).
---bypass-lock            Bypass locking mechanism
+--lock-wait SECONDS      wait at most SECONDS for acquiring a repository/cache lock (default: 10).
 --show-version           show/log the borg version
 --show-rc                show/log the return code (rc)
 --umask M                set umask to M (local only, default: 0077)

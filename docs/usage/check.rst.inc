@@ -23,6 +23,8 @@ borg check
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--repair``                                 | attempt to repair any inconsistencies found                                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--undelete-archives``                      | attempt to undelete archives (use with --repair)                                                          |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--max-duration SECONDS``                   | do only a partial repo check for max. SECONDS seconds (Default: unlimited)                                |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                         |
@@ -65,6 +67,7 @@ borg check
         --archives-only    only perform archives checks
         --verify-data     perform cryptographic archive data integrity verification (conflicts with ``--repository-only``)
         --repair          attempt to repair any inconsistencies found
+        --undelete-archives    attempt to undelete archives (use with --repair)
         --max-duration SECONDS    do only a partial repo check for max. SECONDS seconds (Default: unlimited)
 
 
@@ -89,8 +92,8 @@ The check command verifies the consistency of a repository and its archives.
 It consists of two major steps:
 
 1. Checking the consistency of the repository itself. This includes checking
-   the segment magic headers, and both the metadata and data of all objects in
-   the segments. The read data is checked by size and CRC. Bit rot and other
+   the file magic headers, and both the metadata and data of all objects in
+   the repository. The read data is checked by size and hash. Bit rot and other
    types of accidental damage can be detected this way. Running the repository
    check can be split into multiple partial checks using ``--max-duration``.
    When checking a remote repository, please note that the checks run on the
@@ -125,13 +128,12 @@ archive checks, nor enable repair mode. Consequently, if you want to use
 
 **Warning:** Please note that partial repository checks (i.e. running it with
 ``--max-duration``) can only perform non-cryptographic checksum checks on the
-segment files. A full repository check (i.e. without ``--max-duration``) can
-also do a repository index check. Enabling partial repository checks excepts
-archive checks for the same reason. Therefore partial checks may be useful with
-very large repositories only where a full check would take too long.
+repository files. Enabling partial repository checks excepts archive checks
+for the same reason. Therefore partial checks may be useful with very large
+repositories only where a full check would take too long.
 
 The ``--verify-data`` option will perform a full integrity verification (as
-opposed to checking the CRC32 of the segment) of data, which means reading the
+opposed to checking just the xxh64) of data, which means reading the
 data from the repository, decrypting and decompressing it. It is a complete
 cryptographic verification and hence very time consuming, but will detect any
 accidental and malicious corruption. Tamper-resistance is only guaranteed for
@@ -168,17 +170,15 @@ by definition, a potentially lossy task.
 
 In practice, repair mode hooks into both the repository and archive checks:
 
-1. When checking the repository's consistency, repair mode will try to recover
-   as many objects from segments with integrity errors as possible, and ensure
-   that the index is consistent with the data stored in the segments.
+1. When checking the repository's consistency, repair mode removes corrupted
+   objects from the repository after it did a 2nd try to read them correctly.
 
 2. When checking the consistency and correctness of archives, repair mode might
    remove whole archives from the manifest if their archive metadata chunk is
    corrupt or lost. On a chunk level (i.e. the contents of files), repair mode
    will replace corrupt or lost chunks with a same-size replacement chunk of
    zeroes. If a previously zeroed chunk reappears, repair mode will restore
-   this lost chunk using the new chunk. Lastly, repair mode will also delete
-   orphaned chunks (e.g. caused by read errors while creating the archive).
+   this lost chunk using the new chunk.
 
 Most steps taken by repair mode have a one-time effect on the repository, like
 removing a lost archive from the repository. However, replacing a corrupt or
@@ -197,3 +197,9 @@ replace the all-zero replacement chunk by the reappeared chunk. If all lost
 chunks of a "zero-patched" file reappear, this effectively "heals" the file.
 Consequently, if lost chunks were repaired earlier, it is advised to run
 ``--repair`` a second time after creating some new backups.
+
+If ``--repair --undelete-archives`` is given, Borg will scan the repository
+for archive metadata and if it finds some where no corresponding archives
+directory entry exists, it will create the entries. This is basically undoing
+``borg delete archive`` or ``borg prune ...`` commands and only possible before
+``borg compact`` would remove the archives' data completely.

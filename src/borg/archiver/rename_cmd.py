@@ -11,14 +11,12 @@ logger = create_logger()
 
 
 class RenameMixIn:
-    @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(cache=True, compatibility=(Manifest.Operation.CHECK,))
     @with_archive
     def do_rename(self, args, repository, manifest, cache, archive):
         """Rename an existing archive"""
         archive.rename(args.newname)
         manifest.write()
-        repository.commit(compact=False)
-        cache.commit()
 
     def build_parser_rename(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

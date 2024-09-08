@@ -105,7 +105,7 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     #
 
     # Options for borg create
-    BORG_OPTS="--stats --one-file-system --compression lz4 --checkpoint-interval 86400"
+    BORG_OPTS="--stats --one-file-system --compression lz4"
 
     # Set BORG_PASSPHRASE or BORG_PASSCOMMAND somewhere around here, using export,
     # if encryption is used.

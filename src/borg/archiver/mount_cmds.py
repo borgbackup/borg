@@ -158,12 +158,6 @@ class MountMixIn:
         from ._common import define_exclusion_group, define_archive_filters_group
 
         parser.set_defaults(func=self.do_mount)
-        parser.add_argument(
-            "--consider-checkpoints",
-            action="store_true",
-            dest="consider_checkpoints",
-            help="Show checkpoint archives in the repository contents list (default: hidden).",
-        )
         parser.add_argument("mountpoint", metavar="MOUNTPOINT", type=str, help="where to mount filesystem")
         parser.add_argument(
             "-f", "--foreground", dest="foreground", action="store_true", help="stay in foreground, do not daemonize"

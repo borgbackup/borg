@@ -5,6 +5,7 @@ that did not fit better elsewhere.
 Code used to be in borg/helpers.py but was split into the modules in this
 package, which are imported into here for compatibility.
 """
+
 import os
 from typing import List
 from collections import namedtuple
@@ -38,7 +39,7 @@ from .parseformat import BaseFormatter, ArchiveFormatter, ItemFormatter, DiffFor
 from .parseformat import swidth_slice, ellipsis_truncate
 from .parseformat import BorgJsonEncoder, basic_json_data, json_print, json_dump, prepare_dump_dict
 from .parseformat import Highlander, MakePathSafeAction
-from .process import daemonize, daemonizing
+from .process import daemonize, daemonizing, ThreadRunner
 from .process import signal_handler, raising_signal_handler, sig_int, ignore_sigint, SigHup, SigTerm
 from .process import popen_with_error_handling, is_terminal, prepare_subprocess_env, create_filter_process
 from .progress import ProgressIndicatorPercent, ProgressIndicatorMessage

@@ -14,6 +14,7 @@ sudo chown myuser /tmp/borg-mount/
 
 if the directory does not exist, the test will be skipped.
 """
+
 import errno
 import os
 import random

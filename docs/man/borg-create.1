@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -53,9 +53,7 @@ stdin\fP below for details.
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
 .sp
-The archive name needs to be unique. It must not end in \(aq.checkpoint\(aq or
-\(aq.checkpoint.N\(aq (with N being a number), because these names are used for
-checkpoints and treated in special ways.
+The archive name needs to be unique.
 .sp
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
@@ -155,12 +153,6 @@ only display items with the given status characters (see description)
 .B  \-\-json
 output stats as JSON. Implies \fB\-\-stats\fP\&.
 .TP
-.B  \-\-no\-cache\-sync
-experimental: do not synchronize the chunks cache.
-.TP
-.B  \-\-no\-cache\-sync\-forced
-experimental: do not synchronize the chunks cache (forced).
-.TP
 .B  \-\-prefer\-adhoc\-cache
 experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).
 .TP
@@ -259,12 +251,6 @@ add a comment text to the archive
 .TP
 .BI \-\-timestamp \ TIMESTAMP
 manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
-.TP
-.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
-write checkpoint every SECONDS seconds (Default: 1800)
-.TP
-.BI \-\-checkpoint\-volume \ BYTES
-write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)
 .TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095

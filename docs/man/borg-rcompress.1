@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RCOMPRESS" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-RCOMPRESS" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
 borg-rcompress \- Repository (re-)compression
 .SH SYNOPSIS
@@ -37,19 +37,13 @@ borg [common options] rcompress [options]
 .sp
 Repository (re\-)compression (and/or re\-obfuscation).
 .sp
-Reads all chunks in the repository (in on\-disk order, this is important for
-compaction) and recompresses them if they are not already using the compression
-type/level and obfuscation level given via \fB\-\-compression\fP\&.
+Reads all chunks in the repository and recompresses them if they are not already
+using the compression type/level and obfuscation level given via \fB\-\-compression\fP\&.
 .sp
 If the outcome of the chunk processing indicates a change in compression
 type/level or obfuscation level, the processed chunk is written to the repository.
 Please note that the outcome might not always be the desired compression
 type/level \- if no compression gives a shorter output, that might be chosen.
-.sp
-Every \fB\-\-checkpoint\-interval\fP, progress is committed to the repository and
-the repository is compacted (this is to keep temporary repo space usage in bounds).
-A lower checkpoint interval means lower temporary repo space usage, but also
-slower progress due to higher overhead (and vice versa).
 .sp
 Please note that this command can not work in low (or zero) free disk space
 conditions.
@@ -72,9 +66,6 @@ select compression algorithm, see the output of the \(dqborg help compression\(d
 .TP
 .B  \-s\fP,\fB  \-\-stats
 print statistics
-.TP
-.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
-write checkpoint every SECONDS seconds (Default: 1800)
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

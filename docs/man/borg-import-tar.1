@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-IMPORT-TAR" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-IMPORT-TAR" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -125,12 +125,6 @@ add a comment text to the archive
 .TP
 .BI \-\-timestamp \ TIMESTAMP
 manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
-.TP
-.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
-write checkpoint every SECONDS seconds (Default: 1800)
-.TP
-.BI \-\-checkpoint\-volume \ BYTES
-write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)
 .TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095

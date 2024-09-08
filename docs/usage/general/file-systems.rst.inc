@@ -1,30 +1,37 @@
 File systems
 ~~~~~~~~~~~~
 
-We strongly recommend against using Borg (or any other database-like
-software) on non-journaling file systems like FAT, since it is not
-possible to assume any consistency in case of power failures (or a
-sudden disconnect of an external drive or similar failures).
+We recommend using a reliable, scalable journaling filesystem for the
+repository, e.g. zfs, btrfs, ext4, apfs.
 
-While Borg uses a data store that is resilient against these failures
-when used on journaling file systems, it is not possible to guarantee
-this with some hardware -- independent of the software used. We don't
-know a list of affected hardware.
+Borg now uses the ``borgstore`` package to implement the key/value store it
+uses for the repository.
 
-If you are suspicious whether your Borg repository is still consistent
-and readable after one of the failures mentioned above occurred, run
-``borg check --verify-data`` to make sure it is consistent.
+It currently uses the ``file:`` Store (posixfs backend) either with a local
+directory or via ssh and a remote ``borg serve`` agent using borgstore on the
+remote side.
 
-.. rubric:: Requirements for Borg repository file systems
+This means that it will store each chunk into a separate filesystem file
+(for more details, see the ``borgstore`` project).
 
-- Long file names
-- At least three directory levels with short names
-- Typically, file sizes up to a few hundred MB.
-  Large repositories may require large files (>2 GB).
-- Up to 1000 files per directory.
-- rename(2) / MoveFile(Ex) should work as specified, i.e. on the same file system
-  it should be a move (not a copy) operation, and in case of a directory
-  it should fail if the destination exists and is not an empty directory,
-  since this is used for locking.
-- Also hardlinks are used for more safe and secure file updating (e.g. of the repo
-  config file), but the code tries to work also if hardlinks are not supported.
+This has some pros and cons (compared to legacy borg 1.x's segment files):
+
+Pros:
+
+- Simplicity and better maintainability of the borg code.
+- Sometimes faster, less I/O, better scalability: e.g. borg compact can just
+  remove unused chunks by deleting a single file and does not need to read
+  and re-write segment files to free space.
+- In future, easier to adapt to other kinds of storage:
+  borgstore's backends are quite simple to implement.
+  A ``sftp:`` backend already exists, cloud storage might be easy to add.
+- Parallel repository access with less locking is easier to implement.
+
+Cons:
+
+- The repository filesystem will have to deal with a big amount of files (there
+  are provisions in borgstore against having too many files in a single directory
+  by using a nested directory structure).
+- Bigger fs space usage overhead (will depend on allocation block size - modern
+  filesystems like zfs are rather clever here using a variable block size).
+- Sometimes slower, due to less sequential / more random access operations.

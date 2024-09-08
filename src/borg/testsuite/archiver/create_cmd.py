@@ -236,33 +236,9 @@ def test_create_stdin(archivers, request):
     assert extracted_data == input_data
 
 
-def test_create_stdin_checkpointing(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    chunk_size = 1000  # fixed chunker with this size, also volume based checkpointing after that volume
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    input_data = b"X" * (chunk_size * 2 - 1)  # one full and one partial chunk
-    cmd(
-        archiver,
-        "create",
-        f"--chunker-params=fixed,{chunk_size}",
-        f"--checkpoint-volume={chunk_size}",
-        "test",
-        "-",
-        input=input_data,
-    )
-    # repo looking good overall? checks for rc == 0.
-    cmd(archiver, "check", "--debug")
-    # verify that there are no part files in final archive
-    out = cmd(archiver, "list", "test")
-    assert "stdin.borg_part" not in out
-    # verify full file
-    out = cmd(archiver, "extract", "test", "stdin", "--stdout", binary_output=True)
-    assert out == input_data
-
-
 def test_create_erroneous_file(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    chunk_size = 1000  # fixed chunker with this size, also volume based checkpointing after that volume
+    chunk_size = 1000  # fixed chunker with this size
     create_regular_file(archiver.input_path, os.path.join(archiver.input_path, "file1"), size=chunk_size * 2)
     create_regular_file(archiver.input_path, os.path.join(archiver.input_path, "file2"), size=chunk_size * 2)
     create_regular_file(archiver.input_path, os.path.join(archiver.input_path, "file3"), size=chunk_size * 2)
@@ -550,7 +526,7 @@ def test_create_pattern_intermediate_folders_first(archivers, request):
     assert out_list.index("d x/b") < out_list.index("- x/b/foo_b")
 
 
-@pytest.mark.skipif(get_cache_impl() in ("adhocwithfiles", "local"), reason="only works with AdHocCache")
+@pytest.mark.skipif(get_cache_impl() != "adhoc", reason="only works with AdHocCache")
 def test_create_no_cache_sync_adhoc(archivers, request):  # TODO: add test for AdHocWithFilesCache
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
@@ -670,7 +646,7 @@ def test_create_dry_run(archivers, request):
     # Make sure no archive has been created
     with Repository(archiver.repository_path) as repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-    assert len(manifest.archives) == 0
+        assert manifest.archives.count() == 0
 
 
 def test_progress_on(archivers, request):

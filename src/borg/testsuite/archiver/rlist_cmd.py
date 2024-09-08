@@ -80,26 +80,6 @@ def test_date_matching(archivers, request):
     assert "archive3" not in output
 
 
-def test_rlist_consider_checkpoints(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    cmd(archiver, "create", "test1", src_dir)
-    # these are not really a checkpoints, but they look like some:
-    cmd(archiver, "create", "test2.checkpoint", src_dir)
-    cmd(archiver, "create", "test3.checkpoint.1", src_dir)
-
-    output = cmd(archiver, "rlist")
-    assert "test1" in output
-    assert "test2.checkpoint" not in output
-    assert "test3.checkpoint.1" not in output
-
-    output = cmd(archiver, "rlist", "--consider-checkpoints")
-    assert "test1" in output
-    assert "test2.checkpoint" in output
-    assert "test3.checkpoint.1" in output
-
-
 def test_rlist_json(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

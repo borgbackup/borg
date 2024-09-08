@@ -23,39 +23,18 @@ def test_prune_repository(archivers, request):
     cmd(archiver, "rcreate", RK_ENCRYPTION)
     cmd(archiver, "create", "test1", src_dir)
     cmd(archiver, "create", "test2", src_dir)
-    # these are not really a checkpoints, but they look like some:
-    cmd(archiver, "create", "test3.checkpoint", src_dir)
-    cmd(archiver, "create", "test3.checkpoint.1", src_dir)
-    cmd(archiver, "create", "test4.checkpoint", src_dir)
     output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1")
     assert re.search(r"Would prune:\s+test1", output)
-    # must keep the latest non-checkpoint archive:
+    # must keep the latest archive:
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+test2", output)
-    # must keep the latest checkpoint archive:
-    assert re.search(r"Keeping checkpoint archive:\s+test4.checkpoint", output)
-    output = cmd(archiver, "rlist", "--consider-checkpoints")
+    output = cmd(archiver, "rlist")
     assert "test1" in output
     assert "test2" in output
-    assert "test3.checkpoint" in output
-    assert "test3.checkpoint.1" in output
-    assert "test4.checkpoint" in output
     cmd(archiver, "prune", "--keep-daily=1")
-    output = cmd(archiver, "rlist", "--consider-checkpoints")
+    output = cmd(archiver, "rlist")
     assert "test1" not in output
-    # the latest non-checkpoint archive must be still there:
+    # the latest archive must be still there:
     assert "test2" in output
-    # only the latest checkpoint archive must still be there:
-    assert "test3.checkpoint" not in output
-    assert "test3.checkpoint.1" not in output
-    assert "test4.checkpoint" in output
-    # now we supersede the latest checkpoint by a successful backup:
-    cmd(archiver, "create", "test5", src_dir)
-    cmd(archiver, "prune", "--keep-daily=2")
-    output = cmd(archiver, "rlist", "--consider-checkpoints")
-    # all checkpoints should be gone now:
-    assert "checkpoint" not in output
-    # the latest archive must be still there
-    assert "test5" in output
 
 
 # This test must match docs/misc/prune-example.txt

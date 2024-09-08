@@ -73,13 +73,8 @@ class KeysMixIn:
         manifest.key = key_new
         manifest.repo_objs.key = key_new
         manifest.write()
-        repository.commit(compact=False)
 
-        # we need to rewrite cache config and security key-type info,
-        # so that the cached key-type will match the repo key-type.
-        cache.begin_txn()  # need to start a cache transaction, otherwise commit() does nothing.
         cache.key = key_new
-        cache.commit()
 
         loc = key_new.find_key() if hasattr(key_new, "find_key") else None
         if args.keep:
@@ -88,7 +83,7 @@ class KeysMixIn:
             key.remove(key.target)  # remove key from current location
             logger.info(f"Key moved to {loc}")
 
-    @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
+    @with_repository(lock=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
         """Export the repository key for backup"""
         manager = KeyManager(repository)
@@ -107,7 +102,7 @@ class KeysMixIn:
         except IsADirectoryError:
             raise CommandError(f"'{args.path}' must be a file, not a directory")
 
-    @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
+    @with_repository(lock=False, manifest=False, cache=False)
     def do_key_import(self, args, repository):
         """Import the repository key from backup"""
         manager = KeyManager(repository)

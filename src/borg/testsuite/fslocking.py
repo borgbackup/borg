@@ -6,7 +6,7 @@ from traceback import format_exc
 import pytest
 
 from ..platform import get_process_id, process_alive
-from ..locking import (
+from ..fslocking import (
     TimeoutTimer,
     ExclusiveLock,
     Lock,

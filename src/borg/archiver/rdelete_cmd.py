@@ -29,7 +29,7 @@ class RDeleteMixIn:
                 msg = []
                 try:
                     manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-                    n_archives = len(manifest.archives)
+                    n_archives = manifest.archives.count()
                     msg.append(
                         f"You requested to DELETE the following repository completely "
                         f"*including* {n_archives} archives it contains:"

@@ -5,7 +5,7 @@ from . import cmd_fixture, changedir  # NOQA
 
 
 def test_return_codes(cmd_fixture, tmpdir):
-    repo = tmpdir.mkdir("repo")
+    repo = tmpdir / "repo"  # borg creates the directory
     input = tmpdir.mkdir("input")
     output = tmpdir.mkdir("output")
     input.join("test_file").write("content")

@@ -5,7 +5,8 @@ from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec, ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..helpers import sig_int, ProgressIndicatorPercent, Error
-
+from ..repository import Repository
+from ..remote import RemoteRepository
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -15,27 +16,16 @@ logger = create_logger()
 
 def find_chunks(repository, repo_objs, stats, ctype, clevel, olevel):
     """find chunks that need processing (usually: recompression)."""
-    # to do it this way is maybe not obvious, thus keeping the essential design criteria here:
-    # - determine the chunk ids at one point in time (== do a **full** scan in one go) **before**
-    # writing to the repo (and especially before doing a compaction, which moves segment files around)
-    # - get the chunk ids in **on-disk order** (so we can efficiently compact while processing the chunks)
-    # - only put the ids into the list that actually need recompression (keeps it a little shorter in some cases)
     recompress_ids = []
     compr_keys = stats["compr_keys"] = set()
     compr_wanted = ctype, clevel, olevel
-    state = None
-    chunks_count = len(repository)
-    chunks_limit = min(1000, max(100, chunks_count // 1000))
-    pi = ProgressIndicatorPercent(
-        total=chunks_count,
-        msg="Searching for recompression candidates %3.1f%%",
-        step=0.1,
-        msgid="rcompress.find_chunks",
-    )
+    marker = None
     while True:
-        chunk_ids, state = repository.scan(limit=chunks_limit, state=state)
-        if not chunk_ids:
+        result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
+        if not result:
             break
+        marker = result[-1][0]
+        chunk_ids = [id for id, _ in result]
         for id, chunk_no_data in zip(chunk_ids, repository.get_many(chunk_ids, read_data=False)):
             meta = repo_objs.parse_meta(id, chunk_no_data, ro_type=ROBJ_DONTCARE)
             compr_found = meta["ctype"], meta["clevel"], meta.get("olevel", -1)
@@ -44,8 +34,6 @@ def find_chunks(repository, repo_objs, stats, ctype, clevel, olevel):
             compr_keys.add(compr_found)
             stats[compr_found] += 1
             stats["checked_count"] += 1
-            pi.show(increase=1)
-    pi.finish()
     return recompress_ids
 
 
@@ -100,7 +88,7 @@ def format_compression_spec(ctype, clevel, olevel):
 
 
 class RCompressMixIn:
-    @with_repository(cache=False, manifest=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(cache=False, manifest=True, compatibility=(Manifest.Operation.CHECK,))
     def do_rcompress(self, args, repository, manifest):
         """Repository (re-)compression"""
 
@@ -114,25 +102,17 @@ class RCompressMixIn:
             ctype, clevel, olevel = c.ID, c.level, -1
             return ctype, clevel, olevel
 
+        if not isinstance(repository, (Repository, RemoteRepository)):
+            raise Error("rcompress not supported for legacy repositories.")
+
         repo_objs = manifest.repo_objs
         ctype, clevel, olevel = get_csettings(repo_objs.compressor)  # desired compression set by --compression
-
-        def checkpoint_func():
-            while repository.async_response(wait=True) is not None:
-                pass
-            repository.commit(compact=True)
 
         stats_find = defaultdict(int)
         stats_process = defaultdict(int)
         recompress_ids = find_chunks(repository, repo_objs, stats_find, ctype, clevel, olevel)
         recompress_candidate_count = len(recompress_ids)
         chunks_limit = min(1000, max(100, recompress_candidate_count // 1000))
-        uncommitted_chunks = 0
-
-        # start a new transaction
-        data = repository.get(Manifest.MANIFEST_ID)
-        repository.put(Manifest.MANIFEST_ID, data)
-        uncommitted_chunks += 1
 
         pi = ProgressIndicatorPercent(
             total=len(recompress_ids), msg="Recompressing %3.1f%%", step=0.1, msgid="rcompress.process_chunks"
@@ -143,16 +123,13 @@ class RCompressMixIn:
             ids, recompress_ids = recompress_ids[:chunks_limit], recompress_ids[chunks_limit:]
             process_chunks(repository, repo_objs, stats_process, ids, olevel)
             pi.show(increase=len(ids))
-            checkpointed = self.maybe_checkpoint(
-                checkpoint_func=checkpoint_func, checkpoint_interval=args.checkpoint_interval
-            )
-            uncommitted_chunks = 0 if checkpointed else (uncommitted_chunks + len(ids))
         pi.finish()
         if sig_int:
-            # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
+            # Ctrl-C / SIGINT: do not commit
             raise Error("Got Ctrl-C / SIGINT.")
-        elif uncommitted_chunks > 0:
-            checkpoint_func()
+        else:
+            while repository.async_response(wait=True) is not None:
+                pass
         if args.stats:
             print()
             print("Recompression stats:")
@@ -185,19 +162,13 @@ class RCompressMixIn:
             """
         Repository (re-)compression (and/or re-obfuscation).
 
-        Reads all chunks in the repository (in on-disk order, this is important for
-        compaction) and recompresses them if they are not already using the compression
-        type/level and obfuscation level given via ``--compression``.
+        Reads all chunks in the repository and recompresses them if they are not already
+        using the compression type/level and obfuscation level given via ``--compression``.
 
         If the outcome of the chunk processing indicates a change in compression
         type/level or obfuscation level, the processed chunk is written to the repository.
         Please note that the outcome might not always be the desired compression
         type/level - if no compression gives a shorter output, that might be chosen.
-
-        Every ``--checkpoint-interval``, progress is committed to the repository and
-        the repository is compacted (this is to keep temporary repo space usage in bounds).
-        A lower checkpoint interval means lower temporary repo space usage, but also
-        slower progress due to higher overhead (and vice versa).
 
         Please note that this command can not work in low (or zero) free disk space
         conditions.
@@ -234,14 +205,3 @@ class RCompressMixIn:
         )
 
         subparser.add_argument("-s", "--stats", dest="stats", action="store_true", help="print statistics")
-
-        subparser.add_argument(
-            "-c",
-            "--checkpoint-interval",
-            metavar="SECONDS",
-            dest="checkpoint_interval",
-            type=int,
-            default=1800,
-            action=Highlander,
-            help="write checkpoint every SECONDS seconds (Default: 1800)",
-        )

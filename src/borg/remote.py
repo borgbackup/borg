@@ -30,9 +30,11 @@ from .helpers import format_file_size
 from .helpers import safe_unlink
 from .helpers import prepare_subprocess_env, ignore_sigint
 from .helpers import get_socket_filename
-from .locking import LockTimeout, NotLocked, NotMyLock, LockFailed
+from .fslocking import LockTimeout, NotLocked, NotMyLock, LockFailed
 from .logger import create_logger, borg_serve_log_queue
+from .manifest import NoManifestError
 from .helpers import msgpack
+from .legacyrepository import LegacyRepository
 from .repository import Repository
 from .version import parse_version, format_version
 from .checksums import xxh64
@@ -125,7 +127,7 @@ class ConnectionBrokenWithHint(Error):
 # For the client the return of the negotiate method is a dict which includes the server version.
 #
 # All method calls on the remote repository object must be allowlisted in RepositoryServer.rpc_methods and have api
-# stubs in RemoteRepository. The @api decorator on these stubs is used to set server version requirements.
+# stubs in RemoteRepository*. The @api decorator on these stubs is used to set server version requirements.
 #
 # Method parameters are identified only by name and never by position. Unknown parameters are ignored by the server.
 # If a new parameter is important and may not be ignored, on the client a parameter specific version requirement needs
@@ -135,17 +137,14 @@ class ConnectionBrokenWithHint(Error):
 
 
 class RepositoryServer:  # pragma: no cover
-    rpc_methods = (
+    _legacy_rpc_methods = (  # LegacyRepository
         "__len__",
         "check",
         "commit",
         "delete",
         "destroy",
-        "flags",
-        "flags_many",
         "get",
         "list",
-        "scan",
         "negotiate",
         "open",
         "close",
@@ -158,8 +157,34 @@ class RepositoryServer:  # pragma: no cover
         "inject_exception",
     )
 
+    _rpc_methods = (  # Repository
+        "__len__",
+        "check",
+        "delete",
+        "destroy",
+        "get",
+        "list",
+        "negotiate",
+        "open",
+        "close",
+        "info",
+        "put",
+        "save_key",
+        "load_key",
+        "break_lock",
+        "inject_exception",
+        "get_manifest",
+        "put_manifest",
+        "store_list",
+        "store_load",
+        "store_store",
+        "store_delete",
+    )
+
     def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota, use_socket):
         self.repository = None
+        self.RepoCls = None
+        self.rpc_methods = ("open", "close", "negotiate")
         self.restrict_to_paths = restrict_to_paths
         self.restrict_to_repositories = restrict_to_repositories
         # This flag is parsed from the serve command line via Archiver.do_serve,
@@ -228,6 +253,7 @@ class RepositoryServer:  # pragma: no cover
                                 self.repository.close()
                             raise UnexpectedRPCDataFormatFromClient(__version__)
                         try:
+                            # logger.debug(f"{type(self)} method: {type(self.repository)}.{method}")
                             if method not in self.rpc_methods:
                                 raise InvalidRPCMethod(method)
                             try:
@@ -237,14 +263,15 @@ class RepositoryServer:  # pragma: no cover
                             args = self.filter_args(f, args)
                             res = f(**args)
                         except BaseException as e:
+                            # logger.exception(e)
                             ex_short = traceback.format_exception_only(e.__class__, e)
                             ex_full = traceback.format_exception(*sys.exc_info())
                             ex_trace = True
                             if isinstance(e, Error):
                                 ex_short = [e.get_message()]
                                 ex_trace = e.traceback
-                            if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
-                                # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                            if isinstance(e, (self.RepoCls.DoesNotExist, self.RepoCls.AlreadyExists, PathNotAllowed)):
+                                # These exceptions are reconstructed on the client end in RemoteRepository*.call_many(),
                                 # and will be handled just like locally raised exceptions. Suppress the remote traceback
                                 # for these, except ErrorWithTraceback, which should always display a traceback.
                                 pass
@@ -341,8 +368,18 @@ class RepositoryServer:  # pragma: no cover
         return os.path.realpath(path)
 
     def open(
-        self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False, make_parent_dirs=False
+        self,
+        path,
+        create=False,
+        lock_wait=None,
+        lock=True,
+        exclusive=None,
+        append_only=False,
+        make_parent_dirs=False,
+        v1_or_v2=False,
     ):
+        self.RepoCls = LegacyRepository if v1_or_v2 else Repository
+        self.rpc_methods = self._legacy_rpc_methods if v1_or_v2 else self._rpc_methods
         logging.debug("Resolving repository path %r", path)
         path = self._resolve_path(path)
         logging.debug("Resolved repository path to %r", path)
@@ -368,7 +405,7 @@ class RepositoryServer:  # pragma: no cover
         # while "borg init --append-only" (=append_only) does, regardless of the --append-only (self.append_only)
         # flag for serve.
         append_only = (not create and self.append_only) or append_only
-        self.repository = Repository(
+        self.repository = self.RepoCls(
             path,
             create,
             lock_wait=lock_wait,
@@ -393,17 +430,17 @@ class RepositoryServer:  # pragma: no cover
         s1 = "test string"
         s2 = "test string2"
         if kind == "DoesNotExist":
-            raise Repository.DoesNotExist(s1)
+            raise self.RepoCls.DoesNotExist(s1)
         elif kind == "AlreadyExists":
-            raise Repository.AlreadyExists(s1)
+            raise self.RepoCls.AlreadyExists(s1)
         elif kind == "CheckNeeded":
-            raise Repository.CheckNeeded(s1)
+            raise self.RepoCls.CheckNeeded(s1)
         elif kind == "IntegrityError":
             raise IntegrityError(s1)
         elif kind == "PathNotAllowed":
             raise PathNotAllowed("foo")
         elif kind == "ObjectNotFound":
-            raise Repository.ObjectNotFound(s1, s2)
+            raise self.RepoCls.ObjectNotFound(s1, s2)
         elif kind == "InvalidRPCMethod":
             raise InvalidRPCMethod(s1)
         elif kind == "divide":
@@ -550,7 +587,7 @@ class RemoteRepository:
         location,
         create=False,
         exclusive=False,
-        lock_wait=None,
+        lock_wait=1.0,
         lock=True,
         append_only=False,
         make_parent_dirs=False,
@@ -585,7 +622,6 @@ class RemoteRepository:
                 borg_cmd = self.ssh_cmd(location) + borg_cmd
             logger.debug("SSH command line: %s", borg_cmd)
             # we do not want the ssh getting killed by Ctrl-C/SIGINT because it is needed for clean shutdown of borg.
-            # borg's SIGINT handler tries to write a checkpoint and requires the remote repo connection.
             self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, preexec_fn=ignore_sigint)
             self.stdin_fd = self.p.stdin.fileno()
             self.stdout_fd = self.p.stdout.fileno()
@@ -654,7 +690,7 @@ class RemoteRepository:
             logging.debug("still %d cached responses left in RemoteRepository" % (len(self.responses),))
         if self.p or self.sock:
             self.close()
-            assert False, "cleanup happened in Repository.__del__"
+            assert False, "cleanup happened in RemoteRepository.__del__"
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.location.canonical_path()}>"
@@ -666,11 +702,8 @@ class RemoteRepository:
         try:
             if exc_type is not None:
                 self.shutdown_time = time.monotonic() + 30
-                self.rollback()
         finally:
-            # in any case, we want to close the repo cleanly, even if the
-            # rollback can not succeed (e.g. because the connection was
-            # already closed) and raised another exception:
+            # in any case, we want to close the repo cleanly.
             logger.debug(
                 "RemoteRepository: %s bytes sent, %s bytes received, %d messages sent",
                 format_file_size(self.tx_bytes),
@@ -805,6 +838,8 @@ class RemoteRepository:
                 raise NotLocked(args[0])
             elif error == "NotMyLock":
                 raise NotMyLock(args[0])
+            elif error == "NoManifestError":
+                raise NoManifestError
             else:
                 raise self.RPCError(unpacked)
 
@@ -939,9 +974,18 @@ class RemoteRepository:
         since=parse_version("1.0.0"),
         append_only={"since": parse_version("1.0.7"), "previously": False},
         make_parent_dirs={"since": parse_version("1.1.9"), "previously": False},
+        v1_or_v2={"since": parse_version("2.0.0b8"), "previously": True},  # TODO fix version
     )
     def open(
-        self, path, create=False, lock_wait=None, lock=True, exclusive=False, append_only=False, make_parent_dirs=False
+        self,
+        path,
+        create=False,
+        lock_wait=None,
+        lock=True,
+        exclusive=False,
+        append_only=False,
+        make_parent_dirs=False,
+        v1_or_v2=False,
     ):
         """actual remoting is done via self.call in the @api decorator"""
 
@@ -973,24 +1017,8 @@ class RemoteRepository:
     def __len__(self):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(
-        since=parse_version("1.0.0"),
-        mask={"since": parse_version("2.0.0b2"), "previously": 0},
-        value={"since": parse_version("2.0.0b2"), "previously": 0},
-    )
-    def list(self, limit=None, marker=None, mask=0, value=0):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b3"))
-    def scan(self, limit=None, state=None):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b2"))
-    def flags(self, id, mask=0xFFFFFFFF, value=None):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b2"))
-    def flags_many(self, ids, mask=0xFFFFFFFF, value=None):
+    @api(since=parse_version("1.0.0"))
+    def list(self, limit=None, marker=None):
         """actual remoting is done via self.call in the @api decorator"""
 
     def get(self, id, read_data=True):
@@ -1043,6 +1071,30 @@ class RemoteRepository:
 
     def preload(self, ids):
         self.preload_ids += ids
+
+    @api(since=parse_version("2.0.0b8"))
+    def get_manifest(self):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"))
+    def put_manifest(self, data):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"))
+    def store_list(self, name):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"))
+    def store_load(self, name):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"))
+    def store_store(self, name, value):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"))
+    def store_delete(self, name):
+        """actual remoting is done via self.call in the @api decorator"""
 
 
 class RepositoryNoCache:

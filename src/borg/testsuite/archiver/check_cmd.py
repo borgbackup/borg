@@ -8,7 +8,9 @@ from ...archive import ChunkBuffer
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack
 from ...manifest import Manifest
+from ...remote import RemoteRepository
 from ...repository import Repository
+from ..repository import fchunk
 from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -26,17 +28,15 @@ def test_check_usage(archivers, request):
     check_cmd_setup(archiver)
 
     output = cmd(archiver, "check", "-v", "--progress", exit_code=0)
-    assert "Starting repository check" in output
+    assert "Starting full repository check" in output
     assert "Starting archive consistency check" in output
-    assert "Checking segments" in output
 
     output = cmd(archiver, "check", "-v", "--repository-only", exit_code=0)
-    assert "Starting repository check" in output
+    assert "Starting full repository check" in output
     assert "Starting archive consistency check" not in output
-    assert "Checking segments" not in output
 
     output = cmd(archiver, "check", "-v", "--archives-only", exit_code=0)
-    assert "Starting repository check" not in output
+    assert "Starting full repository check" not in output
     assert "Starting archive consistency check" in output
 
     output = cmd(archiver, "check", "-v", "--archives-only", "--match-archives=archive2", exit_code=0)
@@ -105,7 +105,6 @@ def test_missing_file_chunk(archivers, request):
                 break
         else:
             pytest.fail("should not happen")  # convert 'fail'
-        repository.commit(compact=False)
 
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "--repair", exit_code=0)
@@ -171,7 +170,6 @@ def test_missing_archive_item_chunk(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         repository.delete(archive.metadata.items[0])
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
@@ -183,7 +181,6 @@ def test_missing_archive_metadata(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         repository.delete(archive.id)
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", exit_code=0)
     cmd(archiver, "check", exit_code=0)
@@ -194,8 +191,10 @@ def test_missing_manifest(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        repository.delete(Manifest.MANIFEST_ID)
-        repository.commit(compact=False)
+        if isinstance(repository, (Repository, RemoteRepository)):
+            repository.store_delete("config/manifest")
+        else:
+            repository.delete(Manifest.MANIFEST_ID)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "archive1" in output
@@ -208,10 +207,9 @@ def test_corrupted_manifest(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        manifest = repository.get(Manifest.MANIFEST_ID)
-        corrupted_manifest = manifest + b"corrupted!"
-        repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
-        repository.commit(compact=False)
+        manifest = repository.get_manifest()
+        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
+        repository.put_manifest(corrupted_manifest)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "archive1" in output
@@ -242,8 +240,7 @@ def test_spoofed_manifest(archivers, request):
         )
         # maybe a repo-side attacker could manage to move the fake manifest file chunk over to the manifest ID.
         # we simulate this here by directly writing the fake manifest data to the manifest ID.
-        repository.put(Manifest.MANIFEST_ID, cdata)
-        repository.commit(compact=False)
+        repository.put_manifest(cdata)
     # borg should notice that the manifest has the wrong ro_type.
     cmd(archiver, "check", exit_code=1)
     # borg check --repair should remove the corrupted manifest and rebuild a new one.
@@ -258,13 +255,12 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        manifest = repository.get(Manifest.MANIFEST_ID)
-        corrupted_manifest = manifest + b"corrupted!"
-        repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
+        manifest = repository.get_manifest()
+        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
+        repository.put_manifest(corrupted_manifest)
         chunk = repository.get(archive.id)
         corrupted_chunk = chunk + b"corrupted!"
         repository.put(archive.id, corrupted_chunk)
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
     assert "archive2" in output
@@ -277,9 +273,9 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     repo_objs = archive.repo_objs
     with repository:
-        manifest = repository.get(Manifest.MANIFEST_ID)
-        corrupted_manifest = manifest + b"corrupted!"
-        repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
+        manifest = repository.get_manifest()
+        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
+        repository.put_manifest(corrupted_manifest)
         archive_dict = {
             "command_line": "",
             "item_ptrs": [],
@@ -292,9 +288,12 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
         archive = repo_objs.key.pack_metadata(archive_dict)
         archive_id = repo_objs.id_hash(archive)
         repository.put(archive_id, repo_objs.format(archive_id, {}, archive, ro_type=ROBJ_ARCHIVE_META))
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
-    cmd(archiver, "check", "--repair", exit_code=0)
+    # when undeleting archives, borg check will discover both the original archive1 as well as
+    # the fake archive1 we created above. for the fake one, a new archives directory entry
+    # named archive1.1 will be created because we request undeleting archives and there
+    # is no archives directory entry for the fake archive yet.
+    cmd(archiver, "check", "--repair", "--undelete-archives", exit_code=0)
     output = cmd(archiver, "rlist")
     assert "archive1" in output
     assert "archive1.1" in output
@@ -308,9 +307,9 @@ def test_spoofed_archive(archivers, request):
     repo_objs = archive.repo_objs
     with repository:
         # attacker would corrupt or delete the manifest to trigger a rebuild of it:
-        manifest = repository.get(Manifest.MANIFEST_ID)
-        corrupted_manifest = manifest + b"corrupted!"
-        repository.put(Manifest.MANIFEST_ID, corrupted_manifest)
+        manifest = repository.get_manifest()
+        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
+        repository.put_manifest(corrupted_manifest)
         archive_dict = {
             "command_line": "",
             "item_ptrs": [],
@@ -333,7 +332,6 @@ def test_spoofed_archive(archivers, request):
                 ro_type=ROBJ_FILE_STREAM,  # a real archive is stored with ROBJ_ARCHIVE_META
             ),
         )
-        repository.commit(compact=False)
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", "--debug", exit_code=0)
     output = cmd(archiver, "rlist")
@@ -349,18 +347,61 @@ def test_extra_chunks(archivers, request):
     check_cmd_setup(archiver)
     cmd(archiver, "check", exit_code=0)
     with Repository(archiver.repository_location, exclusive=True) as repository:
-        repository.put(b"01234567890123456789012345678901", b"xxxx")
-        repository.commit(compact=False)
-    output = cmd(archiver, "check", "-v", exit_code=0)  # orphans are not considered warnings anymore
-    assert "1 orphaned (unused) objects found." in output
-    cmd(archiver, "check", "--repair", exit_code=0)
-    output = cmd(archiver, "check", "-v", exit_code=0)
-    assert "orphaned (unused) objects found." not in output
-    cmd(archiver, "extract", "archive1", "--dry-run", exit_code=0)
+        chunk = fchunk(b"xxxx")
+        repository.put(b"01234567890123456789012345678901", chunk)
+    cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 
 @pytest.mark.parametrize("init_args", [["--encryption=repokey-aes-ocb"], ["--encryption", "none"]])
 def test_verify_data(archivers, request, init_args):
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local":
+        pytest.skip("only works locally, patches objects")
+
+    # it's tricky to test the cryptographic data verification, because usually already the
+    # repository-level xxh64 hash fails to verify. So we use a fake one that doesn't.
+    # note: it only works like tested here for a highly engineered data corruption attack,
+    # because with accidental corruption, usually already the xxh64 low-level check fails.
+    def fake_xxh64(data, seed=0):
+        return b"fakefake"
+
+    import borg.repoobj
+    import borg.repository
+
+    with patch.object(borg.repoobj, "xxh64", fake_xxh64), patch.object(borg.repository, "xxh64", fake_xxh64):
+        check_cmd_setup(archiver)
+        shutil.rmtree(archiver.repository_path)
+        cmd(archiver, "rcreate", *init_args)
+        create_src_archive(archiver, "archive1")
+        archive, repository = open_archive(archiver.repository_path, "archive1")
+        with repository:
+            for item in archive.iter_items():
+                if item.path.endswith(src_file):
+                    chunk = item.chunks[-1]
+                    data = repository.get(chunk.id)
+                    data = data[0:123] + b"x" + data[123:]
+                    repository.put(chunk.id, data)
+                    break
+
+        # the normal archives check does not read file content data.
+        cmd(archiver, "check", "--archives-only", exit_code=0)
+        # but with --verify-data, it does and notices the issue.
+        output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
+        assert f"{bin_to_hex(chunk.id)}, integrity error" in output
+
+        # repair (heal is tested in another test)
+        output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
+        assert f"{bin_to_hex(chunk.id)}, integrity error" in output
+        assert f"{src_file}: New missing file chunk detected" in output
+
+        # run with --verify-data again, all fine now (file was patched with a replacement chunk).
+        cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=0)
+
+
+@pytest.mark.parametrize("init_args", [["--encryption=repokey-aes-ocb"], ["--encryption", "none"]])
+def test_corrupted_file_chunk(archivers, request, init_args):
+    ## similar to test_verify_data, but here we let the low level repository-only checks discover the issue.
+
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     shutil.rmtree(archiver.repository_path)
@@ -372,18 +413,21 @@ def test_verify_data(archivers, request, init_args):
             if item.path.endswith(src_file):
                 chunk = item.chunks[-1]
                 data = repository.get(chunk.id)
-                data = data[0:100] + b"x" + data[101:]
+                data = data[0:123] + b"x" + data[123:]
                 repository.put(chunk.id, data)
                 break
-        repository.commit(compact=False)
-    cmd(archiver, "check", exit_code=0)
-    output = cmd(archiver, "check", "--verify-data", exit_code=1)
-    assert bin_to_hex(chunk.id) + ", integrity error" in output
+
+    # the normal check checks all repository objects and the xxh64 checksum fails.
+    output = cmd(archiver, "check", "--repository-only", exit_code=1)
+    assert f"{bin_to_hex(chunk.id)} is corrupted: data does not match checksum." in output
 
     # repair (heal is tested in another test)
-    output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
-    assert bin_to_hex(chunk.id) + ", integrity error" in output
+    output = cmd(archiver, "check", "--repair", exit_code=0)
+    assert f"{bin_to_hex(chunk.id)} is corrupted: data does not match checksum." in output
     assert f"{src_file}: New missing file chunk detected" in output
+
+    # run normal check again, all fine now (file was patched with a replacement chunk).
+    cmd(archiver, "check", "--repository-only", exit_code=0)
 
 
 def test_empty_repository(archivers, request):
@@ -392,7 +436,6 @@ def test_empty_repository(archivers, request):
         pytest.skip("only works locally")
     check_cmd_setup(archiver)
     with Repository(archiver.repository_location, exclusive=True) as repository:
-        for id_ in repository.list():
-            repository.delete(id_)
-        repository.commit(compact=False)
+        for id, _ in repository.list():
+            repository.delete(id)
     cmd(archiver, "check", exit_code=1)

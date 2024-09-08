@@ -14,7 +14,6 @@ try:
     import os
     import shlex
     import signal
-    import time
     from datetime import datetime, timezone
 
     from ..logger import create_logger, setup_logging
@@ -68,7 +67,6 @@ def get_func(args):
 from .benchmark_cmd import BenchmarkMixIn
 from .check_cmd import CheckMixIn
 from .compact_cmd import CompactMixIn
-from .config_cmd import ConfigMixIn
 from .create_cmd import CreateMixIn
 from .debug_cmd import DebugMixIn
 from .delete_cmd import DeleteMixIn
@@ -88,6 +86,7 @@ from .rcreate_cmd import RCreateMixIn
 from .rinfo_cmd import RInfoMixIn
 from .rdelete_cmd import RDeleteMixIn
 from .rlist_cmd import RListMixIn
+from .rspace_cmd import RSpaceMixIn
 from .serve_cmd import ServeMixIn
 from .tar_cmds import TarMixIn
 from .transfer_cmd import TransferMixIn
@@ -98,7 +97,6 @@ class Archiver(
     BenchmarkMixIn,
     CheckMixIn,
     CompactMixIn,
-    ConfigMixIn,
     CreateMixIn,
     DebugMixIn,
     DeleteMixIn,
@@ -118,6 +116,7 @@ class Archiver(
     RDeleteMixIn,
     RInfoMixIn,
     RListMixIn,
+    RSpaceMixIn,
     ServeMixIn,
     TarMixIn,
     TransferMixIn,
@@ -126,7 +125,6 @@ class Archiver(
     def __init__(self, lock_wait=None, prog=None):
         self.lock_wait = lock_wait
         self.prog = prog
-        self.last_checkpoint = time.monotonic()
 
     def print_warning(self, msg, *args, **kw):
         warning_code = kw.get("wc", EXIT_WARNING)  # note: wc=None can be used to not influence exit code
@@ -336,7 +334,6 @@ class Archiver(
         self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
         self.build_parser_check(subparsers, common_parser, mid_common_parser)
         self.build_parser_compact(subparsers, common_parser, mid_common_parser)
-        self.build_parser_config(subparsers, common_parser, mid_common_parser)
         self.build_parser_create(subparsers, common_parser, mid_common_parser)
         self.build_parser_debug(subparsers, common_parser, mid_common_parser)
         self.build_parser_delete(subparsers, common_parser, mid_common_parser)
@@ -356,6 +353,7 @@ class Archiver(
         self.build_parser_rlist(subparsers, common_parser, mid_common_parser)
         self.build_parser_recreate(subparsers, common_parser, mid_common_parser)
         self.build_parser_rename(subparsers, common_parser, mid_common_parser)
+        self.build_parser_rspace(subparsers, common_parser, mid_common_parser)
         self.build_parser_serve(subparsers, common_parser, mid_common_parser)
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)
@@ -412,22 +410,6 @@ class Archiver(
             elif not args.paths_from_stdin:
                 # need at least 1 path but args.paths may also be populated from patterns
                 parser.error("Need at least one PATH argument.")
-        if not getattr(args, "lock", True):  # Option --bypass-lock sets args.lock = False
-            bypass_allowed = {
-                self.do_check,
-                self.do_config,
-                self.do_diff,
-                self.do_export_tar,
-                self.do_extract,
-                self.do_info,
-                self.do_rinfo,
-                self.do_list,
-                self.do_rlist,
-                self.do_mount,
-                self.do_umount,
-            }
-            if func not in bypass_allowed:
-                raise Error("Not allowed to bypass locking mechanism for chosen command")
         # we can only have a complete knowledge of placeholder replacements we should do **after** arg parsing,
         # e.g. due to options like --timestamp that override the current time.
         # thus we have to initialize replace_placeholders here and process all args that need placeholder replacement.
@@ -473,20 +455,6 @@ class Archiver(
                 topic = "borg.debug." + topic
             logger.debug("Enabling debug topic %s", topic)
             logging.getLogger(topic).setLevel("DEBUG")
-
-    def maybe_checkpoint(self, *, checkpoint_func, checkpoint_interval):
-        checkpointed = False
-        sig_int_triggered = sig_int and sig_int.action_triggered()
-        if sig_int_triggered or checkpoint_interval and time.monotonic() - self.last_checkpoint > checkpoint_interval:
-            if sig_int_triggered:
-                logger.info("checkpoint requested: starting checkpoint creation...")
-            checkpoint_func()
-            checkpointed = True
-            self.last_checkpoint = time.monotonic()
-            if sig_int_triggered:
-                sig_int.action_completed()
-                logger.info("checkpoint requested: finished checkpoint creation!")
-        return checkpointed
 
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
@@ -617,14 +585,13 @@ def main():  # pragma: no cover
 
     # Register fault handler for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL.
     faulthandler.enable()
-    with signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)), signal_handler(
-        "SIGHUP", raising_signal_handler(SigHup)
-    ), signal_handler("SIGTERM", raising_signal_handler(SigTerm)), signal_handler(
-        "SIGUSR1", sig_info_handler
-    ), signal_handler(
-        "SIGUSR2", sig_trace_handler
-    ), signal_handler(
-        "SIGINFO", sig_info_handler
+    with (
+        signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)),
+        signal_handler("SIGHUP", raising_signal_handler(SigHup)),
+        signal_handler("SIGTERM", raising_signal_handler(SigTerm)),
+        signal_handler("SIGUSR1", sig_info_handler),
+        signal_handler("SIGUSR2", sig_trace_handler),
+        signal_handler("SIGINFO", sig_info_handler),
     ):
         archiver = Archiver()
         msg = msgid = tb = None

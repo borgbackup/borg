@@ -12,8 +12,8 @@ This section provides information about security and corruption issues.
 Upgrade Notes
 =============
 
-borg 1.2.x to borg 2.0
-----------------------
+borg 1.2.x/1.4.x to borg 2.0
+----------------------------
 
 Compatibility notes:
 
@@ -21,11 +21,11 @@ Compatibility notes:
 
   We tried to put all the necessary "breaking" changes into this release, so we
   hopefully do not need another breaking release in the near future. The changes
-  were necessary for improved security, improved speed, unblocking future
-  improvements, getting rid of legacy crap / design limitations, having less and
-  simpler code to maintain.
+  were necessary for improved security, improved speed and parallelism,
+  unblocking future improvements, getting rid of legacy crap and design
+  limitations, having less and simpler code to maintain.
 
-  You can use "borg transfer" to transfer archives from borg 1.1/1.2 repos to
+  You can use "borg transfer" to transfer archives from borg 1.2/1.4 repos to
   a new borg 2.0 repo, but it will need some time and space.
 
   Before using "borg transfer", you must have upgraded to borg >= 1.2.6 (or
@@ -84,6 +84,7 @@ Compatibility notes:
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
   - removed --save-space option (does not change behaviour)
+- removed --bypass-lock option
 - using --list together with --progress is now disallowed (except with --log-json), #7219
 - the --glob-archives option was renamed to --match-archives (the short option
   name -a is unchanged) and extended to support different pattern styles:
@@ -114,11 +115,60 @@ Compatibility notes:
   fail now that somehow "worked" before (but maybe didn't work as intended due to
   the contradicting options).
 
-
 .. _changelog:
 
 Change Log 2.x
 ==============
+
+Version 2.0.0b10 (2024-09-09)
+-----------------------------
+
+TL;DR: this is a huge change and the first very fundamental change in how borg
+works since ever:
+
+- you will need to create new repos.
+- likely more exciting than previous betas, definitely not for production.
+
+New features:
+
+- borgstore based repository, file:, ssh: and sftp: for now, more possible.
+- repository stores objects separately now, not using segment files.
+  this has more fs overhead, but needs much less I/O because no segment
+  files compaction is required anymore. also, no repository index is
+  needed anymore because we can directly find the objects by their ID.
+- locking: new borgstore based repository locking with automatic stale
+  lock removal (if lock does not get refreshed, if lock owner process is dead).
+- simultaneous repository access for many borg commands except check/compact.
+  the cache lock for adhocwithfiles is still exclusive though, so use
+  BORG_CACHE_IMPL=adhoc if you want to try that out using only 1 machine
+  and 1 user (that implementation doesn't use a cache lock). When using
+  multiple client machines or users, it also works with the default cache.
+- delete/prune: much quicker now and can be undone.
+- check --repair --undelete-archives: bring archives back from the dead.
+- rspace: manage reserved space in repository (avoid dead-end situation if
+  repository fs runs full).
+
+Bugs/issues fixed:
+
+- a lot! all linked from PR #8332.
+
+Other changes:
+
+- repository: remove transactions, solved differently and much simpler now
+  (convergence and write order primarily).
+- repository: replaced precise reference counting with "object exists in repo?"
+  and "garbage collection of unused objects".
+- cache: remove transactions, remove chunks cache.
+  removed LocalCache, BORG_CACHE_IMPL=local, solving all related issues.
+  as in beta 9, adhowwithfiles is the default implementation.
+- compact: needs the borg key now (run it clientside), -v gives nice stats.
+- transfer: archive transfers from borg 1.x need the --from-borg1 option
+- check: reimplemented / bigger changes.
+- code: got rid of a metric ton of not needed complexity.
+  when borg does not need to read borg 1.x repos/archives anymore, after
+  users have transferred their archives, even much more can be removed.
+- docs: updated / removed outdated stuff
+
 
 Version 2.0.0b9 (2024-07-20)
 ----------------------------

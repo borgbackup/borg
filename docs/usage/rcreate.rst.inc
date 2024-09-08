@@ -17,6 +17,8 @@ borg rcreate
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--other-repo SRC_REPOSITORY``    | reuse the key material from the other repository                                                                                                                                                                                       |
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--from-borg1``                   | other repository is borg 1.x                                                                                                                                                                                                           |
+    +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-e MODE``, ``--encryption MODE`` | select encryption key mode **(required)**                                                                                                                                                                                              |
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--append-only``                  | create an append-only mode repository. Note that this only affects the low level structure of the repository, and running `delete` or `prune` will still be allowed. See :ref:`append_only_mode` in Additional Notes for more details. |
@@ -46,6 +48,7 @@ borg rcreate
 
     optional arguments
         --other-repo SRC_REPOSITORY    reuse the key material from the other repository
+        --from-borg1                   other repository is borg 1.x
         -e MODE, --encryption MODE     select encryption key mode **(required)**
         --append-only                  create an append-only mode repository. Note that this only affects the low level structure of the repository, and running `delete` or `prune` will still be allowed. See :ref:`append_only_mode` in Additional Notes for more details.
         --storage-quota QUOTA          Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
@@ -59,8 +62,8 @@ borg rcreate
 Description
 ~~~~~~~~~~~
 
-This command creates a new, empty repository. A repository is a filesystem
-directory containing the deduplicated data from zero or more archives.
+This command creates a new, empty repository. A repository is a ``borgstore`` store
+containing the deduplicated data from zero or more archives.
 
 Encryption mode TLDR
 ++++++++++++++++++++
@@ -174,3 +177,11 @@ Optionally, if you use ``--copy-crypt-key`` you can also keep the same crypt_key
 keys to manage.
 
 Creating related repositories is useful e.g. if you want to use ``borg transfer`` later.
+
+Creating a related repository for data migration from borg 1.2 or 1.4
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+You can use ``borg rcreate --other-repo ORIG_REPO --from-borg1 ...`` to create a related
+repository that uses the same secret key material as the given other/original repository.
+
+Then use ``borg transfer --other-repo ORIG_REPO --from-borg1 ...`` to transfer the archives.

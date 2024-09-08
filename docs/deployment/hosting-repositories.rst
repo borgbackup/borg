@@ -68,8 +68,6 @@ can be filled to the specified quota.
 If storage quotas are used, ensure that all deployed Borg releases
 support storage quotas.
 
-Refer to :ref:`internals_storage_quota` for more details on storage quotas.
-
 **Specificities: Append-only repositories**
 
 Running ``borg init`` via a ``borg serve --append-only`` server will **not**

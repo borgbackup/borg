@@ -17,7 +17,7 @@ logger = create_logger()
 
 class TransferMixIn:
     @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
-    @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(manifest=True, cache=True, compatibility=(Manifest.Operation.WRITE,))
     def do_transfer(self, args, *, repository, manifest, cache, other_repository=None, other_manifest=None):
         """archives transfer from other repository, optionally upgrade data format"""
         key = manifest.key
@@ -33,7 +33,6 @@ class TransferMixIn:
             )
 
         dry_run = args.dry_run
-        args.consider_checkpoints = True
         archive_names = tuple(x.name for x in other_manifest.archives.list_considering(args))
         if not archive_names:
             return
@@ -61,10 +60,15 @@ class TransferMixIn:
 
         from .. import upgrade as upgrade_mod
 
+        v1_or_v2 = getattr(args, "v1_or_v2", False)
+        upgrader = args.upgrader
+        if upgrader == "NoOp" and v1_or_v2:
+            upgrader = "From12To20"
+
         try:
-            UpgraderCls = getattr(upgrade_mod, f"Upgrader{args.upgrader}")
+            UpgraderCls = getattr(upgrade_mod, f"Upgrader{upgrader}")
         except AttributeError:
-            raise Error(f"No such upgrader: {args.upgrader}")
+            raise Error(f"No such upgrader: {upgrader}")
 
         if UpgraderCls is not upgrade_mod.UpgraderFrom12To20 and other_manifest.repository.version == 1:
             raise Error("To transfer from a borg 1.x repo, you need to use: --upgrader=From12To20")
@@ -74,7 +78,7 @@ class TransferMixIn:
         for name in archive_names:
             transfer_size = 0
             present_size = 0
-            if name in manifest.archives and not dry_run:
+            if manifest.archives.exists(name) and not dry_run:
                 print(f"{name}: archive is already present in destination repo, skipping.")
             else:
                 if not dry_run:
@@ -96,8 +100,8 @@ class TransferMixIn:
                     if "chunks" in item:
                         chunks = []
                         for chunk_id, size in item.chunks:
-                            refcount = cache.seen_chunk(chunk_id, size)
-                            if refcount == 0:  # target repo does not yet have this chunk
+                            chunk_present = cache.seen_chunk(chunk_id, size)
+                            if not chunk_present:  # target repo does not yet have this chunk
                                 if not dry_run:
                                     cdata = other_repository.get(chunk_id)
                                     if args.recompress == "never":
@@ -143,7 +147,7 @@ class TransferMixIn:
                                 transfer_size += size
                             else:
                                 if not dry_run:
-                                    chunk_entry = cache.chunk_incref(chunk_id, size, archive.stats)
+                                    chunk_entry = cache.reuse_chunk(chunk_id, size, archive.stats)
                                     chunks.append(chunk_entry)
                                 present_size += size
                         if not dry_run:
@@ -188,32 +192,41 @@ class TransferMixIn:
         If you want to globally change compression while transferring archives to the DST_REPO,
         give ``--compress=WANTED_COMPRESSION --recompress=always``.
 
-        Suggested use for general purpose archive transfer (not repo upgrades)::
+        The default is to transfer all archives.
+
+        You could use the misc. archive filter options to limit which archives it will
+        transfer, e.g. using the ``-a`` option. This is recommended for big
+        repositories with multiple data sets to keep the runtime per invocation lower.
+
+        General purpose archive transfer
+        ++++++++++++++++++++++++++++++++
+
+        Transfer borg2 archives into a related other borg2 repository::
 
             # create a related DST_REPO (reusing key material from SRC_REPO), so that
             # chunking and chunk id generation will work in the same way as before.
-            borg --repo=DST_REPO rcreate --other-repo=SRC_REPO --encryption=DST_ENC
+            borg --repo=DST_REPO rcreate --encryption=DST_ENC --other-repo=SRC_REPO
 
             # transfer archives from SRC_REPO to DST_REPO
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check what it would do
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
 
-        The default is to transfer all archives, including checkpoint archives.
 
-        You could use the misc. archive filter options to limit which archives it will
-        transfer, e.g. using the ``-a`` option. This is recommended for big
-        repositories with multiple data sets to keep the runtime per invocation lower.
+        Data migration / upgrade from borg 1.x
+        ++++++++++++++++++++++++++++++++++++++
 
-        For repository upgrades (e.g. from a borg 1.2 repo to a related borg 2.0 repo), usage is
-        quite similar to the above::
+        To migrate your borg 1.x archives into a related, new borg2 repository, usage is quite similar
+        to the above, but you need the ``--from-borg1`` option::
 
-            # fast: compress metadata with zstd,3, but keep data chunks compressed as they are:
-            borg --repo=DST_REPO transfer --other-repo=SRC_REPO --upgrader=From12To20 \\
-                 --compress=zstd,3 --recompress=never
+            borg --repo=DST_REPO rcreate --encryption=DST_ENC --other-repo=SRC_REPO --from-borg1
 
-            # compress metadata and recompress data with zstd,3
-            borg --repo=DST_REPO transfer --other-repo=SRC_REPO --upgrader=From12To20 \\
+            # to continue using lz4 compression as you did in SRC_REPO:
+            borg --repo=DST_REPO transfer --other-repo=SRC_REPO --from-borg1 \\
+                 --compress=lz4 --recompress=never
+
+            # alternatively, to recompress everything to zstd,3:
+            borg --repo=DST_REPO transfer --other-repo=SRC_REPO --from-borg1 \\
                  --compress=zstd,3 --recompress=always
 
 
@@ -240,6 +253,9 @@ class TransferMixIn:
             default=Location(other=True),
             action=Highlander,
             help="transfer archives from the other repository",
+        )
+        subparser.add_argument(
+            "--from-borg1", dest="v1_or_v2", action="store_true", help="other repository is borg 1.x"
         )
         subparser.add_argument(
             "--upgrader",

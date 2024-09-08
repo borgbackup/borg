@@ -4,7 +4,7 @@ from ._common import with_repository, with_other_repository, Highlander
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names
-from ..helpers import CancelledByUser
+from ..helpers import CancelledByUser, CommandError
 from ..helpers import location_validator, Location
 from ..helpers import parse_storage_quota
 from ..manifest import Manifest
@@ -19,6 +19,10 @@ class RCreateMixIn:
     @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
     def do_rcreate(self, args, repository, *, other_repository=None, other_manifest=None):
         """Create a new, empty repository"""
+        if args.storage_quota is not None:
+            raise CommandError("storage-quota is not supported (yet?)")
+        if args.append_only:
+            raise CommandError("append-only is not supported (yet?)")
         other_key = other_manifest.key if other_manifest is not None else None
         path = args.location.canonical_path()
         logger.info('Initializing repository at "%s"' % path)
@@ -32,7 +36,6 @@ class RCreateMixIn:
         manifest = Manifest(key, repository)
         manifest.key = key
         manifest.write()
-        repository.commit(compact=False)
         with Cache(repository, manifest, warn_if_unencrypted=False):
             pass
         if key.NAME != "plaintext":
@@ -49,16 +52,22 @@ class RCreateMixIn:
                 "   borg key export -r REPOSITORY           encrypted-key-backup\n"
                 "   borg key export -r REPOSITORY --paper   encrypted-key-backup.txt\n"
                 "   borg key export -r REPOSITORY --qr-html encrypted-key-backup.html\n"
-                "2. Write down the borg key passphrase and store it at safe place.\n"
+                "2. Write down the borg key passphrase and store it at safe place."
             )
+        logger.warning(
+            "\n"
+            "Reserve some repository storage space now for emergencies like 'disk full'\n"
+            "by running:\n"
+            "    borg rspace --reserve 1G"
+        )
 
     def build_parser_rcreate(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
         rcreate_epilog = process_epilog(
             """
-        This command creates a new, empty repository. A repository is a filesystem
-        directory containing the deduplicated data from zero or more archives.
+        This command creates a new, empty repository. A repository is a ``borgstore`` store
+        containing the deduplicated data from zero or more archives.
 
         Encryption mode TLDR
         ++++++++++++++++++++
@@ -172,6 +181,14 @@ class RCreateMixIn:
         keys to manage.
 
         Creating related repositories is useful e.g. if you want to use ``borg transfer`` later.
+
+        Creating a related repository for data migration from borg 1.2 or 1.4
+        +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+        You can use ``borg rcreate --other-repo ORIG_REPO --from-borg1 ...`` to create a related
+        repository that uses the same secret key material as the given other/original repository.
+
+        Then use ``borg transfer --other-repo ORIG_REPO --from-borg1 ...`` to transfer the archives.
         """
         )
         subparser = subparsers.add_parser(
@@ -192,6 +209,9 @@ class RCreateMixIn:
             default=Location(other=True),
             action=Highlander,
             help="reuse the key material from the other repository",
+        )
+        subparser.add_argument(
+            "--from-borg1", dest="v1_or_v2", action="store_true", help="other repository is borg 1.x"
         )
         subparser.add_argument(
             "-e",

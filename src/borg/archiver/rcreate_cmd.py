@@ -4,7 +4,7 @@ from ._common import with_repository, with_other_repository, Highlander
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names
-from ..helpers import CancelledByUser
+from ..helpers import CancelledByUser, CommandError
 from ..helpers import location_validator, Location
 from ..helpers import parse_storage_quota
 from ..manifest import Manifest
@@ -19,6 +19,10 @@ class RCreateMixIn:
     @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
     def do_rcreate(self, args, repository, *, other_repository=None, other_manifest=None):
         """Create a new, empty repository"""
+        if args.storage_quota is not None:
+            raise CommandError("storage-quota is not supported (yet?)")
+        if args.append_only:
+            raise CommandError("append-only is not supported (yet?)")
         other_key = other_manifest.key if other_manifest is not None else None
         path = args.location.canonical_path()
         logger.info('Initializing repository at "%s"' % path)

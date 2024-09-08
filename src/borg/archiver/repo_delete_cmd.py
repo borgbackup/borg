@@ -90,7 +90,7 @@ class RepoDeleteMixIn:
     def build_parser_repo_delete(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        rdelete_epilog = process_epilog(
+        repo_delete_epilog = process_epilog(
             """
         This command deletes the complete repository.
 
@@ -107,7 +107,7 @@ class RepoDeleteMixIn:
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_delete.__doc__,
-            epilog=rdelete_epilog,
+            epilog=repo_delete_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="delete repository",
         )

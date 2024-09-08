@@ -158,7 +158,7 @@ class RepoCompressMixIn:
     def build_parser_repo_compress(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        rcompress_epilog = process_epilog(
+        repo_compress_epilog = process_epilog(
             """
         Repository (re-)compression (and/or re-obfuscation).
 
@@ -187,7 +187,7 @@ class RepoCompressMixIn:
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_compress.__doc__,
-            epilog=rcompress_epilog,
+            epilog=repo_compress_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help=self.do_repo_compress.__doc__,
         )

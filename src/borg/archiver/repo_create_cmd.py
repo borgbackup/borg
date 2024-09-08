@@ -64,7 +64,7 @@ class RepoCreateMixIn:
     def build_parser_repo_create(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        rcreate_epilog = process_epilog(
+        repo_create_epilog = process_epilog(
             """
         This command creates a new, empty repository. A repository is a ``borgstore`` store
         containing the deduplicated data from zero or more archives.
@@ -196,7 +196,7 @@ class RepoCreateMixIn:
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_create.__doc__,
-            epilog=rcreate_epilog,
+            epilog=repo_create_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="create a new, empty repository",
         )

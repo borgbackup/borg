@@ -39,7 +39,7 @@ class RepoListMixIn:
     def build_parser_repo_list(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_archive_filters_group
 
-        rlist_epilog = (
+        repo_list_epilog = (
             process_epilog(
                 """
         This command lists the archives contained in a repository.
@@ -87,7 +87,7 @@ class RepoListMixIn:
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_list.__doc__,
-            epilog=rlist_epilog,
+            epilog=repo_list_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="list repository contents",
         )

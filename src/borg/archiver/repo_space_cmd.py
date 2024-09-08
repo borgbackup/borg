@@ -48,7 +48,7 @@ class RepoSpaceMixIn:
     def build_parser_repo_space(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        rspace_epilog = process_epilog(
+        repo_space_epilog = process_epilog(
             """
         This command manages reserved space in a repository.
 
@@ -88,7 +88,7 @@ class RepoSpaceMixIn:
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_space.__doc__,
-            epilog=rspace_epilog,
+            epilog=repo_space_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="manage reserved space in a repository",
         )

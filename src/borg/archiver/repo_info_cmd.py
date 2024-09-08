@@ -68,7 +68,7 @@ class RepoInfoMixIn:
     def build_parser_repo_info(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        rinfo_epilog = process_epilog(
+        repo_info_epilog = process_epilog(
             """
         This command displays detailed information about the repository.
         """
@@ -78,7 +78,7 @@ class RepoInfoMixIn:
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_info.__doc__,
-            epilog=rinfo_epilog,
+            epilog=repo_info_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="show repository information",
         )

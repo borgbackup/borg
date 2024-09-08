@@ -9,7 +9,7 @@ def test_return_codes(cmd_fixture, tmpdir):
     input = tmpdir.mkdir("input")
     output = tmpdir.mkdir("output")
     input.join("test_file").write("content")
-    rc, out = cmd_fixture("--repo=%s" % str(repo), "rcreate", "--encryption=none")
+    rc, out = cmd_fixture("--repo=%s" % str(repo), "repo-create", "--encryption=none")
     assert rc == EXIT_SUCCESS
     rc, out = cmd_fixture("--repo=%s" % repo, "create", "archive", str(input))
     assert rc == EXIT_SUCCESS

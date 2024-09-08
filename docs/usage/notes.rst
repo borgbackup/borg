@@ -234,8 +234,8 @@ in ``.ssh/authorized_keys``:
     command="borg serve --append-only ..." ssh-rsa <key used for not-always-trustable backup clients>
     command="borg serve ..." ssh-rsa <key used for backup management>
 
-Running ``borg rcreate`` via a ``borg serve --append-only`` server will *not* create
-an append-only repository. Running ``borg rcreate --append-only`` creates an append-only
+Running ``borg repo-create`` via a ``borg serve --append-only`` server will *not* create
+an append-only repository. Running ``borg repo-create --append-only`` creates an append-only
 repository regardless of server settings.
 
 Example
@@ -280,7 +280,7 @@ than what you actually have in the repository now, after the rollback.
 
 Thus, you need to clear the cache::
 
-    borg rdelete --cache-only
+    borg repo-delete --cache-only
 
 The cache will get rebuilt automatically. Depending on repo size and archive
 count, it may take a while.

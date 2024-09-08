@@ -103,7 +103,7 @@ class RepoCompressMixIn:
             return ctype, clevel, olevel
 
         if not isinstance(repository, (Repository, RemoteRepository)):
-            raise Error("rcompress not supported for legacy repositories.")
+            raise Error("repo-compress not supported for legacy repositories.")
 
         repo_objs = manifest.repo_objs
         ctype, clevel, olevel = get_csettings(repo_objs.compressor)  # desired compression set by --compression
@@ -115,7 +115,7 @@ class RepoCompressMixIn:
         chunks_limit = min(1000, max(100, recompress_candidate_count // 1000))
 
         pi = ProgressIndicatorPercent(
-            total=len(recompress_ids), msg="Recompressing %3.1f%%", step=0.1, msgid="rcompress.process_chunks"
+            total=len(recompress_ids), msg="Recompressing %3.1f%%", step=0.1, msgid="repo_compress.process_chunks"
         )
         while recompress_ids:
             if sig_int and sig_int.action_done():
@@ -173,17 +173,17 @@ class RepoCompressMixIn:
         Please note that this command can not work in low (or zero) free disk space
         conditions.
 
-        If the ``borg rcompress`` process receives a SIGINT signal (Ctrl-C), the repo
+        If the ``borg repo-compress`` process receives a SIGINT signal (Ctrl-C), the repo
         will be committed and compacted and borg will terminate cleanly afterwards.
 
-        Both ``--progress`` and ``--stats`` are recommended when ``borg rcompress``
+        Both ``--progress`` and ``--stats`` are recommended when ``borg repo-compress``
         is used interactively.
 
-        You do **not** need to run ``borg compact`` after ``borg rcompress``.
+        You do **not** need to run ``borg compact`` after ``borg repo-compress``.
         """
         )
         subparser = subparsers.add_parser(
-            "rcompress",
+            "repo-compress",
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_compress.__doc__,

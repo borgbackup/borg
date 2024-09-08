@@ -4,7 +4,7 @@ Examples
 ~~~~~~~~
 ::
 
-    $ borg rinfo
+    $ borg repo-info
     Repository ID: 0e85a7811022326c067acb2a7181d5b526b7d2f61b34470fb8670c440a67f1a9
     Location: /Users/tw/w/borg/path/to/repo
     Encrypted: Yes (repokey AES-OCB)

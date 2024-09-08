@@ -74,7 +74,7 @@ class RepoInfoMixIn:
         """
         )
         subparser = subparsers.add_parser(
-            "rinfo",
+            "repo-info",
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_info.__doc__,

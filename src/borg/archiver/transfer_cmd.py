@@ -205,7 +205,7 @@ class TransferMixIn:
 
             # create a related DST_REPO (reusing key material from SRC_REPO), so that
             # chunking and chunk id generation will work in the same way as before.
-            borg --repo=DST_REPO rcreate --encryption=DST_ENC --other-repo=SRC_REPO
+            borg --repo=DST_REPO repo-create --encryption=DST_ENC --other-repo=SRC_REPO
 
             # transfer archives from SRC_REPO to DST_REPO
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check what it would do
@@ -219,7 +219,7 @@ class TransferMixIn:
         To migrate your borg 1.x archives into a related, new borg2 repository, usage is quite similar
         to the above, but you need the ``--from-borg1`` option::
 
-            borg --repo=DST_REPO rcreate --encryption=DST_ENC --other-repo=SRC_REPO --from-borg1
+            borg --repo=DST_REPO repocreate --encryption=DST_ENC --other-repo=SRC_REPO --from-borg1
 
             # to continue using lz4 compression as you did in SRC_REPO:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --from-borg1 \\

@@ -38,9 +38,9 @@ def test_usage(archiver):
 def test_help(archiver):
     assert "Borg" in cmd(archiver, "help")
     assert "patterns" in cmd(archiver, "help", "patterns")
-    assert "creates a new, empty repository" in cmd(archiver, "help", "rcreate")
-    assert "positional arguments" not in cmd(archiver, "help", "rcreate", "--epilog-only")
-    assert "creates a new, empty repository" not in cmd(archiver, "help", "rcreate", "--usage-only")
+    assert "creates a new, empty repository" in cmd(archiver, "help", "repo-create")
+    assert "positional arguments" not in cmd(archiver, "help", "repo-create", "--epilog-only")
+    assert "creates a new, empty repository" not in cmd(archiver, "help", "repo-create", "--usage-only")
 
 
 @pytest.mark.parametrize("command, parser", list(get_all_parsers().items()))

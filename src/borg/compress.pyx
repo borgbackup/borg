@@ -587,7 +587,7 @@ class ObfuscateSize(CompressorBase):
         trailer = bytes(addtl_size)
         obfuscated_data = compressed_data + trailer
         meta["csize"] = len(obfuscated_data)  # csize is the overall output size of this "obfuscation compressor"
-        meta["olevel"] = self.level  # remember the obfuscation level, useful for rcompress
+        meta["olevel"] = self.level  # remember the obfuscation level, useful for repo-compress
         return meta, obfuscated_data  # for borg2 it is enough that we have the payload size in meta["psize"]
 
     def decompress(self, meta, data):

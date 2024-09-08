@@ -103,7 +103,7 @@ class RepoDeleteMixIn:
         """
         )
         subparser = subparsers.add_parser(
-            "rdelete",
+            "repo-delete",
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_delete.__doc__,

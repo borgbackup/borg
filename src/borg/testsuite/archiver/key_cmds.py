@@ -18,58 +18,58 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 def test_change_passphrase(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     os.environ["BORG_NEW_PASSPHRASE"] = "newpassphrase"
     # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
     cmd(archiver, "key", "change-passphrase")
     os.environ["BORG_PASSPHRASE"] = "newpassphrase"
-    cmd(archiver, "rlist")
+    cmd(archiver, "repo-list")
 
 
 def test_change_location_to_keyfile(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    log = cmd(archiver, "rinfo")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    log = cmd(archiver, "repo-info")
     assert "(repokey" in log
     cmd(archiver, "key", "change-location", "keyfile")
-    log = cmd(archiver, "rinfo")
+    log = cmd(archiver, "repo-info")
     assert "(key file" in log
 
 
 def test_change_location_to_b2keyfile(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", "--encryption=repokey-blake2-aes-ocb")
-    log = cmd(archiver, "rinfo")
+    cmd(archiver, "repo-create", "--encryption=repokey-blake2-aes-ocb")
+    log = cmd(archiver, "repo-info")
     assert "(repokey BLAKE2b" in log
     cmd(archiver, "key", "change-location", "keyfile")
-    log = cmd(archiver, "rinfo")
+    log = cmd(archiver, "repo-info")
     assert "(key file BLAKE2b" in log
 
 
 def test_change_location_to_repokey(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", KF_ENCRYPTION)
-    log = cmd(archiver, "rinfo")
+    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    log = cmd(archiver, "repo-info")
     assert "(key file" in log
     cmd(archiver, "key", "change-location", "repokey")
-    log = cmd(archiver, "rinfo")
+    log = cmd(archiver, "repo-info")
     assert "(repokey" in log
 
 
 def test_change_location_to_b2repokey(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", "--encryption=keyfile-blake2-aes-ocb")
-    log = cmd(archiver, "rinfo")
+    cmd(archiver, "repo-create", "--encryption=keyfile-blake2-aes-ocb")
+    log = cmd(archiver, "repo-info")
     assert "(key file BLAKE2b" in log
     cmd(archiver, "key", "change-location", "repokey")
-    log = cmd(archiver, "rinfo")
+    log = cmd(archiver, "repo-info")
     assert "(repokey BLAKE2b" in log
 
 
 def test_key_export_keyfile(archivers, request):
     archiver = request.getfixturevalue(archivers)
     export_file = archiver.output_path + "/exported"
-    cmd(archiver, "rcreate", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION)
     repo_id = _extract_repository_id(archiver.repository_path)
     cmd(archiver, "key", "export", export_file)
 
@@ -97,7 +97,7 @@ def test_key_export_keyfile(archivers, request):
 
 def test_key_import_keyfile_with_borg_key_file(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION)
 
     exported_key_file = os.path.join(archiver.output_path, "exported")
     cmd(archiver, "key", "export", exported_key_file)
@@ -120,7 +120,7 @@ def test_key_import_keyfile_with_borg_key_file(archivers, request, monkeypatch):
 def test_key_export_repokey(archivers, request):
     archiver = request.getfixturevalue(archivers)
     export_file = archiver.output_path + "/exported"
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     repo_id = _extract_repository_id(archiver.repository_path)
     cmd(archiver, "key", "export", export_file)
 
@@ -153,7 +153,7 @@ def test_key_export_repokey(archivers, request):
 def test_key_export_qr(archivers, request):
     archiver = request.getfixturevalue(archivers)
     export_file = archiver.output_path + "/exported.html"
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     repo_id = _extract_repository_id(archiver.repository_path)
     cmd(archiver, "key", "export", "--qr-html", export_file)
 
@@ -169,7 +169,7 @@ def test_key_export_directory(archivers, request):
     archiver = request.getfixturevalue(archivers)
     export_directory = archiver.output_path + "/exported"
     os.mkdir(export_directory)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     if archiver.FORK_DEFAULT:
         expected_ec = CommandError().exit_code
         cmd(archiver, "key", "export", export_directory, exit_code=expected_ec)
@@ -182,7 +182,7 @@ def test_key_export_qr_directory(archivers, request):
     archiver = request.getfixturevalue(archivers)
     export_directory = archiver.output_path + "/exported"
     os.mkdir(export_directory)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     if archiver.FORK_DEFAULT:
         expected_ec = CommandError().exit_code
         cmd(archiver, "key", "export", "--qr-html", export_directory, exit_code=expected_ec)
@@ -194,7 +194,7 @@ def test_key_export_qr_directory(archivers, request):
 def test_key_import_errors(archivers, request):
     archiver = request.getfixturevalue(archivers)
     export_file = archiver.output_path + "/exported"
-    cmd(archiver, "rcreate", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION)
     if archiver.FORK_DEFAULT:
         expected_ec = CommandError().exit_code
         cmd(archiver, "key", "import", export_file, exit_code=expected_ec)
@@ -227,7 +227,7 @@ def test_key_export_paperkey(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_id = "e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239"
     export_file = archiver.output_path + "/exported"
-    cmd(archiver, "rcreate", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION)
     _set_repository_id(archiver.repository_path, hex_to_bin(repo_id))
     key_file = archiver.keys_path + "/" + os.listdir(archiver.keys_path)[0]
 
@@ -255,7 +255,7 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
 def test_key_import_paperkey(archivers, request):
     archiver = request.getfixturevalue(archivers)
     repo_id = "e294423506da4e1ea76e8dcdf1a3919624ae3ae496fddf905610c351d3f09239"
-    cmd(archiver, "rcreate", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION)
     _set_repository_id(archiver.repository_path, hex_to_bin(repo_id))
 
     key_file = archiver.keys_path + "/" + os.listdir(archiver.keys_path)[0]
@@ -301,7 +301,7 @@ def test_key_import_paperkey(archivers, request):
 def test_init_defaults_to_argon2(archivers, request):
     """https://github.com/borgbackup/borg/issues/747#issuecomment-1076160401"""
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     with Repository(archiver.repository_path) as repository:
         key = msgpack.unpackb(binascii.a2b_base64(repository.load_key()))
         assert key["algorithm"] == "argon2 chacha20-poly1305"
@@ -309,7 +309,7 @@ def test_init_defaults_to_argon2(archivers, request):
 
 def test_change_passphrase_does_not_change_algorithm_argon2(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     os.environ["BORG_NEW_PASSPHRASE"] = "newpassphrase"
     cmd(archiver, "key", "change-passphrase")
 
@@ -320,7 +320,7 @@ def test_change_passphrase_does_not_change_algorithm_argon2(archivers, request):
 
 def test_change_location_does_not_change_algorithm_argon2(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", KF_ENCRYPTION)
+    cmd(archiver, "repo-create", KF_ENCRYPTION)
     cmd(archiver, "key", "change-location", "repokey")
 
     with Repository(archiver.repository_path) as repository:

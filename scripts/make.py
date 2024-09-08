@@ -257,17 +257,25 @@ class BuildMan:
     """build man pages"""
 
     see_also = {
-        "create": ("delete", "prune", "check", "patterns", "placeholders", "compression", "rcreate"),
+        "create": ("delete", "prune", "check", "patterns", "placeholders", "compression", "repo-create"),
         "recreate": ("patterns", "placeholders", "compression"),
-        "list": ("info", "diff", "prune", "patterns", "rlist"),
-        "info": ("list", "diff", "rinfo"),
-        "rcreate": ("rdelete", "rlist", "check", "benchmark-cpu", "key-import", "key-export", "key-change-passphrase"),
+        "list": ("info", "diff", "prune", "patterns", "repo-list"),
+        "info": ("list", "diff", "repo-info"),
+        "repo-create": (
+            "repo-delete",
+            "repo-list",
+            "check",
+            "benchmark-cpu",
+            "key-import",
+            "key-export",
+            "key-change-passphrase",
+        ),
         "key-import": ("key-export",),
         "key-export": ("key-import",),
         "mount": ("umount", "extract"),  # Would be cooler if these two were on the same page
         "umount": ("mount",),
         "extract": ("mount",),
-        "delete": ("compact", "rdelete"),
+        "delete": ("compact", "repo-delete"),
         "prune": ("compact",),
     }
 

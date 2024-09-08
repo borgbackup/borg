@@ -1,6 +1,6 @@
 1. Before a backup can be made, a repository has to be initialized::
 
-    $ borg -r /path/to/repo rcreate --encryption=repokey-aes-ocb
+    $ borg -r /path/to/repo repo-create --encryption=repokey-aes-ocb
 
 2. Back up the ``~/src`` and ``~/Documents`` directories into an archive called
    *Monday*::
@@ -29,7 +29,7 @@
 
 4. List all archives in the repository::
 
-    $ borg -r /path/to/repo rlist
+    $ borg -r /path/to/repo repo-list
     Monday                               Sat, 2022-06-25 20:21:14 [b80e24d2...b179f298]
     Tuesday                              Sat, 2022-06-25 20:21:43 [bcd1b53f...1877718d]
 

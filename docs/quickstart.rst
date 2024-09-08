@@ -43,7 +43,7 @@ in your backup log files (you check them regularly anyway, right?).
 
 Also helpful:
 
-- use `borg rspace` to reserve some disk space that can be freed when the fs
+- use `borg repo-space` to reserve some disk space that can be freed when the fs
   does not have free space any more.
 - if you use LVM: use a LV + a filesystem that you can resize later and have
   some unallocated PEs you can add to the LV.
@@ -332,7 +332,7 @@ Repository encryption
 
 You can choose the repository encryption mode at repository creation time::
 
-    $ borg rcreate --encryption=MODE
+    $ borg repo-create --encryption=MODE
 
 For a list of available encryption MODEs and their descriptions, please refer
 to :ref:`borg_rcreate`.
@@ -380,7 +380,7 @@ Borg can initialize and access repositories on remote hosts if the
 host is accessible using SSH.  This is fastest and easiest when Borg
 is installed on the remote host, in which case the following syntax is used::
 
-  $ borg -r ssh://user@hostname:port/path/to/repo rcreate ...
+  $ borg -r ssh://user@hostname:port/path/to/repo repo-create ...
 
 Note: please see the usage chapter for a full documentation of repo URLs.
 
@@ -396,7 +396,7 @@ it is still possible to use the remote host to store a repository by
 mounting the remote filesystem, for example, using sshfs::
 
   $ sshfs user@hostname:/path/to /path/to
-  $ borg -r /path/to/repo rcreate ...
+  $ borg -r /path/to/repo repo-create ...
   $ fusermount -u /path/to
 
 You can also use other remote filesystems in a similar way. Just be careful,
@@ -502,7 +502,7 @@ Example with **borg mount**:
     # open a new, separate terminal (this terminal will be blocked until umount)
 
     # now we find out the archive names we have in the repo:
-    borg rlist
+    borg repo-list
 
     # mount one archive from a borg repo:
     borg mount -a myserver-system-2019-08-11 /mnt/borg
@@ -528,7 +528,7 @@ Example with **borg extract**:
     cd borg_restore
 
     # now we find out the archive names we have in the repo:
-    borg rlist
+    borg repo-list
 
     # we could find out the archive contents, esp. the path layout:
     borg list myserver-system-2019-08-11

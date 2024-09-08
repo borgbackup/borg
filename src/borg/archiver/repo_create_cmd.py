@@ -58,7 +58,7 @@ class RepoCreateMixIn:
             "\n"
             "Reserve some repository storage space now for emergencies like 'disk full'\n"
             "by running:\n"
-            "    borg rspace --reserve 1G"
+            "    borg repo-space --reserve 1G"
         )
 
     def build_parser_repo_create(self, subparsers, common_parser, mid_common_parser):
@@ -79,7 +79,7 @@ class RepoCreateMixIn:
 
         ::
 
-            borg rcreate --encryption repokey-aes-ocb
+            borg repo-create --encryption repokey-aes-ocb
 
         Borg will:
 
@@ -170,7 +170,7 @@ class RepoCreateMixIn:
         Creating a related repository
         +++++++++++++++++++++++++++++
 
-        You can use ``borg rcreate --other-repo ORIG_REPO ...`` to create a related repository
+        You can use ``borg repo-create --other-repo ORIG_REPO ...`` to create a related repository
         that uses the same secret key material as the given other/original repository.
 
         By default, only the ID key and chunker secret will be the same (these are important
@@ -185,14 +185,14 @@ class RepoCreateMixIn:
         Creating a related repository for data migration from borg 1.2 or 1.4
         +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-        You can use ``borg rcreate --other-repo ORIG_REPO --from-borg1 ...`` to create a related
+        You can use ``borg repo-create --other-repo ORIG_REPO --from-borg1 ...`` to create a related
         repository that uses the same secret key material as the given other/original repository.
 
         Then use ``borg transfer --other-repo ORIG_REPO --from-borg1 ...`` to transfer the archives.
         """
         )
         subparser = subparsers.add_parser(
-            "rcreate",
+            "repo-create",
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_create.__doc__,

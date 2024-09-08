@@ -122,9 +122,9 @@ For ease of use, set the BORG_REPO environment variable::
 
     $ export BORG_REPO=/path/to/repo
 
-Create a new backup repository (see ``borg rcreate --help`` for encryption options)::
+Create a new backup repository (see ``borg repo-create --help`` for encryption options)::
 
-    $ borg rcreate -e repokey-aes-ocb
+    $ borg repo-create -e repokey-aes-ocb
 
 Create a new backup archive::
 

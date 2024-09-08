@@ -138,9 +138,9 @@ General:
 
 Output formatting:
     BORG_LIST_FORMAT
-        Giving the default value for ``borg list --format=X``.
+        Giving the default value for ``borg repo-list --format=X``.
     BORG_RLIST_FORMAT
-        Giving the default value for ``borg rlist --format=X``.
+        Giving the default value for ``borg repo-list --format=X``.
     BORG_PRUNE_FORMAT
         Giving the default value for ``borg prune --format=X``.
 
@@ -200,7 +200,7 @@ Directories and files:
         - using a full, absolute path to the key file is recommended.
         - all directories in the given path must exist.
         - this setting forces borg to use the key file at the given location.
-        - the key file must either exist (for most commands) or will be created (``borg rcreate``).
+        - the key file must either exist (for most commands) or will be created (``borg repo-create``).
         - you need to give a different path for different repositories.
         - you need to point to the correct key file matching the repository the command will operate on.
     TMPDIR

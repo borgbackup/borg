@@ -9,19 +9,19 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 def test_info(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
-    info_repo = cmd(archiver, "rinfo")
+    info_repo = cmd(archiver, "repo-info")
     assert "Repository ID:" in info_repo
 
 
 def test_info_json(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
 
-    info_repo = json.loads(cmd(archiver, "rinfo", "--json"))
+    info_repo = json.loads(cmd(archiver, "repo-info", "--json"))
     repository = info_repo["repository"]
     assert len(repository["id"]) == 64
     assert "last_modified" in repository

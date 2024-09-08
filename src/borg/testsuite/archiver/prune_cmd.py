@@ -20,18 +20,18 @@ def _create_archive_ts(archiver, name, y, m, d, H=0, M=0, S=0):
 
 def test_prune_repository(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test1", src_dir)
     cmd(archiver, "create", "test2", src_dir)
     output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1")
     assert re.search(r"Would prune:\s+test1", output)
     # must keep the latest archive:
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+test2", output)
-    output = cmd(archiver, "rlist")
+    output = cmd(archiver, "repo-list")
     assert "test1" in output
     assert "test2" in output
     cmd(archiver, "prune", "--keep-daily=1")
-    output = cmd(archiver, "rlist")
+    output = cmd(archiver, "repo-list")
     assert "test1" not in output
     # the latest archive must be still there:
     assert "test2" in output
@@ -40,7 +40,7 @@ def test_prune_repository(archivers, request):
 # This test must match docs/misc/prune-example.txt
 def test_prune_repository_example(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     # Archives that will be kept, per the example
     # Oldest archive
     _create_archive_ts(archiver, "test01", 2015, 1, 1)
@@ -86,12 +86,12 @@ def test_prune_repository_example(archivers, request):
         assert re.search(r"Keeping archive \(rule: monthly #" + str(i) + r"\):\s+test" + ("%02d" % (8 - i)), output)
     for i in range(1, 15):
         assert re.search(r"Keeping archive \(rule: daily #" + str(i) + r"\):\s+test" + ("%02d" % (22 - i)), output)
-    output = cmd(archiver, "rlist")
+    output = cmd(archiver, "repo-list")
     # Nothing pruned after dry run
     for i in range(1, 25):
         assert "test%02d" % i in output
     cmd(archiver, "prune", "--keep-daily=14", "--keep-monthly=6", "--keep-yearly=1")
-    output = cmd(archiver, "rlist")
+    output = cmd(archiver, "repo-list")
     # All matching backups plus oldest kept
     for i in range(1, 22):
         assert "test%02d" % i in output
@@ -103,7 +103,7 @@ def test_prune_repository_example(archivers, request):
 # With an initial and daily backup, prune daily until oldest is replaced by a monthly backup
 def test_prune_retain_and_expire_oldest(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     # Initial backup
     _create_archive_ts(archiver, "original_archive", 2020, 9, 1, 11, 15)
     # Archive and prune daily for 30 days
@@ -128,7 +128,7 @@ def test_prune_retain_and_expire_oldest(archivers, request):
 
 def test_prune_repository_prefix(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "foo-2015-08-12-10:00", src_dir)
     cmd(archiver, "create", "foo-2015-08-12-20:00", src_dir)
     cmd(archiver, "create", "bar-2015-08-12-10:00", src_dir)
@@ -136,13 +136,13 @@ def test_prune_repository_prefix(archivers, request):
     output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1", "--match-archives=sh:foo-*")
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+foo-2015-08-12-20:00", output)
     assert re.search(r"Would prune:\s+foo-2015-08-12-10:00", output)
-    output = cmd(archiver, "rlist")
+    output = cmd(archiver, "repo-list")
     assert "foo-2015-08-12-10:00" in output
     assert "foo-2015-08-12-20:00" in output
     assert "bar-2015-08-12-10:00" in output
     assert "bar-2015-08-12-20:00" in output
     cmd(archiver, "prune", "--keep-daily=1", "--match-archives=sh:foo-*")
-    output = cmd(archiver, "rlist")
+    output = cmd(archiver, "repo-list")
     assert "foo-2015-08-12-10:00" not in output
     assert "foo-2015-08-12-20:00" in output
     assert "bar-2015-08-12-10:00" in output
@@ -151,7 +151,7 @@ def test_prune_repository_prefix(archivers, request):
 
 def test_prune_repository_glob(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "2015-08-12-10:00-foo", src_dir)
     cmd(archiver, "create", "2015-08-12-20:00-foo", src_dir)
     cmd(archiver, "create", "2015-08-12-10:00-bar", src_dir)
@@ -159,13 +159,13 @@ def test_prune_repository_glob(archivers, request):
     output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1", "--match-archives=sh:2015-*-foo")
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+2015-08-12-20:00-foo", output)
     assert re.search(r"Would prune:\s+2015-08-12-10:00-foo", output)
-    output = cmd(archiver, "rlist")
+    output = cmd(archiver, "repo-list")
     assert "2015-08-12-10:00-foo" in output
     assert "2015-08-12-20:00-foo" in output
     assert "2015-08-12-10:00-bar" in output
     assert "2015-08-12-20:00-bar" in output
     cmd(archiver, "prune", "--keep-daily=1", "--match-archives=sh:2015-*-foo")
-    output = cmd(archiver, "rlist")
+    output = cmd(archiver, "repo-list")
     assert "2015-08-12-10:00-foo" not in output
     assert "2015-08-12-20:00-foo" in output
     assert "2015-08-12-10:00-bar" in output

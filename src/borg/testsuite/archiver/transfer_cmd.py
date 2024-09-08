@@ -18,7 +18,7 @@ def test_transfer(archivers, request):
     original_location, input_path = archiver.repository_location, archiver.input_path
 
     def check_repo():
-        listing = cmd(archiver, "rlist", "--short")
+        listing = cmd(archiver, "repo-list", "--short")
         assert "arch1" in listing
         assert "arch2" in listing
         listing = cmd(archiver, "list", "--short", "arch1")
@@ -29,14 +29,14 @@ def test_transfer(archivers, request):
     create_test_files(input_path)
     archiver.repository_location = original_location + "1"
 
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "arch1", "input")
     cmd(archiver, "create", "arch2", "input")
     check_repo()
 
     archiver.repository_location = original_location + "2"
     other_repo1 = f"--other-repo={original_location}1"
-    cmd(archiver, "rcreate", RK_ENCRYPTION, other_repo1)
+    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1)
     cmd(archiver, "transfer", other_repo1, "--dry-run")
     cmd(archiver, "transfer", other_repo1)
     cmd(archiver, "transfer", other_repo1, "--dry-run")
@@ -75,12 +75,12 @@ def test_transfer_upgrade(archivers, request):
     assert os.environ.get("BORG_PASSPHRASE") == "waytooeasyonlyfortests"
     os.environ["BORG_TESTONLY_WEAKEN_KDF"] = "0"  # must use the strong kdf here or it can't decrypt the key
 
-    cmd(archiver, "rcreate", RK_ENCRYPTION, other_repo1, "--from-borg1")
+    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1, "--from-borg1")
     cmd(archiver, "transfer", other_repo1, "--from-borg1")
     cmd(archiver, "check")
 
     # check list of archives / manifest
-    rlist_json = cmd(archiver, "rlist", "--json")
+    rlist_json = cmd(archiver, "repo-list", "--json")
     got = json.loads(rlist_json)
     with open(os.path.join(dst_dir, "test_meta", "repo_list.json")) as f:
         expected = json.load(f)

@@ -15,7 +15,7 @@ Examples
     # the AEAD cipher does not matter (everything must be re-encrypted and
     # re-authenticated anyway), you could also choose repokey-blake2-chacha20-poly1305.
     # in case your old borg repo did not use blake2, just remove the "-blake2".
-    $ borg --repo       ssh://borg2@borgbackup/./tests/b20 rcreate \
+    $ borg --repo       ssh://borg2@borgbackup/./tests/b20 repo-create \
            --other-repo ssh://borg2@borgbackup/./tests/b12 -e repokey-blake2-aes-ocb
 
     # 2. Check what and how much it would transfer:

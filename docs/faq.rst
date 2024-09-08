@@ -41,8 +41,8 @@ Can I copy or synchronize my repo to another location?
 If you want to have redundant backup repositories (preferably at separate
 locations), the recommended way to do that is like this:
 
-- ``borg rcreate repo1 --encryption=X``
-- ``borg rcreate repo2 --encryption=X --other-repo=repo1``
+- ``borg repo-create repo1 --encryption=X``
+- ``borg repo-create repo2 --encryption=X --other-repo=repo1``
 - maybe do a snapshot to have stable and same input data for both borg create.
 - client machine ---borg create---> repo1
 - client machine ---borg create---> repo2
@@ -86,7 +86,7 @@ you could delete the manifest-timestamp and the local cache:
 
   borg config id   # shows the REPO_ID
   rm ~/.config/borg/security/REPO_ID/manifest-timestamp
-  borg rdelete --cache-only
+  borg repo-delete --cache-only
 
 This is an unsafe and unsupported way to use borg, you have been warned.
 
@@ -355,7 +355,7 @@ are calculated *before* compression. New compression settings
 will only be applied to new chunks, not existing chunks. So it's safe
 to change them.
 
-Use ``borg rcompress`` to efficiently recompress a complete repository.
+Use ``borg repo-compress`` to efficiently recompress a complete repository.
 
 Security
 ########
@@ -445,7 +445,7 @@ Using ``BORG_PASSCOMMAND`` with a file of proper permissions
 Using keyfile-based encryption with a blank passphrase
   It is possible to encrypt your repository in ``keyfile`` mode instead of the default
   ``repokey`` mode and use a blank passphrase for the key file (simply press Enter twice
-  when ``borg rcreate`` asks for the password). See :ref:`encrypted_repos`
+  when ``borg repo-create`` asks for the password). See :ref:`encrypted_repos`
   for more details.
 
 Using ``BORG_PASSCOMMAND`` with macOS Keychain

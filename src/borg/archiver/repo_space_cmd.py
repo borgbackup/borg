@@ -65,26 +65,26 @@ class RepoSpaceMixIn:
         Examples::
 
             # Create a new repository:
-            $ borg rcreate ...
+            $ borg repo-create ...
             # Reserve approx. 1GB of space for emergencies:
-            $ borg rspace --reserve 1G
+            $ borg repo-space --reserve 1G
 
             # Check amount of reserved space in the repository:
-            $ borg rspace
+            $ borg repo-space
 
             # EMERGENCY! Free all reserved space to get things back to normal:
-            $ borg rspace --free
+            $ borg repo-space --free
             $ borg prune ...
             $ borg delete ...
             $ borg compact -v  # only this actually frees space of deleted archives
-            $ borg rspace --reserve 1G  # reserve space again for next time
+            $ borg repo-space --reserve 1G  # reserve space again for next time
 
 
         Reserved space is always rounded up to use full reservation blocks of 64MiB.
         """
         )
         subparser = subparsers.add_parser(
-            "rspace",
+            "repo-space",
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_space.__doc__,

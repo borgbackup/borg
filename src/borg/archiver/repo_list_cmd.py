@@ -55,7 +55,7 @@ class RepoListMixIn:
         Examples:
         ::
 
-            $ borg rlist --format '{archive}{NL}'
+            $ borg repo-list --format '{archive}{NL}'
             ArchiveFoo
             ArchiveBar
             ...
@@ -63,7 +63,7 @@ class RepoListMixIn:
             # {VAR:NUMBER} - pad to NUMBER columns.
             # Strings are left-aligned, numbers are right-aligned.
             # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
-            $ borg rlist --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
+            $ borg repo-list --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
             ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9...3b274]
             ...
 
@@ -83,7 +83,7 @@ class RepoListMixIn:
             + ArchiveFormatter.keys_help()
         )
         subparser = subparsers.add_parser(
-            "rlist",
+            "repo-list",
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_list.__doc__,

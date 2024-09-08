@@ -79,14 +79,14 @@ from .list_cmd import ListMixIn
 from .lock_cmds import LocksMixIn
 from .mount_cmds import MountMixIn
 from .prune_cmd import PruneMixIn
-from .repo_compress_cmd import RCompressMixIn
+from .repo_compress_cmd import RepoCompressMixIn
 from .recreate_cmd import RecreateMixIn
 from .rename_cmd import RenameMixIn
-from .repo_create_cmd import RCreateMixIn
-from .repo_info_cmd import RInfoMixIn
-from .repo_delete_cmd import RDeleteMixIn
-from .repo_list_cmd import RListMixIn
-from .repo_space_cmd import RSpaceMixIn
+from .repo_create_cmd import RepoCreateMixIn
+from .repo_info_cmd import RepoInfoMixIn
+from .repo_delete_cmd import RepoDeleteMixIn
+from .repo_list_cmd import RepoListMixIn
+from .repo_space_cmd import RepoSpaceMixIn
 from .serve_cmd import ServeMixIn
 from .tar_cmds import TarMixIn
 from .transfer_cmd import TransferMixIn
@@ -111,12 +111,12 @@ class Archiver(
     PruneMixIn,
     RecreateMixIn,
     RenameMixIn,
-    RCompressMixIn,
-    RCreateMixIn,
-    RDeleteMixIn,
-    RInfoMixIn,
-    RListMixIn,
-    RSpaceMixIn,
+    RepoCompressMixIn,
+    RepoCreateMixIn,
+    RepoDeleteMixIn,
+    RepoInfoMixIn,
+    RepoListMixIn,
+    RepoSpaceMixIn,
     ServeMixIn,
     TarMixIn,
     TransferMixIn,

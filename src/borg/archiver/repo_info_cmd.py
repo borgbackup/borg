@@ -11,7 +11,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-class RInfoMixIn:
+class RepoInfoMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
     def do_rinfo(self, args, repository, manifest, cache):
         """Show repository infos"""

@@ -14,7 +14,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-class RCreateMixIn:
+class RepoCreateMixIn:
     @with_repository(create=True, exclusive=True, manifest=False)
     @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
     def do_rcreate(self, args, repository, *, other_repository=None, other_manifest=None):

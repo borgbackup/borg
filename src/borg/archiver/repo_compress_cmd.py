@@ -87,7 +87,7 @@ def format_compression_spec(ctype, clevel, olevel):
     return obfuscation + cname + clevel
 
 
-class RCompressMixIn:
+class RepoCompressMixIn:
     @with_repository(cache=False, manifest=True, compatibility=(Manifest.Operation.CHECK,))
     def do_rcompress(self, args, repository, manifest):
         """Repository (re-)compression"""

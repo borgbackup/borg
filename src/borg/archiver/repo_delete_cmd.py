@@ -14,7 +14,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-class RDeleteMixIn:
+class RepoDeleteMixIn:
     @with_repository(exclusive=True, manifest=False)
     def do_rdelete(self, args, repository):
         """Delete a repository"""

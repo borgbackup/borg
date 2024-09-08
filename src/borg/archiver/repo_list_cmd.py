@@ -13,7 +13,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-class RListMixIn:
+class RepoListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_rlist(self, args, repository, manifest):
         """List the archives contained in a repository"""

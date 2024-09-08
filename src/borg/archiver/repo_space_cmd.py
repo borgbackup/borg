@@ -11,7 +11,7 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-class RSpaceMixIn:
+class RepoSpaceMixIn:
     @with_repository(lock=False, manifest=False)
     def do_rspace(self, args, repository):
         """Manage reserved space in repository"""

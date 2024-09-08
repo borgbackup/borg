@@ -42,7 +42,7 @@ SEE ALSO
 
 `borg-common(1)` for common command line options
 
-`borg-rcreate(1)`, `borg-rdelete(1)`, `borg-rlist(1)`, `borg-rinfo(1)`,
+`borg-repo-create(1)`, `borg-repo-delete(1)`, `borg-repo-list(1)`, `borg-repo-info(1)`,
 `borg-create(1)`, `borg-mount(1)`, `borg-extract(1)`,
 `borg-list(1)`, `borg-info(1)`,
 `borg-delete(1)`, `borg-prune(1)`, `borg-compact(1)`,

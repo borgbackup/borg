@@ -1,12 +1,12 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. _borg_rlist:
+.. _borg_repo-list:
 
-borg rlist
-----------
+borg repo-list
+--------------
 .. code-block:: none
 
-    borg [common options] rlist [options]
+    borg [common options] repo-list [options]
 
 .. only:: html
 
@@ -92,7 +92,7 @@ The ``--format`` option uses python's `format string syntax
 Examples:
 ::
 
-    $ borg rlist --format '{archive}{NL}'
+    $ borg repo-list --format '{archive}{NL}'
     ArchiveFoo
     ArchiveBar
     ...
@@ -100,7 +100,7 @@ Examples:
     # {VAR:NUMBER} - pad to NUMBER columns.
     # Strings are left-aligned, numbers are right-aligned.
     # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
-    $ borg rlist --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
+    $ borg repo-list --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
     ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9...3b274]
     ...
 

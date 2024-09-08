@@ -1,6 +1,6 @@
-.. _borg-rcreate:
+.. _borg_repo_create:
 
-.. include:: rcreate.rst.inc
+.. include:: repo-create.rst.inc
 
 Examples
 ~~~~~~~~

@@ -123,7 +123,7 @@ Supported: borg 2.0+
 Encryption with these modes is based on AEAD ciphers (authenticated encryption
 with associated data) and session keys.
 
-Depending on the chosen mode (see :ref:`borg_rcreate`) different AEAD ciphers are used:
+Depending on the chosen mode (see :ref:`borg_repo-create`) different AEAD ciphers are used:
 
 - AES-256-OCB - super fast, single-pass algorithm IF you have hw accelerated AES.
 - chacha20-poly1305 - very fast, purely software based AEAD cipher.

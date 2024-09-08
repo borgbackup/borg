@@ -255,7 +255,7 @@ Passphrase prompts should be handled differently. Use the environment variables 
 and *BORG_NEW_PASSPHRASE* (see :ref:`env_vars` for reference) to pass passphrases to Borg, don't
 use the interactive passphrase prompts.
 
-When setting a new passphrase (:ref:`borg_rcreate`, :ref:`borg_key_change-passphrase`) normally
+When setting a new passphrase (:ref:`borg_repo-create`, :ref:`borg_key_change-passphrase`) normally
 Borg prompts whether it should display the passphrase. This can be suppressed by setting
 the environment variable *BORG_DISPLAY_PASSPHRASE* to *no*.
 
@@ -299,7 +299,7 @@ last_modified
 The *encryption* key, if present, contains:
 
 mode
-    Textual encryption mode name (same as :ref:`borg_rcreate` ``--encryption`` names)
+    Textual encryption mode name (same as :ref:`borg_repo-create` ``--encryption`` names)
 keyfile
     Path to the local key file used for access. Depending on *mode* this key may be absent.
 

@@ -1,4 +1,4 @@
-.. include:: rdelete.rst.inc
+.. include:: repo-delete.rst.inc
 
 Examples
 ~~~~~~~~

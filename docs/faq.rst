@@ -33,7 +33,7 @@ Can I back up to multiple, swapped backup targets?
 --------------------------------------------------
 
 It is possible to swap your backup disks if each backup medium is assigned its
-own repository by creating a new one with :ref:`borg_rcreate`.
+own repository by creating a new one with :ref:`borg_repo-create`.
 
 Can I copy or synchronize my repo to another location?
 ------------------------------------------------------

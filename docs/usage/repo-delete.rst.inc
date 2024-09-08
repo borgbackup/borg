@@ -1,12 +1,12 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. _borg_rdelete:
+.. _borg_repo-delete:
 
-borg rdelete
-------------
+borg repo-delete
+----------------
 .. code-block:: none
 
-    borg [common options] rdelete [options]
+    borg [common options] repo-delete [options]
 
 .. only:: html
 

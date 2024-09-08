@@ -1,4 +1,4 @@
-.. include:: rlist.rst.inc
+.. include:: repo-list.rst.inc
 
 Examples
 ~~~~~~~~

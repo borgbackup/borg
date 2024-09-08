@@ -1,12 +1,12 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. _borg_rinfo:
+.. _borg_repo-info:
 
-borg rinfo
-----------
+borg repo-info
+--------------
 .. code-block:: none
 
-    borg [common options] rinfo [options]
+    borg [common options] repo-info [options]
 
 .. only:: html
 

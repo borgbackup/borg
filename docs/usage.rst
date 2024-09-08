@@ -36,12 +36,12 @@ Usage
 .. toctree::
    usage/general
 
-   usage/rcreate
-   usage/rspace
-   usage/rlist
-   usage/rinfo
-   usage/rcompress
-   usage/rdelete
+   usage/repo-create
+   usage/repo-space
+   usage/repo-list
+   usage/repo-info
+   usage/repo-compress
+   usage/repo-delete
    usage/serve
    usage/version
    usage/compact

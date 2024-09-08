@@ -335,7 +335,7 @@ You can choose the repository encryption mode at repository creation time::
     $ borg repo-create --encryption=MODE
 
 For a list of available encryption MODEs and their descriptions, please refer
-to :ref:`borg_rcreate`.
+to :ref:`borg_repo-create`.
 
 If you use encryption, all data is encrypted on the client before being written
 to the repository.

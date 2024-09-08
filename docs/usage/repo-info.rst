@@ -1,4 +1,4 @@
-.. include:: rinfo.rst.inc
+.. include:: repo-info.rst.inc
 
 Examples
 ~~~~~~~~

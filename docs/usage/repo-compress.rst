@@ -1,4 +1,4 @@
-.. include:: rcompress.rst.inc
+.. include:: repo-compress.rst.inc
 
 Examples
 ~~~~~~~~

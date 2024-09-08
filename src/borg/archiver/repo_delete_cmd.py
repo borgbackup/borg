@@ -87,7 +87,7 @@ class RepoDeleteMixIn:
         else:
             logger.info("Would delete cache.")
 
-    def build_parser_rdelete(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_delete(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
         rdelete_epilog = process_epilog(

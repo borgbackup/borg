@@ -65,7 +65,7 @@ class RepoInfoMixIn:
 
             print(output)
 
-    def build_parser_rinfo(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_info(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
         rinfo_epilog = process_epilog(

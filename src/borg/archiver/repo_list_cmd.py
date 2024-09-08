@@ -36,7 +36,7 @@ class RepoListMixIn:
         if args.json:
             json_print(basic_json_data(manifest, extra={"archives": output_data}))
 
-    def build_parser_rlist(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_list(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_archive_filters_group
 
         rlist_epilog = (

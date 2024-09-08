@@ -61,7 +61,7 @@ class RepoCreateMixIn:
             "    borg rspace --reserve 1G"
         )
 
-    def build_parser_rcreate(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_create(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
         rcreate_epilog = process_epilog(

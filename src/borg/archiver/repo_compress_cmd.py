@@ -155,7 +155,7 @@ class RepoCompressMixIn:
             print(f"Kept as is: {stats_process['kept_count']}")
             print(f"Total: {stats_process['recompressed_count'] + stats_process['kept_count']}")
 
-    def build_parser_rcompress(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_compress(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
         rcompress_epilog = process_epilog(

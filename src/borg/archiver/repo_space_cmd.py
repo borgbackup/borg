@@ -45,7 +45,7 @@ class RepoSpaceMixIn:
             print("In case you want to change the amount, use --free first to free all reserved space,")
             print("then use --reserve with the desired amount.")
 
-    def build_parser_rspace(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_space(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
         rspace_epilog = process_epilog(

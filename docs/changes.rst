@@ -58,10 +58,12 @@ Compatibility notes:
 
     - borg 2 repo commands:
 
-      - borg rcreate  # "repo create", was: borg init
-      - borg rlist  # "repo list"
-      - borg rinfo  # "repo info"
-      - borg rdelete  # "repo delete"
+      - borg repo-create  # was: borg init
+      - borg repo-list
+      - borg repo-info
+      - borg repo-delete
+      - borg repo-compress
+      - borg repo-space
     - borg 2 archive commands:
 
       - borg create ARCHIVE ...
@@ -145,8 +147,8 @@ New features:
   multiple client machines or users, it also works with the default cache.
 - delete/prune: much quicker now and can be undone.
 - check --repair --undelete-archives: bring archives back from the dead.
-- rspace: manage reserved space in repository (avoid dead-end situation if
-  repository fs runs full).
+- repo-space: manage reserved space in repository (avoid dead-end situation if
+  repository filesystem runs full).
 
 Bugs/issues fixed:
 
@@ -168,6 +170,7 @@ Other changes:
   when borg does not need to read borg 1.x repos/archives anymore, after
   users have transferred their archives, even much more can be removed.
 - docs: updated / removed outdated stuff
+- renamed r* commands to repo-*
 
 
 Version 2.0.0b9 (2024-07-20)

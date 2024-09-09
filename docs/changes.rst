@@ -126,11 +126,21 @@ Change Log 2.x
 Version 2.0.0b10 (2024-09-09)
 -----------------------------
 
+Please note:
+
+This is a beta release, only for testing - do not use for production repos.
+
+For upgrade and compatibility hints, please also read the section "Upgrade Notes"
+above.
+
 TL;DR: this is a huge change and the first very fundamental change in how borg
 works since ever:
 
 - you will need to create new repos.
 - likely more exciting than previous betas, definitely not for production.
+- remove "borg check --repair --archives-only" from your script in case you
+  added that for b9. "borg compact -v" now finds and deletes orphan chunks
+  and also outputs some new stats.
 
 New features:
 
@@ -176,13 +186,6 @@ Other changes:
 
 Version 2.0.0b9 (2024-07-20)
 ----------------------------
-
-Please note:
-
-This is a beta release, only for testing - do not use for production repos.
-
-For upgrade and compatibility hints, please also read the section "Upgrade Notes"
-above.
 
 New features:
 

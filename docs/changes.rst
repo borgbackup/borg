@@ -87,6 +87,7 @@ Compatibility notes:
   - removed --noatime (default now, see also --atime)
   - removed --save-space option (does not change behaviour)
 - removed --bypass-lock option
+- removed borg config command (only worked locally anyway)
 - using --list together with --progress is now disallowed (except with --log-json), #7219
 - the --glob-archives option was renamed to --match-archives (the short option
   name -a is unchanged) and extended to support different pattern styles:

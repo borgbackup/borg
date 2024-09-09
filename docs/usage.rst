@@ -45,7 +45,6 @@ Usage
    usage/serve
    usage/version
    usage/compact
-   usage/config
    usage/lock
    usage/key
 

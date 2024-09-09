@@ -276,13 +276,13 @@ def _extract_hardlinks_setup(archiver):
     create_regular_file(input_path, "dir1/source2")
     os.link(os.path.join(input_path, "dir1/source2"), os.path.join(input_path, "dir1/aaaa"))
 
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
 
 
 def _create_test_caches(archiver):
     input_path = archiver.input_path
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(input_path, "file1", size=1024 * 80)
     create_regular_file(input_path, "cache1/%s" % CACHE_TAG_NAME, contents=CACHE_TAG_CONTENTS + b" extra stuff")
     create_regular_file(input_path, "cache2/%s" % CACHE_TAG_NAME, contents=b"invalid signature")
@@ -302,7 +302,7 @@ def _assert_test_caches(archiver):
 
 def _create_test_tagged(archiver):
     input_path = archiver.input_path
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(input_path, "file1", size=1024 * 80)
     create_regular_file(input_path, "tagged1/.NOBACKUP")
     create_regular_file(input_path, "tagged2/00-NOBACKUP")
@@ -317,7 +317,7 @@ def _assert_test_tagged(archiver):
 
 def _create_test_keep_tagged(archiver):
     input_path = archiver.input_path
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(input_path, "file0", size=1024)
     create_regular_file(input_path, "tagged1/.NOBACKUP1")
     create_regular_file(input_path, "tagged1/file1", size=1024)

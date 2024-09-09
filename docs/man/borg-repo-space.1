@@ -27,12 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RSPACE" 1 "2024-09-08" "" "borg backup tool"
+.TH "BORG-REPO-SPACE" 1 "2024-09-08" "" "borg backup tool"
 .SH NAME
-borg-rspace \- Manage reserved space in repository
+borg-repo-space \- Manage reserved space in repository
 .SH SYNOPSIS
 .sp
-borg [common options] rspace [options]
+borg [common options] repo\-space [options]
 .SH DESCRIPTION
 .sp
 This command manages reserved space in a repository.
@@ -54,19 +54,19 @@ Examples:
 .nf
 .ft C
 # Create a new repository:
-$ borg rcreate ...
+$ borg repo\-create ...
 # Reserve approx. 1GB of space for emergencies:
-$ borg rspace \-\-reserve 1G
+$ borg repo\-space \-\-reserve 1G
 
 # Check amount of reserved space in the repository:
-$ borg rspace
+$ borg repo\-space
 
 # EMERGENCY! Free all reserved space to get things back to normal:
-$ borg rspace \-\-free
+$ borg repo\-space \-\-free
 $ borg prune ...
 $ borg delete ...
 $ borg compact \-v  # only this actually frees space of deleted archives
-$ borg rspace \-\-reserve 1G  # reserve space again for next time
+$ borg repo\-space \-\-reserve 1G  # reserve space again for next time
 .ft P
 .fi
 .UNINDENT

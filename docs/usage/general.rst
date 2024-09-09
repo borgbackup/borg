@@ -7,7 +7,7 @@ The following sections will describe each command in detail.
 
 Commands, options, parameters, paths and such are ``set in fixed-width``.
 Option values are `underlined`. Borg has few options accepting a fixed set
-of values (e.g. ``--encryption`` of :ref:`borg_rcreate`).
+of values (e.g. ``--encryption`` of :ref:`borg_repo-create`).
 
 .. container:: experimental
 

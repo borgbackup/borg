@@ -14,10 +14,10 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-class RCreateMixIn:
+class RepoCreateMixIn:
     @with_repository(create=True, exclusive=True, manifest=False)
     @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
-    def do_rcreate(self, args, repository, *, other_repository=None, other_manifest=None):
+    def do_repo_create(self, args, repository, *, other_repository=None, other_manifest=None):
         """Create a new, empty repository"""
         if args.storage_quota is not None:
             raise CommandError("storage-quota is not supported (yet?)")
@@ -58,13 +58,13 @@ class RCreateMixIn:
             "\n"
             "Reserve some repository storage space now for emergencies like 'disk full'\n"
             "by running:\n"
-            "    borg rspace --reserve 1G"
+            "    borg repo-space --reserve 1G"
         )
 
-    def build_parser_rcreate(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_create(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        rcreate_epilog = process_epilog(
+        repo_create_epilog = process_epilog(
             """
         This command creates a new, empty repository. A repository is a ``borgstore`` store
         containing the deduplicated data from zero or more archives.
@@ -79,7 +79,7 @@ class RCreateMixIn:
 
         ::
 
-            borg rcreate --encryption repokey-aes-ocb
+            borg repo-create --encryption repokey-aes-ocb
 
         Borg will:
 
@@ -170,7 +170,7 @@ class RCreateMixIn:
         Creating a related repository
         +++++++++++++++++++++++++++++
 
-        You can use ``borg rcreate --other-repo ORIG_REPO ...`` to create a related repository
+        You can use ``borg repo-create --other-repo ORIG_REPO ...`` to create a related repository
         that uses the same secret key material as the given other/original repository.
 
         By default, only the ID key and chunker secret will be the same (these are important
@@ -185,22 +185,22 @@ class RCreateMixIn:
         Creating a related repository for data migration from borg 1.2 or 1.4
         +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-        You can use ``borg rcreate --other-repo ORIG_REPO --from-borg1 ...`` to create a related
+        You can use ``borg repo-create --other-repo ORIG_REPO --from-borg1 ...`` to create a related
         repository that uses the same secret key material as the given other/original repository.
 
         Then use ``borg transfer --other-repo ORIG_REPO --from-borg1 ...`` to transfer the archives.
         """
         )
         subparser = subparsers.add_parser(
-            "rcreate",
+            "repo-create",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rcreate.__doc__,
-            epilog=rcreate_epilog,
+            description=self.do_repo_create.__doc__,
+            epilog=repo_create_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="create a new, empty repository",
         )
-        subparser.set_defaults(func=self.do_rcreate)
+        subparser.set_defaults(func=self.do_repo_create)
         subparser.add_argument(
             "--other-repo",
             metavar="SRC_REPOSITORY",

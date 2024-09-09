@@ -67,7 +67,7 @@ byte-strings of fixed length (256bit, 32 bytes), computed like this::
 
   key = id = id_hash(plaintext_data)  # plain = not encrypted, not compressed, not obfuscated
 
-The id_hash function depends on the :ref:`encryption mode <borg_rcreate>`.
+The id_hash function depends on the :ref:`encryption mode <borg_repo-create>`.
 
 As the id / key is used for deduplication, id_hash must be a cryptographically
 strong hash or MAC.

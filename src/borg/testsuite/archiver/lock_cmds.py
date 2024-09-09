@@ -11,7 +11,7 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 def test_break_lock(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "break-lock")
 
 
@@ -19,7 +19,7 @@ def test_with_lock(tmp_path):
     repo_path = tmp_path / "repo"
     env = os.environ.copy()
     env["BORG_REPO"] = "file://" + str(repo_path)
-    command0 = "python3", "-m", "borg", "rcreate", "--encryption=none"
+    command0 = "python3", "-m", "borg", "repo-create", "--encryption=none"
     # timings must be adjusted so that command1 keeps running while command2 tries to get the lock,
     # so that lock acquisition for command2 fails as the test expects it.
     lock_wait, execution_time, startup_wait = 2, 4, 1
@@ -46,7 +46,7 @@ def test_with_lock(tmp_path):
 
 def test_with_lock_non_existent_command(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     command = ["non_existent_command"]
     expected_ec = CommandError().exit_code
     cmd(archiver, "with-lock", *command, fork=True, exit_code=expected_ec)

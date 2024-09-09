@@ -14,9 +14,9 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-class RDeleteMixIn:
+class RepoDeleteMixIn:
     @with_repository(exclusive=True, manifest=False)
-    def do_rdelete(self, args, repository):
+    def do_repo_delete(self, args, repository):
         """Delete a repository"""
         self.output_list = args.output_list
         dry_run = args.dry_run
@@ -87,10 +87,10 @@ class RDeleteMixIn:
         else:
             logger.info("Would delete cache.")
 
-    def build_parser_rdelete(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_delete(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        rdelete_epilog = process_epilog(
+        repo_delete_epilog = process_epilog(
             """
         This command deletes the complete repository.
 
@@ -103,15 +103,15 @@ class RDeleteMixIn:
         """
         )
         subparser = subparsers.add_parser(
-            "rdelete",
+            "repo-delete",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rdelete.__doc__,
-            epilog=rdelete_epilog,
+            description=self.do_repo_delete.__doc__,
+            epilog=repo_delete_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="delete repository",
         )
-        subparser.set_defaults(func=self.do_rdelete)
+        subparser.set_defaults(func=self.do_repo_delete)
         subparser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository")
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output verbose list of archives"

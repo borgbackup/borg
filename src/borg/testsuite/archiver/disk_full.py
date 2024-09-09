@@ -51,9 +51,9 @@ def test_disk_full(test_pass, cmd_fixture, monkeypatch):
     input = os.path.join(DF_MOUNT, "input")
     shutil.rmtree(repo, ignore_errors=True)
     shutil.rmtree(input, ignore_errors=True)
-    rc, out = cmd_fixture(f"--repo={repo}", "rcreate", "--encryption=none")
+    rc, out = cmd_fixture(f"--repo={repo}", "repo-create", "--encryption=none")
     if rc != EXIT_SUCCESS:
-        print("rcreate", rc, out)
+        print("repo-create", rc, out)
     assert rc == EXIT_SUCCESS
     try:
         try:
@@ -81,13 +81,13 @@ def test_disk_full(test_pass, cmd_fixture, monkeypatch):
             # now some error happened, likely we are out of disk space.
             # free some space such that we can expect borg to be able to work normally:
             shutil.rmtree(input, ignore_errors=True)
-        rc, out = cmd_fixture(f"--repo={repo}", "rlist")
+        rc, out = cmd_fixture(f"--repo={repo}", "repo-list")
         if rc != EXIT_SUCCESS:
-            print("rlist", rc, out)
+            print("repo-list", rc, out)
         rc, out = cmd_fixture(f"--repo={repo}", "check", "--repair")
         if rc != EXIT_SUCCESS:
             print("check", rc, out)
         assert rc == EXIT_SUCCESS
     finally:
         # try to free the space allocated for the repo
-        cmd_fixture(f"--repo={repo}", "rdelete")
+        cmd_fixture(f"--repo={repo}", "repo-delete")

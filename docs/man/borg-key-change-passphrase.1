@@ -52,7 +52,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .nf
 .ft C
 # Create a key file protected repository
-$ borg rcreate \-\-encryption=keyfile\-aes\-ocb \-v
+$ borg repo\-create \-\-encryption=keyfile\-aes\-ocb \-v
 Initializing repository at \(dq/path/to/repo\(dq
 Enter new passphrase:
 Enter same passphrase again:
@@ -86,7 +86,7 @@ Fully automated using environment variables:
 .sp
 .nf
 .ft C
-$ BORG_NEW_PASSPHRASE=old borg rcreate \-\-encryption=repokey\-aes\-ocb
+$ BORG_NEW_PASSPHRASE=old borg repo\-create \-\-encryption=repokey\-aes\-ocb
 # now \(dqold\(dq is the current passphrase.
 $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change\-passphrase
 # now \(dqnew\(dq is the current passphrase.

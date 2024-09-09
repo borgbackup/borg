@@ -63,7 +63,7 @@ def test_recreate_exclude_keep_tagged(archivers, request):
 @pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
 def test_recreate_hardlinked_tags(archivers, request):  # test for issue #4911
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none")
     create_regular_file(
         archiver.input_path, "file1", contents=CACHE_TAG_CONTENTS
     )  # "wrong" filename, but correct tag contents
@@ -81,7 +81,7 @@ def test_recreate_hardlinked_tags(archivers, request):  # test for issue #4911
 
 def test_recreate_target_rc(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     if archiver.FORK_DEFAULT:
         expected_ec = CommandError().exit_code
         output = cmd(archiver, "recreate", "--target=asdf", exit_code=expected_ec)
@@ -94,15 +94,15 @@ def test_recreate_target_rc(archivers, request):
 def test_recreate_target(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "check")
     cmd(archiver, "create", "test0", "input")
     cmd(archiver, "check")
-    original_archive = cmd(archiver, "rlist")
+    original_archive = cmd(archiver, "repo-list")
     cmd(archiver, "recreate", "test0", "input/dir2", "-e", "input/dir2/file3", "--target=new-archive")
     cmd(archiver, "check")
 
-    archives = cmd(archiver, "rlist")
+    archives = cmd(archiver, "repo-list")
     assert original_archive in archives
     assert "new-archive" in archives
 
@@ -116,7 +116,7 @@ def test_recreate_basic(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     create_regular_file(archiver.input_path, "dir2/file3", size=1024 * 80)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test0", "input")
     cmd(archiver, "recreate", "test0", "input/dir2", "-e", "input/dir2/file3")
     cmd(archiver, "check")
@@ -150,7 +150,7 @@ def test_recreate_rechunkify(archivers, request):
     with open(os.path.join(archiver.input_path, "large_file"), "wb") as fd:
         fd.write(b"a" * 280)
         fd.write(b"b" * 280)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test1", "input", "--chunker-params", "7,9,8,128")
     cmd(archiver, "create", "test2", "input", "--files-cache=disabled")
     num_chunks1 = int(cmd(archiver, "list", "test1", "input/large_file", "--format", "{num_chunks}"))
@@ -171,7 +171,7 @@ def test_recreate_fixed_rechunkify(archivers, request):
     archiver = request.getfixturevalue(archivers)
     with open(os.path.join(archiver.input_path, "file"), "wb") as fd:
         fd.write(b"a" * 8192)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input", "--chunker-params", "7,9,8,128")
     output = cmd(archiver, "list", "test", "input/file", "--format", "{num_chunks}")
     num_chunks = int(output)
@@ -186,7 +186,7 @@ def test_recreate_no_rechunkify(archivers, request):
     archiver = request.getfixturevalue(archivers)
     with open(os.path.join(archiver.input_path, "file"), "wb") as fd:
         fd.write(b"a" * 8192)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     # first create an archive with non-default chunker params:
     cmd(archiver, "create", "test", "input", "--chunker-params", "7,9,8,128")
     output = cmd(archiver, "list", "test", "input/file", "--format", "{num_chunks}")
@@ -202,7 +202,7 @@ def test_recreate_no_rechunkify(archivers, request):
 def test_recreate_timestamp(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test0", "input")
     cmd(archiver, "recreate", "test0", "--timestamp", "1970-01-02T00:00:00", "--comment", "test")
     info = cmd(archiver, "info", "-a", "test0").splitlines()
@@ -215,7 +215,7 @@ def test_recreate_timestamp(archivers, request):
 def test_recreate_dry_run(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "compressible", size=10000)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     archives_before = cmd(archiver, "list", "test")
     cmd(archiver, "recreate", "-n", "-e", "input/compressible")
@@ -227,7 +227,7 @@ def test_recreate_dry_run(archivers, request):
 def test_recreate_skips_nothing_to_do(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     info_before = cmd(archiver, "info", "-a", "test")
     cmd(archiver, "recreate", "--chunker-params", "default")
@@ -238,7 +238,7 @@ def test_recreate_skips_nothing_to_do(archivers, request):
 
 def test_recreate_list_output(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(archiver.input_path, "file1", size=0)
     create_regular_file(archiver.input_path, "file2", size=0)
     create_regular_file(archiver.input_path, "file3", size=0)
@@ -271,7 +271,7 @@ def test_comment(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
 
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test1", "input")
     cmd(archiver, "create", "test2", "input", "--comment", "this is the comment")
     cmd(archiver, "create", "test3", "input", "--comment", '"deleted" comment')

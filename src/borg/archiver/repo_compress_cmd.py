@@ -87,9 +87,9 @@ def format_compression_spec(ctype, clevel, olevel):
     return obfuscation + cname + clevel
 
 
-class RCompressMixIn:
+class RepoCompressMixIn:
     @with_repository(cache=False, manifest=True, compatibility=(Manifest.Operation.CHECK,))
-    def do_rcompress(self, args, repository, manifest):
+    def do_repo_compress(self, args, repository, manifest):
         """Repository (re-)compression"""
 
         def get_csettings(c):
@@ -103,7 +103,7 @@ class RCompressMixIn:
             return ctype, clevel, olevel
 
         if not isinstance(repository, (Repository, RemoteRepository)):
-            raise Error("rcompress not supported for legacy repositories.")
+            raise Error("repo-compress not supported for legacy repositories.")
 
         repo_objs = manifest.repo_objs
         ctype, clevel, olevel = get_csettings(repo_objs.compressor)  # desired compression set by --compression
@@ -115,7 +115,7 @@ class RCompressMixIn:
         chunks_limit = min(1000, max(100, recompress_candidate_count // 1000))
 
         pi = ProgressIndicatorPercent(
-            total=len(recompress_ids), msg="Recompressing %3.1f%%", step=0.1, msgid="rcompress.process_chunks"
+            total=len(recompress_ids), msg="Recompressing %3.1f%%", step=0.1, msgid="repo_compress.process_chunks"
         )
         while recompress_ids:
             if sig_int and sig_int.action_done():
@@ -155,10 +155,10 @@ class RCompressMixIn:
             print(f"Kept as is: {stats_process['kept_count']}")
             print(f"Total: {stats_process['recompressed_count'] + stats_process['kept_count']}")
 
-    def build_parser_rcompress(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_compress(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        rcompress_epilog = process_epilog(
+        repo_compress_epilog = process_epilog(
             """
         Repository (re-)compression (and/or re-obfuscation).
 
@@ -173,25 +173,25 @@ class RCompressMixIn:
         Please note that this command can not work in low (or zero) free disk space
         conditions.
 
-        If the ``borg rcompress`` process receives a SIGINT signal (Ctrl-C), the repo
+        If the ``borg repo-compress`` process receives a SIGINT signal (Ctrl-C), the repo
         will be committed and compacted and borg will terminate cleanly afterwards.
 
-        Both ``--progress`` and ``--stats`` are recommended when ``borg rcompress``
+        Both ``--progress`` and ``--stats`` are recommended when ``borg repo-compress``
         is used interactively.
 
-        You do **not** need to run ``borg compact`` after ``borg rcompress``.
+        You do **not** need to run ``borg compact`` after ``borg repo-compress``.
         """
         )
         subparser = subparsers.add_parser(
-            "rcompress",
+            "repo-compress",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rcompress.__doc__,
-            epilog=rcompress_epilog,
+            description=self.do_repo_compress.__doc__,
+            epilog=repo_compress_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help=self.do_rcompress.__doc__,
+            help=self.do_repo_compress.__doc__,
         )
-        subparser.set_defaults(func=self.do_rcompress)
+        subparser.set_defaults(func=self.do_repo_compress)
 
         subparser.add_argument(
             "-C",

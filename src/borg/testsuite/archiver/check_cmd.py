@@ -18,7 +18,7 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 def check_cmd_setup(archiver):
     with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):
-        cmd(archiver, "rcreate", RK_ENCRYPTION)
+        cmd(archiver, "repo-create", RK_ENCRYPTION)
         create_src_archive(archiver, "archive1")
         create_src_archive(archiver, "archive2")
 
@@ -56,7 +56,7 @@ def test_date_matching(archivers, request):
     check_cmd_setup(archiver)
 
     shutil.rmtree(archiver.repository_path)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     earliest_ts = "2022-11-20T23:59:59"
     ts_in_between = "2022-12-18T23:59:59"
     create_src_archive(archiver, "archive1", ts=earliest_ts)
@@ -294,7 +294,7 @@ def test_manifest_rebuild_duplicate_archive(archivers, request):
     # named archive1.1 will be created because we request undeleting archives and there
     # is no archives directory entry for the fake archive yet.
     cmd(archiver, "check", "--repair", "--undelete-archives", exit_code=0)
-    output = cmd(archiver, "rlist")
+    output = cmd(archiver, "repo-list")
     assert "archive1" in output
     assert "archive1.1" in output
     assert "archive2" in output
@@ -334,7 +334,7 @@ def test_spoofed_archive(archivers, request):
         )
     cmd(archiver, "check", exit_code=1)
     cmd(archiver, "check", "--repair", "--debug", exit_code=0)
-    output = cmd(archiver, "rlist")
+    output = cmd(archiver, "repo-list")
     assert "archive1" in output
     assert "archive2" in output
     assert "archive_spoofed" not in output
@@ -371,7 +371,7 @@ def test_verify_data(archivers, request, init_args):
     with patch.object(borg.repoobj, "xxh64", fake_xxh64), patch.object(borg.repository, "xxh64", fake_xxh64):
         check_cmd_setup(archiver)
         shutil.rmtree(archiver.repository_path)
-        cmd(archiver, "rcreate", *init_args)
+        cmd(archiver, "repo-create", *init_args)
         create_src_archive(archiver, "archive1")
         archive, repository = open_archive(archiver.repository_path, "archive1")
         with repository:
@@ -405,7 +405,7 @@ def test_corrupted_file_chunk(archivers, request, init_args):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)
     shutil.rmtree(archiver.repository_path)
-    cmd(archiver, "rcreate", *init_args)
+    cmd(archiver, "repo-create", *init_args)
     create_src_archive(archiver, "archive1")
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:

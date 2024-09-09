@@ -29,7 +29,7 @@ def test_export_tar(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     os.unlink("input/flagfile")
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     cmd(archiver, "export-tar", "test", "simple.tar", "--progress", "--tar-format=GNU")
     with changedir("output"):
@@ -44,7 +44,7 @@ def test_export_tar_gz(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     os.unlink("input/flagfile")
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     test_list = cmd(archiver, "export-tar", "test", "simple.tar.gz", "--list", "--tar-format=GNU")
     assert "input/file1\n" in test_list
@@ -60,7 +60,7 @@ def test_export_tar_strip_components(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     os.unlink("input/flagfile")
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     test_list = cmd(archiver, "export-tar", "test", "simple.tar", "--strip-components=1", "--list", "--tar-format=GNU")
     # --list's path are those before processing with --strip-components
@@ -103,7 +103,7 @@ def test_import_tar(archivers, request, tar_format="PAX"):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
     os.unlink("input/flagfile")
-    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "simple.tar", f"--tar-format={tar_format}")
     cmd(archiver, "import-tar", "dst", "simple.tar")
@@ -122,7 +122,7 @@ def test_import_unusual_tar(archivers, request):
     # ./foo//bar
     # ./
     tar_archive = os.path.join(os.path.dirname(__file__), "unusual_paths.tar")
-    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "import-tar", "dst", tar_archive)
     files = cmd(archiver, "list", "dst", "--format", "{path}{NL}").splitlines()
     assert set(files) == {"foobar", "bar", "foo2", "foo/bar", "."}
@@ -136,7 +136,7 @@ def test_import_tar_with_dotdot(archivers, request):
     # Contains this file:
     # ../../../../etc/shadow
     tar_archive = os.path.join(os.path.dirname(__file__), "dotdot_path.tar")
-    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none")
     with pytest.raises(ValueError, match="unexpected '..' element in path '../../../../etc/shadow'"):
         cmd(archiver, "import-tar", "dst", tar_archive, exit_code=2)
 
@@ -146,7 +146,7 @@ def test_import_tar_gz(archivers, request, tar_format="GNU"):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
     os.unlink("input/flagfile")
-    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "simple.tgz", f"--tar-format={tar_format}")
     cmd(archiver, "import-tar", "dst", "simple.tgz")
@@ -174,7 +174,7 @@ def test_import_concatenated_tar_with_ignore_zeros(archivers, request):
             # Clean up for assert_dirs_equal.
             os.unlink("the_rest.tar")
 
-    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "import-tar", "--ignore-zeros", "dst", "input/concatenated.tar")
     # Clean up for assert_dirs_equal.
     os.unlink("input/concatenated.tar")
@@ -199,7 +199,7 @@ def test_import_concatenated_tar_without_ignore_zeros(archivers, request):
             with open("the_rest.tar", "rb") as the_rest:
                 concatenated.write(the_rest.read())
             os.unlink("the_rest.tar")
-    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "import-tar", "dst", "input/concatenated.tar")
 
     with changedir(archiver.output_path):
@@ -212,7 +212,7 @@ def test_import_concatenated_tar_without_ignore_zeros(archivers, request):
 def test_roundtrip_pax_borg(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
-    cmd(archiver, "rcreate", "--encryption=none")
+    cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "simple.tar", "--tar-format=BORG")
     cmd(archiver, "import-tar", "dst", "simple.tar")

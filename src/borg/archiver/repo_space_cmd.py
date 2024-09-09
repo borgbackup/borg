@@ -11,9 +11,9 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-class RSpaceMixIn:
+class RepoSpaceMixIn:
     @with_repository(lock=False, manifest=False)
-    def do_rspace(self, args, repository):
+    def do_repo_space(self, args, repository):
         """Manage reserved space in repository"""
         # we work without locking here because locks don't work with full disk.
         if args.reserve_space > 0:
@@ -45,10 +45,10 @@ class RSpaceMixIn:
             print("In case you want to change the amount, use --free first to free all reserved space,")
             print("then use --reserve with the desired amount.")
 
-    def build_parser_rspace(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_space(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        rspace_epilog = process_epilog(
+        repo_space_epilog = process_epilog(
             """
         This command manages reserved space in a repository.
 
@@ -65,34 +65,34 @@ class RSpaceMixIn:
         Examples::
 
             # Create a new repository:
-            $ borg rcreate ...
+            $ borg repo-create ...
             # Reserve approx. 1GB of space for emergencies:
-            $ borg rspace --reserve 1G
+            $ borg repo-space --reserve 1G
 
             # Check amount of reserved space in the repository:
-            $ borg rspace
+            $ borg repo-space
 
             # EMERGENCY! Free all reserved space to get things back to normal:
-            $ borg rspace --free
+            $ borg repo-space --free
             $ borg prune ...
             $ borg delete ...
             $ borg compact -v  # only this actually frees space of deleted archives
-            $ borg rspace --reserve 1G  # reserve space again for next time
+            $ borg repo-space --reserve 1G  # reserve space again for next time
 
 
         Reserved space is always rounded up to use full reservation blocks of 64MiB.
         """
         )
         subparser = subparsers.add_parser(
-            "rspace",
+            "repo-space",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rspace.__doc__,
-            epilog=rspace_epilog,
+            description=self.do_repo_space.__doc__,
+            epilog=repo_space_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="manage reserved space in a repository",
         )
-        subparser.set_defaults(func=self.do_rspace)
+        subparser.set_defaults(func=self.do_repo_space)
         subparser.add_argument(
             "--reserve",
             metavar="SPACE",

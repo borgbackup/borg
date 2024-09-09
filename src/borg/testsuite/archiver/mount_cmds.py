@@ -75,7 +75,7 @@ def test_fuse(archivers, request):
             noatime_used = flags_noatime != flags_normal
             return noatime_used and atime_before == atime_after
 
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_test_files(archiver.input_path)
     have_noatime = has_noatime("input/file1")
     cmd(archiver, "create", "--exclude-nodump", "--atime", "archive", "input")
@@ -169,7 +169,7 @@ def test_fuse(archivers, request):
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_versions_view(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(archiver.input_path, "test", contents=b"first")
     if are_hardlinks_supported():
         create_regular_file(archiver.input_path, "hardlink1", contents=b"123456")
@@ -203,7 +203,7 @@ def test_fuse_versions_view(archivers, request):
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_allow_damaged_files(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_src_archive(archiver, "archive")
     # Get rid of a chunk and repair it
     archive, repository = open_archive(archiver.repository_path, "archive")
@@ -229,7 +229,7 @@ def test_fuse_allow_damaged_files(archivers, request):
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_mount_options(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_src_archive(archiver, "arch11")
     create_src_archive(archiver, "arch12")
     create_src_archive(archiver, "arch21")
@@ -307,7 +307,7 @@ def test_migrate_lock_alive(archivers, request):
     # Decorate
     Lock.migrate_lock = write_assert_data(Lock.migrate_lock)
     try:
-        cmd(archiver, "rcreate", "--encryption=none")
+        cmd(archiver, "repo-create", "--encryption=none")
         create_src_archive(archiver, "arch")
         mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
         # In order that the decoration is kept for the borg mount process, we must not spawn, but actually fork;

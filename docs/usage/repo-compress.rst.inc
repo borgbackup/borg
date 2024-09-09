@@ -1,12 +1,12 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. _borg_rcompress:
+.. _borg_repo-compress:
 
-borg rcompress
---------------
+borg repo-compress
+------------------
 .. code-block:: none
 
-    borg [common options] rcompress [options]
+    borg [common options] repo-compress [options]
 
 .. only:: html
 
@@ -60,10 +60,10 @@ type/level - if no compression gives a shorter output, that might be chosen.
 Please note that this command can not work in low (or zero) free disk space
 conditions.
 
-If the ``borg rcompress`` process receives a SIGINT signal (Ctrl-C), the repo
+If the ``borg repo-compress`` process receives a SIGINT signal (Ctrl-C), the repo
 will be committed and compacted and borg will terminate cleanly afterwards.
 
-Both ``--progress`` and ``--stats`` are recommended when ``borg rcompress``
+Both ``--progress`` and ``--stats`` are recommended when ``borg repo-compress``
 is used interactively.
 
-You do **not** need to run ``borg compact`` after ``borg rcompress``.
+You do **not** need to run ``borg compact`` after ``borg repo-compress``.

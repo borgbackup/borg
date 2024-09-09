@@ -9,7 +9,7 @@ Examples
 ::
 
     # Create a key file protected repository
-    $ borg rcreate --encryption=keyfile-aes-ocb -v
+    $ borg repo-create --encryption=keyfile-aes-ocb -v
     Initializing repository at "/path/to/repo"
     Enter new passphrase:
     Enter same passphrase again:
@@ -37,7 +37,7 @@ Fully automated using environment variables:
 
 ::
 
-    $ BORG_NEW_PASSPHRASE=old borg rcreate --encryption=repokey-aes-ocb
+    $ BORG_NEW_PASSPHRASE=old borg repo-create --encryption=repokey-aes-ocb
     # now "old" is the current passphrase.
     $ BORG_PASSPHRASE=old BORG_NEW_PASSPHRASE=new borg key change-passphrase
     # now "new" is the current passphrase.

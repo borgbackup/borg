@@ -79,14 +79,14 @@ from .list_cmd import ListMixIn
 from .lock_cmds import LocksMixIn
 from .mount_cmds import MountMixIn
 from .prune_cmd import PruneMixIn
-from .rcompress_cmd import RCompressMixIn
+from .repo_compress_cmd import RepoCompressMixIn
 from .recreate_cmd import RecreateMixIn
 from .rename_cmd import RenameMixIn
-from .rcreate_cmd import RCreateMixIn
-from .rinfo_cmd import RInfoMixIn
-from .rdelete_cmd import RDeleteMixIn
-from .rlist_cmd import RListMixIn
-from .rspace_cmd import RSpaceMixIn
+from .repo_create_cmd import RepoCreateMixIn
+from .repo_info_cmd import RepoInfoMixIn
+from .repo_delete_cmd import RepoDeleteMixIn
+from .repo_list_cmd import RepoListMixIn
+from .repo_space_cmd import RepoSpaceMixIn
 from .serve_cmd import ServeMixIn
 from .tar_cmds import TarMixIn
 from .transfer_cmd import TransferMixIn
@@ -111,12 +111,12 @@ class Archiver(
     PruneMixIn,
     RecreateMixIn,
     RenameMixIn,
-    RCompressMixIn,
-    RCreateMixIn,
-    RDeleteMixIn,
-    RInfoMixIn,
-    RListMixIn,
-    RSpaceMixIn,
+    RepoCompressMixIn,
+    RepoCreateMixIn,
+    RepoDeleteMixIn,
+    RepoInfoMixIn,
+    RepoListMixIn,
+    RepoSpaceMixIn,
     ServeMixIn,
     TarMixIn,
     TransferMixIn,
@@ -346,14 +346,14 @@ class Archiver(
         self.build_parser_locks(subparsers, common_parser, mid_common_parser)
         self.build_parser_mount_umount(subparsers, common_parser, mid_common_parser)
         self.build_parser_prune(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rcompress(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rcreate(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rdelete(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rinfo(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rlist(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_compress(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_create(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_delete(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_info(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_list(subparsers, common_parser, mid_common_parser)
         self.build_parser_recreate(subparsers, common_parser, mid_common_parser)
         self.build_parser_rename(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rspace(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_space(subparsers, common_parser, mid_common_parser)
         self.build_parser_serve(subparsers, common_parser, mid_common_parser)
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)

@@ -7,7 +7,7 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 def test_compact_empty_repository(archivers, request):
     archiver = request.getfixturevalue(archivers)
 
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
 
     output = cmd(archiver, "compact", "-v", exit_code=0)
     assert "Starting compaction" in output
@@ -18,7 +18,7 @@ def test_compact_empty_repository(archivers, request):
 def test_compact_after_deleting_all_archives(archivers, request):
     archiver = request.getfixturevalue(archivers)
 
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_src_archive(archiver, "archive")
     cmd(archiver, "delete", "-a", "archive", exit_code=0)
 
@@ -32,7 +32,7 @@ def test_compact_after_deleting_all_archives(archivers, request):
 def test_compact_after_deleting_some_archives(archivers, request):
     archiver = request.getfixturevalue(archivers)
 
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_src_archive(archiver, "archive1")
     create_src_archive(archiver, "archive2")
     cmd(archiver, "delete", "-a", "archive1", exit_code=0)

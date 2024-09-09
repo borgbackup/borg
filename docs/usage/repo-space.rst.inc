@@ -1,12 +1,12 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. _borg_rspace:
+.. _borg_repo-space:
 
-borg rspace
------------
+borg repo-space
+---------------
 .. code-block:: none
 
-    borg [common options] rspace [options]
+    borg [common options] repo-space [options]
 
 .. only:: html
 
@@ -62,19 +62,19 @@ situation again at a later time.
 Examples::
 
     # Create a new repository:
-    $ borg rcreate ...
+    $ borg repo-create ...
     # Reserve approx. 1GB of space for emergencies:
-    $ borg rspace --reserve 1G
+    $ borg repo-space --reserve 1G
 
     # Check amount of reserved space in the repository:
-    $ borg rspace
+    $ borg repo-space
 
     # EMERGENCY! Free all reserved space to get things back to normal:
-    $ borg rspace --free
+    $ borg repo-space --free
     $ borg prune ...
     $ borg delete ...
     $ borg compact -v  # only this actually frees space of deleted archives
-    $ borg rspace --reserve 1G  # reserve space again for next time
+    $ borg repo-space --reserve 1G  # reserve space again for next time
 
 
 Reserved space is always rounded up to use full reservation blocks of 64MiB.

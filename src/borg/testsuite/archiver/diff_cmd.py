@@ -34,7 +34,7 @@ def test_basic_functionality(archivers, request):
         os.link("input/empty", "input/hardlink_contents_changed")
         os.link("input/file_removed", "input/hardlink_removed")
         os.link("input/file_removed2", "input/hardlink_target_removed")
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     # Create the first snapshot
     cmd(archiver, "create", "test0", "input")
     # Setup files for the second snapshot
@@ -232,7 +232,7 @@ def test_basic_functionality(archivers, request):
 
 def test_time_diffs(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(archiver.input_path, "test_file", size=10)
     cmd(archiver, "create", "archive1", "input")
     time.sleep(0.1)
@@ -263,7 +263,7 @@ def test_time_diffs(archivers, request):
 
 def test_sort_option(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
 
     create_regular_file(archiver.input_path, "a_file_removed", size=8)
     create_regular_file(archiver.input_path, "f_file_removed", size=16)

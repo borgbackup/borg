@@ -12,8 +12,8 @@ from . import cmd, create_test_files, RK_ENCRYPTION
 
 def corrupt_archiver(archiver):
     create_test_files(archiver.input_path)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
-    archiver.cache_path = json.loads(cmd(archiver, "rinfo", "--json"))["cache"].get("path")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    archiver.cache_path = json.loads(cmd(archiver, "repo-info", "--json"))["cache"].get("path")
 
 
 def corrupt(file, amount=1):
@@ -49,5 +49,5 @@ def test_old_version_interfered(archiver):
     config.set("cache", "manifest", bin_to_hex(bytes(32)))
     with open(config_path, "w") as fd:
         config.write(fd)
-    out = cmd(archiver, "rinfo")
+    out = cmd(archiver, "repo-info")
     assert "Cache integrity data not available: old Borg version modified the cache." in out

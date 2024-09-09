@@ -10,7 +10,7 @@ def test_rename(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
     create_regular_file(archiver.input_path, "dir2/file2", size=1024 * 80)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     cmd(archiver, "create", "test.2", "input")
     cmd(archiver, "extract", "test", "--dry-run")

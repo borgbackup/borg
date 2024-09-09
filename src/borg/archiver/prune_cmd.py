@@ -197,7 +197,7 @@ class PruneMixIn:
 
         You can influence how the ``--list`` output is formatted by using the ``--short``
         option (less wide output) or by giving a custom format using ``--format`` (see
-        the ``borg rlist`` description for more details about the format string).
+        the ``borg repo-list`` description for more details about the format string).
         """
         )
         subparser = subparsers.add_parser(

@@ -13,9 +13,9 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-class RListMixIn:
+class RepoListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
-    def do_rlist(self, args, repository, manifest):
+    def do_repo_list(self, args, repository, manifest):
         """List the archives contained in a repository"""
         if args.format is not None:
             format = args.format
@@ -36,10 +36,10 @@ class RListMixIn:
         if args.json:
             json_print(basic_json_data(manifest, extra={"archives": output_data}))
 
-    def build_parser_rlist(self, subparsers, common_parser, mid_common_parser):
+    def build_parser_repo_list(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog, define_archive_filters_group
 
-        rlist_epilog = (
+        repo_list_epilog = (
             process_epilog(
                 """
         This command lists the archives contained in a repository.
@@ -55,7 +55,7 @@ class RListMixIn:
         Examples:
         ::
 
-            $ borg rlist --format '{archive}{NL}'
+            $ borg repo-list --format '{archive}{NL}'
             ArchiveFoo
             ArchiveBar
             ...
@@ -63,7 +63,7 @@ class RListMixIn:
             # {VAR:NUMBER} - pad to NUMBER columns.
             # Strings are left-aligned, numbers are right-aligned.
             # Note: time columns except ``isomtime``, ``isoctime`` and ``isoatime`` cannot be padded.
-            $ borg rlist --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
+            $ borg repo-list --format '{archive:36} {time} [{id}]{NL}' /path/to/repo
             ArchiveFoo                           Thu, 2021-12-09 10:22:28 [0b8e9...3b274]
             ...
 
@@ -83,15 +83,15 @@ class RListMixIn:
             + ArchiveFormatter.keys_help()
         )
         subparser = subparsers.add_parser(
-            "rlist",
+            "repo-list",
             parents=[common_parser],
             add_help=False,
-            description=self.do_rlist.__doc__,
-            epilog=rlist_epilog,
+            description=self.do_repo_list.__doc__,
+            epilog=repo_list_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
             help="list repository contents",
         )
-        subparser.set_defaults(func=self.do_rlist)
+        subparser.set_defaults(func=self.do_repo_list)
         subparser.add_argument(
             "--short", dest="short", action="store_true", help="only print the archive names, nothing else"
         )

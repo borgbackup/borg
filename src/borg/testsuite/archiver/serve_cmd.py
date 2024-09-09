@@ -35,15 +35,17 @@ def test_with_socket(serve_socket, tmpdir, monkeypatch):
     have_a_short_runtime_dir(monkeypatch)
     repo_path = str(tmpdir.join("repo"))
 
-    ret, output = exec_cmd(f"--socket={serve_socket}", f"--repo=socket://{repo_path}", "rcreate", "--encryption=none")
+    ret, output = exec_cmd(
+        f"--socket={serve_socket}", f"--repo=socket://{repo_path}", "repo-create", "--encryption=none"
+    )
     assert ret == 0
 
-    ret, output = exec_cmd(f"--socket={serve_socket}", f"--repo=socket://{repo_path}", "rinfo")
+    ret, output = exec_cmd(f"--socket={serve_socket}", f"--repo=socket://{repo_path}", "repo-info")
     assert ret == 0
     assert "Repository ID: " in output
 
     monkeypatch.setenv("BORG_DELETE_I_KNOW_WHAT_I_AM_DOING", "YES")
-    ret, output = exec_cmd(f"--socket={serve_socket}", f"--repo=socket://{repo_path}", "rdelete")
+    ret, output = exec_cmd(f"--socket={serve_socket}", f"--repo=socket://{repo_path}", "repo-delete")
     assert ret == 0
 
 

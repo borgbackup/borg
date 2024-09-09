@@ -13,7 +13,7 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 def test_debug_profile(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input", "--debug-profile=create.prof")
     cmd(archiver, "debug", "convert-profile", "create.prof", "create.pyprof")
     stats = pstats.Stats("create.pyprof")
@@ -28,7 +28,7 @@ def test_debug_profile(archivers, request):
 def test_debug_dump_archive_items(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         output = cmd(archiver, "debug", "dump-archive-items", "test")
@@ -40,7 +40,7 @@ def test_debug_dump_archive_items(archivers, request):
 def test_debug_dump_repo_objs(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         output = cmd(archiver, "debug", "dump-repo-objs")
@@ -51,7 +51,7 @@ def test_debug_dump_repo_objs(archivers, request):
 
 def test_debug_put_get_delete_obj(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     data = b"some data"
     create_regular_file(archiver.input_path, "file", contents=data)
 
@@ -81,7 +81,7 @@ def test_debug_put_get_delete_obj(archivers, request):
 def test_debug_id_hash_format_put_get_parse_obj(archivers, request):
     """Test format-obj and parse-obj commands"""
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     data = b"some data" * 100
     meta_dict = {"some": "property"}
     meta = json.dumps(meta_dict).encode()
@@ -126,7 +126,7 @@ def test_debug_id_hash_format_put_get_parse_obj(archivers, request):
 def test_debug_dump_manifest(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     dump_file = archiver.output_path + "/dump"
     output = cmd(archiver, "debug", "dump-manifest", dump_file)
@@ -144,7 +144,7 @@ def test_debug_dump_manifest(archivers, request):
 def test_debug_dump_archive(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     dump_file = archiver.output_path + "/dump"
     output = cmd(archiver, "debug", "dump-archive", "test", dump_file)

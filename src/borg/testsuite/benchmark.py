@@ -29,7 +29,7 @@ def repo_url(request, tmpdir, monkeypatch):
 
 @pytest.fixture(params=["none", "repokey-aes-ocb"])
 def repo(request, cmd_fixture, repo_url):
-    cmd_fixture(f"--repo={repo_url}", "rcreate", "--encryption", request.param)
+    cmd_fixture(f"--repo={repo_url}", "repo-create", "--encryption", request.param)
     return repo_url
 
 

@@ -1,12 +1,12 @@
 .. IMPORTANT: this file is auto-generated from borg's built-in help, do not edit!
 
-.. _borg_rcreate:
+.. _borg_repo-create:
 
-borg rcreate
-------------
+borg repo-create
+----------------
 .. code-block:: none
 
-    borg [common options] rcreate [options]
+    borg [common options] repo-create [options]
 
 .. only:: html
 
@@ -75,7 +75,7 @@ tips will come below):
 
 ::
 
-    borg rcreate --encryption repokey-aes-ocb
+    borg repo-create --encryption repokey-aes-ocb
 
 Borg will:
 
@@ -166,7 +166,7 @@ there is an emergency workaround, see ``BORG_WORKAROUNDS=authenticated_no_key`` 
 Creating a related repository
 +++++++++++++++++++++++++++++
 
-You can use ``borg rcreate --other-repo ORIG_REPO ...`` to create a related repository
+You can use ``borg repo-create --other-repo ORIG_REPO ...`` to create a related repository
 that uses the same secret key material as the given other/original repository.
 
 By default, only the ID key and chunker secret will be the same (these are important
@@ -181,7 +181,7 @@ Creating related repositories is useful e.g. if you want to use ``borg transfer`
 Creating a related repository for data migration from borg 1.2 or 1.4
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-You can use ``borg rcreate --other-repo ORIG_REPO --from-borg1 ...`` to create a related
+You can use ``borg repo-create --other-repo ORIG_REPO --from-borg1 ...`` to create a related
 repository that uses the same secret key material as the given other/original repository.
 
 Then use ``borg transfer --other-repo ORIG_REPO --from-borg1 ...`` to transfer the archives.

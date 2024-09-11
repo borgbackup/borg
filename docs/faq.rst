@@ -218,7 +218,7 @@ This is not a problem anymore.
 For more details, see :ref:`checkpoints_parts`.
 
 How can I switch append-only mode on and off?
------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------
 
 You could do that (via borg config REPO append_only 0/1), but using different
 ssh keys and different entries in ``authorized_keys`` is much easier and also

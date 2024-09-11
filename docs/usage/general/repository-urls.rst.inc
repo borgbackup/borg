@@ -14,12 +14,21 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 
 **Remote repositories** accessed via ssh user@host:
 
-``user@host:/path/to/repo`` - remote repo, absolute path
+``ssh://user@host:port/path/to/repo`` - remote repo, absolute path, port can be given
 
-``ssh://user@host:port/path/to/repo`` - same, alternative syntax, port can be given
+``user@host:/path/to/repo`` - remote repo, absolute path, deprecated syntax
 
 
-**Remote repositories with relative paths** can be given using this syntax:
+**Remote repositories with relative paths, URL style syntax with port**:
+
+``ssh://user@host:port/./path/to/repo`` - path relative to current directory
+
+``ssh://user@host:port/~/path/to/repo`` - path relative to user's home directory
+
+``ssh://user@host:port/~other/path/to/repo`` - path relative to other's home directory (deprecated)
+
+
+**Remote repositories with relative paths, deprecated SCP style syntax**:
 
 ``user@host:path/to/repo`` - path relative to current directory
 
@@ -29,15 +38,6 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 
 Note: giving ``user@host:/./path/to/repo`` or ``user@host:/~/path/to/repo`` or
 ``user@host:/~other/path/to/repo`` is also supported, but not required here.
-
-
-**Remote repositories with relative paths, alternative syntax with port**:
-
-``ssh://user@host:port/./path/to/repo`` - path relative to current directory
-
-``ssh://user@host:port/~/path/to/repo`` - path relative to user's home directory
-
-``ssh://user@host:port/~other/path/to/repo`` - path relative to other's home directory
 
 
 If you frequently need the same repo URL, it is a good idea to set the

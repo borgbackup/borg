@@ -257,9 +257,10 @@ def with_archive(method):
     def wrapper(self, args, repository, manifest, **kwargs):
         archive_name = getattr(args, "name", None)
         assert archive_name is not None
+        archive_info = manifest.archives.get_one(archive_name)
         archive = Archive(
             manifest,
-            archive_name,
+            archive_info.id,
             numeric_ids=getattr(args, "numeric_ids", False),
             noflags=getattr(args, "noflags", False),
             noacls=getattr(args, "noacls", False),

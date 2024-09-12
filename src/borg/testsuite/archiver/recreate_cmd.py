@@ -5,7 +5,6 @@ from datetime import datetime
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers import CommandError
 from .. import changedir, are_hardlinks_supported
 from . import (
     _create_test_caches,
@@ -77,18 +76,6 @@ def test_recreate_hardlinked_tags(archivers, request):  # test for issue #4911
     # - a hardlink item for "CACHEDIR.TAG" referring back to file1 for its contents
     cmd(archiver, "recreate", "test", "--exclude-caches", "--keep-exclude-tags")
     # if issue #4911 is present, the recreate will crash with a KeyError for "input/file1"
-
-
-def test_recreate_target_rc(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    if archiver.FORK_DEFAULT:
-        expected_ec = CommandError().exit_code
-        output = cmd(archiver, "recreate", "--target=asdf", exit_code=expected_ec)
-        assert "Need to specify single archive" in output
-    else:
-        with pytest.raises(CommandError):
-            cmd(archiver, "recreate", "--target=asdf")
 
 
 def test_recreate_target(archivers, request):

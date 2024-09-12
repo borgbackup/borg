@@ -33,14 +33,15 @@ class TransferMixIn:
             )
 
         dry_run = args.dry_run
-        archive_names = tuple(x.name for x in other_manifest.archives.list_considering(args))
-        if not archive_names:
+        archive_infos = other_manifest.archives.list_considering(args)
+        count = len(archive_infos)
+        if count == 0:
             return
 
         an_errors = []
-        for archive_name in archive_names:
+        for archive_info in archive_infos:
             try:
-                archivename_validator(archive_name)
+                archivename_validator(archive_info.name)
             except argparse.ArgumentTypeError as err:
                 an_errors.append(str(err))
         if an_errors:
@@ -48,12 +49,12 @@ class TransferMixIn:
             raise Error("\n".join(an_errors))
 
         ac_errors = []
-        for archive_name in archive_names:
-            archive = Archive(other_manifest, archive_name)
+        for archive_info in archive_infos:
+            archive = Archive(other_manifest, archive_info.id)
             try:
                 comment_validator(archive.metadata.get("comment", ""))
             except argparse.ArgumentTypeError as err:
-                ac_errors.append(f"{archive_name}: {err}")
+                ac_errors.append(f"{archive_info.name}: {err}")
         if ac_errors:
             ac_errors.insert(0, "Invalid archive comments detected, please fix them before transfer:")
             raise Error("\n".join(ac_errors))
@@ -75,7 +76,8 @@ class TransferMixIn:
 
         upgrader = UpgraderCls(cache=cache)
 
-        for name in archive_names:
+        for archive_info in archive_infos:
+            name = archive_info.name
             transfer_size = 0
             present_size = 0
             if manifest.archives.exists(name) and not dry_run:

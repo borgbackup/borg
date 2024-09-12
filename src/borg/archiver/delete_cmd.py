@@ -3,7 +3,7 @@ import logging
 
 from ._common import with_repository
 from ..constants import *  # NOQA
-from ..helpers import format_archive, CommandError
+from ..helpers import format_archive, CommandError, bin_to_hex
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -18,8 +18,9 @@ class DeleteMixIn:
         self.output_list = args.output_list
         dry_run = args.dry_run
         manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
-        archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
-        if not archive_names:
+        archive_infos = manifest.archives.list_considering(args)
+        count = len(archive_infos)
+        if count == 0:
             return
         if args.match_archives is None and args.first == 0 and args.last == 0:
             raise CommandError(
@@ -29,18 +30,20 @@ class DeleteMixIn:
 
         deleted = False
         logger_list = logging.getLogger("borg.output.list")
-        for i, archive_name in enumerate(archive_names, 1):
+        for i, archive_info in enumerate(archive_infos, 1):
+            name, id, hex_id = archive_info.name, archive_info.id, bin_to_hex(archive_info.id)
             try:
                 # this does NOT use Archive.delete, so this code hopefully even works in cases a corrupt archive
                 # would make the code in class Archive crash, so the user can at least get rid of such archives.
-                current_archive = manifest.archives.delete(archive_name)
+                if not dry_run:
+                    manifest.archives.delete_by_id(id)
             except KeyError:
-                self.print_warning(f"Archive {archive_name} not found ({i}/{len(archive_names)}).")
+                self.print_warning(f"Archive {name} {hex_id} not found ({i}/{count}).")
             else:
                 deleted = True
                 if self.output_list:
                     msg = "Would delete: {} ({}/{})" if dry_run else "Deleted archive: {} ({}/{})"
-                    logger_list.info(msg.format(format_archive(current_archive), i, len(archive_names)))
+                    logger_list.info(msg.format(format_archive(archive_info), i, count))
         if dry_run:
             logger.info("Finished dry-run.")
         elif deleted:

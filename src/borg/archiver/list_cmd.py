@@ -27,8 +27,10 @@ class ListMixIn:
         else:
             format = os.environ.get("BORG_LIST_FORMAT", "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")
 
+        archive_info = manifest.archives.get_one(args.name)
+
         def _list_inner(cache):
-            archive = Archive(manifest, args.name, cache=cache)
+            archive = Archive(manifest, archive_info.id, cache=cache)
             formatter = ItemFormatter(archive, format)
             for item in archive.iter_items(lambda item: matcher.match(item.path)):
                 sys.stdout.write(formatter.format_item(item, args.json_lines, sort=True))

@@ -1,4 +1,3 @@
-from ...archive import Archive
 from ...constants import *  # NOQA
 from ...helpers import IncludePatternNeverMatchedWarning
 from . import cmd_fixture, changedir  # NOQA
@@ -18,5 +17,3 @@ def test_return_codes(cmd_fixture, tmpdir):
         assert rc == EXIT_SUCCESS
     rc, out = cmd_fixture("--repo=%s" % repo, "extract", "archive", "does/not/match")
     assert rc == IncludePatternNeverMatchedWarning().exit_code
-    rc, out = cmd_fixture("--repo=%s" % repo, "create", "archive", str(input))
-    assert rc == Archive.AlreadyExists().exit_code

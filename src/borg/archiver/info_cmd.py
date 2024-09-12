@@ -18,12 +18,12 @@ class InfoMixIn:
     def do_info(self, args, repository, manifest, cache):
         """Show archive details such as disk space used"""
 
-        archive_names = tuple(x.name for x in manifest.archives.list_considering(args))
+        archive_infos = manifest.archives.list_considering(args)
 
         output_data = []
 
-        for i, archive_name in enumerate(archive_names, 1):
-            archive = Archive(manifest, archive_name, cache=cache, iec=args.iec)
+        for i, archive_info in enumerate(archive_infos, 1):
+            archive = Archive(manifest, archive_info.id, cache=cache, iec=args.iec)
             info = archive.info()
             if args.json:
                 output_data.append(info)
@@ -48,7 +48,7 @@ class InfoMixIn:
                     .strip()
                     .format(**info)
                 )
-            if not args.json and len(archive_names) - i:
+            if not args.json and len(archive_infos) - i:
                 print()
 
         if args.json:

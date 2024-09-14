@@ -267,36 +267,20 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
     cmd(archiver, "check", exit_code=0)
 
 
-def test_manifest_rebuild_duplicate_archive(archivers, request):
+def test_check_undelete_archives(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    check_cmd_setup(archiver)
-    archive, repository = open_archive(archiver.repository_path, "archive1")
-    repo_objs = archive.repo_objs
-    with repository:
-        manifest = repository.get_manifest()
-        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
-        repository.put_manifest(corrupted_manifest)
-        archive_dict = {
-            "command_line": "",
-            "item_ptrs": [],
-            "hostname": "foo",
-            "username": "bar",
-            "name": "archive1",
-            "time": "2016-12-15T18:49:51.849711",
-            "version": 2,
-        }
-        archive = repo_objs.key.pack_metadata(archive_dict)
-        archive_id = repo_objs.id_hash(archive)
-        repository.put(archive_id, repo_objs.format(archive_id, {}, archive, ro_type=ROBJ_ARCHIVE_META))
-    cmd(archiver, "check", exit_code=1)
-    # when undeleting archives, borg check will discover both the original archive1 as well as
-    # the fake archive1 we created above. for the fake one, a new archives directory entry
-    # named archive1.1 will be created because we request undeleting archives and there
-    # is no archives directory entry for the fake archive yet.
+    check_cmd_setup(archiver)  # creates archive1 and archive2
+    # borg delete does it rather quick and dirty: it only kills the archives directory entry
+    cmd(archiver, "delete", "archive1")
+    cmd(archiver, "delete", "archive2")
+    output = cmd(archiver, "repo-list")
+    assert "archive1" not in output
+    assert "archive2" not in output
+    # borg check will re-discover archive1 and archive2 and new archives directory entries
+    # will be created because we requested undeleting archives.
     cmd(archiver, "check", "--repair", "--undelete-archives", exit_code=0)
     output = cmd(archiver, "repo-list")
     assert "archive1" in output
-    assert "archive1.1" in output
     assert "archive2" in output
 
 

@@ -1818,23 +1818,13 @@ class ArchiveChecker:
                 archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)
                 name = archive.name
-                logger.info(f"Found archive {name}, id {bin_to_hex(chunk_id)}.")
-                if self.manifest.archives.exists_name_and_id(name, chunk_id):
+                archive_id, archive_id_hex = chunk_id, bin_to_hex(chunk_id)
+                logger.info(f"Found archive {name} {archive_id_hex}.")
+                if self.manifest.archives.exists_name_and_id(name, archive_id):
                     logger.info("We already have an archives directory entry for this.")
-                elif not self.manifest.archives.exists(name):
-                    # no archives list entry yet and name is not taken yet, create an entry
-                    logger.warning(f"Creating archives directory entry for {name}.")
-                    self.manifest.archives.create(name, chunk_id, archive.time)
                 else:
-                    # we don't have an entry yet, but the name is taken by something else
-                    i = 1
-                    while True:
-                        new_name = "%s.%d" % (name, i)
-                        if not self.manifest.archives.exists(new_name):
-                            break
-                        i += 1
-                    logger.warning(f"Creating archives directory entry using {new_name}.")
-                    self.manifest.archives.create(new_name, chunk_id, archive.time)
+                    logger.warning(f"Creating archives directory entry for {name} {archive_id_hex}.")
+                    self.manifest.archives.create(name, archive_id, archive.time)
         pi.finish()
         logger.info("Rebuilding missing archives directory entries completed.")
 
@@ -2046,28 +2036,28 @@ class ArchiveChecker:
         with cache_if_remote(self.repository) as repository:
             for i, info in enumerate(archive_infos):
                 pi.show(i)
-                logger.info(f"Analyzing archive {info.name} ({i + 1}/{num_archives})")
-                archive_id = info.id
+                archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
+                logger.info(f"Analyzing archive {info.name} {archive_id_hex} ({i + 1}/{num_archives})")
                 if archive_id not in self.chunks:
-                    logger.error("Archive metadata block %s is missing!", bin_to_hex(archive_id))
+                    logger.error(f"Archive metadata block {archive_id_hex} is missing!")
                     self.error_found = True
                     if self.repair:
-                        logger.error(f"Deleting broken archive {info.name}.")
-                        self.manifest.archives.delete(info.name)
+                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                        self.manifest.archives.delete_by_id(archive_id)
                     else:
-                        logger.error(f"Would delete broken archive {info.name}.")
+                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
                     continue
                 cdata = self.repository.get(archive_id)
                 try:
                     _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
                 except IntegrityError as integrity_error:
-                    logger.error("Archive metadata block %s is corrupted: %s", bin_to_hex(archive_id), integrity_error)
+                    logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
                     self.error_found = True
                     if self.repair:
-                        logger.error(f"Deleting broken archive {info.name}.")
-                        self.manifest.archives.delete(info.name)
+                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                        self.manifest.archives.delete_by_id(archive_id)
                     else:
-                        logger.error(f"Would delete broken archive {info.name}.")
+                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
                     continue
                 archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)

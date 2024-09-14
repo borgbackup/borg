@@ -103,14 +103,7 @@ class Archives:
 
     def count(self):
         # return the count of archives in the repo
-        if not self.legacy:
-            try:
-                infos = list(self.repository.store_list("archives"))
-            except ObjectNotFound:
-                infos = []
-            return len(infos)  # we do not check here if entries are valid
-        else:
-            return len(self._archives)
+        return len(list(self.ids()))
 
     def exists(self, name):
         # check if an archive with this name exists
@@ -125,7 +118,7 @@ class Archives:
         assert isinstance(name, str)
         assert isinstance(id, bytes)
         if not self.legacy:
-            for _, archive_info in self._infos():
+            for archive_info in self._infos():
                 if archive_info["name"] == name and archive_info["id"] == id:
                     return True
             else:
@@ -170,10 +163,8 @@ class Archives:
             )
         return metadata
 
-    def _infos(self):
-        # yield the infos of all archives: (store_key, archive_info)
-        from .helpers import msgpack
-
+    def ids(self):
+        # yield the binary IDs of all archives
         if not self.legacy:
             try:
                 infos = list(self.repository.store_list("archives"))
@@ -181,62 +172,43 @@ class Archives:
                 infos = []
             for info in infos:
                 info = ItemInfo(*info)  # RPC does not give us a NamedTuple
-                # TODO: we could directly use archives/<hex_archive_id> as name of a content-less object,
-                # so we can know the archive_id without even loading the content from the store.
-                value = self.repository.store_load(f"archives/{info.name}")
-                _, value = self.manifest.repo_objs.parse(hex_to_bin(info.name), value, ro_type=ROBJ_MANIFEST)
-                archive_info = msgpack.unpackb(value)
-                # new:
-                archive_info = self._get_archive_meta(archive_info["id"])
-                yield info.name, archive_info
+                yield hex_to_bin(info.name)
         else:
-            for name in self._archives:
-                archive_info = dict(name=name, id=self._archives[name]["id"], time=self._archives[name]["time"])
-                # new:
-                archive_info = self._get_archive_meta(archive_info["id"])
-                yield None, archive_info
+            for archive_info in self._archives.values():
+                yield archive_info["id"]
+
+    def _infos(self):
+        # yield the infos of all archives
+        for id in self.ids():
+            yield self._get_archive_meta(id)
 
     def _info_tuples(self):
-        for _, info in self._infos():
+        for info in self._infos():
             yield ArchiveInfo(name=info["name"], id=info["id"], ts=parse_timestamp(info["time"]))
 
     def _lookup_name(self, name, raw=False):
         assert isinstance(name, str)
         assert not self.legacy
-        for store_key, archive_info in self._infos():
+        for archive_info in self._infos():
             if archive_info["exists"] and archive_info["name"] == name:
                 if not raw:
                     ts = parse_timestamp(archive_info["time"])
-                    return store_key, ArchiveInfo(name=archive_info["name"], id=archive_info["id"], ts=ts)
+                    return ArchiveInfo(name=archive_info["name"], id=archive_info["id"], ts=ts)
                 else:
-                    return store_key, archive_info
+                    return archive_info
         else:
             raise KeyError(name)
 
-    def _lookup_id(self, id, raw=False):
-        assert isinstance(id, bytes)
-        assert not self.legacy
-        for store_key, archive_info in self._infos():
-            if archive_info["id"] == id:
-                if not raw:
-                    ts = parse_timestamp(archive_info["time"])
-                    return store_key, ArchiveInfo(name=archive_info["name"], id=archive_info["id"], ts=ts)
-                else:
-                    return store_key, archive_info
-        else:
-            raise KeyError(bin_to_hex(id))
-
     def names(self):
         # yield the names of all archives
-        for _, archive_info in self._infos():
+        for archive_info in self._infos():
             yield archive_info["name"]
 
     def get(self, name, raw=False):
         assert isinstance(name, str)
         if not self.legacy:
             try:
-                store_key, archive_info = self._lookup_name(name, raw=raw)
-                return archive_info
+                return self._lookup_name(name, raw=raw)
             except KeyError:
                 return None
         else:
@@ -252,11 +224,14 @@ class Archives:
     def get_by_id(self, id, raw=False):
         assert isinstance(id, bytes)
         if not self.legacy:
-            try:
-                store_key, archive_info = self._lookup_id(id, raw=raw)
-                return archive_info
-            except KeyError:
-                return None
+            if id in self.ids():  # check directory
+                # looks like this archive id is in the archives directory, thus it is NOT deleted.
+                archive_info = self._get_archive_meta(id)
+                if archive_info["exists"]:
+                    if not raw:
+                        ts = parse_timestamp(archive_info["time"])
+                        archive_info = ArchiveInfo(name=archive_info["name"], id=archive_info["id"], ts=ts)
+                    return archive_info
         else:
             for name, values in self._archives.items():
                 if id == values["id"]:
@@ -276,32 +251,18 @@ class Archives:
             ts = ts.isoformat(timespec="microseconds")
         assert isinstance(ts, str)
         if not self.legacy:
-            archive = dict(name=name, id=id, time=ts)
-            value = self.manifest.key.pack_metadata(archive)
-            id = self.manifest.repo_objs.id_hash(value)
-            key = bin_to_hex(id)
-            value = self.manifest.repo_objs.format(id, {}, value, ro_type=ROBJ_MANIFEST)
-            self.repository.store_store(f"archives/{key}", value)
+            # we only create a directory entry, its name points to the archive item:
+            self.repository.store_store(f"archives/{bin_to_hex(id)}", b"")
         else:
             if self.exists(name) and not overwrite:
                 raise KeyError("archive already exists")
             self._archives[name] = {"id": id, "time": ts}
 
-    def delete(self, name):
-        # delete an archive
-        assert isinstance(name, str)
-        if not self.legacy:
-            store_key, archive_info = self._lookup_name(name)
-            self.repository.store_delete(f"archives/{store_key}")
-        else:
-            self._archives.pop(name)
-
     def delete_by_id(self, id):
         # delete an archive
         assert isinstance(id, bytes)
         assert not self.legacy
-        store_key, archive_info = self._lookup_id(id)
-        self.repository.store_delete(f"archives/{store_key}")
+        self.repository.store_delete(f"archives/{bin_to_hex(id)}")
 
     def list(
         self,

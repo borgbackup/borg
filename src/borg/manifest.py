@@ -16,6 +16,7 @@ from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex, hex_to_bin
 from .helpers.time import parse_timestamp, calculate_relative_offset, archive_ts_now
 from .helpers.errors import Error, CommandError
+from .item import ArchiveItem
 from .patterns import get_regex_from_pattern
 from .repoobj import RepoObj
 
@@ -132,6 +133,43 @@ class Archives:
         else:
             raise NotImplementedError
 
+    def _get_archive_meta(self, id: bytes) -> dict:
+        # get all metadata directly from the ArchiveItem in the repo.
+        from .legacyrepository import LegacyRepository
+        from .repository import Repository
+
+        try:
+            cdata = self.repository.get(id)
+        except (Repository.ObjectNotFound, LegacyRepository.ObjectNotFound):
+            metadata = dict(
+                id=id,
+                name="archive-does-not-exist",
+                time="1970-01-01T00:00:00.000000",
+                # new:
+                exists=False,  # we have the pointer, but the repo does not have an archive item
+            )
+        else:
+            _, data = self.manifest.repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
+            archive_dict = self.manifest.key.unpack_archive(data)
+            archive_item = ArchiveItem(internal_dict=archive_dict)
+            if archive_item.version not in (1, 2):  # legacy: still need to read v1 archives
+                raise Exception("Unknown archive metadata version")
+            # callers expect a dict with dict["key"] access, not ArchiveItem.key access.
+            # also, we need to put the id in there.
+            metadata = dict(
+                id=id,
+                name=archive_item.name,
+                time=archive_item.time,
+                # new:
+                exists=True,  # repo has a valid archive item
+                username=archive_item.username,
+                hostname=archive_item.hostname,
+                size=archive_item.size,
+                nfiles=archive_item.nfiles,
+                comment=archive_item.comment,  # not always present?
+            )
+        return metadata
+
     def _infos(self):
         # yield the infos of all archives: (store_key, archive_info)
         from .helpers import msgpack
@@ -143,13 +181,19 @@ class Archives:
                 infos = []
             for info in infos:
                 info = ItemInfo(*info)  # RPC does not give us a NamedTuple
+                # TODO: we could directly use archives/<hex_archive_id> as name of a content-less object,
+                # so we can know the archive_id without even loading the content from the store.
                 value = self.repository.store_load(f"archives/{info.name}")
                 _, value = self.manifest.repo_objs.parse(hex_to_bin(info.name), value, ro_type=ROBJ_MANIFEST)
                 archive_info = msgpack.unpackb(value)
+                # new:
+                archive_info = self._get_archive_meta(archive_info["id"])
                 yield info.name, archive_info
         else:
             for name in self._archives:
                 archive_info = dict(name=name, id=self._archives[name]["id"], time=self._archives[name]["time"])
+                # new:
+                archive_info = self._get_archive_meta(archive_info["id"])
                 yield None, archive_info
 
     def _info_tuples(self):
@@ -160,7 +204,7 @@ class Archives:
         assert isinstance(name, str)
         assert not self.legacy
         for store_key, archive_info in self._infos():
-            if archive_info["name"] == name:
+            if archive_info["exists"] and archive_info["name"] == name:
                 if not raw:
                     ts = parse_timestamp(archive_info["time"])
                     return store_key, ArchiveInfo(name=archive_info["name"], id=archive_info["id"], ts=ts)
@@ -184,11 +228,8 @@ class Archives:
 
     def names(self):
         # yield the names of all archives
-        if not self.legacy:
-            for _, archive_info in self._infos():
-                yield archive_info["name"]
-        else:
-            yield from self._archives
+        for _, archive_info in self._infos():
+            yield archive_info["name"]
 
     def get(self, name, raw=False):
         assert isinstance(name, str)

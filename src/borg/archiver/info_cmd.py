@@ -5,7 +5,7 @@ from datetime import timedelta
 from ._common import with_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import format_timedelta, json_print, basic_json_data
+from ..helpers import format_timedelta, json_print, basic_json_data, archivename_validator
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -18,7 +18,10 @@ class InfoMixIn:
     def do_info(self, args, repository, manifest, cache):
         """Show archive details such as disk space used"""
 
-        archive_infos = manifest.archives.list_considering(args)
+        if args.name:
+            archive_infos = [manifest.archives.get_one(args.name)]
+        else:
+            archive_infos = manifest.archives.list_considering(args)
 
         output_data = []
 
@@ -83,3 +86,6 @@ class InfoMixIn:
         subparser.set_defaults(func=self.do_info)
         subparser.add_argument("--json", action="store_true", help="format output as JSON")
         define_archive_filters_group(subparser)
+        subparser.add_argument(
+            "name", metavar="NAME", nargs="?", type=archivename_validator, help="specify the archive name"
+        )

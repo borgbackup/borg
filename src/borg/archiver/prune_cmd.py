@@ -10,6 +10,7 @@ from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
+from ..helpers import archivename_validator
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -90,7 +91,9 @@ class PruneMixIn:
             format = os.environ.get("BORG_PRUNE_FORMAT", "{archive:<36} {time} [{id}]")
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
-        archives = manifest.archives.list(match=args.match_archives, sort_by=["ts"], reverse=True)
+        match = args.name if args.name else args.match_archives
+        archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
+
         keep = []
         # collect the rule responsible for the keeping of each archive in this dict
         # keys are archive ids, values are a tuple
@@ -299,3 +302,6 @@ class PruneMixIn:
             help="number of yearly archives to keep",
         )
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
+        subparser.add_argument(
+            "name", metavar="NAME", nargs="?", type=archivename_validator, help="specify the archive name"
+        )

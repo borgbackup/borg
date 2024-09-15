@@ -191,6 +191,19 @@ class Archives:
         else:
             raise NotImplementedError
 
+    def exists_name_and_ts(self, name, ts):
+        # check if an archive with this name AND timestamp exists
+        assert isinstance(name, str)
+        assert isinstance(ts, datetime)
+        if not self.legacy:
+            for archive_info in self._info_tuples():
+                if archive_info.name == name and archive_info.ts == ts:
+                    return True
+            else:
+                return False
+        else:
+            raise NotImplementedError
+
     def _lookup_name(self, name, raw=False):
         assert isinstance(name, str)
         assert not self.legacy

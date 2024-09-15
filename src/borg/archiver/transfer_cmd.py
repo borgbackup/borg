@@ -7,7 +7,7 @@ from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
 from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
-from ..helpers import format_file_size
+from ..helpers import format_file_size, bin_to_hex
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -77,14 +77,26 @@ class TransferMixIn:
         upgrader = UpgraderCls(cache=cache)
 
         for archive_info in archive_infos:
-            name = archive_info.name
+            name, id, ts = archive_info.name, archive_info.id, archive_info.ts
+            id_hex, ts_str = bin_to_hex(id), ts.isoformat()
             transfer_size = 0
             present_size = 0
-            if manifest.archives.exists(name) and not dry_run:
-                print(f"{name}: archive is already present in destination repo, skipping.")
+            # at least for borg 1.x -> borg2 transfers, we can not use the id to check for
+            # already transferred archives (due to upgrade of metadata stream, id will be
+            # different anyway). so we use archive name and timestamp.
+            # the name alone might be sufficient for borg 1.x -> 2 transfers, but isn't
+            # for 2 -> 2 transfers, because borg2 allows duplicate names ("series" feature).
+            # so, best is to check for both name/ts and name/id.
+            if not dry_run and manifest.archives.exists_name_and_ts(name, archive_info.ts):
+                # useful for borg 1.x -> 2 transfers, we have unique names in borg 1.x.
+                # also useful for borg 2 -> 2 transfers with metadata changes (id changes).
+                print(f"{name} {ts_str}: archive is already present in destination repo, skipping.")
+            elif not dry_run and manifest.archives.exists_name_and_id(name, id):
+                # useful for borg 2 -> 2 transfers without changes (id stays the same)
+                print(f"{name} {id_hex}: archive is already present in destination repo, skipping.")
             else:
                 if not dry_run:
-                    print(f"{name}: copying archive to destination repo...")
+                    print(f"{name} {ts_str} {id_hex}: copying archive to destination repo...")
                 other_archive = Archive(other_manifest, name)
                 archive = (
                     Archive(manifest, name, cache=cache, create=True, progress=args.progress) if not dry_run else None
@@ -164,15 +176,15 @@ class TransferMixIn:
                     additional_metadata = upgrader.upgrade_archive_metadata(metadata=other_archive.metadata)
                     archive.save(additional_metadata=additional_metadata)
                     print(
-                        f"{name}: finished. "
+                        f"{name} {ts_str} {id_hex}: finished. "
                         f"transfer_size: {format_file_size(transfer_size)} "
                         f"present_size: {format_file_size(present_size)}"
                     )
                 else:
                     print(
-                        f"{name}: completed"
+                        f"{name} {ts_str} {id_hex}: completed"
                         if transfer_size == 0
-                        else f"{name}: incomplete, "
+                        else f"{name} {ts_str} {id_hex}: incomplete, "
                         f"transfer_size: {format_file_size(transfer_size)} "
                         f"present_size: {format_file_size(present_size)}"
                     )

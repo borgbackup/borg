@@ -288,6 +288,8 @@ cdef class Item(PropDict):
     # size is only present for items with a chunk list and then it is sum(chunk_sizes)
     size = PropDictProperty(int)
 
+    inode = PropDictProperty(int)
+
     hlid = PropDictProperty(bytes)  # hard link id: same value means same hard link.
     hardlink_master = PropDictProperty(bool)  # legacy
 

@@ -1058,6 +1058,8 @@ class MetadataCollector:
             group = gid2group(st.st_gid)
             if group is not None:
                 attrs["group"] = group
+        if st.st_ino > 0:
+            attrs["inode"] = st.st_ino
         return attrs
 
     def stat_ext_attrs(self, st, path, fd=None):

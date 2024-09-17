@@ -12,11 +12,12 @@ logger = create_logger()
 files_cache_logger = create_logger("borg.debug.files_cache")
 
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM
+from .checksums import xxh64
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Error
 from .helpers import get_cache_dir, get_security_dir
-from .helpers import hex_to_bin, parse_stringified_list
-from .helpers import format_file_size
+from .helpers import hex_to_bin, bin_to_hex, parse_stringified_list
+from .helpers import format_file_size, safe_encode
 from .helpers import safe_ns
 from .helpers import yes
 from .helpers import ProgressIndicatorMessage
@@ -25,14 +26,13 @@ from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
 from .crypto.key import PlaintextKey
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
-from .fslocking import Lock
 from .manifest import Manifest
 from .platform import SaveFile
 from .remote import RemoteRepository
 from .repository import LIST_SCAN_LIMIT, Repository
 
-# note: cmtime might be either a ctime or a mtime timestamp, chunks is a list of ChunkListEntry
-FileCacheEntry = namedtuple("FileCacheEntry", "age inode size cmtime chunks")
+# chunks is a list of ChunkListEntry
+FileCacheEntry = namedtuple("FileCacheEntry", "age inode size ctime mtime chunks")
 
 
 class SecurityManager:
@@ -154,7 +154,7 @@ class SecurityManager:
         if self.known() and not self.key_matches(key):
             raise Cache.EncryptionMethodMismatch()
 
-    def assert_secure(self, manifest, key, *, warn_if_unencrypted=True, lock_wait=None):
+    def assert_secure(self, manifest, key, *, warn_if_unencrypted=True):
         # warn_if_unencrypted=False is only used for initializing a new repository.
         # Thus, avoiding asking about a repository that's currently initializing.
         self.assert_access_unknown(warn_if_unencrypted, manifest, key)
@@ -194,9 +194,9 @@ class SecurityManager:
                 raise Cache.CacheInitAbortedError()
 
 
-def assert_secure(repository, manifest, lock_wait):
+def assert_secure(repository, manifest):
     sm = SecurityManager(repository)
-    sm.assert_secure(manifest, manifest.key, lock_wait=lock_wait)
+    sm.assert_secure(manifest, manifest.key)
 
 
 def cache_dir(repository, path=None):
@@ -204,13 +204,11 @@ def cache_dir(repository, path=None):
 
 
 class CacheConfig:
-    def __init__(self, repository, path=None, lock_wait=None):
+    def __init__(self, repository, path=None):
         self.repository = repository
         self.path = cache_dir(repository, path)
         logger.debug("Using %s as cache", self.path)
         self.config_path = os.path.join(self.path, "config")
-        self.lock = None
-        self.lock_wait = lock_wait
 
     def __enter__(self):
         self.open()
@@ -235,7 +233,6 @@ class CacheConfig:
             config.write(fd)
 
     def open(self):
-        self.lock = Lock(os.path.join(self.path, "lock"), exclusive=True, timeout=self.lock_wait).acquire()
         self.load()
 
     def load(self):
@@ -278,9 +275,7 @@ class CacheConfig:
             self._config.write(fd)
 
     def close(self):
-        if self.lock is not None:
-            self.lock.release()
-            self.lock = None
+        pass
 
     def _check_upgrade(self, config_path):
         try:
@@ -294,10 +289,6 @@ class CacheConfig:
         except configparser.NoSectionError:
             self.close()
             raise Exception("%s does not look like a Borg cache." % config_path) from None
-
-
-def get_cache_impl():
-    return os.environ.get("BORG_CACHE_IMPL", "adhocwithfiles")
 
 
 class Cache:
@@ -330,8 +321,7 @@ class Cache:
 
     @staticmethod
     def break_lock(repository, path=None):
-        path = cache_dir(repository, path)
-        Lock(os.path.join(path, "lock"), exclusive=True).break_lock()
+        pass
 
     @staticmethod
     def destroy(repository, path=None):
@@ -350,71 +340,117 @@ class Cache:
         sync=True,
         warn_if_unencrypted=True,
         progress=False,
-        lock_wait=None,
-        prefer_adhoc_cache=False,
         cache_mode=FILES_CACHE_MODE_DISABLED,
         iec=False,
+        archive_name=None,
     ):
-        def adhocwithfiles():
-            return AdHocWithFilesCache(
-                manifest=manifest,
-                path=path,
-                warn_if_unencrypted=warn_if_unencrypted,
-                progress=progress,
-                iec=iec,
-                lock_wait=lock_wait,
-                cache_mode=cache_mode,
-            )
-
-        def adhoc():
-            return AdHocCache(manifest=manifest, lock_wait=lock_wait, iec=iec)
-
-        impl = get_cache_impl()
-        if impl != "cli":
-            methods = dict(adhocwithfiles=adhocwithfiles, adhoc=adhoc)
-            try:
-                method = methods[impl]
-            except KeyError:
-                raise RuntimeError("Unknown BORG_CACHE_IMPL value: %s" % impl)
-            return method()
-
-        return adhoc() if prefer_adhoc_cache else adhocwithfiles()
+        return AdHocWithFilesCache(
+            manifest=manifest,
+            path=path,
+            warn_if_unencrypted=warn_if_unencrypted,
+            progress=progress,
+            iec=iec,
+            cache_mode=cache_mode,
+            archive_name=archive_name,
+        )
 
 
 class FilesCacheMixin:
     """
-    Massively accelerate processing of unchanged files by caching their chunks list.
-    With that, we can avoid having to read and chunk them to get their chunks list.
+    Massively accelerate processing of unchanged files.
+    We read the "files cache" (either from cache directory or from previous archive
+    in repo) that has metadata for all "already stored" files, like size, ctime/mtime,
+    inode number and chunks id/size list.
+    When finding a file on disk, we use the metadata to determine if the file is unchanged.
+    If so, we use the cached chunks list and skip reading/chunking the file contents.
     """
 
     FILES_CACHE_NAME = "files"
 
-    def __init__(self, cache_mode):
+    def __init__(self, cache_mode, archive_name=None):
+        self.archive_name = archive_name  # ideally a SERIES name
+        assert not ("c" in cache_mode and "m" in cache_mode)
+        assert "d" in cache_mode or "c" in cache_mode or "m" in cache_mode
         self.cache_mode = cache_mode
         self._files = None
-        self._newest_cmtime = None
+        self._newest_cmtime = 0
+        self._newest_path_hashes = set()
 
     @property
     def files(self):
         if self._files is None:
-            self._files = self._read_files_cache()
+            self._files = self._read_files_cache()  # try loading from cache dir
+        if self._files is None:
+            self._files = self._build_files_cache()  # try loading from repository
+        if self._files is None:
+            self._files = {}  # start from scratch
         return self._files
+
+    def _build_files_cache(self):
+        """rebuild the files cache by reading previous archive from repository"""
+        if "d" in self.cache_mode:  # d(isabled)
+            return
+
+        if not self.archive_name:
+            return
+
+        from .archive import Archive
+
+        # get the latest archive with the IDENTICAL name, supporting archive series:
+        archives = self.manifest.archives.list(match=self.archive_name, sort_by=["ts"], last=1)
+        if not archives:
+            # nothing found
+            return
+        prev_archive = archives[0]
+
+        files = {}
+        logger.debug(
+            f"Building files cache from {prev_archive.name} {prev_archive.ts} {bin_to_hex(prev_archive.id)} ..."
+        )
+        files_cache_logger.debug("FILES-CACHE-BUILD: starting...")
+        archive = Archive(self.manifest, prev_archive.id)
+        for item in archive.iter_items(preload=False):
+            # only put regular files' infos into the files cache:
+            if stat.S_ISREG(item.mode):
+                path_hash = self.key.id_hash(safe_encode(item.path))
+                # keep track of the key(s) for the most recent timestamp(s):
+                ctime_ns = item.ctime
+                if ctime_ns > self._newest_cmtime:
+                    self._newest_cmtime = ctime_ns
+                    self._newest_path_hashes = {path_hash}
+                elif ctime_ns == self._newest_cmtime:
+                    self._newest_path_hashes.add(path_hash)
+                mtime_ns = item.mtime
+                if mtime_ns > self._newest_cmtime:
+                    self._newest_cmtime = mtime_ns
+                    self._newest_path_hashes = {path_hash}
+                elif mtime_ns == self._newest_cmtime:
+                    self._newest_path_hashes.add(path_hash)
+                # add the file to the in-memory files cache
+                entry = FileCacheEntry(
+                    item.get("inode", 0), item.size, int_to_timestamp(ctime_ns), int_to_timestamp(mtime_ns), item.chunks
+                )
+                files[path_hash] = msgpack.packb(entry)  # takes about 240 Bytes per file
+        # deal with special snapshot / timestamp granularity case, see FAQ:
+        for path_hash in self._newest_path_hashes:
+            del files[path_hash]
+        files_cache_logger.debug("FILES-CACHE-BUILD: finished, %d entries loaded.", len(files))
+        return files
 
     def files_cache_name(self):
         suffix = os.environ.get("BORG_FILES_CACHE_SUFFIX", "")
-        return self.FILES_CACHE_NAME + "." + suffix if suffix else self.FILES_CACHE_NAME
+        # when using archive series, we automatically make up a separate cache file per series.
+        # when not, the user may manually do that by using the env var.
+        if not suffix:
+            # avoid issues with too complex or long archive_name by hashing it:
+            suffix = bin_to_hex(xxh64(self.archive_name.encode()))
+        return self.FILES_CACHE_NAME + "." + suffix
 
-    def discover_files_cache_name(self, path):
-        return [
-            fn for fn in os.listdir(path) if fn == self.FILES_CACHE_NAME or fn.startswith(self.FILES_CACHE_NAME + ".")
-        ][0]
-
-    def _create_empty_files_cache(self, path):
-        with IntegrityCheckedFile(path=os.path.join(path, self.files_cache_name()), write=True) as fd:
-            pass  # empty file
-        return fd.integrity_data
+    def discover_files_cache_names(self, path):
+        return [fn for fn in os.listdir(path) if fn.startswith(self.FILES_CACHE_NAME + ".")]
 
     def _read_files_cache(self):
+        """read files cache from cache directory"""
         if "d" in self.cache_mode:  # d(isabled)
             return
 
@@ -447,17 +483,17 @@ class FilesCacheMixin:
         except FileIntegrityError as fie:
             msg = "The files cache is corrupted. [%s]" % str(fie)
         if msg is not None:
-            logger.warning(msg)
-            logger.warning("Continuing without files cache - expect lower performance.")
-            files = {}
-        files_cache_logger.debug("FILES-CACHE-LOAD: finished, %d entries loaded.", len(files))
+            logger.debug(msg)
+            files = None
+        files_cache_logger.debug("FILES-CACHE-LOAD: finished, %d entries loaded.", len(files or {}))
         return files
 
     def _write_files_cache(self, files):
+        """write files cache to cache directory"""
         if self._newest_cmtime is None:
             # was never set because no files were modified/added
             self._newest_cmtime = 2**63 - 1  # nanoseconds, good until y2262
-        ttl = int(os.environ.get("BORG_FILES_CACHE_TTL", 20))
+        ttl = int(os.environ.get("BORG_FILES_CACHE_TTL", 2))
         files_cache_logger.debug("FILES-CACHE-SAVE: starting...")
         # TODO: use something like SaveFile here, but that didn't work due to SyncFile missing .seek().
         with IntegrityCheckedFile(path=os.path.join(self.path, self.files_cache_name()), write=True) as fd:
@@ -469,7 +505,7 @@ class FilesCacheMixin:
                 entry = FileCacheEntry(*msgpack.unpackb(item))
                 if (
                     entry.age == 0
-                    and timestamp_to_int(entry.cmtime) < self._newest_cmtime
+                    and max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < self._newest_cmtime
                     or entry.age > 0
                     and entry.age < ttl
                 ):
@@ -517,10 +553,10 @@ class FilesCacheMixin:
         if "i" in cache_mode and entry.inode != st.st_ino:
             files_cache_logger.debug("KNOWN-CHANGED: file inode number has changed: %r", hashed_path)
             return True, None
-        if "c" in cache_mode and timestamp_to_int(entry.cmtime) != st.st_ctime_ns:
+        if "c" in cache_mode and timestamp_to_int(entry.ctime) != st.st_ctime_ns:
             files_cache_logger.debug("KNOWN-CHANGED: file ctime has changed: %r", hashed_path)
             return True, None
-        elif "m" in cache_mode and timestamp_to_int(entry.cmtime) != st.st_mtime_ns:
+        if "m" in cache_mode and timestamp_to_int(entry.mtime) != st.st_mtime_ns:
             files_cache_logger.debug("KNOWN-CHANGED: file mtime has changed: %r", hashed_path)
             return True, None
         # we ignored the inode number in the comparison above or it is still same.
@@ -538,30 +574,25 @@ class FilesCacheMixin:
     def memorize_file(self, hashed_path, path_hash, st, chunks):
         if not stat.S_ISREG(st.st_mode):
             return
-        cache_mode = self.cache_mode
         # note: r(echunk) modes will update the files cache, d(isabled) mode won't
-        if "d" in cache_mode:
+        if "d" in self.cache_mode:
             files_cache_logger.debug("FILES-CACHE-NOUPDATE: files cache disabled")
             return
-        if "c" in cache_mode:
-            cmtime_type = "ctime"
-            cmtime_ns = safe_ns(st.st_ctime_ns)
-        elif "m" in cache_mode:
-            cmtime_type = "mtime"
-            cmtime_ns = safe_ns(st.st_mtime_ns)
-        else:  # neither 'c' nor 'm' in cache_mode, avoid UnboundLocalError
-            cmtime_type = "ctime"
-            cmtime_ns = safe_ns(st.st_ctime_ns)
+        ctime_ns = safe_ns(st.st_ctime_ns)
+        mtime_ns = safe_ns(st.st_mtime_ns)
         entry = FileCacheEntry(
-            age=0, inode=st.st_ino, size=st.st_size, cmtime=int_to_timestamp(cmtime_ns), chunks=chunks
+            age=0,
+            inode=st.st_ino,
+            size=st.st_size,
+            ctime=int_to_timestamp(ctime_ns),
+            mtime=int_to_timestamp(mtime_ns),
+            chunks=chunks,
         )
         self.files[path_hash] = msgpack.packb(entry)
-        self._newest_cmtime = max(self._newest_cmtime or 0, cmtime_ns)
+        self._newest_cmtime = max(self._newest_cmtime or 0, ctime_ns)
+        self._newest_cmtime = max(self._newest_cmtime or 0, mtime_ns)
         files_cache_logger.debug(
-            "FILES-CACHE-UPDATE: put %r [has %s] <- %r",
-            entry._replace(chunks="[%d entries]" % len(entry.chunks)),
-            cmtime_type,
-            hashed_path,
+            "FILES-CACHE-UPDATE: put %r <- %r", entry._replace(chunks="[%d entries]" % len(entry.chunks)), hashed_path
         )
 
 
@@ -615,7 +646,7 @@ class ChunksMixin:
         if entry.refcount and size is not None:
             assert isinstance(entry.size, int)
             if not entry.size:
-                # AdHocWithFilesCache / AdHocCache:
+                # AdHocWithFilesCache:
                 # Here *size* is used to update the chunk's size information, which will be zero for existing chunks.
                 self.chunks[id] = entry._replace(size=size)
         return entry.refcount != 0
@@ -659,7 +690,13 @@ class ChunksMixin:
 
 class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     """
-    Like AdHocCache, but with a files cache.
+    An ad-hoc chunks and files cache.
+
+    Chunks: it does not maintain accurate reference count.
+    Chunks that were not added during the current lifetime won't have correct size set (0 bytes)
+    and will have an infinite reference count (MAX_VALUE).
+
+    Files: if a previous_archive_id is given, ad-hoc build a in-memory files cache from that archive.
     """
 
     def __init__(
@@ -668,16 +705,15 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         path=None,
         warn_if_unencrypted=True,
         progress=False,
-        lock_wait=None,
         cache_mode=FILES_CACHE_MODE_DISABLED,
         iec=False,
+        archive_name=None,
     ):
         """
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
-        :param lock_wait: timeout for lock acquisition (int [s] or None [wait forever])
         :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         """
-        FilesCacheMixin.__init__(self, cache_mode)
+        FilesCacheMixin.__init__(self, cache_mode, archive_name)
         ChunksMixin.__init__(self)
         assert isinstance(manifest, Manifest)
         self.manifest = manifest
@@ -688,7 +724,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
 
         self.path = cache_dir(self.repository, path)
         self.security_manager = SecurityManager(self.repository)
-        self.cache_config = CacheConfig(self.repository, self.path, lock_wait)
+        self.cache_config = CacheConfig(self.repository, self.path)
 
         # Warn user before sending data to a never seen before unencrypted repository
         if not os.path.exists(self.path):
@@ -721,7 +757,6 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         with open(os.path.join(self.path, "README"), "w") as fd:
             fd.write(CACHE_README)
         self.cache_config.create()
-        self._create_empty_files_cache(self.path)
 
     def open(self):
         if not os.path.isdir(self.path):
@@ -757,7 +792,6 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def wipe_cache(self):
         logger.warning("Discarding incompatible cache and forcing a cache rebuild")
         self._chunks = ChunkIndex()
-        self._create_empty_files_cache(self.path)
         self.cache_config.manifest_id = ""
         self.cache_config._config.set("cache", "manifest", "")
 
@@ -773,46 +807,3 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
 
         self.cache_config.ignored_features.update(repo_features - my_features)
         self.cache_config.mandatory_features.update(repo_features & my_features)
-
-
-class AdHocCache(ChunksMixin):
-    """
-    Ad-hoc, non-persistent cache.
-
-    The AdHocCache does not maintain accurate reference count, nor does it provide a files cache
-    (which would require persistence).
-    Chunks that were not added during the current AdHocCache lifetime won't have correct size set
-    (0 bytes) and will have an infinite reference count (MAX_VALUE).
-    """
-
-    def __init__(self, manifest, warn_if_unencrypted=True, lock_wait=None, iec=False):
-        ChunksMixin.__init__(self)
-        assert isinstance(manifest, Manifest)
-        self.manifest = manifest
-        self.repository = manifest.repository
-        self.key = manifest.key
-        self.repo_objs = manifest.repo_objs
-
-        self.security_manager = SecurityManager(self.repository)
-        self.security_manager.assert_secure(manifest, self.key, lock_wait=lock_wait)
-
-    # Public API
-
-    def __enter__(self):
-        self._chunks = None
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None:
-            self.security_manager.save(self.manifest, self.key)
-        self._chunks = None
-
-    files = None  # type: ignore
-    cache_mode = "d"
-
-    def file_known_and_unchanged(self, hashed_path, path_hash, st):
-        files_cache_logger.debug("UNKNOWN: files cache not implemented")
-        return False, None
-
-    def memorize_file(self, hashed_path, path_hash, st, chunks):
-        pass

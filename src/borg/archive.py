@@ -1345,7 +1345,7 @@ class FilesystemObjectProcessors:
                         item.chunks.append(chunk_entry)
                 else:  # normal case, no "2nd+" hardlink
                     if not is_special_file:
-                        hashed_path = safe_encode(os.path.join(self.cwd, path))
+                        hashed_path = safe_encode(item.path)  # path as in archive item!
                         started_hashing = time.monotonic()
                         path_hash = self.key.id_hash(hashed_path)
                         self.stats.hashing_time += time.monotonic() - started_hashing

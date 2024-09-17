@@ -474,18 +474,20 @@ guess what files you have based on a specific set of chunk sizes).
 The cache
 ---------
 
-The **files cache** is stored in ``cache/files`` and is used at backup time to
-quickly determine whether a given file is unchanged and we have all its chunks.
+The **files cache** is stored in ``cache/files.<SUFFIX>`` and is used at backup
+time to quickly determine whether a given file is unchanged and we have all its
+chunks.
 
 In memory, the files cache is a key -> value mapping (a Python *dict*) and contains:
 
-* key: id_hash of the encoded, absolute file path
+* key: id_hash of the encoded path (same path as seen in archive)
 * value:
 
+  - age (0 [newest], ..., BORG_FILES_CACHE_TTL - 1)
   - file inode number
   - file size
-  - file ctime_ns (or mtime_ns)
-  - age (0 [newest], 1, 2, 3, ..., BORG_FILES_CACHE_TTL - 1)
+  - file ctime_ns
+  - file mtime_ns
   - list of chunk (id, size) tuples representing the file's contents
 
 To determine whether a file has not changed, cached values are looked up via
@@ -514,7 +516,7 @@ be told to ignore the inode number in the check via --files-cache.
 The age value is used for cache management. If a file is "seen" in a backup
 run, its age is reset to 0, otherwise its age is incremented by one.
 If a file was not seen in BORG_FILES_CACHE_TTL backups, its cache entry is
-removed. See also: :ref:`always_chunking` and :ref:`a_status_oddity`
+removed.
 
 The files cache is a python dictionary, storing python objects, which
 generates a lot of overhead.

@@ -37,7 +37,7 @@ class ListMixIn:
 
         # Only load the cache if it will be used
         if ItemFormatter.format_needs_cache(format):
-            with Cache(repository, manifest, lock_wait=self.lock_wait) as cache:
+            with Cache(repository, manifest) as cache:
                 _list_inner(cache)
         else:
             _list_inner(cache=None)

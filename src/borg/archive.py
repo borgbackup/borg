@@ -196,6 +196,7 @@ class BackupIO:
         if exc_type and issubclass(exc_type, OSError):
             E_MAP = {
                 errno.EPERM: BackupPermissionError,
+                errno.EISDIR: BackupPermissionError,
                 errno.EACCES: BackupPermissionError,
                 errno.EBUSY: BackupPermissionError,
                 errno.ENOENT: BackupFileNotFoundError,

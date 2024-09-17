@@ -155,6 +155,7 @@ class RepositoryServer:  # pragma: no cover
         "load_key",
         "break_lock",
         "inject_exception",
+        "get_manifest",  # borg2 LegacyRepository has this
     )
 
     _rpc_methods = (  # Repository

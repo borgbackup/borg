@@ -280,12 +280,12 @@ class FuseBackend:
         for archive in self._manifest.archives.list_considering(self._args):
             if self.versions:
                 # process archives immediately
-                self._process_archive(archive.name)
+                self._process_archive(archive.id)
             else:
                 # lazily load archives, create archive placeholder inode
                 archive_inode = self._create_dir(parent=1, mtime=int(archive.ts.timestamp() * 1e9))
                 self.contents[1][os.fsencode(archive.name)] = archive_inode
-                self.pending_archives[archive_inode] = archive.name
+                self.pending_archives[archive_inode] = archive
 
     def get_item(self, inode):
         item = self._inode_cache.get(inode)
@@ -302,9 +302,9 @@ class FuseBackend:
 
     def check_pending_archive(self, inode):
         # Check if this is an archive we need to load
-        archive_name = self.pending_archives.pop(inode, None)
-        if archive_name is not None:
-            self._process_archive(archive_name, [os.fsencode(archive_name)])
+        archive_info = self.pending_archives.pop(inode, None)
+        if archive_info is not None:
+            self._process_archive(archive_info.id, [os.fsencode(archive_info.name)])
 
     def _allocate_inode(self):
         self.inode_count += 1
@@ -328,11 +328,11 @@ class FuseBackend:
             inode = self.contents[inode][segment]
         return inode
 
-    def _process_archive(self, archive_name, prefix=[]):
+    def _process_archive(self, archive_id, prefix=[]):
         """Build FUSE inode hierarchy from archive metadata"""
         self.file_versions = {}  # for versions mode: original path -> version
         t0 = time.perf_counter()
-        archive = Archive(self._manifest, archive_name)
+        archive = Archive(self._manifest, archive_id)
         strip_components = self._args.strip_components
         matcher = build_matcher(self._args.patterns, self._args.paths)
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path

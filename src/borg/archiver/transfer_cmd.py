@@ -97,7 +97,7 @@ class TransferMixIn:
             else:
                 if not dry_run:
                     print(f"{name} {ts_str} {id_hex}: copying archive to destination repo...")
-                other_archive = Archive(other_manifest, name)
+                other_archive = Archive(other_manifest, id)
                 archive = (
                     Archive(manifest, name, cache=cache, create=True, progress=args.progress) if not dry_run else None
                 )

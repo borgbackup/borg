@@ -167,7 +167,7 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
         --exclude 'home/*/.cache/*'     \
         --exclude 'var/tmp/*'           \
                                         \
-        '{hostname}-{now}'              \
+        '{hostname}'                    \
         /etc                            \
         /home                           \
         /root                           \
@@ -178,16 +178,16 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
     info "Pruning repository"
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. The '{hostname}-*' globbing is very important to
-    # limit prune's operation to this machine's archives and not apply to
-    # other machines' archives also:
+    # archives of THIS machine. The '{hostname}' matching is very important to
+    # limit prune's operation to archives with exactly that name and not apply
+    # to archives with other names also:
 
-    borg prune                              \
-        --list                              \
-        --match-archives 'sh:{hostname}-*'  \
-        --show-rc                           \
-        --keep-daily    7                   \
-        --keep-weekly   4                   \
+    borg prune               \
+        '{hostname}'         \
+        --list               \
+        --show-rc            \
+        --keep-daily    7    \
+        --keep-weekly   4    \
         --keep-monthly  6
 
     prune_exit=$?
@@ -196,7 +196,7 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
 
     info "Compacting repository"
 
-    borg compact
+    borg compact -v
 
     compact_exit=$?
 
@@ -501,11 +501,11 @@ Example with **borg mount**:
 
     # open a new, separate terminal (this terminal will be blocked until umount)
 
-    # now we find out the archive names we have in the repo:
+    # now we find out the archive ID of the archive we want to mount:
     borg repo-list
 
-    # mount one archive from a borg repo:
-    borg mount -a myserver-system-2019-08-11 /mnt/borg
+    # mount one archive giving its archive ID prefix:
+    borg mount -a aid:d34db33f /mnt/borg
 
     # alternatively, mount all archives from a borg repo (slower):
     borg mount /mnt/borg
@@ -527,17 +527,17 @@ Example with **borg extract**:
     mkdir borg_restore
     cd borg_restore
 
-    # now we find out the archive names we have in the repo:
+    # now we find out the archive ID of the archive we want to extract:
     borg repo-list
 
-    # we could find out the archive contents, esp. the path layout:
-    borg list myserver-system-2019-08-11
+    # find out how the paths stored in the the archive look like:
+    borg list aid:d34db33f
 
     # we extract only some specific path (note: no leading / !):
-    borg extract myserver-system-2019-08-11 path/to/extract
+    borg extract aid:d34db33f path/to/extract
 
     # alternatively, we could fully extract the archive:
-    borg extract myserver-system-2019-08-11
+    borg extract aid:d34db33f
 
     # now move the files to the correct place...
 

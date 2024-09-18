@@ -23,18 +23,18 @@ Examples
     # /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
     $ borg create my-files /home --exclude 'sh:home/*/.thumbnails'
 
-    # Backup the root filesystem into an archive named "root-YYYY-MM-DD"
+    # Backup the root filesystem into an archive named "root-archive"
     # use zlib compression (good, but slow) - default is lz4 (fast, low compression ratio)
-    $ borg create -C zlib,6 --one-file-system root-{now:%Y-%m-%d} /
+    $ borg create -C zlib,6 --one-file-system root-archive /
 
-    # Backup into an archive name like FQDN-root-TIMESTAMP
-    $ borg create '{fqdn}-root-{now}' /
+    # Backup into an archive name like FQDN-root
+    $ borg create '{fqdn}-root' /
 
     # Backup a remote host locally ("pull" style) using sshfs
     $ mkdir sshfs-mount
     $ sshfs root@example.com:/ sshfs-mount
     $ cd sshfs-mount
-    $ borg create example.com-root-{now:%Y-%m-%d} .
+    $ borg create example.com-root .
     $ cd ..
     $ fusermount -u sshfs-mount
 
@@ -63,17 +63,13 @@ Examples
     # Only compress compressible data with lzma,N (N = 0..9)
     $ borg create --compression auto,lzma,N arch ~
 
-    # Use short hostname, user name and current time in archive name
-    $ borg create '{hostname}-{user}-{now}' ~
-    # Similar, use the same datetime format that is default as of borg 1.1
-    $ borg create '{hostname}-{user}-{now:%Y-%m-%dT%H:%M:%S}' ~
-    # As above, but add nanoseconds
-    $ borg create '{hostname}-{user}-{now:%Y-%m-%dT%H:%M:%S.%f}' ~
+    # Use short hostname and user name as archive name
+    $ borg create '{hostname}-{user}' ~
 
     # Backing up relative paths by moving into the correct directory first
     $ cd /home/user/Documents
     # The root directory of the archive will be "projectA"
-    $ borg create 'daily-projectA-{now:%Y-%m-%d}' projectA
+    $ borg create 'daily-projectA' projectA
 
     # Use external command to determine files to archive
     # Use --paths-from-stdin with find to back up only files less than 1MB in size

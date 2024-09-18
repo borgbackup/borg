@@ -4,10 +4,13 @@ Examples
 ~~~~~~~~
 ::
 
-    # delete a single backup archive:
-    $ borg delete -a Monday
+    # delete all backup archives named "kenny-files":
+    $ borg delete -a kenny-files
     # actually free disk space:
     $ borg compact
+
+    # delete a specific backup archive using its unique archive ID prefix
+    $ borg delete aid:d34db33f
 
     # delete all archives whose names begin with the machine's hostname followed by "-"
     $ borg delete -a 'sh:{hostname}-*'

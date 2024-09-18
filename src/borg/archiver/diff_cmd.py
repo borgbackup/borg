@@ -4,7 +4,7 @@ import json
 import sys
 import os
 
-from ._common import with_repository, with_archive, build_matcher, Highlander
+from ._common import with_repository, build_matcher, Highlander
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
@@ -16,8 +16,7 @@ logger = create_logger()
 
 class DiffMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
-    @with_archive
-    def do_diff(self, args, repository, manifest, archive):
+    def do_diff(self, args, repository, manifest):
         """Diff contents of two archives"""
         if args.format is not None:
             format = args.format
@@ -26,8 +25,10 @@ class DiffMixIn:
         else:
             format = os.environ.get("BORG_DIFF_FORMAT", "{change} {path}{NL}")
 
-        archive1 = archive
-        archive2 = Archive(manifest, args.other_name)
+        archive1_info = manifest.archives.get_one(args.name)
+        archive2_info = manifest.archives.get_one(args.other_name)
+        archive1 = Archive(manifest, archive1_info.id)
+        archive2 = Archive(manifest, archive2_info.id)
 
         can_compare_chunk_ids = (
             archive1.metadata.get("chunker_params", False) == archive2.metadata.get("chunker_params", True)

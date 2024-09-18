@@ -7,12 +7,21 @@ Be careful, prune is a potentially dangerous command, it will remove backup
 archives.
 
 The default of prune is to apply to **all archives in the repository** unless
-you restrict its operation to a subset of the archives using ``-a`` / ``--match-archives``.
+you restrict its operation to a subset of the archives.
+
+The recommended way to name archives (with ``borg create``) is to use the
+identical archive name within a series of archives. Then you can simply give
+that name to prune also, so it operates just on that series of archives.
+
+Alternatively, you can use ``-a`` / ``--match-archives`` to do a match on the
+archive names to select some of them.
 When using ``-a``, be careful to choose a good pattern - e.g. do not use a
 prefix "foo" if you do not also want to match "foobar".
 
 It is strongly recommended to always run ``prune -v --list --dry-run ...``
 first so you will see what it would do without it actually doing anything.
+
+Don't forget to run ``borg compact -v`` after prune to actually free disk space.
 
 ::
 
@@ -20,11 +29,12 @@ first so you will see what it would do without it actually doing anything.
     # Do a dry-run without actually deleting anything.
     $ borg prune -v --list --dry-run --keep-daily=7 --keep-weekly=4
 
-    # Same as above but only apply to archive names starting with the hostname
+    # Similar as above but only apply to the archive series named '{hostname}':
+    $ borg prune -v --list --keep-daily=7 --keep-weekly=4 '{hostname}'
+
+    # Similar as above but apply to archive names starting with the hostname
     # of the machine followed by a "-" character:
     $ borg prune -v --list --keep-daily=7 --keep-weekly=4 -a 'sh:{hostname}-*'
-    # actually free disk space:
-    $ borg compact
 
     # Keep 7 end of day, 4 additional end of week archives,
     # and an end of month archive for every month:

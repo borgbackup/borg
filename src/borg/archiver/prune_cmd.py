@@ -10,6 +10,7 @@ from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
+from ..helpers import archivename_validator
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -90,7 +91,9 @@ class PruneMixIn:
             format = os.environ.get("BORG_PRUNE_FORMAT", "{archive:<36} {time} [{id}]")
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
-        archives = manifest.archives.list(match=args.match_archives, sort_by=["ts"], reverse=True)
+        match = args.name if args.name else args.match_archives
+        archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
+
         keep = []
         # collect the rule responsible for the keeping of each archive in this dict
         # keys are archive ids, values are a tuple
@@ -125,7 +128,7 @@ class PruneMixIn:
                     else:
                         archives_deleted += 1
                         log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
-                        archive = Archive(manifest, archive.name, cache)
+                        archive = Archive(manifest, archive.id, cache=cache)
                         archive.delete()
                         uncommitted_deletes += 1
                 else:
@@ -160,17 +163,18 @@ class PruneMixIn:
         `GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>`_
         (Grandfather-father-son) backup rotation scheme.
 
-        If you use --match-archives (-a), then only archives that match the pattern are
-        considered for deletion and only those archives count towards the totals
-        specified by the rules.
+        The recommended way to use prune is to give the archive series name to it via the
+        NAME argument (assuming you have the same name for all archives in a series).
+        Alternatively, you can also use --match-archives (-a), then only archives that
+        match the pattern are considered for deletion and only those archives count
+        towards the totals specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
         There is no automatic distinction between archives representing different
         contents. These need to be distinguished by specifying matching globs.
 
-        If you have multiple sequences of archives with different data sets (e.g.
+        If you have multiple series of archives with different data sets (e.g.
         from different machines) in one shared repository, use one prune call per
-        data set that matches only the respective archives using the --match-archives
-        (-a) option.
+        series.
 
         The ``--keep-within`` option takes an argument of the form "<int><char>",
         where char is "H", "d", "w", "m", "y". For example, ``--keep-within 2d`` means
@@ -299,3 +303,6 @@ class PruneMixIn:
             help="number of yearly archives to keep",
         )
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
+        subparser.add_argument(
+            "name", metavar="NAME", nargs="?", type=archivename_validator, help="specify the archive name"
+        )

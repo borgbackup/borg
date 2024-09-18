@@ -442,6 +442,7 @@ class Archive:
         self,
         manifest,
         name,
+        *,
         cache=None,
         create=False,
         numeric_ids=False,
@@ -458,6 +459,7 @@ class Archive:
         log_json=False,
         iec=False,
     ):
+        name_is_id = isinstance(name, bytes)
         self.cwd = os.getcwd()
         assert isinstance(manifest, Manifest)
         self.manifest = manifest
@@ -493,10 +495,12 @@ class Archive:
         self.create = create
         if self.create:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
-            if manifest.archives.exists(name):
-                raise self.AlreadyExists(name)
         else:
-            info = self.manifest.archives.get(name)
+            if name_is_id:
+                # we also go over the manifest here to avoid quick&dirty deleted archives
+                info = self.manifest.archives.get_by_id(name)
+            else:
+                info = self.manifest.archives.get(name)
             if info is None:
                 raise self.DoesNotExist(name)
             self.load(info.id)
@@ -611,8 +615,6 @@ Duration: {0.duration}
 
     def save(self, name=None, comment=None, timestamp=None, stats=None, additional_metadata=None):
         name = name or self.name
-        if self.manifest.archives.exists(name):
-            raise self.AlreadyExists(name)
         self.items_buffer.flush(flush=True)
         item_ptrs = archive_put_items(
             self.items_buffer.chunks, repo_objs=self.repo_objs, cache=self.cache, stats=self.stats
@@ -956,18 +958,16 @@ Duration: {0.duration}
         self.id = new_id
 
     def rename(self, name):
-        if self.manifest.archives.exists(name):
-            raise self.AlreadyExists(name)
-        oldname = self.name
+        old_id = self.id
         self.name = name
         self.set_meta("name", name)
-        self.manifest.archives.delete(oldname)
+        self.manifest.archives.delete_by_id(old_id)
 
     def delete(self):
         # quick and dirty: we just nuke the archive from the archives list - that will
         # potentially orphan all chunks previously referenced by the archive, except the ones also
         # referenced by other archives. In the end, "borg compact" will clean up and free space.
-        self.manifest.archives.delete(self.name)
+        self.manifest.archives.delete_by_id(self.id)
 
     @staticmethod
     def compare_archives_iter(
@@ -1818,23 +1818,13 @@ class ArchiveChecker:
                 archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)
                 name = archive.name
-                logger.info(f"Found archive {name}, id {bin_to_hex(chunk_id)}.")
-                if self.manifest.archives.exists_name_and_id(name, chunk_id):
+                archive_id, archive_id_hex = chunk_id, bin_to_hex(chunk_id)
+                logger.info(f"Found archive {name} {archive_id_hex}.")
+                if self.manifest.archives.exists_name_and_id(name, archive_id):
                     logger.info("We already have an archives directory entry for this.")
-                elif not self.manifest.archives.exists(name):
-                    # no archives list entry yet and name is not taken yet, create an entry
-                    logger.warning(f"Creating archives directory entry for {name}.")
-                    self.manifest.archives.create(name, chunk_id, archive.time)
                 else:
-                    # we don't have an entry yet, but the name is taken by something else
-                    i = 1
-                    while True:
-                        new_name = "%s.%d" % (name, i)
-                        if not self.manifest.archives.exists(new_name):
-                            break
-                        i += 1
-                    logger.warning(f"Creating archives directory entry using {new_name}.")
-                    self.manifest.archives.create(new_name, chunk_id, archive.time)
+                    logger.warning(f"Creating archives directory entry for {name} {archive_id_hex}.")
+                    self.manifest.archives.create(name, archive_id, archive.time)
         pi.finish()
         logger.info("Rebuilding missing archives directory entries completed.")
 
@@ -2046,28 +2036,28 @@ class ArchiveChecker:
         with cache_if_remote(self.repository) as repository:
             for i, info in enumerate(archive_infos):
                 pi.show(i)
-                logger.info(f"Analyzing archive {info.name} ({i + 1}/{num_archives})")
-                archive_id = info.id
+                archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
+                logger.info(f"Analyzing archive {info.name} {archive_id_hex} ({i + 1}/{num_archives})")
                 if archive_id not in self.chunks:
-                    logger.error("Archive metadata block %s is missing!", bin_to_hex(archive_id))
+                    logger.error(f"Archive metadata block {archive_id_hex} is missing!")
                     self.error_found = True
                     if self.repair:
-                        logger.error(f"Deleting broken archive {info.name}.")
-                        self.manifest.archives.delete(info.name)
+                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                        self.manifest.archives.delete_by_id(archive_id)
                     else:
-                        logger.error(f"Would delete broken archive {info.name}.")
+                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
                     continue
                 cdata = self.repository.get(archive_id)
                 try:
                     _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
                 except IntegrityError as integrity_error:
-                    logger.error("Archive metadata block %s is corrupted: %s", bin_to_hex(archive_id), integrity_error)
+                    logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
                     self.error_found = True
                     if self.repair:
-                        logger.error(f"Deleting broken archive {info.name}.")
-                        self.manifest.archives.delete(info.name)
+                        logger.error(f"Deleting broken archive {info.name} {archive_id_hex}.")
+                        self.manifest.archives.delete_by_id(archive_id)
                     else:
-                        logger.error(f"Would delete broken archive {info.name}.")
+                        logger.error(f"Would delete broken archive {info.name} {archive_id_hex}.")
                     continue
                 archive = self.key.unpack_archive(data)
                 archive = ArchiveItem(internal_dict=archive)
@@ -2090,7 +2080,9 @@ class ArchiveChecker:
                     logger.debug(f"archive id new: {bin_to_hex(new_archive_id)}")
                     cdata = self.repo_objs.format(new_archive_id, {}, data, ro_type=ROBJ_ARCHIVE_META)
                     add_reference(new_archive_id, len(data), cdata)
-                    self.manifest.archives.create(info.name, new_archive_id, info.ts, overwrite=True)
+                    self.manifest.archives.create(info.name, new_archive_id, info.ts)
+                    if archive_id != new_archive_id:
+                        self.manifest.archives.delete_by_id(archive_id)
             pi.finish()
 
     def finish(self):
@@ -2148,18 +2140,16 @@ class ArchiveRecreater:
         self.progress = progress
         self.print_file_status = file_status_printer or (lambda *args: None)
 
-    def recreate(self, archive_name, comment=None, target_name=None):
-        assert not self.is_temporary_archive(archive_name)
-        archive = self.open_archive(archive_name)
+    def recreate(self, archive_id, target_name, delete_original, comment=None):
+        archive = self.open_archive(archive_id)
         target = self.create_target(archive, target_name)
         if self.exclude_if_present or self.exclude_caches:
             self.matcher_add_tagged_dirs(archive)
-        if self.matcher.empty() and not target.recreate_rechunkify and comment is None and target_name is None:
+        if self.matcher.empty() and not target.recreate_rechunkify and comment is None:
             # nothing to do
             return False
         self.process_items(archive, target)
-        replace_original = target_name is None
-        self.save(archive, target, comment, replace_original=replace_original)
+        self.save(archive, target, comment, delete_original=delete_original)
         return True
 
     def process_items(self, archive, target):
@@ -2216,7 +2206,7 @@ class ArchiveRecreater:
             for chunk in chunk_iterator:
                 yield Chunk(chunk, size=len(chunk), allocation=CH_DATA)
 
-    def save(self, archive, target, comment=None, replace_original=True):
+    def save(self, archive, target, comment=None, delete_original=True):
         if self.dry_run:
             return
         if comment is None:
@@ -2242,9 +2232,8 @@ class ArchiveRecreater:
             }
 
         target.save(comment=comment, timestamp=self.timestamp, additional_metadata=additional_metadata)
-        if replace_original:
+        if delete_original:
             archive.delete()
-            target.rename(archive.name)
         if self.stats:
             target.start = _start
             target.end = archive_ts_now()
@@ -2277,9 +2266,8 @@ class ArchiveRecreater:
         matcher.add(tag_files, IECommand.Include)
         matcher.add(tagged_dirs, IECommand.ExcludeNoRecurse)
 
-    def create_target(self, archive, target_name=None):
+    def create_target(self, archive, target_name):
         """Create target archive."""
-        target_name = target_name or archive.name + ".recreate"
         target = self.create_target_archive(target_name)
         # If the archives use the same chunker params, then don't rechunkify
         source_chunker_params = tuple(archive.metadata.get("chunker_params", []))
@@ -2308,5 +2296,5 @@ class ArchiveRecreater:
         )
         return target
 
-    def open_archive(self, name, **kwargs):
-        return Archive(self.manifest, name, cache=self.cache, **kwargs)
+    def open_archive(self, archive_id, **kwargs):
+        return Archive(self.manifest, archive_id, cache=self.cache, **kwargs)

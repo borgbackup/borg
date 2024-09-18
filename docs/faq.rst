@@ -318,16 +318,16 @@ How do I configure different prune policies for different directories?
 
 Say you want to prune ``/var/log`` faster than the rest of
 ``/``. How do we implement that? The answer is to back up to different
-archive *names* and then implement different prune policies for
-different prefixes. For example, you could have a script that does::
+archive *series* and then implement different prune policies for the
+different series. For example, you could have a script that does::
 
-    borg create --exclude var/log main-$(date +%Y-%m-%d) /
-    borg create logs-$(date +%Y-%m-%d) /var/log
+    borg create --exclude var/log main /
+    borg create logs /var/log
 
 Then you would have two different prune calls with different policies::
 
-    borg prune --verbose --list -d 30 -a 'sh:main-*'
-    borg prune --verbose --list -d 7  -a 'sh:logs-*'
+    borg prune --verbose --list -d 30 main
+    borg prune --verbose --list -d 7  logs
 
 This will keep 7 days of logs and 30 days of everything else.
 

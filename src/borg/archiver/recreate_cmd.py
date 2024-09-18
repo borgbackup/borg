@@ -5,7 +5,7 @@ from ._common import build_matcher
 from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
-from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, CommandError
+from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex
 from ..helpers import timestamp
 from ..manifest import Manifest
 
@@ -38,15 +38,19 @@ class RecreateMixIn:
             timestamp=args.timestamp,
         )
 
-        archive_names = tuple(archive.name for archive in manifest.archives.list_considering(args))
-        if args.target is not None and len(archive_names) != 1:
-            raise CommandError("--target: Need to specify single archive")
-        for name in archive_names:
-            if recreater.is_temporary_archive(name):
+        for archive_info in manifest.archives.list_considering(args):
+            if recreater.is_temporary_archive(archive_info.name):
                 continue
-            print("Processing", name)
-            if not recreater.recreate(name, args.comment, args.target):
-                logger.info("Skipped archive %s: Nothing to do. Archive was not processed.", name)
+            name, hex_id = archive_info.name, bin_to_hex(archive_info.id)
+            print(f"Processing {name} {hex_id}")
+            if args.target:
+                target = args.target
+                delete_original = False
+            else:
+                target = archive_info.name
+                delete_original = True
+            if not recreater.recreate(archive_info.id, target, delete_original, args.comment):
+                logger.info(f"Skipped archive {name} {hex_id}: Nothing to do.")
         if not args.dry_run:
             manifest.write()
 
@@ -135,8 +139,7 @@ class RecreateMixIn:
             default=None,
             type=archivename_validator,
             action=Highlander,
-            help="create a new archive with the name ARCHIVE, do not replace existing archive "
-            "(only applies for a single archive)",
+            help="create a new archive with the name ARCHIVE, do not replace existing archive",
         )
         archive_group.add_argument(
             "--comment",

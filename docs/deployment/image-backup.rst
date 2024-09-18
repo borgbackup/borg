@@ -9,8 +9,8 @@ technique makes sure only the modified parts of the file are stored. Borg also h
 optional simple sparse file support for extract.
 
 It is of utmost importancy to pin down the disk you want to backup.
-You need to use the SERIAL for that. 
-Use: 
+You need to use the SERIAL for that.
+Use:
 
 .. code-block:: bash
 
@@ -26,10 +26,10 @@ Use:
     echo "Disk Identifier: $DISK_ID"
 
     # Use the following line to perform a borg backup for the full disk:
-    # borg create --read-special {now} "$DISK_ID"
+    # borg create --read-special disk-backup "$DISK_ID"
 
     # Use the following to perform a borg backup for all partitions of the disk
-    # borg create --read-special {now} "${PARTITIONS[@]}"
+    # borg create --read-special partitions-backup "${PARTITIONS[@]}"
 
     # Example output:
     # Partitions of /dev/nvme1n1:
@@ -37,8 +37,8 @@ Use:
     # /dev/nvme1n1p2
     # /dev/nvme1n1p3
     # Disk Identifier: /dev/nvme1n1
-    # borg create --read-special {now} /dev/nvme1n1
-    # borg create --read-special {now} /dev/nvme1n1p1 /dev/nvme1n1p2 /dev/nvme1n1p3
+    # borg create --read-special disk-backup /dev/nvme1n1
+    # borg create --read-special partitions-backup /dev/nvme1n1p1 /dev/nvme1n1p2 /dev/nvme1n1p3
 
 
 

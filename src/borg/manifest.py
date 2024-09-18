@@ -15,7 +15,8 @@ from .constants import *  # NOQA
 from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex, hex_to_bin
 from .helpers.time import parse_timestamp, calculate_relative_offset, archive_ts_now
-from .helpers.errors import Error
+from .helpers.errors import Error, CommandError
+from .item import ArchiveItem
 from .patterns import get_regex_from_pattern
 from .repoobj import RepoObj
 
@@ -100,16 +101,74 @@ class Archives:
             manifest_archives = StableDict(self._get_raw_dict())
         return manifest_archives
 
-    def count(self):
-        # return the count of archives in the repo
+    def ids(self):
+        # yield the binary IDs of all archives
         if not self.legacy:
             try:
                 infos = list(self.repository.store_list("archives"))
             except ObjectNotFound:
                 infos = []
-            return len(infos)  # we do not check here if entries are valid
+            for info in infos:
+                info = ItemInfo(*info)  # RPC does not give us a NamedTuple
+                yield hex_to_bin(info.name)
         else:
-            return len(self._archives)
+            for archive_info in self._archives.values():
+                yield archive_info["id"]
+
+    def _get_archive_meta(self, id: bytes) -> dict:
+        # get all metadata directly from the ArchiveItem in the repo.
+        from .legacyrepository import LegacyRepository
+        from .repository import Repository
+
+        try:
+            cdata = self.repository.get(id)
+        except (Repository.ObjectNotFound, LegacyRepository.ObjectNotFound):
+            metadata = dict(
+                id=id,
+                name="archive-does-not-exist",
+                time="1970-01-01T00:00:00.000000",
+                # new:
+                exists=False,  # we have the pointer, but the repo does not have an archive item
+            )
+        else:
+            _, data = self.manifest.repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
+            archive_dict = self.manifest.key.unpack_archive(data)
+            archive_item = ArchiveItem(internal_dict=archive_dict)
+            if archive_item.version not in (1, 2):  # legacy: still need to read v1 archives
+                raise Exception("Unknown archive metadata version")
+            # callers expect a dict with dict["key"] access, not ArchiveItem.key access.
+            # also, we need to put the id in there.
+            metadata = dict(
+                id=id,
+                name=archive_item.name,
+                time=archive_item.time,
+                # new:
+                exists=True,  # repo has a valid archive item
+                username=archive_item.username,
+                hostname=archive_item.hostname,
+                size=archive_item.size,
+                nfiles=archive_item.nfiles,
+                comment=archive_item.comment,  # not always present?
+            )
+        return metadata
+
+    def _infos(self):
+        # yield the infos of all archives
+        for id in self.ids():
+            yield self._get_archive_meta(id)
+
+    def _info_tuples(self):
+        for info in self._infos():
+            yield ArchiveInfo(name=info["name"], id=info["id"], ts=parse_timestamp(info["time"]))
+
+    def count(self):
+        # return the count of archives in the repo
+        return len(list(self.ids()))
+
+    def names(self):
+        # yield the names of all archives
+        for archive_info in self._infos():
+            yield archive_info["name"]
 
     def exists(self, name):
         # check if an archive with this name exists
@@ -124,7 +183,7 @@ class Archives:
         assert isinstance(name, str)
         assert isinstance(id, bytes)
         if not self.legacy:
-            for _, archive_info in self._infos():
+            for archive_info in self._infos():
                 if archive_info["name"] == name and archive_info["id"] == id:
                     return True
             else:
@@ -132,58 +191,65 @@ class Archives:
         else:
             raise NotImplementedError
 
-    def _infos(self):
-        # yield the infos of all archives: (store_key, archive_info)
-        from .helpers import msgpack
-
+    def exists_name_and_ts(self, name, ts):
+        # check if an archive with this name AND timestamp exists
+        assert isinstance(name, str)
+        assert isinstance(ts, datetime)
         if not self.legacy:
-            try:
-                infos = list(self.repository.store_list("archives"))
-            except ObjectNotFound:
-                infos = []
-            for info in infos:
-                info = ItemInfo(*info)  # RPC does not give us a NamedTuple
-                value = self.repository.store_load(f"archives/{info.name}")
-                _, value = self.manifest.repo_objs.parse(hex_to_bin(info.name), value, ro_type=ROBJ_MANIFEST)
-                archive_info = msgpack.unpackb(value)
-                yield info.name, archive_info
+            for archive_info in self._info_tuples():
+                if archive_info.name == name and archive_info.ts == ts:
+                    return True
+            else:
+                return False
         else:
-            for name in self._archives:
-                archive_info = dict(name=name, id=self._archives[name]["id"], time=self._archives[name]["time"])
-                yield None, archive_info
+            raise NotImplementedError
 
     def _lookup_name(self, name, raw=False):
         assert isinstance(name, str)
         assert not self.legacy
-        for store_key, archive_info in self._infos():
-            if archive_info["name"] == name:
+        for archive_info in self._infos():
+            if archive_info["exists"] and archive_info["name"] == name:
                 if not raw:
                     ts = parse_timestamp(archive_info["time"])
-                    return store_key, ArchiveInfo(name=name, id=archive_info["id"], ts=ts)
+                    return ArchiveInfo(name=archive_info["name"], id=archive_info["id"], ts=ts)
                 else:
-                    return store_key, archive_info
+                    return archive_info
         else:
             raise KeyError(name)
-
-    def names(self):
-        # yield the names of all archives
-        if not self.legacy:
-            for _, archive_info in self._infos():
-                yield archive_info["name"]
-        else:
-            yield from self._archives
 
     def get(self, name, raw=False):
         assert isinstance(name, str)
         if not self.legacy:
             try:
-                store_key, archive_info = self._lookup_name(name, raw=raw)
-                return archive_info
+                return self._lookup_name(name, raw=raw)
             except KeyError:
                 return None
         else:
             values = self._archives.get(name)
             if values is None:
+                return None
+            if not raw:
+                ts = parse_timestamp(values["time"])
+                return ArchiveInfo(name=name, id=values["id"], ts=ts)
+            else:
+                return dict(name=name, id=values["id"], time=values["time"])
+
+    def get_by_id(self, id, raw=False):
+        assert isinstance(id, bytes)
+        if not self.legacy:
+            if id in self.ids():  # check directory
+                # looks like this archive id is in the archives directory, thus it is NOT deleted.
+                archive_info = self._get_archive_meta(id)
+                if archive_info["exists"]:
+                    if not raw:
+                        ts = parse_timestamp(archive_info["time"])
+                        archive_info = ArchiveInfo(name=archive_info["name"], id=archive_info["id"], ts=ts)
+                    return archive_info
+        else:
+            for name, values in self._archives.items():
+                if id == values["id"]:
+                    break
+            else:
                 return None
             if not raw:
                 ts = parse_timestamp(values["time"])
@@ -198,35 +264,18 @@ class Archives:
             ts = ts.isoformat(timespec="microseconds")
         assert isinstance(ts, str)
         if not self.legacy:
-            try:
-                store_key, _ = self._lookup_name(name)
-            except KeyError:
-                pass
-            else:
-                # looks like we already have an archive list entry with that name
-                if not overwrite:
-                    raise KeyError("archive already exists")
-                else:
-                    self.repository.store_delete(f"archives/{store_key}")
-            archive = dict(name=name, id=id, time=ts)
-            value = self.manifest.key.pack_metadata(archive)
-            id = self.manifest.repo_objs.id_hash(value)
-            key = bin_to_hex(id)
-            value = self.manifest.repo_objs.format(id, {}, value, ro_type=ROBJ_MANIFEST)
-            self.repository.store_store(f"archives/{key}", value)
+            # we only create a directory entry, its name points to the archive item:
+            self.repository.store_store(f"archives/{bin_to_hex(id)}", b"")
         else:
             if self.exists(name) and not overwrite:
                 raise KeyError("archive already exists")
             self._archives[name] = {"id": id, "time": ts}
 
-    def delete(self, name):
+    def delete_by_id(self, id):
         # delete an archive
-        assert isinstance(name, str)
-        if not self.legacy:
-            store_key, archive_info = self._lookup_name(name)
-            self.repository.store_delete(f"archives/{store_key}")
-        else:
-            self._archives.pop(name)
+        assert isinstance(id, bytes)
+        assert not self.legacy
+        self.repository.store_delete(f"archives/{bin_to_hex(id)}")
 
     def list(
         self,
@@ -262,22 +311,32 @@ class Archives:
         if isinstance(sort_by, (str, bytes)):
             raise TypeError("sort_by must be a sequence of str")
 
-        archives = [self.get(name) for name in self.names()]
-        regex = get_regex_from_pattern(match or "re:.*")
-        regex = re.compile(regex + match_end)
-        archives = [x for x in archives if regex.match(x.name) is not None]
+        archive_infos = self._info_tuples()
+        if match is None:
+            archive_infos = list(archive_infos)
+        elif match.startswith("aid:"):  # do a match on the archive ID (prefix)
+            wanted_id = match.removeprefix("aid:")
+            archive_infos = [x for x in archive_infos if bin_to_hex(x.id).startswith(wanted_id)]
+            if len(archive_infos) != 1:
+                raise CommandError("archive ID based match needs to match precisely one archive ID")
+        else:  #  do a match on the name
+            regex = get_regex_from_pattern(match)
+            regex = re.compile(regex + match_end)
+            archive_infos = [x for x in archive_infos if regex.match(x.name) is not None]
 
         if any([oldest, newest, older, newer]):
-            archives = filter_archives_by_date(archives, oldest=oldest, newest=newest, newer=newer, older=older)
+            archive_infos = filter_archives_by_date(
+                archive_infos, oldest=oldest, newest=newest, newer=newer, older=older
+            )
         for sortkey in reversed(sort_by):
-            archives.sort(key=attrgetter(sortkey))
+            archive_infos.sort(key=attrgetter(sortkey))
         if first:
-            archives = archives[:first]
+            archive_infos = archive_infos[:first]
         elif last:
-            archives = archives[max(len(archives) - last, 0) :]
+            archive_infos = archive_infos[max(len(archive_infos) - last, 0) :]
         if reverse:
-            archives.reverse()
-        return archives
+            archive_infos.reverse()
+        return archive_infos
 
     def list_considering(self, args):
         """
@@ -298,6 +357,21 @@ class Archives:
             oldest=getattr(args, "oldest", None),
             newest=getattr(args, "newest", None),
         )
+
+    def get_one(self, match, *, match_end=r"\Z"):
+        """get exactly one archive matching <match>"""
+        assert match is not None
+        archive_infos = self._info_tuples()
+        if match.startswith("aid:"):  # do a match on the archive ID (prefix)
+            wanted_id = match.removeprefix("aid:")
+            archive_infos = [i for i in archive_infos if bin_to_hex(i.id).startswith(wanted_id)]
+        else:  # do a match on the name
+            regex = get_regex_from_pattern(match)
+            regex = re.compile(regex + match_end)
+            archive_infos = [i for i in archive_infos if regex.match(i.name) is not None]
+        if len(archive_infos) != 1:
+            raise CommandError(f"{match} needed to match precisely one archive, but matched {len(archive_infos)}.")
+        return archive_infos[0]
 
     def _set_raw_dict(self, d):
         """set the dict we get from the msgpack unpacker"""

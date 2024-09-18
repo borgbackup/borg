@@ -7,7 +7,7 @@ from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
 from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
-from ..helpers import format_file_size
+from ..helpers import format_file_size, bin_to_hex
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -33,14 +33,15 @@ class TransferMixIn:
             )
 
         dry_run = args.dry_run
-        archive_names = tuple(x.name for x in other_manifest.archives.list_considering(args))
-        if not archive_names:
+        archive_infos = other_manifest.archives.list_considering(args)
+        count = len(archive_infos)
+        if count == 0:
             return
 
         an_errors = []
-        for archive_name in archive_names:
+        for archive_info in archive_infos:
             try:
-                archivename_validator(archive_name)
+                archivename_validator(archive_info.name)
             except argparse.ArgumentTypeError as err:
                 an_errors.append(str(err))
         if an_errors:
@@ -48,12 +49,12 @@ class TransferMixIn:
             raise Error("\n".join(an_errors))
 
         ac_errors = []
-        for archive_name in archive_names:
-            archive = Archive(other_manifest, archive_name)
+        for archive_info in archive_infos:
+            archive = Archive(other_manifest, archive_info.id)
             try:
                 comment_validator(archive.metadata.get("comment", ""))
             except argparse.ArgumentTypeError as err:
-                ac_errors.append(f"{archive_name}: {err}")
+                ac_errors.append(f"{archive_info.name}: {err}")
         if ac_errors:
             ac_errors.insert(0, "Invalid archive comments detected, please fix them before transfer:")
             raise Error("\n".join(ac_errors))
@@ -75,14 +76,27 @@ class TransferMixIn:
 
         upgrader = UpgraderCls(cache=cache)
 
-        for name in archive_names:
+        for archive_info in archive_infos:
+            name, id, ts = archive_info.name, archive_info.id, archive_info.ts
+            id_hex, ts_str = bin_to_hex(id), ts.isoformat()
             transfer_size = 0
             present_size = 0
-            if manifest.archives.exists(name) and not dry_run:
-                print(f"{name}: archive is already present in destination repo, skipping.")
+            # at least for borg 1.x -> borg2 transfers, we can not use the id to check for
+            # already transferred archives (due to upgrade of metadata stream, id will be
+            # different anyway). so we use archive name and timestamp.
+            # the name alone might be sufficient for borg 1.x -> 2 transfers, but isn't
+            # for 2 -> 2 transfers, because borg2 allows duplicate names ("series" feature).
+            # so, best is to check for both name/ts and name/id.
+            if not dry_run and manifest.archives.exists_name_and_ts(name, archive_info.ts):
+                # useful for borg 1.x -> 2 transfers, we have unique names in borg 1.x.
+                # also useful for borg 2 -> 2 transfers with metadata changes (id changes).
+                print(f"{name} {ts_str}: archive is already present in destination repo, skipping.")
+            elif not dry_run and manifest.archives.exists_name_and_id(name, id):
+                # useful for borg 2 -> 2 transfers without changes (id stays the same)
+                print(f"{name} {id_hex}: archive is already present in destination repo, skipping.")
             else:
                 if not dry_run:
-                    print(f"{name}: copying archive to destination repo...")
+                    print(f"{name} {ts_str} {id_hex}: copying archive to destination repo...")
                 other_archive = Archive(other_manifest, name)
                 archive = (
                     Archive(manifest, name, cache=cache, create=True, progress=args.progress) if not dry_run else None
@@ -162,15 +176,15 @@ class TransferMixIn:
                     additional_metadata = upgrader.upgrade_archive_metadata(metadata=other_archive.metadata)
                     archive.save(additional_metadata=additional_metadata)
                     print(
-                        f"{name}: finished. "
+                        f"{name} {ts_str} {id_hex}: finished. "
                         f"transfer_size: {format_file_size(transfer_size)} "
                         f"present_size: {format_file_size(present_size)}"
                     )
                 else:
                     print(
-                        f"{name}: completed"
+                        f"{name} {ts_str} {id_hex}: completed"
                         if transfer_size == 0
-                        else f"{name}: incomplete, "
+                        else f"{name} {ts_str} {id_hex}: incomplete, "
                         f"transfer_size: {format_file_size(transfer_size)} "
                         f"present_size: {format_file_size(present_size)}"
                     )

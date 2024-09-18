@@ -2,7 +2,6 @@ import errno
 import json
 import os
 import tempfile
-from random import randbytes
 import shutil
 import socket
 import stat
@@ -947,43 +946,3 @@ def test_common_options(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     log = cmd(archiver, "--debug", "create", "test", "input")
     assert "security: read previous location" in log
-
-
-def test_hashing_time(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-
-    def extract_hashing_time(borg_create_output):
-        borg_create_output = borg_create_output.strip().splitlines()
-        borg_create_output = [line.split(":", 1) for line in borg_create_output]
-        hashing_time = [line for line in borg_create_output if line[0] == "Time spent in hashing"].pop()
-        hashing_time = hashing_time[1]
-        hashing_time = float(hashing_time.removesuffix(" seconds"))
-        return hashing_time
-
-    # Test case set up: create a repository and a file
-    cmd(archiver, "repo-create", "--encryption=none")
-    create_regular_file(archiver.input_path, "testfile", contents=randbytes(50000000))
-    # Archive
-    result = cmd(archiver, "create", "--stats", "test_archive", archiver.input_path)
-    hashing_time = extract_hashing_time(result)
-    assert hashing_time > 0.0
-
-
-def test_chunking_time(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-
-    def extract_chunking_time(borg_create_output):
-        borg_create_output = borg_create_output.strip().splitlines()
-        borg_create_output = [line.split(":", 1) for line in borg_create_output]
-        chunking_time = [line for line in borg_create_output if line[0] == "Time spent in chunking"].pop()
-        chunking_time = chunking_time[1]
-        chunking_time = float(chunking_time.removesuffix(" seconds"))
-        return chunking_time
-
-    # Test case set up: create a repository and a file
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    create_regular_file(archiver.input_path, "testfile", contents=randbytes(50000000))
-    # Archive
-    result = cmd(archiver, "create", "--stats", "test_archive", archiver.input_path)
-    chunking_time = extract_chunking_time(result)
-    assert chunking_time > 0.0

@@ -62,7 +62,7 @@ class ArchiveGarbageCollector:
         """Iterate over all items in all archives, create the dicts id -> size of all used/wanted chunks."""
         used_chunks = {}  # chunks referenced by item.chunks
         wanted_chunks = {}  # additional "wanted" chunks seen in item.chunks_healthy
-        archive_infos = self.manifest.archives.list()
+        archive_infos = self.manifest.archives.list(sort_by=["ts"])
         num_archives = len(archive_infos)
         pi = ProgressIndicatorPercent(
             total=num_archives, msg="Computing used/wanted chunks %3.1f%%", step=0.1, msgid="compact.analyze_archives"
@@ -70,8 +70,8 @@ class ArchiveGarbageCollector:
         total_size, total_files = 0, 0
         for i, info in enumerate(archive_infos):
             pi.show(i)
-            logger.info(f"Analyzing archive {info.name} ({i + 1}/{num_archives})")
-            archive = Archive(self.manifest, info.name)
+            logger.info(f"Analyzing archive {info.name} {info.ts} {bin_to_hex(info.id)} ({i + 1}/{num_archives})")
+            archive = Archive(self.manifest, info.id)
             # archive metadata size unknown, but usually small/irrelevant:
             used_chunks[archive.id] = 0
             for id in archive.metadata.item_ptrs:

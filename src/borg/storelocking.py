@@ -79,6 +79,7 @@ class Lock:
         self.last_refresh_dt = None
         self.id = id or platform.get_process_id()
         assert len(self.id) == 3
+        logger.debug(f"LOCK-INIT: initialising. store: {store}, stale: {stale}s, refresh: {stale // 2}s.")
 
     def __enter__(self):
         return self.acquire()
@@ -96,11 +97,13 @@ class Lock:
         lock = dict(exclusive=exclusive, hostid=self.id[0], processid=self.id[1], threadid=self.id[2], time=timestamp)
         value = json.dumps(lock).encode("utf-8")
         key = bin_to_hex(xxh64(value))
+        logger.debug(f"LOCK-CREATE: creating lock in store. key: {key}, lock: {lock}.")
         self.store.store(f"locks/{key}", value)
         self.last_refresh_dt = now
         return key
 
     def _delete_lock(self, key, *, ignore_not_found=False):
+        logger.debug(f"LOCK-DELETE: deleting lock from store. key: {key}.")
         try:
             self.store.delete(f"locks/{key}")
         except ObjectNotFound:
@@ -110,10 +113,10 @@ class Lock:
     def _is_stale_lock(self, lock):
         now = datetime.datetime.now(datetime.timezone.utc)
         if lock["dt"] < now - self.stale_td:
-            # lock is too old, it was not refreshed.
+            logger.debug(f"LOCK-STALE: lock is too old, it was not refreshed. lock: {lock}.")
             return True
         if not platform.process_alive(lock["hostid"], lock["processid"], lock["threadid"]):
-            # we KNOW that the lock owning process is dead.
+            logger.debug(f"LOCK-STALE: we KNOW that the lock owning process is dead. lock: {lock}.")
             return True
         return False
 
@@ -151,6 +154,7 @@ class Lock:
         # goal
         # for exclusive lock: there must be only 1 exclusive lock and no other (exclusive or non-exclusive) locks.
         # for non-exclusive lock: there can be multiple n-e locks, but there must not exist an exclusive lock.
+        logger.debug(f"LOCK-ACQUIRE: trying to acquire a lock. exclusive: {self.is_exclusive}.")
         started = time.monotonic()
         while time.monotonic() - started < self.timeout:
             exclusive_locks = self._find_locks(only_exclusive=True)
@@ -165,27 +169,29 @@ class Lock:
                 exclusive_locks = self._find_locks(only_exclusive=True)
                 if self.is_exclusive:
                     if len(exclusive_locks) == 1 and exclusive_locks[0]["key"] == key:
-                        # success, we are the only exclusive lock! wait until the non-exclusive locks go away:
+                        logger.debug("LOCK-ACQUIRE: we are the only exclusive lock!")
                         while time.monotonic() - started < self.timeout:
                             locks = self._find_locks(only_exclusive=False)
                             if len(locks) == 1 and locks[0]["key"] == key:
-                                # success, we are alone!
+                                logger.debug("LOCK-ACQUIRE: success! no non-exclusive locks are left!")
                                 return self
                             time.sleep(self.other_locks_go_away_delay)
+                        logger.debug("LOCK-ACQUIRE: timeout while waiting for non-exclusive locks to go away.")
                         break  # timeout
                     else:
-                        # take back our lock as some other client(s) also created exclusive lock(s).
+                        logger.debug("LOCK-ACQUIRE: someone else also created an exclusive lock, deleting ours.")
                         self._delete_lock(key, ignore_not_found=True)
                 else:  # not is_exclusive
                     if len(exclusive_locks) == 0:
-                        # success, noone else created an exclusive lock meanwhile!
+                        logger.debug("LOCK-ACQUIRE: success! no exclusive locks detected.")
                         # We don't care for other non-exclusive locks.
                         return self
                     else:
-                        # take back our lock as some other client(s) also created exclusive lock(s).
+                        logger.debug("LOCK-ACQUIRE: exclusive locks detected, deleting our shared lock.")
                         self._delete_lock(key, ignore_not_found=True)
             # wait a random bit before retrying
             time.sleep(self.retry_delay_min + (self.retry_delay_max - self.retry_delay_min) * random.random())
+        logger.debug("LOCK-ACQUIRE: timeout while trying to acquire a lock.")
         raise LockTimeout(str(self.store))
 
     def release(self):
@@ -193,7 +199,9 @@ class Lock:
         if not locks:
             raise NotLocked(str(self.store))
         assert len(locks) == 1
-        self._delete_lock(locks[0]["key"], ignore_not_found=True)
+        lock = locks[0]
+        logger.debug(f"LOCK-RELEASE: releasing lock: {lock}.")
+        self._delete_lock(lock["key"], ignore_not_found=True)
         self.last_refresh_dt = None
 
     def got_exclusive_lock(self):
@@ -202,6 +210,7 @@ class Lock:
 
     def break_lock(self):
         """break ALL locks (not just ours)"""
+        logger.debug("LOCK-BREAK: break_lock() was called - deleting ALL locks!")
         locks = self._get_locks()
         for key in locks:
             self._delete_lock(key, ignore_not_found=True)
@@ -209,6 +218,7 @@ class Lock:
 
     def migrate_lock(self, old_id, new_id):
         """migrate the lock ownership from old_id to new_id"""
+        logger.debug(f"LOCK-MIGRATE: {old_id} -> {new_id}.")
         assert self.id == old_id
         assert len(new_id) == 3
         old_locks = self._find_locks(only_mine=True)
@@ -234,10 +244,12 @@ class Lock:
                 # no archive has been added yet to the manifest, thus all objects looked unused/orphaned.
                 # another scenario when this can happen is a careless user running break-lock on another
                 # machine without making sure there is no borg activity in that repo.
-                raise LockTimeout(str(self.store))  # our lock was killed, there is no safe way to continue.
+                logger.debug("LOCK-REFRESH: our lock was killed, there is no safe way to continue.")
+                raise LockTimeout(str(self.store))
             assert len(old_locks) == 1  # there shouldn't be more than 1
             old_lock = old_locks[0]
             if old_lock["dt"] < now - self.refresh_td:
+                logger.debug(f"LOCK-REFRESH: lock needs a refresh. lock: {old_lock}.")
                 self._create_lock(exclusive=old_lock["exclusive"])
                 self._delete_lock(old_lock["key"])
                 self.last_refresh_dt = now

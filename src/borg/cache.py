@@ -553,21 +553,23 @@ class FilesCacheMixin:
         if "i" in cache_mode and entry.inode != st.st_ino:
             files_cache_logger.debug("KNOWN-CHANGED: file inode number has changed: %r", hashed_path)
             return True, None
-        if "c" in cache_mode and timestamp_to_int(entry.ctime) != st.st_ctime_ns:
+        ctime = int_to_timestamp(safe_ns(st.st_ctime_ns))
+        if "c" in cache_mode and entry.ctime != ctime:
             files_cache_logger.debug("KNOWN-CHANGED: file ctime has changed: %r", hashed_path)
             return True, None
-        if "m" in cache_mode and timestamp_to_int(entry.mtime) != st.st_mtime_ns:
+        mtime = int_to_timestamp(safe_ns(st.st_mtime_ns))
+        if "m" in cache_mode and entry.mtime != mtime:
             files_cache_logger.debug("KNOWN-CHANGED: file mtime has changed: %r", hashed_path)
             return True, None
-        # we ignored the inode number in the comparison above or it is still same.
+        # V = any of the inode number, mtime, ctime values.
+        # we ignored V in the comparison above or it is still the same value.
         # if it is still the same, replacing it in the tuple doesn't change it.
-        # if we ignored it, a reason for doing that is that files were moved to a new
-        # disk / new fs (so a one-time change of inode number is expected) and we wanted
-        # to avoid everything getting chunked again. to be able to re-enable the inode
-        # number comparison in a future backup run (and avoid chunking everything
-        # again at that time), we need to update the inode number in the cache with what
-        # we see in the filesystem.
-        self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, age=0))
+        # if we ignored it, a reason for doing that is that files were moved/copied to
+        # a new disk / new fs (so a one-time change of V is expected) and we wanted
+        # to avoid everything getting chunked again. to be able to re-enable the
+        # V comparison in a future backup run (and avoid chunking everything again at
+        # that time), we need to update V in the cache with what we see in the filesystem.
+        self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, ctime=ctime, mtime=mtime, age=0))
         chunks = [ChunkListEntry(*chunk) for chunk in entry.chunks]  # convert to list of namedtuple
         return True, chunks
 

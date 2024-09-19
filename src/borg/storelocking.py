@@ -84,8 +84,11 @@ class Lock:
     def __enter__(self):
         return self.acquire()
 
-    def __exit__(self, *exc):
-        self.release()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        ignore_not_found = exc_type is not None
+        # if there was an exception, try to release the lock,
+        # but don't raise another exception while trying if it was not there.
+        self.release(ignore_not_found=ignore_not_found)
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.id!r}>"
@@ -194,15 +197,19 @@ class Lock:
         logger.debug("LOCK-ACQUIRE: timeout while trying to acquire a lock.")
         raise LockTimeout(str(self.store))
 
-    def release(self):
+    def release(self, *, ignore_not_found=False):
+        self.last_refresh_dt = None
         locks = self._find_locks(only_mine=True)
         if not locks:
-            raise NotLocked(str(self.store))
+            if ignore_not_found:
+                logger.debug("LOCK-RELEASE: trying to release lock, but none was found.")
+                return
+            else:
+                raise NotLocked(str(self.store))
         assert len(locks) == 1
         lock = locks[0]
         logger.debug(f"LOCK-RELEASE: releasing lock: {lock}.")
         self._delete_lock(lock["key"], ignore_not_found=True)
-        self.last_refresh_dt = None
 
     def got_exclusive_lock(self):
         locks = self._find_locks(only_mine=True, only_exclusive=True)

@@ -202,7 +202,8 @@ jobs:
     needs: linux
 
     env:
-      SETUPTOOLS_USE_DISTUTILS: stdlib # Needed for pip to work - https://www.msys2.org/docs/python/#known-issues
+      # Needed for setuptools < 70.2.0 to work, see: https://www.msys2.org/docs/python/#known-issues
+      # SETUPTOOLS_USE_DISTUTILS: stdlib
       PY_COLORS: 1
 
     defaults:
@@ -222,10 +223,10 @@ jobs:
       - name: Build
         run: |
           # build borg.exe
-          SETUPTOOLS_USE_DISTUTILS=stdlib pip install -e .
+          pip install -e .
           pyinstaller -y scripts/borg.exe.spec
           # build sdist and wheel in dist/...
-          SETUPTOOLS_USE_DISTUTILS=stdlib python -m build
+          python -m build
       - uses: actions/upload-artifact@v4
         with:
           name: borg-windows

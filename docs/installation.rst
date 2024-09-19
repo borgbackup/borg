@@ -350,7 +350,8 @@ Ensure to install the dependencies as described within :ref:`Dependencies: Windo
 
 ::
 
-    export SETUPTOOLS_USE_DISTUTILS=stdlib # Needed for pip to work - https://www.msys2.org/docs/python/#known-issues
+    # Needed for setuptools < 70.2.0 to work - https://www.msys2.org/docs/python/#known-issues
+    # export SETUPTOOLS_USE_DISTUTILS=stdlib
     pip install -e .
     pyinstaller -y scripts/borg.exe.spec
 

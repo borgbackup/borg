@@ -336,11 +336,11 @@ class Repository:
         list <limit> infos starting from after id <marker>.
         each info is a tuple (id, storage_size).
         """
-        self._lock_refresh()
         collect = True if marker is None else False
         result = []
         infos = self.store.list("data")  # generator yielding ItemInfos
         while True:
+            self._lock_refresh()
             try:
                 info = next(infos)
             except StoreObjectNotFound:

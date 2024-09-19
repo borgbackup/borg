@@ -14,26 +14,20 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-def find_chunks(repository, repo_objs, stats, ctype, clevel, olevel):
+def find_chunks(repository, repo_objs, cache, stats, ctype, clevel, olevel):
     """find chunks that need processing (usually: recompression)."""
     recompress_ids = []
     compr_keys = stats["compr_keys"] = set()
     compr_wanted = ctype, clevel, olevel
-    marker = None
-    while True:
-        result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-        if not result:
-            break
-        marker = result[-1][0]
-        chunk_ids = [id for id, _ in result]
-        for id, chunk_no_data in zip(chunk_ids, repository.get_many(chunk_ids, read_data=False)):
-            meta = repo_objs.parse_meta(id, chunk_no_data, ro_type=ROBJ_DONTCARE)
-            compr_found = meta["ctype"], meta["clevel"], meta.get("olevel", -1)
-            if compr_found != compr_wanted:
-                recompress_ids.append(id)
-            compr_keys.add(compr_found)
-            stats[compr_found] += 1
-            stats["checked_count"] += 1
+    for id, _ in cache.chunks.iteritems():
+        chunk_no_data = repository.get(id, read_data=False)
+        meta = repo_objs.parse_meta(id, chunk_no_data, ro_type=ROBJ_DONTCARE)
+        compr_found = meta["ctype"], meta["clevel"], meta.get("olevel", -1)
+        if compr_found != compr_wanted:
+            recompress_ids.append(id)
+        compr_keys.add(compr_found)
+        stats[compr_found] += 1
+        stats["checked_count"] += 1
     return recompress_ids
 
 
@@ -88,8 +82,8 @@ def format_compression_spec(ctype, clevel, olevel):
 
 
 class RepoCompressMixIn:
-    @with_repository(cache=False, manifest=True, compatibility=(Manifest.Operation.CHECK,))
-    def do_repo_compress(self, args, repository, manifest):
+    @with_repository(cache=True, manifest=True, compatibility=(Manifest.Operation.CHECK,))
+    def do_repo_compress(self, args, repository, manifest, cache):
         """Repository (re-)compression"""
 
         def get_csettings(c):
@@ -110,7 +104,7 @@ class RepoCompressMixIn:
 
         stats_find = defaultdict(int)
         stats_process = defaultdict(int)
-        recompress_ids = find_chunks(repository, repo_objs, stats_find, ctype, clevel, olevel)
+        recompress_ids = find_chunks(repository, repo_objs, cache, stats_find, ctype, clevel, olevel)
         recompress_candidate_count = len(recompress_ids)
         chunks_limit = min(1000, max(100, recompress_candidate_count // 1000))
 

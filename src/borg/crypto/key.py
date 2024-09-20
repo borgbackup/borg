@@ -296,6 +296,8 @@ class KeyBase:
         unpacker = get_limited_unpacker('archive')
         unpacker.feed(data)
         unpacked = unpacker.unpack()
+        if AUTHENTICATED_NO_KEY:
+            return unpacked, True, None  # True is a lie.
         if b'tam' not in unpacked:
             if tam_required:
                 archive_name = unpacked.get(b'name', b'<unknown>').decode('ascii', 'replace')

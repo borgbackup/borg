@@ -214,6 +214,7 @@ class CreateMixIn:
         self.noxattrs = args.noxattrs
         self.exclude_nodump = args.exclude_nodump
         dry_run = args.dry_run
+        self.start_backup = time.time_ns()
         t0 = archive_ts_now()
         t0_monotonic = time.monotonic()
         logger.info('Creating archive at "%s"' % args.location.processed)

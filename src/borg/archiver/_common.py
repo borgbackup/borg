@@ -168,6 +168,7 @@ def with_repository(
                         manifest_,
                         progress=getattr(args, "progress", False),
                         cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
+                        start_backup=getattr(self, "start_backup", None),
                         iec=getattr(args, "iec", False),
                     ) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)

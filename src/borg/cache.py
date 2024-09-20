@@ -3,6 +3,7 @@ import os
 import shutil
 import stat
 from collections import namedtuple
+from datetime import datetime, timezone
 from time import perf_counter
 
 from .logger import create_logger
@@ -11,7 +12,7 @@ logger = create_logger()
 
 files_cache_logger = create_logger("borg.debug.files_cache")
 
-from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM
+from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
 from .checksums import xxh64
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Error
@@ -343,6 +344,7 @@ class Cache:
         cache_mode=FILES_CACHE_MODE_DISABLED,
         iec=False,
         archive_name=None,
+        start_backup=None,
     ):
         return AdHocWithFilesCache(
             manifest=manifest,
@@ -352,6 +354,7 @@ class Cache:
             iec=iec,
             cache_mode=cache_mode,
             archive_name=archive_name,
+            start_backup=start_backup,
         )
 
 
@@ -367,7 +370,7 @@ class FilesCacheMixin:
 
     FILES_CACHE_NAME = "files"
 
-    def __init__(self, cache_mode, archive_name=None):
+    def __init__(self, cache_mode, archive_name=None, start_backup=None):
         self.archive_name = archive_name  # ideally a SERIES name
         assert not ("c" in cache_mode and "m" in cache_mode)
         assert "d" in cache_mode or "c" in cache_mode or "m" in cache_mode
@@ -375,6 +378,7 @@ class FilesCacheMixin:
         self._files = None
         self._newest_cmtime = 0
         self._newest_path_hashes = set()
+        self.start_backup = start_backup
 
     @property
     def files(self):
@@ -490,32 +494,43 @@ class FilesCacheMixin:
 
     def _write_files_cache(self, files):
         """write files cache to cache directory"""
-        if self._newest_cmtime is None:
-            # was never set because no files were modified/added
-            self._newest_cmtime = 2**63 - 1  # nanoseconds, good until y2262
+        max_time_ns = 2**63 - 1  # nanoseconds, good until y2262
+        # _self._newest_cmtime might be None if it was never set because no files were modified/added.
+        newest_cmtime = self._newest_cmtime if self._newest_cmtime is not None else max_time_ns
+        start_backup_time = self.start_backup - TIME_DIFFERS2_NS if self.start_backup is not None else max_time_ns
+        # we don't want to persist files cache entries of potentially problematic files:
+        discard_after = min(newest_cmtime, start_backup_time)
         ttl = int(os.environ.get("BORG_FILES_CACHE_TTL", 2))
         files_cache_logger.debug("FILES-CACHE-SAVE: starting...")
         # TODO: use something like SaveFile here, but that didn't work due to SyncFile missing .seek().
         with IntegrityCheckedFile(path=os.path.join(self.path, self.files_cache_name()), write=True) as fd:
-            entry_count = 0
+            entries = 0
+            age_discarded = 0
+            race_discarded = 0
             for path_hash, item in files.items():
-                # Only keep files seen in this backup that are older than newest cmtime seen in this backup -
-                # this is to avoid issues with filesystem snapshots and cmtime granularity.
-                # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
                 entry = FileCacheEntry(*msgpack.unpackb(item))
-                if (
-                    entry.age == 0
-                    and max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < self._newest_cmtime
-                    or entry.age > 0
-                    and entry.age < ttl
-                ):
+                if entry.age == 0:  # current entries
+                    if max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < discard_after:
+                        # Only keep files seen in this backup that old enough not to suffer race conditions relating
+                        # to filesystem snapshots and ctime/mtime granularity or being modified while we read them.
+                        keep = True
+                    else:
+                        keep = False
+                        race_discarded += 1
+                else:  # old entries
+                    if entry.age < ttl:
+                        # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
+                        keep = True
+                    else:
+                        keep = False
+                        age_discarded += 1
+                if keep:
                     msgpack.pack((path_hash, entry), fd)
-                    entry_count += 1
-        files_cache_logger.debug("FILES-CACHE-KILL: removed all old entries with age >= TTL [%d]", ttl)
-        files_cache_logger.debug(
-            "FILES-CACHE-KILL: removed all current entries with newest cmtime %d", self._newest_cmtime
-        )
-        files_cache_logger.debug("FILES-CACHE-SAVE: finished, %d remaining entries saved.", entry_count)
+                    entries += 1
+        files_cache_logger.debug(f"FILES-CACHE-KILL: removed {age_discarded} entries with age >= TTL [{ttl}]")
+        t_str = datetime.fromtimestamp(discard_after / 1e9, timezone.utc).isoformat()
+        files_cache_logger.debug(f"FILES-CACHE-KILL: removed {race_discarded} entries with ctime/mtime >= {t_str}")
+        files_cache_logger.debug(f"FILES-CACHE-SAVE: finished, {entries} remaining entries saved.")
         return fd.integrity_data
 
     def file_known_and_unchanged(self, hashed_path, path_hash, st):
@@ -710,12 +725,13 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         cache_mode=FILES_CACHE_MODE_DISABLED,
         iec=False,
         archive_name=None,
+        start_backup=None,
     ):
         """
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
         :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
         """
-        FilesCacheMixin.__init__(self, cache_mode, archive_name)
+        FilesCacheMixin.__init__(self, cache_mode, archive_name, start_backup)
         ChunksMixin.__init__(self)
         assert isinstance(manifest, Manifest)
         self.manifest = manifest

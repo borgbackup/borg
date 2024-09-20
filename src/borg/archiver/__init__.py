@@ -125,6 +125,7 @@ class Archiver(
     def __init__(self, lock_wait=None, prog=None):
         self.lock_wait = lock_wait
         self.prog = prog
+        self.start_backup = None
 
     def print_warning(self, msg, *args, **kw):
         warning_code = kw.get("wc", EXIT_WARNING)  # note: wc=None can be used to not influence exit code

@@ -117,6 +117,9 @@ FILES_CACHE_MODE_DISABLED = "d"  # most borg commands do not use the files cache
 # we can't go much higher here (like e.g. to 2s) without causing issues.
 TIME_DIFFERS1_NS = 20000000
 
+# similar to above, but for bigger granularity / clock differences
+TIME_DIFFERS2_NS = 3000000000
+
 # return codes returned by borg command
 EXIT_SUCCESS = 0  # everything done, no problems
 EXIT_WARNING = 1  # reached normal end of operation, but there were issues (generic warning)

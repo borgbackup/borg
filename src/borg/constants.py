@@ -113,6 +113,10 @@ CH_DATA, CH_ALLOC, CH_HOLE = 0, 1, 2
 FILES_CACHE_MODE_UI_DEFAULT = "ctime,size,inode"  # default for "borg create" command (CLI UI)
 FILES_CACHE_MODE_DISABLED = "d"  # most borg commands do not use the files cache at all (disable)
 
+# account for clocks being slightly out-of-sync, timestamps granularity.
+# we can't go much higher here (like e.g. to 2s) without causing issues.
+TIME_DIFFERS1_NS = 20000000
+
 # return codes returned by borg command
 EXIT_SUCCESS = 0  # everything done, no problems
 EXIT_WARNING = 1  # reached normal end of operation, but there were issues (generic warning)

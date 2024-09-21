@@ -50,7 +50,7 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import RemoteRepository, cache_if_remote
-from .repository import Repository, NoManifestError
+from .repository import Repository, NoManifestError, StoreObjectNotFound
 from .repoobj import RepoObj
 
 has_link = hasattr(os, "link")
@@ -1644,7 +1644,7 @@ class ArchiveChecker:
         self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
         self.repository = repository
-        self.chunks = build_chunkindex_from_repo(self.repository)
+        self.chunks = build_chunkindex_from_repo(self.repository, disable_caches=True, cache_immediately=not repair)
         self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)
         if verify_data:
@@ -2100,6 +2100,18 @@ class ArchiveChecker:
 
     def finish(self):
         if self.repair:
+            logger.info("Deleting chunks cache in repository - next repository access will cause a rebuild.")
+            # we may have deleted chunks, invalidate/remove the chunks index cache!
+            try:
+                self.repository.store_delete("cache/chunks_hash")
+            except (Repository.ObjectNotFound, StoreObjectNotFound):
+                # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
+                pass
+            try:
+                self.repository.store_delete("cache/chunks")
+            except (Repository.ObjectNotFound, StoreObjectNotFound):
+                # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
+                pass
             logger.info("Writing Manifest.")
             self.manifest.write()
 

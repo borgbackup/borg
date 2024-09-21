@@ -214,6 +214,7 @@ class CreateMixIn:
         self.noxattrs = args.noxattrs
         self.exclude_nodump = args.exclude_nodump
         dry_run = args.dry_run
+        self.start_backup = time.time_ns()
         t0 = archive_ts_now()
         t0_monotonic = time.monotonic()
         logger.info('Creating archive at "%s"' % args.location.processed)
@@ -222,10 +223,9 @@ class CreateMixIn:
                 repository,
                 manifest,
                 progress=args.progress,
-                lock_wait=self.lock_wait,
-                prefer_adhoc_cache=args.prefer_adhoc_cache,
                 cache_mode=args.files_cache_mode,
                 iec=args.iec,
+                archive_name=args.name,
             ) as cache:
                 archive = Archive(
                     manifest,
@@ -787,12 +787,6 @@ class CreateMixIn:
             help="only display items with the given status characters (see description)",
         )
         subparser.add_argument("--json", action="store_true", help="output stats as JSON. Implies ``--stats``.")
-        subparser.add_argument(
-            "--prefer-adhoc-cache",
-            dest="prefer_adhoc_cache",
-            action="store_true",
-            help="experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).",
-        )
         subparser.add_argument(
             "--stdin-name",
             metavar="NAME",

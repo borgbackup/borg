@@ -837,50 +837,29 @@ already used.
 By default, ctime (change time) is used for the timestamps to have a rather
 safe change detection (see also the --files-cache option).
 
-Furthermore, pathnames recorded in files cache are always absolute, even if you
-specify source directories with relative pathname. If relative pathnames are
-stable, but absolute are not (for example if you mount a filesystem without
-stable mount points for each backup or if you are running the backup from a
-filesystem snapshot whose name is not stable), borg will assume that files are
-different and will report them as 'added', even though no new chunks will be
-actually recorded for them. To avoid this, you could bind mount your source
-directory in a directory with the stable path.
+Furthermore, pathnames used as key into the files cache are **as archived**,
+so make sure these are always the same (see ``borg list``).
 
 .. _always_chunking:
 
 It always chunks all my files, even unchanged ones!
 ---------------------------------------------------
 
-Borg maintains a files cache where it remembers the timestamp, size and
+Borg maintains a files cache where it remembers the timestamps, size and
 inode of files. When Borg does a new backup and starts processing a
 file, it first looks whether the file has changed (compared to the values
 stored in the files cache). If the values are the same, the file is assumed
 unchanged and thus its contents won't get chunked (again).
 
-Borg can't keep an infinite history of files of course, thus entries
-in the files cache have a "maximum time to live" which is set via the
-environment variable BORG_FILES_CACHE_TTL (and defaults to 20).
-Every time you do a backup (on the same machine, using the same user), the
-cache entries' ttl values of files that were not "seen" are incremented by 1
-and if they reach BORG_FILES_CACHE_TTL, the entry is removed from the cache.
+The files cache is stored separately (using a different filename suffix) per
+archive series, thus using always the same name for the archive is strongly
+recommended. The "rebuild files cache from previous archive in repo" feature
+also depends on that.
+Alternatively, there is also BORG_FILES_CACHE_SUFFIX which can be used to
+manually set a custom suffix (if you can't just use the same archive name).
 
-So, for example, if you do daily backups of 26 different data sets A, B,
-C, ..., Z on one machine (using the default TTL), the files from A will be
-already forgotten when you repeat the same backups on the next day and it
-will be slow because it would chunk all the files each time. If you set
-BORG_FILES_CACHE_TTL to at least 26 (or maybe even a small multiple of that),
-it would be much faster.
-
-Besides using a higher BORG_FILES_CACHE_TTL (which also increases memory usage),
-there is also BORG_FILES_CACHE_SUFFIX which can be used to have separate (smaller)
-files caches for each backup set instead of the default one (big) unified files cache.
-
-Another possible reason is that files don't always have the same path, for
-example if you mount a filesystem without stable mount points for each backup
-or if you are running the backup from a filesystem snapshot whose name is not
-stable. If the directory where you mount a filesystem is different every time,
-Borg assumes they are different files. This is true even if you back up these
-files with relative pathnames - borg uses full pathnames in files cache regardless.
+Another possible reason is that files don't always have the same path -
+borg uses the paths as seen in the archive when using ``borg list``.
 
 It is possible for some filesystems, such as ``mergerfs`` or network filesystems,
 to return inconsistent inode numbers across runs, causing borg to consider them changed.

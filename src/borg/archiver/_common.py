@@ -161,14 +161,14 @@ def with_repository(
                     if "compression" in args:
                         manifest_.repo_objs.compressor = args.compression.compressor
                     if secure:
-                        assert_secure(repository, manifest_, self.lock_wait)
+                        assert_secure(repository, manifest_)
                 if cache:
                     with Cache(
                         repository,
                         manifest_,
                         progress=getattr(args, "progress", False),
-                        lock_wait=self.lock_wait,
                         cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
+                        start_backup=getattr(self, "start_backup", None),
                         iec=getattr(args, "iec", False),
                     ) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
@@ -230,7 +230,7 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                     manifest_ = Manifest.load(
                         repository, compatibility, ro_cls=RepoObj if repository.version > 1 else RepoObj1
                     )
-                    assert_secure(repository, manifest_, self.lock_wait)
+                    assert_secure(repository, manifest_)
                     if manifest:
                         kwargs["other_manifest"] = manifest_
                 if cache:
@@ -238,7 +238,6 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                         repository,
                         manifest_,
                         progress=False,
-                        lock_wait=self.lock_wait,
                         cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
                         iec=getattr(args, "iec", False),
                     ) as cache_:

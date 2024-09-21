@@ -1345,7 +1345,7 @@ class FilesystemObjectProcessors:
                         item.chunks.append(chunk_entry)
                 else:  # normal case, no "2nd+" hardlink
                     if not is_special_file:
-                        hashed_path = safe_encode(os.path.join(self.cwd, path))
+                        hashed_path = safe_encode(item.path)  # path as in archive item!
                         started_hashing = time.monotonic()
                         path_hash = self.key.id_hash(hashed_path)
                         self.stats.hashing_time += time.monotonic() - started_hashing
@@ -1376,6 +1376,7 @@ class FilesystemObjectProcessors:
                     # Only chunkify the file if needed
                     changed_while_backup = False
                     if "chunks" not in item:
+                        start_reading = time.time_ns()
                         with backup_io("read"):
                             self.process_file_chunks(
                                 item,
@@ -1385,13 +1386,25 @@ class FilesystemObjectProcessors:
                                 backup_io_iter(self.chunker.chunkify(None, fd)),
                             )
                             self.stats.chunking_time = self.chunker.chunking_time
+                        end_reading = time.time_ns()
                         if not is_win32:  # TODO for win32
                             with backup_io("fstat2"):
                                 st2 = os.fstat(fd)
-                            # special files:
-                            # - fifos change naturally, because they are fed from the other side. no problem.
-                            # - blk/chr devices don't change ctime anyway.
-                            changed_while_backup = not is_special_file and st.st_ctime_ns != st2.st_ctime_ns
+                            if is_special_file:
+                                # special files:
+                                # - fifos change naturally, because they are fed from the other side. no problem.
+                                # - blk/chr devices don't change ctime anyway.
+                                pass
+                            elif st.st_ctime_ns != st2.st_ctime_ns:
+                                # ctime was changed, this is either a metadata or a data change.
+                                changed_while_backup = True
+                            elif start_reading - TIME_DIFFERS1_NS < st2.st_ctime_ns < end_reading + TIME_DIFFERS1_NS:
+                                # this is to treat a very special race condition, see #3536.
+                                # - file was changed right before st.ctime was determined.
+                                # - then, shortly afterwards, but already while we read the file, the
+                                #   file was changed again, but st2.ctime is the same due to ctime granularity.
+                                # when comparing file ctime to local clock, widen interval by TIME_DIFFERS1_NS.
+                                changed_while_backup = True
                         if changed_while_backup:
                             # regular file changed while we backed it up, might be inconsistent/corrupt!
                             if last_try:

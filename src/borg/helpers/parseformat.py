@@ -1189,7 +1189,7 @@ class BorgJsonEncoder(json.JSONEncoder):
         from ..legacyremote import LegacyRemoteRepository
         from ..remote import RemoteRepository
         from ..archive import Archive
-        from ..cache import AdHocCache, AdHocWithFilesCache
+        from ..cache import AdHocWithFilesCache
 
         if isinstance(o, (LegacyRepository, LegacyRemoteRepository)) or isinstance(o, (Repository, RemoteRepository)):
             return {"id": bin_to_hex(o.id), "location": o._location.canonical_path()}
@@ -1197,8 +1197,6 @@ class BorgJsonEncoder(json.JSONEncoder):
             return o.info()
         if isinstance(o, (AdHocWithFilesCache,)):
             return {"path": o.path}
-        if isinstance(o, AdHocCache):
-            return {}
         if callable(getattr(o, "to_json", None)):
             return o.to_json()
         return super().default(o)

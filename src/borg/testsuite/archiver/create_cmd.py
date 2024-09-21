@@ -11,7 +11,6 @@ import time
 import pytest
 
 from ... import platform
-from ...cache import get_cache_impl
 from ...constants import *  # NOQA
 from ...manifest import Manifest
 from ...platform import is_cygwin, is_win32, is_darwin
@@ -525,25 +524,6 @@ def test_create_pattern_intermediate_folders_first(archivers, request):
     assert out_list.index("d x/b") < out_list.index("- x/b/foo_b")
 
 
-@pytest.mark.skipif(get_cache_impl() != "adhoc", reason="only works with AdHocCache")
-def test_create_no_cache_sync_adhoc(archivers, request):  # TODO: add test for AdHocWithFilesCache
-    archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path)
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "repo-delete", "--cache-only")
-    create_json = json.loads(
-        cmd(archiver, "create", "--no-cache-sync", "--prefer-adhoc-cache", "--json", "test", "input")
-    )
-    info_json = json.loads(cmd(archiver, "info", "-a", "test", "--json"))
-    create_stats = create_json["cache"]["stats"]
-    info_stats = info_json["cache"]["stats"]
-    assert create_stats == info_stats
-    cmd(archiver, "repo-delete", "--cache-only")
-    cmd(archiver, "create", "--no-cache-sync", "--prefer-adhoc-cache", "test2", "input")
-    cmd(archiver, "repo-info")
-    cmd(archiver, "check")
-
-
 def test_create_archivename_with_placeholder(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
@@ -676,7 +656,7 @@ def test_file_status(archivers, request):
     assert "A input/file1" in output
     assert "A input/file2" in output
     # should find first file as unmodified
-    output = cmd(archiver, "create", "--list", "test2", "input")
+    output = cmd(archiver, "create", "--list", "test", "input")
     assert "U input/file1" in output
     # although surprising, this is expected. For why, see:
     # https://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
@@ -693,13 +673,13 @@ def test_file_status_cs_cache_mode(archivers, request):
     time.sleep(1)  # file2 must have newer timestamps than file1
     create_regular_file(archiver.input_path, "file2", size=10)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "test1", "input", "--list", "--files-cache=ctime,size")
+    cmd(archiver, "create", "test", "input", "--list", "--files-cache=ctime,size")
     # modify file1, but cheat with the mtime (and atime) and also keep same size:
     st = os.stat("input/file1")
     create_regular_file(archiver.input_path, "file1", contents=b"321")
     os.utime("input/file1", ns=(st.st_atime_ns, st.st_mtime_ns))
     # this mode uses ctime for change detection, so it should find file1 as modified
-    output = cmd(archiver, "create", "test2", "input", "--list", "--files-cache=ctime,size")
+    output = cmd(archiver, "create", "test", "input", "--list", "--files-cache=ctime,size")
     assert "M input/file1" in output
 
 
@@ -710,12 +690,12 @@ def test_file_status_ms_cache_mode(archivers, request):
     time.sleep(1)  # file2 must have newer timestamps than file1
     create_regular_file(archiver.input_path, "file2", size=10)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "--list", "--files-cache=mtime,size", "test1", "input")
+    cmd(archiver, "create", "--list", "--files-cache=mtime,size", "test", "input")
     # change mode of file1, no content change:
     st = os.stat("input/file1")
     os.chmod("input/file1", st.st_mode ^ stat.S_IRWXO)  # this triggers a ctime change, but mtime is unchanged
     # this mode uses mtime for change detection, so it should find file1 as unmodified
-    output = cmd(archiver, "create", "--list", "--files-cache=mtime,size", "test2", "input")
+    output = cmd(archiver, "create", "--list", "--files-cache=mtime,size", "test", "input")
     assert "U input/file1" in output
 
 
@@ -726,9 +706,9 @@ def test_file_status_rc_cache_mode(archivers, request):
     time.sleep(1)  # file2 must have newer timestamps than file1
     create_regular_file(archiver.input_path, "file2", size=10)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "--list", "--files-cache=rechunk,ctime", "test1", "input")
+    cmd(archiver, "create", "--list", "--files-cache=rechunk,ctime", "test", "input")
     # no changes here, but this mode rechunks unconditionally
-    output = cmd(archiver, "create", "--list", "--files-cache=rechunk,ctime", "test2", "input")
+    output = cmd(archiver, "create", "--list", "--files-cache=rechunk,ctime", "test", "input")
     assert "A input/file1" in output
 
 
@@ -748,7 +728,7 @@ def test_file_status_excluded(archivers, request):
     if has_lchflags:
         assert "- input/file3" in output
     # should find second file as excluded
-    output = cmd(archiver, "create", "test1", "input", "--list", "--exclude-nodump", "--exclude", "*/file2")
+    output = cmd(archiver, "create", "test", "input", "--list", "--exclude-nodump", "--exclude", "*/file2")
     assert "U input/file1" in output
     assert "- input/file2" in output
     if has_lchflags:
@@ -781,14 +761,14 @@ def test_file_status_counters(archivers, request):
     create_regular_file(archiver.input_path, "testfile1", contents=b"test1")
     time.sleep(1.0 if is_darwin else 0.01)  # testfile2 must have newer timestamps than testfile1
     create_regular_file(archiver.input_path, "testfile2", contents=b"test2")
-    result = cmd(archiver, "create", "--stats", "test_archive2", archiver.input_path)
+    result = cmd(archiver, "create", "--stats", "test_archive", archiver.input_path)
     result = to_dict(result)
     assert result["Added files"] == 2
     assert result["Unchanged files"] == 0
     assert result["Modified files"] == 0
     # Archive a dir with 1 unmodified file and 1 modified
     create_regular_file(archiver.input_path, "testfile1", contents=b"new data")
-    result = cmd(archiver, "create", "--stats", "test_archive3", archiver.input_path)
+    result = cmd(archiver, "create", "--stats", "test_archive", archiver.input_path)
     result = to_dict(result)
     # Should process testfile2 as added because of
     # https://borgbackup.readthedocs.io/en/stable/faq.html#i-am-seeing-a-added-status-for-an-unchanged-file
@@ -826,18 +806,18 @@ def test_create_topical(archivers, request):
     output = cmd(archiver, "create", "test", "input")
     assert "file1" not in output
     # shouldn't be listed even if unchanged
-    output = cmd(archiver, "create", "test0", "input")
+    output = cmd(archiver, "create", "test", "input")
     assert "file1" not in output
     # should list the file as unchanged
-    output = cmd(archiver, "create", "test1", "input", "--list", "--filter=U")
+    output = cmd(archiver, "create", "test", "input", "--list", "--filter=U")
     assert "file1" in output
     # should *not* list the file as changed
-    output = cmd(archiver, "create", "test2", "input", "--list", "--filter=AM")
+    output = cmd(archiver, "create", "test", "input", "--list", "--filter=AM")
     assert "file1" not in output
     # change the file
     create_regular_file(archiver.input_path, "file1", size=1024 * 100)
     # should list the file as changed
-    output = cmd(archiver, "create", "test3", "input", "--list", "--filter=AM")
+    output = cmd(archiver, "create", "test", "input", "--list", "--filter=AM")
     assert "file1" in output
 
 

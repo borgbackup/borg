@@ -104,7 +104,6 @@ def archiver(tmp_path, set_env_variables):
     archiver.patterns_file_path = os.fspath(tmp_path / "patterns")
     os.environ["BORG_KEYS_DIR"] = archiver.keys_path
     os.environ["BORG_CACHE_DIR"] = archiver.cache_path
-    # os.environ["BORG_CACHE_IMPL"] = "adhocwithfiles"
     os.mkdir(archiver.input_path)
     os.chmod(archiver.input_path, 0o777)  # avoid troubles with fakeroot / FUSE
     os.mkdir(archiver.output_path)

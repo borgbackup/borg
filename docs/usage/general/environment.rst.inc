@@ -66,8 +66,7 @@ General:
         cache entries for backup sources other than the current sources.
     BORG_FILES_CACHE_TTL
         When set to a numeric value, this determines the maximum "time to live" for the files cache
-        entries (default: 20). The files cache is used to determine quickly whether a file is unchanged.
-        The FAQ explains this more detailed in: :ref:`always_chunking`
+        entries (default: 2). The files cache is used to determine quickly whether a file is unchanged.
     BORG_USE_CHUNKS_ARCHIVE
         When set to no (default: yes), the ``chunks.archive.d`` folder will not be used. This reduces
         disk space usage but slows down cache resyncs.
@@ -85,15 +84,6 @@ General:
         - ``pyfuse3``: only try to load pyfuse3
         - ``llfuse``: only try to load llfuse
         - ``none``: do not try to load an implementation
-    BORG_CACHE_IMPL
-        Choose the implementation for the clientside cache, choose one of:
-
-        - ``adhoc``: builds a non-persistent chunks cache by querying the repo. Chunks cache contents
-          are somewhat sloppy for already existing chunks, concerning their refcount ("infinite") and
-          size (0). No files cache (slow, will chunk all input files). DEPRECATED.
-        - ``adhocwithfiles``: Like ``adhoc``, but with a persistent files cache. Default implementation.
-        - ``cli``: Determine the cache implementation from cli options. Without special options, will
-          usually end up with the ``local`` implementation.
     BORG_SELFTEST
         This can be used to influence borg's builtin self-tests. The default is to execute the tests
         at the beginning of each borg command invocation.

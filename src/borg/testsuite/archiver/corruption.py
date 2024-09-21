@@ -1,4 +1,3 @@
-import io
 import json
 import os
 from configparser import ConfigParser
@@ -14,26 +13,6 @@ def corrupt_archiver(archiver):
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     archiver.cache_path = json.loads(cmd(archiver, "repo-info", "--json"))["cache"].get("path")
-
-
-def corrupt(file, amount=1):
-    with open(file, "r+b") as fd:
-        fd.seek(-amount, io.SEEK_END)
-        corrupted = bytes(255 - c for c in fd.read(amount))
-        fd.seek(-amount, io.SEEK_END)
-        fd.write(corrupted)
-
-
-def test_cache_files(archiver):
-    corrupt_archiver(archiver)
-    if archiver.cache_path is None:
-        pytest.skip("no cache path for this kind of Cache implementation")
-
-    cmd(archiver, "create", "test", "input")
-    corrupt(os.path.join(archiver.cache_path, "files"))
-    out = cmd(archiver, "create", "test1", "input")
-    # borg warns about the corrupt files cache, but then continues without files cache.
-    assert "files cache is corrupted" in out
 
 
 def test_old_version_interfered(archiver):

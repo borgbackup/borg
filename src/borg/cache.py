@@ -432,7 +432,12 @@ class FilesCacheMixin:
                     self._newest_path_hashes.add(path_hash)
                 # add the file to the in-memory files cache
                 entry = FileCacheEntry(
-                    item.get("inode", 0), item.size, int_to_timestamp(ctime_ns), int_to_timestamp(mtime_ns), item.chunks
+                    age=0,
+                    inode=item.get("inode", 0),
+                    size=item.size,
+                    ctime=int_to_timestamp(ctime_ns),
+                    mtime=int_to_timestamp(mtime_ns),
+                    chunks=item.chunks,
                 )
                 files[path_hash] = msgpack.packb(entry)  # takes about 240 Bytes per file
         # deal with special snapshot / timestamp granularity case, see FAQ:

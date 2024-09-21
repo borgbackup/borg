@@ -411,6 +411,7 @@ Due to using the `borgstore` project, borg now also supports other kinds of
 
 - sftp: the borg client will directly talk to an sftp server.
   This does not require borg being installed on the sftp server.
+- rclone: the borg client will talk via rclone to cloud storage.
 - Others may come in the future, adding backends to `borgstore` is rather simple.
 
 Restoring a backup

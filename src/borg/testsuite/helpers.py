@@ -187,6 +187,14 @@ class TestLocationWithoutEnv:
             "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='/some/path')"
         )
 
+    def test_rclone(self, monkeypatch, keys_dir):
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        assert (
+            repr(Location("rclone://remote:path"))
+            == "Location(proto='rclone', user=None, host=None, port=None, path='remote:path')"
+        )
+        assert Location("rclone://remote:path").to_key_filename() == keys_dir + "remote_path"
+
     def test_sftp(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (

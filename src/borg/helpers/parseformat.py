@@ -467,6 +467,14 @@ class Location:
         re.VERBOSE,
     )  # path
 
+    rclone_re = re.compile(
+        r"""
+        (?P<proto>rclone)://                                    # rclone://
+        (?P<path>(.*))
+        """,
+        re.VERBOSE,
+    )  # path
+
     socket_re = re.compile(
         r"""
         (?P<proto>socket)://                                    # socket://
@@ -546,6 +554,11 @@ class Location:
             self.port = m.group("port") and int(m.group("port")) or None
             self.path = normpath_special(m.group("path"))
             return True
+        m = self.rclone_re.match(text)
+        if m:
+            self.proto = m.group("proto")
+            self.path = m.group("path")
+            return True
         m = self.file_re.match(text)
         if m:
             self.proto = m.group("proto")
@@ -575,7 +588,7 @@ class Location:
 
     def to_key_filename(self):
         name = re.sub(r"[^\w]", "_", self.path).strip("_")
-        if self.proto not in ("file", "socket"):
+        if self.proto not in ("file", "socket", "rclone"):
             name = re.sub(r"[^\w]", "_", self.host) + "__" + name
         if len(name) > 100:
             # Limit file names to some reasonable length. Most file systems

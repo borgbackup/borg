@@ -24,7 +24,7 @@ Pros:
   and re-write segment files to free space.
 - In future, easier to adapt to other kinds of storage:
   borgstore's backends are quite simple to implement.
-  A ``sftp:`` backend already exists, cloud storage might be easy to add.
+  ``sftp:`` and ``rclone:`` backends already exists, others might be easy to add.
 - Parallel repository access with less locking is easier to implement.
 
 Cons:

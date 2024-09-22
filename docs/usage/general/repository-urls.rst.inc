@@ -14,7 +14,7 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 
 **Remote repositories** accessed via ssh user@host:
 
-``ssh://user@host:port/path/to/repo`` - absolute path`
+``ssh://user@host:port/path/to/repo`` - absolute path
 
 ``ssh://user@host:port/./path/to/repo`` - path relative to current directory
 
@@ -22,9 +22,14 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 
 **Remote repositories** accessed via sftp:
 
-``sftp://user@host:port/path/to/repo`` - absolute path`
+``sftp://user@host:port/path/to/repo`` - absolute path
 
 For ssh and sftp URLs, the ``user@`` and ``:port`` parts are optional.
+
+**Remote repositories** accessed via rclone:
+
+``rclone://remote:path``
+
 
 If you frequently need the same repo URL, it is a good idea to set the
 ``BORG_REPO`` environment variable to set a default for the repo URL:

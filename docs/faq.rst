@@ -478,6 +478,17 @@ will only be applied to new chunks, not existing chunks. So it's safe
 to change them.
 
 
+Why is backing up an unmodified FAT filesystem slow on Linux?
+-------------------------------------------------------------
+
+By default, the files cache used by BorgBackup considers the inode of files.
+When an inode number changes compared to the last backup, it hashes the file
+again. The ``vfat`` kernel driver does not produce stable inode numbers by
+default.  One way to achieve stable inode numbering is mounting the filesystem
+using ``nfs=nostale_ro``. Doing so implies mounting the filesystem read-only.
+Another option is to not consider inode numbers in the files cache by passing
+``--files-cache=ctime,size``.
+
 Security
 ########
 

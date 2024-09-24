@@ -1,4 +1,5 @@
 import configparser
+import io
 import os
 import shutil
 import stat
@@ -30,7 +31,7 @@ from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from .manifest import Manifest
 from .platform import SaveFile
 from .remote import RemoteRepository
-from .repository import LIST_SCAN_LIMIT, Repository
+from .repository import LIST_SCAN_LIMIT, Repository, StoreObjectNotFound
 
 # chunks is a list of ChunkListEntry
 FileCacheEntry = namedtuple("FileCacheEntry", "age inode size ctime mtime chunks")
@@ -618,7 +619,64 @@ class FilesCacheMixin:
         )
 
 
-def build_chunkindex_from_repo(repository):
+def load_chunks_hash(repository) -> bytes:
+    try:
+        hash = repository.store_load("cache/chunks_hash")
+        logger.debug(f"cache/chunks_hash is '{bin_to_hex(hash)}'.")
+    except (Repository.ObjectNotFound, StoreObjectNotFound):
+        # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
+        hash = b""
+        logger.debug("cache/chunks_hash missing!")
+    return hash
+
+
+def write_chunkindex_to_repo_cache(repository, chunks, *, compact=False, clear=False, force_write=False):
+    cached_hash = load_chunks_hash(repository)
+    if compact:
+        # if we don't need the in-memory chunks index anymore:
+        chunks.compact()  # vacuum the hash table
+    with io.BytesIO() as f:
+        chunks.write(f)
+        data = f.getvalue()
+    if clear:
+        # if we don't need the in-memory chunks index anymore:
+        chunks.clear()  # free memory, immediately
+    new_hash = xxh64(data)
+    if force_write or new_hash != cached_hash:
+        # when an updated chunks index is stored into the cache, we also store its hash into the cache.
+        # when a client is loading the chunks index from a cache, it has to compare its xxh64
+        # hash against cache/chunks_hash in the repository. if it is the same, the cache
+        # is valid. If it is different, the cache is either corrupted or out of date and
+        # has to be discarded.
+        # when some functionality is DELETING chunks from the repository, it has to either update
+        # both cache/chunks and cache/chunks_hash (like borg compact does) or it has to delete both,
+        # so that all clients will discard any client-local chunks index caches.
+        logger.debug(f"caching chunks index {bin_to_hex(new_hash)} in repository...")
+        repository.store_store("cache/chunks", data)
+        repository.store_store("cache/chunks_hash", new_hash)
+    return new_hash
+
+
+def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immediately=False):
+    chunks = None
+    # first, try to load a pre-computed and centrally cached chunks index:
+    if not disable_caches:
+        wanted_hash = load_chunks_hash(repository)
+        logger.debug(f"trying to get cached chunk index (id {bin_to_hex(wanted_hash)}) from the repo...")
+        try:
+            chunks_data = repository.store_load("cache/chunks")
+        except (Repository.ObjectNotFound, StoreObjectNotFound):
+            # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
+            logger.debug("cache/chunks not found in the repository.")
+        else:
+            if xxh64(chunks_data) == wanted_hash:
+                logger.debug("cache/chunks is valid.")
+                with io.BytesIO(chunks_data) as f:
+                    chunks = ChunkIndex.read(f)
+                return chunks
+            else:
+                logger.debug("cache/chunks is invalid.")
+    # if we didn't get anything from the cache, compute the ChunkIndex the slow way:
     logger.debug("querying the chunk IDs list from the repo...")
     chunks = ChunkIndex()
     t0 = perf_counter()
@@ -646,6 +704,9 @@ def build_chunkindex_from_repo(repository):
     # Protocol overhead is neglected in this calculation.
     speed = format_file_size(num_chunks * 34 / duration)
     logger.debug(f"queried {num_chunks} chunk IDs in {duration} s ({num_requests} requests), ~{speed}/s")
+    if cache_immediately:
+        # immediately update cache/chunks, so we only rarely have to do it the slow way:
+        write_chunkindex_to_repo_cache(repository, chunks, compact=False, clear=False, force_write=True)
     return chunks
 
 
@@ -660,7 +721,7 @@ class ChunksMixin:
     @property
     def chunks(self):
         if self._chunks is None:
-            self._chunks = build_chunkindex_from_repo(self.repository)
+            self._chunks = build_chunkindex_from_repo(self.repository, cache_immediately=True)
         return self._chunks
 
     def seen_chunk(self, id, size=None):
@@ -708,6 +769,11 @@ class ChunksMixin:
         self.chunks.add(id, ChunkIndex.MAX_VALUE, size)
         stats.update(size, not exists)
         return ChunkListEntry(id, size)
+
+    def _write_chunks_cache(self, chunks):
+        # this is called from .close, so we can clear/compact here:
+        write_chunkindex_to_repo_cache(self.repository, self._chunks, compact=True, clear=True)
+        self._chunks = None  # nothing there (cleared!)
 
 
 class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
@@ -794,6 +860,9 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
             pi.output("Saving files cache")
             integrity_data = self._write_files_cache(self._files)
             self.cache_config.integrity[self.files_cache_name()] = integrity_data
+        if self._chunks is not None:
+            pi.output("Saving chunks cache")
+            self._write_chunks_cache(self._chunks)  # cache/chunks in repo has a different integrity mechanism
         pi.output("Saving cache config")
         self.cache_config.save(self.manifest)
         self.cache_config.close()

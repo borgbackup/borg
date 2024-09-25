@@ -42,17 +42,23 @@ Compatibility notes:
   - ssh:// URLs: removed support for /~otheruser/, #6855.
     If you used this, just replace it by: ssh://user@host:port/home/otheruser/
   - -P / --prefix option was removed, please use the similar -a / --match-archives.
-  - the archive name is always given separately from the repository
+  - archive names don't need to be unique anymore. to the contrary:
+    it is now strongly recommended to use the identical name for borg create
+    within the same series of archives to make borg work more efficiently.
+    the name now identifies a series of archive, to identify a single archive
+    please use aid:<archive-hash-prefix>, e.g.: borg delete aid:d34db33f
+  - the archive id is always given separately from the repository
     (differently than with borg 1.x you must not give repo::archive).
-  - the archive name is either given as a positional parameter, like:
+  - the series name or archive id is either given as a positional parameter,
+    like:
 
-    - borg create myarchive2 /some/path
-    - borg diff myarchive1 myarchive2
+    - borg create documents ~/Documents
+    - borg diff aid:deadbeef aid:d34db33f
   - or, if the command makes sense for an arbitrary amount of archives, archives
     can be selected using a glob pattern, like:
 
-    - borg delete -a 'sh:myarchive*'
-    - borg recreate -a 'sh:myarchive*'
+    - borg delete -a 'sh:myarchive-2024-*'
+    - borg recreate -a 'sh:myarchive-2024-*'
   - some borg 1.x commands that supported working on a repo AND on an archive
     were split into 2 commands, some others were renamed:
 
@@ -66,15 +72,15 @@ Compatibility notes:
       - borg repo-space
     - borg 2 archive commands:
 
-      - borg create ARCHIVE ...
-      - borg list ARCHIVE
-      - borg extract ARCHIVE ...
-      - borg diff ARCH1 ARCH2
-      - borg rename OLDNAME NEWNAME
-      - borg info -a ARCH_GLOB
-      - borg delete -a ARCH_GLOB
-      - borg recreate -a ARCH_GLOB ...
-      - borg mount -a ARCH_GLOB mountpoint ...
+      - borg create NAME ...
+      - borg list ID
+      - borg extract ID ...
+      - borg diff ID1 ID2
+      - borg rename ID NEWNAME
+      - borg info ID
+      - borg delete ID
+      - borg recreate ID ...
+      - borg mount -a ID mountpoint ...
 
     For more details, please consult the docs or --help option output.
   - create/recreate/import-tar --timestamp: defaults to local timezone
@@ -98,8 +104,8 @@ Compatibility notes:
 
   So you might need to edit your scripts like e.g.::
 
-      borg 1.x: --glob-archives 'myserver-*'
-      borg 2.0: --match-archives 'sh:myserver-*'
+      borg 1.x: --glob-archives 'myserver-2024-*'
+      borg 2.0: --match-archives 'sh:myserver-2024-*'
 
 - use platformdirs 3.x.x instead of home-grown code. Due to that:
 
@@ -123,24 +129,72 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b10 (2024-09-09)
+Version 2.0.0b11 (2024-xx-xx)
 -----------------------------
 
 Please note:
 
-This is a beta release, only for testing - do not use for production repos.
+Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
 
-TL;DR: this is a huge change and the first very fundamental change in how borg
-works since ever:
+New features:
 
-- you will need to create new repos.
-- likely more exciting than previous betas, definitely not for production.
-- remove "borg check --repair --archives-only" from your script in case you
-  added that for b9. "borg compact -v" now finds and deletes orphan chunks
-  and also outputs some new stats.
+- rclone:// borg repositories, this enables 100+ cloud storage providers!
+- parallel operations in same repo from same client (same user/machine)
+- archive series feature, #7930
+
+  TL;DR: a NAME now identifies a series of identically named archives,
+  to identify a specific single archive, use aid:<archive hash>.
+
+  in borg 1.x, we used to put a timestamp into the archive name, because borg1
+  required unique archive names.
+
+  borg2 does not require unique archive names, but it encourages you to even
+  use a identical archive names within the same SERIES of archives, e.g. you
+  could backup user files to archives named "user-files" and system files to
+  archives named "system-files".
+  that makes matching (e.g. for prune, for the files cache, ...) much simpler
+  and borg now KNOWS which archives belong to the same series (because they all
+  have the same name).
+- info/delete/prune: allow positional NAME argument, e.g.:
+
+  - borg prune --keep-daily 30 <seriesname>
+  - borg delete aid:<archive hash>
+- create: also archive inode number, #8362
+
+  borg can use this when using archive series to rebuild the local files cache
+  from the previous archive (of the same series) in the repository.
+
+Fixes:
+
+- bugfix: remove superfluous repository.list() call. for high latency repos
+  (like sftp, cloud), this improves performance of borg check and compact.
+- repository.list: refresh lock more frequently
+- misc. commands fixed for non-unique archive names
+- remote: allow get_manifest method
+- files cache: fix rare race condition with data loss potential, #3536
+- storelocking: misc. fixes / cleanups
+
+Other changes:
+
+- cache the chunks index in the repository, #8397.
+  improves high latency repo performance for most commands compared to b10.
+- repo-compress: faster by using chunks index rather than repository.list().
+- files cache entries now have ctime AND mtime.
+  borg updates the ctime and mtime of known and "unchanged" files, #4915.
+- rebuild files cache from previous archive in same series, #8385.
+- reduce RAM usage by splitting the files cache by archive series, #5658.
+- remove AdHocCache, remove BORG_CACHE_IMPL (we only have one implementation).
+- docs: user@ and :port are optional in sftp and ssh URLs.
+- CI: re-enable windows build after fixing it.
+- upgrade pyinstaller to 6.10.0
+- increase IDS_PER_CHUNK, #6945q
+
+
+Version 2.0.0b10 (2024-09-09)
+-----------------------------
 
 New features:
 

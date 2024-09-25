@@ -64,7 +64,7 @@ DEFAULT_MAX_SEGMENT_SIZE = 500 * 1024 * 1024
 MAX_SEGMENT_SIZE_LIMIT = 2**32 - MAX_OBJECT_SIZE
 
 # how many metadata stream chunk ids do we store into a "pointer chunk" of the ArchiveItem.item_ptrs list?
-IDS_PER_CHUNK = 3  # MAX_DATA_SIZE // 40
+IDS_PER_CHUNK = MAX_DATA_SIZE // 40
 
 # have one all-zero bytes object
 # we use it at all places where we need to detect or create all-zero buffers

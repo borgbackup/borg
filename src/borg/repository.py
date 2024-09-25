@@ -3,6 +3,7 @@ import time
 
 from borgstore.store import Store
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
+from borgstore.backends.errors import BackendError as StoreBackendError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
 
 from .checksums import xxh64
@@ -116,7 +117,10 @@ class Repository:
             location = Location(url)
         self._location = location
         # use a Store with flat config storage and 2-levels-nested data storage
-        self.store = Store(url, levels={"config/": [0], "data/": [2]})
+        try:
+            self.store = Store(url, levels={"config/": [0], "data/": [2]})
+        except StoreBackendError as e:
+            raise Error(str(e))
         self.version = None
         # long-running repository methods which emit log or progress output are responsible for calling
         # the ._send_log method periodically to get log and progress output transferred to the borg client

@@ -18,6 +18,18 @@ from .repoobj import RepoObj
 logger = create_logger(__name__)
 
 
+def repo_lister(repository, *, limit=None):
+    marker = None
+    finished = False
+    while not finished:
+        result = repository.list(limit=limit, marker=marker)
+        finished = (len(result) < limit) if limit is not None else (len(result) == 0)
+        if not finished:
+            marker = result[-1][0]
+        for id, stored_size in result:
+            yield id, stored_size
+
+
 class Repository:
     """borgstore based key value store"""
 

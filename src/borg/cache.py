@@ -31,7 +31,7 @@ from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from .manifest import Manifest
 from .platform import SaveFile
 from .remote import RemoteRepository
-from .repository import LIST_SCAN_LIMIT, Repository, StoreObjectNotFound
+from .repository import LIST_SCAN_LIMIT, Repository, StoreObjectNotFound, repo_lister
 
 # chunks is a list of ChunkListEntry
 FileCacheEntry = namedtuple("FileCacheEntry", "age inode size ctime mtime chunks")
@@ -680,22 +680,14 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
     logger.debug("querying the chunk IDs list from the repo...")
     chunks = ChunkIndex()
     t0 = perf_counter()
-    num_requests = 0
     num_chunks = 0
-    marker = None
-    while True:
-        result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-        num_requests += 1
-        if not result:
-            break
-        marker = result[-1][0]
-        # The repo says it has these chunks, so we assume they are referenced chunks.
-        # We do not care for refcounting anymore, so we just set refcount = MAX_VALUE.
-        # We do not know the plaintext size (!= stored_size), thus we set size = 0.
-        init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
-        for id, stored_size in result:
-            num_chunks += 1
-            chunks[id] = init_entry
+    # The repo says it has these chunks, so we assume they are referenced chunks.
+    # We do not care for refcounting anymore, so we just set refcount = MAX_VALUE.
+    # We do not know the plaintext size (!= stored_size), thus we set size = 0.
+    init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
+    for id, stored_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
+        num_chunks += 1
+        chunks[id] = init_entry
     # Cache does not contain the manifest.
     if not isinstance(repository, (Repository, RemoteRepository)):
         del chunks[Manifest.MANIFEST_ID]
@@ -703,7 +695,7 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
     # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.
     # Protocol overhead is neglected in this calculation.
     speed = format_file_size(num_chunks * 34 / duration)
-    logger.debug(f"queried {num_chunks} chunk IDs in {duration} s ({num_requests} requests), ~{speed}/s")
+    logger.debug(f"queried {num_chunks} chunk IDs in {duration} s, ~{speed}/s")
     if cache_immediately:
         # immediately update cache/chunks, so we only rarely have to do it the slow way:
         write_chunkindex_to_repo_cache(repository, chunks, compact=False, clear=False, force_write=True)

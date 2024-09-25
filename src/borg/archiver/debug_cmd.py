@@ -15,7 +15,7 @@ from ..helpers import archivename_validator
 from ..helpers import CommandError, RTError
 from ..manifest import Manifest
 from ..platform import get_process_id
-from ..repository import Repository, LIST_SCAN_LIMIT
+from ..repository import Repository, LIST_SCAN_LIMIT, repo_lister
 from ..repoobj import RepoObj
 
 from ._common import with_repository, Highlander
@@ -130,15 +130,9 @@ class DebugMixIn:
         cdata = repository.get(id)
         key = key_factory(repository, cdata)
         repo_objs = RepoObj(key)
-        marker = None
-        while True:
-            result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-            if not result:
-                break
-            marker = result[-1][0]
-            for id, stored_size in result:
-                cdata = repository.get(id)
-                decrypt_dump(id, cdata)
+        for id, stored_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
+            cdata = repository.get(id)
+            decrypt_dump(id, cdata)
         print("Done.")
 
     @with_repository(manifest=False)
@@ -177,38 +171,32 @@ class DebugMixIn:
         key = key_factory(repository, cdata)
         repo_objs = RepoObj(key)
 
-        marker = None
         last_data = b""
         last_id = None
         i = 0
-        while True:
-            result = repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-            if not result:
-                break
-            marker = result[-1][0]
-            for id, stored_size in result:
-                cdata = repository.get(id)
-                _, data = repo_objs.parse(id, cdata, ro_type=ROBJ_DONTCARE)
+        for id, stored_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
+            cdata = repository.get(id)
+            _, data = repo_objs.parse(id, cdata, ro_type=ROBJ_DONTCARE)
 
-                # try to locate wanted sequence crossing the border of last_data and data
-                boundary_data = last_data[-(len(wanted) - 1) :] + data[: len(wanted) - 1]
-                if wanted in boundary_data:
-                    boundary_data = last_data[-(len(wanted) - 1 + context) :] + data[: len(wanted) - 1 + context]
-                    offset = boundary_data.find(wanted)
-                    info = "%d %s | %s" % (i, last_id.hex(), id.hex())
-                    print_finding(info, wanted, boundary_data, offset)
+            # try to locate wanted sequence crossing the border of last_data and data
+            boundary_data = last_data[-(len(wanted) - 1) :] + data[: len(wanted) - 1]
+            if wanted in boundary_data:
+                boundary_data = last_data[-(len(wanted) - 1 + context) :] + data[: len(wanted) - 1 + context]
+                offset = boundary_data.find(wanted)
+                info = "%d %s | %s" % (i, last_id.hex(), id.hex())
+                print_finding(info, wanted, boundary_data, offset)
 
-                # try to locate wanted sequence in data
-                count = data.count(wanted)
-                if count:
-                    offset = data.find(wanted)  # only determine first occurrence's offset
-                    info = "%d %s #%d" % (i, id.hex(), count)
-                    print_finding(info, wanted, data, offset)
+            # try to locate wanted sequence in data
+            count = data.count(wanted)
+            if count:
+                offset = data.find(wanted)  # only determine first occurrence's offset
+                info = "%d %s #%d" % (i, id.hex(), count)
+                print_finding(info, wanted, data, offset)
 
-                last_id, last_data = id, data
-                i += 1
-                if i % 10000 == 0:
-                    print("%d objects processed." % i)
+            last_id, last_data = id, data
+            i += 1
+            if i % 10000 == 0:
+                print("%d objects processed." % i)
         print("Done.")
 
     @with_repository(manifest=False)

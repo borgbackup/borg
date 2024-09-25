@@ -10,7 +10,7 @@ from ..helpers import set_ec, EXIT_WARNING, EXIT_ERROR, format_file_size, bin_to
 from ..helpers import ProgressIndicatorPercent
 from ..manifest import Manifest
 from ..remote import RemoteRepository
-from ..repository import Repository
+from ..repository import Repository, repo_lister
 
 from ..logger import create_logger
 
@@ -49,18 +49,12 @@ class ArchiveGarbageCollector:
     def get_repository_chunks(self) -> ChunkIndex:
         """Build a dict id -> size of all chunks present in the repository"""
         chunks = ChunkIndex()
-        marker = None
-        while True:
-            result = self.repository.list(limit=LIST_SCAN_LIMIT, marker=marker)
-            if not result:
-                break
-            marker = result[-1][0]
-            for id, stored_size in result:
-                # we add this id to the chunks index, using refcount == 0, because
-                # we do not know yet whether it is actually referenced from some archives.
-                # we "abuse" the size field here. usually there is the plaintext size,
-                # but we use it for the size of the stored object here.
-                chunks[id] = ChunkIndexEntry(refcount=0, size=stored_size)
+        for id, stored_size in repo_lister(self.repository, limit=LIST_SCAN_LIMIT):
+            # we add this id to the chunks index, using refcount == 0, because
+            # we do not know yet whether it is actually referenced from some archives.
+            # we "abuse" the size field here. usually there is the plaintext size,
+            # but we use it for the size of the stored object here.
+            chunks[id] = ChunkIndexEntry(refcount=0, size=stored_size)
         return chunks
 
     def save_chunk_index(self):

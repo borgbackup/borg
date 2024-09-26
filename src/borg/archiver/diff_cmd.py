@@ -25,8 +25,8 @@ class DiffMixIn:
         else:
             format = os.environ.get("BORG_DIFF_FORMAT", "{change} {path}{NL}")
 
-        archive1_info = manifest.archives.get_one(args.name)
-        archive2_info = manifest.archives.get_one(args.other_name)
+        archive1_info = manifest.archives.get_one([args.name])
+        archive2_info = manifest.archives.get_one([args.other_name])
         archive1 = Archive(manifest, archive1_info.id)
         archive2 = Archive(manifest, archive2_info.id)
 

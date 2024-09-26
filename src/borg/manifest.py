@@ -172,29 +172,31 @@ class Archives:
                 host=info["hostname"],
             )
 
-    def _matching_info_tuples(self, match, match_end):
-        archive_infos = self._info_tuples()
-        if match is None:
-            archive_infos = list(archive_infos)
-        elif match.startswith("aid:"):  # do a match on the archive ID (prefix)
-            wanted_id = match.removeprefix("aid:")
-            archive_infos = [x for x in archive_infos if bin_to_hex(x.id).startswith(wanted_id)]
-            if len(archive_infos) != 1:
-                raise CommandError("archive ID based match needs to match precisely one archive ID")
-        elif match.startswith("tags:"):
-            wanted_tags = match.removeprefix("tags:")
-            wanted_tags = [tag for tag in wanted_tags.split(",") if tag]  # remove empty tags
-            archive_infos = [x for x in archive_infos if set(x.tags) >= set(wanted_tags)]
-        elif match.startswith("user:"):
-            wanted_user = match.removeprefix("user:")
-            archive_infos = [x for x in archive_infos if x.user == wanted_user]
-        elif match.startswith("host:"):
-            wanted_host = match.removeprefix("host:")
-            archive_infos = [x for x in archive_infos if x.host == wanted_host]
-        else:  #  do a match on the name
-            regex = get_regex_from_pattern(match)
-            regex = re.compile(regex + match_end)
-            archive_infos = [x for x in archive_infos if regex.match(x.name) is not None]
+    def _matching_info_tuples(self, match_patterns, match_end):
+        archive_infos = list(self._info_tuples())
+        if match_patterns:
+            assert isinstance(match_patterns, list), f"match_pattern is a {type(match_patterns)}"
+            for match in match_patterns:
+                if match.startswith("aid:"):  # do a match on the archive ID (prefix)
+                    wanted_id = match.removeprefix("aid:")
+                    archive_infos = [x for x in archive_infos if bin_to_hex(x.id).startswith(wanted_id)]
+                    if len(archive_infos) != 1:
+                        raise CommandError("archive ID based match needs to match precisely one archive ID")
+                elif match.startswith("tags:"):
+                    wanted_tags = match.removeprefix("tags:")
+                    wanted_tags = [tag for tag in wanted_tags.split(",") if tag]  # remove empty tags
+                    archive_infos = [x for x in archive_infos if set(x.tags) >= set(wanted_tags)]
+                elif match.startswith("user:"):
+                    wanted_user = match.removeprefix("user:")
+                    archive_infos = [x for x in archive_infos if x.user == wanted_user]
+                elif match.startswith("host:"):
+                    wanted_host = match.removeprefix("host:")
+                    archive_infos = [x for x in archive_infos if x.host == wanted_host]
+                else:  #  do a match on the name
+                    match = match.removeprefix("name:")  # accept optional name: prefix
+                    regex = get_regex_from_pattern(match)
+                    regex = re.compile(regex + match_end)
+                    archive_infos = [x for x in archive_infos if regex.match(x.name) is not None]
         return archive_infos
 
     def count(self):

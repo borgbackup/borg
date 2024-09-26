@@ -19,13 +19,13 @@ class DeleteMixIn:
         dry_run = args.dry_run
         manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
         if args.name:
-            archive_infos = [manifest.archives.get_one(args.name)]
+            archive_infos = [manifest.archives.get_one([args.name])]
         else:
             archive_infos = manifest.archives.list_considering(args)
         count = len(archive_infos)
         if count == 0:
             return
-        if not args.name and args.match_archives is None and args.first == 0 and args.last == 0:
+        if not args.name and not args.match_archives and args.first == 0 and args.last == 0:
             raise CommandError(
                 "Aborting: if you really want to delete all archives, please use -a 'sh:*' "
                 "or just delete the whole repository (might be much faster)."

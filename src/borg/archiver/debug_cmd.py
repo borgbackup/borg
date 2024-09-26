@@ -32,7 +32,7 @@ class DebugMixIn:
     def do_debug_dump_archive_items(self, args, repository, manifest):
         """dump (decrypted, decompressed) archive items metadata (not: data)"""
         repo_objs = manifest.repo_objs
-        archive_info = manifest.archives.get_one(args.name)
+        archive_info = manifest.archives.get_one([args.name])
         archive = Archive(manifest, archive_info.id)
         for i, item_id in enumerate(archive.metadata.items):
             _, data = repo_objs.parse(item_id, repository.get(item_id), ro_type=ROBJ_ARCHIVE_STREAM)
@@ -45,7 +45,7 @@ class DebugMixIn:
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_archive(self, args, repository, manifest):
         """dump decoded archive metadata (not: data)"""
-        archive_info = manifest.archives.get_one(args.name)
+        archive_info = manifest.archives.get_one([args.name])
         repo_objs = manifest.repo_objs
         try:
             archive_meta_orig = manifest.archives.get_by_id(archive_info.id, raw=True)

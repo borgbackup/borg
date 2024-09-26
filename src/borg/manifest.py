@@ -33,7 +33,7 @@ class NoManifestError(Error):
     exit_mcode = 26
 
 
-ArchiveInfo = namedtuple("ArchiveInfo", "name id ts tags", defaults=[()])
+ArchiveInfo = namedtuple("ArchiveInfo", "name id ts tags host user", defaults=[(), None, None])
 
 # timestamp is a replacement for ts, archive is an alias for name (see SortBySpec)
 AI_HUMAN_SORT_KEYS = ["timestamp", "archive"] + list(ArchiveInfo._fields)
@@ -129,6 +129,8 @@ class Archives:
                 time="1970-01-01T00:00:00.000000",
                 # new:
                 exists=False,  # we have the pointer, but the repo does not have an archive item
+                username="",
+                hostname="",
                 tags=(),
             )
         else:
@@ -161,7 +163,14 @@ class Archives:
 
     def _info_tuples(self):
         for info in self._infos():
-            yield ArchiveInfo(name=info["name"], id=info["id"], ts=parse_timestamp(info["time"]), tags=info["tags"])
+            yield ArchiveInfo(
+                name=info["name"],
+                id=info["id"],
+                ts=parse_timestamp(info["time"]),
+                tags=info["tags"],
+                user=info["username"],
+                host=info["hostname"],
+            )
 
     def _matching_info_tuples(self, match, match_end):
         archive_infos = self._info_tuples()
@@ -176,6 +185,12 @@ class Archives:
             wanted_tags = match.removeprefix("tags:")
             wanted_tags = [tag for tag in wanted_tags.split(",") if tag]  # remove empty tags
             archive_infos = [x for x in archive_infos if set(x.tags) >= set(wanted_tags)]
+        elif match.startswith("user:"):
+            wanted_user = match.removeprefix("user:")
+            archive_infos = [x for x in archive_infos if x.user == wanted_user]
+        elif match.startswith("host:"):
+            wanted_host = match.removeprefix("host:")
+            archive_infos = [x for x in archive_infos if x.host == wanted_host]
         else:  #  do a match on the name
             regex = get_regex_from_pattern(match)
             regex = re.compile(regex + match_end)
@@ -233,7 +248,12 @@ class Archives:
                 if not raw:
                     ts = parse_timestamp(archive_info["time"])
                     return ArchiveInfo(
-                        name=archive_info["name"], id=archive_info["id"], ts=ts, tags=archive_info["tags"]
+                        name=archive_info["name"],
+                        id=archive_info["id"],
+                        ts=ts,
+                        tags=archive_info["tags"],
+                        user=archive_info["username"],
+                        host=archive_info["hostname"],
                     )
                 else:
                     return archive_info
@@ -267,7 +287,12 @@ class Archives:
                     if not raw:
                         ts = parse_timestamp(archive_info["time"])
                         archive_info = ArchiveInfo(
-                            name=archive_info["name"], id=archive_info["id"], ts=ts, tags=archive_info["tags"]
+                            name=archive_info["name"],
+                            id=archive_info["id"],
+                            ts=ts,
+                            tags=archive_info["tags"],
+                            user=archive_info["username"],
+                            host=archive_info["hostname"],
                         )
                     return archive_info
         else:

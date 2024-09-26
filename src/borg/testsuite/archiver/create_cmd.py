@@ -63,7 +63,7 @@ def test_basic_functionality(archivers, request):
     with changedir("output"):
         cmd(archiver, "extract", "test")
 
-    list_output = cmd(archiver, "repo-list", "--short")
+    list_output = cmd(archiver, "repo-list")
     assert "test" in list_output
     assert "test.2" in list_output
 
@@ -532,7 +532,7 @@ def test_create_archivename_with_placeholder(archivers, request):
     name_given = "test-{now}"  # placeholder in archive name gets replaced by borg
     name_expected = f"test-{ts}"  # placeholder in f-string gets replaced by python
     cmd(archiver, "create", f"--timestamp={ts}", name_given, "input")
-    list_output = cmd(archiver, "repo-list", "--short")
+    list_output = cmd(archiver, "repo-list")
     assert name_expected in list_output
 
 

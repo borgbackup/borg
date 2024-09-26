@@ -20,9 +20,11 @@ class RepoListMixIn:
         if args.format is not None:
             format = args.format
         elif args.short:
-            format = "{archive}{NL}"
+            format = "{id}{NL}"
         else:
-            format = os.environ.get("BORG_RLIST_FORMAT", "{archive:<36} {time} [{id}]{NL}")
+            format = os.environ.get(
+                "BORG_RLIST_FORMAT", "{id:.8}  {time}  {archive:<15}  {username:<10}  {hostname:<10}  {comment:.40}{NL}"
+            )
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
         output_data = []
@@ -93,7 +95,7 @@ class RepoListMixIn:
         )
         subparser.set_defaults(func=self.do_repo_list)
         subparser.add_argument(
-            "--short", dest="short", action="store_true", help="only print the archive names, nothing else"
+            "--short", dest="short", action="store_true", help="only print the archive IDs, nothing else"
         )
         subparser.add_argument(
             "--format",

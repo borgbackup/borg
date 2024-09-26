@@ -31,8 +31,6 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--json``                                        | output stats as JSON. Implies ``--stats``.                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--prefer-adhoc-cache``                          | experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).                                                                                                    |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdin-name NAME``                             | use NAME in archive for stdin data (default: 'stdin')                                                                                                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdin-user USER``                             | set user USER in archive for stdin data (default: do not store user/uid)                                                                                                                          |
@@ -128,7 +126,6 @@ borg create
         --list          output verbose list of items (files, dirs, ...)
         --filter STATUSCHARS    only display items with the given status characters (see description)
         --json          output stats as JSON. Implies ``--stats``.
-        --prefer-adhoc-cache    experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).
         --stdin-name NAME    use NAME in archive for stdin data (default: 'stdin')
         --stdin-user USER    set user USER in archive for stdin data (default: do not store user/uid)
         --stdin-group GROUP    set group GROUP in archive for stdin data (default: do not store group/gid)
@@ -195,7 +192,9 @@ stdin* below for details.
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
 
-The archive name needs to be unique.
+The archive name does NOT need to be unique, you can and should use the same
+name for a series of archives. The unique archive identifier is its ID (hash)
+and you can abbreviate the ID as long as it is unique.
 
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.

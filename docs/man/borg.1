@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2024-09-09" "" "borg backup tool"
+.TH "BORG" 1 "2024-09-26" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -67,25 +67,25 @@ $ borg \-r /path/to/repo repo\-create \-\-encryption=repokey\-aes\-ocb
 .UNINDENT
 .IP 2. 3
 Back up the \fB~/src\fP and \fB~/Documents\fP directories into an archive called
-\fIMonday\fP:
+\fIdocs\fP:
 .INDENT 3.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-$ borg \-r /path/to/repo create Monday ~/src ~/Documents
+$ borg \-r /path/to/repo create docs ~/src ~/Documents
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .IP 3. 3
-The next day create a new archive called \fITuesday\fP:
+The next day create a new archive using the same archive name:
 .INDENT 3.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-$ borg \-r /path/to/repo create \-\-stats Tuesday ~/src ~/Documents
+$ borg \-r /path/to/repo create \-\-stats docs ~/src ~/Documents
 .ft P
 .fi
 .UNINDENT
@@ -101,7 +101,7 @@ size (the amount of unique data not shared with other archives):
 .nf
 .ft C
 Repository: /path/to/repo
-Archive name: Tuesday
+Archive name: docs
 Archive fingerprint: bcd1b53f9b4991b7afc2b339f851b7ffe3c6d030688936fe4552eccc1877718d
 Time (start): Sat, 2022\-06\-25 20:21:43
 Time (end):   Sat, 2022\-06\-25 20:21:43
@@ -122,20 +122,20 @@ List all archives in the repository:
 .nf
 .ft C
 $ borg \-r /path/to/repo repo\-list
-Monday                               Sat, 2022\-06\-25 20:21:14 [b80e24d2...b179f298]
-Tuesday                              Sat, 2022\-06\-25 20:21:43 [bcd1b53f...1877718d]
+docs                                 Sat, 2022\-06\-25 20:21:14 [b80e24d2...b179f298]
+docs                                 Sat, 2022\-06\-25 20:21:43 [bcd1b53f...1877718d]
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .IP 5. 3
-List the contents of the \fIMonday\fP archive:
+List the contents of the first archive:
 .INDENT 3.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-$ borg \-r /path/to/repo list Monday
+$ borg \-r /path/to/repo list aid:b80e24d2
 drwxr\-xr\-x user   group          0 Mon, 2016\-02\-15 18:22:30 home/user/Documents
 \-rw\-r\-\-r\-\- user   group       7961 Mon, 2016\-02\-15 18:22:30 home/user/Documents/Important.doc
 \&...
@@ -144,34 +144,32 @@ drwxr\-xr\-x user   group          0 Mon, 2016\-02\-15 18:22:30 home/user/Docume
 .UNINDENT
 .UNINDENT
 .IP 6. 3
-Restore the \fIMonday\fP archive by extracting the files relative to the current directory:
+Restore the first archive by extracting the files relative to the current directory:
 .INDENT 3.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-$ borg \-r /path/to/repo extract Monday
+$ borg \-r /path/to/repo extract aid:b80e24d2
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .IP 7. 3
-Delete the \fIMonday\fP archive (please note that this does \fBnot\fP free repo disk space):
+Delete the first archive (please note that this does \fBnot\fP free repo disk space):
 .INDENT 3.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-$ borg \-r /path/to/repo delete \-a Monday
+$ borg \-r /path/to/repo delete aid:b80e24d2
 .ft P
 .fi
 .UNINDENT
 .UNINDENT
 .sp
-Please note the \fB\-a\fP option here (short for \fB\-\-match\-archives\fP) which enables you
-to give a pattern to delete multiple archives, like \fB\-a \(aqsh:oldcrap\-*\(aq\fP\&.
-You can also combine this with \fB\-\-first\fP, \fB\-\-last\fP and \fB\-\-sort\-by\fP\&.
-Be careful, always first use with \fB\-\-dry\-run\fP and \fB\-\-list\fP!
+Be careful if you use an archive NAME (and not an archive ID), that might match multiple archives!
+Always first use with \fB\-\-dry\-run\fP and \fB\-\-list\fP!
 .IP 8. 3
 Recover disk space by compacting the segment files in the repo:
 .INDENT 3.0
@@ -179,7 +177,7 @@ Recover disk space by compacting the segment files in the repo:
 .sp
 .nf
 .ft C
-$ borg \-r /path/to/repo compact
+$ borg \-r /path/to/repo compact \-v
 .ft P
 .fi
 .UNINDENT
@@ -232,7 +230,7 @@ Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style
 .sp
 \fBRemote repositories\fP accessed via ssh \fI\%user@host\fP:
 .sp
-\fBssh://user@host:port/path/to/repo\fP \- absolute path\(ga
+\fBssh://user@host:port/path/to/repo\fP \- absolute path
 .sp
 \fBssh://user@host:port/./path/to/repo\fP \- path relative to current directory
 .sp
@@ -240,7 +238,13 @@ Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style
 .sp
 \fBRemote repositories\fP accessed via sftp:
 .sp
-\fBsftp://user@host:port/path/to/repo\fP \- absolute path\(ga
+\fBsftp://user@host:port/path/to/repo\fP \- absolute path
+.sp
+For ssh and sftp URLs, the \fBuser@\fP and \fB:port\fP parts are optional.
+.sp
+\fBRemote repositories\fP accessed via rclone:
+.sp
+\fBrclone://remote:path\fP
 .sp
 If you frequently need the same repo URL, it is a good idea to set the
 \fBBORG_REPO\fP environment variable to set a default for the repo URL:
@@ -462,8 +466,7 @@ cache entries for backup sources other than the current sources.
 .TP
 .B BORG_FILES_CACHE_TTL
 When set to a numeric value, this determines the maximum \(dqtime to live\(dq for the files cache
-entries (default: 20). The files cache is used to determine quickly whether a file is unchanged.
-The FAQ explains this more detailed in: \fIalways_chunking\fP
+entries (default: 2). The files cache is used to determine quickly whether a file is unchanged.
 .TP
 .B BORG_USE_CHUNKS_ARCHIVE
 When set to no (default: yes), the \fBchunks.archive.d\fP folder will not be used. This reduces
@@ -489,20 +492,6 @@ given order, e.g.:
 \fBllfuse\fP: only try to load llfuse
 .IP \(bu 2
 \fBnone\fP: do not try to load an implementation
-.UNINDENT
-.TP
-.B BORG_CACHE_IMPL
-Choose the implementation for the clientside cache, choose one of:
-.INDENT 7.0
-.IP \(bu 2
-\fBadhoc\fP: builds a non\-persistent chunks cache by querying the repo. Chunks cache contents
-are somewhat sloppy for already existing chunks, concerning their refcount (\(dqinfinite\(dq) and
-size (0). No files cache (slow, will chunk all input files). DEPRECATED.
-.IP \(bu 2
-\fBadhocwithfiles\fP: Like \fBadhoc\fP, but with a persistent files cache. Default implementation.
-.IP \(bu 2
-\fBcli\fP: Determine the cache implementation from cli options. Without special options, will
-usually end up with the \fBlocal\fP implementation.
 .UNINDENT
 .TP
 .B BORG_SELFTEST
@@ -724,7 +713,7 @@ and re\-write segment files to free space.
 .IP \(bu 2
 In future, easier to adapt to other kinds of storage:
 borgstore\(aqs backends are quite simple to implement.
-A \fBsftp:\fP backend already exists, cloud storage might be easy to add.
+\fBsftp:\fP and \fBrclone:\fP backends already exists, others might be easy to add.
 .IP \(bu 2
 Parallel repository access with less locking is easier to implement.
 .UNINDENT

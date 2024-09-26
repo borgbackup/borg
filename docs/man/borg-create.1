@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2024-09-09" "" "borg backup tool"
+.TH "BORG-CREATE" 1 "2024-09-26" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -53,7 +53,9 @@ stdin\fP below for details.
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
 .sp
-The archive name needs to be unique.
+The archive name does NOT need to be unique, you can and should use the same
+name for a series of archives. The unique archive identifier is its ID (hash)
+and you can abbreviate the ID as long as it is unique.
 .sp
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
@@ -152,9 +154,6 @@ only display items with the given status characters (see description)
 .TP
 .B  \-\-json
 output stats as JSON. Implies \fB\-\-stats\fP\&.
-.TP
-.B  \-\-prefer\-adhoc\-cache
-experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).
 .TP
 .BI \-\-stdin\-name \ NAME
 use NAME in archive for stdin data (default: \(aqstdin\(aq)
@@ -283,18 +282,18 @@ $ borg create my\-files                \e
 # /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
 $ borg create my\-files /home \-\-exclude \(aqsh:home/*/.thumbnails\(aq
 
-# Backup the root filesystem into an archive named \(dqroot\-YYYY\-MM\-DD\(dq
+# Backup the root filesystem into an archive named \(dqroot\-archive\(dq
 # use zlib compression (good, but slow) \- default is lz4 (fast, low compression ratio)
-$ borg create \-C zlib,6 \-\-one\-file\-system root\-{now:%Y\-%m\-%d} /
+$ borg create \-C zlib,6 \-\-one\-file\-system root\-archive /
 
-# Backup into an archive name like FQDN\-root\-TIMESTAMP
-$ borg create \(aq{fqdn}\-root\-{now}\(aq /
+# Backup into an archive name like FQDN\-root
+$ borg create \(aq{fqdn}\-root\(aq /
 
 # Backup a remote host locally (\(dqpull\(dq style) using sshfs
 $ mkdir sshfs\-mount
 $ sshfs root@example.com:/ sshfs\-mount
 $ cd sshfs\-mount
-$ borg create example.com\-root\-{now:%Y\-%m\-%d} .
+$ borg create example.com\-root .
 $ cd ..
 $ fusermount \-u sshfs\-mount
 
@@ -323,17 +322,13 @@ $ borg create \-\-compression lzma,N arch ~
 # Only compress compressible data with lzma,N (N = 0..9)
 $ borg create \-\-compression auto,lzma,N arch ~
 
-# Use short hostname, user name and current time in archive name
-$ borg create \(aq{hostname}\-{user}\-{now}\(aq ~
-# Similar, use the same datetime format that is default as of borg 1.1
-$ borg create \(aq{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S}\(aq ~
-# As above, but add nanoseconds
-$ borg create \(aq{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S.%f}\(aq ~
+# Use short hostname and user name as archive name
+$ borg create \(aq{hostname}\-{user}\(aq ~
 
 # Backing up relative paths by moving into the correct directory first
 $ cd /home/user/Documents
 # The root directory of the archive will be \(dqprojectA\(dq
-$ borg create \(aqdaily\-projectA\-{now:%Y\-%m\-%d}\(aq projectA
+$ borg create \(aqdaily\-projectA\(aq projectA
 
 # Use external command to determine files to archive
 # Use \-\-paths\-from\-stdin with find to back up only files less than 1MB in size

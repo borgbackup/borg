@@ -129,7 +129,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b11 (2024-xx-xx)
+Version 2.0.0b11 (2024-09-26)
 -----------------------------
 
 Please note:
@@ -141,9 +141,16 @@ above.
 
 New features:
 
-- rclone:// borg repositories, this enables 100+ cloud storage providers!
-- parallel operations in same repo from same client (same user/machine)
-- archive series feature, #7930
+- Support rclone:// URLs for borg repositories.
+
+  This enables 70+ cloud storage products, including Amazon S3, Backblaze B2,
+  Ceph, Dropbox, ftp(s), Google Cloud Storage, Google Drive, Microsoft Azure,
+  Microsoft OneDrive, OpenStack Swift, pCloud, Seafile, sftp, SMB / CIFS and
+  WebDAV!
+
+  See https://rclone.org/ for more details.
+- Parallel operations in same repo from same client (same user/machine).
+- Archive series feature, #7930.
 
   TL;DR: a NAME now identifies a series of identically named archives,
   to identify a specific single archive, use aid:<archive hash>.
@@ -164,12 +171,12 @@ New features:
   - borg delete aid:<archive hash>
 - create: also archive inode number, #8362
 
-  borg can use this when using archive series to rebuild the local files cache
+  Borg can use this when using archive series to rebuild the local files cache
   from the previous archive (of the same series) in the repository.
 
 Fixes:
 
-- bugfix: remove superfluous repository.list() call. for high latency repos
+- Remove superfluous repository.list() call. for high latency repos
   (like sftp, cloud), this improves performance of borg check and compact.
 - repository.list: refresh lock more frequently
 - misc. commands fixed for non-unique archive names
@@ -179,18 +186,18 @@ Fixes:
 
 Other changes:
 
-- cache the chunks index in the repository, #8397.
-  improves high latency repo performance for most commands compared to b10.
+- Cache the chunks index in the repository, #8397.
+  Improves high latency repo performance for most commands compared to b10.
 - repo-compress: faster by using chunks index rather than repository.list().
-- files cache entries now have ctime AND mtime.
-  borg updates the ctime and mtime of known and "unchanged" files, #4915.
-- rebuild files cache from previous archive in same series, #8385.
-- reduce RAM usage by splitting the files cache by archive series, #5658.
-- remove AdHocCache, remove BORG_CACHE_IMPL (we only have one implementation).
-- docs: user@ and :port are optional in sftp and ssh URLs.
+- Files cache entries now have both ctime AND mtime.
+- Borg updates the ctime and mtime of known and "unchanged" files, #4915.
+- Rebuild files cache from previous archive in same series, #8385.
+- Reduce RAM usage by splitting the files cache by archive series, #5658.
+- Remove AdHocCache, remove BORG_CACHE_IMPL (we only have one implementation).
+- Docs: user@ and :port are optional in sftp and ssh URLs.
 - CI: re-enable windows build after fixing it.
-- upgrade pyinstaller to 6.10.0
-- increase IDS_PER_CHUNK, #6945q
+- Upgrade pyinstaller to 6.10.0.
+- Increase IDS_PER_CHUNK, #6945.
 
 
 Version 2.0.0b10 (2024-09-09)

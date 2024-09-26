@@ -32,6 +32,7 @@ def test_info_json(archivers, request):
     assert isinstance(archive["command_line"], str)
     assert isinstance(archive["duration"], float)
     assert len(archive["id"]) == 64
+    assert archive["tags"] == []
     assert "stats" in archive
     checkts(archive["start"])
     checkts(archive["end"])

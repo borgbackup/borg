@@ -12,6 +12,7 @@ REQUIRED_ITEM_KEYS = frozenset(["path", "mtime"])
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
 # fmt: off
 ARCHIVE_KEYS = frozenset(['version', 'name', 'hostname', 'username', 'time', 'time_end',
+                          'tags',  # v2+ archives
                           'items',  # legacy v1 archives
                           'item_ptrs',  # v2+ archives
                           'comment', 'chunker_params',

@@ -32,6 +32,7 @@ class InfoMixIn:
                 output_data.append(info)
             else:
                 info["duration"] = format_timedelta(timedelta(seconds=info["duration"]))
+                info["tags"] = ",".join(info["tags"])
                 print(
                     textwrap.dedent(
                         """
@@ -40,6 +41,7 @@ class InfoMixIn:
                 Comment: {comment}
                 Hostname: {hostname}
                 Username: {username}
+                Tags: {tags}
                 Time (start): {start}
                 Time (end): {end}
                 Duration: {duration}

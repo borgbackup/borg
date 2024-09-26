@@ -473,6 +473,7 @@ class Archive:
         self.name = name  # overwritten later with name from archive metadata
         self.name_in_manifest = name  # can differ from .name later (if borg check fixed duplicate archive names)
         self.comment = None
+        self.tags = None
         self.numeric_ids = numeric_ids
         self.noatime = noatime
         self.noctime = noctime
@@ -495,6 +496,7 @@ class Archive:
         self.create = create
         if self.create:
             self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
+            self.tags = set()
         else:
             if name_is_id:
                 # we also go over the manifest here to avoid quick&dirty deleted archives
@@ -521,6 +523,7 @@ class Archive:
         self.metadata = self._load_meta(self.id)
         self.name = self.metadata.name
         self.comment = self.metadata.get("comment", "")
+        self.tags = set(self.metadata.get("tags", []))
 
     @property
     def ts(self):
@@ -573,6 +576,7 @@ class Archive:
                     "hostname": self.metadata.hostname,
                     "username": self.metadata.username,
                     "comment": self.metadata.get("comment", ""),
+                    "tags": sorted(self.tags),
                     "chunker_params": self.metadata.get("chunker_params", ""),
                 }
             )
@@ -632,6 +636,7 @@ Duration: {0.duration}
             "version": 2,
             "name": name,
             "comment": comment or "",
+            "tags": list(sorted(self.tags)),
             "item_ptrs": item_ptrs,  # see #1473
             "command_line": join_cmd(sys.argv),
             "hostname": hostname,

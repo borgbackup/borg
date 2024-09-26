@@ -18,7 +18,7 @@ def test_transfer(archivers, request):
     original_location, input_path = archiver.repository_location, archiver.input_path
 
     def check_repo():
-        listing = cmd(archiver, "repo-list", "--short")
+        listing = cmd(archiver, "repo-list")
         assert "arch1" in listing
         assert "arch2" in listing
         listing = cmd(archiver, "list", "--short", "arch1")
@@ -93,6 +93,9 @@ def test_transfer_upgrade(archivers, request):
 
     for got_archive, expected_archive in zip(got["archives"], expected["archives"]):
         del got_archive["id"]
+        del got_archive["username"]  # we didn't have this in the 1.x default format
+        del got_archive["hostname"]  # we didn't have this in the 1.x default format
+        del got_archive["comment"]  # we didn't have this in the 1.x default format
         del expected_archive["id"]
         del expected_archive["barchive"]
         # timestamps:

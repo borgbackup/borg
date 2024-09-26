@@ -22,7 +22,9 @@ class RepoListMixIn:
         elif args.short:
             format = "{id}{NL}"
         else:
-            format = os.environ.get("BORG_RLIST_FORMAT", "{archive:<36} {time} [{id}]{NL}")
+            format = os.environ.get(
+                "BORG_RLIST_FORMAT", "{id:.8}  {time}  {archive:<15}  {username:<10}  {hostname:<10}  {comment:.40}{NL}"
+            )
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
         output_data = []

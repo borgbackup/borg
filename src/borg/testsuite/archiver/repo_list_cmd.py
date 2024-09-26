@@ -25,13 +25,18 @@ def test_archives_format(archivers, request):
     cmd(archiver, "create", "--comment", "comment 1", "test-1", src_dir)
     cmd(archiver, "create", "--comment", "comment 2", "test-2", src_dir)
     output_1 = cmd(archiver, "repo-list")
-    output_2 = cmd(archiver, "repo-list", "--format", "{archive:<36} {time} [{id}]{NL}")
+    output_2 = cmd(
+        archiver,
+        "repo-list",
+        "--format",
+        "{id:.8}  {time}  {archive:<15}  {username:<10}  {hostname:<10}  {comment:.40}{NL}",
+    )
     assert output_1 == output_2
-    output_1 = cmd(archiver, "repo-list", "--short")
-    assert output_1 == "test-1" + os.linesep + "test-2" + os.linesep
-    output_3 = cmd(archiver, "repo-list", "--format", "{name} {comment}{NL}")
-    assert "test-1 comment 1" + os.linesep in output_3
-    assert "test-2 comment 2" + os.linesep in output_3
+    output = cmd(archiver, "repo-list", "--short")
+    assert len(output) == 2 * 64 + 2 * len(os.linesep)
+    output = cmd(archiver, "repo-list", "--format", "{name} {comment}{NL}")
+    assert "test-1 comment 1" + os.linesep in output
+    assert "test-2 comment 2" + os.linesep in output
 
 
 def test_size_nfiles(archivers, request):

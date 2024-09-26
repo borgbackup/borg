@@ -511,6 +511,7 @@ cdef class ArchiveItem(PropDict):
     time = PropDictProperty(str)
     time_end = PropDictProperty(str)
     comment = PropDictProperty(str, 'surrogate-escaped str')
+    tags = PropDictProperty(list)  # list of s-e-str
     chunker_params = PropDictProperty(tuple)
     recreate_cmdline = PropDictProperty(list)  # legacy, list of s-e-str
     recreate_command_line = PropDictProperty(str, 'surrogate-escaped str')

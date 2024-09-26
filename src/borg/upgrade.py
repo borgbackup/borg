@@ -161,4 +161,5 @@ class UpgraderFrom12To20:
             new_metadata["command_line"] = join_cmd(getattr(metadata, "cmdline"))
         if hasattr(metadata, "recreate_cmdline"):
             new_metadata["recreate_command_line"] = join_cmd(getattr(metadata, "recreate_cmdline"))
+        new_metadata["tags"] = []
         return new_metadata

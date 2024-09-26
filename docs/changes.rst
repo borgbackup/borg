@@ -57,8 +57,8 @@ Compatibility notes:
   - or, if the command makes sense for an arbitrary amount of archives, archives
     can be selected using a glob pattern, like:
 
-    - borg delete -a 'sh:myarchive-2024-*'
-    - borg recreate -a 'sh:myarchive-2024-*'
+    - borg delete -a 'sh:myarchive-2024-??-??'
+    - borg recreate -a 'sh:myarchive-2024-??-??'
   - some borg 1.x commands that supported working on a repo AND on an archive
     were split into 2 commands, some others were renamed:
 

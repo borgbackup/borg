@@ -27,12 +27,12 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2024-09-09" "" "borg backup tool"
+.TH "BORG-DELETE" 1 "2024-09-26" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete archives
 .SH SYNOPSIS
 .sp
-borg [common options] delete [options]
+borg [common options] delete [options] [NAME]
 .SH DESCRIPTION
 .sp
 This command deletes archives from the repository.
@@ -48,6 +48,12 @@ see \fIborg_patterns\fP).
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS arguments
+.INDENT 0.0
+.TP
+.B NAME
+specify the archive name
+.UNINDENT
 .SS optional arguments
 .INDENT 0.0
 .TP
@@ -90,10 +96,13 @@ consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
 .sp
 .nf
 .ft C
-# delete a single backup archive:
-$ borg delete \-a Monday
+# delete all backup archives named \(dqkenny\-files\(dq:
+$ borg delete \-a kenny\-files
 # actually free disk space:
 $ borg compact
+
+# delete a specific backup archive using its unique archive ID prefix
+$ borg delete aid:d34db33f
 
 # delete all archives whose names begin with the machine\(aqs hostname followed by \(dq\-\(dq
 $ borg delete \-a \(aqsh:{hostname}\-*\(aq

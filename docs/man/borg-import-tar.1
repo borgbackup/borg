@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-IMPORT-TAR" 1 "2024-09-09" "" "borg backup tool"
+.TH "BORG-IMPORT-TAR" 1 "2024-09-26" "" "borg backup tool"
 .SH NAME
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -170,9 +170,9 @@ Outputs a script that copies all archives from repo1 to repo2:
 .sp
 .nf
 .ft C
-for A T in \(gaborg list \-\-format=\(aq{archive} {time:%Y\-%m\-%dT%H:%M:%S}{NL}\(aq\(ga
+for N I T in \(gaborg list \-\-format=\(aq{archive} {id} {time:%Y\-%m\-%dT%H:%M:%S}{NL}\(aq\(ga
 do
-  echo \(dqborg \-r repo1 export\-tar \-\-tar\-format=BORG $A \- | borg \-r repo2 import\-tar \-\-timestamp=$T $A \-\(dq
+  echo \(dqborg \-r repo1 export\-tar \-\-tar\-format=BORG aid:$I \- | borg \-r repo2 import\-tar \-\-timestamp=$T $N \-\(dq
 done
 .ft P
 .fi

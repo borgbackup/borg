@@ -6,12 +6,16 @@ borg prune
 ----------
 .. code-block:: none
 
-    borg [common options] prune [options]
+    borg [common options] prune [options] [NAME]
 
 .. only:: html
 
     .. class:: borg-options-table
 
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
+    | **positional arguments**                                                                                                                                                                                                       |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
+    |                                                                             | ``NAME``                                     | specify the archive name                                                                          |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
     | **optional arguments**                                                                                                                                                                                                         |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
@@ -70,6 +74,8 @@ borg prune
 
 .. only:: latex
 
+    NAME
+        specify the archive name
 
 
     optional arguments
@@ -113,17 +119,18 @@ certain number of historic backups. This retention policy is commonly referred t
 `GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>`_
 (Grandfather-father-son) backup rotation scheme.
 
-If you use --match-archives (-a), then only archives that match the pattern are
-considered for deletion and only those archives count towards the totals
-specified by the rules.
+The recommended way to use prune is to give the archive series name to it via the
+NAME argument (assuming you have the same name for all archives in a series).
+Alternatively, you can also use --match-archives (-a), then only archives that
+match the pattern are considered for deletion and only those archives count
+towards the totals specified by the rules.
 Otherwise, *all* archives in the repository are candidates for deletion!
 There is no automatic distinction between archives representing different
 contents. These need to be distinguished by specifying matching globs.
 
-If you have multiple sequences of archives with different data sets (e.g.
+If you have multiple series of archives with different data sets (e.g.
 from different machines) in one shared repository, use one prune call per
-data set that matches only the respective archives using the --match-archives
-(-a) option.
+series.
 
 The ``--keep-within`` option takes an argument of the form "<int><char>",
 where char is "H", "d", "w", "m", "y". For example, ``--keep-within 2d`` means

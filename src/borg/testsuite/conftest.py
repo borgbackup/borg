@@ -30,6 +30,7 @@ def clean_env(tmpdir_factory, monkeypatch):
     monkeypatch.setenv("BORG_BASE_DIR", str(tmpdir_factory.mktemp("borg-base-dir")))
     # Speed up tests
     monkeypatch.setenv("BORG_TESTONLY_WEAKEN_KDF", "1")
+    monkeypatch.setenv("BORG_STORE_DATA_LEVELS", "0")  # flat storage for few objects
 
 
 def pytest_report_header(config, start_path):

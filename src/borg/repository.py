@@ -116,9 +116,18 @@ class Repository:
             url = "file://%s" % os.path.abspath(path_or_location)
             location = Location(url)
         self._location = location
-        # use a Store with flat config storage and 2-levels-nested data storage
+        # lots of stuff in data: use 2 levels by default (data/00/00/ .. data/ff/ff/ dirs)!
+        data_levels = int(os.environ.get("BORG_STORE_DATA_LEVELS", "2"))
+        levels_config = {
+            "archives/": [0],
+            "cache/": [0],
+            "config/": [0],
+            "data/": [data_levels],
+            "keys/": [0],
+            "locks/": [0],
+        }
         try:
-            self.store = Store(url, levels={"config/": [0], "data/": [2]})
+            self.store = Store(url, levels=levels_config)
         except StoreBackendError as e:
             raise Error(str(e))
         self.version = None

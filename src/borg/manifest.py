@@ -33,7 +33,7 @@ class NoManifestError(Error):
     exit_mcode = 26
 
 
-ArchiveInfo = namedtuple("ArchiveInfo", "name id ts")
+ArchiveInfo = namedtuple("ArchiveInfo", "name id ts tags host user", defaults=[(), None, None])
 
 # timestamp is a replacement for ts, archive is an alias for name (see SortBySpec)
 AI_HUMAN_SORT_KEYS = ["timestamp", "archive"] + list(ArchiveInfo._fields)
@@ -129,6 +129,9 @@ class Archives:
                 time="1970-01-01T00:00:00.000000",
                 # new:
                 exists=False,  # we have the pointer, but the repo does not have an archive item
+                username="",
+                hostname="",
+                tags=(),
             )
         else:
             _, data = self.manifest.repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
@@ -149,6 +152,7 @@ class Archives:
                 size=archive_item.size,
                 nfiles=archive_item.nfiles,
                 comment=archive_item.comment,  # not always present?
+                tags=tuple(sorted(getattr(archive_item, "tags", []))),  # must be hashable
             )
         return metadata
 
@@ -159,7 +163,41 @@ class Archives:
 
     def _info_tuples(self):
         for info in self._infos():
-            yield ArchiveInfo(name=info["name"], id=info["id"], ts=parse_timestamp(info["time"]))
+            yield ArchiveInfo(
+                name=info["name"],
+                id=info["id"],
+                ts=parse_timestamp(info["time"]),
+                tags=info["tags"],
+                user=info["username"],
+                host=info["hostname"],
+            )
+
+    def _matching_info_tuples(self, match_patterns, match_end):
+        archive_infos = list(self._info_tuples())
+        if match_patterns:
+            assert isinstance(match_patterns, list), f"match_pattern is a {type(match_patterns)}"
+            for match in match_patterns:
+                if match.startswith("aid:"):  # do a match on the archive ID (prefix)
+                    wanted_id = match.removeprefix("aid:")
+                    archive_infos = [x for x in archive_infos if bin_to_hex(x.id).startswith(wanted_id)]
+                    if len(archive_infos) != 1:
+                        raise CommandError("archive ID based match needs to match precisely one archive ID")
+                elif match.startswith("tags:"):
+                    wanted_tags = match.removeprefix("tags:")
+                    wanted_tags = [tag for tag in wanted_tags.split(",") if tag]  # remove empty tags
+                    archive_infos = [x for x in archive_infos if set(x.tags) >= set(wanted_tags)]
+                elif match.startswith("user:"):
+                    wanted_user = match.removeprefix("user:")
+                    archive_infos = [x for x in archive_infos if x.user == wanted_user]
+                elif match.startswith("host:"):
+                    wanted_host = match.removeprefix("host:")
+                    archive_infos = [x for x in archive_infos if x.host == wanted_host]
+                else:  #  do a match on the name
+                    match = match.removeprefix("name:")  # accept optional name: prefix
+                    regex = get_regex_from_pattern(match)
+                    regex = re.compile(regex + match_end)
+                    archive_infos = [x for x in archive_infos if regex.match(x.name) is not None]
+        return archive_infos
 
     def count(self):
         # return the count of archives in the repo
@@ -211,7 +249,14 @@ class Archives:
             if archive_info["exists"] and archive_info["name"] == name:
                 if not raw:
                     ts = parse_timestamp(archive_info["time"])
-                    return ArchiveInfo(name=archive_info["name"], id=archive_info["id"], ts=ts)
+                    return ArchiveInfo(
+                        name=archive_info["name"],
+                        id=archive_info["id"],
+                        ts=ts,
+                        tags=archive_info["tags"],
+                        user=archive_info["username"],
+                        host=archive_info["hostname"],
+                    )
                 else:
                     return archive_info
         else:
@@ -243,7 +288,14 @@ class Archives:
                 if archive_info["exists"]:
                     if not raw:
                         ts = parse_timestamp(archive_info["time"])
-                        archive_info = ArchiveInfo(name=archive_info["name"], id=archive_info["id"], ts=ts)
+                        archive_info = ArchiveInfo(
+                            name=archive_info["name"],
+                            id=archive_info["id"],
+                            ts=ts,
+                            tags=archive_info["tags"],
+                            user=archive_info["username"],
+                            host=archive_info["hostname"],
+                        )
                     return archive_info
         else:
             for name, values in self._archives.items():
@@ -311,18 +363,7 @@ class Archives:
         if isinstance(sort_by, (str, bytes)):
             raise TypeError("sort_by must be a sequence of str")
 
-        archive_infos = self._info_tuples()
-        if match is None:
-            archive_infos = list(archive_infos)
-        elif match.startswith("aid:"):  # do a match on the archive ID (prefix)
-            wanted_id = match.removeprefix("aid:")
-            archive_infos = [x for x in archive_infos if bin_to_hex(x.id).startswith(wanted_id)]
-            if len(archive_infos) != 1:
-                raise CommandError("archive ID based match needs to match precisely one archive ID")
-        else:  #  do a match on the name
-            regex = get_regex_from_pattern(match)
-            regex = re.compile(regex + match_end)
-            archive_infos = [x for x in archive_infos if regex.match(x.name) is not None]
+        archive_infos = self._matching_info_tuples(match, match_end)
 
         if any([oldest, newest, older, newer]):
             archive_infos = filter_archives_by_date(
@@ -361,14 +402,7 @@ class Archives:
     def get_one(self, match, *, match_end=r"\Z"):
         """get exactly one archive matching <match>"""
         assert match is not None
-        archive_infos = self._info_tuples()
-        if match.startswith("aid:"):  # do a match on the archive ID (prefix)
-            wanted_id = match.removeprefix("aid:")
-            archive_infos = [i for i in archive_infos if bin_to_hex(i.id).startswith(wanted_id)]
-        else:  # do a match on the name
-            regex = get_regex_from_pattern(match)
-            regex = re.compile(regex + match_end)
-            archive_infos = [i for i in archive_infos if regex.match(i.name) is not None]
+        archive_infos = self._matching_info_tuples(match, match_end)
         if len(archive_infos) != 1:
             raise CommandError(f"{match} needed to match precisely one archive, but matched {len(archive_infos)}.")
         return archive_infos[0]

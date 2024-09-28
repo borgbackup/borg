@@ -19,7 +19,7 @@ class InfoMixIn:
         """Show archive details such as disk space used"""
 
         if args.name:
-            archive_infos = [manifest.archives.get_one(args.name)]
+            archive_infos = [manifest.archives.get_one([args.name])]
         else:
             archive_infos = manifest.archives.list_considering(args)
 

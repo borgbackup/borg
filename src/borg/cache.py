@@ -402,7 +402,7 @@ class FilesCacheMixin:
         from .archive import Archive
 
         # get the latest archive with the IDENTICAL name, supporting archive series:
-        archives = self.manifest.archives.list(match=self.archive_name, sort_by=["ts"], last=1)
+        archives = self.manifest.archives.list(match=[self.archive_name], sort_by=["ts"], last=1)
         if not archives:
             # nothing found
             return

@@ -256,7 +256,7 @@ def with_archive(method):
     def wrapper(self, args, repository, manifest, **kwargs):
         archive_name = getattr(args, "name", None)
         assert archive_name is not None
-        archive_info = manifest.archives.get_one(archive_name)
+        archive_info = manifest.archives.get_one([archive_name])
         archive = Archive(
             manifest,
             archive_info.id,
@@ -379,8 +379,8 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
         "--match-archives",
         metavar="PATTERN",
         dest="match_archives",
-        action=Highlander,
-        help='only consider archive names matching the pattern. see "borg help match-archives".',
+        action="append",
+        help='only consider archives matching all patterns. see "borg help match-archives".',
     )
 
     if sort_by:

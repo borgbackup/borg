@@ -1,6 +1,6 @@
 setuptools >=45, !=60.6.0, !=60.7.0
 setuptools_scm
-pip
+pip ==24.1
 wheel
 virtualenv
 build

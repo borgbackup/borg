@@ -41,6 +41,7 @@ def packages_freebsd
     pkg install -y xxhash liblz4 zstd pkgconf
     pkg install -y fusefs-libs || true
     pkg install -y fusefs-libs3 || true
+    pkg install -y rust
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python (for the tests we use pyenv built pythons):
     pkg install -y python310 py310-sqlite3
@@ -77,6 +78,7 @@ def packages_openbsd
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
+    pkg_add rust
     pkg_add openssl%3.0
     pkg_add py3-pip
     pkg_add py3-virtualenv
@@ -89,6 +91,7 @@ def packages_netbsd
     pkgin update
     pkgin -y upgrade
     pkg_add zstd lz4 xxhash git
+    pkg_add rust
     pkg_add bash
     chsh -s bash vagrant
     echo "export PROMPT_COMMAND=" >> ~vagrant/.bash_profile  # bug in netbsd 9.3, .bash_profile broken for screen
@@ -165,8 +168,8 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
-    pyenv install 3.12.0  # tests
-    pyenv install 3.11.9  # tests, binary build
+    pyenv install 3.12.6  # tests, binary build
+    pyenv install 3.11.2  # tests
     pyenv install 3.10.2  # tests
     pyenv install 3.9.4  # tests
     pyenv rehash
@@ -185,9 +188,9 @@ def build_pyenv_venv(boxname)
   return <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
-    # use the latest 3.11 release
-    pyenv global 3.11.9
-    pyenv virtualenv 3.11.9 borg-env
+    # use the latest 3.12 release
+    pyenv global 3.12.6
+    pyenv virtualenv 3.12.6 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -233,8 +236,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.4 3.10.2 3.11.9 3.12.0
-      pyenv local 3.9.4 3.10.2 3.11.9 3.12.0
+      pyenv global 3.9.4 3.10.2 3.11.2 3.12.6
+      pyenv local 3.9.4 3.10.2 3.11.2 3.12.6
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:

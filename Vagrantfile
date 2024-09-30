@@ -279,7 +279,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "noble" do |b|
-    b.vm.box = "ubuntu/noble64"
+    b.vm.box = "bento/ubuntu-24.04"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end

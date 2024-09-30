@@ -41,6 +41,7 @@ def packages_freebsd
     pkg install -y xxhash liblz4 zstd pkgconf
     pkg install -y fusefs-libs || true
     pkg install -y fusefs-libs3 || true
+    pkg install -y rust
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python (for the tests we use pyenv built pythons):
     pkg install -y python310 py310-sqlite3
@@ -77,6 +78,7 @@ def packages_openbsd
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
+    pkg_add rust
     pkg_add openssl%3.0
     pkg_add py3-pip
     pkg_add py3-virtualenv
@@ -89,6 +91,7 @@ def packages_netbsd
     pkgin update
     pkgin -y upgrade
     pkg_add zstd lz4 xxhash git
+    pkg_add rust
     pkg_add bash
     chsh -s bash vagrant
     echo "export PROMPT_COMMAND=" >> ~vagrant/.bash_profile  # bug in netbsd 9.3, .bash_profile broken for screen

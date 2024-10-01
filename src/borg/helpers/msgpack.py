@@ -218,7 +218,7 @@ def get_limited_unpacker(kind):
     #       unpack(data) or from max_buffer_size for Unpacker(max_buffer_size=N).
     args = dict(use_list=False, max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE))  # return tuples, not lists
     if kind in ("server", "client"):
-        pass  # nothing special
+        args.update(dict(max_buffer_size=0))  # 0 means "maximum" here, ~4GiB - needed for store_load/save
     elif kind in ("manifest", "archive", "key"):
         args.update(dict(use_list=True, object_hook=StableDict))  # default value
     else:

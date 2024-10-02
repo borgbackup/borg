@@ -28,7 +28,7 @@ For ssh and sftp URLs, the ``user@`` and ``:port`` parts are optional.
 
 **Remote repositories** accessed via rclone:
 
-``rclone://remote:path``
+``rclone://remote:path`` - see the rclone docs for more details.
 
 
 If you frequently need the same repo URL, it is a good idea to set the

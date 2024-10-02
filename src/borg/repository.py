@@ -130,6 +130,7 @@ class Repository:
             self.store = Store(url, levels=levels_config)
         except StoreBackendError as e:
             raise Error(str(e))
+        self.store_opened = False
         self.version = None
         # long-running repository methods which emit log or progress output are responsible for calling
         # the ._send_log method periodically to get log and progress output transferred to the borg client
@@ -156,7 +157,11 @@ class Repository:
             self.do_create = False
             self.create()
             self.created = True
-        self.open(exclusive=bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
+        try:
+            self.open(exclusive=bool(self.exclusive), lock_wait=self.lock_wait, lock=self.do_lock)
+        except Exception:
+            self.close()
+            raise
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -170,11 +175,13 @@ class Repository:
         """Create a new empty repository"""
         self.store.create()
         self.store.open()
-        self.store.store("config/readme", REPOSITORY_README.encode())
-        self.version = 3
-        self.store.store("config/version", str(self.version).encode())
-        self.store.store("config/id", bin_to_hex(os.urandom(32)).encode())
-        self.store.close()
+        try:
+            self.store.store("config/readme", REPOSITORY_README.encode())
+            self.version = 3
+            self.store.store("config/version", str(self.version).encode())
+            self.store.store("config/id", bin_to_hex(os.urandom(32)).encode())
+        finally:
+            self.store.close()
 
     def _set_id(self, id):
         # for testing: change the id of an existing repository
@@ -207,6 +214,8 @@ class Repository:
             self.store.open()
         except StoreBackendDoesNotExist:
             raise self.DoesNotExist(str(self._location)) from None
+        else:
+            self.store_opened = True
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         else:
@@ -224,12 +233,13 @@ class Repository:
         self.opened = True
 
     def close(self):
-        if self.opened:
-            if self.lock:
-                self.lock.release()
-                self.lock = None
+        if self.lock:
+            self.lock.release()
+            self.lock = None
+        if self.store_opened:
             self.store.close()
-            self.opened = False
+            self.store_opened = False
+        self.opened = False
 
     def info(self):
         """return some infos about the repo (must be opened first)"""

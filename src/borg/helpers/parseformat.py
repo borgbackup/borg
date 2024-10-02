@@ -616,7 +616,8 @@ class Location:
                 path = "/./" + self.path  # /./x = path x relative to cwd
             else:
                 path = self.path
-            return "ssh://{}{}{}{}".format(
+            return "{}://{}{}{}{}".format(
+                self.proto if self.proto else "???",
                 f"{self.user}@" if self.user else "",
                 self._host,  # needed for ipv6 addrs
                 f":{self.port}" if self.port else "",

@@ -685,6 +685,7 @@ def text_validator(*, name, max_length, min_length=0, invalid_ctrl_chars="\0", i
 
 
 comment_validator = text_validator(name="comment", max_length=10000)
+tag_validator = text_validator(name="tag", min_length=0, max_length=10, invalid_chars=" ,$")
 
 
 def archivename_validator(text):

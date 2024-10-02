@@ -51,8 +51,9 @@ Usage
    usage/create
    usage/extract
    usage/check
-   usage/rename
    usage/list
+   usage/tag
+   usage/rename
    usage/diff
    usage/delete
    usage/prune

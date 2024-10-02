@@ -96,6 +96,7 @@ def test_transfer_upgrade(archivers, request):
         del got_archive["username"]  # we didn't have this in the 1.x default format
         del got_archive["hostname"]  # we didn't have this in the 1.x default format
         del got_archive["comment"]  # we didn't have this in the 1.x default format
+        del got_archive["tags"]  # we didn't have this in the 1.x default format
         del expected_archive["id"]
         del expected_archive["barchive"]
         # timestamps:

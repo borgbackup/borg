@@ -4,7 +4,7 @@ import os
 import shutil
 import stat
 from collections import namedtuple
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from time import perf_counter
 
 from .logger import create_logger
@@ -709,6 +709,8 @@ class ChunksMixin:
 
     def __init__(self):
         self._chunks = None
+        self.last_refresh_dt = datetime.now(timezone.utc)
+        self.refresh_td = timedelta(seconds=60)
 
     @property
     def chunks(self):
@@ -751,13 +753,18 @@ class ChunksMixin:
                 size = len(data)  # data is still uncompressed
             else:
                 raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
+        now = datetime.now(timezone.utc)
         exists = self.seen_chunk(id, size)
         if exists:
+            # if borg create is processing lots of unchanged files (no content and not metadata changes),
+            # there could be a long time without any repository operations and the repo lock would get stale.
+            self.refresh_lock(now)
             return self.reuse_chunk(id, size, stats)
         cdata = self.repo_objs.format(
             id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
         )
         self.repository.put(id, cdata, wait=wait)
+        self.last_refresh_dt = now  # .put also refreshed the lock
         self.chunks.add(id, ChunkIndex.MAX_VALUE, size)
         stats.update(size, not exists)
         return ChunkListEntry(id, size)
@@ -766,6 +773,13 @@ class ChunksMixin:
         # this is called from .close, so we can clear/compact here:
         write_chunkindex_to_repo_cache(self.repository, self._chunks, compact=True, clear=True)
         self._chunks = None  # nothing there (cleared!)
+
+    def refresh_lock(self, now):
+        if now > self.last_refresh_dt + self.refresh_td:
+            # the repository lock needs to get refreshed regularly, or it will be killed as stale.
+            # refreshing the lock is not part of the repository API, so we do it indirectly via repository.info.
+            self.repository.info()
+            self.last_refresh_dt = now
 
 
 class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):

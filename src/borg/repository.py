@@ -476,25 +476,31 @@ class Repository:
             self.lock.migrate_lock(old_id, new_id)
 
     def get_manifest(self):
+        self._lock_refresh()
         try:
             return self.store.load("config/manifest")
         except StoreObjectNotFound:
             raise NoManifestError
 
     def put_manifest(self, data):
+        self._lock_refresh()
         return self.store.store("config/manifest", data)
 
     def store_list(self, name):
+        self._lock_refresh()
         try:
             return list(self.store.list(name))
         except StoreObjectNotFound:
             return []
 
     def store_load(self, name):
+        self._lock_refresh()
         return self.store.load(name)
 
     def store_store(self, name, value):
+        self._lock_refresh()
         return self.store.store(name, value)
 
     def store_delete(self, name):
+        self._lock_refresh()
         return self.store.delete(name)

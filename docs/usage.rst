@@ -57,6 +57,7 @@ Usage
    usage/delete
    usage/prune
    usage/info
+   usage/analyze
    usage/mount
    usage/recreate
    usage/tar

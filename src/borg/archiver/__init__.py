@@ -64,6 +64,7 @@ def get_func(args):
     raise Exception("expected func attributes not found")
 
 
+from .analyze_cmd import AnalyzeMixIn
 from .benchmark_cmd import BenchmarkMixIn
 from .check_cmd import CheckMixIn
 from .compact_cmd import CompactMixIn
@@ -94,6 +95,7 @@ from .version_cmd import VersionMixIn
 
 
 class Archiver(
+    AnalyzeMixIn,
     BenchmarkMixIn,
     CheckMixIn,
     CompactMixIn,
@@ -332,6 +334,7 @@ class Archiver(
 
         subparsers = parser.add_subparsers(title="required arguments", metavar="<command>")
 
+        self.build_parser_analyze(subparsers, common_parser, mid_common_parser)
         self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
         self.build_parser_check(subparsers, common_parser, mid_common_parser)
         self.build_parser_compact(subparsers, common_parser, mid_common_parser)

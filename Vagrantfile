@@ -169,7 +169,7 @@ def install_pythons(boxname)
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
     pyenv install 3.12.6  # tests, binary build
-    pyenv install 3.11.2  # tests
+    pyenv install 3.11.3  # tests
     pyenv install 3.10.2  # tests
     pyenv install 3.9.4  # tests
     pyenv rehash
@@ -236,8 +236,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.4 3.10.2 3.11.2 3.12.6
-      pyenv local 3.9.4 3.10.2 3.11.2 3.12.6
+      pyenv global 3.9.4 3.10.2 3.11.3 3.12.6
+      pyenv local 3.9.4 3.10.2 3.11.3 3.12.6
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -279,7 +279,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "noble" do |b|
-    b.vm.box = "ubuntu/noble64"
+    b.vm.box = "bento/ubuntu-24.04"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -395,7 +395,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "macos1012" do |b|
     b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
-      v.memory = 4096 + $wmem
+      v.memory = 8192 + $wmem
       v.customize ['modifyvm', :id, '--ostype', 'MacOS_64']
       v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
       v.customize ['modifyvm', :id, '--nested-hw-virt', 'on']

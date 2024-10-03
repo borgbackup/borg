@@ -27,15 +27,30 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-MATCH-ARCHIVES" 1 "2024-09-26" "" "borg backup tool"
+.TH "BORG-MATCH-ARCHIVES" 1 "2024-10-03" "" "borg backup tool"
 .SH NAME
 borg-match-archives \- Details regarding match-archives
 .SH DESCRIPTION
 .sp
-The \fB\-\-match\-archives\fP option matches a given pattern against the list of all archive
-names in the repository.
+The \fB\-\-match\-archives\fP option matches a given pattern against the list of all archives
+in the repository. It can be given multiple times.
 .sp
-It uses pattern styles similar to the ones described by \fBborg help patterns\fP:
+The patterns can have a prefix of:
+.INDENT 0.0
+.IP \(bu 2
+name: pattern match on the archive name (default)
+.IP \(bu 2
+aid: prefix match on the archive id (only one result allowed)
+.IP \(bu 2
+user: exact match on the username who created the archive
+.IP \(bu 2
+host: exact match on the hostname where the archive was created
+.IP \(bu 2
+tags: match on the archive tags
+.UNINDENT
+.sp
+In case of a name pattern match,
+it uses pattern styles similar to the ones described by \fBborg help patterns\fP:
 .INDENT 0.0
 .TP
 .B Identical match pattern, selector \fBid:\fP (default)
@@ -55,16 +70,26 @@ Examples:
 .sp
 .nf
 .ft C
-# id: style
+# name match, id: style
 borg delete \-\-match\-archives \(aqid:archive\-with\-crap\(aq
 borg delete \-a \(aqid:archive\-with\-crap\(aq  # same, using short option
 borg delete \-a \(aqarchive\-with\-crap\(aq  # same, because \(aqid:\(aq is the default
 
-# sh: style
+# name match, sh: style
 borg delete \-a \(aqsh:home\-kenny\-*\(aq
 
-# re: style
+# name match, re: style
 borg delete \-a \(aqre:pc[123]\-home\-(user1|user2)\-2022\-09\-.*\(aq
+
+# archive id prefix match:
+borg delete \-a \(aqaid:d34db33f\(aq
+
+# host or user match
+borg delete \-a \(aquser:kenny\(aq
+borg delete \-a \(aqhost:kenny\-pc\(aq
+
+# tags match
+borg delete \-a \(aqtags:TAG1\(aq \-a \(aqtags:TAG2\(aq
 .ft P
 .fi
 .UNINDENT

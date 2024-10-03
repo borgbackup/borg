@@ -129,7 +129,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b11 (2024-09-26)
+Version 2.0.0b12 (2024-10-03)
 -----------------------------
 
 Please note:
@@ -138,6 +138,42 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- tag: new command to set, add, remove tags.
+- repo-list: add tags/hostname/username/comment to default format, reorder, adjust.
+
+  Idea: not putting these into the archive name, but keeping them separate.
+- repo-list --short: only print archive IDs (unique IDs, used for scripting).
+- implement --match-archives user:USERNAME host:HOSTNAME tags:TAG1,TAG2,...
+- allow -a / --match-archives multiple times (logical AND).
+
+  E.g.: borg delete -a home -a user:kenny -a host:kenny-pc
+- analyze: list changed chunks' sizes per directory.
+
+Fixes:
+
+- locking: also refresh the lock in other repo methods. avoid repo lock
+  getting stale when processing lots of unchanged files, #8442.
+- make sure the store gets closed in case of exceptions, #8413.
+- msgpack: increase max_buffer_size to ~4GiB, #8440.
+- Location.canonical_path: fix protocol and host display, #8446.
+
+Other changes:
+
+- give borgstore.Store a complete levels configuration, #8432.
+- add BORG_STORE_DATA_LEVELS=2 env var.
+- check: also display archive timestamp.
+- vagrant:
+
+  - use python 3.12.6 for binary builds.
+  - new testing box based on bento/ubuntu-24.04.
+  - install Rust on BSD.
+
+
+Version 2.0.0b11 (2024-09-26)
+-----------------------------
 
 New features:
 

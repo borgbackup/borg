@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2024-09-26" "" "borg backup tool"
+.TH "BORG" 1 "2024-10-03" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -244,7 +244,7 @@ For ssh and sftp URLs, the \fBuser@\fP and \fB:port\fP parts are optional.
 .sp
 \fBRemote repositories\fP accessed via rclone:
 .sp
-\fBrclone://remote:path\fP
+\fBrclone://remote:path\fP \- see the rclone docs for more details.
 .sp
 If you frequently need the same repo URL, it is a good idea to set the
 \fBBORG_REPO\fP environment variable to set a default for the repo URL:
@@ -713,7 +713,7 @@ and re\-write segment files to free space.
 .IP \(bu 2
 In future, easier to adapt to other kinds of storage:
 borgstore\(aqs backends are quite simple to implement.
-\fBsftp:\fP and \fBrclone:\fP backends already exists, others might be easy to add.
+\fBsftp:\fP and \fBrclone:\fP backends already exist, others might be easy to add.
 .IP \(bu 2
 Parallel repository access with less locking is easier to implement.
 .UNINDENT

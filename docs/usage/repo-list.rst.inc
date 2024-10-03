@@ -15,7 +15,7 @@ borg repo-list
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **optional arguments**                                                                                                                                                                                                                                                                                       |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--short``                                  | only print the archive names, nothing else                                                                                                                                      |
+    |                                                                             | ``--short``                                  | only print the archive IDs, nothing else                                                                                                                                        |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--format FORMAT``                          | specify format for archive listing (default: "{archive:<36} {time} [{id}]{NL}")                                                                                                 |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -27,9 +27,9 @@ borg repo-list
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                                                                                  |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archive names matching the pattern. see "borg help match-archives".                                                                                               |
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. see "borg help match-archives".                                                                                                   |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp                                                                       |
+    |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp                                                     |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--first N``                                | consider first N archives after other filters were applied                                                                                                                      |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -57,7 +57,7 @@ borg repo-list
 
 
     optional arguments
-        --short     only print the archive names, nothing else
+        --short     only print the archive IDs, nothing else
         --format FORMAT    specify format for archive listing (default: "{archive:<36} {time} [{id}]{NL}")
         --json      Format output as JSON. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
 
@@ -66,8 +66,8 @@ borg repo-list
         |
 
     Archive filters
-        -a PATTERN, --match-archives PATTERN     only consider archive names matching the pattern. see "borg help match-archives".
-        --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp
+        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. see "borg help match-archives".
+        --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
         --first N                                consider first N archives after other filters were applied
         --last N                                 consider last N archives after other filters were applied
         --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
@@ -121,6 +121,7 @@ Keys available only when listing archives in a repository:
 - name: alias of "archive"
 - comment: archive comment
 - id: internal ID of the archive
+- tags: archive tags
 
 - start: time (start) of creation of the archive
 - time: alias of "start"

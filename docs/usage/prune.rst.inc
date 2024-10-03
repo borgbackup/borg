@@ -53,7 +53,7 @@ borg prune
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
     | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                    |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archive names matching the pattern. see "borg help match-archives".                 |
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. see "borg help match-archives".                     |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m. |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
@@ -99,7 +99,7 @@ borg prune
         |
 
     Archive filters
-        -a PATTERN, --match-archives PATTERN     only consider archive names matching the pattern. see "borg help match-archives".
+        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. see "borg help match-archives".
         --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
         --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.
         --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g. 7d or 12m.

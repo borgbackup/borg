@@ -264,10 +264,19 @@ borg help match-archives
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-The ``--match-archives`` option matches a given pattern against the list of all archive
-names in the repository.
+The ``--match-archives`` option matches a given pattern against the list of all archives
+in the repository. It can be given multiple times.
 
-It uses pattern styles similar to the ones described by ``borg help patterns``:
+The patterns can have a prefix of:
+
+- name: pattern match on the archive name (default)
+- aid: prefix match on the archive id (only one result allowed)
+- user: exact match on the username who created the archive
+- host: exact match on the hostname where the archive was created
+- tags: match on the archive tags
+
+In case of a name pattern match,
+it uses pattern styles similar to the ones described by ``borg help patterns``:
 
 Identical match pattern, selector ``id:`` (default)
     Simple string match, must fully match exactly as given.
@@ -281,16 +290,26 @@ Shell-style patterns, selector ``sh:``
 
 Examples::
 
-    # id: style
+    # name match, id: style
     borg delete --match-archives 'id:archive-with-crap'
     borg delete -a 'id:archive-with-crap'  # same, using short option
     borg delete -a 'archive-with-crap'  # same, because 'id:' is the default
 
-    # sh: style
+    # name match, sh: style
     borg delete -a 'sh:home-kenny-*'
 
-    # re: style
+    # name match, re: style
     borg delete -a 're:pc[123]-home-(user1|user2)-2022-09-.*'
+
+    # archive id prefix match:
+    borg delete -a 'aid:d34db33f'
+
+    # host or user match
+    borg delete -a 'user:kenny'
+    borg delete -a 'host:kenny-pc'
+
+    # tags match
+    borg delete -a 'tags:TAG1' -a 'tags:TAG2'
 
 .. _borg_placeholders:
 

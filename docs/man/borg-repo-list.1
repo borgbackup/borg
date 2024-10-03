@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-LIST" 1 "2024-09-26" "" "borg backup tool"
+.TH "BORG-REPO-LIST" 1 "2024-10-03" "" "borg backup tool"
 .SH NAME
 borg-repo-list \- List the archives contained in a repository
 .SH SYNOPSIS
@@ -43,7 +43,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .INDENT 0.0
 .TP
 .B  \-\-short
-only print the archive names, nothing else
+only print the archive IDs, nothing else
 .TP
 .BI \-\-format \ FORMAT
 specify format for archive listing (default: \(dq{archive:<36} {time} [{id}]{NL}\(dq)
@@ -55,10 +55,10 @@ Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archive names matching the pattern. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
-Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp
+Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
 consider first N archives after other filters were applied
@@ -85,10 +85,12 @@ consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
 .nf
 .ft C
 $ borg repo\-list
-Monday                               Mon, 2016\-02\-15 19:15:11
-repo                                 Mon, 2016\-02\-15 19:26:54
-root\-2016\-02\-15                      Mon, 2016\-02\-15 19:36:29
-newname                              Mon, 2016\-02\-15 19:50:19
+151b1a57  Mon, 2024\-09\-23 22:57:11 +0200  docs             tw          MacBook\-Pro  this is a comment
+3387a079  Thu, 2024\-09\-26 09:07:07 +0200  scripts          tw          MacBook\-Pro
+ca774425  Thu, 2024\-09\-26 10:05:23 +0200  scripts          tw          MacBook\-Pro
+ba56c4a5  Thu, 2024\-09\-26 10:12:45 +0200  src              tw          MacBook\-Pro
+7567b79a  Thu, 2024\-09\-26 10:15:07 +0200  scripts          tw          MacBook\-Pro
+21ab3600  Thu, 2024\-09\-26 10:15:17 +0200  docs             tw          MacBook\-Pro
 \&...
 .ft P
 .fi
@@ -149,6 +151,8 @@ name: alias of \(dqarchive\(dq
 comment: archive comment
 .IP \(bu 2
 id: internal ID of the archive
+.IP \(bu 2
+tags: archive tags
 .IP \(bu 2
 start: time (start) of creation of the archive
 .IP \(bu 2

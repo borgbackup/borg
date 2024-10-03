@@ -686,6 +686,7 @@ def text_validator(*, name, max_length, min_length=0, invalid_ctrl_chars="\0", i
 
 
 comment_validator = text_validator(name="comment", max_length=10000)
+tag_validator = text_validator(name="tag", min_length=0, max_length=10, invalid_chars=" ,$")
 
 
 def archivename_validator(text):
@@ -771,6 +772,7 @@ class ArchiveFormatter(BaseFormatter):
         "archive": "archive name",
         "name": 'alias of "archive"',
         "comment": "archive comment",
+        "tags": "archive tags",
         # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
         "start": "time (start) of creation of the archive",
         "time": 'alias of "start"',
@@ -783,7 +785,7 @@ class ArchiveFormatter(BaseFormatter):
         "nfiles": "count of files in this archive",
     }
     KEY_GROUPS = (
-        ("archive", "name", "comment", "id"),
+        ("archive", "name", "comment", "id", "tags"),
         ("start", "time", "end", "command_line"),
         ("hostname", "username"),
         ("size", "nfiles"),
@@ -809,6 +811,7 @@ class ArchiveFormatter(BaseFormatter):
             "size": partial(self.get_meta, "size", 0),
             "nfiles": partial(self.get_meta, "nfiles", 0),
             "end": self.get_ts_end,
+            "tags": self.get_tags,
         }
         self.used_call_keys = set(self.call_keys) & self.format_keys
 
@@ -853,6 +856,9 @@ class ArchiveFormatter(BaseFormatter):
 
     def format_time(self, ts):
         return OutputTimestamp(ts)
+
+    def get_tags(self):
+        return ",".join(sorted(self.archive.tags))
 
 
 class ItemFormatter(BaseFormatter):

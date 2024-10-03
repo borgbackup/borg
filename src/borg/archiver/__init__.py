@@ -89,6 +89,7 @@ from .repo_delete_cmd import RepoDeleteMixIn
 from .repo_list_cmd import RepoListMixIn
 from .repo_space_cmd import RepoSpaceMixIn
 from .serve_cmd import ServeMixIn
+from .tag_cmd import TagMixIn
 from .tar_cmds import TarMixIn
 from .transfer_cmd import TransferMixIn
 from .version_cmd import VersionMixIn
@@ -120,6 +121,7 @@ class Archiver(
     RepoListMixIn,
     RepoSpaceMixIn,
     ServeMixIn,
+    TagMixIn,
     TarMixIn,
     TransferMixIn,
     VersionMixIn,
@@ -359,6 +361,7 @@ class Archiver(
         self.build_parser_rename(subparsers, common_parser, mid_common_parser)
         self.build_parser_repo_space(subparsers, common_parser, mid_common_parser)
         self.build_parser_serve(subparsers, common_parser, mid_common_parser)
+        self.build_parser_tag(subparsers, common_parser, mid_common_parser)
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)
         self.build_parser_version(subparsers, common_parser, mid_common_parser)

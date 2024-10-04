@@ -19,21 +19,23 @@ def io_logger():
 
 def test_setup_logging(io_logger):
     logger.info("hello world")
-    assert io_logger.getvalue() == "borg.testsuite.logger: hello world\n"
+    assert io_logger.getvalue() == "borg.testsuite.logger_test: hello world\n"
 
 
 def test_multiple_loggers(io_logger):
     logger = logging.getLogger(__name__)
     logger.info("hello world 1")
-    assert io_logger.getvalue() == "borg.testsuite.logger: hello world 1\n"
-    logger = logging.getLogger("borg.testsuite.logger")
+    assert io_logger.getvalue() == "borg.testsuite.logger_test: hello world 1\n"
+    logger = logging.getLogger("borg.testsuite.logger_test")
     logger.info("hello world 2")
-    assert io_logger.getvalue() == "borg.testsuite.logger: hello world 1\nborg.testsuite.logger: hello world 2\n"
+    assert (
+        io_logger.getvalue() == "borg.testsuite.logger_test: hello world 1\nborg.testsuite.logger_test: hello world 2\n"
+    )
     io_logger.truncate(0)
     io_logger.seek(0)
-    logger = logging.getLogger("borg.testsuite.logger")
+    logger = logging.getLogger("borg.testsuite.logger_test")
     logger.info("hello world 2")
-    assert io_logger.getvalue() == "borg.testsuite.logger: hello world 2\n"
+    assert io_logger.getvalue() == "borg.testsuite.logger_test: hello world 2\n"
 
 
 def test_parent_module():

@@ -12,9 +12,9 @@ from ..repository import Repository
 from ..crypto.key import PlaintextKey
 from ..helpers import IntegrityError
 from ..repoobj import RepoObj
-from .hashindex import H
-from .repository import fchunk, pdchunk
-from .key import TestKey
+from .hashindex_test import H
+from .repository_test import fchunk, pdchunk
+from .key_test import TestKey
 
 
 class TestSleepingBandwidthLimiter:

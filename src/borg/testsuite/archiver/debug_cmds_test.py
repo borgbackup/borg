@@ -4,7 +4,7 @@ import pstats
 
 from ...constants import *  # NOQA
 from .. import changedir
-from ..compress import Compressor
+from ..compress_test import Compressor
 from . import cmd, create_test_files, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA

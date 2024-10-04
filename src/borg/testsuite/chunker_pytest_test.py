@@ -4,7 +4,7 @@ import tempfile
 
 import pytest
 
-from .chunker import cf
+from .chunker_test import cf
 from ..chunker import Chunker, ChunkerFixed, sparsemap, has_seek_hole, ChunkerFailing
 from ..constants import *  # NOQA
 

@@ -12,7 +12,7 @@ from ..platformflags import is_win32
 from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed
 from ..repository import Repository, MAX_DATA_SIZE
 from ..repoobj import RepoObj
-from .hashindex import H
+from .hashindex_test import H
 
 
 @pytest.fixture()

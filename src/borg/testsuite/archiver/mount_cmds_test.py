@@ -12,7 +12,7 @@ from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, llfuse
 from .. import changedir, no_selinux, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
-from ..platform import fakeroot_detected
+from ..platform_test import fakeroot_detected
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
 

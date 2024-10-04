@@ -11,7 +11,7 @@ import os
 import pytest
 
 from .archiver import changedir, cmd_fixture  # NOQA
-from .item import Item
+from .item_test import Item
 from ..constants import zeros
 
 

@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from .chunker import cf
+from .chunker_test import cf
 from ..chunker import Chunker
 from ..crypto.low_level import blake2b_256
 from ..constants import *  # NOQA

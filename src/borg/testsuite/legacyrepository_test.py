@@ -17,7 +17,7 @@ from ..legacyremote import LegacyRemoteRepository, InvalidRPCMethod, PathNotAllo
 from ..legacyrepository import LegacyRepository, LoggedIO
 from ..legacyrepository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
 from ..repoobj import RepoObj
-from .hashindex import H
+from .hashindex_test import H
 
 
 @pytest.fixture()

@@ -21,9 +21,9 @@ import sys
 import time
 from unittest import TestResult, TestSuite, defaultTestLoader
 
-from .testsuite.hashindex import HashIndexDataTestCase, HashIndexRefcountingTestCase, HashIndexTestCase
-from .testsuite.crypto import CryptoTestCase
-from .testsuite.chunker import ChunkerTestCase
+from .testsuite.hashindex_test import HashIndexDataTestCase, HashIndexRefcountingTestCase, HashIndexTestCase
+from .testsuite.crypto_test import CryptoTestCase
+from .testsuite.chunker_test import ChunkerTestCase
 
 SELFTEST_CASES = [
     HashIndexDataTestCase,

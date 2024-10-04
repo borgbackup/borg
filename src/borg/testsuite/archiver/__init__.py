@@ -29,7 +29,7 @@ from ...repository import Repository
 from .. import has_lchflags, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, no_selinux
 from .. import changedir
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
-from ..platform import is_win32
+from ..platform_test import is_win32
 from ...xattr import get_all
 
 RK_ENCRYPTION = "--encryption=repokey-aes-ocb"

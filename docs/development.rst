@@ -323,20 +323,8 @@ github releases page)::
     pip install borgbackup
     pip install pytest pytest-benchmark
 
-    # method A: use a pytest.ini
-
-    cat >pytest.ini <<<EOF
-    [pytest]
-    python_files = testsuite/*.py
-    markers = allow_cache_wipe
-    addopts = -rs --benchmark-skip
-    EOF
-
-    pytest --pyargs borg.testsuite
-
-    # method B: give the options via the cmdline (each time you invoke the tests):
-
-    pytest -rs --benchmark-skip -o 'python_files=testsuite/*.py' -o 'markers=allow_cache_wipe' --pyargs borg.testsuite
+    # run the tests
+    pytest -v -rs --benchmark-skip --pyargs borg.testsuite
 
 
 Adding a compression algorithm

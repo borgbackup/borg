@@ -10,7 +10,7 @@ from ...helpers import bin_to_hex, msgpack
 from ...manifest import Manifest
 from ...remote import RemoteRepository
 from ...repository import Repository
-from ..repository import fchunk
+from ..repository_test import fchunk
 from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA

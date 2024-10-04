@@ -8,7 +8,7 @@ from ..platformflags import is_darwin, is_freebsd, is_linux, is_win32
 from ..platform import acl_get, acl_set
 from ..platform import get_process_id, process_alive
 from . import unopened_tempfile
-from .fslocking import free_pid  # NOQA
+from .fslocking_test import free_pid  # NOQA
 
 
 def fakeroot_detected():

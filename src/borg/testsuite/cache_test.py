@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-from .hashindex import H
-from .key import TestKey
+from .hashindex_test import H
+from .key_test import TestKey
 from ..archive import Statistics
 from ..cache import AdHocWithFilesCache
 from ..crypto.key import AESOCBRepoKey

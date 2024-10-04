@@ -2,7 +2,7 @@ import os
 import tempfile
 
 from ..platform import acl_get, acl_set
-from .platform import skipif_not_freebsd, skipif_acls_not_working
+from .platform_test import skipif_not_freebsd, skipif_acls_not_working
 
 # set module-level skips
 pytestmark = [skipif_not_freebsd]

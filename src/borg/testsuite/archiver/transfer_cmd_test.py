@@ -7,7 +7,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...helpers.time import parse_timestamp
-from ..platform import is_win32
+from ..platform_test import is_win32
 from . import cmd, create_test_files, RK_ENCRYPTION, open_archive, generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA

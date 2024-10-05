@@ -201,6 +201,24 @@ def test_fuse_versions_view(archivers, request):
 
 
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")
+def test_fuse_duplicate_name(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "duplicate", "input")
+    cmd(archiver, "create", "duplicate", "input")
+    cmd(archiver, "create", "unique1", "input")
+    cmd(archiver, "create", "unique2", "input")
+    mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
+    # mount the whole repository, archives show up as toplevel directories:
+    with fuse_mount(archiver, mountpoint):
+        path = os.path.join(mountpoint)
+        dirs = os.listdir(path)
+        assert len(set(dirs)) == 4  # there must be 4 unique dir names for 4 archives
+        assert "unique1" in dirs  # if an archive has a unique name, do not append the archive id
+        assert "unique2" in dirs
+
+
+@pytest.mark.skipif(not llfuse, reason="llfuse not installed")
 def test_fuse_allow_damaged_files(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

@@ -7,7 +7,7 @@ import struct
 import sys
 import tempfile
 import time
-from collections import defaultdict
+from collections import defaultdict, Counter
 from signal import SIGINT
 
 from .constants import ROBJ_FILE_STREAM
@@ -277,14 +277,19 @@ class FuseBackend:
     def _create_filesystem(self):
         self._create_dir(parent=1)  # first call, create root dir (inode == 1)
         self.versions_index = FuseVersionsIndex()
-        for archive in self._manifest.archives.list_considering(self._args):
+        archives = self._manifest.archives.list_considering(self._args)
+        name_counter = Counter(a.name for a in archives)
+        duplicate_names = {a.name for a in archives if name_counter[a.name] > 1}
+        for archive in archives:
             if self.versions:
                 # process archives immediately
                 self._process_archive(archive.id)
             else:
                 # lazily load archives, create archive placeholder inode
                 archive_inode = self._create_dir(parent=1, mtime=int(archive.ts.timestamp() * 1e9))
-                name = f"{archive.name}-{bin_to_hex(archive.id):.8}"  # archive names may be duplicate!
+                name = f"{archive.name}"
+                if name in duplicate_names:
+                    name += f"-{bin_to_hex(archive.id):.8}"
                 self.contents[1][os.fsencode(name)] = archive_inode
                 self.pending_archives[archive_inode] = archive
 

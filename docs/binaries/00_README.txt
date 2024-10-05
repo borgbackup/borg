@@ -57,6 +57,8 @@ Installing
 ----------
 
 It is suggested that you rename or symlink the binary to just "borg".
+If you need "borgfs", just also symlink it to the same binary, it will
+detect internally under which name it was invoked.
 
 On UNIX-like platforms, /usr/local/bin/ or ~/bin/ is a nice place for it,
 but you can invoke it from every place by giving a full path to it.

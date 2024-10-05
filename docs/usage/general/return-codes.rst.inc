@@ -18,3 +18,5 @@ Return code Meaning
 
 If you use ``--show-rc``, the return code is also logged at the indicated
 level as the last log entry.
+
+The modern exit codes (return codes, "rc") are documented there: :ref:`msgid`

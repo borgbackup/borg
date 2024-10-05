@@ -27,7 +27,9 @@ borg-freebsd13      FreeBSD (built on FreeBSD 13)
 borg-freebsd14      FreeBSD (built on FreeBSD 14)
 
 *.tgz               similar to above, but built as a directory with files,
-                    not as a single self-extracting binary.
+                    not as a single self-extracting binary. using the directory
+                    build is faster and doesn't need as much space in the temp
+                    directory as the one-file build.
 *.asc               GnuPG signatures for *
 
 

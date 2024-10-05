@@ -39,7 +39,7 @@ from .crypto.low_level import blake2b_128
 from .archiver._common import build_matcher, build_filter
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
-from .helpers import daemonize, daemonizing, signal_handler, format_file_size
+from .helpers import daemonize, daemonizing, signal_handler, format_file_size, bin_to_hex
 from .helpers import HardLinkManager
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
@@ -284,7 +284,8 @@ class FuseBackend:
             else:
                 # lazily load archives, create archive placeholder inode
                 archive_inode = self._create_dir(parent=1, mtime=int(archive.ts.timestamp() * 1e9))
-                self.contents[1][os.fsencode(archive.name)] = archive_inode
+                name = f"{archive.name}-{bin_to_hex(archive.id):.8}"  # archive names may be duplicate!
+                self.contents[1][os.fsencode(name)] = archive_inode
                 self.pending_archives[archive_inode] = archive
 
     def get_item(self, inode):

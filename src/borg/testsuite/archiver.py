@@ -4536,6 +4536,8 @@ class ArchiverCorruptionTestCase(ArchiverTestCaseBase):
 
 
 class DiffArchiverTestCase(ArchiverTestCaseBase):
+    requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason='hardlinks not supported')
+
     def test_basic_functionality(self):
         # Setup files for the first snapshot
         self.create_regular_file('empty', size=0)
@@ -4836,6 +4838,26 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             self.assert_in("ctime", output)
         else:
             self.assert_not_in("ctime", output)
+
+
+    @requires_hardlinks
+    def test_multiple_link_exclusion(self):
+        path_a = os.path.join(self.input_path, 'a')
+        path_b = os.path.join(self.input_path, 'b')
+        os.mkdir(path_a)
+        os.mkdir(path_b)
+        hl_a = os.path.join(path_a, 'hardlink')
+        hl_b = os.path.join(path_b, 'hardlink')
+        self.create_regular_file(hl_a, contents=b'123456')
+        os.link(hl_a, hl_b)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.cmd('create', self.repository_location + '::test0', 'input')
+        os.unlink(hl_a)  # Don't duplicate warning message- one is enough.
+        self.cmd('create', self.repository_location + '::test1', 'input')
+
+        output = self.cmd('diff', '--pattern=+ fm:input/b', '--pattern=! **/', self.repository_location + '::test0', 'test1', exit_code=EXIT_WARNING)
+        lines = output.splitlines()
+        self.assert_line_exists(lines, 'cannot find hardlink source for.*skipping compare.')
 
 
 def test_get_args():

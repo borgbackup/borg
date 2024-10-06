@@ -30,15 +30,62 @@ def prune_within(archives, hours, kept_because):
     return result
 
 
+def default_period_func(pattern):
+    def inner(a):
+        # compute in local timezone
+        return a.ts.astimezone().strftime(pattern)
+
+    return inner
+
+
+def quarterly_13weekly_period_func(a):
+    (year, week, _) = a.ts.astimezone().isocalendar()  # local time
+    if week <= 13:
+        # Weeks containing Jan 4th to Mar 28th (leap year) or 29th- 91 (13*7)
+        # days later.
+        return (year, 1)
+    elif 14 <= week <= 26:
+        # Weeks containing Apr 4th (leap year) or 5th to Jun 27th or 28th- 91
+        # days later.
+        return (year, 2)
+    elif 27 <= week <= 39:
+        # Weeks containing Jul 4th (leap year) or 5th to Sep 26th or 27th-
+        # at least 91 days later.
+        return (year, 3)
+    else:
+        # Everything else, Oct 3rd (leap year) or 4th onward, will always
+        # include week of Dec 26th (leap year) or Dec 27th, may also include
+        # up to possibly Jan 3rd of next year.
+        return (year, 4)
+
+
+def quarterly_3monthly_period_func(a):
+    lt = a.ts.astimezone()  # local time
+    if lt.month <= 3:
+        # 1-1 to 3-31
+        return (lt.year, 1)
+    elif 4 <= lt.month <= 6:
+        # 4-1 to 6-30
+        return (lt.year, 2)
+    elif 7 <= lt.month <= 9:
+        # 7-1 to 9-30
+        return (lt.year, 3)
+    else:
+        # 10-1 to 12-31
+        return (lt.year, 4)
+
+
 PRUNING_PATTERNS = OrderedDict(
     [
-        ("secondly", "%Y-%m-%d %H:%M:%S"),
-        ("minutely", "%Y-%m-%d %H:%M"),
-        ("hourly", "%Y-%m-%d %H"),
-        ("daily", "%Y-%m-%d"),
-        ("weekly", "%G-%V"),
-        ("monthly", "%Y-%m"),
-        ("yearly", "%Y"),
+        ("secondly", default_period_func("%Y-%m-%d %H:%M:%S")),
+        ("minutely", default_period_func("%Y-%m-%d %H:%M")),
+        ("hourly", default_period_func("%Y-%m-%d %H")),
+        ("daily", default_period_func("%Y-%m-%d")),
+        ("weekly", default_period_func("%G-%V")),
+        ("monthly", default_period_func("%Y-%m")),
+        ("quarterly_13weekly", quarterly_13weekly_period_func),
+        ("quarterly_3monthly", quarterly_3monthly_period_func),
+        ("yearly", default_period_func("%Y")),
     ]
 )
 
@@ -46,7 +93,7 @@ PRUNING_PATTERNS = OrderedDict(
 def prune_split(archives, rule, n, kept_because=None):
     last = None
     keep = []
-    pattern = PRUNING_PATTERNS[rule]
+    period_func = PRUNING_PATTERNS[rule]
     if kept_because is None:
         kept_because = {}
     if n == 0:
@@ -54,8 +101,7 @@ def prune_split(archives, rule, n, kept_because=None):
 
     a = None
     for a in sorted(archives, key=attrgetter("ts"), reverse=True):
-        # we compute the pruning in local time zone
-        period = a.ts.astimezone().strftime(pattern)
+        period = period_func(a)
         if period != last:
             last = period
             if a.id not in kept_because:
@@ -75,12 +121,24 @@ class PruneMixIn:
     def do_prune(self, args, repository, manifest):
         """Prune repository archives according to specified rules"""
         if not any(
-            (args.secondly, args.minutely, args.hourly, args.daily, args.weekly, args.monthly, args.yearly, args.within)
+            (
+                args.secondly,
+                args.minutely,
+                args.hourly,
+                args.daily,
+                args.weekly,
+                args.monthly,
+                args.quarterly_13weekly,
+                args.quarterly_3monthly,
+                args.yearly,
+                args.within,
+            )
         ):
             raise CommandError(
                 'At least one of the "keep-within", "keep-last", '
                 '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
-                '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.'
+                '"keep-weekly", "keep-monthly", "keep-13weekly", "keep-3monthly", '
+                'or "keep-yearly" settings must be specified.'
             )
 
         if args.format is not None:
@@ -190,10 +248,15 @@ class PruneMixIn:
         starts is used for pruning purposes. Dates and times are interpreted in the local
         timezone of the system where borg prune runs, and weeks go from Monday to Sunday.
         Specifying a negative number of archives to keep means that there is no limit.
-        As of borg 1.2.0, borg will retain the oldest archive if any of the secondly,
-        minutely, hourly, daily, weekly, monthly, or yearly rules was not otherwise able to
-        meet its retention target. This enables the first chronological archive to continue
-        aging until it is replaced by a newer archive that meets the retention criteria.
+
+        Borg will retain the oldest archive if any of the secondly, minutely, hourly,
+        daily, weekly, monthly, quarterly, or yearly rules was not otherwise able to
+        meet its retention target. This enables the first chronological archive to
+        continue aging until it is replaced by a newer archive that meets the retention
+        criteria.
+
+        The ``--keep-13weekly`` and ``--keep-3monthly`` rules are two different
+        strategies for keeping archives every quarter year.
 
         The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
         keep the last N archives under the assumption that you do not create more than one
@@ -292,6 +355,21 @@ class PruneMixIn:
             default=0,
             action=Highlander,
             help="number of monthly archives to keep",
+        )
+        quarterly_group = subparser.add_mutually_exclusive_group()
+        quarterly_group.add_argument(
+            "--keep-13weekly",
+            dest="quarterly_13weekly",
+            type=int,
+            default=0,
+            help="number of quarterly archives to keep (13 week strategy)",
+        )
+        quarterly_group.add_argument(
+            "--keep-3monthly",
+            dest="quarterly_3monthly",
+            type=int,
+            default=0,
+            help="number of quarterly archives to keep (3 month strategy)",
         )
         subparser.add_argument(
             "-y",

@@ -358,6 +358,12 @@ def assert_line_exists(lines, expected_regexpr):
     assert any(re.search(expected_regexpr, line) for line in lines), f"no match for {expected_regexpr} in {lines}"
 
 
+def assert_line_not_exists(lines, expected_regexpr):
+    assert not any(
+        re.search(expected_regexpr, line) for line in lines
+    ), f"unexpected match for {expected_regexpr} in {lines}"
+
+
 def _assert_dirs_equal_cmp(diff, ignore_flags=False, ignore_xattrs=False, ignore_ns=False):
     assert diff.left_only == []
     assert diff.right_only == []

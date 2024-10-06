@@ -18,6 +18,46 @@ class DiffMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_diff(self, args, repository, manifest):
         """Diff contents of two archives"""
+
+        def actual_change(j):
+            j = j.to_dict()
+            if j["type"] == "modified":
+                # Added/removed keys will not exist if chunker params differ
+                # between the two archives. Err on the side of caution and assume
+                # a real modification in this case (short-circuiting retrieving
+                # non-existent keys).
+                return not {"added", "removed"} <= j.keys() or not (j["added"] == 0 and j["removed"] == 0)
+            else:
+                # All other change types are indeed changes.
+                return True
+
+        def print_json_output(diff):
+            print(
+                json.dumps(
+                    {
+                        "path": diff.path,
+                        "changes": [
+                            change.to_dict()
+                            for name, change in diff.changes().items()
+                            if actual_change(change) and (not args.content_only or (name not in DiffFormatter.METADATA))
+                        ],
+                    },
+                    sort_keys=True,
+                    cls=BorgJsonEncoder,
+                )
+            )
+
+        def print_text_output(diff, formatter):
+            actual_changes = dict(
+                (name, change)
+                for name, change in diff.changes().items()
+                if actual_change(change) and (not args.content_only or (name not in DiffFormatter.METADATA))
+            )
+            diff._changes = actual_changes
+            res: str = formatter.format_item(diff)
+            if res.strip():
+                sys.stdout.write(res)
+
         if args.format is not None:
             format = args.format
         elif args.content_only:
@@ -56,24 +96,9 @@ class DiffMixIn:
         formatter = DiffFormatter(format, args.content_only)
         for diff in diffs:
             if args.json_lines:
-                print(
-                    json.dumps(
-                        {
-                            "path": diff.path,
-                            "changes": [
-                                change.to_dict()
-                                for name, change in diff.changes().items()
-                                if not args.content_only or (name not in DiffFormatter.METADATA)
-                            ],
-                        },
-                        sort_keys=True,
-                        cls=BorgJsonEncoder,
-                    )
-                )
+                print_json_output(diff)
             else:
-                res: str = formatter.format_item(diff)
-                if res.strip():
-                    sys.stdout.write(res)
+                print_text_output(diff, formatter)
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))

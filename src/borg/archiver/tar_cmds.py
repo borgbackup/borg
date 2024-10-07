@@ -396,7 +396,7 @@ class TarMixIn:
             "--tar-format",
             metavar="FMT",
             dest="tar_format",
-            default="GNU",
+            default="PAX",
             choices=("BORG", "PAX", "GNU"),
             action=Highlander,
             help="select tar format: BORG, PAX or GNU",

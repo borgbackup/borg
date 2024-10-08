@@ -8,6 +8,7 @@ from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNot
 
 from .checksums import xxh64
 from .constants import *  # NOQA
+from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
@@ -306,6 +307,12 @@ class Repository:
         t_start = time.monotonic()
         t_last_checkpoint = t_start
         objs_checked = objs_errors = 0
+        chunks = ChunkIndex()
+        # we don't do refcounting anymore, neither we can know here whether any archive
+        # is using this object, but we assume that this is the case and set refcount to
+        # MAX_VALUE. As we don't do garbage collection here, this is not a problem.
+        # We also don't know the plaintext size, so we set it to 0.
+        init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
         infos = self.store.list("data")
         try:
             for info in infos:
@@ -338,6 +345,12 @@ class Repository:
                                 self.store.delete(key)
                             else:
                                 log_error("reloading did help, inconsistent behaviour detected!")
+                if not (obj_corrupted and repair):
+                    # add all existing objects to the index.
+                    # borg check: the index may have corrupted objects (we did not delete them)
+                    # borg check --repair: the index will only have non-corrupted objects.
+                    id = hex_to_bin(info.name)
+                    chunks[id] = init_entry
                 now = time.monotonic()
                 if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
                     t_last_checkpoint = now
@@ -353,6 +366,11 @@ class Repository:
                     self.store.delete("config/last-key-checked")
                 except StoreObjectNotFound:
                     pass
+                if not partial:
+                    # if we did a full pass in one go, we built a complete, uptodate ChunkIndex, cache it!
+                    from .cache import write_chunkindex_to_repo_cache
+
+                    write_chunkindex_to_repo_cache(self, chunks, compact=True, clear=True, force_write=True)
         except StoreObjectNotFound:
             # it can be that there is no "data/" at all, then it crashes when iterating infos.
             pass

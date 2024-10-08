@@ -121,6 +121,9 @@ TIME_DIFFERS1_NS = 20000000
 # similar to above, but for bigger granularity / clock differences
 TIME_DIFFERS2_NS = 3000000000
 
+# tar related
+SCHILY_XATTR = "SCHILY.xattr."  # xattr key prefix in tar PAX headers
+
 # return codes returned by borg command
 EXIT_SUCCESS = 0  # everything done, no problems
 EXIT_WARNING = 1  # reached normal end of operation, but there were issues (generic warning)

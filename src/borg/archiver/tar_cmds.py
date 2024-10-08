@@ -211,6 +211,13 @@ class TarMixIn:
                 if hasattr(item, name):
                     ns = getattr(item, name)
                     ph[name] = str(ns / 1e9)
+            if hasattr(item, "xattrs"):
+                for bkey, bvalue in item.xattrs.items():
+                    # we have bytes key and bytes value, but the tarfile code
+                    # expects str key and str value.
+                    key = SCHILY_XATTR + bkey.decode("utf-8", errors="surrogateescape")
+                    value = bvalue.decode("utf-8", errors="surrogateescape")
+                    ph[key] = value
             if format == "BORG":  # BORG format additions
                 ph["BORG.item.version"] = "1"
                 # BORG.item.meta - just serialize all metadata we have:
@@ -355,6 +362,7 @@ class TarMixIn:
         | BORG         | BORG specific, like PAX   | all as supported by borg   |
         +--------------+---------------------------+----------------------------+
         | PAX          | POSIX.1-2001 (pax) format | GNU + atime/ctime/mtime ns |
+        |              |                           | + xattrs                   |
         +--------------+---------------------------+----------------------------+
         | GNU          | GNU tar format            | mtime s, no atime/ctime,   |
         |              |                           | no ACLs/xattrs/bsdflags    |

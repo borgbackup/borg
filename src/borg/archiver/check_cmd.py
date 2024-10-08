@@ -41,6 +41,7 @@ class CheckMixIn:
             raise CommandError("--undelete-archives requires --repair argument.")
         if args.max_duration and not args.repo_only:
             # when doing a partial repo check, we can only check xxh64 hashes in repository files.
+            # archives check requires that a full repo check was done before and has built/cached a ChunkIndex.
             # also, there is no max_duration support in the archives check code anyway.
             raise CommandError("--repository-only is required for --max-duration support.")
         if not args.archives_only:

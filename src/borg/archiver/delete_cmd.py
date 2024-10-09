@@ -22,6 +22,7 @@ class DeleteMixIn:
             archive_infos = [manifest.archives.get_one([args.name])]
         else:
             archive_infos = manifest.archives.list_considering(args)
+        archive_infos = [ai for ai in archive_infos if "@PROT" not in ai.tags]
         count = len(archive_infos)
         if count == 0:
             return

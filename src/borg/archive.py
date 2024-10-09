@@ -1660,7 +1660,9 @@ class ArchiveChecker:
         self.check_all = not any((first, last, match, older, newer, oldest, newest))
         self.repair = repair
         self.repository = repository
-        self.chunks = build_chunkindex_from_repo(self.repository, disable_caches=True, cache_immediately=not repair)
+        # Repository.check already did a full repository-level check and has built and cached a fresh chunkindex -
+        # we can use that here, so we don't disable the caches (also no need to cache immediately, again):
+        self.chunks = build_chunkindex_from_repo(self.repository, disable_caches=False, cache_immediately=False)
         self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)
         if verify_data:

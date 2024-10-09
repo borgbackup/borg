@@ -1487,6 +1487,17 @@ class TarfileObjectProcessors:
                     if name in ph:
                         ns = s_to_ns(ph[name])
                         setattr(item, name, ns)
+                xattrs = StableDict()
+                for key, value in ph.items():
+                    if key.startswith(SCHILY_XATTR):
+                        key = key.removeprefix(SCHILY_XATTR)
+                        # the tarfile code gives us str keys and str values,
+                        # but we need bytes keys and bytes values.
+                        bkey = key.encode("utf-8", errors="surrogateescape")
+                        bvalue = value.encode("utf-8", errors="surrogateescape")
+                        xattrs[bkey] = bvalue
+                if xattrs:
+                    item.xattrs = xattrs
         yield item, status
         # if we get here, "with"-block worked ok without error/exception, the item was processed ok...
         self.add_item(item, stats=self.stats)

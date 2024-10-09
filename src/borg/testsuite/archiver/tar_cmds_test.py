@@ -4,9 +4,11 @@ import subprocess
 
 import pytest
 
+from ... import xattr
 from ...constants import *  # NOQA
 from .. import changedir
-from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, create_test_files, requires_hardlinks, RK_ENCRYPTION
+from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, requires_hardlinks, RK_ENCRYPTION
+from . import create_test_files, create_regular_file
 from . import generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -219,3 +221,22 @@ def test_roundtrip_pax_borg(archivers, request):
     with changedir(archiver.output_path):
         cmd(archiver, "extract", "dst")
     assert_dirs_equal("input", "output/input")
+
+
+def test_roundtrip_pax_xattrs(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    if not xattr.is_enabled(archiver.input_path):
+        pytest.skip("xattrs not supported")
+    create_regular_file(archiver.input_path, "file")
+    original_path = os.path.join(archiver.input_path, "file")
+    xa_key, xa_value = b"user.xattrtest", b"not valid utf-8: \xff"
+    xattr.setxattr(original_path.encode(), xa_key, xa_value)
+    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "create", "src", "input")
+    cmd(archiver, "export-tar", "src", "xattrs.tar", "--tar-format=PAX")
+    cmd(archiver, "import-tar", "dst", "xattrs.tar")
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "dst")
+        extracted_path = os.path.abspath("input/file")
+        xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
+    assert xa_value_extracted == xa_value

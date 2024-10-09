@@ -37,8 +37,9 @@ class RecreateMixIn:
             dry_run=args.dry_run,
             timestamp=args.timestamp,
         )
-
-        for archive_info in manifest.archives.list_considering(args):
+        archive_infos = manifest.archives.list_considering(args)
+        archive_infos = [ai for ai in archive_infos if "@PROT" not in ai.tags]
+        for archive_info in archive_infos:
             if recreater.is_temporary_archive(archive_info.name):
                 continue
             name, hex_id = archive_info.name, bin_to_hex(archive_info.id)

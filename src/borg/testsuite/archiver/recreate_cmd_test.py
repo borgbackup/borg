@@ -274,3 +274,18 @@ def test_comment(archivers, request):
     assert "Comment: modified comment" in cmd(archiver, "info", "-a", "test2")
     assert "Comment: " + os.linesep in cmd(archiver, "info", "-a", "test3")
     assert "Comment: preserved comment" in cmd(archiver, "info", "-a", "test4")
+
+
+def test_recreate_ignore_protected(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    create_regular_file(archiver.input_path, "file2", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive", "input")
+    cmd(archiver, "tag", "--add=@PROT", "archive")
+    cmd(archiver, "recreate", "archive", "-e", "input")  # this would normally remove all from archive
+    listing = cmd(archiver, "list", "archive", "--short")
+    # archive was protected, so recreate ignored it:
+    assert "file1" in listing
+    assert "file2" in listing

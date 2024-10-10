@@ -29,7 +29,7 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
 
     # Set a BORG_XXX environment variable on the "borg serve" side
     $ cat ~/.ssh/authorized_keys
-    command="export BORG_XXX=value; borg serve [...]",restrict ssh-rsa [...]
+    command="BORG_XXX=value borg serve [...]",restrict ssh-rsa [...]
 
 .. note::
     The examples above use the ``restrict`` directive. This does automatically

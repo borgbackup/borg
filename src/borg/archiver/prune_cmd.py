@@ -151,6 +151,7 @@ class PruneMixIn:
 
         match = args.name if args.name else args.match_archives
         archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
+        archives = [ai for ai in archives if "@PROT" not in ai.tags]
 
         keep = []
         # collect the rule responsible for the keeping of each archive in this dict

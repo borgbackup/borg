@@ -32,3 +32,19 @@ def test_delete_multiple(archivers, request):
     cmd(archiver, "delete", "-a", "test1")
     cmd(archiver, "delete", "-a", "test2")
     assert not cmd(archiver, "repo-list")
+
+
+def test_delete_ignore_protected(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", "input")
+    cmd(archiver, "tag", "--add=@PROT", "test1")
+    cmd(archiver, "create", "test2", "input")
+    cmd(archiver, "delete", "-a", "test1")
+    cmd(archiver, "delete", "-a", "test2")
+    cmd(archiver, "delete", "-a", "sh:test*")
+    output = cmd(archiver, "repo-list")
+    assert "@PROT" in output
+    assert "test1" in output
+    assert "test2" not in output

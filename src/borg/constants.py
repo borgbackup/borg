@@ -124,6 +124,10 @@ TIME_DIFFERS2_NS = 3000000000
 # tar related
 SCHILY_XATTR = "SCHILY.xattr."  # xattr key prefix in tar PAX headers
 
+# special tags
+# @PROT protects archives against accidential deletion or modification by delete, prune or recreate.
+SPECIAL_TAGS = frozenset(["@PROT"])
+
 # return codes returned by borg command
 EXIT_SUCCESS = 0  # everything done, no problems
 EXIT_WARNING = 1  # reached normal end of operation, but there were issues (generic warning)

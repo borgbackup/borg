@@ -241,3 +241,19 @@ def test_prune_repository_glob(archivers, request):
     assert "2015-08-12-20:00-foo" in output
     assert "2015-08-12-10:00-bar" in output
     assert "2015-08-12-20:00-bar" in output
+
+
+def test_prune_ignore_protected(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive1", archiver.input_path)
+    cmd(archiver, "tag", "--set=@PROT", "archive1")  # do not delete archive1!
+    cmd(archiver, "create", "archive2", archiver.input_path)
+    cmd(archiver, "create", "archive3", archiver.input_path)
+    output = cmd(archiver, "prune", "--list", "--keep-last=1", "--match-archives=sh:archive*")
+    assert "archive1" not in output  # @PROT archives are completely ignored.
+    assert re.search(r"Keeping archive \(rule: secondly #1\):\s+archive3", output)
+    assert re.search(r"Pruning archive \(.*?\):\s+archive2", output)
+    output = cmd(archiver, "repo-list")
+    assert "archive1" in output  # @PROT protected archive1 from deletion
+    assert "archive3" in output  # last one

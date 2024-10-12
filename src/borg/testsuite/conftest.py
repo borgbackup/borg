@@ -3,20 +3,18 @@ from typing import Optional, List
 
 import pytest
 
-from borg.testsuite.archiver import BORG_EXES
-
 if hasattr(pytest, "register_assert_rewrite"):
     pytest.register_assert_rewrite("borg.testsuite")
 
-
-from borg.archiver import Archiver  # noqa: E402
+# Ensure that the loggers exist for all tests
 from borg.logger import setup_logging  # noqa: E402
 
-# Ensure that the loggers exist for all tests
 setup_logging()
 
+from borg.archiver import Archiver  # noqa: E402
 from borg.testsuite import has_lchflags, has_llfuse, has_pyfuse3  # noqa: E402
 from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported  # noqa: E402
+from borg.testsuite.archiver import BORG_EXES
 from borg.testsuite.platform_test import fakeroot_detected  # noqa: E402
 
 

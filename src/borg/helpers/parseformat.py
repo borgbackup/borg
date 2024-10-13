@@ -469,7 +469,7 @@ class Location:
 
     rclone_re = re.compile(
         r"""
-        (?P<proto>rclone)://                                    # rclone://
+        (?P<proto>rclone):                                      # rclone:
         (?P<path>(.*))
         """,
         re.VERBOSE,
@@ -616,13 +616,16 @@ class Location:
                 path = "/./" + self.path  # /./x = path x relative to cwd
             else:
                 path = self.path
-            return "{}://{}{}{}{}".format(
-                self.proto if self.proto else "???",
-                f"{self.user}@" if self.user else "",
-                self._host if self._host else "",  # needed for ipv6 addrs
-                f":{self.port}" if self.port else "",
-                path,
-            )
+            if self.proto == "rclone":
+                return f"{self.proto}:{self.path}"
+            else:
+                return "{}://{}{}{}{}".format(
+                    self.proto if self.proto else "???",
+                    f"{self.user}@" if self.user else "",
+                    self._host if self._host else "",  # needed for ipv6 addrs
+                    f":{self.port}" if self.port else "",
+                    path,
+                )
 
     def with_timestamp(self, timestamp):
         # note: this only affects the repository URL/path, not the archive name!

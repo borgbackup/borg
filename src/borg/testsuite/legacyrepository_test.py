@@ -30,7 +30,7 @@ def repository(tmp_path):
 def remote_repository(tmp_path):
     if is_win32:
         pytest.skip("Remote repository does not yet work on Windows.")
-    repository_location = Location("ssh://__testsuite__" + os.fspath(tmp_path / "repository"))
+    repository_location = Location("ssh://__testsuite__/" + os.fspath(tmp_path / "repository"))
     yield LegacyRemoteRepository(repository_location, exclusive=True, create=True)
 
 

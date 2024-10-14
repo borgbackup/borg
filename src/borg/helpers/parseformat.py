@@ -454,9 +454,9 @@ class Location:
         + optional_user_re
         + host_re
         + r"""                 # user@  (optional), host name or address
-        (?::(?P<port>\d+))?                                     # :port (optional)
+        (?::(?P<port>\d+))?/                                    # :port (optional) + "/" as separator
         """
-        + abs_path_re,
+        + path_re,
         re.VERBOSE,
     )  # path
 
@@ -538,19 +538,13 @@ class Location:
             raise ValueError('Invalid location format: "%s"' % self.processed)
 
     def _parse(self, text):
-        def normpath_special(p):
-            # avoid that normpath strips away our relative path hack and even makes p absolute
-            relative = p.startswith("/./")
-            p = os.path.normpath(p)
-            return ("/." + p) if relative else p
-
         m = self.ssh_re.match(text)
         if m:
             self.proto = m.group("proto")
             self.user = m.group("user")
             self._host = m.group("host")
             self.port = m.group("port") and int(m.group("port")) or None
-            self.path = normpath_special(m.group("path"))
+            self.path = os.path.normpath(m.group("path"))
             return True
         m = self.sftp_re.match(text)
         if m:
@@ -558,7 +552,7 @@ class Location:
             self.user = m.group("user")
             self._host = m.group("host")
             self.port = m.group("port") and int(m.group("port")) or None
-            self.path = normpath_special(m.group("path"))
+            self.path = os.path.normpath(m.group("path"))
             return True
         m = self.rclone_re.match(text)
         if m:
@@ -568,17 +562,17 @@ class Location:
         m = self.file_re.match(text)
         if m:
             self.proto = m.group("proto")
-            self.path = normpath_special(m.group("path"))
+            self.path = os.path.normpath(m.group("path"))
             return True
         m = self.socket_re.match(text)
         if m:
             self.proto = m.group("proto")
-            self.path = normpath_special(m.group("path"))
+            self.path = os.path.normpath(m.group("path"))
             return True
         m = self.local_re.match(text)
         if m:
             self.proto = "file"
-            self.path = normpath_special(m.group("path"))
+            self.path = os.path.normpath(m.group("path"))
             return True
         return False
 
@@ -615,31 +609,17 @@ class Location:
     def canonical_path(self):
         if self.proto in ("file", "socket"):
             return self.path
-        else:
-            if self.path and self.path.startswith("~"):
-                path = "/" + self.path  # /~/x = path x relative to home dir
-            elif self.path and not self.path.startswith("/"):
-                path = "/./" + self.path  # /./x = path x relative to cwd
-            else:
-                path = self.path
-            if self.proto == "rclone":
-                return f"{self.proto}:{self.path}"
-            elif self.proto == "sftp":
-                return (
-                    f"{self.proto}://"
-                    f"{(self.user + '@') if self.user else ''}"
-                    f"{self._host if self._host else ''}"
-                    f"{self.port if self.port else ''}/"
-                    f"{path}"
-                )
-            else:
-                return "{}://{}{}{}{}".format(
-                    self.proto if self.proto else "???",
-                    f"{self.user}@" if self.user else "",
-                    self._host if self._host else "",  # needed for ipv6 addrs
-                    f":{self.port}" if self.port else "",
-                    path,
-                )
+        if self.proto == "rclone":
+            return f"{self.proto}:{self.path}"
+        if self.proto in ("sftp", "ssh"):
+            return (
+                f"{self.proto}://"
+                f"{(self.user + '@') if self.user else ''}"
+                f"{self._host if self._host else ''}"
+                f"{self.port if self.port else ''}/"
+                f"{self.path}"
+            )
+        raise NotImplementedError(self.proto)
 
     def with_timestamp(self, timestamp):
         # note: this only affects the repository URL/path, not the archive name!

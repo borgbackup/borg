@@ -197,11 +197,18 @@ class TestLocationWithoutEnv:
 
     def test_sftp(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
+        # relative path
         assert (
-            repr(Location("sftp://user@host:1234/some/path"))
-            == "Location(proto='sftp', user='user', host='host', port=1234, path='/some/path')"
+            repr(Location("sftp://user@host:1234/rel/path"))
+            == "Location(proto='sftp', user='user', host='host', port=1234, path='rel/path')"
         )
-        assert Location("sftp://user@host:1234/some/path").to_key_filename() == keys_dir + "host__some_path"
+        assert Location("sftp://user@host:1234/rel/path").to_key_filename() == keys_dir + "host__rel_path"
+        # absolute path
+        assert (
+            repr(Location("sftp://user@host:1234//abs/path"))
+            == "Location(proto='sftp', user='user', host='host', port=1234, path='/abs/path')"
+        )
+        assert Location("sftp://user@host:1234//abs/path").to_key_filename() == keys_dir + "host__abs_path"
 
     def test_socket(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)

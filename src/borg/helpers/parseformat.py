@@ -431,6 +431,12 @@ class Location:
         (?P<path>(/([^:]|(:(?!:)))+))                       # start with /, then any chars, but no "::"
         """
 
+    # path must not contain :: (it ends at :: or string end), but may contain single colons.
+    # it may or may not start with a /.
+    path_re = r"""
+        (?P<path>(([^:]|(:(?!:)))+))                        # any chars, but no "::"
+        """
+
     # host NAME, or host IP ADDRESS (v4 or v6, v6 must be in square brackets)
     host_re = r"""
         (?P<host>(
@@ -461,9 +467,9 @@ class Location:
         + optional_user_re
         + host_re
         + r"""                 # user@  (optional), host name or address
-        (?::(?P<port>\d+))?                                     # :port (optional)
+        (?::(?P<port>\d+))?/                                    # :port (optional) + "/" as separator
         """
-        + abs_path_re,
+        + path_re,
         re.VERBOSE,
     )  # path
 
@@ -618,6 +624,14 @@ class Location:
                 path = self.path
             if self.proto == "rclone":
                 return f"{self.proto}:{self.path}"
+            elif self.proto == "sftp":
+                return (
+                    f"{self.proto}://"
+                    f"{(self.user + '@') if self.user else ''}"
+                    f"{self._host if self._host else ''}"
+                    f"{self.port if self.port else ''}/"
+                    f"{path}"
+                )
             else:
                 return "{}://{}{}{}{}".format(
                     self.proto if self.proto else "???",

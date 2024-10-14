@@ -226,12 +226,10 @@ class TestLocationWithoutEnv:
 
     def test_folder(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
-        assert repr(Location("path")) == "Location(proto='file', user=None, host=None, port=None, path='path')"
-        assert Location("path").to_key_filename() == keys_dir + "path"
-
-    def test_long_path(self, monkeypatch, keys_dir):
-        monkeypatch.delenv("BORG_REPO", raising=False)
-        assert Location(os.path.join(*(40 * ["path"]))).to_key_filename() == keys_dir + "_".join(20 * ["path"]) + "_"
+        rel_path = "path"
+        abs_path = os.path.abspath(rel_path)
+        assert repr(Location(rel_path)) == f"Location(proto='file', user=None, host=None, port=None, path='{abs_path}')"
+        assert Location("path").to_key_filename().endswith(rel_path)
 
     def test_abspath(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
@@ -248,11 +246,11 @@ class TestLocationWithoutEnv:
 
     def test_relpath(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
-        assert (
-            repr(Location("relative/path"))
-            == "Location(proto='file', user=None, host=None, port=None, path='relative/path')"
-        )
-        assert Location("relative/path").to_key_filename() == keys_dir + "relative_path"
+        # for a local path, borg creates a Location instance with an absolute path
+        rel_path = "relative/path"
+        abs_path = os.path.abspath(rel_path)
+        assert repr(Location(rel_path)) == f"Location(proto='file', user=None, host=None, port=None, path='{abs_path}')"
+        assert Location(rel_path).to_key_filename().endswith("relative_path")
         assert (
             repr(Location("ssh://user@host/relative/path"))
             == "Location(proto='ssh', user='user', host='host', port=None, path='relative/path')"

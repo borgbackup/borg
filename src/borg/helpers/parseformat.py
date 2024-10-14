@@ -502,7 +502,7 @@ class Location:
         m = self.local_re.match(text)
         if m:
             self.proto = "file"
-            self.path = os.path.normpath(m.group("path"))
+            self.path = os.path.abspath(os.path.normpath(m.group("path")))
             return True
         return False
 

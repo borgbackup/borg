@@ -593,7 +593,7 @@ class Location:
         return ", ".join(items)
 
     def to_key_filename(self):
-        name = re.sub(r"[^\w]", "_", self.path).strip("_")
+        name = re.sub(r"[^\w]", "_", self.path.rstrip("/"))
         if self.proto not in ("file", "socket", "rclone"):
             name = re.sub(r"[^\w]", "_", self.host) + "__" + name
         if len(name) > 100:

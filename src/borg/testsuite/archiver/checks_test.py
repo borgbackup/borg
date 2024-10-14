@@ -250,7 +250,6 @@ def test_unknown_feature_on_mount(archivers, request):
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     os.mkdir(mountpoint)
     # XXX this might hang if it doesn't raise an error
-    archiver.repository_location += "::test"
     cmd_raises_unknown_feature(archiver, ["mount", mountpoint])
 
 

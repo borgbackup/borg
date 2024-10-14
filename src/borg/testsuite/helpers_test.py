@@ -278,14 +278,17 @@ class TestLocationWithoutEnv:
     def test_canonical_path(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)
         locations = [
-            "some/path",
-            "file://some/path",
-            "host:some/path",
-            "host:~user/some/path",
-            "socket:///some/path",
+            "relative/path",
+            "/absolute/path",
+            "file:///absolute/path",
+            "socket:///absolute/path",
             "ssh://host/relative/path",
             "ssh://host//absolute/path",
-            "ssh://user@host:1234/some/path",
+            "ssh://user@host:1234/relative/path",
+            "sftp://host/relative/path",
+            "sftp://host//absolute/path",
+            "sftp://user@host:1234/relative/path",
+            "rclone:remote:path",
         ]
         for location in locations:
             assert (

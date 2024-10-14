@@ -181,6 +181,14 @@ class Repository:
             self.version = 3
             self.store.store("config/version", str(self.version).encode())
             self.store.store("config/id", bin_to_hex(os.urandom(32)).encode())
+            # we know repo/data/ still does not have any chunks stored in it,
+            # but for some stores, there might be a lot of empty directories and
+            # listing them all might be rather slow, so we better cache an empty
+            # ChunkIndex from here so that the first repo operation does not have
+            # to build the ChunkIndex the slow way by listing all the directories.
+            from borg.cache import write_chunkindex_to_repo_cache
+
+            write_chunkindex_to_repo_cache(self, ChunkIndex(), compact=True, clear=True, force_write=True)
         finally:
             self.store.close()
 

@@ -5,6 +5,7 @@ from borgstore.store import Store
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
 from borgstore.backends.errors import BackendError as StoreBackendError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
+from borgstore.backends.errors import BackendAlreadyExists as StoreBackendAlreadyExists
 
 from .checksums import xxh64
 from .constants import *  # NOQA
@@ -117,6 +118,7 @@ class Repository:
             url = "file://%s" % os.path.abspath(path_or_location)
             location = Location(url)
         self._location = location
+        self.url = url
         # lots of stuff in data: use 2 levels by default (data/00/00/ .. data/ff/ff/ dirs)!
         data_levels = int(os.environ.get("BORG_STORE_DATA_LEVELS", "2"))
         levels_config = {
@@ -174,7 +176,10 @@ class Repository:
 
     def create(self):
         """Create a new empty repository"""
-        self.store.create()
+        try:
+            self.store.create()
+        except StoreBackendAlreadyExists:
+            raise self.AlreadyExists(self.url)
         self.store.open()
         try:
             self.store.store("config/readme", REPOSITORY_README.encode())

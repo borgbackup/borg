@@ -5,6 +5,7 @@ from borgstore.store import Store
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
 from borgstore.backends.errors import BackendError as StoreBackendError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
+from borgstore.backends.errors import BackendAlreadyExists as StoreBackendAlreadyExists
 
 from .checksums import xxh64
 from .constants import *  # NOQA
@@ -117,6 +118,7 @@ class Repository:
             url = "file://%s" % os.path.abspath(path_or_location)
             location = Location(url)
         self._location = location
+        self.url = url
         # lots of stuff in data: use 2 levels by default (data/00/00/ .. data/ff/ff/ dirs)!
         data_levels = int(os.environ.get("BORG_STORE_DATA_LEVELS", "2"))
         levels_config = {
@@ -174,13 +176,24 @@ class Repository:
 
     def create(self):
         """Create a new empty repository"""
-        self.store.create()
+        try:
+            self.store.create()
+        except StoreBackendAlreadyExists:
+            raise self.AlreadyExists(self.url)
         self.store.open()
         try:
             self.store.store("config/readme", REPOSITORY_README.encode())
             self.version = 3
             self.store.store("config/version", str(self.version).encode())
             self.store.store("config/id", bin_to_hex(os.urandom(32)).encode())
+            # we know repo/data/ still does not have any chunks stored in it,
+            # but for some stores, there might be a lot of empty directories and
+            # listing them all might be rather slow, so we better cache an empty
+            # ChunkIndex from here so that the first repo operation does not have
+            # to build the ChunkIndex the slow way by listing all the directories.
+            from borg.cache import write_chunkindex_to_repo_cache
+
+            write_chunkindex_to_repo_cache(self, ChunkIndex(), compact=True, clear=True, force_write=True)
         finally:
             self.store.close()
 

@@ -361,12 +361,8 @@ class RepositoryServer:  # pragma: no cover
     def _resolve_path(self, path):
         if isinstance(path, bytes):
             path = os.fsdecode(path)
-        if path.startswith("/~/"):  # /~/x = path x relative to own home dir
-            home_dir = os.environ.get("HOME") or os.path.expanduser("~%s" % os.environ.get("USER", ""))
-            path = os.path.join(home_dir, path[3:])
-        elif path.startswith("/./"):  # /./x = path x relative to cwd
-            path = path[3:]
-        return os.path.realpath(path)
+        path = os.path.realpath(path)
+        return path
 
     def open(
         self,

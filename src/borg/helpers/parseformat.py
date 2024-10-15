@@ -401,6 +401,7 @@ def parse_stringified_list(s):
 class Location:
     """Object representing a repository location"""
 
+    # user@ (optional)
     # user must not contain "@", ":" or "/".
     # Quoting adduser error message:
     # "To avoid problems, the username should consist only of letters, digits,
@@ -408,28 +409,7 @@ class Location:
     # (as defined by IEEE Std 1003.1-2001)."
     # We use "@" as separator between username and hostname, so we must
     # disallow it within the pure username part.
-    optional_user_re = r"""
-        (?:(?P<user>[^@:/]+)@)?
-    """
-
-    # path must not contain :: (it ends at :: or string end), but may contain single colons.
-    # to avoid ambiguities with other regexes, it must also not start with ":" nor with "//" nor with "ssh://".
-    local_path_re = r"""
-        (?!(:|//|ssh://|socket://))                         # not starting with ":" or // or ssh:// or socket://
-        (?P<path>([^:]|(:(?!:)))+)                          # any chars, but no "::"
-        """
-
-    # file_path must not contain :: (it ends at :: or string end), but may contain single colons.
-    # it must start with a / and that slash is part of the path.
-    file_path_re = r"""
-        (?P<path>(([^/]*)/([^:]|(:(?!:)))+))                # start opt. servername, then /, then any chars, but no "::"
-        """
-
-    # abs_path must not contain :: (it ends at :: or string end), but may contain single colons.
-    # it must start with a / and that slash is part of the path.
-    abs_path_re = r"""
-        (?P<path>(/([^:]|(:(?!:)))+))                       # start with /, then any chars, but no "::"
-        """
+    optional_user_re = r"(?:(?P<user>[^@:/]+)@)?"
 
     # host NAME, or host IP ADDRESS (v4 or v6, v6 must be in square brackets)
     host_re = r"""
@@ -440,69 +420,38 @@ class Location:
         )
     """
 
+    # :port (optional)
+    optional_port_re = r"(?::(?P<port>\d+))?"
+
+    # path may contain any chars. to avoid ambiguities with other regexes,
+    # it must not start with "//" nor with "scheme://" nor with "rclone:".
+    local_path_re = r"""
+        (?!(//|(ssh|socket|sftp|file)://|rclone:))
+        (?P<path>.+)
+    """
+
+    # abs_path must start with a slash.
+    abs_path_re = r"(?P<path>/.+)"
+
+    # path may or may not start with a slash.
+    abs_or_rel_path_re = r"(?P<path>.+)"
+
     # regexes for misc. kinds of supported location specifiers:
-    ssh_re = re.compile(
-        r"""
-        (?P<proto>ssh)://                                       # ssh://
-        """
+    ssh_or_sftp_re = re.compile(
+        r"(?P<proto>(ssh|sftp))://"
         + optional_user_re
         + host_re
-        + r"""                 # user@  (optional), host name or address
-        (?::(?P<port>\d+))?                                     # :port (optional)
-        """
-        + abs_path_re,
-        re.VERBOSE,
-    )  # path
-
-    sftp_re = re.compile(
-        r"""
-        (?P<proto>sftp)://                                      # sftp://
-        """
-        + optional_user_re
-        + host_re
-        + r"""                 # user@  (optional), host name or address
-        (?::(?P<port>\d+))?                                     # :port (optional)
-        """
-        + abs_path_re,
-        re.VERBOSE,
-    )  # path
-
-    rclone_re = re.compile(
-        r"""
-        (?P<proto>rclone)://                                    # rclone://
-        (?P<path>(.*))
-        """,
-        re.VERBOSE,
-    )  # path
-
-    socket_re = re.compile(
-        r"""
-        (?P<proto>socket)://                                    # socket://
-        """
-        + abs_path_re,
-        re.VERBOSE,
-    )  # path
-
-    file_re = re.compile(
-        r"""
-        (?P<proto>file)://                                      # file://
-        """
-        + file_path_re,
-        re.VERBOSE,
-    )  # servername/path or path
-
-    local_re = re.compile(local_path_re, re.VERBOSE)  # local path
-
-    win_file_re = re.compile(
-        r"""
-        (?:file://)?                                        # optional file protocol
-        (?P<path>
-            (?:[a-zA-Z]:)?                                  # Drive letter followed by a colon (optional)
-            (?:[^:]+)                                       # Anything which does not contain a :, at least one char
-        )
-        """,
+        + optional_port_re
+        + r"/"  # this is the separator, not part of the path!
+        + abs_or_rel_path_re,
         re.VERBOSE,
     )
+
+    rclone_re = re.compile(r"(?P<proto>rclone):(?P<path>(.*))", re.VERBOSE)
+
+    file_or_socket_re = re.compile(r"(?P<proto>(file|socket))://" + abs_path_re, re.VERBOSE)
+
+    local_re = re.compile(local_path_re, re.VERBOSE)
 
     def __init__(self, text="", overrides={}, other=False):
         self.repo_env_var = "BORG_OTHER_REPO" if other else "BORG_REPO"
@@ -532,47 +481,28 @@ class Location:
             raise ValueError('Invalid location format: "%s"' % self.processed)
 
     def _parse(self, text):
-        def normpath_special(p):
-            # avoid that normpath strips away our relative path hack and even makes p absolute
-            relative = p.startswith("/./")
-            p = os.path.normpath(p)
-            return ("/." + p) if relative else p
-
-        m = self.ssh_re.match(text)
+        m = self.ssh_or_sftp_re.match(text)
         if m:
             self.proto = m.group("proto")
             self.user = m.group("user")
             self._host = m.group("host")
             self.port = m.group("port") and int(m.group("port")) or None
-            self.path = normpath_special(m.group("path"))
-            return True
-        m = self.sftp_re.match(text)
-        if m:
-            self.proto = m.group("proto")
-            self.user = m.group("user")
-            self._host = m.group("host")
-            self.port = m.group("port") and int(m.group("port")) or None
-            self.path = normpath_special(m.group("path"))
+            self.path = os.path.normpath(m.group("path"))
             return True
         m = self.rclone_re.match(text)
         if m:
             self.proto = m.group("proto")
             self.path = m.group("path")
             return True
-        m = self.file_re.match(text)
+        m = self.file_or_socket_re.match(text)
         if m:
             self.proto = m.group("proto")
-            self.path = normpath_special(m.group("path"))
-            return True
-        m = self.socket_re.match(text)
-        if m:
-            self.proto = m.group("proto")
-            self.path = normpath_special(m.group("path"))
+            self.path = os.path.normpath(m.group("path"))
             return True
         m = self.local_re.match(text)
         if m:
             self.proto = "file"
-            self.path = normpath_special(m.group("path"))
+            self.path = os.path.abspath(os.path.normpath(m.group("path")))
             return True
         return False
 
@@ -587,7 +517,7 @@ class Location:
         return ", ".join(items)
 
     def to_key_filename(self):
-        name = re.sub(r"[^\w]", "_", self.path).strip("_")
+        name = re.sub(r"[^\w]", "_", self.path.rstrip("/"))
         if self.proto not in ("file", "socket", "rclone"):
             name = re.sub(r"[^\w]", "_", self.host) + "__" + name
         if len(name) > 100:
@@ -609,20 +539,17 @@ class Location:
     def canonical_path(self):
         if self.proto in ("file", "socket"):
             return self.path
-        else:
-            if self.path and self.path.startswith("~"):
-                path = "/" + self.path  # /~/x = path x relative to home dir
-            elif self.path and not self.path.startswith("/"):
-                path = "/./" + self.path  # /./x = path x relative to cwd
-            else:
-                path = self.path
-            return "{}://{}{}{}{}".format(
-                self.proto if self.proto else "???",
-                f"{self.user}@" if self.user else "",
-                self._host if self._host else "",  # needed for ipv6 addrs
-                f":{self.port}" if self.port else "",
-                path,
+        if self.proto == "rclone":
+            return f"{self.proto}:{self.path}"
+        if self.proto in ("sftp", "ssh"):
+            return (
+                f"{self.proto}://"
+                f"{(self.user + '@') if self.user else ''}"
+                f"{self._host if self._host else ''}"
+                f"{self.port if self.port else ''}/"
+                f"{self.path}"
             )
+        raise NotImplementedError(self.proto)
 
     def with_timestamp(self, timestamp):
         # note: this only affects the repository URL/path, not the archive name!

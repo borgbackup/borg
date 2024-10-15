@@ -14,21 +14,21 @@ Note: you may also prepend a ``file://`` to a filesystem path to get URL style.
 
 **Remote repositories** accessed via ssh user@host:
 
-``ssh://user@host:port/path/to/repo`` - absolute path
+``ssh://user@host:port//abs/path/to/repo`` - absolute path
 
-``ssh://user@host:port/./path/to/repo`` - path relative to current directory
-
-``ssh://user@host:port/~/path/to/repo`` - path relative to user's home directory
+``ssh://user@host:port/rel/path/to/repo`` - path relative to current directory
 
 **Remote repositories** accessed via sftp:
 
-``sftp://user@host:port/path/to/repo`` - absolute path
+``sftp://user@host:port//abs/path/to/repo`` - absolute path
+
+``sftp://user@host:port/rel/path/to/repo`` - path relative to current directory
 
 For ssh and sftp URLs, the ``user@`` and ``:port`` parts are optional.
 
 **Remote repositories** accessed via rclone:
 
-``rclone://remote:path`` - see the rclone docs for more details.
+``rclone:remote:path`` - see the rclone docs for more details about remote:path.
 
 
 If you frequently need the same repo URL, it is a good idea to set the
@@ -36,7 +36,7 @@ If you frequently need the same repo URL, it is a good idea to set the
 
 ::
 
-    export BORG_REPO='ssh://user@host:port/path/to/repo'
+    export BORG_REPO='ssh://user@host:port/rel/path/to/repo'
 
 Then just leave away the ``--repo`` option if you want
 to use the default - it will be read from BORG_REPO then.

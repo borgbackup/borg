@@ -1,7 +1,7 @@
 #!/bin/bash
 
-pacman -S --needed --noconfirm git mingw-w64-ucrt-x86_64-{toolchain,pkgconf,zstd,lz4,xxhash,openssl,python-msgpack,python-argon2_cffi,python-platformdirs,python,cython,python-setuptools,python-wheel,python-build,python-pkgconfig,python-packaging,python-pip,python-paramiko}
-python -m pip install --upgrade pip 
+pacman -S --needed --noconfirm git mingw-w64-ucrt-x86_64-{toolchain,pkgconf,zstd,lz4,xxhash,openssl,rclone,python-msgpack,python-argon2_cffi,python-platformdirs,python,cython,python-setuptools,python-wheel,python-build,python-pkgconfig,python-packaging,python-pip,python-paramiko}
+python -m pip install --upgrade pip
 pip install pyinstaller==6.3.0
 
 if [ "$1" = "development" ]; then

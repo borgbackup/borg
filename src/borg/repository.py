@@ -234,7 +234,10 @@ class Repository:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         else:
             self.lock = None
-        readme = self.store.load("config/readme").decode()
+        try:
+            readme = self.store.load("config/readme").decode()
+        except StoreObjectNotFound:
+            raise self.DoesNotExist(str(self._location)) from None
         if readme != REPOSITORY_README:
             raise self.InvalidRepository(str(self._location))
         self.version = int(self.store.load("config/version").decode())

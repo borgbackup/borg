@@ -39,8 +39,11 @@ Compatibility notes:
     call borg like: "borg -r <MYREPO> <COMMAND>".
     in the docs, we usually omit "-r ..." for brevity.
   - the scp-style REPO syntax was removed, please use ssh://..., #6697
-  - ssh:// URLs: removed support for /~otheruser/, #6855.
-    If you used this, just replace it by: ssh://user@host:port/home/otheruser/
+  - ssh:// URLs: removed support for /~otheruser/, /~/ and /./, #6855.
+    New format:
+
+    - ssh://user@host:port/relative/path
+    - ssh://user@host:port//absolute/path
   - -P / --prefix option was removed, please use the similar -a / --match-archives.
   - archive names don't need to be unique anymore. to the contrary:
     it is now strongly recommended to use the identical name for borg create
@@ -129,7 +132,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b12 (2024-10-03)
+Version 2.0.0b13 (2024-10-xx)
 -----------------------------
 
 Please note:
@@ -138,6 +141,52 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- implement special tags, @PROT tag for protecting archives, #953.
+  borg won't delete/prune/recreate protected archives.
+- prune: add quarterly pruning strategy, #8337.
+- repo-create: build and cache an empty ChunkIndex.
+- check (repository part): build and cache a ChunkIndex.
+  check (archives part): use cached ChunkIndex from check (repository part).
+- import-tar/export-tar: add xattr support for PAX format, #2521.
+- export-tar: switch default to PAX format.
+
+Fixes:
+
+- simple error msgs for existing / non-existing repo, no tracebacks, #8475.
+- mount: create unique directory names, #8461.
+- diff: suppress modified changes for files which weren't actually modified.
+- diff: do not test for ctime difference on windows.
+
+Other changes:
+
+- new file:, rclone:, ssh:, sftp: URLs, #8372, #8446.
+  new way to deal with absolute vs. relative paths.
+- require borgstore ~= 0.1.0.
+- docs:
+
+  - update URL docs
+  - mount: document on-demand loading, perf tips, #7173.
+  - borg/borgfs detects internally under which name it was invoked, #8207.
+  - better link modern return codes, #8370.
+  - binary: using the directory build is faster, #8008.
+  - update "Running the tests (using the pypi package)", #6386.
+- github CI:
+
+  - temporarily disabled windows CI, #8474.
+  - msys2: use pyinstaller 6.10.0.
+  - msys2: install rclone.
+- tests:
+
+  - rename test files so that pytest default discovery finds them.
+  - call register_assert_rewrite before importing borg.testsuite.
+  - move conftest.py one directory level higher.
+
+
+Version 2.0.0b12 (2024-10-03)
+-----------------------------
 
 New features:
 

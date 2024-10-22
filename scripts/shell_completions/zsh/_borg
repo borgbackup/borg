@@ -656,7 +656,6 @@ __borg_setup_common_options() {
     '(-p --progress)'{-p,--progress}'[show progress information]'
     '--log-json[Output one JSON object per log line instead of formatted text.]'
     '--lock-wait=[wait at most SECONDS for acquiring a repository/cache lock (default: 1)]: : _borg_guard_unsigned_number "SECONDS"'
-    '--bypass-lock[bypass locking mechanism]'
     '(- :)--show-version[show/log the borg version]'
     '--show-rc[show/log the return code (rc)]'
     '--umask=[set umask to M (local only, default: 0077)]:M'

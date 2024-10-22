@@ -602,31 +602,22 @@ You will also get this error if you try to access a repository with a key that u
 We recommend upgrading to the latest stable version and trying again. We are sorry. We should have thought about forward
 compatibility and implemented a more helpful error message.
 
-Why does Borg extract hang after some time?
--------------------------------------------
+.. _disconnect_hang:
 
-When I do a ``borg extract``, after a while all activity stops, no cpu usage,
-no downloads.
+Why does Borg disconnect or hang when backing up to a remote server?
+--------------------------------------------------------------------
 
-This may happen when the SSH connection is stuck on server side. You can
-configure SSH on client side to prevent this by sending keep-alive requests,
-for example in ~/.ssh/config:
+Communication with the remote server (using an ssh: repo URL) happens via an SSH
+connection. This can lead to some issues that would not occur during a local backup:
 
-::
+- Since Borg does not send data all the time, the connection may get closed, leading
+  to errors like "connection closed by remote".
+- On the other hand, network issues may lead to a dysfunctional connection
+  that is only detected after some time by the server, leading to stale ``borg serve``
+  processes and locked repositories.
 
-    Host borg.example.com
-        # Client kills connection after 3*30 seconds without server response:
-        ServerAliveInterval 30
-        ServerAliveCountMax 3
-
-You can also do the opposite and configure SSH on server side in
-/etc/ssh/sshd_config, to make the server send keep-alive requests to the client:
-
-::
-
-    # Server kills connection after 3*30 seconds without client response:
-    ClientAliveInterval 30
-    ClientAliveCountMax 3
+To fix such problems, please apply these :ref:`SSH settings <ssh_configuration>` so that
+keep-alive requests are sent regularly.
 
 How can I deal with my very unstable SSH connection?
 ----------------------------------------------------
@@ -642,32 +633,10 @@ could try to work around:
   to do any more. Due to the way borg mount works, this might be less efficient
   than borg extract for bigger volumes of data.
 
-Why do I get "connection closed by remote" after a while?
----------------------------------------------------------
-
-When doing a backup to a remote server (using a ssh: repo URL), it sometimes
-stops after a while (some minutes, hours, ... - not immediately) with
-"connection closed by remote" error message. Why?
-
-That's a good question and we are trying to find a good answer in :issue:`636`.
-
 Why am I seeing idle borg serve processes on the repo server?
 -------------------------------------------------------------
 
-Maybe the ssh connection between client and server broke down and that was not
-yet noticed on the server. Try these settings:
-
-::
-
-    # /etc/ssh/sshd_config on borg repo server - kill connection to client
-    # after ClientAliveCountMax * ClientAliveInterval seconds with no response
-    ClientAliveInterval 20
-    ClientAliveCountMax 3
-
-If you have multiple borg create ... ; borg create ... commands in a already
-serialized way in a single script, you need to give them ``--lock-wait N`` (with N
-being a bit more than the time the server needs to terminate broken down
-connections and release the lock).
+Please see :ref:`disconnect_hang`
 
 Can I back up my root partition (/) with Borg?
 ----------------------------------------------

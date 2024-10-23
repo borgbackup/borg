@@ -149,7 +149,7 @@ class PruneMixIn:
             format = os.environ.get("BORG_PRUNE_FORMAT", "{archive:<36} {time} [{id}]")
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
-        match = args.name if args.name else args.match_archives
+        match = [args.name] if args.name else args.match_archives
         archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
         archives = [ai for ai in archives if "@PROT" not in ai.tags]
 

@@ -230,10 +230,6 @@ class Repository:
             raise self.DoesNotExist(str(self._location)) from None
         else:
             self.store_opened = True
-        if lock:
-            self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
-        else:
-            self.lock = None
         try:
             readme = self.store.load("config/readme").decode()
         except StoreObjectNotFound:
@@ -247,6 +243,9 @@ class Repository:
                 str(self._location), "repository version %d is not supported by this borg version" % self.version
             )
         self.id = hex_to_bin(self.store.load("config/id").decode(), length=32)
+        # important: lock *after* making sure that there actually is an existing, supported repository.
+        if lock:
+            self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         self.opened = True
 
     def close(self):

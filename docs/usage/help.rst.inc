@@ -425,7 +425,8 @@ auto,C[,L]
     The heuristic tries with lz4 whether the data is compressible.
     For incompressible data, it will not use compression (uses "none").
     For compressible data, it uses the given C[,L] compression - with C[,L]
-    being any valid compression specifier.
+    being any valid compression specifier. This can be helpful for media files which
+    often cannot be compressed much more.
 
 obfuscate,SPEC,C[,L]
     Use compressed-size obfuscation to make fingerprinting attacks based on

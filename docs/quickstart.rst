@@ -292,35 +292,27 @@ Backup compression
 ------------------
 
 The default is lz4 (very fast, but low compression ratio), but other methods are
-supported for different situations.
+supported for different situations. Compression not only helps you save disk space,
+but will especially speed up remote backups since less data needs to be transferred.
 
-You can use zstd for a wide range from high speed (and relatively low
-compression) using N=1 to high compression (and lower speed) using N=22.
-
-zstd is a modern compression algorithm and might be preferable over zlib and
-lzma.::
+zstd is a modern compression algorithm which can be parametrized to anything between
+N=1 for highest speed (and relatively low compression) to N=22 for highest compression
+(and lower speed)::
 
     $ borg create --compression zstd,N arch ~
 
-Other options are:
-
-If you have a fast repo storage and you want minimum CPU usage, no compression::
+If you have a fast repo storage and you want minimum CPU usage you can disable
+compression::
 
     $ borg create --compression none arch ~
 
-If you have a less fast repo storage and you want a bit more compression (N=0..9,
-0 means no compression, 9 means high compression):
+You can also use zlib and lzma instead of zstd, although zstd usually provides the
+the best compression for a given resource consumption. Please see :ref:`borg_compression`
+for all options.
 
-::
-
-    $ borg create --compression zlib,N arch ~
-
-If you have a very slow repo storage and you want high compression (N=0..9, 0 means
-low compression, 9 means high compression):
-
-::
-
-    $ borg create --compression lzma,N arch ~
+An interesting alternative is ``auto``, which first checks with lz4 whether a chunk is
+compressible (that check is very fast), and only if it is, compresses it with the
+specified algorithm.
 
 You'll need to experiment a bit to find the best compression for your use case.
 Keep an eye on CPU load and throughput.

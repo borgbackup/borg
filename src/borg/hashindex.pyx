@@ -2,8 +2,6 @@ from collections import namedtuple
 
 cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
-from libc.string cimport memcpy
-from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_CheckExact, PyBytes_GET_SIZE, PyBytes_AS_STRING
 
 from borghash cimport _borghash
 
@@ -13,10 +11,6 @@ API_VERSION = '1.2_01'
 cdef extern from "_hashindex.c":
     ctypedef struct HashIndex:
         pass
-
-    ctypedef struct FuseVersionsElement:
-        uint32_t version
-        char hash[16]
 
     HashIndex *hashindex_read(object file_py, int permit_compact, int legacy) except *
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
@@ -160,36 +154,6 @@ cdef class IndexBase:
 
     def compact(self):
         return hashindex_compact(self.index)
-
-
-cdef class FuseVersionsIndex(IndexBase):
-    # 4 byte version + 16 byte file contents hash
-    value_size = 20
-    _key_size = 16
-
-    def __getitem__(self, key):
-        cdef FuseVersionsElement *data
-        assert len(key) == self.key_size
-        data = <FuseVersionsElement *>hashindex_get(self.index, <unsigned char *>key)
-        if data == NULL:
-            raise KeyError(key)
-        return _le32toh(data.version), PyBytes_FromStringAndSize(data.hash, 16)
-
-    def __setitem__(self, key, value):
-        cdef FuseVersionsElement data
-        assert len(key) == self.key_size
-        data.version = value[0]
-        assert data.version <= _MAX_VALUE, "maximum number of versions reached"
-        if not PyBytes_CheckExact(value[1]) or PyBytes_GET_SIZE(value[1]) != 16:
-            raise TypeError("Expected bytes of length 16 for second value")
-        memcpy(data.hash, PyBytes_AS_STRING(value[1]), 16)
-        data.version = _htole32(data.version)
-        if not hashindex_set(self.index, <unsigned char *>key, <void *> &data):
-            raise Exception('hashindex_set failed')
-
-    def __contains__(self, key):
-        assert len(key) == self.key_size
-        return hashindex_get(self.index, <unsigned char *>key) != NULL
 
 
 NSIndexEntry = namedtuple('NSIndexEntry', 'segment offset size')
@@ -410,3 +374,34 @@ class ChunkIndex:
 
     def size(self):
         return self.ht.size()
+
+
+FuseVersionsIndexEntry = namedtuple('FuseVersionsEntry', 'version hash')
+
+
+class FuseVersionsIndex:
+    # key: 16 bytes, value: 4 byte version + 16 bytes file contents hash
+
+    def __init__(self):
+        self.ht = _borghash.HashTableNT(key_size=16, value_format="<I16s", namedtuple_type=FuseVersionsIndexEntry)
+
+    def __setitem__(self, key, value):
+        self.ht[key] = value
+
+    def __getitem__(self, key):
+        return self.ht[key]
+
+    def __delitem__(self, key):
+        del self.ht[key]
+
+    def __contains__(self, key):
+        return key in self.ht
+
+    def __len__(self):
+        return len(self.ht)
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default

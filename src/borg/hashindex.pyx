@@ -3,8 +3,9 @@ from collections import namedtuple
 cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
 from libc.string cimport memcpy
-from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_CheckExact, PyBytes_GET_SIZE, PyBytes_AS_STRING
+
+from borghash cimport _borghash
 
 API_VERSION = '1.2_01'
 
@@ -349,109 +350,63 @@ cdef class NSKeyIterator1:  # legacy borg 1.x
 ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size')
 
 
-cdef class ChunkIndex(IndexBase):
+class ChunkIndex:
     """
     Mapping of 32 byte keys to (refcount, size), which are all 32-bit unsigned.
-
-    The reference count cannot overflow. If an overflow would occur, the refcount
-    is fixed to MAX_VALUE and will neither increase nor decrease by incref(), decref()
-    or add().
-
-    Prior signed 32-bit overflow is handled correctly for most cases: All values
-    from UINT32_MAX (2**32-1, inclusive) to MAX_VALUE (exclusive) are reserved and either
-    cause silent data loss (-1, -2) or will raise an AssertionError when accessed.
-    Other values are handled correctly. Note that previously the refcount could also reach
-    0 by *increasing* it.
-
-    Assigning refcounts in this reserved range is an invalid operation and raises AssertionError.
     """
+    MAX_VALUE = 2**32 - 1  # borghash has the full uint32_t range
 
-    value_size = 8
-
-    def __getitem__(self, key):
-        assert len(key) == self.key_size
-        data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
-        if not data:
-            raise KeyError(key)
-        cdef uint32_t refcount = _le32toh(data[0])
-        assert refcount <= _MAX_VALUE, "invalid reference count"
-        return ChunkIndexEntry(refcount, _le32toh(data[1]))
+    def __init__(self, capacity=1000, path=None, permit_compact=False, usable=None):
+        if path:
+            self.ht = _borghash.HashTableNT.read(path)
+        else:
+            if usable is not None:
+                capacity = usable * 2  # load factor 0.5
+            self.ht = _borghash.HashTableNT(key_size=32, value_format="<II", namedtuple_type=ChunkIndexEntry, capacity=capacity)
 
     def __setitem__(self, key, value):
-        assert len(key) == self.key_size
-        cdef uint32_t[2] data
-        cdef uint32_t refcount = value[0]
-        assert refcount <= _MAX_VALUE, "invalid reference count"
-        data[0] = _htole32(refcount)
-        data[1] = _htole32(value[1])
-        if not hashindex_set(self.index, <unsigned char *>key, data):
-            raise Exception('hashindex_set failed')
+        if not isinstance(value, ChunkIndexEntry) and isinstance(value, tuple):
+            value = ChunkIndexEntry(*value)
+        self.ht[key] = value
+
+    def __getitem__(self, key):
+        return self.ht[key]
+
+    def __delitem__(self, key):
+        del self.ht[key]
 
     def __contains__(self, key):
-        assert len(key) == self.key_size
-        data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
-        if data != NULL:
-            assert _le32toh(data[0]) <= _MAX_VALUE, "invalid reference count"
-        return data != NULL
+        return key in self.ht
 
-    def iteritems(self, marker=None):
-        cdef const unsigned char *key
-        iter = ChunkKeyIterator(self.key_size)
-        iter.idx = self
-        iter.index = self.index
-        if marker:
-            key = hashindex_get(self.index, <unsigned char *>marker)
-            if marker is None:
-                raise IndexError
-            iter.key = key - self.key_size
-        return iter
+    def __len__(self):
+        return len(self.ht)
+
+    def iteritems(self):
+        yield from self.ht.iteritems()
 
     def add(self, key, refs, size):
-        assert len(key) == self.key_size
-        cdef uint32_t[2] data
-        data[0] = _htole32(refs)
-        data[1] = _htole32(size)
-        self._add(<unsigned char*> key, data)
+        v = self.get(key, ChunkIndexEntry(0, 0))
+        refcount = min(self.MAX_VALUE, v.refcount + refs)
+        self[key] = v._replace(refcount=refcount, size=size)
 
-    cdef _add(self, unsigned char *key, uint32_t *data):
-        cdef uint64_t refcount1, refcount2, result64
-        values = <uint32_t*> hashindex_get(self.index, key)
-        if values:
-            refcount1 = _le32toh(values[0])
-            refcount2 = _le32toh(data[0])
-            assert refcount1 <= _MAX_VALUE, "invalid reference count"
-            assert refcount2 <= _MAX_VALUE, "invalid reference count"
-            result64 = refcount1 + refcount2
-            values[0] = _htole32(min(result64, _MAX_VALUE))
-            values[1] = data[1]
-        else:
-            if not hashindex_set(self.index, key, data):
-                raise Exception('hashindex_set failed')
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
+    def compact(self):
+        pass
 
-cdef class ChunkKeyIterator:
-    cdef ChunkIndex idx
-    cdef HashIndex *index
-    cdef const unsigned char *key
-    cdef int key_size
-    cdef int exhausted
+    def clear(self):
+        pass
 
-    def __cinit__(self, key_size):
-        self.key = NULL
-        self.key_size = key_size
-        self.exhausted = 0
+    @classmethod
+    def read(cls, path, permit_compact=False):
+        return cls(path=path)
 
-    def __iter__(self):
-        return self
+    def write(self, path):
+        self.ht.write(path)
 
-    def __next__(self):
-        if self.exhausted:
-            raise StopIteration
-        self.key = hashindex_next_key(self.index, <unsigned char *>self.key)
-        if not self.key:
-            self.exhausted = 1
-            raise StopIteration
-        cdef uint32_t *value = <uint32_t *>(self.key + self.key_size)
-        cdef uint32_t refcount = _le32toh(value[0])
-        assert refcount <= _MAX_VALUE, "invalid reference count"
-        return (<char *>self.key)[:self.key_size], ChunkIndexEntry(refcount, _le32toh(value[1]))
+    def size(self):
+        return self.ht.size()

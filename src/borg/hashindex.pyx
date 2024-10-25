@@ -141,13 +141,11 @@ class NSIndex1:
 
     def pop(self, key, default=_NoDefault):
         try:
-            value = self[key]
-            del self[key]
-            return value
+            return self.ht.pop(key)
         except KeyError:
-            if default != _NoDefault:
-                return default
-            raise
+            if default is _NoDefault:
+                raise
+            return default
 
     def iteritems(self, marker=None):
         do_yield = marker is None

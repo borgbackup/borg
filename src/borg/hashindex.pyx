@@ -46,16 +46,13 @@ class ChunkIndex:
     def iteritems(self):
         yield from self.ht.iteritems()
 
+    def get(self, key, default=None):
+        return self.ht.get(key, default)
+
     def add(self, key, refs, size):
         v = self.get(key, ChunkIndexEntry(0, 0))
         refcount = min(self.MAX_VALUE, v.refcount + refs)
         self[key] = v._replace(refcount=refcount, size=size)
-
-    def get(self, key, default=None):
-        try:
-            return self[key]
-        except KeyError:
-            return default
 
     def compact(self):
         return 0
@@ -100,10 +97,7 @@ class FuseVersionsIndex:
         return len(self.ht)
 
     def get(self, key, default=None):
-        try:
-            return self[key]
-        except KeyError:
-            return default
+        return self.ht.get(key, default)
 
 
 NSIndex1Entry = namedtuple('NSIndex1Entry', 'segment offset')
@@ -143,10 +137,7 @@ class NSIndex1:
         return len(self.ht)
 
     def get(self, key, default=None):
-        try:
-            return self[key]
-        except KeyError:
-            return default
+        return self.ht.get(key, default)
 
     def pop(self, key, default=_NoDefault):
         try:

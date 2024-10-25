@@ -2,7 +2,7 @@ from collections import namedtuple
 import os
 import struct
 
-from borghash cimport _borghash
+from borghash cimport HashTableNT
 
 API_VERSION = '1.2_01'
 
@@ -20,11 +20,11 @@ class ChunkIndex:
 
     def __init__(self, capacity=1000, path=None, permit_compact=False, usable=None):
         if path:
-            self.ht = _borghash.HashTableNT.read(path)
+            self.ht = HashTableNT.read(path)
         else:
             if usable is not None:
                 capacity = usable * 2  # load factor 0.5
-            self.ht = _borghash.HashTableNT(key_size=32, value_format="<II", namedtuple_type=ChunkIndexEntry, capacity=capacity)
+            self.ht = HashTableNT(key_size=32, value_format="<II", namedtuple_type=ChunkIndexEntry, capacity=capacity)
 
     def __setitem__(self, key, value):
         if not isinstance(value, ChunkIndexEntry) and isinstance(value, tuple):
@@ -82,7 +82,7 @@ class FuseVersionsIndex:
     Mapping from key128 to (file_version32, file_content_hash128) to support the FUSE versions view.
     """
     def __init__(self):
-        self.ht = _borghash.HashTableNT(key_size=16, value_format="<I16s", namedtuple_type=FuseVersionsIndexEntry)
+        self.ht = HashTableNT(key_size=16, value_format="<I16s", namedtuple_type=FuseVersionsIndexEntry)
 
     def __setitem__(self, key, value):
         self.ht[key] = value
@@ -123,7 +123,7 @@ class NSIndex1:
     def __init__(self, capacity=1000, path=None, permit_compact=False, usable=None):
         if usable is not None:
             capacity = usable * 2  # load factor 0.5
-        self.ht = _borghash.HashTableNT(key_size=self.KEY_SIZE, value_format=self.VALUE_FMT, namedtuple_type=NSIndex1Entry, capacity=capacity)
+        self.ht = HashTableNT(key_size=self.KEY_SIZE, value_format=self.VALUE_FMT, namedtuple_type=NSIndex1Entry, capacity=capacity)
         if path:
             self._read(path)
 

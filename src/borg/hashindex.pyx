@@ -2,16 +2,11 @@ from collections import namedtuple
 import os
 import struct
 
-cimport cython
-
 from borghash cimport _borghash
 
 API_VERSION = '1.2_01'
 
 cdef _NoDefault = object()
-
-_MAX_VALUE = 4294966271UL  # 2**32 - 1025
-assert _MAX_VALUE % 2 == 1
 
 
 ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size')
@@ -19,7 +14,7 @@ ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size')
 
 class ChunkIndex:
     """
-    Mapping of 32 byte keys to (refcount, size), which are all 32-bit unsigned.
+    Mapping from key256 to (refcount32, size32) to track chunks in the repository.
     """
     MAX_VALUE = 2**32 - 1  # borghash has the full uint32_t range
 
@@ -83,8 +78,9 @@ FuseVersionsIndexEntry = namedtuple('FuseVersionsEntry', 'version hash')
 
 
 class FuseVersionsIndex:
-    # key: 16 bytes, value: 4 byte version + 16 bytes file contents hash
-
+    """
+    Mapping from key128 to (file_version32, file_content_hash128) to support the FUSE versions view.
+    """
     def __init__(self):
         self.ht = _borghash.HashTableNT(key_size=16, value_format="<I16s", namedtuple_type=FuseVersionsIndexEntry)
 
@@ -110,11 +106,13 @@ class FuseVersionsIndex:
             return default
 
 
-NSIndex1Entry = namedtuple('NSIndex1bEntry', 'segment offset')
+NSIndex1Entry = namedtuple('NSIndex1Entry', 'segment offset')
 
 
-class NSIndex1:  # legacy borg 1.x
-
+class NSIndex1:
+    """
+    Mapping from key256 to (segment32, offset32), as used by legacy repo index of borg 1.x.
+    """
     MAX_VALUE = 2**32 - 1  # borghash has the full uint32_t range
     MAGIC = b"BORG_IDX"  # borg 1.x
     HEADER_FMT = "<8sIIBB"  # magic, entries, buckets, ksize, vsize

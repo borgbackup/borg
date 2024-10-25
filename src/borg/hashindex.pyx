@@ -74,7 +74,7 @@ class ChunkIndex:
         return self.ht.size()
 
 
-FuseVersionsIndexEntry = namedtuple('FuseVersionsEntry', 'version hash')
+FuseVersionsIndexEntry = namedtuple('FuseVersionsIndexEntry', 'version hash')
 
 
 class FuseVersionsIndex:

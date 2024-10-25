@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from ..checksums import xxh64
-from ..hashindex import NSIndex
+from ..hashindex import NSIndex1
 from ..helpers import Location
 from ..helpers import IntegrityError
 from ..helpers import msgpack
@@ -268,7 +268,7 @@ def test_sparse_delete(repository):
         repository.delete(H(0))
         repository.io._write_fd.sync()
         # the on-line tracking works on a per-object basis...
-        assert repository.compact[0] == 41 + 8 + 41 + len(chunk0)
+        assert repository.compact[0] == 41 + 8 + 41 + 0  # len(chunk0) information is lost
         repository._rebuild_sparse(0)
         # ...while _rebuild_sparse can mark whole segments as completely sparse (which then includes the segment magic)
         assert repository.compact[0] == 41 + 8 + 41 + len(chunk0) + len(MAGIC)
@@ -805,7 +805,7 @@ def get_head(repo_path):
 
 
 def open_index(repo_path):
-    return NSIndex.read(os.path.join(repo_path, f"index.{get_head(repo_path)}"))
+    return NSIndex1.read(os.path.join(repo_path, f"index.{get_head(repo_path)}"))
 
 
 def corrupt_object(repo_path, id_):

@@ -630,11 +630,8 @@ def load_chunks_hash(repository) -> bytes:
     return hash
 
 
-def write_chunkindex_to_repo_cache(repository, chunks, *, compact=False, clear=False, force_write=False):
+def write_chunkindex_to_repo_cache(repository, chunks, *, clear=False, force_write=False):
     cached_hash = load_chunks_hash(repository)
-    if compact:
-        # if we don't need the in-memory chunks index anymore:
-        chunks.compact()  # vacuum the hash table
     with io.BytesIO() as f:
         chunks.write(f)
         data = f.getvalue()
@@ -698,7 +695,7 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
     logger.debug(f"queried {num_chunks} chunk IDs in {duration} s, ~{speed}/s")
     if cache_immediately:
         # immediately update cache/chunks, so we only rarely have to do it the slow way:
-        write_chunkindex_to_repo_cache(repository, chunks, compact=False, clear=False, force_write=True)
+        write_chunkindex_to_repo_cache(repository, chunks, clear=False, force_write=True)
     return chunks
 
 
@@ -770,8 +767,8 @@ class ChunksMixin:
         return ChunkListEntry(id, size)
 
     def _write_chunks_cache(self, chunks):
-        # this is called from .close, so we can clear/compact here:
-        write_chunkindex_to_repo_cache(self.repository, self._chunks, compact=True, clear=True)
+        # this is called from .close, so we can clear here:
+        write_chunkindex_to_repo_cache(self.repository, self._chunks, clear=True)
         self._chunks = None  # nothing there (cleared!)
 
     def refresh_lock(self, now):

@@ -54,9 +54,6 @@ class ChunkIndex:
         refcount = min(self.MAX_VALUE, v.refcount + refs)
         self[key] = v._replace(refcount=refcount, size=size)
 
-    def compact(self):
-        return 0
-
     def clear(self):
         pass
 
@@ -154,9 +151,6 @@ class NSIndex1:
                 yield key, value
             else:
                 do_yield = key == marker
-
-    def compact(self):
-        return 0
 
     def clear(self):
         pass

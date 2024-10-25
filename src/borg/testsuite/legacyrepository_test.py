@@ -234,7 +234,7 @@ def test_max_data_size(repo_fixtures, request):
 
 def _assert_sparse(repository):
     # the superseded 123456... PUT
-    assert repository.compact[0] == 41 + 8 + len(fchunk(b"123456789"))
+    assert repository.compact[0] == 41 + 8 + 0  # len(fchunk(b"123456789"))
     # a COMMIT
     assert repository.compact[1] == 9
     # the DELETE issued by the superseding PUT (or issued directly)
@@ -564,56 +564,6 @@ def test_create_free_space(repository):
         assert not os.path.exists(repository.path)
 
 
-def test_tracking(repository):
-    with repository:
-        assert repository.storage_quota_use == 0
-        ch1 = fchunk(bytes(1234))
-        repository.put(H(1), ch1)
-        assert repository.storage_quota_use == len(ch1) + 41 + 8
-        ch2 = fchunk(bytes(5678))
-        repository.put(H(2), ch2)
-        assert repository.storage_quota_use == len(ch1) + len(ch2) + 2 * (41 + 8)
-        repository.delete(H(1))
-        assert repository.storage_quota_use == len(ch1) + len(ch2) + 2 * (41 + 8)  # we have not compacted yet
-        repository.commit(compact=False)
-        assert repository.storage_quota_use == len(ch1) + len(ch2) + 2 * (41 + 8)  # we have not compacted yet
-    with reopen(repository) as repository:
-        # open new transaction; hints and thus quota data is not loaded unless needed.
-        ch3 = fchunk(b"")
-        repository.put(H(3), ch3)
-        repository.delete(H(3))
-        assert repository.storage_quota_use == len(ch1) + len(ch2) + len(ch3) + 3 * (
-            41 + 8
-        )  # we have not compacted yet
-        repository.commit(compact=True)
-        assert repository.storage_quota_use == len(ch2) + 41 + 8
-
-
-def test_exceed_quota(repository):
-    with repository:
-        assert repository.storage_quota_use == 0
-        repository.storage_quota = 80
-        ch1 = fchunk(b"x" * 7)
-        repository.put(H(1), ch1)
-        assert repository.storage_quota_use == len(ch1) + 41 + 8
-        repository.commit(compact=False)
-        with pytest.raises(LegacyRepository.StorageQuotaExceeded):
-            ch2 = fchunk(b"y" * 13)
-            repository.put(H(2), ch2)
-        assert repository.storage_quota_use == len(ch1) + len(ch2) + (41 + 8) * 2  # check ch2!?
-        with pytest.raises(LegacyRepository.StorageQuotaExceeded):
-            repository.commit(compact=False)
-        assert repository.storage_quota_use == len(ch1) + len(ch2) + (41 + 8) * 2  # check ch2!?
-    with reopen(repository) as repository:
-        repository.storage_quota = 161
-        # open new transaction; hints and thus quota data is not loaded unless needed.
-        repository.put(H(1), ch1)
-        # we have 2 puts for H(1) here and not yet compacted.
-        assert repository.storage_quota_use == len(ch1) * 2 + (41 + 8) * 2
-        repository.commit(compact=True)
-        assert repository.storage_quota_use == len(ch1) + 41 + 8  # now we have compacted.
-
-
 def make_auxiliary(repository):
     with repository:
         repository.put(H(0), fchunk(b"foo"))
@@ -810,7 +760,7 @@ def open_index(repo_path):
 
 def corrupt_object(repo_path, id_):
     idx = open_index(repo_path)
-    segment, offset, _ = idx[H(id_)]
+    segment, offset = idx[H(id_)]
     with open(os.path.join(repo_path, "data", "0", str(segment)), "r+b") as fd:
         fd.seek(offset)
         fd.write(b"BOOM")

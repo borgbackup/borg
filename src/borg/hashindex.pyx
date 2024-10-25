@@ -1,4 +1,6 @@
 from collections import namedtuple
+import os
+import struct
 
 cimport cython
 from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
@@ -237,7 +239,7 @@ cdef class NSKeyIterator:
                 NSIndexEntry(segment, _le32toh(value[1]), _le32toh(value[2])))
 
 
-cdef class NSIndex1(IndexBase):  # legacy borg 1.x
+cdef class NSIndex1a(IndexBase):  # legacy borg 1.x
 
     legacy = 1
     value_size = 8
@@ -284,7 +286,7 @@ cdef class NSIndex1(IndexBase):  # legacy borg 1.x
 
 
 cdef class NSKeyIterator1:  # legacy borg 1.x
-    cdef NSIndex1 idx
+    cdef NSIndex1a idx
     cdef HashIndex *index
     cdef const unsigned char *key
     cdef int key_size
@@ -405,3 +407,89 @@ class FuseVersionsIndex:
             return self[key]
         except KeyError:
             return default
+
+
+NSIndex1Entry = namedtuple('NSIndex1bEntry', 'segment offset')
+
+
+class NSIndex1:  # legacy borg 1.x
+
+    def __init__(self, capacity=1000, path=None, permit_compact=False, usable=None):
+        if usable is not None:
+            capacity = usable * 2  # load factor 0.5
+        self.ht = _borghash.HashTableNT(key_size=32, value_format="<II", namedtuple_type=NSIndex1Entry, capacity=capacity)
+        if path:
+            self._read(path)
+
+    def __setitem__(self, key, value):
+        self.ht[key] = value
+
+    def __getitem__(self, key):
+        return self.ht[key]
+
+    def __delitem__(self, key):
+        del self.ht[key]
+
+    def __contains__(self, key):
+        return key in self.ht
+
+    def __len__(self):
+        return len(self.ht)
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def iteritems(self):
+        yield from self.ht.iteritems()
+
+    def compact(self):
+        pass
+
+    def clear(self):
+        pass
+
+    @classmethod
+    def read(cls, path, permit_compact=False):
+        return cls(path=path)
+
+    def write(self, path):
+        raise NotImplementedError
+
+    def size(self):
+        raise NotImplementedError
+
+    def _read(self, path):
+        if isinstance(path, str):
+            with open(path, 'rb') as fd:
+                self._read_fd(fd)
+        else:
+            self._read_fd(path)
+
+    def _read_fd(self, fd):
+        MAGIC = b"BORG_IDX"  # borg 1.x
+        HEADER_FMT = "<8sIIBB"  # magic, entries, buckets, ksize, vsize
+        header_size = struct.calcsize(HEADER_FMT)
+        header_bytes = fd.read(header_size)
+        if len(header_bytes) < header_size:
+            raise ValueError(f"Invalid file, file is too short (header).")
+        magic, entries, buckets, ksize, vsize = struct.unpack(HEADER_FMT, header_bytes)
+        if magic != MAGIC:
+            raise ValueError(f"Invalid file, magic {MAGIC.decode()} not found.")
+        VALUE_FMT = "<II"  # borg 1.x on-disk: little-endian segment, offset
+        assert ksize == 32, "invalid key size"
+        assert vsize == struct.calcsize(VALUE_FMT), "invalid value size"
+        buckets_size = buckets * (ksize + vsize)
+        current_pos = fd.tell()
+        end_of_file = fd.seek(0, os.SEEK_END)
+        if current_pos + buckets_size != end_of_file:
+            raise ValueError(f"Invalid file, file size does not match (buckets).")
+        fd.seek(current_pos)
+        for i in range(buckets):
+            key = fd.read(ksize)
+            value = fd.read(vsize)
+            self.ht._set_raw(key, value)
+        pos = fd.tell()
+        assert pos == end_of_file

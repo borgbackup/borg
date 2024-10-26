@@ -24,7 +24,7 @@ class ChunkIndex:
         else:
             if usable is not None:
                 capacity = usable * 2  # load factor 0.5
-            self.ht = HashTableNT(key_size=32, value_format="<II", namedtuple_type=ChunkIndexEntry, capacity=capacity)
+            self.ht = HashTableNT(key_size=32, value_format="<II", value_type=ChunkIndexEntry, capacity=capacity)
 
     def __setitem__(self, key, value):
         if not isinstance(value, ChunkIndexEntry) and isinstance(value, tuple):
@@ -44,7 +44,7 @@ class ChunkIndex:
         return len(self.ht)
 
     def iteritems(self):
-        yield from self.ht.iteritems()
+        yield from self.ht.items()
 
     def get(self, key, default=None):
         return self.ht.get(key, default)
@@ -76,7 +76,7 @@ class FuseVersionsIndex:
     Mapping from key128 to (file_version32, file_content_hash128) to support the FUSE versions view.
     """
     def __init__(self):
-        self.ht = HashTableNT(key_size=16, value_format="<I16s", namedtuple_type=FuseVersionsIndexEntry)
+        self.ht = HashTableNT(key_size=16, value_format="<I16s", value_type=FuseVersionsIndexEntry)
 
     def __setitem__(self, key, value):
         self.ht[key] = value
@@ -114,7 +114,7 @@ class NSIndex1:
     def __init__(self, capacity=1000, path=None, permit_compact=False, usable=None):
         if usable is not None:
             capacity = usable * 2  # load factor 0.5
-        self.ht = HashTableNT(key_size=self.KEY_SIZE, value_format=self.VALUE_FMT, namedtuple_type=NSIndex1Entry, capacity=capacity)
+        self.ht = HashTableNT(key_size=self.KEY_SIZE, value_format=self.VALUE_FMT, value_type=NSIndex1Entry, capacity=capacity)
         if path:
             self._read(path)
 
@@ -146,7 +146,7 @@ class NSIndex1:
 
     def iteritems(self, marker=None):
         do_yield = marker is None
-        for key, value in self.ht.iteritems():
+        for key, value in self.ht.items():
             if do_yield:
                 yield key, value
             else:
@@ -181,7 +181,7 @@ class NSIndex1:
         header_bytes = struct.pack(self.HEADER_FMT, self.MAGIC, used, used, self.KEY_SIZE, self.VALUE_SIZE)
         fd.write(header_bytes)
         count = 0
-        for key, _ in self.ht.iteritems():
+        for key, _ in self.ht.items():
             value = self.ht._get_raw(key)
             fd.write(key)
             fd.write(value)

@@ -43,18 +43,13 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
     """
     MAX_VALUE = 2**32 - 1  # borghash has the full uint32_t range
 
-    def __init__(self, capacity=1000, path=None, permit_compact=False, usable=None):
+    def __init__(self, capacity=1000, path=None, usable=None):
         if path:
             self.ht = HashTableNT.read(path)
         else:
             if usable is not None:
                 capacity = usable * 2  # load factor 0.5
             self.ht = HashTableNT(key_size=32, value_format="<II", value_type=ChunkIndexEntry, capacity=capacity)
-
-    def __setitem__(self, key, value):
-        if not isinstance(value, ChunkIndexEntry) and isinstance(value, tuple):
-            value = ChunkIndexEntry(*value)
-        self.ht[key] = value
 
     def iteritems(self):
         yield from self.ht.items()
@@ -65,7 +60,7 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         self[key] = v._replace(refcount=refcount, size=size)
 
     @classmethod
-    def read(cls, path, permit_compact=False):
+    def read(cls, path):
         return cls(path=path)
 
     def write(self, path):
@@ -100,7 +95,7 @@ class NSIndex1(HTProxyMixin, MutableMapping):
     KEY_SIZE = 32
     VALUE_SIZE = 8
 
-    def __init__(self, capacity=1000, path=None, permit_compact=False, usable=None):
+    def __init__(self, capacity=1000, path=None, usable=None):
         if usable is not None:
             capacity = usable * 2  # load factor 0.5
         self.ht = HashTableNT(key_size=self.KEY_SIZE, value_format=self.VALUE_FMT, value_type=NSIndex1Entry, capacity=capacity)
@@ -116,7 +111,7 @@ class NSIndex1(HTProxyMixin, MutableMapping):
                 do_yield = key == marker
 
     @classmethod
-    def read(cls, path, permit_compact=False):
+    def read(cls, path):
         return cls(path=path)
 
     def size(self):

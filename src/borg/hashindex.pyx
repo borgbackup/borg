@@ -1,3 +1,4 @@
+from collections.abc import MutableMapping
 from collections import namedtuple
 import os
 import struct
@@ -12,7 +13,7 @@ cdef _NoDefault = object()
 ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size')
 
 
-class ChunkIndex:
+class ChunkIndex(MutableMapping):
     """
     Mapping from key256 to (refcount32, size32) to track chunks in the repository.
     """
@@ -43,11 +44,12 @@ class ChunkIndex:
     def __len__(self):
         return len(self.ht)
 
+    def __iter__(self):
+        for key, value in self.ht.items():
+            yield key
+
     def iteritems(self):
         yield from self.ht.items()
-
-    def get(self, key, default=None):
-        return self.ht.get(key, default)
 
     def add(self, key, refs, size):
         v = self.get(key, ChunkIndexEntry(0, 0))
@@ -71,7 +73,7 @@ class ChunkIndex:
 FuseVersionsIndexEntry = namedtuple('FuseVersionsIndexEntry', 'version hash')
 
 
-class FuseVersionsIndex:
+class FuseVersionsIndex(MutableMapping):
     """
     Mapping from key128 to (file_version32, file_content_hash128) to support the FUSE versions view.
     """
@@ -93,14 +95,15 @@ class FuseVersionsIndex:
     def __len__(self):
         return len(self.ht)
 
-    def get(self, key, default=None):
-        return self.ht.get(key, default)
+    def __iter__(self):
+        for key, value in self.ht.items():
+            yield key
 
 
 NSIndex1Entry = namedtuple('NSIndex1Entry', 'segment offset')
 
 
-class NSIndex1:
+class NSIndex1(MutableMapping):
     """
     Mapping from key256 to (segment32, offset32), as used by legacy repo index of borg 1.x.
     """
@@ -133,16 +136,9 @@ class NSIndex1:
     def __len__(self):
         return len(self.ht)
 
-    def get(self, key, default=None):
-        return self.ht.get(key, default)
-
-    def pop(self, key, default=_NoDefault):
-        try:
-            return self.ht.pop(key)
-        except KeyError:
-            if default is _NoDefault:
-                raise
-            return default
+    def __iter__(self):
+        for key, value in self.ht.items():
+            yield key
 
     def iteritems(self, marker=None):
         do_yield = marker is None

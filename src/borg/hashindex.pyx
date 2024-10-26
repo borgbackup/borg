@@ -10,10 +10,34 @@ API_VERSION = '1.2_01'
 cdef _NoDefault = object()
 
 
+class HTProxyMixin:
+    def __setitem__(self, key, value):
+        self.ht[key] = value
+
+    def __getitem__(self, key):
+        return self.ht[key]
+
+    def __delitem__(self, key):
+        del self.ht[key]
+
+    def __contains__(self, key):
+        return key in self.ht
+
+    def __len__(self):
+        return len(self.ht)
+
+    def __iter__(self):
+        for key, value in self.ht.items():
+            yield key
+
+    def clear(self):
+        self.ht.clear()
+
+
 ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size')
 
 
-class ChunkIndex(MutableMapping):
+class ChunkIndex(HTProxyMixin, MutableMapping):
     """
     Mapping from key256 to (refcount32, size32) to track chunks in the repository.
     """
@@ -32,22 +56,6 @@ class ChunkIndex(MutableMapping):
             value = ChunkIndexEntry(*value)
         self.ht[key] = value
 
-    def __getitem__(self, key):
-        return self.ht[key]
-
-    def __delitem__(self, key):
-        del self.ht[key]
-
-    def __contains__(self, key):
-        return key in self.ht
-
-    def __len__(self):
-        return len(self.ht)
-
-    def __iter__(self):
-        for key, value in self.ht.items():
-            yield key
-
     def iteritems(self):
         yield from self.ht.items()
 
@@ -55,9 +63,6 @@ class ChunkIndex(MutableMapping):
         v = self.get(key, ChunkIndexEntry(0, 0))
         refcount = min(self.MAX_VALUE, v.refcount + refs)
         self[key] = v._replace(refcount=refcount, size=size)
-
-    def clear(self):
-        self.ht.clear()
 
     @classmethod
     def read(cls, path, permit_compact=False):
@@ -73,37 +78,18 @@ class ChunkIndex(MutableMapping):
 FuseVersionsIndexEntry = namedtuple('FuseVersionsIndexEntry', 'version hash')
 
 
-class FuseVersionsIndex(MutableMapping):
+class FuseVersionsIndex(HTProxyMixin, MutableMapping):
     """
     Mapping from key128 to (file_version32, file_content_hash128) to support the FUSE versions view.
     """
     def __init__(self):
         self.ht = HashTableNT(key_size=16, value_format="<I16s", value_type=FuseVersionsIndexEntry)
 
-    def __setitem__(self, key, value):
-        self.ht[key] = value
-
-    def __getitem__(self, key):
-        return self.ht[key]
-
-    def __delitem__(self, key):
-        del self.ht[key]
-
-    def __contains__(self, key):
-        return key in self.ht
-
-    def __len__(self):
-        return len(self.ht)
-
-    def __iter__(self):
-        for key, value in self.ht.items():
-            yield key
-
 
 NSIndex1Entry = namedtuple('NSIndex1Entry', 'segment offset')
 
 
-class NSIndex1(MutableMapping):
+class NSIndex1(HTProxyMixin, MutableMapping):
     """
     Mapping from key256 to (segment32, offset32), as used by legacy repo index of borg 1.x.
     """
@@ -121,25 +107,6 @@ class NSIndex1(MutableMapping):
         if path:
             self._read(path)
 
-    def __setitem__(self, key, value):
-        self.ht[key] = value
-
-    def __getitem__(self, key):
-        return self.ht[key]
-
-    def __delitem__(self, key):
-        del self.ht[key]
-
-    def __contains__(self, key):
-        return key in self.ht
-
-    def __len__(self):
-        return len(self.ht)
-
-    def __iter__(self):
-        for key, value in self.ht.items():
-            yield key
-
     def iteritems(self, marker=None):
         do_yield = marker is None
         for key, value in self.ht.items():
@@ -147,9 +114,6 @@ class NSIndex1(MutableMapping):
                 yield key, value
             else:
                 do_yield = key == marker
-
-    def clear(self):
-        self.ht.clear()
 
     @classmethod
     def read(cls, path, permit_compact=False):

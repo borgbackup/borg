@@ -55,7 +55,7 @@ class ChunkIndex:
         self[key] = v._replace(refcount=refcount, size=size)
 
     def clear(self):
-        pass
+        self.ht.clear()
 
     @classmethod
     def read(cls, path, permit_compact=False):
@@ -153,7 +153,7 @@ class NSIndex1:
                 do_yield = key == marker
 
     def clear(self):
-        pass
+        self.ht.clear()
 
     @classmethod
     def read(cls, path, permit_compact=False):

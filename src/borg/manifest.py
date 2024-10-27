@@ -149,8 +149,8 @@ class Archives:
                 exists=True,  # repo has a valid archive item
                 username=archive_item.username,
                 hostname=archive_item.hostname,
-                size=archive_item.size,
-                nfiles=archive_item.nfiles,
+                size=archive_item.get("size", 0),
+                nfiles=archive_item.get("nfiles", 0),
                 comment=archive_item.comment,  # not always present?
                 tags=tuple(sorted(getattr(archive_item, "tags", []))),  # must be hashable
             )

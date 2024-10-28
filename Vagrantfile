@@ -140,12 +140,21 @@ def packages_macos
     cd ..
     export HOMEBREW_DEVELOPER=1
     export HOMEBREW_CURL_PATH=/usr/local/bin/curl
+
+    # now the self-built curl should work for homebrew:
     brew install ca-certificates
-    brew install curl  # also installs openssl@3
+    brew install openssl@3
+    export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig
+    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig' >> ~vagrant/.bash_profile
+
+    # install curl from homebrew and use it for homebrew:
+    brew install curl
+    export PATH="/usr/local/opt/curl/bin:$PATH"
     echo 'export PATH="/usr/local/opt/curl/bin:$PATH"' >> ~vagrant/.bash_profile
+    export HOMEBREW_FORCE_BREWED_CURL=1
+    echo 'export HOMEBREW_FORCE_BREWED_CURL=1' >> ~vagrant/.bash_profile
     unset HOMEBREW_CURL_PATH
     unset HOMEBREW_DEVELOPER
-    export HOMEBREW_FORCE_BREWED_CURL=1
 
     # now brew, curl, ca-certificates, openssl@3 should be all ok.
     brew update > /dev/null
@@ -154,7 +163,7 @@ def packages_macos
     # brew upgrade  # upgrade everything (takes rather long)
     echo 'export LDFLAGS=-L/usr/local/opt/openssl@3/lib' >> ~vagrant/.bash_profile
     echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3/include' >> ~vagrant/.bash_profile
-    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig' >> ~vagrant/.bash_profile
+    # pyenv shall use the openssl@3 from homebrew:
     echo 'export PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@3' >> ~vagrant/.bash_profile
   EOF
 end

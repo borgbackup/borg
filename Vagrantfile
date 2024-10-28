@@ -117,15 +117,44 @@ def packages_macos
     sudo softwareupdate --ignore Safari
     sudo softwareupdate --ignore "Install macOS High Sierra"
     sudo softwareupdate --install --all
-    which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+
+    # this box has openssl 1.1 installed
+    export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig
+
+    # the box "as is" has troubles downloading ca-certificates, needs a better working curl:
+    # https://curl.se/docs/install.html
+    curl -L https://github.com/curl/curl/releases/download/curl-8_10_1/curl-8.10.1.tar.gz | tar -xz
+    cd curl-8.10.1/
+    export ARCH=x86_64
+    export SDK=macosx
+    export DEPLOYMENT_TARGET=10.12
+    export CFLAGS="-arch $ARCH -isysroot $(xcrun -sdk $SDK --show-sdk-path) -m$SDK-version-min=$DEPLOYMENT_TARGET"
+    ./configure --host=$ARCH-apple-darwin --prefix $(pwd)/artifacts --with-openssl --without-libpsl
+    make -j8
+    cp artifacts/bin/curl /usr/local/bin/
+    unset ARCH
+    unset SDK
+    unset DEPLOYMENT_TARGET
+    unset CFLAGS
+    cd ..
+    export HOMEBREW_DEVELOPER=1
+    export HOMEBREW_CURL_PATH=/usr/local/bin/curl
+    brew install ca-certificates
+    brew install curl  # also installs openssl@3
+    echo 'export PATH="/usr/local/opt/curl/bin:$PATH"' >> ~vagrant/.bash_profile
+    unset HOMEBREW_CURL_PATH
+    unset HOMEBREW_DEVELOPER
+    export HOMEBREW_FORCE_BREWED_CURL=1
+
+    # now brew, curl, ca-certificates, openssl@3 should be all ok.
     brew update > /dev/null
-    brew install pkg-config readline xxhash openssl@3.0 zstd lz4 xz
+    brew install pkg-config readline xxhash zstd lz4 xz
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
-    echo 'export LDFLAGS=-L/usr/local/opt/openssl@3.0/lib' >> ~vagrant/.bash_profile
-    echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3.0/include' >> ~vagrant/.bash_profile
-    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3.0/lib/pkgconfig' >> ~vagrant/.bash_profile
-    echo 'export PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@3.0' >> ~vagrant/.bash_profile
+    echo 'export LDFLAGS=-L/usr/local/opt/openssl@3/lib' >> ~vagrant/.bash_profile
+    echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3/include' >> ~vagrant/.bash_profile
+    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig' >> ~vagrant/.bash_profile
+    echo 'export PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@3' >> ~vagrant/.bash_profile
   EOF
 end
 

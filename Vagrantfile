@@ -131,6 +131,7 @@ def packages_macos
     export CFLAGS="-arch $ARCH -isysroot $(xcrun -sdk $SDK --show-sdk-path) -m$SDK-version-min=$DEPLOYMENT_TARGET"
     ./configure --host=$ARCH-apple-darwin --prefix $(pwd)/artifacts --with-openssl --without-libpsl
     make -j8
+    make install
     cp artifacts/bin/curl /usr/local/bin/
     unset ARCH
     unset SDK

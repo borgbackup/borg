@@ -129,10 +129,9 @@ def packages_macos
     export SDK=macosx
     export DEPLOYMENT_TARGET=10.12
     export CFLAGS="-arch $ARCH -isysroot $(xcrun -sdk $SDK --show-sdk-path) -m$SDK-version-min=$DEPLOYMENT_TARGET"
-    ./configure --host=$ARCH-apple-darwin --prefix $(pwd)/artifacts --with-openssl --without-libpsl
+    ./configure --host=$ARCH-apple-darwin --prefix /usr/local --with-openssl --without-libpsl --disable-ldap
     make -j8
-    make install
-    cp artifacts/bin/curl /usr/local/bin/
+    sudo make install
     unset ARCH
     unset SDK
     unset DEPLOYMENT_TARGET
@@ -142,9 +141,12 @@ def packages_macos
     export HOMEBREW_CURL_PATH=/usr/local/bin/curl
 
     # now the self-built curl should work for homebrew:
-    brew install ca-certificates
-    brew install openssl@3
+    brew install ca-certificates openssl@3
+    export LDFLAGS=-L/usr/local/opt/openssl@3/lib
+    export CPPFLAGS=-I/usr/local/opt/openssl@3/include
     export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig
+    echo 'export LDFLAGS=-L/usr/local/opt/openssl@3/lib' >> ~vagrant/.bash_profile
+    echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3/include' >> ~vagrant/.bash_profile
     echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig' >> ~vagrant/.bash_profile
 
     # install curl from homebrew and use it for homebrew:
@@ -161,8 +163,6 @@ def packages_macos
     brew install pkg-config readline xxhash zstd lz4 xz
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
-    echo 'export LDFLAGS=-L/usr/local/opt/openssl@3/lib' >> ~vagrant/.bash_profile
-    echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3/include' >> ~vagrant/.bash_profile
     # pyenv shall use the openssl@3 from homebrew:
     echo 'export PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@3' >> ~vagrant/.bash_profile
   EOF

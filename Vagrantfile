@@ -139,15 +139,21 @@ def packages_macos
     cd ..
     export HOMEBREW_DEVELOPER=1
     export HOMEBREW_CURL_PATH=/usr/local/bin/curl
+    echo "finished building curl from source"
+    echo "----------------------------------"
 
     # now the self-built curl should work for homebrew:
-    brew install ca-certificates openssl@3
+    brew update
+    brew install ca-certificates
+    brew install openssl@3
     export LDFLAGS=-L/usr/local/opt/openssl@3/lib
     export CPPFLAGS=-I/usr/local/opt/openssl@3/include
     export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig
     echo 'export LDFLAGS=-L/usr/local/opt/openssl@3/lib' >> ~vagrant/.bash_profile
     echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3/include' >> ~vagrant/.bash_profile
     echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig' >> ~vagrant/.bash_profile
+    echo "finished building ca-certificates and openssl@3"
+    echo "-----------------------------------------------"
 
     # install curl from homebrew and use it for homebrew:
     brew install curl
@@ -157,9 +163,11 @@ def packages_macos
     echo 'export HOMEBREW_FORCE_BREWED_CURL=1' >> ~vagrant/.bash_profile
     unset HOMEBREW_CURL_PATH
     unset HOMEBREW_DEVELOPER
+    echo "finished install homebrew curl"
+    echo "------------------------------"
 
     # now brew, curl, ca-certificates, openssl@3 should be all ok.
-    brew update > /dev/null
+    brew update
     brew install pkg-config readline xxhash zstd lz4 xz
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)

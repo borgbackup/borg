@@ -132,7 +132,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b13 (2024-10-xx)
+Version 2.0.0b13 (2024-10-31)
 -----------------------------
 
 Please note:
@@ -145,13 +145,10 @@ above.
 New features:
 
 - implement special tags, @PROT tag for protecting archives, #953.
+
   borg won't delete/prune/recreate protected archives.
 - prune: add quarterly pruning strategy, #8337.
-- repo-create: build and cache an empty ChunkIndex.
-- check (repository part): build and cache a ChunkIndex.
-  check (archives part): use cached ChunkIndex from check (repository part).
 - import-tar/export-tar: add xattr support for PAX format, #2521.
-- export-tar: switch default to PAX format.
 
 Fixes:
 
@@ -159,12 +156,29 @@ Fixes:
 - mount: create unique directory names, #8461.
 - diff: suppress modified changes for files which weren't actually modified.
 - diff: do not test for ctime difference on windows.
+- prune: fix exception when NAME is given, #8486
+- repo-create: build and cache an empty ChunkIndex.
+- work around missing size/nfiles archive metadata, #8491
+- lock after checking repo exists, #8485
 
 Other changes:
 
 - new file:, rclone:, ssh:, sftp: URLs, #8372, #8446.
+
   new way to deal with absolute vs. relative paths.
-- require borgstore ~= 0.1.0.
+- require borgstore ~= 0.1.0, require borghash ~= 0.0.1.
+- new hashtable code based on borghash project:
+
+  - borghash replaces old / hard to maintain _hashindex.c code.
+  - implement ChunkIndex, NSIndex1, FuseVersionsIndex using borghash.HashTableNT.
+  - rewrite NSIndex1 (borg 1.x) on-disk format read/write methods in Cython.
+  - remove NSIndex (early borg2) data structure / serialization code for repo index.
+  - change xxh64 seed for ChunkIndex to invalidate old cache contents.
+  - chunks index: show hashtable stats at debug log level, #506.
+- check (repository part): build and cache a ChunkIndex.
+
+  check (archives part): use cached ChunkIndex from check (repository part).
+- export-tar: switch default to PAX format.
 - docs:
 
   - update URL docs
@@ -183,6 +197,7 @@ Other changes:
   - rename test files so that pytest default discovery finds them.
   - call register_assert_rewrite before importing borg.testsuite.
   - move conftest.py one directory level higher.
+  - remove hashindex tests from selftests (borghash project has own tests).
 
 
 Version 2.0.0b12 (2024-10-03)

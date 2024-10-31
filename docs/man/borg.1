@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2024-10-03" "" "borg backup tool"
+.TH "BORG" 1 "2024-10-31" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -230,21 +230,21 @@ Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style
 .sp
 \fBRemote repositories\fP accessed via ssh \fI\%user@host\fP:
 .sp
-\fBssh://user@host:port/path/to/repo\fP \- absolute path
+\fBssh://user@host:port//abs/path/to/repo\fP \- absolute path
 .sp
-\fBssh://user@host:port/./path/to/repo\fP \- path relative to current directory
-.sp
-\fBssh://user@host:port/~/path/to/repo\fP \- path relative to user\(aqs home directory
+\fBssh://user@host:port/rel/path/to/repo\fP \- path relative to current directory
 .sp
 \fBRemote repositories\fP accessed via sftp:
 .sp
-\fBsftp://user@host:port/path/to/repo\fP \- absolute path
+\fBsftp://user@host:port//abs/path/to/repo\fP \- absolute path
+.sp
+\fBsftp://user@host:port/rel/path/to/repo\fP \- path relative to current directory
 .sp
 For ssh and sftp URLs, the \fBuser@\fP and \fB:port\fP parts are optional.
 .sp
 \fBRemote repositories\fP accessed via rclone:
 .sp
-\fBrclone://remote:path\fP \- see the rclone docs for more details.
+\fBrclone:remote:path\fP \- see the rclone docs for more details about remote:path.
 .sp
 If you frequently need the same repo URL, it is a good idea to set the
 \fBBORG_REPO\fP environment variable to set a default for the repo URL:
@@ -253,7 +253,7 @@ If you frequently need the same repo URL, it is a good idea to set the
 .sp
 .nf
 .ft C
-export BORG_REPO=\(aqssh://user@host:port/path/to/repo\(aq
+export BORG_REPO=\(aqssh://user@host:port/rel/path/to/repo\(aq
 .ft P
 .fi
 .UNINDENT
@@ -382,6 +382,8 @@ _
 .sp
 If you use \fB\-\-show\-rc\fP, the return code is also logged at the indicated
 level as the last log entry.
+.sp
+The modern exit codes (return codes, \(dqrc\(dq) are documented there: \fImsgid\fP
 .SS Environment Variables
 .sp
 Borg uses some environment variables for automation:

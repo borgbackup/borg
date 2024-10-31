@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-CREATE" 1 "2024-10-03" "" "borg backup tool"
+.TH "BORG-REPO-CREATE" 1 "2024-10-31" "" "borg backup tool"
 .SH NAME
 borg-repo-create \- Create a new, empty repository
 .SH SYNOPSIS
@@ -37,6 +37,10 @@ borg [common options] repo\-create [options]
 .sp
 This command creates a new, empty repository. A repository is a \fBborgstore\fP store
 containing the deduplicated data from zero or more archives.
+.sp
+Repository creation can be quite slow for some kinds of stores (e.g. for \fBsftp:\fP) \-
+this is due to borgstore pre\-creating all directories needed, making usage of the
+store faster.
 .SS Encryption mode TLDR
 .sp
 The encryption mode can only be configured when creating a new repository \- you can

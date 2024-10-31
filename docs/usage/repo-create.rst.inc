@@ -65,6 +65,10 @@ Description
 This command creates a new, empty repository. A repository is a ``borgstore`` store
 containing the deduplicated data from zero or more archives.
 
+Repository creation can be quite slow for some kinds of stores (e.g. for ``sftp:``) -
+this is due to borgstore pre-creating all directories needed, making usage of the
+store faster.
+
 Encryption mode TLDR
 ++++++++++++++++++++
 

@@ -91,3 +91,12 @@ Borg archives can have a set of tags which can be used for matching archives.
 
 You can set the tags to a specific set of tags or you can add or remove
 tags from the current set of tags.
+
+User defined tags must not start with `@` because such tags are considered
+special and users are only allowed to use known special tags:
+
+``@PROT``: protects archives against archive deletion or pruning.
+
+Pre-existing special tags can not be removed via ``--set``. You can still use
+``--set``, but you must give pre-existing special tags also (so they won't be
+removed).

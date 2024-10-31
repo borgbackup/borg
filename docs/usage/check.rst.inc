@@ -96,8 +96,8 @@ It consists of two major steps:
    the repository. The read data is checked by size and hash. Bit rot and other
    types of accidental damage can be detected this way. Running the repository
    check can be split into multiple partial checks using ``--max-duration``.
-   When checking a remote repository, please note that the checks run on the
-   server and do not cause significant network traffic.
+   When checking a ssh:// remote repository, please note that the checks run on
+   the server and do not cause significant network traffic.
 
 2. Checking consistency and correctness of the archive metadata and optionally
    archive data (requires ``--verify-data``). This includes ensuring that the

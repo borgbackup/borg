@@ -45,6 +45,10 @@ borg prune
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``-m``, ``--keep-monthly``                   | number of monthly archives to keep                                                                |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--keep-13weekly``                          | number of quarterly archives to keep (13 week strategy)                                           |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--keep-3monthly``                          | number of quarterly archives to keep (3 month strategy)                                           |
+    +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``-y``, ``--keep-yearly``                    | number of yearly archives to keep                                                                 |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                 |
@@ -92,6 +96,8 @@ borg prune
         -d, --keep-daily      number of daily archives to keep
         -w, --keep-weekly     number of weekly archives to keep
         -m, --keep-monthly    number of monthly archives to keep
+        --keep-13weekly       number of quarterly archives to keep (13 week strategy)
+        --keep-3monthly       number of quarterly archives to keep (3 month strategy)
         -y, --keep-yearly     number of yearly archives to keep
 
 
@@ -146,10 +152,15 @@ rules do not count towards those of later rules. The time that each backup
 starts is used for pruning purposes. Dates and times are interpreted in the local
 timezone of the system where borg prune runs, and weeks go from Monday to Sunday.
 Specifying a negative number of archives to keep means that there is no limit.
-As of borg 1.2.0, borg will retain the oldest archive if any of the secondly,
-minutely, hourly, daily, weekly, monthly, or yearly rules was not otherwise able to
-meet its retention target. This enables the first chronological archive to continue
-aging until it is replaced by a newer archive that meets the retention criteria.
+
+Borg will retain the oldest archive if any of the secondly, minutely, hourly,
+daily, weekly, monthly, quarterly, or yearly rules was not otherwise able to
+meet its retention target. This enables the first chronological archive to
+continue aging until it is replaced by a newer archive that meets the retention
+criteria.
+
+The ``--keep-13weekly`` and ``--keep-3monthly`` rules are two different
+strategies for keeping archives every quarter year.
 
 The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
 keep the last N archives under the assumption that you do not create more than one

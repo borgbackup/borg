@@ -193,7 +193,7 @@ class Repository:
             # to build the ChunkIndex the slow way by listing all the directories.
             from borg.cache import write_chunkindex_to_repo_cache
 
-            write_chunkindex_to_repo_cache(self, ChunkIndex(), compact=True, clear=True, force_write=True)
+            write_chunkindex_to_repo_cache(self, ChunkIndex(), clear=True, force_write=True)
         finally:
             self.store.close()
 
@@ -385,7 +385,7 @@ class Repository:
                     # if we did a full pass in one go, we built a complete, uptodate ChunkIndex, cache it!
                     from .cache import write_chunkindex_to_repo_cache
 
-                    write_chunkindex_to_repo_cache(self, chunks, compact=True, clear=True, force_write=True)
+                    write_chunkindex_to_repo_cache(self, chunks, clear=True, force_write=True)
         except StoreObjectNotFound:
             # it can be that there is no "data/" at all, then it crashes when iterating infos.
             pass

@@ -13,7 +13,7 @@ from itertools import islice
 from typing import Callable, DefaultDict
 
 from .constants import *  # NOQA
-from .hashindex import NSIndexEntry, NSIndex, NSIndex1, hashindex_variant
+from .hashindex import NSIndex1Entry, NSIndex1
 from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
 from .helpers import Location
 from .helpers import ProgressIndicatorPercent
@@ -562,16 +562,12 @@ class LegacyRepository:
 
     def open_index(self, transaction_id, auto_recover=True):
         if transaction_id is None:
-            return NSIndex()
+            return NSIndex1()
         index_path = os.path.join(self.path, "index.%d" % transaction_id)
-        variant = hashindex_variant(index_path)
         integrity_data = self._read_integrity(transaction_id, "index")
         try:
             with IntegrityCheckedFile(index_path, write=False, integrity_data=integrity_data) as fd:
-                if variant == 2:
-                    return NSIndex.read(fd)
-                if variant == 1:  # legacy
-                    return NSIndex1.read(fd)
+                return NSIndex1.read(fd)
         except (ValueError, OSError, FileIntegrityError) as exc:
             logger.warning("Repository index missing or corrupted, trying to recover from: %s", exc)
             os.unlink(index_path)
@@ -864,7 +860,7 @@ class LegacyRepository:
                     except LoggedIO.SegmentFull:
                         complete_xfer()
                         new_segment, offset = self.io.write_put(key, data)
-                    self.index[key] = NSIndexEntry(new_segment, offset, len(data))
+                    self.index[key] = NSIndex1Entry(new_segment, offset)
                     segments.setdefault(new_segment, 0)
                     segments[new_segment] += 1
                     segments[segment] -= 1
@@ -1001,7 +997,7 @@ class LegacyRepository:
                     self.shadow_index.setdefault(key, []).append(in_index.segment)
                 except KeyError:
                     pass
-                self.index[key] = NSIndexEntry(segment, offset, size)
+                self.index[key] = NSIndex1Entry(segment, offset)
                 self.segments[segment] += 1
                 self.storage_quota_use += header_size(tag) + size
             elif tag == TAG_DELETE:
@@ -1015,7 +1011,7 @@ class LegacyRepository:
                         # the old index is not necessarily valid for this transaction (e.g. compaction); if the segment
                         # is already gone, then it was already compacted.
                         self.segments[in_index.segment] -= 1
-                        self.compact[in_index.segment] += header_size(tag) + in_index.size
+                        self.compact[in_index.segment] += header_size(tag) + 0
                         self.shadow_index.setdefault(key, []).append(in_index.segment)
             elif tag == TAG_COMMIT:
                 continue
@@ -1219,8 +1215,8 @@ class LegacyRepository:
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
         try:
-            in_index = NSIndexEntry(*((self.index[id] + (None,))[:3]))  # legacy: index entries have no size element
-            return self.io.read(in_index.segment, in_index.offset, id, expected_size=in_index.size, read_data=read_data)
+            in_index = NSIndex1Entry(*(self.index[id][:2]))  # legacy: index entries have no size element
+            return self.io.read(in_index.segment, in_index.offset, id, read_data=read_data)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
 
@@ -1245,12 +1241,12 @@ class LegacyRepository:
             # it is essential to do a delete first to get correct quota bookkeeping
             # and also a correctly updated shadow_index, so that the compaction code
             # does not wrongly resurrect an old PUT by dropping a DEL that is still needed.
-            self._delete(id, in_index.segment, in_index.offset, in_index.size)
+            self._delete(id, in_index.segment, in_index.offset, 0)
         segment, offset = self.io.write_put(id, data)
         self.storage_quota_use += header_size(TAG_PUT2) + len(data)
         self.segments.setdefault(segment, 0)
         self.segments[segment] += 1
-        self.index[id] = NSIndexEntry(segment, offset, len(data))
+        self.index[id] = NSIndex1Entry(segment, offset)
         if self.storage_quota and self.storage_quota_use > self.storage_quota:
             self.transaction_doomed = self.StorageQuotaExceeded(
                 format_file_size(self.storage_quota), format_file_size(self.storage_quota_use)
@@ -1269,7 +1265,7 @@ class LegacyRepository:
             in_index = self.index.pop(id)
         except KeyError:
             raise self.ObjectNotFound(id, self.path) from None
-        self._delete(id, in_index.segment, in_index.offset, in_index.size)
+        self._delete(id, in_index.segment, in_index.offset, 0)
 
     def _delete(self, id, segment, offset, size):
         # common code used by put and delete

@@ -21,19 +21,12 @@ import sys
 import time
 from unittest import TestResult, TestSuite, defaultTestLoader
 
-from .testsuite.hashindex_test import HashIndexDataTestCase, HashIndexRefcountingTestCase, HashIndexTestCase
 from .testsuite.crypto_test import CryptoTestCase
 from .testsuite.chunker_test import ChunkerTestCase
 
-SELFTEST_CASES = [
-    HashIndexDataTestCase,
-    HashIndexRefcountingTestCase,
-    HashIndexTestCase,
-    CryptoTestCase,
-    ChunkerTestCase,
-]
+SELFTEST_CASES = [CryptoTestCase, ChunkerTestCase]
 
-SELFTEST_COUNT = 19
+SELFTEST_COUNT = 11
 
 
 class SelfTestResult(TestResult):

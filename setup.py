@@ -175,12 +175,12 @@ if not on_rtd:
             dict(sources=[platform_linux_source], libraries=["acl"], extra_compile_args=cflags)
         )
 
-    # note: _chunker.c and _hashindex.c are relatively complex/large pieces of handwritten C code,
-    # thus we undef NDEBUG for them, so the compiled code will contain and execute assert().
+    # note: _chunker.c is a relatively complex/large piece of handwritten C code,
+    # thus we undef NDEBUG for it, so the compiled code will contain and execute assert().
     ext_modules += [
         Extension("borg.crypto.low_level", **crypto_ext_kwargs),
         Extension("borg.compress", **compress_ext_kwargs),
-        Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags, undef_macros=["NDEBUG"]),
+        Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags),
         Extension("borg.item", [item_source], extra_compile_args=cflags),
         Extension("borg.chunker", [chunker_source], extra_compile_args=cflags, undef_macros=["NDEBUG"]),
         Extension("borg.checksums", **checksums_ext_kwargs),

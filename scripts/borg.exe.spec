@@ -10,9 +10,9 @@ here = os.path.dirname(os.path.abspath(SPEC))
 basepath = os.path.abspath(os.path.join(here, '..'))
 
 if is_win32:
-    hiddenimports = []
+    hiddenimports = ['borghash']
 else:
-    hiddenimports = ['borg.platform.posix', 'pkg_resources.py2_warn', ]
+    hiddenimports = ['borg.platform.posix', 'pkg_resources.py2_warn', 'borghash']
 
 block_cipher = None
 

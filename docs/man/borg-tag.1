@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-TAG" 1 "2024-10-03" "" "borg backup tool"
+.TH "BORG-TAG" 1 "2024-10-31" "" "borg backup tool"
 .SH NAME
 borg-tag \- Manage tags
 .SH SYNOPSIS
@@ -41,6 +41,15 @@ Borg archives can have a set of tags which can be used for matching archives.
 .sp
 You can set the tags to a specific set of tags or you can add or remove
 tags from the current set of tags.
+.sp
+User defined tags must not start with \fI@\fP because such tags are considered
+special and users are only allowed to use known special tags:
+.sp
+\fB@PROT\fP: protects archives against archive deletion or pruning.
+.sp
+Pre\-existing special tags can not be removed via \fB\-\-set\fP\&. You can still use
+\fB\-\-set\fP, but you must give pre\-existing special tags also (so they won\(aqt be
+removed).
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

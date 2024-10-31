@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CHECK" 1 "2024-10-03" "" "borg backup tool"
+.TH "BORG-CHECK" 1 "2024-10-31" "" "borg backup tool"
 .SH NAME
 borg-check \- Check repository consistency
 .SH SYNOPSIS
@@ -44,8 +44,8 @@ the file magic headers, and both the metadata and data of all objects in
 the repository. The read data is checked by size and hash. Bit rot and other
 types of accidental damage can be detected this way. Running the repository
 check can be split into multiple partial checks using \fB\-\-max\-duration\fP\&.
-When checking a remote repository, please note that the checks run on the
-server and do not cause significant network traffic.
+When checking a \fI\%ssh://\fP remote repository, please note that the checks run on
+the server and do not cause significant network traffic.
 .IP 2. 3
 Checking consistency and correctness of the archive metadata and optionally
 archive data (requires \fB\-\-verify\-data\fP). This includes ensuring that the

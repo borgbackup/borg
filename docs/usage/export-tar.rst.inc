@@ -110,6 +110,7 @@ Depending on the ``-tar-format`` option, these formats are created:
 | BORG         | BORG specific, like PAX   | all as supported by borg   |
 +--------------+---------------------------+----------------------------+
 | PAX          | POSIX.1-2001 (pax) format | GNU + atime/ctime/mtime ns |
+|              |                           | + xattrs                   |
 +--------------+---------------------------+----------------------------+
 | GNU          | GNU tar format            | mtime s, no atime/ctime,   |
 |              |                           | no ACLs/xattrs/bsdflags    |

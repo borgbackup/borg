@@ -630,6 +630,9 @@ def load_chunks_hash(repository) -> bytes:
     return hash
 
 
+CHUNKINDEX_HASH_SEED = 1
+
+
 def write_chunkindex_to_repo_cache(repository, chunks, *, clear=False, force_write=False):
     cached_hash = load_chunks_hash(repository)
     with io.BytesIO() as f:
@@ -638,7 +641,7 @@ def write_chunkindex_to_repo_cache(repository, chunks, *, clear=False, force_wri
     if clear:
         # if we don't need the in-memory chunks index anymore:
         chunks.clear()  # free memory, immediately
-    new_hash = xxh64(data)
+    new_hash = xxh64(data, seed=CHUNKINDEX_HASH_SEED)
     if force_write or new_hash != cached_hash:
         # when an updated chunks index is stored into the cache, we also store its hash into the cache.
         # when a client is loading the chunks index from a cache, it has to compare its xxh64
@@ -666,7 +669,7 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
             # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
             logger.debug("cache/chunks not found in the repository.")
         else:
-            if xxh64(chunks_data) == wanted_hash:
+            if xxh64(chunks_data, seed=CHUNKINDEX_HASH_SEED) == wanted_hash:
                 logger.debug("cache/chunks is valid.")
                 with io.BytesIO(chunks_data) as f:
                     chunks = ChunkIndex.read(f)

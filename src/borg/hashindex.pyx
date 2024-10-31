@@ -3,7 +3,7 @@ from collections import namedtuple
 import os
 import struct
 
-from borghash cimport HashTableNT
+from borghash import HashTableNT
 
 API_VERSION = '1.2_01'
 

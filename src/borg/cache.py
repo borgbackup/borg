@@ -867,6 +867,8 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
             integrity_data = self._write_files_cache(self._files)
             self.cache_config.integrity[self.files_cache_name()] = integrity_data
         if self._chunks is not None:
+            for key, value in sorted(self._chunks.stats.items()):
+                logger.debug(f"Chunks index stats: {key}: {value}")
             pi.output("Saving chunks cache")
             self._write_chunks_cache(self._chunks)  # cache/chunks in repo has a different integrity mechanism
         pi.output("Saving cache config")

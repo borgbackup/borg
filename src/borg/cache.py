@@ -671,7 +671,7 @@ def load_chunks_hash(repository) -> bytes:
     return hash
 
 
-CHUNKINDEX_HASH_SEED = 1
+CHUNKINDEX_HASH_SEED = 2
 
 
 def write_chunkindex_to_repo_cache(repository, chunks, *, clear=False, force_write=False):

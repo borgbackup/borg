@@ -521,8 +521,8 @@ class FilesCacheMixin:
                         break
                     u.feed(data)
                     try:
-                        for path_hash, item in u:
-                            entry = FileCacheEntry(*item)
+                        for path_hash, entry in u:
+                            entry = FileCacheEntry(*entry)
                             entry = entry._replace(age=entry.age + 1)
                             files[path_hash] = self.compress_entry(entry)
                     except (TypeError, ValueError) as exc:
@@ -553,8 +553,8 @@ class FilesCacheMixin:
             entries = 0
             age_discarded = 0
             race_discarded = 0
-            for path_hash, item in files.items():
-                entry = FileCacheEntry(*self.decompress_entry(item))
+            for path_hash, entry in files.items():
+                entry = self.decompress_entry(entry)
                 if entry.age == 0:  # current entries
                     if max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < discard_after:
                         # Only keep files seen in this backup that old enough not to suffer race conditions relating
@@ -607,7 +607,7 @@ class FilesCacheMixin:
             files_cache_logger.debug("UNKNOWN: no file metadata in cache for: %r", hashed_path)
             return False, None
         # we know the file!
-        entry = FileCacheEntry(*self.decompress_entry(entry))
+        entry = self.decompress_entry(entry)
         if "s" in cache_mode and entry.size != st.st_size:
             files_cache_logger.debug("KNOWN-CHANGED: file size has changed: %r", hashed_path)
             return True, None

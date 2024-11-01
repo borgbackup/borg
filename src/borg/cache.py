@@ -760,14 +760,17 @@ class ChunksMixin:
         return self._chunks
 
     def seen_chunk(self, id, size=None):
-        entry = self.chunks.get(id, ChunkIndexEntry(0, None))
-        if entry.refcount and size is not None:
-            assert isinstance(entry.size, int)
-            if not entry.size:
+        entry = self.chunks.get(id)
+        entry_exists = entry is not None
+        if entry_exists and size is not None:
+            if entry.size == 0:
                 # AdHocWithFilesCache:
                 # Here *size* is used to update the chunk's size information, which will be zero for existing chunks.
                 self.chunks[id] = entry._replace(size=size)
-        return entry.refcount != 0
+            else:
+                # in case we already have a size information in the entry, check consistency:
+                assert size == entry.size
+        return entry_exists
 
     def reuse_chunk(self, id, size, stats):
         assert isinstance(size, int) and size > 0

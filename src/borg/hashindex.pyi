@@ -5,13 +5,15 @@ API_VERSION: str
 PATH_OR_FILE = Union[str, IO]
 
 class ChunkIndexEntry(NamedTuple):
-    refcount: int
+    flags: int
     size: int
 
 CIE = Union[Tuple[int, int], Type[ChunkIndexEntry]]
 
 class ChunkIndex:
-    def add(self, key: bytes, refs: int, size: int) -> None: ...
+    F_NONE: int
+    F_USED: int
+    def add(self, key: bytes, size: int) -> None: ...
     def iteritems(self, marker: bytes = ...) -> Iterator: ...
     def __contains__(self, key: bytes) -> bool: ...
     def __getitem__(self, key: bytes) -> Type[ChunkIndexEntry]: ...

@@ -56,8 +56,7 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
     def iteritems(self):
         yield from self.ht.items()
 
-    def add(self, key, refs, size):
-        assert refs > 0
+    def add(self, key, size):
         v = self.get(key)
         if v is None:
             flags = self.F_USED

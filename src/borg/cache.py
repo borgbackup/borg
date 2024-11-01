@@ -808,7 +808,7 @@ class ChunksMixin:
         )
         self.repository.put(id, cdata, wait=wait)
         self.last_refresh_dt = now  # .put also refreshed the lock
-        self.chunks.add(id, 1, size)
+        self.chunks.add(id, size)
         stats.update(size, not exists)
         return ChunkListEntry(id, size)
 

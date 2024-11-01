@@ -381,6 +381,46 @@ class FilesCacheMixin:
         self._newest_path_hashes = set()
         self.start_backup = start_backup
 
+    def compress_entry(self, entry):
+        """
+        compress a files cache entry:
+
+        - use the ChunkIndex to "compress" the entry's chunks list (256bit key + 32bit size -> 32bit index).
+        - use msgpack to pack the entry (reduce memory usage by packing and having less python objects).
+
+        Note: the result is only valid while the ChunkIndex is in memory!
+        """
+        assert isinstance(self.chunks, ChunkIndex), f"{self.chunks} is not a ChunkIndex"
+        assert isinstance(entry, FileCacheEntry)
+        compressed_chunks = []
+        for id, size in entry.chunks:
+            cie = self.chunks.get(id)
+            assert cie is not None
+            assert cie.refcount > 0
+            assert size == cie.size
+            idx = self.chunks.k_to_idx(id)
+            compressed_chunks.append(idx)
+        entry = entry._replace(chunks=compressed_chunks)
+        return msgpack.packb(entry)
+
+    def decompress_entry(self, entry_packed):
+        """reverse operation of compress_entry"""
+        assert isinstance(self.chunks, ChunkIndex), f"{self.chunks} is not a ChunkIndex"
+        assert isinstance(entry_packed, bytes)
+        entry = msgpack.unpackb(entry_packed)
+        entry = FileCacheEntry(*entry)
+        chunks = []
+        for idx in entry.chunks:
+            assert isinstance(idx, int), f"{idx} is not an int"
+            id = self.chunks.idx_to_k(idx)
+            cie = self.chunks.get(id)
+            assert cie is not None
+            assert cie.refcount > 0
+            assert cie.size > 0
+            chunks.append((id, cie.size))
+        entry = entry._replace(chunks=chunks)
+        return entry
+
     @property
     def files(self):
         if self._files is None:
@@ -440,7 +480,7 @@ class FilesCacheMixin:
                     mtime=int_to_timestamp(mtime_ns),
                     chunks=item.chunks,
                 )
-                files[path_hash] = msgpack.packb(entry)  # takes about 240 Bytes per file
+                files[path_hash] = self.compress_entry(entry)
         # deal with special snapshot / timestamp granularity case, see FAQ:
         for path_hash in self._newest_path_hashes:
             del files[path_hash]
@@ -481,10 +521,10 @@ class FilesCacheMixin:
                         break
                     u.feed(data)
                     try:
-                        for path_hash, item in u:
-                            entry = FileCacheEntry(*item)
-                            # in the end, this takes about 240 Bytes per file
-                            files[path_hash] = msgpack.packb(entry._replace(age=entry.age + 1))
+                        for path_hash, entry in u:
+                            entry = FileCacheEntry(*entry)
+                            entry = entry._replace(age=entry.age + 1)
+                            files[path_hash] = self.compress_entry(entry)
                     except (TypeError, ValueError) as exc:
                         msg = "The files cache seems invalid. [%s]" % str(exc)
                         break
@@ -513,8 +553,8 @@ class FilesCacheMixin:
             entries = 0
             age_discarded = 0
             race_discarded = 0
-            for path_hash, item in files.items():
-                entry = FileCacheEntry(*msgpack.unpackb(item))
+            for path_hash, entry in files.items():
+                entry = self.decompress_entry(entry)
                 if entry.age == 0:  # current entries
                     if max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < discard_after:
                         # Only keep files seen in this backup that old enough not to suffer race conditions relating
@@ -567,7 +607,7 @@ class FilesCacheMixin:
             files_cache_logger.debug("UNKNOWN: no file metadata in cache for: %r", hashed_path)
             return False, None
         # we know the file!
-        entry = FileCacheEntry(*msgpack.unpackb(entry))
+        entry = self.decompress_entry(entry)
         if "s" in cache_mode and entry.size != st.st_size:
             files_cache_logger.debug("KNOWN-CHANGED: file size has changed: %r", hashed_path)
             return True, None
@@ -590,7 +630,8 @@ class FilesCacheMixin:
         # to avoid everything getting chunked again. to be able to re-enable the
         # V comparison in a future backup run (and avoid chunking everything again at
         # that time), we need to update V in the cache with what we see in the filesystem.
-        self.files[path_hash] = msgpack.packb(entry._replace(inode=st.st_ino, ctime=ctime, mtime=mtime, age=0))
+        entry = entry._replace(inode=st.st_ino, ctime=ctime, mtime=mtime, age=0)
+        self.files[path_hash] = self.compress_entry(entry)
         chunks = [ChunkListEntry(*chunk) for chunk in entry.chunks]  # convert to list of namedtuple
         return True, chunks
 
@@ -611,7 +652,7 @@ class FilesCacheMixin:
             mtime=int_to_timestamp(mtime_ns),
             chunks=chunks,
         )
-        self.files[path_hash] = msgpack.packb(entry)
+        self.files[path_hash] = self.compress_entry(entry)
         self._newest_cmtime = max(self._newest_cmtime or 0, ctime_ns)
         self._newest_cmtime = max(self._newest_cmtime or 0, mtime_ns)
         files_cache_logger.debug(

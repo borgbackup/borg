@@ -73,6 +73,12 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
     def stats(self):
         return self.ht.stats
 
+    def k_to_idx(self, key):
+        return self.ht.k_to_idx(key)
+
+    def idx_to_k(self, idx):
+        return self.ht.idx_to_k(idx)
+
 
 FuseVersionsIndexEntry = namedtuple('FuseVersionsIndexEntry', 'version hash')
 

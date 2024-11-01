@@ -3,7 +3,7 @@ import struct
 
 import pytest
 
-from ..hashindex import ChunkIndex
+from ..hashindex import ChunkIndex, ChunkIndexEntry
 
 
 def H(x):
@@ -19,10 +19,14 @@ def H2(x):
 def test_chunkindex_add():
     chunks = ChunkIndex()
     x = H2(1)
-    chunks.add(x, 5, 6)
-    assert chunks[x] == (5, 6)
+    chunks.add(x, 1, 0)
+    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0)
+    chunks.add(x, 1, 2)  # updating size (we do not have a size yet)
+    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=2)
     chunks.add(x, 1, 2)
-    assert chunks[x] == (6, 2)
+    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=2)
+    with pytest.raises(AssertionError):
+        chunks.add(x, 1, 3)  # inconsistent size (we already have a different size)
 
 
 def test_keyerror():
@@ -31,4 +35,4 @@ def test_keyerror():
     with pytest.raises(KeyError):
         chunks[x]
     with pytest.raises(struct.error):
-        chunks.add(x, -1, 0)
+        chunks[x] = ChunkIndexEntry(flags=2**33, size=0)

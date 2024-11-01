@@ -34,14 +34,16 @@ class HTProxyMixin:
         self.ht.clear()
 
 
-ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size')
+ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'flags size')
 
 
 class ChunkIndex(HTProxyMixin, MutableMapping):
     """
     Mapping from key256 to (refcount32, size32) to track chunks in the repository.
     """
-    MAX_VALUE = 2**32 - 1  # borghash has the full uint32_t range
+    # .flags values: 2^0 .. 2^31
+    F_NONE = 0  # all flags cleared
+    F_USED = 1  # chunk is used/referenced
 
     def __init__(self, capacity=1000, path=None, usable=None):
         if path:
@@ -55,9 +57,14 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         yield from self.ht.items()
 
     def add(self, key, refs, size):
-        v = self.get(key, ChunkIndexEntry(0, 0))
-        refcount = min(self.MAX_VALUE, v.refcount + refs)
-        self[key] = v._replace(refcount=refcount, size=size)
+        assert refs > 0
+        v = self.get(key)
+        if v is None:
+            flags = self.F_USED
+        else:
+            flags = v.flags | self.F_USED
+            assert v.size == 0 or v.size == size
+        self[key] = ChunkIndexEntry(flags=flags, size=size)
 
     @classmethod
     def read(cls, path):

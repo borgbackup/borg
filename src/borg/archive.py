@@ -1874,7 +1874,7 @@ class ArchiveChecker:
             # either we already have this chunk in repo and chunks index or we add it now
             if id_ not in self.chunks:
                 assert cdata is not None
-                self.chunks[id_] = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=size)
+                self.chunks[id_] = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=size)
                 if self.repair:
                     self.repository.put(id_, cdata)
 

@@ -324,10 +324,10 @@ class Repository:
         objs_checked = objs_errors = 0
         chunks = ChunkIndex()
         # we don't do refcounting anymore, neither we can know here whether any archive
-        # is using this object, but we assume that this is the case and set refcount to
-        # MAX_VALUE. As we don't do garbage collection here, this is not a problem.
+        # is using this object, but we assume that this is the case.
+        # As we don't do garbage collection here, this is not a problem.
         # We also don't know the plaintext size, so we set it to 0.
-        init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
+        init_entry = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0)
         infos = self.store.list("data")
         try:
             for info in infos:

@@ -396,7 +396,7 @@ class FilesCacheMixin:
         for id, size in entry.chunks:
             cie = self.chunks.get(id)
             assert cie is not None
-            assert cie.refcount > 0
+            assert cie.flags & ChunkIndex.F_USED
             assert size == cie.size
             idx = self.chunks.k_to_idx(id)
             compressed_chunks.append(idx)
@@ -415,7 +415,7 @@ class FilesCacheMixin:
             id = self.chunks.idx_to_k(idx)
             cie = self.chunks.get(id)
             assert cie is not None
-            assert cie.refcount > 0
+            assert cie.flags & ChunkIndex.F_USED
             assert cie.size > 0
             chunks.append((id, cie.size))
         entry = entry._replace(chunks=chunks)
@@ -671,7 +671,7 @@ def load_chunks_hash(repository) -> bytes:
     return hash
 
 
-CHUNKINDEX_HASH_SEED = 1
+CHUNKINDEX_HASH_SEED = 2
 
 
 def write_chunkindex_to_repo_cache(repository, chunks, *, clear=False, force_write=False):
@@ -722,10 +722,9 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
     chunks = ChunkIndex()
     t0 = perf_counter()
     num_chunks = 0
-    # The repo says it has these chunks, so we assume they are referenced chunks.
-    # We do not care for refcounting anymore, so we just set refcount = MAX_VALUE.
+    # The repo says it has these chunks, so we assume they are referenced/used chunks.
     # We do not know the plaintext size (!= stored_size), thus we set size = 0.
-    init_entry = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
+    init_entry = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0)
     for id, stored_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
         num_chunks += 1
         chunks[id] = init_entry
@@ -809,7 +808,7 @@ class ChunksMixin:
         )
         self.repository.put(id, cdata, wait=wait)
         self.last_refresh_dt = now  # .put also refreshed the lock
-        self.chunks.add(id, ChunkIndex.MAX_VALUE, size)
+        self.chunks.add(id, size)
         stats.update(size, not exists)
         return ChunkListEntry(id, size)
 

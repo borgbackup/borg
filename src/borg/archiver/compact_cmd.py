@@ -50,20 +50,20 @@ class ArchiveGarbageCollector:
         """Build a dict id -> size of all chunks present in the repository"""
         chunks = ChunkIndex()
         for id, stored_size in repo_lister(self.repository, limit=LIST_SCAN_LIMIT):
-            # we add this id to the chunks index, using refcount == 0, because
+            # we add this id to the chunks index (as unused chunk), because
             # we do not know yet whether it is actually referenced from some archives.
             # we "abuse" the size field here. usually there is the plaintext size,
             # but we use it for the size of the stored object here.
-            chunks[id] = ChunkIndexEntry(refcount=0, size=stored_size)
+            chunks[id] = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=stored_size)
         return chunks
 
     def save_chunk_index(self):
         # first clean up:
         for id, entry in self.chunks.iteritems():
             # we already deleted the unused chunks, so everything left must be used:
-            assert entry.refcount == ChunkIndex.MAX_VALUE
+            assert entry.flags & ChunkIndex.F_USED
             # as we put the wrong size in there, we need to clean up the size:
-            self.chunks[id] = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=0)
+            self.chunks[id] = entry._replace(size=0)
         # now self.chunks is an uptodate ChunkIndex, usable for general borg usage!
         write_chunkindex_to_repo_cache(self.repository, self.chunks, clear=True, force_write=True)
         self.chunks = None  # nothing there (cleared!)
@@ -74,8 +74,8 @@ class ArchiveGarbageCollector:
         def use_it(id, *, wanted=False):
             entry = self.chunks.get(id)
             if entry is not None:
-                # the chunk is in the repo, mark it used by setting refcount to max.
-                self.chunks[id] = ChunkIndexEntry(refcount=ChunkIndex.MAX_VALUE, size=entry.size)
+                # the chunk is in the repo, mark it used.
+                self.chunks[id] = entry._replace(flags=entry.flags | ChunkIndex.F_USED)
                 if wanted:
                     # chunk id is from chunks_healthy list: a lost chunk has re-appeared!
                     reappeared_chunks.add(id)
@@ -131,7 +131,7 @@ class ArchiveGarbageCollector:
         logger.info("Determining unused objects...")
         unused = set()
         for id, entry in self.chunks.iteritems():
-            if entry.refcount == 0:
+            if not (entry.flags & ChunkIndex.F_USED):
                 unused.add(id)
         logger.info(f"Deleting {len(unused)} unused objects...")
         pi = ProgressIndicatorPercent(

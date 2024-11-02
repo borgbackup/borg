@@ -1833,6 +1833,16 @@ class ArchiveChecker:
         )
         for chunk_id, _ in self.chunks.iteritems():
             pi.show()
+            cdata = self.repository.get(chunk_id, read_data=False)  # only get metadata
+            try:
+                meta = self.repo_objs.parse_meta(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
+            except IntegrityErrorBase as exc:
+                logger.error("Skipping corrupted chunk: %s", exc)
+                self.error_found = True
+                continue
+            if meta["type"] != ROBJ_ARCHIVE_META:
+                continue
+            # now we know it is an archive metadata chunk, load the full object from the repo:
             cdata = self.repository.get(chunk_id)
             try:
                 meta, data = self.repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_DONTCARE)
@@ -1841,7 +1851,7 @@ class ArchiveChecker:
                 self.error_found = True
                 continue
             if meta["type"] != ROBJ_ARCHIVE_META:
-                continue
+                continue  # should never happen
             try:
                 archive = msgpack.unpackb(data)
             # Ignore exceptions that might be raised when feeding msgpack with invalid data

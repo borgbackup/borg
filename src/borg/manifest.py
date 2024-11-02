@@ -327,7 +327,7 @@ class Archives:
         # delete an archive
         assert isinstance(id, bytes)
         assert not self.legacy
-        self.repository.store_delete(f"archives/{bin_to_hex(id)}")
+        self.repository.store_move(f"archives/{bin_to_hex(id)}", delete=True)  # soft-delete
 
     def list(
         self,

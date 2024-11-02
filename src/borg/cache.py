@@ -397,7 +397,10 @@ class FilesCacheMixin:
             cie = self.chunks.get(id)
             assert cie is not None
             assert cie.flags & ChunkIndex.F_USED
-            assert size == cie.size
+            if cie.size == 0:  # size is not known in the chunks index yet
+                self.chunks[id] = cie._replace(size=size)
+            else:
+                assert size == cie.size, f"{size} != {cie.size}"
             idx = self.chunks.k_to_idx(id)
             compressed_chunks.append(idx)
         entry = entry._replace(chunks=compressed_chunks)

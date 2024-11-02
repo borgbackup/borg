@@ -336,6 +336,12 @@ class Archives:
         assert not self.legacy
         self.repository.store_move(f"archives/{bin_to_hex(id)}", delete=True)  # soft-delete
 
+    def undelete_by_id(self, id):
+        # undelete an archive
+        assert isinstance(id, bytes)
+        assert not self.legacy
+        self.repository.store_move(f"archives/{bin_to_hex(id)}", undelete=True)
+
     def list(
         self,
         *,
@@ -408,10 +414,10 @@ class Archives:
             deleted=getattr(args, "deleted", False),
         )
 
-    def get_one(self, match, *, match_end=r"\Z"):
+    def get_one(self, match, *, match_end=r"\Z", deleted=False):
         """get exactly one archive matching <match>"""
         assert match is not None
-        archive_infos = self._matching_info_tuples(match, match_end)
+        archive_infos = self._matching_info_tuples(match, match_end, deleted=deleted)
         if len(archive_infos) != 1:
             raise CommandError(f"{match} needed to match precisely one archive, but matched {len(archive_infos)}.")
         return archive_infos[0]

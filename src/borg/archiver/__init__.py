@@ -92,6 +92,7 @@ from .serve_cmd import ServeMixIn
 from .tag_cmd import TagMixIn
 from .tar_cmds import TarMixIn
 from .transfer_cmd import TransferMixIn
+from .undelete_cmd import UnDeleteMixIn
 from .version_cmd import VersionMixIn
 
 
@@ -124,6 +125,7 @@ class Archiver(
     TagMixIn,
     TarMixIn,
     TransferMixIn,
+    UnDeleteMixIn,
     VersionMixIn,
 ):
     def __init__(self, lock_wait=None, prog=None):
@@ -364,6 +366,7 @@ class Archiver(
         self.build_parser_tag(subparsers, common_parser, mid_common_parser)
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)
+        self.build_parser_undelete(subparsers, common_parser, mid_common_parser)
         self.build_parser_version(subparsers, common_parser, mid_common_parser)
         return parser
 

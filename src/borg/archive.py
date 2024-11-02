@@ -500,7 +500,7 @@ class Archive:
             self.tags = set()
         else:
             if name_is_id:
-                # we also go over the manifest here to avoid quick&dirty deleted archives,
+                # we also go over the manifest here to avoid soft-deleted archives,
                 # except if we explicitly request one via deleted=True.
                 info = self.manifest.archives.get_by_id(name, deleted=deleted)
             else:

@@ -180,6 +180,7 @@ class RepositoryServer:  # pragma: no cover
         "store_load",
         "store_store",
         "store_delete",
+        "store_move",
     )
 
     def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota, use_socket):
@@ -1091,6 +1092,10 @@ class RemoteRepository:
 
     @api(since=parse_version("2.0.0b8"))
     def store_delete(self, name):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b13"))  # TODO -> b14
+    def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
         """actual remoting is done via self.call in the @api decorator"""
 
 

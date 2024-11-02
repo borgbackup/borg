@@ -537,3 +537,7 @@ class Repository:
     def store_delete(self, name):
         self._lock_refresh()
         return self.store.delete(name)
+
+    def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
+        self._lock_refresh()
+        return self.store.move(name, new_name, delete=delete, undelete=undelete, deleted=deleted)

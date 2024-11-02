@@ -1635,7 +1635,7 @@ class ArchiveChecker:
         *,
         verify_data=False,
         repair=False,
-        undelete_archives=False,
+        find_lost_archives=False,
         match=None,
         sort_by="",
         first=0,
@@ -1648,7 +1648,7 @@ class ArchiveChecker:
         """Perform a set of checks on 'repository'
 
         :param repair: enable repair mode, write updated or corrected data into repository
-        :param undelete_archives: create archive directory entries that are missing
+        :param find_lost_archives: create archive directory entries that are missing
         :param first/last/sort_by: only check this number of first/last archives ordered by sort_by
         :param match: only check archives matching this pattern
         :param older/newer: only check archives older/newer than timedelta from now
@@ -1685,7 +1685,7 @@ class ArchiveChecker:
                 rebuild_manifest = True
         if rebuild_manifest:
             self.manifest = self.rebuild_manifest()
-        if undelete_archives:
+        if find_lost_archives:
             self.rebuild_archives_directory()
         self.rebuild_archives(
             match=match, first=first, last=last, sort_by=sort_by, older=older, oldest=oldest, newer=newer, newest=newest
@@ -1815,8 +1815,10 @@ class ArchiveChecker:
         """Rebuild the archives directory, undeleting archives.
 
         Iterates through all objects in the repository looking for archive metadata blocks.
-        When finding some that do not have a corresponding archives directory entry, it will
-        create that entry (undeleting all archives).
+        When finding some that do not have a corresponding archives directory entry (either
+        a normal entry for an "existing" archive, or a soft-deleted entry for a "deleted"
+        archive), it will create that entry (making the archives directory consistent with
+        the repository).
         """
 
         def valid_archive(obj):
@@ -1862,12 +1864,18 @@ class ArchiveChecker:
                 archive = ArchiveItem(internal_dict=archive)
                 name = archive.name
                 archive_id, archive_id_hex = chunk_id, bin_to_hex(chunk_id)
-                logger.info(f"Found archive {name} {archive_id_hex}.")
-                if self.manifest.archives.exists_name_and_id(name, archive_id):
-                    logger.info("We already have an archives directory entry for this.")
+                if self.manifest.archives.exists_id(archive_id, deleted=False):
+                    logger.debug(f"We already have an archives directory entry for {name} {archive_id_hex}.")
+                elif self.manifest.archives.exists_id(archive_id, deleted=True):
+                    logger.debug(f"We already have a deleted archives directory entry for {name} {archive_id_hex}.")
                 else:
-                    logger.warning(f"Creating archives directory entry for {name} {archive_id_hex}.")
-                    self.manifest.archives.create(name, archive_id, archive.time)
+                    self.error_found = True
+                    if self.repair:
+                        logger.warning(f"Creating archives directory entry for {name} {archive_id_hex}.")
+                        self.manifest.archives.create(name, archive_id, archive.time)
+                    else:
+                        logger.warning(f"Would create archives directory entry for {name} {archive_id_hex}.")
+
         pi.finish()
         logger.info("Rebuilding missing archives directory entries completed.")
 

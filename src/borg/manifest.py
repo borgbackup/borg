@@ -222,6 +222,14 @@ class Archives:
         else:
             return name in self._archives
 
+    def exists_id(self, id, *, deleted=False):
+        # check if an archive with this id exists
+        assert isinstance(id, bytes)
+        if not self.legacy:
+            return id in self.ids(deleted=deleted)
+        else:
+            raise NotImplementedError
+
     def exists_name_and_id(self, name, id):
         # check if an archive with this name AND id exists
         assert isinstance(name, str)

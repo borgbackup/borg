@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 import shutil
 from unittest.mock import patch
 
@@ -270,18 +271,21 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
 def test_check_undelete_archives(archivers, request):
     archiver = request.getfixturevalue(archivers)
     check_cmd_setup(archiver)  # creates archive1 and archive2
-    # borg delete does it rather quick and dirty: it only kills the archives directory entry
-    cmd(archiver, "delete", "archive1")
-    cmd(archiver, "delete", "archive2")
-    output = cmd(archiver, "repo-list")
-    assert "archive1" not in output
-    assert "archive2" not in output
-    # borg check will re-discover archive1 and archive2 and new archives directory entries
-    # will be created because we requested undeleting archives.
-    cmd(archiver, "check", "--repair", "--undelete-archives", exit_code=0)
+    existing_archive_ids = set(cmd(archiver, "repo-list", "--short").splitlines())
+    create_src_archive(archiver, "archive3")
+    archive_ids = set(cmd(archiver, "repo-list", "--short").splitlines())
+    new_archive_id_hex = (archive_ids - existing_archive_ids).pop()
+    (Path(archiver.repository_path) / "archives" / new_archive_id_hex).unlink()  # lose the entry for archive3
     output = cmd(archiver, "repo-list")
     assert "archive1" in output
     assert "archive2" in output
+    assert "archive3" not in output
+    # borg check will re-discover archive3 and create a new archives directory entry.
+    cmd(archiver, "check", "--repair", "--find-lost-archives", exit_code=0)
+    output = cmd(archiver, "repo-list")
+    assert "archive1" in output
+    assert "archive2" in output
+    assert "archive3" in output
 
 
 def test_spoofed_archive(archivers, request):

@@ -101,11 +101,17 @@ class Archives:
             manifest_archives = StableDict(self._get_raw_dict())
         return manifest_archives
 
-    def ids(self):
+    def ids(self, *, deleted=False):
         # yield the binary IDs of all archives
         if not self.legacy:
             try:
-                infos = list(self.repository.store_list("archives"))
+                infos = list(self.repository.store_list("archives", deleted=deleted))
+                if deleted:
+                    # hack: store_list(deleted=True) yields deleted AND not deleted items,
+                    # guess this should be fixed in a future borgstore release.
+                    # for now, we remove the not-deleted archives here:
+                    not_deleted_infos = set(self.repository.store_list("archives", deleted=False))
+                    infos = [info for info in infos if info not in not_deleted_infos]
             except ObjectNotFound:
                 infos = []
             for info in infos:
@@ -156,13 +162,13 @@ class Archives:
             )
         return metadata
 
-    def _infos(self):
+    def _infos(self, *, deleted=False):
         # yield the infos of all archives
-        for id in self.ids():
+        for id in self.ids(deleted=deleted):
             yield self._get_archive_meta(id)
 
-    def _info_tuples(self):
-        for info in self._infos():
+    def _info_tuples(self, *, deleted=False):
+        for info in self._infos(deleted=deleted):
             yield ArchiveInfo(
                 name=info["name"],
                 id=info["id"],
@@ -172,8 +178,8 @@ class Archives:
                 host=info["hostname"],
             )
 
-    def _matching_info_tuples(self, match_patterns, match_end):
-        archive_infos = list(self._info_tuples())
+    def _matching_info_tuples(self, match_patterns, match_end, *, deleted=False):
+        archive_infos = list(self._info_tuples(deleted=deleted))
         if match_patterns:
             assert isinstance(match_patterns, list), f"match_pattern is a {type(match_patterns)}"
             for match in match_patterns:
@@ -279,13 +285,14 @@ class Archives:
             else:
                 return dict(name=name, id=values["id"], time=values["time"])
 
-    def get_by_id(self, id, raw=False):
+    def get_by_id(self, id, raw=False, *, deleted=False):
         assert isinstance(id, bytes)
         if not self.legacy:
-            if id in self.ids():  # check directory
+            if id in self.ids(deleted=deleted):  # check directory
                 # looks like this archive id is in the archives directory, thus it is NOT deleted.
+                # OR we have explicitly requested a soft-deleted archive via deleted=True.
                 archive_info = self._get_archive_meta(id)
-                if archive_info["exists"]:
+                if archive_info["exists"]:  # True means we have found Archive metadata in the repo.
                     if not raw:
                         ts = parse_timestamp(archive_info["time"])
                         archive_info = ArchiveInfo(
@@ -342,6 +349,7 @@ class Archives:
         newer=None,
         oldest=None,
         newest=None,
+        deleted=False,
     ):
         """
         Return list of ArchiveInfo instances according to the parameters.
@@ -363,7 +371,7 @@ class Archives:
         if isinstance(sort_by, (str, bytes)):
             raise TypeError("sort_by must be a sequence of str")
 
-        archive_infos = self._matching_info_tuples(match, match_end)
+        archive_infos = self._matching_info_tuples(match, match_end, deleted=deleted)
 
         if any([oldest, newest, older, newer]):
             archive_infos = filter_archives_by_date(
@@ -397,6 +405,7 @@ class Archives:
             newer=getattr(args, "newer", None),
             oldest=getattr(args, "oldest", None),
             newest=getattr(args, "newest", None),
+            deleted=getattr(args, "deleted", False),
         )
 
     def get_one(self, match, *, match_end=r"\Z"):

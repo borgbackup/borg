@@ -369,7 +369,9 @@ def define_exclusion_group(subparser, **kwargs):
     return exclude_group
 
 
-def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, oldest_newest=True, older_newer=True):
+def define_archive_filters_group(
+    subparser, *, sort_by=True, first_last=True, oldest_newest=True, older_newer=True, deleted=False
+):
     filters_group = subparser.add_argument_group(
         "Archive filters", "Archive filters can be applied to repository targets."
     )
@@ -454,6 +456,11 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             type=relative_time_marker_validator,
             action=Highlander,
             help="consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.",
+        )
+
+    if deleted:
+        filters_group.add_argument(
+            "--deleted", dest="deleted", action="store_true", help="consider only deleted archives."
         )
 
     return filters_group

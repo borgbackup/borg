@@ -458,6 +458,7 @@ class Archive:
         end=None,
         log_json=False,
         iec=False,
+        deleted=False,
     ):
         name_is_id = isinstance(name, bytes)
         self.cwd = os.getcwd()
@@ -499,8 +500,9 @@ class Archive:
             self.tags = set()
         else:
             if name_is_id:
-                # we also go over the manifest here to avoid quick&dirty deleted archives
-                info = self.manifest.archives.get_by_id(name)
+                # we also go over the manifest here to avoid quick&dirty deleted archives,
+                # except if we explicitly request one via deleted=True.
+                info = self.manifest.archives.get_by_id(name, deleted=deleted)
             else:
                 info = self.manifest.archives.get(name)
             if info is None:

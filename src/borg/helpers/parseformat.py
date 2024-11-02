@@ -718,7 +718,7 @@ class ArchiveFormatter(BaseFormatter):
         ("size", "nfiles"),
     )
 
-    def __init__(self, format, repository, manifest, key, *, iec=False):
+    def __init__(self, format, repository, manifest, key, *, iec=False, deleted=False):
         static_data = {}  # here could be stuff on repo level, above archive level
         static_data.update(self.FIXED_KEYS)
         super().__init__(format, static_data)
@@ -728,6 +728,7 @@ class ArchiveFormatter(BaseFormatter):
         self.name = None
         self.id = None
         self._archive = None
+        self.deleted = deleted  # True if we want to deal with deleted archives.
         self.iec = iec
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
@@ -772,7 +773,7 @@ class ArchiveFormatter(BaseFormatter):
         if self._archive is None or self._archive.id != self.id:
             from ..archive import Archive
 
-            self._archive = Archive(self.manifest, self.id, iec=self.iec)
+            self._archive = Archive(self.manifest, self.id, iec=self.iec, deleted=self.deleted)
         return self._archive
 
     def get_meta(self, key, default=None):

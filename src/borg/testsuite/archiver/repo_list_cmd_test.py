@@ -98,3 +98,23 @@ def test_repo_list_json(archivers, request):
     assert "keyfile" not in list_repo["encryption"]
     archive0 = list_repo["archives"][0]
     checkts(archive0["time"])
+
+
+def test_repo_list_deleted(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "normal1", src_dir)
+    cmd(archiver, "create", "deleted1", src_dir)
+    cmd(archiver, "create", "normal2", src_dir)
+    cmd(archiver, "create", "deleted2", src_dir)
+    cmd(archiver, "delete", "-a", "sh:deleted*")
+    output = cmd(archiver, "repo-list")
+    assert "normal1" in output
+    assert "normal2" in output
+    assert "deleted1" not in output
+    assert "deleted2" not in output
+    output = cmd(archiver, "repo-list", "--deleted")
+    assert "normal1" not in output
+    assert "normal2" not in output
+    assert "deleted1" in output
+    assert "deleted2" in output

@@ -127,6 +127,15 @@ class ArchiveGarbageCollector:
             logger.warning(f"{len(self.reappeared_chunks)} previously missing objects re-appeared!" + run_repair)
             set_ec(EXIT_WARNING)
 
+        logger.info("Cleaning archives directory from deleted archives...")
+        archive_infos = self.manifest.archives.list(sort_by=["ts"], deleted=True)
+        for archive_info in archive_infos:
+            name, id, hex_id = archive_info.name, archive_info.id, bin_to_hex(archive_info.id)
+            try:
+                self.manifest.archives.nuke_by_id(id)
+            except KeyError:
+                self.print_warning(f"Archive {name} {hex_id} not found.")
+
         repo_size_before = self.repository_size
         logger.info("Determining unused objects...")
         unused = set()
@@ -166,9 +175,19 @@ class CompactMixIn:
             """
             Free repository space by deleting unused chunks.
 
-            borg compact analyzes all existing archives to find out which chunks are
-            actually used. There might be unused chunks resulting from borg delete or prune,
-            which can be removed to free space in the repository.
+            borg compact analyzes all existing archives to find out which repository
+            objects are actually used (referenced). It then removes all unused objects
+            to free repository space.
+
+            Unused objects may result from:
+
+            - borg delete or prune usage
+            - interrupted backups (maybe retry the backup first before running compact!)
+            - backup of source files that had an I/O error in the middle of their contents
+              and that were skipped due to this.
+
+            Important: after compacting it is not possible anymore to use ``borg undelete``
+            to recover previously deleted archives.
 
             Differently than borg 1.x, borg2's compact needs the borg key if the repo is
             encrypted.

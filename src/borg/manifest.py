@@ -331,7 +331,7 @@ class Archives:
             self._archives[name] = {"id": id, "time": ts}
 
     def delete_by_id(self, id):
-        # delete an archive
+        # soft-delete an archive
         assert isinstance(id, bytes)
         assert not self.legacy
         self.repository.store_move(f"archives/{bin_to_hex(id)}", delete=True)  # soft-delete
@@ -341,6 +341,12 @@ class Archives:
         assert isinstance(id, bytes)
         assert not self.legacy
         self.repository.store_move(f"archives/{bin_to_hex(id)}", undelete=True)
+
+    def nuke_by_id(self, id):
+        # really delete an already soft-deleted archive
+        assert isinstance(id, bytes)
+        assert not self.legacy
+        self.repository.store_delete(f"archives/{bin_to_hex(id)}", deleted=True)
 
     def list(
         self,

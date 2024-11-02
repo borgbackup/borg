@@ -519,10 +519,10 @@ class Repository:
         self._lock_refresh()
         return self.store.store("config/manifest", data)
 
-    def store_list(self, name):
+    def store_list(self, name, *, deleted=False):
         self._lock_refresh()
         try:
-            return list(self.store.list(name))
+            return list(self.store.list(name, deleted=deleted))
         except StoreObjectNotFound:
             return []
 

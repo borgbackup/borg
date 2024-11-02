@@ -1078,8 +1078,10 @@ class RemoteRepository:
     def put_manifest(self, data):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version("2.0.0b8"))
-    def store_list(self, name):
+    @api(
+        since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b13"), "previously": False}  # TODO -> b14
+    )
+    def store_list(self, name, *, deleted=False):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("2.0.0b8"))

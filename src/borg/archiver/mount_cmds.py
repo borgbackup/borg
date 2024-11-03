@@ -120,8 +120,8 @@ class MountMixIn:
         Unmounting in these cases could cause an active rsync or similar process
         to delete data unintentionally.
 
-        When running in the foreground ^C/SIGINT unmounts cleanly, but other
-        signals or crashes do not.
+        When running in the foreground, ^C/SIGINT cleanly unmounts the filesystem,
+        but other signals or crashes do not.
         """
         )
         subparser = subparsers.add_parser(

@@ -1,13 +1,12 @@
 #compdef borg borgfs -P -value-,BORG_*,-default-
 
-# Zsh completion for Borg Backup 1.2.0a9 (2020-09-27).
+# Zsh completion for Borg Backup 2.0.0b13 (2024-11-04).
 #
 # Recommended _borg specific settings:
 #
 #   zstyle -e ':completion:*:*:borg-*:argument-rest:*' tag-order \
 #     '[[ $words[CURRENT] == -* ]] && reply=( "! archives archive-files" "-" )'
 #   zstyle ':completion:*:*:(borg|-value-,BORG_)*' sort false
-#   zstyle ':completion:*:*:borg-config:argument-2:keys' list-grouped false
 #   zstyle ':completion:*:*:borg-*:*' gain-privileges true
 #   zstyle ':completion:*' fake-parameters 'BORG_REPO:scalar'
 #
@@ -23,39 +22,55 @@
 # path-style-selector
 #   Style selector used to select a path (when Borg would use either `pp` or `pf`).
 #   Default: `fm`.
-# repository-suffix
-#   This boolean style controls whether to add the `::` auto-removable suffix to a repository.
-#   Default: `true`.
 
 (( $+functions[_borg_commands] )) ||
 _borg_commands() {
   local -a commands_=(
+    'analyze:analyze archives'
     'benchmark:benchmark command'
-    'break-lock:break the repository lock'
-    'check:check repository consistency'
-    'compact:compact segment files in the repository'
-    'config:get, set, and delete values in a repository or cache config file'
+    'break-lock:break the repository and cache locks'
+    'check:verify repository'
+    'compact:compact repository'
     'create:create new archive'
     'debug:debugging command (not intended for normal use)'
-    'delete:delete an existing repository or archives'
-    'diff:diff contents of two archives'
+    'delete:delete archives'
+    'diff:find differences in archive contents'
     'export-tar:export archive contents as a tarball'
     'extract:extract archive contents'
     'help:extra help'
-    'info:show repository or archive information'
-    'init:initialize an empty repository'
+    'import-tar:create an archive from a tarball'
+    'info:show archive information'
     'key:manage repository key'
-    'list:list archive or repository contents'
+    'list:list archive contents'
     'mount:mount archive or an entire repository as a FUSE filesystem'
-    'prune:prune repository archives according to specified rules'
+    'prune:prune archives according to specified rules'
     'recreate:re-create archives'
     'rename:rename an existing archive'
+    'repo-compress:repository (re-)compression'
+    'repo-create:create an empty repository'
+    'repo-delete:delete a repository'
+    'repo-info:show repository information'
+    'repo-list:list repository contents'
+    'repo-space:manage reserved space in a repository'
     'serve:start in server mode'
+    'tag:tag archives'
+    'transfer:transfer of archives from another repository'
     'umount:un-mount the FUSE filesystem'
-    'upgrade:upgrade a repository from a previous version'
+    'version:display borg client version / borg server version'
     'with-lock:run a user specified command with the repository lock held'
   )
   _describe -t commands 'borg commands' commands_
+}
+
+(( $+functions[_borg-analyze] )) ||
+_borg-analyze() {
+  local -a common_options common_archive_filters_options
+  __borg_setup_common_options
+  __borg_setup_common_archive_filters_options
+
+  _arguments -s -w -S : \
+    $common_archive_filters_options \
+    $common_options
 }
 
 (( $+functions[_borg-benchmark] )) ||
@@ -65,8 +80,7 @@ _borg-benchmark() {
 
   _arguments -s -w -S : \
     $common_options \
-    ':type:(crud)' \
-    ': :_borg_repository' \
+    ':type:(crud cpu)' \
     ':PATH:_files'
 }
 
@@ -76,8 +90,7 @@ _borg-break-lock() {
   __borg_setup_common_options
 
   _arguments -s -w -S : \
-    $common_options \
-    ':: :_borg_repository'
+    $common_options
 }
 
 (( $+functions[_borg-check] )) ||
@@ -91,11 +104,9 @@ _borg-check() {
     '--archives-only[only perform archives checks]' \
     '(--repository-only)--verify-data[perform cryptographic archive data integrity verification]' \
     '--repair[attempt to repair any inconsistencies found]' \
-    '--save-space[work slower, but using less space]' \
     '--max-duration=[partial repo check for max. SECONDS]: : _borg_guard_unsigned_number "SECONDS"' \
     $common_archive_filters_options \
-    $common_options \
-    '::REPOSITORY_OR_ARCHIVE: _borg_repository_or_archive'
+    $common_options
 }
 
 (( $+functions[_borg-compact] )) ||
@@ -104,25 +115,7 @@ _borg-compact() {
   __borg_setup_common_options
 
   _arguments -s -w -S : \
-    $common_options \
-     '--cleanup-commits[cleanup commit-only 17-byte segment files]' \
-     '--threshold=[set minimum threshold for saved space in PERCENT (default: 10)]: : _borg_guard_unsigned_number "PERCENT (default\: 10)"' \
-    ':: :_borg_repository'
-}
-
-(( $+functions[_borg-config] )) ||
-_borg-config() {
-  local -a common_options
-  __borg_setup_common_options
-
-  _arguments -s -w -S : \
-    '(-c --cache)'{-c,--cache}'[get and set values from the repo cache]' \
-    '(-d --delete)'{-d,--delete}'[delete the key from the config]' \
-    '(-l --list)'{-l,--list}'[list the configuration of the repo]' \
-    $common_options \
-    ': :_borg_repository' \
-    ': : _borg_config $line[1]' \
-    '::VALUE'
+    $common_options
 }
 
 (( $+functions[_borg-create] )) ||
@@ -140,27 +133,24 @@ _borg-create() {
 
   _arguments -C -s -w -S : \
     '*'{-e,--exclude}'=[exclude paths matching PATTERN]: : _borg_style_selector_or_archive_files -f -e "$line[1]" fm "${(@)line[2,-1]}"' \
-    '*--pattern=[experimental: include/exclude paths matching PATTERN]: : _borg_style_selector_or_archive_files -p -f -e "$line[1]" sh "${(@)line[2,-1]}"' \
+    '*--pattern=[include/exclude paths matching PATTERN]: : _borg_style_selector_or_archive_files -p -f -e "$line[1]" sh "${(@)line[2,-1]}"' \
     $common_create_options \
     '(-s --stats)--json[Output stats as JSON. Implies --stats.]' \
-    '--no-cache-sync[experimental: do not synchronize the cache. Implies not using the files cache.]' \
     '--stdin-name=[use NAME in archive for stdin data (default: "stdin")]:NAME' \
     '--content-from-command[interpret PATH as command and store its stdout]' \
     '--exclude-nodump[exclude files flagged NODUMP]' \
     '(-x --one-file-system)'{-x,--one-file-system}'[stay in the same file system]' \
     '--numeric-owner[only store numeric user and group identifiers]' \
-    '--noatime[do not store atime into archive]' \
     '--atime[do store atime into archive]' \
     '--noctime[do not store ctime into archive]' \
     '--nobirthtime[do not store birthtime (creation date) into archive]' \
-    '--nobsdflags[deprecated, use --noflags instead]' \
     '--noacls[do not read and store ACLs into archive]' \
     '--noxattrs[do not read and store xattrs into archive]' \
     '--noflags[do not read and store flags (e.g. NODUMP, IMMUTABLE) into archive]' \
     '--files-cache=[operate files cache in MODE. default: ctime,size,inode]:MODE:(ctime,size,inode mtime,size,inode ctime,size mtime,size rechunk,ctime rechunk,mtime size disabled)' \
     '--read-special[open and read block and char device files as well as FIFOs as if they were regular files]' \
     $common_options \
-    ':ARCHIVE: _borg_repository_or_archive -a -p' \
+    ':ARCHIVE: _borg_archive -a -p' \
     $lastspec && ret=0
 
   case $state in
@@ -201,8 +191,6 @@ _borg-debug() {
       'get-obj:get object from repository'
       'put-obj:put object to repository'
       'delete-obj:delete object from repository'
-      'refcount-obj:show refcount for object from repository'
-      'dump-hints:dump repository hints'
       'convert-profile:convert Borg profile to Python profile'
     )
     _describe -t commands 'command' debug_commands && ret=0
@@ -218,61 +206,43 @@ _borg-debug() {
     (dump-archive-items)
       _arguments -s -w -S : \
         $common_options \
-        ':ARCHIVE: _borg_repository_or_archive -a' && ret=0
+        ':ARCHIVE: _borg_archive -a' && ret=0
       ;;
     (dump-archive)
       _arguments -s -w -S : \
         $common_options \
-        ':ARCHIVE: _borg_repository_or_archive -a' \
+        ':ARCHIVE: _borg_archive -a' \
         ':PATH:_files' && ret=0
       ;;
     (dump-manifest)
       _arguments -s -w -S : \
         $common_options \
-        ': :_borg_repository' \
         ':PATH:_files' && ret=0
       ;;
     (dump-repo-objs)
       _arguments -s -w -S : \
-        $common_options \
-        ': :_borg_repository' && ret=0
+        $common_options && ret=0
       ;;
     (search-repo-objs)
       _arguments -s -w -S : \
         $common_options \
-        ': :_borg_repository' \
         ':WANTED (hex or string):' && ret=0
       ;;
     (get-obj)
       _arguments -s -w -S : \
         $common_options \
-        ': :_borg_repository' \
         ':ID (hex object):' \
         ':PATH:_files' && ret=0
       ;;
     (put-obj)
       _arguments -s -w -S : \
         $common_options \
-        ': :_borg_repository' \
         '*:PATH:_files' && ret=0
       ;;
     (delete-obj)
       _arguments -s -w -S : \
         $common_options \
-        ': :_borg_repository' \
         '*:ID (hex object):'  && ret=0
-      ;;
-    (refcount-obj)
-      _arguments -s -w -S : \
-        $common_options \
-        ': :_borg_repository' \
-        '*:ID (hex object):'  && ret=0
-      ;;
-    (dump-hints)
-      _arguments -s -w -S : \
-        $common_options \
-        ': :_borg_repository' \
-        '*:PATH:_files' && ret=0
       ;;
     (convert-profile)
       _arguments -s -w -S : \
@@ -301,13 +271,9 @@ _borg-delete() {
 
   _arguments -s -w -S : \
     $common_dry_run_stats_options \
-    '--cache-only[delete only the local cache for the given repository]' \
-    '*--force[force deletion of corrupted archives, use "--force --force" in case "--force" does not work]' \
-    '--keep-security-info[keep the local security info when deleting a repository]' \
-    '--save-space[work slower, but using less space]' \
     $common_archive_filters_options \
     $common_options \
-    ':REPOSITORY_OR_ARCHIVE: _borg_repository_or_archive' \
+    ':ARCHIVE: _borg_archive' \
     '*:ARCHIVE: _borg_archive "${line[1]%%::*}"'
 }
 
@@ -324,7 +290,7 @@ _borg-diff() {
     '--json-lines[format output as JSON Lines]' \
     $common_exclude_options \
     $common_options \
-    ':ARCHIVE1: _borg_repository_or_archive -a' \
+    ':ARCHIVE1: _borg_archive -a' \
     ':ARCHIVE2: _borg_archive "${line[1]%%::*}"' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
 }
@@ -340,7 +306,7 @@ _borg-export-tar() {
     '--list[output verbose list of items (files, dirs, ...)]' \
     $common_exclude_extract_options \
     $common_options \
-    ':ARCHIVE: _borg_repository_or_archive -a' \
+    ':ARCHIVE: _borg_archive -a' \
     ':FILE:_files' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
 }
@@ -355,7 +321,6 @@ _borg-extract() {
     '--list[output verbose list of items (files, dirs, ...)]' \
     '(-n --dry-run)'{-n,--dry-run}'[do not actually change any files]' \
     '--numeric-owner[only obey numeric user and group identifiers]' \
-    '--nobsdflags[deprecated, use --noflags instead]' \
     '--noacls[do not extract/set ACLs]' \
     '--noxattrs[do not extract/set xattrs]' \
     '--noflags[do not extract/set flags (e.g. NODUMP, IMMUTABLE)]' \
@@ -363,7 +328,7 @@ _borg-extract() {
     '--sparse[create holes in output sparse file from all-zero chunks]' \
     $common_exclude_extract_options \
     $common_options \
-    ':ARCHIVE: _borg_repository_or_archive -a' \
+    ':ARCHIVE: _borg_archive -a' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
 }
 
@@ -379,6 +344,22 @@ _borg-help() {
     ':: : _alternative "topics:TOPIC:(patterns placeholders compression)" ": :_borg_commands"'
 }
 
+(( $+functions[_borg-import-tar] )) ||
+_borg-import-tar() {
+  local -a common_options common_exclude_extract_options
+  __borg_setup_common_options
+  __borg_setup_common_exclude_extract_options
+
+  _arguments -s -w -S : \
+    '--tar-filter[filter program to pipe data through]: :_cmdstring' \
+    '--list[output verbose list of items (files, dirs, ...)]' \
+    $common_exclude_extract_options \
+    $common_options \
+    ':ARCHIVE: _borg_archive -a' \
+    ':FILE:_files' \
+    '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
+}
+
 (( $+functions[_borg-info] )) ||
 _borg-info() {
   local -a common_options common_archive_filters_options
@@ -389,30 +370,7 @@ _borg-info() {
     '--json[format output as JSON]' \
     $common_archive_filters_options \
     $common_options \
-    '::REPOSITORY_OR_ARCHIVE: _borg_repository_or_archive'
-}
-
-(( $+functions[_borg-init] )) ||
-_borg-init() {
-  local -i ret=1
-  local -a common_options common_init_options
-  __borg_setup_common_options
-  __borg_setup_common_init_options
-
-  # special handling for the required optional argument
-  if (( ! ${words[(I)(-e|--encryption)(|=*)]} )); then
-    local desc='select encryption key mode'
-    local -a long=( "--encryption:$desc" ) short=( "-e:$desc" ) remove_chars=( -r '= \t\n\-' )
-    _describe -t required-options 'required option' long -S '=' $remove_chars -- short $remove_chars && ret=0
-  fi
-
-  _arguments -s -w -S : \
-    '(-e --encryption)'{-e,--encryption}'=[select encryption key mode (required)]:MODE:(none keyfile keyfile-blake2 repokey repokey-blake2 authenticated authenticated-blake2)' \
-    $common_init_options \
-    '--make-parent-dirs[create parent directories]' \
-    '::REPOSITORY:_directories' && ret=0
-
-  return ret
+    '::ARCHIVE: _borg_archive'
 }
 
 (( $+functions[_borg-key] )) ||
@@ -431,10 +389,9 @@ _borg-key() {
   case $state in
   (command)
     local -a key_commands=(
-      'change-passphrase:Change repository key file passphrase'
-      'export:Export the repository key for backup'
-      'import:Import the repository key from backup'
-      'migrate-to-repokey:Migrate passphrase -> repokey'
+      'change-passphrase:Change borg key passphrase'
+      'export:Export a backup of the borg key'
+      'import:Import a backup of the borg key'
     )
     _describe -t commands 'command' key_commands && ret=0
     ;;
@@ -444,28 +401,20 @@ _borg-key() {
     case $line[1] in
     (change-passphrase)
       _arguments -s -w -S : \
-        $common_options \
-        ': :_borg_repository' && ret=0
+        $common_options
       ;;
     (export)
       _arguments -s -w -S : \
         '--paper[create an export suitable for printing and later type-in]' \
         '--qr-html[create an html file suitable for printing and later type-in or qr scan]' \
         $common_options \
-        ': :_borg_repository' \
         '::PATH:_files' && ret=0
       ;;
     (import)
       _arguments -s -w -S : \
         '--paper[interactively import from a backup done with --paper]' \
         $common_options \
-        ': :_borg_repository' \
         '::PATH:_files' && ret=0
-      ;;
-    (migrate-to-repokey)
-      _arguments -s -w -S : \
-        $common_options \
-        ':: :_borg_repository' && ret=0
       ;;
     (*)
       if ! _call_function ret _borg_key_$line[1]; then
@@ -487,15 +436,13 @@ _borg-list() {
   __borg_setup_common_archive_filters_options
 
   _arguments -s -w -S : \
-    '--consider-checkpoints[show checkpoint archives in the repository contents list (default: hidden)]' \
     '--short[only print file/directory names, nothing else]' \
-    {--format,--list-format}'=[specify format for file listing]:FORMAT: _borg_format_keys $line[1]' \
-    '--json[Only valid for listing repository contents. Format output as JSON.]' \
-    '--json-lines[Only valid for listing archive contents. Format output as JSON Lines.]' \
+    '--format=[specify format for file listing]: : _borg_format_keys $line[1]' \
+    '--json-lines[Format output as JSON Lines.]' \
     $common_archive_filters_options \
     $common_exclude_options \
     $common_options \
-    ':REPOSITORY_OR_ARCHIVE: _borg_repository_or_archive' \
+    ':ARCHIVE: _borg_archive' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
 }
 
@@ -508,7 +455,6 @@ _borg-mount() {
 
   _arguments -s -w -S : \
     $* \
-    '--consider-checkpoints[show checkpoint archives in the repository contents list (default: hidden)]' \
     '(-f --foreground)'{-f,--foreground}'[stay in foreground, do not daemonize]' \
     '-o[mount options]: :_fuse_values "mount options"
           "versions[merged, versioned view of the files in the archives]"
@@ -517,16 +463,15 @@ _borg-mount() {
     $common_archive_filters_options \
     $common_exclude_extract_options \
     $common_options \
-    ':REPOSITORY_OR_ARCHIVE: _borg_repository_or_archive' \
     ':MOUNTPOINT:_directories' \
     '*: : _borg_style_selector_or_archive_files "$line[1]" pp'
 }
 
 (( $+functions[_borg-prune] )) ||
 _borg-prune() {
-  local -a common_options common_prefix_and_glob_archives_filter_options common_dry_run_stats_options
+  local -a common_options common_match_archives_filter_options common_dry_run_stats_options
   __borg_setup_common_options
-  __borg_setup_common_prefix_and_glob_archives_filter_options
+  __borg_setup_common_match_archives_filter_options
   __borg_setup_common_dry_run_stats_options
 
   _arguments -s -w -S : \
@@ -540,11 +485,11 @@ _borg-prune() {
     '(-d --keep-daily)'{-d,--keep-daily}'[number of daily archives to keep]: : _borg_guard_unsigned_number "N"' \
     '(-w --keep-weekly)'{-w,--keep-weekly}'[number of weekly archives to keep]: : _borg_guard_unsigned_number "N"' \
     '(-m --keep-monthly)'{-m,--keep-monthly}'[number of monthly archives to keep]: : _borg_guard_unsigned_number "N"' \
+    '--keep-3monthly[number of 3monthly archives to keep]: : _borg_guard_unsigned_number "N"' \
+    '--keep-13weekly[number of 13weekly archives to keep]: : _borg_guard_unsigned_number "N"' \
     '(-y --keep-yearly)'{-y,--keep-yearly}'[number of yearly archives to keep]: : _borg_guard_unsigned_number "N"' \
-    '--save-space[work slower, but using less space]' \
-    $common_prefix_and_glob_archives_filter_options \
-    $common_options \
-    ':: :_borg_repository'
+    $common_match_archives_filter_options \
+    $common_options
 }
 
 (( $+functions[_borg-recreate] )) ||
@@ -566,7 +511,7 @@ _borg-recreate() {
     '--target=[create a new archive with the name ARCHIVE]:ARCHIVE: _borg_placeholder_or_archive "${line[1]%%\:\:*}"' \
     '--recompress=[recompress data chunks according to "MODE" and "--compression"]:MODE:'"(($mods))" \
     $common_options \
-    ':REPOSITORY_OR_ARCHIVE: _borg_repository_or_archive' \
+    ':ARCHIVE: _borg_archive' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
 }
 
@@ -577,20 +522,130 @@ _borg-rename() {
 
   _arguments -s -w -S : \
     $common_options \
-    ':ARCHIVE: _borg_repository_or_archive -a' \
+    ':ARCHIVE: _borg_archive -a' \
     ':NEWNAME'
+}
+
+(( $+functions[_borg-repo-compress] )) ||
+_borg-repo-compress() {
+  local -a common_options common_dry_run_stats_options
+  __borg_setup_common_options
+  __borg_setup_common_dry_run_stats_options
+
+  _arguments -s -w -S : \
+    $common_dry_run_stats_options \
+    $common_options \
+    '(-C --compression)'{-C,--compression}'=[select compression algorithm]: :_borg_compression'
+}
+
+(( $+functions[_borg-repo-create] )) ||
+_borg-repo-create() {
+  local -i ret=1
+  local -a common_options common_repo_options
+  __borg_setup_common_options
+  __borg_setup_common_repo_options
+
+  # special handling for the required optional argument
+  if (( ! ${words[(I)(-e|--encryption)(|=*)]} )); then
+    local desc='select encryption key mode'
+    local -a long=( "--encryption:$desc" ) short=( "-e:$desc" ) remove_chars=( -r '= \t\n\-' )
+    _describe -t required-options 'required option' long -S '=' $remove_chars -- short $remove_chars && ret=0
+  fi
+
+  _arguments -s -w -S : \
+    '(-e --encryption)'{-e,--encryption}'=[select encryption key mode (required)]:MODE:(none authenticated authenticated-blake2 keyfile-aes-ocb repokey-aes-ocb keyfile-chacha20-poly1305 repokey-chacha20-poly1305 keyfile-blake2-aes-ocb repokey-blake2-aes-ocb keyfile-blake2-chacha20-poly1305 repokey-blake2-chacha20-poly1305)' \
+    $common_repo_options \
+    '--make-parent-dirs[create parent directories]'
+}
+
+(( $+functions[_borg-repo-delete] )) ||
+_borg-repo-delete() {
+  local -a common_options common_dry_run_stats_options
+  __borg_setup_common_options
+  __borg_setup_common_dry_run_stats_options
+
+  _arguments -s -w -S : \
+    $common_dry_run_stats_options \
+    '--cache-only[delete only the local cache for the given repository]' \
+    '*--force[force deletion of corrupted archives, use "--force --force" in case "--force" does not work]' \
+    '--keep-security-info[keep the local security info when deleting a repository]' \
+    $common_options
+}
+
+(( $+functions[_borg-repo-info] )) ||
+_borg-repo-info() {
+  local -a common_options
+  __borg_setup_common_options
+
+  _arguments -s -w -S : \
+    '--json[format output as JSON]' \
+    $common_options
+}
+
+(( $+functions[_borg-repo-list] )) ||
+_borg-repo-list() {
+  local -a common_options common_archive_filters_options
+  __borg_setup_common_options
+  __borg_setup_common_archive_filters_options
+
+  _arguments -s -w -S : \
+    '--short[only print archive IDs]' \
+    '--format=[specify format for archive listing]: : _borg_format_keys $line[1]' \
+    '--json[Format output as JSON.]' \
+    $common_archive_filters_options \
+    $common_options
+}
+
+(( $+functions[_borg-repo-space] )) ||
+_borg-repo-space() {
+  local -a common_options
+  __borg_setup_common_options
+
+  _arguments -s -w -S : \
+    $common_options \
+    '--reserve=[amount of space to reserve in repository]: :_borg_quota_suffixes' \
+    '--free[free all reserved space]'
 }
 
 (( $+functions[_borg-serve] )) ||
 _borg-serve() {
-  local -a common_options common_init_options
+  local -a common_options common_repo_options
   __borg_setup_common_options
-  __borg_setup_common_init_options
+  __borg_setup_common_repo_options
 
   _arguments -s -w -S : \
-    $common_init_options \
+    $common_repo_options \
     '*--restrict-to-path=[restrict repository access to PATH]:PATH:_files' \
     '*--restrict-to-repository=[restrict repository access]: :_borg_repository'
+}
+
+(( $+functions[_borg-tag] )) ||
+_borg-tag() {
+  local -a common_options common_archive_filters_options common_dry_run_stats_options
+  __borg_setup_common_options
+  __borg_setup_common_archive_filters_options
+  __borg_setup_common_dry_run_stats_options
+
+  _arguments -s -w -S : \
+    $common_dry_run_stats_options \
+    $common_archive_filters_options \
+    $common_options \
+    ':ARCHIVE: _borg_archive' \
+    '*:ARCHIVE: _borg_archive "${line[1]%%::*}"'
+}
+
+(( $+functions[_borg-transfer] )) ||
+_borg-transfer() {
+  local -a common_options common_archive_filters_options common_dry_run_stats_options
+  __borg_setup_common_options
+  __borg_setup_common_archive_filters_options
+  __borg_setup_common_dry_run_stats_options
+
+  _arguments -s -w -S : \
+    $common_dry_run_stats_options \
+    $common_archive_filters_options \
+    $common_options \
+    '(-C --compression)'{-C,--compression}'=[select compression algorithm]: :_borg_compression'
 }
 
 (( $+functions[_borg-umount] )) ||
@@ -603,19 +658,13 @@ _borg-umount() {
     ':MOUNTPOINT:_umountable'
 }
 
-(( $+functions[_borg-upgrade] )) ||
-_borg-upgrade() {
+(( $+functions[_borg-version] )) ||
+_borg-version() {
   local -a common_options
   __borg_setup_common_options
 
   _arguments -s -w -S : \
-    '(-n --dry-run)'{-n,--dry-run}'[do not change repository]' \
-    '--inplace[rewrite repository in place, with no chance of going back to older versions of the repository]' \
-    '--force[force upgrade]' \
-    '--tam[enable manifest authentication (in key and cache)]' \
-    '--disable-tam[disable manifest authentication (in key and cache)]' \
-    $common_options \
-    ':: :_borg_repository'
+    $common_options
 }
 
 (( $+functions[_borg-with-lock] )) ||
@@ -628,7 +677,6 @@ _borg-with-lock() {
 
   _arguments -s -w -C -S : \
     $common_options \
-    '(-): :_borg_repository' \
     '(-):COMMAND: _command_names -e' \
     '(-)*:ARGS:->normal' && ret=0
 
@@ -662,9 +710,9 @@ __borg_setup_common_options() {
     '--remote-path=[set remote path to executable (default: "borg")]: :_cmdstring'
     '--remote-ratelimit=[set remote network upload rate limit in kiByte/s (default: 0=unlimited)]: : _borg_guard_unsigned_number "RATE"'
     '--remote-buffer=[set upload buffer size in MiB. (default: 0=no buffer)]: : _borg_guard_unsigned_number "UPLOAD_BUFFER"'
-    '--consider-part-files[treat part files like normal files (e.g. to list/extract them)]'
     '--debug-profile=[write execution profile in Borg format into FILE]:FILE:_files'
     '--rsh=[use COMMAND instead of ssh]: :_cmdstring'
+    '(-r --repo)'{-r,--repo}'=[repository]'
   )
 }
 
@@ -673,8 +721,8 @@ __borg_setup_common_exclude_options() {
   typeset -ga common_exclude_options=(
     '*'{-e,--exclude}'=[exclude paths matching PATTERN]: : _borg_style_selector_or_archive_files "$line[1]" fm'
     '*--exclude-from=[read exclude patterns from EXCLUDEFILE, one per line]:EXCLUDEFILE:_files'
-    '*--pattern=[experimental: include/exclude paths matching PATTERN]: : _borg_style_selector_or_archive_files -p "$line[1]" sh'
-    '*--patterns-from=[experimental: read include/exclude patterns from PATTERNFILE, one per line]:PATTERNFILE:_files'
+    '*--pattern=[include/exclude paths matching PATTERN]: : _borg_style_selector_or_archive_files -p "$line[1]" sh'
+    '*--patterns-from=[read include/exclude patterns from PATTERNFILE, one per line]:PATTERNFILE:_files'
   )
 }
 
@@ -688,20 +736,19 @@ __borg_setup_common_exclude_extract_options() {
   )
 }
 
-(( $+functions[__borg_setup_common_prefix_and_glob_archives_filter_options] )) ||
-__borg_setup_common_prefix_and_glob_archives_filter_options() {
-  typeset -ga common_prefix_and_glob_archives_filter_options=(
-    '(-P --prefix -a --glob-archives)'{-P,--prefix}'=[only consider archive names starting with this prefix]:PREFIX: _borg_archive -n "${line[1]%%\:\:*}"'
-    '(-P --prefix)*'{-a,--glob-archives}'=[only consider archive names matching the glob]:GLOB: _borg_archive -n "${line[1]%%\:\:*}"'
+(( $+functions[__borg_setup_common_match_archives_filter_options] )) ||
+__borg_setup_common_match_archives_filter_options() {
+  typeset -ga common_match_archives_filter_options=(
+    '(-P --prefix)*'{-a,--match-archives}'=[only consider archive names matching the pattern]:PATTERN: _borg_archive -n "${line[1]%%\:\:*}"'
   )
 }
 
 (( $+functions[__borg_setup_common_archive_filters_options] )) ||
 __borg_setup_common_archive_filters_options() {
-  local -a common_prefix_and_glob_archives_filter_options
-  __borg_setup_common_prefix_and_glob_archives_filter_options
+  local -a common_match_archives_filter_options
+  __borg_setup_common_match_archives_filter_options
   typeset -ga common_archive_filters_options=(
-    $common_prefix_and_glob_archives_filter_options
+    $common_match_archives_filter_options
     '--sort-by=[Comma-separated list of sorting keys, default: timestamp]:KEYS:(timestamp name id)'
     '(--last)--first=[consider first N archives after other filters were applied]:N: _borg_archive -n "${line[1]%%\:\:*}"'
     '(--first)--last=[consider last N archives after other filters were applied]:N: _borg_archive -n "${line[1]%%\:\:*}"'
@@ -732,17 +779,16 @@ __borg_setup_common_create_options() {
     '--keep-exclude-tags[if tag objects are specified with --exclude-if-present, don'\''t omit the tag objects themselves]'
     '--comment=[add a comment text to the archive]:COMMENT:_borg_placeholders'
     '--timestamp=[manually specify the archive creation date/time]:TIMESTAMP:_borg_timestamp'
-    '(-c --checkpoint-interval)'{-c,--checkpoint-interval}'=[write checkpoint every SECONDS seconds (default: 1800)]: : _borg_guard_unsigned_number "SECONDS"'
     '--chunker-params=[specify the chunker parameters]: :_borg_chunker_params_examples'
     '(-C --compression)'{-C,--compression}'=[select compression algorithm]: :_borg_compression'
   )
 }
 
-(( $+functions[__borg_setup_common_init_options] )) ||
-__borg_setup_common_init_options() {
+(( $+functions[__borg_setup_common_repo_options] )) ||
+__borg_setup_common_repo_options() {
   local -a common_options
   __borg_setup_common_options
-  typeset -ga common_init_options=(
+  typeset -ga common_repo_options=(
     $common_options
     '--append-only[only allow appending to repository segment files]'
     '--storage-quota=[override storage quota of the repository]: :_borg_quota_suffixes'
@@ -888,59 +934,6 @@ _borg_remote_repositories() {
   fi
 }
 
-# _borg_repository_or_archive [-a] [-p]
-#
-# -a archive is mandatory. The suffix `::` will be added to the repository if possible.
-# -p complete placeholders
-(( $+functions[_borg_repository_or_archive] )) ||
-_borg_repository_or_archive() {
-  local -A opts
-  zparseopts -A opts -D -E a p
-
-  if compset -P 1 '*::'; then
-    local qrepo=$IPREFIX[1,-3]
-    local -i def_repo=0
-    [[ -z $qrepo && -n $BORG_REPO ]] && qrepo=${(q)BORG_REPO} && def_repo=1
-    if [[ -n $qrepo ]]; then
-
-      if (( ! def_repo )); then
-        case $compstate[quote] in
-          (\') qrepo=${(qq)qrepo} ;;
-          (\") qrepo=${(qqq)${(e)qrepo}} ;;
-          # NOTE: currently `(e)` don't have any effect, but maybe one day zsh will stop to change the quoting method
-          #       of double quoted parameters
-        esac
-      fi
-
-      if (( $+opts[-p] )); then
-        _borg_placeholder_or_archive $qrepo
-      else
-        _borg_archive $qrepo
-      fi
-    else
-      _message "not a borg repository: ${(Q)qrepo}"
-      return 1
-    fi
-  else
-    local -a suf
-    if ! compset -S '::*'; then
-      if (( $+opts[-a] )) || zstyle -T ":completion:${curcontext}:repositories" repository-suffix; then
-        suf=( -S '::' )
-      fi
-      local oqrepo="$PREFIX$SUFFIX"
-      local qrepo=$oqrepo
-      [[ $compstate[quote] != (\'|\") ]] && qrepo=${(Q)qrepo}
-      if __borg_is_borg_repo $qrepo; then
-        qrepo=${oqrepo%%/}
-        [[ -z $SUFFIX ]] && PREFIX=${PREFIX%%/} || SUFFIX=${SUFFIX%%/}
-        compadd -S '::' -r ':/ \t\n\-' -Q -- $qrepo
-        return
-      fi
-    fi
-    _borg_repository "$suf[@]"
-  fi
-}
-
 # _borg_archive [-F] [-n] [qrepo]
 #
 # -F don't apply archive filter options on the command line
@@ -971,7 +964,7 @@ _borg_archive() {
       local -i reversed_order=1
 
       if (( ! $+opts[-F] )); then
-        local -a archive_filter_options=( -P --prefix -a --glob-archives --first --last --sort-by ) tmp
+        local -a archive_filter_options=( -a --match-archives --first --last --sort-by ) tmp
         local k
         for k in $archive_filter_options; do
           if [[ -n $opt_args[$k] ]]; then
@@ -1040,7 +1033,7 @@ _borg_archive() {
             descfmt='{archive:<36} {time} [{id}]'
           fmt="{barchive}{NUL}$descfmt{NUL}"
           _call_program -p archive-descriptions \
-            ${(q)__borg_command:-borg} list --format=${(q)fmt} ${(q)sort_by} $archive_filters $qrepo 2>/dev/null |
+            ${(q)__borg_command:-borg} repo-list --format=${(q)fmt} ${(q)sort_by} $archive_filters $qrepo 2>/dev/null |
           while IFS= read -r -d $'\0' name && IFS= read -r -d $'\0' descr; do
             __borg_archive_names[1,0]=( $name )
             __borg_archive_descriptions[1,0]=( "$descr" )
@@ -1060,7 +1053,7 @@ _borg_archive() {
         typeset -gHa __borg_archive_names=()
         local fmt='{barchive}{NUL}'
         __borg_archive_names=( ${(@0aO)"$(_call_program -p archives \
-          ${(q)__borg_command:-borg} list --format=${(q)fmt} ${(q)sort_by} $archive_filters $qrepo 2>/dev/null)"} )
+          ${(q)__borg_command:-borg} repo-list --format=${(q)fmt} ${(q)sort_by} $archive_filters $qrepo 2>/dev/null)"} )
         (( $pipestatus[1] )) && {
           _message "couldn't list repository: ${(Q)qrepo}"
           unset __borg_prev_{repo,mtime,order,sort_by}
@@ -1089,17 +1082,6 @@ __borg_unset_archives() {
 (( $+functions[__borg_unset_archives_need_update] )) ||
 __borg_unset_archives_need_update() {
   unset __borg_archives_need_update
-}
-
-(( $+functions[__borg_is_borg_repo] )) ||
-__borg_is_borg_repo() {
-  local repo=$1
-  __borg_expand_path $repo repo
-  if [[ -d $repo && -d $repo/data ]]; then
-    local -a files=( $repo/(hints|index|integrity).<1->(#qN.) )
-    (( $#files >= 3 )) && return 0
-  fi
-  return 1
 }
 
 (( $+functions[__borg_expand_path] )) ||
@@ -1464,37 +1446,6 @@ __borg_skip_pattern_matching() {
   return 0
 }
 
-(( $+functions[_borg_config] )) ||
-_borg_config() {
-  local qrepo=$1
-  shift
-
-  if (( ! $+__borg_config_sect )); then
-    comppostfuncs+=( __borg_unset_config )
-    typeset -gH __borg_config_sect=
-    typeset -gHa __borg_config_keys=()
-    local sect line
-    local -a match mbegin mend
-    _call_program -p keys ${(q)__borg_command:-borg} config --list $qrepo 2>/dev/null | {
-      IFS= read -r sect
-      sect=${${sect#\[}%\]}
-      __borg_config_sect=$sect
-      while IFS= read -r line && [[ $line == (#b)(*)\ =\ (*) ]]; do
-        __borg_config_keys+=( "${${match[1]//\\/\\\\}//:/\\:}:(current: $match[2])" )
-      done
-    }
-  fi
-
-  local -a alts=( 'keys:key: _describe -t keys "key" __borg_config_keys' )
-  compset -P "${__borg_config_sect}." || alts+=( 'sections:section:compadd -S "." $__borg_config_sect' )
-  _alternative $alts
-}
-
-(( $+functions[__borg_unset_config] )) ||
-__borg_unset_config() {
-  unset __borg_config_sect __borg_config_keys
-}
-
 # A simple prefix-oriented completion function for compressors. Can be improved by supporting the suffix.
 (( $+functions[_borg_compression] )) ||
 _borg_compression() {
@@ -1582,8 +1533,8 @@ _borg_statuschars() {
     's[symlink]' \
     'f[fifo]' \
     'i[backup data was read from standard input (stdin)]' \
-    '-[dry run, item was not backed up]' \
-    'x[excluded, item was not backed up]' \
+    '-[excluded]' \
+    '+[included]' \
     '?[missing status code]'
 }
 

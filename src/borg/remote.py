@@ -180,6 +180,7 @@ class RepositoryServer:  # pragma: no cover
         "store_load",
         "store_store",
         "store_delete",
+        "store_move",
     )
 
     def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota, use_socket):
@@ -1077,8 +1078,10 @@ class RemoteRepository:
     def put_manifest(self, data):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version("2.0.0b8"))
-    def store_list(self, name):
+    @api(
+        since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b13"), "previously": False}  # TODO -> b14
+    )
+    def store_list(self, name, *, deleted=False):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("2.0.0b8"))
@@ -1089,8 +1092,14 @@ class RemoteRepository:
     def store_store(self, name, value):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version("2.0.0b8"))
-    def store_delete(self, name):
+    @api(
+        since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b13"), "previously": False}
+    )  # TODO -> b14)
+    def store_delete(self, name, *, deleted=False):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b13"))  # TODO -> b14
+    def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
         """actual remoting is done via self.call in the @api decorator"""
 
 

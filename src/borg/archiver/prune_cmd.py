@@ -215,7 +215,11 @@ class PruneMixIn:
         The prune command prunes a repository by deleting all archives not matching
         any of the specified retention options.
 
-        Important: Repository disk space is **not** freed until you run ``borg compact``.
+        Important:
+
+        - Repository disk space is **not** freed until you run ``borg compact``.
+        - You can use ``borg undelete`` to undelete archives, but only until
+          you run ``borg compact``.
 
         This command is normally used by automated backup scripts wanting to keep a
         certain number of historic backups. This retention policy is commonly referred to as

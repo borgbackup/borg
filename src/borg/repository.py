@@ -519,10 +519,10 @@ class Repository:
         self._lock_refresh()
         return self.store.store("config/manifest", data)
 
-    def store_list(self, name):
+    def store_list(self, name, *, deleted=False):
         self._lock_refresh()
         try:
-            return list(self.store.list(name))
+            return list(self.store.list(name, deleted=deleted))
         except StoreObjectNotFound:
             return []
 
@@ -534,6 +534,10 @@ class Repository:
         self._lock_refresh()
         return self.store.store(name, value)
 
-    def store_delete(self, name):
+    def store_delete(self, name, *, deleted=False):
         self._lock_refresh()
-        return self.store.delete(name)
+        return self.store.delete(name, deleted=deleted)
+
+    def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
+        self._lock_refresh()
+        return self.store.move(name, new_name, delete=delete, undelete=undelete, deleted=deleted)

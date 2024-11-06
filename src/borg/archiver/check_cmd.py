@@ -35,10 +35,10 @@ class CheckMixIn:
             raise CommandError(
                 "--repository-only contradicts --first, --last, -a / --match-archives and --verify-data arguments."
             )
+        if args.repo_only and args.find_lost_archives:
+            raise CommandError("--repository-only contradicts the --find-lost-archives option.")
         if args.repair and args.max_duration:
             raise CommandError("--repair does not allow --max-duration argument.")
-        if args.undelete_archives and not args.repair:
-            raise CommandError("--undelete-archives requires --repair argument.")
         if args.max_duration and not args.repo_only:
             # when doing a partial repo check, we can only check xxh64 hashes in repository files.
             # archives check requires that a full repo check was done before and has built/cached a ChunkIndex.
@@ -51,7 +51,7 @@ class CheckMixIn:
             repository,
             verify_data=args.verify_data,
             repair=args.repair,
-            undelete_archives=args.undelete_archives,
+            find_lost_archives=args.find_lost_archives,
             match=args.match_archives,
             sort_by=args.sort_by or "ts",
             first=args.first,
@@ -85,12 +85,14 @@ class CheckMixIn:
            archive data (requires ``--verify-data``). This includes ensuring that the
            repository manifest exists, the archive metadata chunk is present, and that
            all chunks referencing files (items) in the archive exist. This requires
-           reading archive and file metadata, but not data. To cryptographically verify
-           the file (content) data integrity pass ``--verify-data``, but keep in mind
-           that this requires reading all data and is hence very time consuming. When
-           checking archives of a remote repository, archive checks run on the client
-           machine because they require decrypting data and therefore the encryption
-           key.
+           reading archive and file metadata, but not data. To scan for archives whose
+           entries were lost from the archive directory, pass ``--find-lost-archives``.
+           It requires reading all data and is hence very time consuming.
+           To additionally cryptographically verify the file (content) data integrity,
+           pass ``--verify-data``, which is even more time consuming.
+
+           When checking archives of a remote repository, archive checks run on the client
+           machine because they require decrypting data and therefore the encryption key.
 
         Both steps can also be run independently. Pass ``--repository-only`` to run the
         repository checks only, or pass ``--archives-only`` to run the archive checks
@@ -121,6 +123,15 @@ class CheckMixIn:
         accidental and malicious corruption. Tamper-resistance is only guaranteed for
         encrypted repositories against attackers without access to the keys. You can
         not use ``--verify-data`` with ``--repository-only``.
+
+        The ``--find-lost-archives`` option will also scan the whole repository, but
+        tells Borg to search for lost archive metadata. If Borg encounters any archive
+        metadata that doesn't match with an archive directory entry, it means that an
+        entry was lost.
+        Unless ``borg compact`` is called, these archives can be fully restored with
+        ``--repair``. Please note that ``--find-lost-archives`` must read a lot of
+        data from the repository and is thus very time consuming. You can not use
+        ``--find-lost-archives`` with ``--repository-only``.
 
         About repair mode
         +++++++++++++++++
@@ -180,10 +191,8 @@ class CheckMixIn:
         Consequently, if lost chunks were repaired earlier, it is advised to run
         ``--repair`` a second time after creating some new backups.
 
-        If ``--repair --undelete-archives`` is given, Borg will scan the repository
-        for archive metadata and if it finds some where no corresponding archives
-        directory entry exists, it will create the entries. This is basically undoing
-        ``borg delete archive`` or ``borg prune ...`` commands and only possible before
+        If ``--repair --find-lost-archives`` is given, previously lost entries will
+        be recreated in the archive directory. This is only possible before
         ``borg compact`` would remove the archives' data completely.
         """
         )
@@ -213,10 +222,7 @@ class CheckMixIn:
             "--repair", dest="repair", action="store_true", help="attempt to repair any inconsistencies found"
         )
         subparser.add_argument(
-            "--undelete-archives",
-            dest="undelete_archives",
-            action="store_true",
-            help="attempt to undelete archives (use with --repair)",
+            "--find-lost-archives", dest="find_lost_archives", action="store_true", help="attempt to find lost archives"
         )
         subparser.add_argument(
             "--max-duration",

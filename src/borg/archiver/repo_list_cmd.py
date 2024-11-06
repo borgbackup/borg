@@ -26,7 +26,7 @@ class RepoListMixIn:
                 "BORG_RLIST_FORMAT",
                 "{id:.8}  {time}  {archive:<15}  {tags:<10}  {username:<10}  {hostname:<10}  {comment:.40}{NL}",
             )
-        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
+        formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec, deleted=args.deleted)
 
         output_data = []
 
@@ -113,4 +113,4 @@ class RepoListMixIn:
             "but keys used in it are added to the JSON output. "
             "Some keys are always present. Note: JSON can only represent text.",
         )
-        define_archive_filters_group(subparser)
+        define_archive_filters_group(subparser, deleted=True)

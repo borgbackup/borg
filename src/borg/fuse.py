@@ -273,6 +273,7 @@ class FuseBackend:
         self.uid_forced = None
         self.gid_forced = None
         self.umask = 0
+        self.archive_root_dir = {}  # archive ID --> directory name
 
     def _create_filesystem(self):
         self._create_dir(parent=1)  # first call, create root dir (inode == 1)
@@ -281,15 +282,18 @@ class FuseBackend:
         name_counter = Counter(a.name for a in archives)
         duplicate_names = {a.name for a in archives if name_counter[a.name] > 1}
         for archive in archives:
+            name = f"{archive.name}"
+            if name in duplicate_names:
+                name += f"-{bin_to_hex(archive.id):.8}"
+            self.archive_root_dir[archive.id] = name
+        for archive in archives:
             if self.versions:
                 # process archives immediately
                 self._process_archive(archive.id)
             else:
                 # lazily load archives, create archive placeholder inode
                 archive_inode = self._create_dir(parent=1, mtime=int(archive.ts.timestamp() * 1e9))
-                name = f"{archive.name}"
-                if name in duplicate_names:
-                    name += f"-{bin_to_hex(archive.id):.8}"
+                name = self.archive_root_dir[archive.id]
                 self.contents[1][os.fsencode(name)] = archive_inode
                 self.pending_archives[archive_inode] = archive
 
@@ -310,7 +314,7 @@ class FuseBackend:
         # Check if this is an archive we need to load
         archive_info = self.pending_archives.pop(inode, None)
         if archive_info is not None:
-            self._process_archive(archive_info.id, [os.fsencode(archive_info.name)])
+            self._process_archive(archive_info.id, [os.fsencode(self.archive_root_dir[archive_info.id])])
 
     def _allocate_inode(self):
         self.inode_count += 1

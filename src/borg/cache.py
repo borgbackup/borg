@@ -707,7 +707,9 @@ def delete_chunkindex_cache(repository):
 CHUNKINDEX_HASH_SEED = 2
 
 
-def write_chunkindex_to_repo_cache(repository, chunks, *, clear=False, force_write=False, delete_other=False):
+def write_chunkindex_to_repo_cache(
+    repository, chunks, *, clear=False, force_write=False, delete_other=False, delete_these=None
+):
     cached_hashes = list_chunkindex_hashes(repository)
     with io.BytesIO() as f:
         chunks.write(f)
@@ -728,14 +730,20 @@ def write_chunkindex_to_repo_cache(repository, chunks, *, clear=False, force_wri
         logger.debug(f"caching chunks index as {cache_name} in repository...")
         repository.store_store(cache_name, data)
         if delete_other:
-            for hash in cached_hashes:
-                cache_name = f"cache/chunks.{hash}"
-                try:
-                    repository.store_delete(cache_name)
-                except (Repository.ObjectNotFound, StoreObjectNotFound):
-                    # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
-                    pass
-            logger.debug(f"cached chunk indexes deleted: {cached_hashes}")
+            delete_these = cached_hashes
+        elif delete_these:
+            pass
+        else:
+            delete_these = []
+        for hash in delete_these:
+            cache_name = f"cache/chunks.{hash}"
+            try:
+                repository.store_delete(cache_name)
+            except (Repository.ObjectNotFound, StoreObjectNotFound):
+                # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
+                pass
+        if delete_these:
+            logger.debug(f"cached chunk indexes deleted: {delete_these}")
     return new_hash
 
 
@@ -776,7 +784,9 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
             if merged > 0:
                 if merged > 1 and cache_immediately:
                     # immediately update cache/chunks, so we don't have to merge these again:
-                    write_chunkindex_to_repo_cache(repository, chunks, clear=False, force_write=True, delete_other=True)
+                    write_chunkindex_to_repo_cache(
+                        repository, chunks, clear=False, force_write=True, delete_these=hashes
+                    )
                 return chunks
     # if we didn't get anything from the cache, compute the ChunkIndex the slow way:
     logger.debug("querying the chunk IDs list from the repo...")
@@ -875,7 +885,7 @@ class ChunksMixin:
 
     def _write_chunks_cache(self, chunks):
         # this is called from .close, so we can clear here:
-        write_chunkindex_to_repo_cache(self.repository, self._chunks, clear=True, delete_other=False)
+        write_chunkindex_to_repo_cache(self.repository, self._chunks, clear=True)
         self._chunks = None  # nothing there (cleared!)
 
     def refresh_lock(self, now):

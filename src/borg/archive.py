@@ -22,7 +22,7 @@ logger = create_logger()
 
 from . import xattr
 from .chunker import get_chunker, Chunk
-from .cache import ChunkListEntry, build_chunkindex_from_repo
+from .cache import ChunkListEntry, build_chunkindex_from_repo, delete_chunkindex_cache
 from .crypto.key import key_factory, UnsupportedPayloadError
 from .compress import CompressionSpec
 from .constants import *  # NOQA
@@ -50,7 +50,7 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import RemoteRepository, cache_if_remote
-from .repository import Repository, NoManifestError, StoreObjectNotFound
+from .repository import Repository, NoManifestError
 from .repoobj import RepoObj
 
 has_link = hasattr(os, "link")
@@ -2140,18 +2140,9 @@ class ArchiveChecker:
 
     def finish(self):
         if self.repair:
+            # we may have deleted chunks, remove the chunks index cache!
             logger.info("Deleting chunks cache in repository - next repository access will cause a rebuild.")
-            # we may have deleted chunks, invalidate/remove the chunks index cache!
-            try:
-                self.repository.store_delete("cache/chunks_hash")
-            except (Repository.ObjectNotFound, StoreObjectNotFound):
-                # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
-                pass
-            try:
-                self.repository.store_delete("cache/chunks")
-            except (Repository.ObjectNotFound, StoreObjectNotFound):
-                # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
-                pass
+            delete_chunkindex_cache(self.repository)
             logger.info("Writing Manifest.")
             self.manifest.write()
 

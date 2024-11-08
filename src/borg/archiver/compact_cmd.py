@@ -65,7 +65,7 @@ class ArchiveGarbageCollector:
             # as we put the wrong size in there, we need to clean up the size:
             self.chunks[id] = entry._replace(size=0)
         # now self.chunks is an uptodate ChunkIndex, usable for general borg usage!
-        write_chunkindex_to_repo_cache(self.repository, self.chunks, clear=True, force_write=True)
+        write_chunkindex_to_repo_cache(self.repository, self.chunks, clear=True, force_write=True, delete_other=True)
         self.chunks = None  # nothing there (cleared!)
 
     def analyze_archives(self) -> Tuple[Set, Set, int, int, int]:

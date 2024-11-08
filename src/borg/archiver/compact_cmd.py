@@ -127,7 +127,7 @@ class ArchiveGarbageCollector:
             logger.warning(f"{len(self.reappeared_chunks)} previously missing objects re-appeared!" + run_repair)
             set_ec(EXIT_WARNING)
 
-        logger.info("Cleaning archives directory from deleted archives...")
+        logger.info("Cleaning archives directory from soft-deleted archives...")
         archive_infos = self.manifest.archives.list(sort_by=["ts"], deleted=True)
         for archive_info in archive_infos:
             name, id, hex_id = archive_info.name, archive_info.id, bin_to_hex(archive_info.id)
@@ -176,16 +176,17 @@ class CompactMixIn:
             Free repository space by deleting unused chunks.
 
             borg compact analyzes all existing archives to find out which repository
-            objects are actually used (referenced). It then removes all unused objects
-            to free repository space.
+            objects are actually used (referenced). It then deletes all unused objects
+            from the repository to free space.
 
             Unused objects may result from:
 
             - borg delete or prune usage
-            - interrupted backups (maybe retry the backup first before running compact!)
+            - interrupted backups (maybe retry the backup first before running compact)
             - backup of source files that had an I/O error in the middle of their contents
-              and that were skipped due to this.
-            - corruption of the repository (e.g. the archives directory having lost entries)
+              and that were skipped due to this
+            - corruption of the repository (e.g. the archives directory having lost
+              entries, see notes below)
 
             You usually don't want to run ``borg compact`` after every write operation, but
             either regularly (e.g. once a month, possibly together with ``borg check``) or
@@ -193,18 +194,15 @@ class CompactMixIn:
 
             **Important:**
 
-            After compacting it is not possible anymore to use ``borg undelete`` to recover
-            previously deleted archives.
+            After compacting it is no longer possible to use ``borg undelete`` to recover
+            previously soft-deleted archives.
 
             ``borg compact`` might also delete data from archives that were "lost" due to
             archives directory corruption. Such archives could potentially be restored with
-            ``borg check --find-lost-archives [--repair]``, which is slow and thus you
-            maybe usually don't want to do that unless there are signs of lost archives
-            (e.g. when seeing fatal errors when creating backups or when archives are
-            missing in ``borg list``).
-
-            Differently than borg 1.x, borg2's compact needs the borg key if the repo is
-            encrypted.
+            ``borg check --find-lost-archives [--repair]``, which is slow. You therefore
+            might not want to do that unless there are signs of lost archives (e.g. when
+            seeing fatal errors when creating backups or when archives are missing in
+            ``borg repo-list``).
             """
         )
         subparser = subparsers.add_parser(

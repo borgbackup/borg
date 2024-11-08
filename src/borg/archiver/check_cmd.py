@@ -126,8 +126,8 @@ class CheckMixIn:
 
         The ``--find-lost-archives`` option will also scan the whole repository, but
         tells Borg to search for lost archive metadata. If Borg encounters any archive
-        metadata that doesn't match with an archive directory entry, it means that an
-        entry was lost.
+        metadata that doesn't match with an archive directory entry (including
+        soft-deleted archives), it means that an entry was lost.
         Unless ``borg compact`` is called, these archives can be fully restored with
         ``--repair``. Please note that ``--find-lost-archives`` must read a lot of
         data from the repository and is thus very time consuming. You can not use

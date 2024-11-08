@@ -667,17 +667,13 @@ class FilesCacheMixin:
 
 def try_upgrade_to_b14(repository):
     # TODO: remove this before 2.0.0 release
-    try:
-        hash = repository.store_load("cache/chunks_hash")
-    except (Repository.ObjectNotFound, StoreObjectNotFound):
-        # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
-        pass  # likely already upgraded
-    else:
-        old_name = "cache/chunks"
-        new_name = f"cache/chunks.{bin_to_hex(hash)}"
-        logger.debug(f"renaming {old_name} to {new_name}.")
-        repository.store_move(old_name, new_name)
-        repository.store_delete("cache/chunks_hash")
+    # we just delete any present chunk index cache here, it is invalid due to the
+    # refcount -> flags change we did and due to the different CHUNKINDEX_HASH_SEED.
+    for name in "chunks_hash", "chunks":
+        try:
+            repository.store_delete(f"cache/{name}")
+        except (Repository.ObjectNotFound, StoreObjectNotFound):
+            pass  # likely already upgraded
 
 
 def list_chunkindex_hashes(repository):

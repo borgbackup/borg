@@ -681,12 +681,13 @@ def try_upgrade_to_b14(repository):
 
 
 def list_chunkindex_hashes(repository):
-    hashes = set()
+    hashes = []
     for info in repository.store_list("cache"):
         info = ItemInfo(*info)  # RPC does not give namedtuple
         if info.name.startswith("chunks."):
             hash = info.name.removeprefix("chunks.")
-            hashes.add(hash)
+            hashes.append(hash)
+    hashes = sorted(hashes)
     logger.debug(f"cached chunk indexes: {hashes}")
     return hashes
 

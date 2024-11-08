@@ -460,7 +460,7 @@ def define_archive_filters_group(
 
     if deleted:
         filters_group.add_argument(
-            "--deleted", dest="deleted", action="store_true", help="consider only deleted archives."
+            "--deleted", dest="deleted", action="store_true", help="consider only soft-deleted archives."
         )
 
     return filters_group

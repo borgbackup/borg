@@ -1867,7 +1867,9 @@ class ArchiveChecker:
                 if self.manifest.archives.exists_id(archive_id, deleted=False):
                     logger.debug(f"We already have an archives directory entry for {name} {archive_id_hex}.")
                 elif self.manifest.archives.exists_id(archive_id, deleted=True):
-                    logger.debug(f"We already have a deleted archives directory entry for {name} {archive_id_hex}.")
+                    logger.debug(
+                        f"We already have a soft-deleted archives directory entry for {name} {archive_id_hex}."
+                    )
                 else:
                     self.error_found = True
                     if self.repair:

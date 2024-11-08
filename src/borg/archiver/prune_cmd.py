@@ -212,12 +212,13 @@ class PruneMixIn:
 
         prune_epilog = process_epilog(
             """
-        The prune command prunes a repository by deleting all archives not matching
-        any of the specified retention options.
+        The prune command prunes a repository by soft-deleting all archives not
+        matching any of the specified retention options.
 
         Important:
 
-        - Repository disk space is **not** freed until you run ``borg compact``.
+        - The prune command will only mark archives for deletion ("soft-deletion"),
+          repository disk space is **not** freed until you run ``borg compact``.
         - You can use ``borg undelete`` to undelete archives, but only until
           you run ``borg compact``.
 

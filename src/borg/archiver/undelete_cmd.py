@@ -61,7 +61,8 @@ class UnDeleteMixIn:
 
         Important: Undeleting archives is only possible before compacting.
         Once ``borg compact`` has run, all disk space occupied only by the
-        deleted archives will be freed and undelete is not possible anymore.
+        soft-deleted archives will be freed and undelete is not possible
+        anymore.
 
         When in doubt, use ``--dry-run --list`` to see what would be undeleted.
 

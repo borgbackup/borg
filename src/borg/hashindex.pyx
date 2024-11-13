@@ -39,11 +39,16 @@ ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'flags size')
 
 class ChunkIndex(HTProxyMixin, MutableMapping):
     """
-    Mapping from key256 to (refcount32, size32) to track chunks in the repository.
+    Mapping from key256 to (flags32, size32) to track chunks in the repository.
     """
-    # .flags values: 2^0 .. 2^31
+    # .flags related values:
     F_NONE = 0  # all flags cleared
-    F_USED = 1  # chunk is used/referenced
+    M_USER = 0x00ffffff  # mask for user flags
+    M_SYSTEM = 0xff000000  # mask for system flags
+    # user flags:
+    F_USED = 2 ** 0  # chunk is used/referenced
+    # system flags (internal use, always 0 to user, not changeable by user):
+    F_NEW = 2 ** 24  # a new chunk that is not present in repo/cache/chunks.* yet.
 
     def __init__(self, capacity=1000, path=None, usable=None):
         if path:
@@ -53,8 +58,15 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
                 capacity = usable * 2  # load factor 0.5
             self.ht = HashTableNT(key_size=32, value_format="<II", value_type=ChunkIndexEntry, capacity=capacity)
 
-    def iteritems(self):
-        yield from self.ht.items()
+    def hide_system_flags(self, value):
+        user_flags = value.flags & self.M_USER
+        return value._replace(flags=user_flags)
+
+    def iteritems(self, *, only_new=False):
+        """iterate items (optionally only new items), hide system flags."""
+        for key, value in self.ht.items():
+            if not only_new or (value.flags & self.F_NEW):
+                yield key, self.hide_system_flags(value)
 
     def add(self, key, size):
         v = self.get(key)
@@ -64,6 +76,36 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
             flags = v.flags | self.F_USED
             assert v.size == 0 or v.size == size
         self[key] = ChunkIndexEntry(flags=flags, size=size)
+
+    def __getitem__(self, key):
+        """specialized __getitem__ that hides system flags."""
+        value = self.ht[key]
+        return self.hide_system_flags(value)
+
+    def __setitem__(self, key, value):
+        """specialized __setitem__ that protects system flags, manages F_NEW flag."""
+        try:
+            prev = self.ht[key]
+        except KeyError:
+            prev_flags = self.F_NONE
+            is_new = True
+        else:
+            prev_flags = prev.flags
+            is_new = bool(prev_flags & self.F_NEW)  # was new? stays new!
+        system_flags = prev_flags & self.M_SYSTEM
+        if is_new:
+            system_flags |= self.F_NEW
+        else:
+            system_flags &= ~self.F_NEW
+        user_flags = value.flags & self.M_USER
+        self.ht[key] = value._replace(flags=system_flags | user_flags)
+
+    def clear_new(self):
+        """clear F_NEW flag of all items"""
+        for key, value in self.ht.items():
+            if value.flags & self.F_NEW:
+                flags = value.flags & ~self.F_NEW
+                self.ht[key] = value._replace(flags=flags)
 
     @classmethod
     def read(cls, path):

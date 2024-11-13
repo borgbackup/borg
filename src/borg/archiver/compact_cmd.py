@@ -58,13 +58,8 @@ class ArchiveGarbageCollector:
         return chunks
 
     def save_chunk_index(self):
-        # first clean up:
-        for id, entry in self.chunks.iteritems():
-            # we already deleted the unused chunks, so everything left must be used:
-            assert entry.flags & ChunkIndex.F_USED
-            # as we put the wrong size in there, we need to clean up the size:
-            self.chunks[id] = entry._replace(size=0)
-        # now self.chunks is an uptodate ChunkIndex, usable for general borg usage!
+        # write_chunkindex_to_repo now removes all flags and size infos.
+        # we need this, as we put the wrong size in there.
         write_chunkindex_to_repo_cache(self.repository, self.chunks, clear=True, force_write=True, delete_other=True)
         self.chunks = None  # nothing there (cleared!)
 

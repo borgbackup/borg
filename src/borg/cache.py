@@ -833,6 +833,8 @@ class ChunksMixin:
         self._chunks = None
         self.last_refresh_dt = datetime.now(timezone.utc)
         self.refresh_td = timedelta(seconds=60)
+        self.chunks_cache_last_write = datetime.now(timezone.utc)
+        self.chunks_cache_write_td = timedelta(seconds=600)
 
     @property
     def chunks(self):
@@ -879,6 +881,7 @@ class ChunksMixin:
             else:
                 raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
         now = datetime.now(timezone.utc)
+        self._maybe_write_chunks_cache(now)
         exists = self.seen_chunk(id, size)
         if exists:
             # if borg create is processing lots of unchanged files (no content and not metadata changes),
@@ -894,10 +897,10 @@ class ChunksMixin:
         stats.update(size, not exists)
         return ChunkListEntry(id, size)
 
-    def _write_chunks_cache(self, chunks):
-        # this is called from .close, so we can clear here:
-        write_chunkindex_to_repo_cache(self.repository, self._chunks, clear=True)
-        self._chunks = None  # nothing there (cleared!)
+    def _maybe_write_chunks_cache(self, now, force=False, clear=False):
+        if force or now > self.chunks_cache_last_write + self.chunks_cache_write_td:
+            write_chunkindex_to_repo_cache(self.repository, self._chunks, clear=clear)
+            self.chunks_cache_last_write = now
 
     def refresh_lock(self, now):
         if now > self.last_refresh_dt + self.refresh_td:
@@ -995,7 +998,9 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
             for key, value in sorted(self._chunks.stats.items()):
                 logger.debug(f"Chunks index stats: {key}: {value}")
             pi.output("Saving chunks cache")
-            self._write_chunks_cache(self._chunks)  # cache/chunks in repo has a different integrity mechanism
+            # note: cache/chunks.* in repo has a different integrity mechanism
+            self._maybe_write_chunks_cache(self._chunks, force=True, clear=True)
+            self._chunks = None  # nothing there (cleared!)
         pi.output("Saving cache config")
         self.cache_config.save(self.manifest)
         self.cache_config.close()

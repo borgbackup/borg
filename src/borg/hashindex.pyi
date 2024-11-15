@@ -13,6 +13,7 @@ CIE = Union[Tuple[int, int], Type[ChunkIndexEntry]]
 class ChunkIndex:
     F_NONE: int
     F_USED: int
+    F_COMPRESS: int
     F_NEW: int
     M_USER: int
     M_SYSTEM: int

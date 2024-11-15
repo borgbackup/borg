@@ -35,4 +35,23 @@ def test_keyerror():
     with pytest.raises(KeyError):
         chunks[x]
     with pytest.raises(struct.error):
-        chunks[x] = ChunkIndexEntry(flags=2**33, size=0)
+        chunks[x] = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=2**33)
+
+
+def test_new():
+    def new_chunks():
+        return list(chunks.iteritems(only_new=True))
+
+    chunks = ChunkIndex()
+    key1, value1a = H2(1), ChunkIndexEntry(flags=ChunkIndex.F_USED, size=23)
+    key2, value2a = H2(2), ChunkIndexEntry(flags=ChunkIndex.F_USED, size=42)
+    # tracking of new entries
+    assert new_chunks() == []
+    chunks[key1] = value1a
+    assert new_chunks() == [(key1, value1a)]
+    chunks.clear_new()
+    assert new_chunks() == []
+    chunks[key2] = value2a
+    assert new_chunks() == [(key2, value2a)]
+    chunks.clear_new()
+    assert new_chunks() == []

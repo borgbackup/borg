@@ -23,7 +23,7 @@ borg check
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--repair``                                 | attempt to repair any inconsistencies found                                                                                 |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--undelete-archives``                      | attempt to undelete archives (use with --repair)                                                                            |
+    |                                                                             | ``--find-lost-archives``                     | attempt to find lost archives                                                                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--max-duration SECONDS``                   | do only a partial repo check for max. SECONDS seconds (Default: unlimited)                                                  |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
@@ -67,7 +67,7 @@ borg check
         --archives-only    only perform archives checks
         --verify-data     perform cryptographic archive data integrity verification (conflicts with ``--repository-only``)
         --repair          attempt to repair any inconsistencies found
-        --undelete-archives    attempt to undelete archives (use with --repair)
+        --find-lost-archives    attempt to find lost archives
         --max-duration SECONDS    do only a partial repo check for max. SECONDS seconds (Default: unlimited)
 
 
@@ -103,12 +103,14 @@ It consists of two major steps:
    archive data (requires ``--verify-data``). This includes ensuring that the
    repository manifest exists, the archive metadata chunk is present, and that
    all chunks referencing files (items) in the archive exist. This requires
-   reading archive and file metadata, but not data. To cryptographically verify
-   the file (content) data integrity pass ``--verify-data``, but keep in mind
-   that this requires reading all data and is hence very time consuming. When
-   checking archives of a remote repository, archive checks run on the client
-   machine because they require decrypting data and therefore the encryption
-   key.
+   reading archive and file metadata, but not data. To scan for archives whose
+   entries were lost from the archive directory, pass ``--find-lost-archives``.
+   It requires reading all data and is hence very time consuming.
+   To additionally cryptographically verify the file (content) data integrity,
+   pass ``--verify-data``, which is even more time consuming.
+
+   When checking archives of a remote repository, archive checks run on the client
+   machine because they require decrypting data and therefore the encryption key.
 
 Both steps can also be run independently. Pass ``--repository-only`` to run the
 repository checks only, or pass ``--archives-only`` to run the archive checks
@@ -139,6 +141,15 @@ cryptographic verification and hence very time consuming, but will detect any
 accidental and malicious corruption. Tamper-resistance is only guaranteed for
 encrypted repositories against attackers without access to the keys. You can
 not use ``--verify-data`` with ``--repository-only``.
+
+The ``--find-lost-archives`` option will also scan the whole repository, but
+tells Borg to search for lost archive metadata. If Borg encounters any archive
+metadata that doesn't match with an archive directory entry (including
+soft-deleted archives), it means that an entry was lost.
+Unless ``borg compact`` is called, these archives can be fully restored with
+``--repair``. Please note that ``--find-lost-archives`` must read a lot of
+data from the repository and is thus very time consuming. You can not use
+``--find-lost-archives`` with ``--repository-only``.
 
 About repair mode
 +++++++++++++++++
@@ -198,8 +209,6 @@ chunks of a "zero-patched" file reappear, this effectively "heals" the file.
 Consequently, if lost chunks were repaired earlier, it is advised to run
 ``--repair`` a second time after creating some new backups.
 
-If ``--repair --undelete-archives`` is given, Borg will scan the repository
-for archive metadata and if it finds some where no corresponding archives
-directory entry exists, it will create the entries. This is basically undoing
-``borg delete archive`` or ``borg prune ...`` commands and only possible before
+If ``--repair --find-lost-archives`` is given, previously lost entries will
+be recreated in the archive directory. This is only possible before
 ``borg compact`` would remove the archives' data completely.

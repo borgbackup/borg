@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2024-10-31" "" "borg backup tool"
+.TH "BORG-DELETE" 1 "2024-11-16" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete archives
 .SH SYNOPSIS
@@ -35,10 +35,17 @@ borg-delete \- Delete archives
 borg [common options] delete [options] [NAME]
 .SH DESCRIPTION
 .sp
-This command deletes archives from the repository.
+This command soft\-deletes archives from the repository.
 .sp
-Important: When deleting archives, repository disk space is \fBnot\fP freed until
+Important:
+.INDENT 0.0
+.IP \(bu 2
+The delete command will only mark archives for deletion (\(dqsoft\-deletion\(dq),
+repository disk space is \fBnot\fP freed until you run \fBborg compact\fP\&.
+.IP \(bu 2
+You can use \fBborg undelete\fP to undelete archives, but only until
 you run \fBborg compact\fP\&.
+.UNINDENT
 .sp
 When in doubt, use \fB\-\-dry\-run \-\-list\fP to see what would be deleted.
 .sp

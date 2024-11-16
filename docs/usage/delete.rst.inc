@@ -82,10 +82,14 @@ borg delete
 Description
 ~~~~~~~~~~~
 
-This command deletes archives from the repository.
+This command soft-deletes archives from the repository.
 
-Important: When deleting archives, repository disk space is **not** freed until
-you run ``borg compact``.
+Important:
+
+- The delete command will only mark archives for deletion ("soft-deletion"),
+  repository disk space is **not** freed until you run ``borg compact``.
+- You can use ``borg undelete`` to undelete archives, but only until
+  you run ``borg compact``.
 
 When in doubt, use ``--dry-run --list`` to see what would be deleted.
 

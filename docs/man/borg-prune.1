@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2024-10-31" "" "borg backup tool"
+.TH "BORG-PRUNE" 1 "2024-11-16" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -35,10 +35,18 @@ borg-prune \- Prune repository archives according to specified rules
 borg [common options] prune [options] [NAME]
 .SH DESCRIPTION
 .sp
-The prune command prunes a repository by deleting all archives not matching
-any of the specified retention options.
+The prune command prunes a repository by soft\-deleting all archives not
+matching any of the specified retention options.
 .sp
-Important: Repository disk space is \fBnot\fP freed until you run \fBborg compact\fP\&.
+Important:
+.INDENT 0.0
+.IP \(bu 2
+The prune command will only mark archives for deletion (\(dqsoft\-deletion\(dq),
+repository disk space is \fBnot\fP freed until you run \fBborg compact\fP\&.
+.IP \(bu 2
+You can use \fBborg undelete\fP to undelete archives, but only until
+you run \fBborg compact\fP\&.
+.UNINDENT
 .sp
 This command is normally used by automated backup scripts wanting to keep a
 certain number of historic backups. This retention policy is commonly referred to as

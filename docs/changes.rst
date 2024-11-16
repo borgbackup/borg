@@ -134,7 +134,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b13 (2024-10-31)
+Version 2.0.0b14 (2024-11-xx)
 -----------------------------
 
 Please note:
@@ -143,6 +143,44 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- delete: now only soft-deletes archives (same for prune)
+- repo-list: --deleted lists deleted archives
+- undelete: undelete soft-deleted archives, #8500
+
+Fixes:
+
+- chunks index cache:
+
+  - enable partial/incremental updates (F_NEW flag).
+  - write chunks index every 10mins, #8503.
+    this makes sure progress is not totally lost when a backup is interrupted.
+  - write to repo/cache/chunks.<HASH> to enable parallel updates.
+- mount: fix check_pending_archive to give correct root dir, #8528
+
+Other changes:
+
+- repo-compress: reduce memory consumption (F_COMPRESS flag)
+- files cache: reduce memory consumption, #5756
+- check: rename --undelete-archives to --find-lost-archives
+- check: rebuild_archives_directory: accelerate by only reading metadata
+- shell completions: adapt zsh for borg 2.0.0b13 - needs more work!
+- chunk index: rename .refcount to .flags, use it for user and system flags.
+- vagrant:
+
+  - add bookworm32 box for 32bit platform testing
+  - fix pythons on freebsd14
+  - simplify openindiana box setup
+- docs:
+
+  - remove --bypass-lock, small changes regarding compression
+  - FAQ: clean up entries regarding SSH settings
+
+
+Version 2.0.0b13 (2024-10-31)
+-----------------------------
 
 New features:
 

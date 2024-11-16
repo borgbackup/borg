@@ -50,6 +50,16 @@ Compatibility notes:
     within the same series of archives to make borg work more efficiently.
     the name now identifies a series of archive, to identify a single archive
     please use aid:<archive-hash-prefix>, e.g.: borg delete aid:d34db33f
+  - in case you do NOT want to adopt the "series name" way of naming archives
+    (like "myarchive") as we recommend, but keep using always-changing names
+    (like "myserver-myarchive-20241231"), you can do that, but then you must
+    make use of BORG_FILES_CACHE_SUFFIX and either set it to a constant suffix
+    (like "all") or to a unique suffix per archive series (like
+    "myserver-myarchive") so that borg can find the correct files cache.
+    For the "all" variant, you must also set BORG_FILES_CACHE_TTL to a value
+    greater than the count of different archives series you write to that repo.
+    Usually borg uses a different files cache suffix per archive (series) name
+    and defaults to BORG_FILES_CACHE_TTL=2 because that is sufficient for that.
   - the archive id is always given separately from the repository
     (differently than with borg 1.x you must not give repo::archive).
   - the series name or archive id is either given as a positional parameter,

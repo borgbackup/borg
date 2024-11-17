@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CHECK" 1 "2024-10-31" "" "borg backup tool"
+.TH "BORG-CHECK" 1 "2024-11-16" "" "borg backup tool"
 .SH NAME
 borg-check \- Check repository consistency
 .SH SYNOPSIS
@@ -51,12 +51,14 @@ Checking consistency and correctness of the archive metadata and optionally
 archive data (requires \fB\-\-verify\-data\fP). This includes ensuring that the
 repository manifest exists, the archive metadata chunk is present, and that
 all chunks referencing files (items) in the archive exist. This requires
-reading archive and file metadata, but not data. To cryptographically verify
-the file (content) data integrity pass \fB\-\-verify\-data\fP, but keep in mind
-that this requires reading all data and is hence very time consuming. When
-checking archives of a remote repository, archive checks run on the client
-machine because they require decrypting data and therefore the encryption
-key.
+reading archive and file metadata, but not data. To scan for archives whose
+entries were lost from the archive directory, pass \fB\-\-find\-lost\-archives\fP\&.
+It requires reading all data and is hence very time consuming.
+To additionally cryptographically verify the file (content) data integrity,
+pass \fB\-\-verify\-data\fP, which is even more time consuming.
+.sp
+When checking archives of a remote repository, archive checks run on the client
+machine because they require decrypting data and therefore the encryption key.
 .UNINDENT
 .sp
 Both steps can also be run independently. Pass \fB\-\-repository\-only\fP to run the
@@ -88,6 +90,15 @@ cryptographic verification and hence very time consuming, but will detect any
 accidental and malicious corruption. Tamper\-resistance is only guaranteed for
 encrypted repositories against attackers without access to the keys. You can
 not use \fB\-\-verify\-data\fP with \fB\-\-repository\-only\fP\&.
+.sp
+The \fB\-\-find\-lost\-archives\fP option will also scan the whole repository, but
+tells Borg to search for lost archive metadata. If Borg encounters any archive
+metadata that doesn\(aqt match with an archive directory entry (including
+soft\-deleted archives), it means that an entry was lost.
+Unless \fBborg compact\fP is called, these archives can be fully restored with
+\fB\-\-repair\fP\&. Please note that \fB\-\-find\-lost\-archives\fP must read a lot of
+data from the repository and is thus very time consuming. You can not use
+\fB\-\-find\-lost\-archives\fP with \fB\-\-repository\-only\fP\&.
 .SS About repair mode
 .sp
 The check command is a readonly task by default. If any corruption is found,
@@ -150,10 +161,8 @@ chunks of a \(dqzero\-patched\(dq file reappear, this effectively \(dqheals\(dq 
 Consequently, if lost chunks were repaired earlier, it is advised to run
 \fB\-\-repair\fP a second time after creating some new backups.
 .sp
-If \fB\-\-repair \-\-undelete\-archives\fP is given, Borg will scan the repository
-for archive metadata and if it finds some where no corresponding archives
-directory entry exists, it will create the entries. This is basically undoing
-\fBborg delete archive\fP or \fBborg prune ...\fP commands and only possible before
+If \fB\-\-repair \-\-find\-lost\-archives\fP is given, previously lost entries will
+be recreated in the archive directory. This is only possible before
 \fBborg compact\fP would remove the archives\(aq data completely.
 .SH OPTIONS
 .sp
@@ -173,8 +182,8 @@ perform cryptographic archive data integrity verification (conflicts with \fB\-\
 .B  \-\-repair
 attempt to repair any inconsistencies found
 .TP
-.B  \-\-undelete\-archives
-attempt to undelete archives (use with \-\-repair)
+.B  \-\-find\-lost\-archives
+attempt to find lost archives
 .TP
 .BI \-\-max\-duration \ SECONDS
 do only a partial repo check for max. SECONDS seconds (Default: unlimited)

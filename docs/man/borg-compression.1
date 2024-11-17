@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-COMPRESSION" 1 "2024-10-31" "" "borg backup tool"
+.TH "BORG-COMPRESSION" 1 "2024-11-16" "" "borg backup tool"
 .SH NAME
 borg-compression \- Details regarding compression
 .SH DESCRIPTION
@@ -77,7 +77,8 @@ Use a built\-in heuristic to decide per chunk whether to compress or not.
 The heuristic tries with lz4 whether the data is compressible.
 For incompressible data, it will not use compression (uses \(dqnone\(dq).
 For compressible data, it uses the given C[,L] compression \- with C[,L]
-being any valid compression specifier.
+being any valid compression specifier. This can be helpful for media files
+which often cannot be compressed much more.
 .TP
 .B obfuscate,SPEC,C[,L]
 Use compressed\-size obfuscation to make fingerprinting attacks based on

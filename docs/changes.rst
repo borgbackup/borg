@@ -144,7 +144,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b14 (2024-11-xx)
+Version 2.0.0b14 (2024-11-17)
 -----------------------------
 
 Please note:

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-LIST" 1 "2024-10-31" "" "borg backup tool"
+.TH "BORG-REPO-LIST" 1 "2024-11-16" "" "borg backup tool"
 .SH NAME
 borg-repo-list \- List the archives contained in a repository
 .SH SYNOPSIS
@@ -77,6 +77,9 @@ consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
 consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+.TP
+.B  \-\-deleted
+consider only soft\-deleted archives.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

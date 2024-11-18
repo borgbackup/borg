@@ -35,6 +35,8 @@ class HTProxyMixin:
 
 
 ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'flags size')
+ChunkIndexEntryFormatT = namedtuple('ChunkIndexEntryFormatT', 'flags size')
+ChunkIndexEntryFormat = ChunkIndexEntryFormatT(flags="I", size="I")
 
 
 class ChunkIndex(HTProxyMixin, MutableMapping):
@@ -57,7 +59,8 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         else:
             if usable is not None:
                 capacity = usable * 2  # load factor 0.5
-            self.ht = HashTableNT(key_size=32, value_format="<II", value_type=ChunkIndexEntry, capacity=capacity)
+            self.ht = HashTableNT(key_size=32, value_type=ChunkIndexEntry, value_format=ChunkIndexEntryFormat,
+                                  capacity=capacity)
 
     def hide_system_flags(self, value):
         user_flags = value.flags & self.M_USER
@@ -130,6 +133,8 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
 
 
 FuseVersionsIndexEntry = namedtuple('FuseVersionsIndexEntry', 'version hash')
+FuseVersionsIndexEntryFormatT = namedtuple('FuseVersionsIndexEntryFormatT', 'version hash')
+FuseVersionsIndexEntryFormat = FuseVersionsIndexEntryFormatT(version="I", hash="16s")
 
 
 class FuseVersionsIndex(HTProxyMixin, MutableMapping):
@@ -137,10 +142,12 @@ class FuseVersionsIndex(HTProxyMixin, MutableMapping):
     Mapping from key128 to (file_version32, file_content_hash128) to support the FUSE versions view.
     """
     def __init__(self):
-        self.ht = HashTableNT(key_size=16, value_format="<I16s", value_type=FuseVersionsIndexEntry)
+        self.ht = HashTableNT(key_size=16, value_type=FuseVersionsIndexEntry, value_format=FuseVersionsIndexEntryFormat)
 
 
 NSIndex1Entry = namedtuple('NSIndex1Entry', 'segment offset')
+NSIndex1EntryFormatT = namedtuple('NSIndex1EntryFormatT', 'segment offset')
+NSIndex1EntryFormat = NSIndex1EntryFormatT(segment="I", offset="I")
 
 
 class NSIndex1(HTProxyMixin, MutableMapping):
@@ -150,14 +157,14 @@ class NSIndex1(HTProxyMixin, MutableMapping):
     MAX_VALUE = 2**32 - 1  # borghash has the full uint32_t range
     MAGIC = b"BORG_IDX"  # borg 1.x
     HEADER_FMT = "<8sIIBB"  # magic, entries, buckets, ksize, vsize
-    VALUE_FMT = "<II"  # borg 1.x on-disk: little-endian segment, offset
     KEY_SIZE = 32
     VALUE_SIZE = 8
 
     def __init__(self, capacity=1000, path=None, usable=None):
         if usable is not None:
             capacity = usable * 2  # load factor 0.5
-        self.ht = HashTableNT(key_size=self.KEY_SIZE, value_format=self.VALUE_FMT, value_type=NSIndex1Entry, capacity=capacity)
+        self.ht = HashTableNT(key_size=self.KEY_SIZE, value_type=NSIndex1Entry, value_format=NSIndex1EntryFormat,
+                              capacity=capacity)
         if path:
             self._read(path)
 

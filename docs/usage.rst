@@ -57,6 +57,7 @@ Usage
    usage/diff
    usage/delete
    usage/prune
+   usage/undelete
    usage/info
    usage/analyze
    usage/mount

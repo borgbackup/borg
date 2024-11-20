@@ -73,6 +73,7 @@ end
 
 def packages_openbsd
   return <<-EOF
+    echo "https://ftp.eu.openbsd.org/pub/OpenBSD" > /etc/installurl
     pkg_add bash
     chsh -s bash vagrant
     pkg_add xxhash

@@ -44,6 +44,12 @@ configured = False
 # warnings.filterwarnings('ignore', r'... regex for warning message to ignore ...')
 
 
+# we do not want that urllib spoils test output with LibreSSL related warnings on OpenBSD.
+# NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+,
+#                    currently the 'ssl' module is compiled with 'LibreSSL 3.8.2'.
+warnings.filterwarnings("ignore", message=r".*urllib3 v2 only supports OpenSSL.*")
+
+
 def _log_warning(message, category, filename, lineno, file=None, line=None):
     # for warnings, we just want to use the logging system, not stderr or other files
     msg = f"{filename}:{lineno}: {category.__name__}: {message}"

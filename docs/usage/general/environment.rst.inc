@@ -198,6 +198,8 @@ Directories and files:
         operations), see tempfile_ for details.
 
 Building:
+    BORG_OPENSSL_NAME
+        Defines the subdirectory name for OpenSSL (setup.py).
     BORG_OPENSSL_PREFIX
         Adds given OpenSSL header file directory to the default locations (setup.py).
     BORG_LIBACL_PREFIX

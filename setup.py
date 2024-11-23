@@ -132,23 +132,23 @@ if not on_rtd:
             f"or ensure {lib_pkg_name}.pc is in PKG_CONFIG_PATH."
         )
 
-    crypto_extra_objects = []
     if is_win32:
         crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "libcrypto", "libcrypto", ">=1.1.1", lib_subdir="")
     elif is_openbsd:
         # Use openssl (not libressl) because we need AES-OCB via EVP api. Link
         # it statically to avoid conflicting with shared libcrypto from the base
         # OS pulled in via dependencies.
-        crypto_ext_lib = {"include_dirs": ["/usr/local/include/eopenssl30"]}
-        crypto_extra_objects += ["/usr/local/lib/eopenssl30/libcrypto.a"]
+        openssl_prefix = os.environ.get("BORG_OPENSSL_PREFIX", "/usr/local")
+        openssl_name = os.environ.get("BORG_OPENSSL_NAME", "eopenssl33")
+        crypto_ext_lib = dict(
+            include_dirs=[os.path.join(openssl_prefix, "include", openssl_name)],
+            extra_objects=[os.path.join(openssl_prefix, "lib", openssl_name, "libcrypto.a")],
+        )
     else:
         crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "crypto", "libcrypto", ">=1.1.1")
 
     crypto_ext_kwargs = members_appended(
-        dict(sources=[crypto_ll_source]),
-        crypto_ext_lib,
-        dict(extra_compile_args=cflags),
-        dict(extra_objects=crypto_extra_objects),
+        dict(sources=[crypto_ll_source]), crypto_ext_lib, dict(extra_compile_args=cflags)
     )
 
     compress_ext_kwargs = members_appended(

@@ -171,7 +171,7 @@ def packages_macos
 
     # now brew, curl, ca-certificates, openssl@3 should be all ok.
     brew update
-    brew install pkg-config readline xxhash zstd lz4 xz
+    brew install pkgconf readline xxhash zstd lz4 xz
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
     # pyenv shall use the openssl@3 from homebrew:

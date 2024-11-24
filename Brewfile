@@ -1,4 +1,4 @@
-brew 'pkg-config'
+brew 'pkgconf'
 brew 'zstd'
 brew 'lz4'
 brew 'xxhash'

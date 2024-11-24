@@ -162,7 +162,9 @@ jobs:
             ${{ runner.os }}-
 
     - name: Install macOS packages
-      run: brew bundle install
+      run: |
+        brew unlink pkg-config@0.29.2 || true
+        brew bundle install
 
     - name: Install Python requirements
       run: |

@@ -334,8 +334,8 @@ borg usually just stores their metadata:
 Other flags used include:
 
 - 'i' = backup data was read from standard input (stdin)
-- '-' = dry run, item was *not* backed up
-- 'x' = excluded, item was *not* backed up
+- '-' = item would be included in archive(s) (if not in dry-run mode)
+- 'x' = item was excluded - or would be excluded from archive(s) (if not in dry-run mode) 
 - '?' = missing status code (if you see this, please file a bug report!)
 
 Reading backup data from stdin

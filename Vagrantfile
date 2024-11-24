@@ -84,6 +84,7 @@ def packages_openbsd
     pkg_add openssl%3.0
     pkg_add py3-pip
     pkg_add py3-virtualenv
+    echo 'export BORG_OPENSSL_NAME=eopenssl30' >> ~vagrant/.bash_profile
   EOF
 end
 

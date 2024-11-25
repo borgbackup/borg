@@ -95,16 +95,10 @@ class RecreateMixIn:
         at least the entire deduplicated size of the archives using the previous
         chunker params.
 
-        If you recently ran borg check --repair and it had to fix lost chunks with all-zero
-        replacement chunks, please first run another backup for the same data and re-run
-        borg check --repair afterwards to heal any archives that had lost chunks which are
-        still generated from the input data.
-
-        Important: running borg recreate to re-chunk will remove the chunks_healthy
-        metadata of all items with replacement chunks, so healing will not be possible
-        any more after re-chunking (it is also unlikely it would ever work: due to the
-        change of chunking parameters, the missing chunk likely will never be seen again
-        even if you still have the data that produced it).
+        If your most recent borg check found missing chunks, please first run another
+        backup for the same data, before doing any rechunking. If you are lucky, that
+        will re-create the missing chunks. Optionally, do another borg check, to see
+        if the chunks are still missing).
         """
         )
         subparser = subparsers.add_parser(

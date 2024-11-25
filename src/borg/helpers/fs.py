@@ -308,8 +308,8 @@ class HardLinkManager:
        If we encounter the same hlid again later, we hardlink to the path of the already extracted content of same hlid.
 
     C) When transferring from a borg1 archive, we need:
-       path -> chunks, chunks_healthy  # for borg1_hl_targets
-       If we encounter a regular file item with source == path later, we reuse chunks and chunks_healthy
+       path -> chunks_correct  # for borg1_hl_targets, chunks_correct must be either from .chunks_healthy or .chunks.
+       If we encounter a regular file item with source == path later, we reuse chunks_correct
        and create the same hlid = hardlink_id_from_path(source).
 
     D) When importing a tar file (simplified 1-pass way for now, not creating borg hardlink items):
@@ -353,7 +353,7 @@ class HardLinkManager:
                    a hlid (new borg style) [bytes]
                    a (dev, inode) tuple (filesystem)
         :param info: information to remember, could be:
-                     chunks / chunks_healthy list
+                     chunks list
                      hlid
         """
         assert isinstance(id, self.id_type), f"id is {id!r}, not of type {self.id_type}"

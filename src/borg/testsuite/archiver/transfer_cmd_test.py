@@ -164,7 +164,6 @@ def test_transfer_upgrade(archivers, request):
                     # fix expectation for size
                     e["size"] = g["size"]
                 # Note: size == 0 for all items without a size or chunks list (like e.g. directories)
-                # Note: healthy == True indicates the *absence* of the additional chunks_healthy list
             del g["hlid"]
 
             # borg 1 used "linktarget" and "source" for links, borg 2 uses "target" for symlinks.
@@ -177,6 +176,9 @@ def test_transfer_upgrade(archivers, request):
                 # The S_IFBLK macro is broken on MINGW
                 del e["type"], g["type"]
                 del e["mode"], g["mode"]
+
+            del e["healthy"]  # not supported anymore
+
             assert g == e
 
         if name == "archive1":

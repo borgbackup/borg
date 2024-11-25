@@ -104,9 +104,9 @@ class MountMixIn:
 
         - ``versions``: when used with a repository mount, this gives a merged, versioned
           view of the files in the archives. EXPERIMENTAL, layout may change in future.
-        - ``allow_damaged_files``: by default damaged files (where missing chunks were
-          replaced with runs of zeros by ``borg check --repair``) are not readable and
-          return EIO (I/O error). Set this option to read such files.
+        - ``allow_damaged_files``: by default damaged files (where chunks are missing)
+          will return EIO (I/O error) when trying to read the related parts of the file.
+          Set this option to replace the missing parts with all-zero bytes.
         - ``ignore_permissions``: for security reasons the ``default_permissions`` mount
           option is internally enforced by borg. ``ignore_permissions`` can be given to
           not enforce ``default_permissions``.

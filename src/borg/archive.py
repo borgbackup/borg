@@ -280,7 +280,7 @@ class DownloadPipeline:
                 if filter is None or filter(item):
                     if "chunks" in item:
                         item.chunks = [ChunkListEntry(*e) for e in item.chunks]
-                    if "chunks_healthy" in item:
+                    if "chunks_healthy" in item:  # legacy
                         item.chunks_healthy = [ChunkListEntry(*e) for e in item.chunks_healthy]
                     yield item
 
@@ -762,7 +762,6 @@ Duration: {0.duration}
             # if a previous extraction was interrupted between setting the mtime and setting non-default flags.
             return True
 
-        has_damaged_chunks = "chunks_healthy" in item
         if dry_run or stdout:
             with self.extract_helper(item, "", hlm, dry_run=dry_run or stdout) as hardlink_set:
                 if not hardlink_set:
@@ -789,8 +788,6 @@ Duration: {0.duration}
                                         item_size, item_chunks_size
                                     )
                                 )
-            if has_damaged_chunks:
-                raise BackupError("File has damaged (all-zero) chunks. Try running borg check --repair.")
             return
 
         dest = self.cwd
@@ -845,8 +842,6 @@ Duration: {0.duration}
                         raise BackupError(
                             f"Size inconsistency detected: size {item_size}, chunks size {item_chunks_size}"
                         )
-                if has_damaged_chunks:
-                    raise BackupError("File has damaged (all-zero) chunks. Try running borg check --repair.")
             return
         with backup_io:
             # No repository access beyond this point.
@@ -1159,10 +1154,6 @@ class ChunksProcessor:
                 return chunk_entry
 
         item.chunks = []
-        # if we rechunkify, we'll get a fundamentally different chunks list, thus we need
-        # to get rid of .chunks_healthy, as it might not correspond to .chunks any more.
-        if self.rechunkify and "chunks_healthy" in item:
-            del item.chunks_healthy
         for chunk in chunk_iter:
             chunk_entry = chunk_processor(chunk)
             item.chunks.append(chunk_entry)
@@ -1779,13 +1770,10 @@ class ArchiveChecker:
         if defect_chunks:
             if self.repair:
                 # if we kill the defect chunk here, subsequent actions within this "borg check"
-                # run will find missing chunks and replace them with all-zero replacement
-                # chunks and flag the files as "repaired".
-                # if another backup is done later and the missing chunks get backed up again,
-                # a "borg check" afterwards can heal all files where this chunk was missing.
+                # run will find missing chunks.
                 logger.warning(
-                    "Found defect chunks. They will be deleted now, so affected files can "
-                    "get repaired now and maybe healed later."
+                    "Found defect chunks and will delete them now. "
+                    "Reading files referencing these chunks will result in an I/O error."
                 )
                 for defect_chunk in defect_chunks:
                     # remote repo (ssh): retry might help for strange network / NIC / RAM errors
@@ -1805,10 +1793,7 @@ class ArchiveChecker:
                     else:
                         logger.warning("chunk %s not deleted, did not consistently fail.", bin_to_hex(defect_chunk))
             else:
-                logger.warning(
-                    "Found defect chunks. With --repair, they would get deleted, so affected "
-                    "files could get repaired then and maybe healed later."
-                )
+                logger.warning("Found defect chunks. With --repair, they would get deleted.")
                 for defect_chunk in defect_chunks:
                     logger.debug("chunk %s is defect.", bin_to_hex(defect_chunk))
         log = logger.error if errors else logger.info
@@ -1919,80 +1904,18 @@ class ArchiveChecker:
                     self.repository.put(id_, cdata)
 
         def verify_file_chunks(archive_name, item):
-            """Verifies that all file chunks are present.
-
-            Missing file chunks will be replaced with new chunks of the same length containing all zeros.
-            If a previously missing file chunk re-appears, the replacement chunk is replaced by the correct one.
-            """
-
-            def replacement_chunk(size):
-                chunk = Chunk(None, allocation=CH_ALLOC, size=size)
-                chunk_id, data = cached_hash(chunk, self.key.id_hash)
-                cdata = self.repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM)
-                return chunk_id, size, cdata
-
+            """Verifies that all file chunks are present. Missing file chunks will be logged."""
             offset = 0
-            chunk_list = []
-            chunks_replaced = False
-            has_chunks_healthy = "chunks_healthy" in item
-            chunks_current = item.chunks
-            chunks_healthy = item.chunks_healthy if has_chunks_healthy else chunks_current
-            if has_chunks_healthy and len(chunks_current) != len(chunks_healthy):
-                # should never happen, but there was issue #3218.
-                logger.warning(f"{archive_name}: {item.path}: Invalid chunks_healthy metadata removed!")
-                del item.chunks_healthy
-                has_chunks_healthy = False
-                chunks_healthy = chunks_current
-            for chunk_current, chunk_healthy in zip(chunks_current, chunks_healthy):
-                chunk_id, size = chunk_healthy
+            for chunk in item.chunks:
+                chunk_id, size = chunk
                 if chunk_id not in self.chunks:
-                    # a chunk of the healthy list is missing
-                    if chunk_current == chunk_healthy:
-                        logger.error(
-                            "{}: {}: New missing file chunk detected (Byte {}-{}, Chunk {}). "
-                            "Replacing with all-zero chunk.".format(
-                                archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)
-                            )
+                    logger.error(
+                        "{}: {}: Missing file chunk detected (Byte {}-{}, Chunk {}).".format(
+                            archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)
                         )
-                        self.error_found = chunks_replaced = True
-                        chunk_id, size, cdata = replacement_chunk(size)
-                        add_reference(chunk_id, size, cdata)
-                    else:
-                        logger.info(
-                            "{}: {}: Previously missing file chunk is still missing (Byte {}-{}, Chunk {}). "
-                            "It has an all-zero replacement chunk already.".format(
-                                archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)
-                            )
-                        )
-                        chunk_id, size = chunk_current
-                        if chunk_id not in self.chunks:
-                            logger.warning(
-                                "{}: {}: Missing all-zero replacement chunk detected (Byte {}-{}, Chunk {}). "
-                                "Generating new replacement chunk.".format(
-                                    archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)
-                                )
-                            )
-                            self.error_found = chunks_replaced = True
-                            chunk_id, size, cdata = replacement_chunk(size)
-                            add_reference(chunk_id, size, cdata)
-                else:
-                    if chunk_current == chunk_healthy:
-                        pass  # normal case, all fine.
-                    else:
-                        logger.info(
-                            "{}: {}: Healed previously missing file chunk! (Byte {}-{}, Chunk {}).".format(
-                                archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)
-                            )
-                        )
-                chunk_list.append([chunk_id, size])  # list-typed element as chunks_healthy is list-of-lists
+                    )
+                    self.error_found = True
                 offset += size
-            if chunks_replaced and not has_chunks_healthy:
-                # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
-                item.chunks_healthy = item.chunks
-            if has_chunks_healthy and chunk_list == chunks_healthy:
-                logger.info(f"{archive_name}: {item.path}: Completely healed previously damaged file!")
-                del item.chunks_healthy
-            item.chunks = chunk_list
             if "size" in item:
                 item_size = item.size
                 item_chunks_size = item.get_size(from_chunks=True)

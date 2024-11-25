@@ -180,7 +180,7 @@ class TransferMixIn:
                                     chunks.append(chunk_entry)
                                 present_size += size
                         if not dry_run:
-                            item.chunks = chunks  # TODO: overwrite? IDs and sizes are same.
+                            item.chunks = chunks
                             archive.stats.nfiles += 1
                     if not dry_run:
                         item = upgrader.upgrade_item(item=item)

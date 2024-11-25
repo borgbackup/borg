@@ -55,6 +55,7 @@ class UpgraderFrom12To20:
         ITEM_KEY_WHITELIST = {
             "path",
             "rdev",
+            "chunks",
             "hlid",
             "mode",
             "user",
@@ -76,13 +77,7 @@ class UpgraderFrom12To20:
 
         if self.hlm.borg1_hardlink_master(item):
             item.hlid = hlid = self.hlm.hardlink_id_from_path(item.path)
-            if "chunks_healthy" in item:
-                chunks_correct = item.chunks_healthy
-            elif "chunks" in item:
-                chunks_correct = item.chunks
-            else:
-                chunks_correct = None
-            self.hlm.remember(id=hlid, info=chunks_correct)
+            self.hlm.remember(id=hlid, info=item.get("chunks"))
         elif self.hlm.borg1_hardlink_slave(item):
             item.hlid = hlid = self.hlm.hardlink_id_from_path(item.source)
             chunks = self.hlm.retrieve(id=hlid)
@@ -96,12 +91,6 @@ class UpgraderFrom12To20:
         # - 'hardlink_master' (superseded by hlid)
         item_dict = item.as_dict()
         new_item_dict = {key: value for key, value in item_dict.items() if key in ITEM_KEY_WHITELIST}
-        if "chunks_healthy" in item_dict:
-            # we want the chunks list with the CORRECT chunk ids, even if the chunk is missing.
-            new_item_dict["chunks"] = item_dict["chunks_healthy"]
-        elif "chunks" in item_dict:
-            # if there is no .chunks_healthy, the correct chunk ids are in .chunks.
-            new_item_dict["chunks"] = item_dict["chunks"]
         # symlink targets were .source for borg1, but borg2 uses .target:
         if "source" in item_dict:
             new_item_dict["target"] = item_dict["source"]

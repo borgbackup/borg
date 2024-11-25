@@ -6,7 +6,7 @@ from ..archive import Archive
 from ..cache import write_chunkindex_to_repo_cache, build_chunkindex_from_repo
 from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex, ChunkIndexEntry
-from ..helpers import set_ec, EXIT_WARNING, EXIT_ERROR, format_file_size, bin_to_hex
+from ..helpers import set_ec, EXIT_ERROR, format_file_size, bin_to_hex
 from ..helpers import ProgressIndicatorPercent
 from ..manifest import Manifest
 from ..remote import RemoteRepository
@@ -39,9 +39,7 @@ class ArchiveGarbageCollector:
         logger.info("Starting compaction / garbage collection...")
         self.chunks = self.get_repository_chunks()
         logger.info("Computing object IDs used by archives...")
-        (self.missing_chunks, self.reappeared_chunks, self.total_files, self.total_size, self.archives_count) = (
-            self.analyze_archives()
-        )
+        (self.missing_chunks, self.total_files, self.total_size, self.archives_count) = self.analyze_archives()
         self.report_and_delete()
         self.save_chunk_index()
         logger.info("Finished compaction / garbage collection...")
@@ -73,28 +71,24 @@ class ArchiveGarbageCollector:
             self.chunks.clear()  # we already have updated the repo cache in get_repository_chunks
         self.chunks = None  # nothing there (cleared!)
 
-    def analyze_archives(self) -> Tuple[Set, Set, int, int, int]:
-        """Iterate over all items in all archives, create the dicts id -> size of all used/wanted chunks."""
+    def analyze_archives(self) -> Tuple[Set, int, int, int]:
+        """Iterate over all items in all archives, create the dicts id -> size of all used chunks."""
 
-        def use_it(id, *, wanted=False):
+        def use_it(id):
             entry = self.chunks.get(id)
             if entry is not None:
                 # the chunk is in the repo, mark it used.
                 self.chunks[id] = entry._replace(flags=entry.flags | ChunkIndex.F_USED)
-                if wanted:
-                    # chunk id is from chunks_healthy list: a lost chunk has re-appeared!
-                    reappeared_chunks.add(id)
             else:
                 # with --stats: we do NOT have this chunk in the repository!
                 # without --stats: we do not have this chunk or the chunks index is incomplete.
                 missing_chunks.add(id)
 
         missing_chunks: set[bytes] = set()
-        reappeared_chunks: set[bytes] = set()
         archive_infos = self.manifest.archives.list(sort_by=["ts"])
         num_archives = len(archive_infos)
         pi = ProgressIndicatorPercent(
-            total=num_archives, msg="Computing used/wanted chunks %3.1f%%", step=0.1, msgid="compact.analyze_archives"
+            total=num_archives, msg="Computing used chunks %3.1f%%", step=0.1, msgid="compact.analyze_archives"
         )
         total_size, total_files = 0, 0
         for i, info in enumerate(archive_infos):
@@ -114,24 +108,13 @@ class ArchiveGarbageCollector:
                     for id, size in item.chunks:
                         total_size += size  # original, uncompressed file content size
                         use_it(id)
-                    if "chunks_healthy" in item:
-                        # we also consider the chunks_healthy chunks as referenced - do not throw away
-                        # anything that borg check --repair might still need.
-                        for id, size in item.chunks_healthy:
-                            use_it(id, wanted=True)
         pi.finish()
-        return missing_chunks, reappeared_chunks, total_files, total_size, num_archives
+        return missing_chunks, total_files, total_size, num_archives
 
     def report_and_delete(self):
-        run_repair = " Run borg check --repair!"
-
         if self.missing_chunks:
-            logger.error(f"Repository has {len(self.missing_chunks)} missing objects." + run_repair)
+            logger.error(f"Repository has {len(self.missing_chunks)} missing objects!")
             set_ec(EXIT_ERROR)
-
-        if self.reappeared_chunks:
-            logger.warning(f"{len(self.reappeared_chunks)} previously missing objects re-appeared!" + run_repair)
-            set_ec(EXIT_WARNING)
 
         logger.info("Cleaning archives directory from soft-deleted archives...")
         archive_infos = self.manifest.archives.list(sort_by=["ts"], deleted=True)

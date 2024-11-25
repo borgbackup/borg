@@ -826,7 +826,6 @@ class ItemFormatter(BaseFormatter):
         "isoctime": "file change time (ISO 8601 format)",
         "isoatime": "file access time (ISO 8601 format)",
         "xxh64": "XXH64 checksum of this file (note: this is NOT a cryptographic hash!)",
-        "health": 'either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)',
         "archiveid": "internal ID of the archive",
         "archivename": "name of the archive",
     }
@@ -836,7 +835,6 @@ class ItemFormatter(BaseFormatter):
         ("mtime", "ctime", "atime", "isomtime", "isoctime", "isoatime"),
         tuple(sorted(hash_algorithms)),
         ("archiveid", "archivename", "extra"),
-        ("health",),
     )
 
     KEYS_REQUIRING_CACHE = ()
@@ -893,10 +891,6 @@ class ItemFormatter(BaseFormatter):
         item_data.update(text_to_json("user", item.get("user", str(item_data["uid"]))))
         item_data.update(text_to_json("group", item.get("group", str(item_data["gid"]))))
 
-        if jsonline:
-            item_data["healthy"] = "chunks_healthy" not in item
-        else:
-            item_data["health"] = "broken" if "chunks_healthy" in item else "healthy"
         item_data["flags"] = item.get("bsdflags")  # int if flags known, else (if flags unknown) None
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)

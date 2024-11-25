@@ -10,7 +10,7 @@ import time
 from collections import defaultdict, Counter
 from signal import SIGINT
 
-from .constants import ROBJ_FILE_STREAM
+from .constants import ROBJ_FILE_STREAM, zeros
 from .fuse_impl import llfuse, has_pyfuse3
 
 
@@ -46,6 +46,7 @@ from .helpers.lrucache import LRUCache
 from .item import Item
 from .platform import uid2user, gid2group
 from .platformflags import is_darwin
+from .repository import Repository
 from .remote import RemoteRepository
 
 
@@ -652,17 +653,6 @@ class FuseOperations(llfuse.Operations, FuseBackend):
 
     @async_wrapper
     def open(self, inode, flags, ctx=None):
-        if not self.allow_damaged_files:
-            item = self.get_item(inode)
-            if "chunks_healthy" in item:
-                # Processed archive items don't carry the path anymore; for converting the inode
-                # to the path we'd either have to store the inverse of the current structure,
-                # or search the entire archive. So we just don't print it. It's easy to correlate anyway.
-                logger.warning(
-                    "File has damaged (all-zero) chunks. Try running borg check --repair. "
-                    "Mount with allow_damaged_files to read damaged files."
-                )
-                raise llfuse.FUSEError(errno.EIO)
         return llfuse.FileInfo(fh=inode) if has_pyfuse3 else inode
 
     @async_wrapper
@@ -699,7 +689,16 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                     # evict fully read chunk from cache
                     del self.data_cache[id]
             else:
-                _, data = self.repo_objs.parse(id, self.repository_uncached.get(id), ro_type=ROBJ_FILE_STREAM)
+                try:
+                    cdata = self.repository_uncached.get(id)
+                except Repository.ObjectNotFound:
+                    if self.allow_damaged_files:
+                        data = zeros[:s]
+                        assert len(data) == s
+                    else:
+                        raise llfuse.FUSEError(errno.EIO) from None
+                else:
+                    _, data = self.repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
                 if offset + n < len(data):
                     # chunk was only partially read, cache it
                     self.data_cache[id] = data

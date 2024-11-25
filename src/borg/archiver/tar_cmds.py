@@ -113,9 +113,7 @@ class TarMixIn:
             """
             Return a file-like object that reads from the chunks of *item*.
             """
-            chunk_iterator = archive.pipeline.fetch_many(
-                [chunk_id for chunk_id, _ in item.chunks], is_preloaded=True, ro_type=ROBJ_FILE_STREAM
-            )
+            chunk_iterator = archive.pipeline.fetch_many(item.chunks, is_preloaded=True, ro_type=ROBJ_FILE_STREAM)
             if pi:
                 info = [remove_surrogates(item.path)]
                 return ChunkIteratorFileWrapper(

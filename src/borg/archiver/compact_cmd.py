@@ -3,7 +3,7 @@ from typing import Tuple, Set
 
 from ._common import with_repository
 from ..archive import Archive
-from ..cache import write_chunkindex_to_repo_cache
+from ..cache import write_chunkindex_to_repo_cache, build_chunkindex_from_repo
 from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..helpers import set_ec, EXIT_WARNING, EXIT_ERROR, format_file_size, bin_to_hex
@@ -18,7 +18,7 @@ logger = create_logger()
 
 
 class ArchiveGarbageCollector:
-    def __init__(self, repository, manifest):
+    def __init__(self, repository, manifest, *, stats):
         self.repository = repository
         assert isinstance(repository, (Repository, RemoteRepository))
         self.manifest = manifest
@@ -26,17 +26,17 @@ class ArchiveGarbageCollector:
         self.total_files = None  # overall number of source files written to all archives in this repo
         self.total_size = None  # overall size of source file content data written to all archives
         self.archives_count = None  # number of archives
+        self.stats = stats  # compute repo space usage before/after - lists all repo objects, can be slow.
 
     @property
     def repository_size(self):
-        if self.chunks is None:
+        if self.chunks is None or not self.stats:
             return None
         return sum(entry.size for id, entry in self.chunks.iteritems())  # sum of stored sizes
 
     def garbage_collect(self):
         """Removes unused chunks from a repository."""
         logger.info("Starting compaction / garbage collection...")
-        logger.info("Getting object IDs present in the repository...")
         self.chunks = self.get_repository_chunks()
         logger.info("Computing object IDs used by archives...")
         (self.missing_chunks, self.reappeared_chunks, self.total_files, self.total_size, self.archives_count) = (
@@ -47,20 +47,30 @@ class ArchiveGarbageCollector:
         logger.info("Finished compaction / garbage collection...")
 
     def get_repository_chunks(self) -> ChunkIndex:
-        """Build a dict id -> size of all chunks present in the repository"""
-        chunks = ChunkIndex()
-        for id, stored_size in repo_lister(self.repository, limit=LIST_SCAN_LIMIT):
-            # we add this id to the chunks index (as unused chunk), because
-            # we do not know yet whether it is actually referenced from some archives.
-            # we "abuse" the size field here. usually there is the plaintext size,
-            # but we use it for the size of the stored object here.
-            chunks[id] = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=stored_size)
+        """return a chunks index"""
+        if self.stats:  # slow method: build a fresh chunks index, with stored chunk sizes.
+            logger.info("Getting object IDs present in the repository...")
+            chunks = ChunkIndex()
+            for id, stored_size in repo_lister(self.repository, limit=LIST_SCAN_LIMIT):
+                # we add this id to the chunks index (as unused chunk), because
+                # we do not know yet whether it is actually referenced from some archives.
+                # we "abuse" the size field here. usually there is the plaintext size,
+                # but we use it for the size of the stored object here.
+                chunks[id] = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=stored_size)
+        else:  # faster: rely on existing chunks index (with flags F_NONE and size 0).
+            logger.info("Getting object IDs from cached chunks index...")
+            chunks = build_chunkindex_from_repo(self.repository, cache_immediately=True)
         return chunks
 
     def save_chunk_index(self):
-        # write_chunkindex_to_repo now removes all flags and size infos.
-        # we need this, as we put the wrong size in there.
-        write_chunkindex_to_repo_cache(self.repository, self.chunks, clear=True, force_write=True, delete_other=True)
+        if self.stats:
+            # write_chunkindex_to_repo now removes all flags and size infos.
+            # we need this, as we put the wrong size in there to support --stats computations.
+            write_chunkindex_to_repo_cache(
+                self.repository, self.chunks, clear=True, force_write=True, delete_other=True
+            )
+        else:
+            self.chunks.clear()  # we already have updated the repo cache in get_repository_chunks
         self.chunks = None  # nothing there (cleared!)
 
     def analyze_archives(self) -> Tuple[Set, Set, int, int, int]:
@@ -75,7 +85,8 @@ class ArchiveGarbageCollector:
                     # chunk id is from chunks_healthy list: a lost chunk has re-appeared!
                     reappeared_chunks.add(id)
             else:
-                # we do NOT have this chunk in the repository!
+                # with --stats: we do NOT have this chunk in the repository!
+                # without --stats: we do not have this chunk or the chunks index is incomplete.
                 missing_chunks.add(id)
 
         missing_chunks: set[bytes] = set()
@@ -153,15 +164,18 @@ class ArchiveGarbageCollector:
         logger.info(
             f"Source data size was {format_file_size(self.total_size, precision=0)} in {self.total_files} files."
         )
-        logger.info(f"Repository size is {format_file_size(repo_size_after, precision=0)} in {count} objects.")
-        logger.info(f"Compaction saved {format_file_size(repo_size_before - repo_size_after, precision=0)}.")
+        if self.stats:
+            logger.info(f"Repository size is {format_file_size(repo_size_after, precision=0)} in {count} objects.")
+            logger.info(f"Compaction saved {format_file_size(repo_size_before - repo_size_after, precision=0)}.")
+        else:
+            logger.info(f"Repository has data stored in {count} objects.")
 
 
 class CompactMixIn:
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_compact(self, args, repository, manifest):
         """Collect garbage in repository"""
-        ArchiveGarbageCollector(repository, manifest).garbage_collect()
+        ArchiveGarbageCollector(repository, manifest, stats=args.stats).garbage_collect()
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -198,6 +212,16 @@ class CompactMixIn:
             might not want to do that unless there are signs of lost archives (e.g. when
             seeing fatal errors when creating backups or when archives are missing in
             ``borg repo-list``).
+
+            When giving the ``--stats`` option, borg will internally list all repository
+            objects to determine their existence AND stored size. It will build a fresh
+            chunks index from that information and cache it in the repository. For some
+            types of repositories, this might be very slow. It will tell you the sum of
+            stored object sizes, before and after compaction.
+
+            Without ``--stats``, borg will rely on the cached chunks index to determine
+            existing object IDs (but there is no stored size information in the index,
+            thus it can't compute before/after compaction size statistics).
             """
         )
         subparser = subparsers.add_parser(
@@ -210,3 +234,7 @@ class CompactMixIn:
             help="compact repository",
         )
         subparser.set_defaults(func=self.do_compact)
+
+        subparser.add_argument(
+            "-s", "--stats", dest="stats", action="store_true", help="print statistics (might be much slower)"
+        )

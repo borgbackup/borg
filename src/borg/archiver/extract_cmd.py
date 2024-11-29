@@ -72,6 +72,7 @@ class ExtractMixIn:
                 logging.getLogger("borg.output.list").info(remove_surrogates(item.path))
             try:
                 if dry_run:
+                    print(f"- {item.path}")
                     archive.extract_item(item, dry_run=True, hlm=hlm, pi=pi)
                 else:
                     if stat.S_ISDIR(item.mode):

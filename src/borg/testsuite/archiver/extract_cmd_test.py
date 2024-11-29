@@ -718,3 +718,20 @@ def test_extract_continue(archivers, request):
             assert f.read() == CONTENTS2
         with open("input/file3", "rb") as f:
             assert f.read() == CONTENTS3
+
+
+def test_dry_run_extraction_flags(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1.txt", 0)
+    create_regular_file(archiver.input_path, "file2.txt", 0)
+    cmd(archiver, "create", "test", "input")
+
+    output = cmd(archiver, "extract", "--dry-run", "--list", "test")
+
+    expected_output = ["- input/file1.txt", "- input/file2.txt"]
+    for expected in expected_output:
+        assert expected in output.splitlines(), f"Expected line not found: {expected}"
+        print(output)
+
+    assert not os.listdir("output"), "Output directory should be empty after dry-run"

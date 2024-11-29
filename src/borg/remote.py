@@ -943,7 +943,7 @@ class RemoteRepository:
                             self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))
                     if not self.to_send and self.preload_ids:
                         chunk_id = self.preload_ids.pop(0)
-                        args = {"id": chunk_id}
+                        args = {"id": chunk_id, "raise_missing": True}
                         self.msgid += 1
                         self.chunkid_to_msgids.setdefault(chunk_id, []).append(self.msgid)
                         self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: "get", ARGS: args}))
@@ -991,12 +991,16 @@ class RemoteRepository:
     def list(self, limit=None, marker=None):
         """actual remoting is done via self.call in the @api decorator"""
 
-    def get(self, id, read_data=True):
-        for resp in self.get_many([id], read_data=read_data):
+    def get(self, id, read_data=True, raise_missing=True):
+        for resp in self.get_many([id], read_data=read_data, raise_missing=raise_missing):
             return resp
 
-    def get_many(self, ids, read_data=True, is_preloaded=False):
-        yield from self.call_many("get", [{"id": id, "read_data": read_data} for id in ids], is_preloaded=is_preloaded)
+    def get_many(self, ids, read_data=True, is_preloaded=False, raise_missing=True):
+        yield from self.call_many(
+            "get",
+            [{"id": id, "read_data": read_data, "raise_missing": raise_missing} for id in ids],
+            is_preloaded=is_preloaded,
+        )
 
     @api(since=parse_version("1.0.0"))
     def put(self, id, data, wait=True):
@@ -1098,11 +1102,11 @@ class RepositoryNoCache:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def get(self, key, read_data=True):
-        return next(self.get_many([key], read_data=read_data, cache=False))
+    def get(self, key, read_data=True, raise_missing=True):
+        return next(self.get_many([key], read_data=read_data, raise_missing=raise_missing, cache=False))
 
-    def get_many(self, keys, read_data=True, cache=True):
-        for key, data in zip(keys, self.repository.get_many(keys, read_data=read_data)):
+    def get_many(self, keys, read_data=True, raise_missing=True, cache=True):
+        for key, data in zip(keys, self.repository.get_many(keys, read_data=read_data, raise_missing=raise_missing)):
             yield self.transform(key, data)
 
     def log_instrumentation(self):
@@ -1207,10 +1211,12 @@ class RepositoryCache(RepositoryNoCache):
         self.cache.clear()
         shutil.rmtree(self.basedir)
 
-    def get_many(self, keys, read_data=True, cache=True):
+    def get_many(self, keys, read_data=True, raise_missing=True, cache=True):
         # It could use different cache keys depending on read_data and cache full vs. meta-only chunks.
         unknown_keys = [key for key in keys if self.prefixed_key(key, complete=read_data) not in self.cache]
-        repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys, read_data=read_data))
+        repository_iterator = zip(
+            unknown_keys, self.repository.get_many(unknown_keys, read_data=read_data, raise_missing=raise_missing)
+        )
         for key in keys:
             pkey = self.prefixed_key(key, complete=read_data)
             if pkey in self.cache:
@@ -1228,7 +1234,7 @@ class RepositoryCache(RepositoryNoCache):
                 else:
                     # slow path: eviction during this get_many removed this key from the cache
                     t0 = time.perf_counter()
-                    data = self.repository.get(key, read_data=read_data)
+                    data = self.repository.get(key, read_data=read_data, raise_missing=raise_missing)
                     self.slow_lat += time.perf_counter() - t0
                     transformed = self.add_entry(key, data, cache, complete=read_data)
                     self.slow_misses += 1

@@ -425,7 +425,7 @@ class Repository:
                     # note: do not collect the marker id
         return result
 
-    def get(self, id, read_data=True):
+    def get(self, id, read_data=True, raise_missing=True):
         self._lock_refresh()
         id_hex = bin_to_hex(id)
         key = "data/" + id_hex
@@ -452,11 +452,14 @@ class Repository:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes")
                 return hdr + meta
         except StoreObjectNotFound:
-            raise self.ObjectNotFound(id, str(self._location)) from None
+            if raise_missing:
+                raise self.ObjectNotFound(id, str(self._location)) from None
+            else:
+                return None
 
-    def get_many(self, ids, read_data=True, is_preloaded=False):
+    def get_many(self, ids, read_data=True, is_preloaded=False, raise_missing=True):
         for id_ in ids:
-            yield self.get(id_, read_data=read_data)
+            yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
 
     def put(self, id, data, wait=True):
         """put a repo object

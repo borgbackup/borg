@@ -725,13 +725,16 @@ def test_dry_run_extraction_flags(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(archiver.input_path, "file1.txt", 0)
     create_regular_file(archiver.input_path, "file2.txt", 0)
+    create_regular_file(archiver.input_path, "file3.txt", 0)
     cmd(archiver, "create", "test", "input")
 
-    output = cmd(archiver, "extract", "--dry-run", "--list", "test")
+    output = cmd(archiver, "extract", "--dry-run", "--list", "test", "-e", "input/file3.txt")
 
     expected_output = ["- input/file1.txt", "- input/file2.txt"]
+    output_lines = output.splitlines()
     for expected in expected_output:
-        assert expected in output.splitlines(), f"Expected line not found: {expected}"
+        assert expected in output_lines, f"Expected line not found: {expected}"
         print(output)
 
     assert not os.listdir("output"), "Output directory should be empty after dry-run"
+    print("Dry-run extraction with flags passed successfully!")

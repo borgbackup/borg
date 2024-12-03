@@ -1180,7 +1180,7 @@ class RepositoryCache(RepositoryNoCache):
 
     def prefixed_key(self, key, complete):
         # just prefix another byte telling whether this key refers to a complete chunk
-        # or a without-data-metadata-only chunk (see, raise_missing=True also read_data param).
+        # or a without-data-metadata-only chunk (see also read_data param).
         prefix = b"\x01" if complete else b"\x00"
         return prefix + key
 

@@ -730,11 +730,10 @@ def test_dry_run_extraction_flags(archivers, request):
 
     output = cmd(archiver, "extract", "--dry-run", "--list", "test", "-e", "input/file3.txt")
 
-    expected_output = ["- input/file1.txt", "- input/file2.txt"]
+    expected_output = ["+ input/file1.txt", "+ input/file2.txt", "- input/file3.txt"]
     output_lines = output.splitlines()
     for expected in expected_output:
         assert expected in output_lines, f"Expected line not found: {expected}"
         print(output)
 
     assert not os.listdir("output"), "Output directory should be empty after dry-run"
-    print("Dry-run extraction with flags passed successfully!")

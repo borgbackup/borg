@@ -56,37 +56,12 @@ class ExtractMixIn:
         else:
             pi = None
 
-        for item in archive.iter_items(filter, preload=True):
+        all_items = list(archive.iter_items(preload=True))
+
+        for item in all_items:
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
-            status = None
-
-            if matcher.match(item.path):
-                try:
-                    if dry_run:
-                        archive.extract_item(item, dry_run=True, hlm=hlm, pi=pi)
-                        status = "+"  # Included in extraction
-                    else:
-                        if stat.S_ISDIR(item.mode):
-                            dirs.append(item)
-                            archive.extract_item(item, stdout=stdout, restore_attrs=False)
-                        else:
-                            archive.extract_item(
-                                item,
-                                stdout=stdout,
-                                sparse=sparse,
-                                hlm=hlm,
-                                pi=pi,
-                                continue_extraction=continue_extraction,
-                            )
-                        status = "+"
-                except BackupError as e:
-                    status = "E"
-                    self.print_warning_instance(BackupWarning(remove_surrogates(orig_path), e))
-            else:
-                status = "-"
-            self.print_file_status(status, item.path)
 
             if not args.dry_run:
                 while dirs and not item.path.startswith(dirs[-1].path):
@@ -95,12 +70,27 @@ class ExtractMixIn:
                         archive.extract_item(dir_item, stdout=stdout)
                     except BackupError as e:
                         self.print_warning_instance(BackupWarning(remove_surrogates(dir_item.path), e))
-            if output_list:
-                if matcher.match(item.path):
-                    flag = "-"
+
+                if output_list and matcher.match(item.path):
+                    logging.getLogger("borg.output.list").info(remove_surrogates(item.path))
+            try:
+                if dry_run:
+                    if matcher.match(item.path):
+                        logging.getLogger("borg.output.list").info(f"+ {remove_surrogates(item.path)}")
+                    else:
+                        logging.getLogger("borg.output.list").info(f"- {remove_surrogates(item.path)}")
+                    archive.extract_item(item, dry_run=True, hlm=hlm, pi=pi)
                 else:
-                    flag = "+" if dry_run else ""
-                logging.getLogger("borg.output.list").info(f"{flag} {remove_surrogates(item.path)}")
+                    if matcher.match(item.path):
+                        if stat.S_ISDIR(item.mode):
+                            dirs.append(item)
+                            archive.extract_item(item, stdout=stdout, restore_attrs=False)
+                    else:
+                        archive.extract_item(
+                            item, stdout=stdout, sparse=sparse, hlm=hlm, pi=pi, continue_extraction=continue_extraction
+                        )
+            except BackupError as e:
+                self.print_warning_instance(BackupWarning(remove_surrogates(orig_path), e))
 
         if pi:
             pi.finish()

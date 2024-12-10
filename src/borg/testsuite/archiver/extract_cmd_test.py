@@ -723,14 +723,14 @@ def test_extract_continue(archivers, request):
 def test_dry_run_extraction_flags(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    create_regular_file(archiver.input_path, "file1.txt", 0)
-    create_regular_file(archiver.input_path, "file2.txt", 0)
-    create_regular_file(archiver.input_path, "file3.txt", 0)
+    create_regular_file(archiver.input_path, "file1", 0)
+    create_regular_file(archiver.input_path, "file2", 0)
+    create_regular_file(archiver.input_path, "file3", 0)
     cmd(archiver, "create", "test", "input")
 
-    output = cmd(archiver, "extract", "--dry-run", "--list", "test", "-e", "input/file3.txt")
+    output = cmd(archiver, "extract", "--dry-run", "--list", "test", "-e", "input/file3")
 
-    expected_output = ["+ input/file1.txt", "+ input/file2.txt", "- input/file3.txt"]
+    expected_output = ["+ input/file1", "+ input/file2", "- input/file3"]
     output_lines = output.splitlines()
     for expected in expected_output:
         assert expected in output_lines, f"Expected line not found: {expected}"

@@ -168,6 +168,7 @@ following dependencies first:
   - liblz4_ >= 1.7.0 (r129)
   - libzstd_ >= 1.3.0
   - libxxhash >= 0.8.1 (0.8.0 might work also)
+  - libffi (required for argon2-cffi-bindings)
 * pkg-config (cli tool) and pkgconfig python package (borg uses these to
   discover header and library location - if it can't import pkgconfig and
   is not pointed to header/library locations via env vars [see setup.py],

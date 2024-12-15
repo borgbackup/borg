@@ -203,6 +203,7 @@ Install the dependencies with development headers::
     libacl1-dev libacl1 \
     libssl-dev \
     liblz4-dev libzstd-dev libxxhash-dev \
+    libffi-dev \
     build-essential \
     pkg-config python3-pkgconfig
     sudo apt-get install libfuse-dev fuse    # needed for llfuse
@@ -221,6 +222,7 @@ Install the dependencies with development headers::
     libacl-devel libacl \
     openssl-devel \
     lz4-devel libzstd-devel xxhash-devel \
+    libffi-devel \
     pkgconf python3-pkgconfig
     sudo dnf install gcc gcc-c++ redhat-rpm-config
     sudo dnf install fuse-devel fuse         # needed for llfuse
@@ -237,6 +239,7 @@ Alternatively, you can enumerate all build dependencies in the command line::
 
     sudo zypper install python3 python3-devel \
     libacl-devel openssl-devel xxhash-devel libzstd-devel liblz4-devel \
+    libffi-devel \
     python3-Cython python3-Sphinx python3-msgpack-python python3-pkgconfig pkgconf \
     python3-pytest python3-setuptools python3-setuptools_scm \
     python3-sphinx_rtd_theme gcc gcc-c++

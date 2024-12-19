@@ -38,7 +38,6 @@ class ExtractMixIn:
         matcher = build_matcher(args.patterns, args.paths)
 
         progress = args.progress
-        output_list = args.output_list
         dry_run = args.dry_run
         stdout = args.stdout
         sparse = args.sparse
@@ -48,6 +47,7 @@ class ExtractMixIn:
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
 
         filter = build_filter(matcher, strip_components)
+
         if progress:
             pi = ProgressIndicatorPercent(msg="%5.1f%% Extracting: %s", step=0.1, msgid="extract")
             pi.output("Calculating total archive size for the progress indicator (might take long for large archives)")
@@ -56,32 +56,53 @@ class ExtractMixIn:
         else:
             pi = None
 
-        for item in archive.iter_items(filter, preload=True):
+        for item in archive.iter_items(preload=True):
             orig_path = item.path
-            if strip_components:
-                item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
-            if not args.dry_run:
-                while dirs and not item.path.startswith(dirs[-1].path):
-                    dir_item = dirs.pop(-1)
-                    try:
-                        archive.extract_item(dir_item, stdout=stdout)
-                    except BackupError as e:
-                        self.print_warning_instance(BackupWarning(remove_surrogates(dir_item.path), e))
-            if output_list:
-                logging.getLogger("borg.output.list").info(remove_surrogates(item.path))
-            try:
-                if dry_run:
-                    archive.extract_item(item, dry_run=True, hlm=hlm, pi=pi)
-                else:
-                    if stat.S_ISDIR(item.mode):
-                        dirs.append(item)
-                        archive.extract_item(item, stdout=stdout, restore_attrs=False)
+            components = orig_path.split(os.sep)
+            if strip_components >= len(components):
+                sanitized_path = ""
+            else:
+                sanitized_path = os.sep.join(components[strip_components:])
+
+            if not sanitized_path:
+                continue
+
+            item.path = sanitized_path
+
+            is_matched = matcher.match(item.path)
+            log_prefix = "+" if is_matched else "-"
+            logging.getLogger("borg.output.list").info(f"{log_prefix} {remove_surrogates(item.path)}")
+
+            if is_matched:
+
+                if not args.dry_run:
+                    while dirs and not item.path.startswith(dirs[-1].path):
+                        dir_item = dirs.pop(-1)
+                        try:
+                            archive.extract_item(dir_item, stdout=stdout)
+                        except BackupError as e:
+                            self.print_warning_instance(BackupWarning(remove_surrogates(dir_item.path), e))
+
+                try:
+                    if dry_run:
+                        archive.extract_item(item, dry_run=True, hlm=hlm, pi=pi)
                     else:
-                        archive.extract_item(
-                            item, stdout=stdout, sparse=sparse, hlm=hlm, pi=pi, continue_extraction=continue_extraction
-                        )
-            except BackupError as e:
-                self.print_warning_instance(BackupWarning(remove_surrogates(orig_path), e))
+                        if is_matched:
+                            if stat.S_ISDIR(item.mode):
+                                dirs.append(item)
+                                archive.extract_item(item, stdout=stdout, restore_attrs=False)
+                            else:
+                                archive.extract_item(
+                                    item,
+                                    stdout=stdout,
+                                    sparse=sparse,
+                                    hlm=hlm,
+                                    pi=pi,
+                                    continue_extraction=continue_extraction,
+                                )
+                except BackupError as e:
+                    self.print_warning_instance(BackupWarning(remove_surrogates(orig_path), e))
+
         if pi:
             pi.finish()
 

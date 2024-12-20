@@ -130,6 +130,10 @@ class ExtractMixIn:
             When parent directories are not extracted (because of using file/directory selection
             or any other reason), borg can not restore parent directories' metadata, e.g. owner,
             group, permission, etc.
+
+            The default interpretation for the paths to extract is `pp:` which is a literal
+            path-prefix match. If you want to use e.g. a wildcard, you must select a different
+            pattern style such as `sh:` or `fm:`. See :ref:`borg_patterns` for more information.
         """
         )
         subparser = subparsers.add_parser(

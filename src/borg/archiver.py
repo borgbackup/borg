@@ -4371,11 +4371,15 @@ class Archiver:
 
         # borg extract
         extract_epilog = process_epilog("""
-        This command extracts the contents of an archive. By default the entire
-        archive is extracted but a subset of files and directories can be selected
-        by passing a list of ``PATHs`` as arguments. The file selection can further
-        be restricted by using the ``--exclude`` option.
+        This command extracts the contents of an archive.
 
+        By default, the entire archive is extracted, but a subset of files and directories
+        can be selected by passing a list of ``PATH`` arguments. The default interpretation
+        for the paths to extract is `pp:` which is a literal path-prefix match. If you want
+        to use e.g. a wildcard, you must select a different pattern style such as `sh:` or
+        `fm:`. See :ref:`borg_patterns` for more information.
+
+        The file selection can be further restricted by using the ``--exclude`` option.
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
         By using ``--dry-run``, you can do all extraction steps except actually writing the

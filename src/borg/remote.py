@@ -780,6 +780,8 @@ class RemoteRepository:
         if not calls and cmd != "async_responses":
             return
 
+        assert not is_preloaded or cmd == "get", "is_preloaded is only supported for 'get'"
+
         def send_buffer():
             if self.to_send:
                 try:
@@ -846,6 +848,9 @@ class RemoteRepository:
         maximum_to_send = 0 if wait else self.upload_buffer_size_limit
         send_buffer()  # Try to send data, as some cases (async_response) will never try to send data otherwise.
         while wait or calls:
+            logger.debug(
+                f"call_many: calls: {len(calls)} waiting_for: {len(waiting_for)} responses: {len(self.responses)}"
+            )
             if self.shutdown_time and time.monotonic() > self.shutdown_time:
                 # we are shutting this RemoteRepository down already, make sure we do not waste
                 # a lot of time in case a lot of async stuff is coming in or remote is gone or slow.
@@ -946,18 +951,18 @@ class RemoteRepository:
                     and len(waiting_for) < MAX_INFLIGHT
                 ):
                     if calls:
-                        if is_preloaded:
-                            assert cmd == "get", "is_preload is only supported for 'get'"
-                            if calls[0]["id"] in self.chunkid_to_msgids:
-                                waiting_for.append(pop_preload_msgid(calls.pop(0)["id"]))
-                        else:
-                            args = calls.pop(0)
-                            if cmd == "get" and args["id"] in self.chunkid_to_msgids:
-                                waiting_for.append(pop_preload_msgid(args["id"]))
-                            else:
-                                self.msgid += 1
-                                waiting_for.append(self.msgid)
-                                self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))
+                        args = calls[0]
+                        if cmd == "get" and args["id"] in self.chunkid_to_msgids:
+                            # we have a get command and have already sent a request for this chunkid when
+                            # doing preloading, so we know the msgid of the response we are waiting for:
+                            waiting_for.append(pop_preload_msgid(args["id"]))
+                            del calls[0]
+                        elif not is_preloaded:
+                            # make and send a request (already done if we are using preloading)
+                            self.msgid += 1
+                            waiting_for.append(self.msgid)
+                            del calls[0]
+                            self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))
                     if not self.to_send and self.preload_ids:
                         chunk_id = self.preload_ids.pop(0)
                         args = {"id": chunk_id}

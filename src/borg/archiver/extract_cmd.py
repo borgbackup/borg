@@ -56,7 +56,8 @@ class ExtractMixIn:
         else:
             pi = None
 
-        for item in archive.iter_items(filter, preload=True):
+        for item in archive.iter_items(filter):
+            archive.preload_item_chunks(item, optimize_hardlinks=True)
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])

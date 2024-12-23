@@ -455,7 +455,7 @@ class FilesCacheMixin:
         )
         files_cache_logger.debug("FILES-CACHE-BUILD: starting...")
         archive = Archive(self.manifest, prev_archive.id)
-        for item in archive.iter_items(preload=False):
+        for item in archive.iter_items():
             # only put regular files' infos into the files cache:
             if stat.S_ISREG(item.mode):
                 path_hash = self.key.id_hash(safe_encode(item.path))

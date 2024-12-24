@@ -209,7 +209,7 @@ def with_archive(method):
 
 def parse_storage_quota(storage_quota):
     parsed = parse_file_size(storage_quota)
-    if parsed < parse_file_size('10M'):
+    if parsed != 0 and parsed < parse_file_size('10M'):
         raise argparse.ArgumentTypeError('quota is too small (%s). At least 10M are required.' % storage_quota)
     return parsed
 
@@ -1919,7 +1919,9 @@ class Archiver:
                     except ValueError:
                         raise ValueError('Invalid value') from None
                     if name == 'storage_quota':
-                        if parse_file_size(value) < parse_file_size('10M'):
+                        wanted = parse_file_size(value)
+                        minimum = parse_file_size('10M')
+                        if wanted != 0 and wanted < minimum:
                             raise ValueError('Invalid value: storage_quota < 10M')
                     elif name == 'max_segment_size':
                         if parse_file_size(value) >= MAX_SEGMENT_SIZE_LIMIT:

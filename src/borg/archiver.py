@@ -1944,6 +1944,11 @@ class Archiver:
                         minimum = parse_file_size('10M')
                         if wanted != 0 and wanted < minimum:
                             raise ValueError('Invalid value: storage_quota < 10M')
+                    elif name == 'additional_free_space':
+                        wanted = parse_file_size(value)
+                        minimum = parse_file_size('10M')
+                        if wanted != 0 and wanted < minimum:
+                            raise ValueError('Invalid value: additional_free_space < 10M')
                     elif name == 'max_segment_size':
                         if parse_file_size(value) >= MAX_SEGMENT_SIZE_LIMIT:
                             raise ValueError('Invalid value: max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)

@@ -39,6 +39,7 @@ class ExtractMixIn:
 
         progress = args.progress
         dry_run = args.dry_run
+        output_list = args.output_list
         stdout = args.stdout
         sparse = args.sparse
         strip_components = args.strip_components
@@ -66,7 +67,10 @@ class ExtractMixIn:
 
             is_matched = matcher.match(orig_path)
             log_prefix = "+" if is_matched else "-"
-            logging.getLogger("borg.output.list").info(f"{log_prefix} {remove_surrogates(item.path)}")
+
+            # Conditionally log based on the output_list flag
+            if output_list:
+                logging.getLogger("borg.output.list").info(f"{log_prefix} {remove_surrogates(item.path)}")
 
             if is_matched:
                 # Preloading item chunks only if the item will be fetched

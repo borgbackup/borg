@@ -55,7 +55,7 @@ class ExtractMixIn:
         else:
             pi = None
 
-        for item in archive.iter_items(None):
+        for item in archive.iter_items():
             orig_path = item.path
             components = orig_path.split(os.sep)
             stripped_path = os.sep.join(components[strip_components:])

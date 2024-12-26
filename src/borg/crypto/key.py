@@ -375,7 +375,7 @@ class FlexiKey:
                     raise PasswordRetriesExceeded
         else:
             if not key.load(target, passphrase):
-                raise PassphraseWrong
+                raise PassphraseWrong(passphrase)
         key.init_ciphers(manifest_data)
         key._passphrase = passphrase
         return key

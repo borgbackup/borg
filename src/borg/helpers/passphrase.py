@@ -31,6 +31,10 @@ class PassphraseWrong(Error):
 
     exit_mcode = 52
 
+    def __init__(self, passphrase):
+        super().__init__(self)
+        Passphrase.display_debug_info(passphrase)
+
 
 class PasswordRetriesExceeded(Error):
     """exceeded the maximum password retries"""
@@ -111,18 +115,26 @@ class Passphrase(str):
         ):
             print('Your passphrase (between double-quotes): "%s"' % passphrase, file=sys.stderr)
             print("Make sure the passphrase displayed above is exactly what you wanted.", file=sys.stderr)
+            print(
+                "Your passphrase (UTF-8 encoding in hex): %s" % bin_to_hex(passphrase.encode("utf-8")), file=sys.stderr
+            )
             try:
                 passphrase.encode("ascii")
             except UnicodeEncodeError:
-                print(
-                    "Your passphrase (UTF-8 encoding in hex): %s" % bin_to_hex(passphrase.encode("utf-8")),
-                    file=sys.stderr,
-                )
                 print(
                     "As you have a non-ASCII passphrase, it is recommended to keep the "
                     "UTF-8 encoding in hex together with the passphrase at a safe place.",
                     file=sys.stderr,
                 )
+
+    @staticmethod
+    def display_debug_info(passphrase):
+        print(
+            "Incorrect passphrase (UTF-8 encoding in hex): %s" % bin_to_hex(passphrase.encode("utf-8")), file=sys.stderr
+        )
+        for env_var in ["BORG_PASSPHRASE", "BORG_PASSCOMMAND", "BORG_PASSPHRASE_FD"]:
+            env_var_value = os.environ.get(env_var)
+            print(f"{env_var} = {env_var_value}", file=sys.stderr)
 
     @classmethod
     def new(cls, allow_empty=False):

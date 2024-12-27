@@ -38,8 +38,8 @@ class ExtractMixIn:
         matcher = build_matcher(args.patterns, args.paths)
 
         progress = args.progress
-        dry_run = args.dry_run
         output_list = args.output_list
+        dry_run = args.dry_run
         stdout = args.stdout
         sparse = args.sparse
         strip_components = args.strip_components
@@ -58,17 +58,16 @@ class ExtractMixIn:
 
         for item in archive.iter_items():
             orig_path = item.path
-            components = orig_path.split(os.sep)
-            stripped_path = os.sep.join(components[strip_components:])
-
-            if not stripped_path:
-                continue
-            item.path = stripped_path
+            if strip_components:
+                stripped_path = os.sep.join(orig_path.split(os.sep)[strip_components:])
+                if not stripped_path:
+                    continue
+                item.path = stripped_path
 
             is_matched = matcher.match(orig_path)
-            log_prefix = "+" if is_matched else "-"
 
             if output_list:
+                log_prefix = "+" if is_matched else "-"
                 logging.getLogger("borg.output.list").info(f"{log_prefix} {remove_surrogates(item.path)}")
 
             if is_matched:

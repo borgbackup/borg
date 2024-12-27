@@ -68,12 +68,10 @@ class ExtractMixIn:
             is_matched = matcher.match(orig_path)
             log_prefix = "+" if is_matched else "-"
 
-            # Conditionally log based on the output_list flag
             if output_list:
                 logging.getLogger("borg.output.list").info(f"{log_prefix} {remove_surrogates(item.path)}")
 
             if is_matched:
-                # Preloading item chunks only if the item will be fetched
                 archive.preload_item_chunks(item, optimize_hardlinks=True)
 
                 if not dry_run:

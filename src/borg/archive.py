@@ -1868,6 +1868,8 @@ class ArchiveChecker:
                 manifest.archives[name] = (chunk_id, archive.time)
         pi.finish()
         logger.info('Manifest rebuild complete.')
+        if not self.repair:
+            logger.warning('The rebuilt manifest will only be committed when using --repair!')
         return manifest
 
     def rebuild_refcounts(self, archive=None, first=0, last=0, sort_by='', glob=None):
@@ -1918,7 +1920,11 @@ class ArchiveChecker:
             chunks_healthy = item.chunks_healthy if has_chunks_healthy else chunks_current
             if has_chunks_healthy and len(chunks_current) != len(chunks_healthy):
                 # should never happen, but there was issue #3218.
-                logger.warning(f'{archive_name}: {item.path}: Invalid chunks_healthy metadata removed!')
+                if self.repair:
+                    msg = 'Invalid chunks_healthy metadata removed!'
+                else:
+                    msg = 'Invalid chunks_healthy metadata would be removed with --repair!'
+                logger.warning(f'{archive_name}: {item.path}: {msg}')
                 del item.chunks_healthy
                 has_chunks_healthy = False
                 chunks_healthy = chunks_current
@@ -1927,9 +1933,12 @@ class ArchiveChecker:
                 if chunk_id not in self.chunks:
                     # a chunk of the healthy list is missing
                     if chunk_current == chunk_healthy:
-                        logger.error('{}: {}: New missing file chunk detected (Byte {}-{}, Chunk {}). '
-                                     'Replacing with all-zero chunk.'.format(
-                                     archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)))
+                        if self.repair:
+                            msg = 'Replacing with all-zero chunk.'
+                        else:
+                            msg = 'Would replace it with all-zero chunk with --repair.'
+                        logger.error(f'{archive_name}: {item.path}: New missing file chunk detected '
+                                     f'(Byte {offset}-{offset+size}, Chunk {bin_to_hex(chunk_id)}). {msg}')
                         self.error_found = chunks_replaced = True
                         chunk_id, size, csize, cdata = replacement_chunk(size)
                         add_reference(chunk_id, size, csize, cdata)
@@ -1941,9 +1950,12 @@ class ArchiveChecker:
                         if chunk_id in self.chunks:
                             add_reference(chunk_id, size, csize)
                         else:
-                            logger.warning('{}: {}: Missing all-zero replacement chunk detected (Byte {}-{}, Chunk {}). '
-                                           'Generating new replacement chunk.'.format(
-                                           archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)))
+                            if self.repair:
+                                msg = 'Generating new replacement chunk.'
+                            else:
+                                msg = 'Would generate new replacement chunk with --repair.'
+                            logger.warning(f'{archive_name}: {item.path}: Missing all-zero replacement chunk detected '
+                                           f'(Byte {offset}-{offset+size}, Chunk {bin_to_hex(chunk_id)}). {msg}')
                             self.error_found = chunks_replaced = True
                             chunk_id, size, csize, cdata = replacement_chunk(size)
                             add_reference(chunk_id, size, csize, cdata)
@@ -1952,8 +1964,12 @@ class ArchiveChecker:
                         # normal case, all fine.
                         add_reference(chunk_id, size, csize)
                     else:
-                        logger.info('{}: {}: Healed previously missing file chunk! (Byte {}-{}, Chunk {}).'.format(
-                            archive_name, item.path, offset, offset + size, bin_to_hex(chunk_id)))
+                        if self.repair:
+                            msg = 'Healed previously missing file chunk!'
+                        else:
+                            msg = 'Missing file chunk would be healed with --repair!'
+                        logger.info(f'{archive_name}: {item.path}: {msg} '
+                                    f'(Byte {offset}-{offset+size}, Chunk {bin_to_hex(chunk_id)})')
                         add_reference(chunk_id, size, csize)
                         mark_as_possibly_superseded(chunk_current[0])  # maybe orphaned the all-zero replacement chunk
                 chunk_list.append([chunk_id, size, csize])  # list-typed element as chunks_healthy is list-of-lists
@@ -1962,7 +1978,11 @@ class ArchiveChecker:
                 # if this is first repair, remember the correct chunk IDs, so we can maybe heal the file later
                 item.chunks_healthy = item.chunks
             if has_chunks_healthy and chunk_list == chunks_healthy:
-                logger.info(f'{archive_name}: {item.path}: Completely healed previously damaged file!')
+                if self.repair:
+                    msg = 'Completely healed previously damaged file!'
+                else:
+                    msg = 'Would completely heal damaged file with --repair!'
+                logger.info(f'{archive_name}: {item.path}: {msg}')
                 del item.chunks_healthy
             item.chunks = chunk_list
             if 'size' in item:
@@ -2095,7 +2115,11 @@ class ArchiveChecker:
                     # when upgrading to borg 1.2.5, users are expected to TAM-authenticate all archives they
                     # trust, so there shouldn't be any without TAM.
                     logger.error('Archive TAM authentication issue for archive %s: %s', info.name, integrity_error)
-                    logger.error('This archive will be *removed* from the manifest! It will be deleted.')
+                    if self.repair:
+                        msg = 'This archive will be *removed* from the manifest! It will be deleted.'
+                    else:
+                        msg = 'This archive would be *removed* / *deleted* when using --repair!'
+                    logger.error(msg)
                     self.error_found = True
                     del self.manifest.archives[info.name]
                     continue

@@ -414,11 +414,63 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.0 (2024-07-03)
+Version 1.4.1 (2024-12-xx)
 --------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- prune: add 13weekly and 3monthly quarterly pruning strategies, #8337
+- add BORG_USE_CHUNKS_ARCHIVE env var as a cleaner way to control whether
+  borg shall use chunks.archive.de/ cache directory. the previous "hack" to
+  create a non-directory file at that place is still supported.
+- compact: support --dry-run (do nothing) to simplify scripting, #8300
+
+Fixes:
+
+- config: fix acceptance of storage_quota 0, #8499
+- config: reject additional_free_space < 10M (but accept 0), #6066
+- check: more consistent messaging considering --repair, #8533
+- yes: deal with UnicodeDecodeError in input(), #6984
+- fix WORKAROUNDS=authenticated_no_key support for archive TAM authentication,
+  #8400
+- diff: do not assert on diff if hard link sources are not found due to
+  exclusions, #8344
+- diff:
+
+  - suppress modified changes for files which weren't actually modified in JSON
+    output, #8334
+  - ensure that 0B changes are hidden from text diffs, too.
+  - remove 0-added,0-removed modified entries from JSON output.
+- try to rebuild cache if an exception is raised, #5213
+
+Other changes:
+
+- support and test on Python 3.13
+- docs:
+
+  - update install docs, nothing bundled anymore, #8342
+  - clarify excluded and included flags for dry-run, #8556
+  - small changes regarding compression, #8542
+  - clean up entries regarding SSH settings, link to recommended ones, #8542
+  - borg/borgfs detects internally under which name it was invoked, #8207
+  - binary: using the directory build is faster, #8008
+  - add readme of the binaries
+  - mount: document on-demand loading, perf tips, #7173
+  - better link modern return codes, #8370
+  - update repository URLs in docs to use new syntax, #8361
+  - align /etc/backups path references in automated backups deployment guide
+- tests:
+
+  - github CI: windows msys2 build: broken, disable it for now, #8264
+  - improve borg check --repair healing tests, #8302
+- vagrant: misc. cleanups/updates, add freebsd 13 box, #8266
+
+
+Version 1.4.0 (2024-07-03)
+--------------------------
 
 Other changes:
 

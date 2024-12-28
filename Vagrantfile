@@ -42,6 +42,7 @@ def packages_freebsd
     pkg install -y liblz4 zstd pkgconf
     pkg install -y fusefs-libs || true
     pkg install -y fusefs-libs3 || true
+    pkg install -y rust
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
     # for building python (for the tests we use pyenv built pythons):
     pkg install -y python310 py310-sqlite3
@@ -76,6 +77,7 @@ def packages_openbsd
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
+    pkg_add rust
     pkg_add openssl%3.0
     pkg_add py3-pip
     pkg_add py3-virtualenv
@@ -88,6 +90,7 @@ def packages_netbsd
     pkgin update
     pkgin -y upgrade
     pkg_add zstd lz4 xxhash git
+    pkg_add rust
     pkg_add bash
     chsh -s bash vagrant
     echo "export PROMPT_COMMAND=" >> ~vagrant/.bash_profile  # bug in netbsd 9.2, .bash_profile broken for screen
@@ -164,7 +167,7 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     pyenv install 3.12.0  # tests
-    pyenv install 3.11.9  # tests, binary build
+    pyenv install 3.11.11  # tests, binary build
     pyenv install 3.10.2  # tests
     pyenv install 3.9.4  # tests
     pyenv rehash
@@ -184,8 +187,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.11 release
-    pyenv global 3.11.9
-    pyenv virtualenv 3.11.9 borg-env
+    pyenv global 3.11.11
+    pyenv virtualenv 3.11.11 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -231,8 +234,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.4 3.10.2 3.11.9 3.12.0
-      pyenv local 3.9.4 3.10.2 3.11.9 3.12.0
+      pyenv global 3.9.4 3.10.2 3.11.11 3.12.0
+      pyenv local 3.9.4 3.10.2 3.11.11 3.12.0
     fi
     # otherwise: just use the system python
     # avoid that git complains about dubious ownership if we use fakeroot:
@@ -276,7 +279,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "noble" do |b|
-    b.vm.box = "ubuntu/noble64"
+    b.vm.box = "bento/ubuntu-24.04"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -408,7 +411,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "macos1012" do |b|
     b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
-      v.memory = 4096 + $wmem
+      v.memory = 8192 + $wmem
       v.customize ['modifyvm', :id, '--ostype', 'MacOS_64']
       v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
       v.customize ['modifyvm', :id, '--nested-hw-virt', 'on']

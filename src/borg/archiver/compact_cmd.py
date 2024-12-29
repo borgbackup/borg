@@ -175,7 +175,8 @@ class CompactMixIn:
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_compact(self, args, repository, manifest):
         """Collect garbage in repository"""
-        ArchiveGarbageCollector(repository, manifest, stats=args.stats).garbage_collect()
+        if not args.dry_run:  # support --dry-run to simplify scripting
+            ArchiveGarbageCollector(repository, manifest, stats=args.stats).garbage_collect()
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -234,7 +235,7 @@ class CompactMixIn:
             help="compact repository",
         )
         subparser.set_defaults(func=self.do_compact)
-
+        subparser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true", help="do nothing")
         subparser.add_argument(
             "-s", "--stats", dest="stats", action="store_true", help="print statistics (might be much slower)"
         )

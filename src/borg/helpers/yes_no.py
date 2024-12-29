@@ -8,6 +8,9 @@ FALSISH = ("No", "NO", "no", "N", "n", "0")
 TRUISH = ("Yes", "YES", "yes", "Y", "y", "1")
 DEFAULTISH = ("Default", "DEFAULT", "default", "D", "d", "")
 
+ERROR = "error"
+assert ERROR not in TRUISH + FALSISH + DEFAULTISH
+
 
 def yes(
     msg=None,
@@ -88,10 +91,14 @@ def yes(
             if not prompt:
                 return default
             try:
-                answer = input()
+                answer = input()  # this may raise UnicodeDecodeError, #6984
+                if answer == ERROR:  # for testing purposes
+                    raise UnicodeDecodeError("?", b"?", 0, 1, "?")  # args don't matter
             except EOFError:
                 # avoid defaultish[0], defaultish could be empty
                 answer = truish[0] if default else falsish[0]
+            except UnicodeDecodeError:
+                answer = ERROR
         if answer in defaultish:
             if default_msg:
                 output(default_msg, "accepted_default")

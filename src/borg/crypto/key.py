@@ -371,6 +371,8 @@ class FlexiKey:
                     passphrase = Passphrase.getpass(prompt)
                     if key.load(target, passphrase):
                         break
+                    else:
+                        Passphrase.display_debug_info(passphrase)
                 else:
                     raise PasswordRetriesExceeded
         else:

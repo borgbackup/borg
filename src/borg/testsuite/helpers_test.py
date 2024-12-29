@@ -1417,11 +1417,12 @@ class TestPassphrase:
             raise PassphraseWrong("wrong_passphrase")
 
         out, err = capsys.readouterr()
-        assert "Incorrect passphrase (UTF-8 encoding in hex)" in err
+        assert "Incorrect passphrase!" in err
+        assert 'Passphrase used (between double-quotes): "wrong_passphrase"' in err
         assert "77726f6e675f70617373706872617365" in err
-        assert "BORG_PASSPHRASE = wrong_passphrase" in err
-        assert "BORG_PASSCOMMAND = echo wrong_passphrase" in err
-        assert "BORG_PASSPHRASE_FD = 123" in err
+        assert "BORG_PASSPHRASE" in err
+        assert "BORG_PASSCOMMAND" in err
+        assert "BORG_PASSPHRASE_FD" in err
 
         assert str(exc_info.value) == (
             "passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."
@@ -1457,11 +1458,12 @@ class TestPassphrase:
         Passphrase.display_debug_info(passphrase)
 
         out, err = capsys.readouterr()
-        assert "Incorrect passphrase (UTF-8 encoding in hex)" in err
+        assert "Incorrect passphrase!" in err
+        assert 'Passphrase used (between double-quotes): "debug_test"' in err
         assert "64656275675f74657374" in err  # UTF-8 hex encoding of 'debug_test'
-        assert "BORG_PASSPHRASE = debug_env_passphrase" in err
-        assert "BORG_PASSCOMMAND = command" in err
-        assert "BORG_PASSPHRASE_FD = fd_value" in err
+        assert "BORG_PASSPHRASE" in err
+        assert "BORG_PASSCOMMAND" in err
+        assert "BORG_PASSPHRASE_FD" in err
 
 
 @pytest.mark.parametrize(

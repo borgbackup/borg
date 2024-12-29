@@ -424,7 +424,7 @@ New features:
 
 - prune: add 13weekly and 3monthly quarterly pruning strategies, #8337
 - add BORG_USE_CHUNKS_ARCHIVE env var as a cleaner way to control whether
-  borg shall use chunks.archive.de/ cache directory. the previous "hack" to
+  borg shall use chunks.archive.d/ cache directory. the previous "hack" to
   create a non-directory file at that place is still supported.
 - compact: support --dry-run (do nothing) to simplify scripting, #8300
 
@@ -449,6 +449,8 @@ Fixes:
 Other changes:
 
 - support and test on Python 3.13
+- use Cython 3.0.11
+- filter LibreSSL related warnings on OpenBSD
 - docs:
 
   - update install docs, nothing bundled anymore, #8342
@@ -462,11 +464,21 @@ Other changes:
   - better link modern return codes, #8370
   - update repository URLs in docs to use new syntax, #8361
   - align /etc/backups path references in automated backups deployment guide
+  - mount docs: apply jdchristensen's suggestion, better phrasing.
+  - FAQ: Why is backing up an unmodified FAT filesystem slow on Linux?
 - tests:
 
   - github CI: windows msys2 build: broken, disable it for now, #8264
   - improve borg check --repair healing tests, #8302
-- vagrant: misc. cleanups/updates, add freebsd 13 box, #8266
+- vagrant:
+
+  - misc. cleanups/updates
+  - pyenv: only use Python 3.11.11, use this for binary build
+  - macos: give more memory
+  - install rust on BSD
+  - add FreeBSD 13 box, for #8266
+  - fix OpenBSD box, #8506
+  - use a bento/ubuntu-24.04 box for now
 
 
 Version 1.4.0 (2024-07-03)

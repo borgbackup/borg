@@ -158,29 +158,27 @@ Dependencies
 ~~~~~~~~~~~~
 
 To install Borg from a source package (including pip), you have to install the
-following dependencies first:
+following dependencies first. For the libraries you will also need their
+development header files (sometimes in a separate `-dev` or `-devel` package).
 
-* `Python 3`_ >= 3.9.0, plus development headers.
-* Libraries (library plus development headers):
-
-  - OpenSSL_ >= 1.1.1 (LibreSSL will not work)
-  - libacl_ (which depends on libattr_)
-  - liblz4_ >= 1.7.0 (r129)
-  - libzstd_ >= 1.3.0
-  - libxxhash >= 0.8.1 (0.8.0 might work also)
-  - libffi (required for argon2-cffi-bindings)
-* pkg-config (cli tool) and pkgconfig python package (borg uses these to
-  discover header and library location - if it can't import pkgconfig and
-  is not pointed to header/library locations via env vars [see setup.py],
-  it will raise a fatal error).
-  **These must be present before invoking setup.py!**
-* some other Python dependencies, pip will automatically install them for you.
-* optionally, if you wish to mount an archive as a FUSE filesystem, you need
+* `Python 3`_ >= 3.9.0
+* OpenSSL_ >= 1.1.1 (LibreSSL will not work)
+* libacl_ (which depends on libattr_)
+* libxxhash_ >= 0.8.1
+* liblz4_ >= 1.7.0 (r129)
+* libzstd_ >= 1.3.0
+* libffi (required for argon2-cffi-bindings)
+* pkg-config (cli tool) - Borg uses this to discover header and library
+  locations automatically. Alternatively, you can also point to them via some
+  environment variables, see setup.py.
+* Some other Python dependencies, pip will automatically install them for you.
+* Optionally, if you wish to mount an archive as a FUSE filesystem, you need
   a FUSE implementation for Python:
 
-  - Either pyfuse3_ (preferably, newer) or llfuse_ (older).
-    See also the BORG_FUSE_IMPL env variable.
-  - See pyproject.toml about the version requirements.
+  - pyfuse3_ >= 3.1.1 (for fuse 3, use `pip install borgbackup[pyfuse3]`), or
+  - llfuse_ >= 1.3.8 (for fuse 2, use `pip install borgbackup[llfuse]`).
+  - Additionally, your OS will need to have FUSE support installed
+    (e.g. a package `fuse` for fuse 2 or a package `fuse3` for fuse 3 support).
 
 If you have troubles finding the right package names, have a look at the
 distribution specific sections below or the Vagrantfile in the git repository,
@@ -188,9 +186,7 @@ which contains installation scripts for a number of operating systems.
 
 In the following, the steps needed to install the dependencies are listed for a
 selection of platforms. If your distribution is not covered by these
-instructions, try to use your package manager to install the dependencies.  On
-FreeBSD, you may need to get a recent enough OpenSSL version from FreeBSD
-ports.
+instructions, try to use your package manager to install the dependencies.
 
 After you have installed the dependencies, you can proceed with steps outlined
 under :ref:`pip-installation`.
@@ -201,12 +197,11 @@ Debian / Ubuntu
 Install the dependencies with development headers::
 
     sudo apt-get install python3 python3-dev python3-pip python3-virtualenv \
-    libacl1-dev libacl1 \
+    libacl1-dev \
     libssl-dev \
     liblz4-dev libzstd-dev libxxhash-dev \
     libffi-dev \
-    build-essential \
-    pkg-config python3-pkgconfig
+    build-essential pkg-config
     sudo apt-get install libfuse-dev fuse    # needed for llfuse
     sudo apt-get install libfuse3-dev fuse3  # needed for pyfuse3
 
@@ -220,11 +215,11 @@ Fedora
 Install the dependencies with development headers::
 
     sudo dnf install python3 python3-devel python3-pip python3-virtualenv \
-    libacl-devel libacl \
+    libacl-devel \
     openssl-devel \
     lz4-devel libzstd-devel xxhash-devel \
     libffi-devel \
-    pkgconf python3-pkgconfig
+    pkgconf
     sudo dnf install gcc gcc-c++ redhat-rpm-config
     sudo dnf install fuse-devel fuse         # needed for llfuse
     sudo dnf install fuse3-devel fuse3       # needed for pyfuse3
@@ -267,7 +262,7 @@ Brewfile::
 
     brew install python@3.11  # can be any supported python3 version
     brew bundle install  # install requirements from borg repo's ./Brewfile
-    pip3 install virtualenv pkgconfig
+    pip3 install virtualenv
 
 Be aware that for all recent macOS releases you must authorize full disk access.
 It is no longer sufficient to run borg backups as root. If you have not yet
@@ -332,7 +327,7 @@ Cygwin
 
 Use the Cygwin installer to install the dependencies::
 
-    python39 python39-devel python39-pkgconfig
+    python39 python39-devel
     python39-setuptools python39-pip python39-wheel python39-virtualenv
     libssl-devel libxxhash-devel liblz4-devel libzstd-devel
     binutils gcc-g++ git make openssh
@@ -385,9 +380,6 @@ This will use ``pip`` to install the latest release from PyPi::
 
     # might be required if your tools are outdated
     pip install -U pip setuptools wheel
-
-    # pkgconfig MUST be available before borg is installed!
-    pip install pkgconfig
 
     # install Borg + Python dependencies into virtualenv
     pip install borgbackup

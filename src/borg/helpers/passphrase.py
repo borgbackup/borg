@@ -118,6 +118,11 @@ class Passphrase(str):
             print(
                 "Your passphrase (UTF-8 encoding in hex): %s" % bin_to_hex(passphrase.encode("utf-8")), file=sys.stderr
             )
+            print(
+                "It is recommended to keep the UTF-8 encoding in hex together with the passphrase at a safe place. "
+                "In case you should ever run into passphrase issues, it could sometimes help debugging them.\n",
+                file=sys.stderr,
+            )
             try:
                 passphrase.encode("ascii")
             except UnicodeEncodeError:
@@ -129,12 +134,16 @@ class Passphrase(str):
 
     @staticmethod
     def display_debug_info(passphrase):
-        print(
-            "Incorrect passphrase (UTF-8 encoding in hex): %s" % bin_to_hex(passphrase.encode("utf-8")), file=sys.stderr
-        )
+        print("Incorrect passphrase!", file=sys.stderr)
+        print(f'Passphrase used (between double-quotes): "{passphrase}"', file=sys.stderr)
+        print(f'Same, UTF-8 encoded, in hex: {bin_to_hex(passphrase.encode("utf-8"))}', file=sys.stderr)
+        print("Relevant Environment Variables:", file=sys.stderr)
         for env_var in ["BORG_PASSPHRASE", "BORG_PASSCOMMAND", "BORG_PASSPHRASE_FD"]:
             env_var_value = os.environ.get(env_var)
-            print(f"{env_var} = {env_var_value}", file=sys.stderr)
+            if env_var_value is not None:
+                print(f'{env_var} = "{env_var_value}"', file=sys.stderr)
+            else:
+                print(f"# {env_var} is not set", file=sys.stderr)
 
     @classmethod
     def new(cls, allow_empty=False):

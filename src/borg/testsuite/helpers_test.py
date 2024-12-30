@@ -1408,12 +1408,14 @@ class TestPassphrase:
     def test_passphrase_repr(self):
         assert "secret" not in repr(Passphrase("secret"))
 
-    def test_passphrase_wrong(self, capsys, monkeypatch):
+    def test_passphrase_wrong_debug_enabled(self, capsys, monkeypatch):
+        monkeypatch.setenv("BORG_DEBUG_PASSPHRASE", "YES")
         monkeypatch.setenv("BORG_PASSPHRASE", "wrong_passphrase")
         monkeypatch.setenv("BORG_PASSCOMMAND", "echo wrong_passphrase")
         monkeypatch.setenv("BORG_PASSPHRASE_FD", "123")
 
         with pytest.raises(PassphraseWrong) as exc_info:
+            Passphrase.display_debug_info("wrong_passphrase")
             raise PassphraseWrong("wrong_passphrase")
 
         out, err = capsys.readouterr()
@@ -1427,6 +1429,17 @@ class TestPassphrase:
         assert str(exc_info.value) == (
             "passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."
         )
+
+    def test_passphrase_wrong_debug_disabled(self, capsys, monkeypatch):
+        monkeypatch.delenv("BORG_DEBUG_PASSPHRASE", raising=False)
+
+        with pytest.raises(PassphraseWrong):
+            Passphrase.display_debug_info("wrong_passphrase")
+            raise PassphraseWrong("wrong_passphrase")
+
+        out, err = capsys.readouterr()
+        assert "Incorrect passphrase!" not in err
+        assert 'Passphrase used (between double-quotes): "wrong_passphrase"' not in err
 
     def test_verification(self, capsys, monkeypatch):
         passphrase = "test_passphrase"
@@ -1451,6 +1464,7 @@ class TestPassphrase:
 
     def test_display_debug_info(self, capsys, monkeypatch):
         passphrase = "debug_test"
+        monkeypatch.setenv("BORG_DEBUG_PASSPHRASE", "YES")
         monkeypatch.setenv("BORG_PASSPHRASE", "debug_env_passphrase")
         monkeypatch.setenv("BORG_PASSCOMMAND", "command")
         monkeypatch.setenv("BORG_PASSPHRASE_FD", "fd_value")
@@ -1461,9 +1475,17 @@ class TestPassphrase:
         assert "Incorrect passphrase!" in err
         assert 'Passphrase used (between double-quotes): "debug_test"' in err
         assert "64656275675f74657374" in err  # UTF-8 hex encoding of 'debug_test'
-        assert "BORG_PASSPHRASE" in err
-        assert "BORG_PASSCOMMAND" in err
-        assert "BORG_PASSPHRASE_FD" in err
+        assert 'BORG_PASSPHRASE = "debug_env_passphrase"' in err
+        assert 'BORG_PASSCOMMAND = "command"' in err
+        assert 'BORG_PASSPHRASE_FD = "fd_value"' in err
+
+        monkeypatch.delenv("BORG_DEBUG_PASSPHRASE", raising=False)
+
+        Passphrase.display_debug_info(passphrase)
+        out, err = capsys.readouterr()
+
+        assert "Incorrect passphrase!" not in err
+        assert 'Passphrase used (between double-quotes): "debug_test"' not in err
 
 
 @pytest.mark.parametrize(

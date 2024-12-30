@@ -852,6 +852,32 @@ A workaround is to set the option ``--files-cache=ctime,size`` to exclude the in
 number comparison from the files cache check so that files with different inode
 numbers won't be treated as modified.
 
+Using a pure-python msgpack! This will result in lower performance.
+-------------------------------------------------------------------
+
+borg uses `msgpack` to serialize/deserialize data.
+
+`msgpack` has 2 implementations:
+
+- a fast one (C code compiled into a platform specific binary), and
+- a slow pure-python one.
+
+The slow one is used if it can't successfully import the fast one.
+
+If you use the pyinstaller-made borg "fat binary" which we offer on github
+releases, it could be that you downloaded a binary that does not match the
+(g)libc on your system.
+
+Binaries made for an older glibc than the one you have on your system usually
+just work, but the opposite is not necessarily the case and can lead to misc.
+issues - like failing to load the fast msgpack code or not working at all.
+
+So: try a binary made for an older glibc.
+
+If you see this without using a "fat binary" from us, it usually means that
+msgpack is not built / installed correctly. It could be also that the platform
+is not fully supported (so the python code works, but there is no fast binary
+code).
 
 Is there a way to limit bandwidth with Borg?
 --------------------------------------------

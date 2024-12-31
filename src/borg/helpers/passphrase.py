@@ -121,16 +121,21 @@ class Passphrase(str):
     @staticmethod
     def display_debug_info(passphrase):
         if os.environ.get("BORG_DEBUG_PASSPHRASE") == "YES":
-            print("Incorrect passphrase!", file=sys.stderr)
-            print(f'Passphrase used (between double-quotes): "{passphrase}"', file=sys.stderr)
-            print(f'Same, UTF-8 encoded, in hex: {bin_to_hex(passphrase.encode("utf-8"))}', file=sys.stderr)
-            print("Relevant Environment Variables:", file=sys.stderr)
+            env_vars_str = ""
             for env_var in ["BORG_PASSPHRASE", "BORG_PASSCOMMAND", "BORG_PASSPHRASE_FD"]:
                 env_var_value = os.environ.get(env_var)
                 if env_var_value is not None:
-                    print(f'{env_var} = "{env_var_value}"', file=sys.stderr)
+                    env_vars_str += f'{env_var} = "{env_var_value}"\n'
                 else:
-                    print(f"# {env_var} is not set", file=sys.stderr)
+                    env_vars_str += f"# {env_var} is not set\n"
+            passphrase_info = (
+                f"Incorrect passphrase!\n"
+                f'Passphrase used (between double-quotes): "{passphrase}"\n'
+                f"Same, UTF-8 encoded, in hex: {bin_to_hex(passphrase.encode('utf-8'))}\n"
+                f"Relevant Environment Variables:\n"
+                f"{env_vars_str}"
+            )
+            print(passphrase_info, file=sys.stderr)
 
     @classmethod
     def new(cls, allow_empty=False):

@@ -1416,7 +1416,7 @@ class TestPassphrase:
 
         with pytest.raises(PassphraseWrong) as exc_info:
             Passphrase.display_debug_info("wrong_passphrase")
-            raise PassphraseWrong("wrong_passphrase")
+            raise PassphraseWrong()
 
         out, err = capsys.readouterr()
         assert "Incorrect passphrase!" in err
@@ -1435,7 +1435,7 @@ class TestPassphrase:
 
         with pytest.raises(PassphraseWrong):
             Passphrase.display_debug_info("wrong_passphrase")
-            raise PassphraseWrong("wrong_passphrase")
+            raise PassphraseWrong()
 
         out, err = capsys.readouterr()
         assert "Incorrect passphrase!" not in err

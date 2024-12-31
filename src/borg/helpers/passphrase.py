@@ -109,20 +109,33 @@ class Passphrase(str):
             retry=True,
             env_var_override="BORG_DISPLAY_PASSPHRASE",
         ):
-            print('Your passphrase (between double-quotes): "%s"' % passphrase, file=sys.stderr)
-            print("Make sure the passphrase displayed above is exactly what you wanted.", file=sys.stderr)
-            try:
-                passphrase.encode("ascii")
-            except UnicodeEncodeError:
-                print(
-                    "Your passphrase (UTF-8 encoding in hex): %s" % bin_to_hex(passphrase.encode("utf-8")),
-                    file=sys.stderr,
-                )
-                print(
-                    "As you have a non-ASCII passphrase, it is recommended to keep the "
-                    "UTF-8 encoding in hex together with the passphrase at a safe place.",
-                    file=sys.stderr,
-                )
+            pw_msg = f"""
+            Your passphrase (between double-quotes): "{passphrase}"
+            Make sure the passphrase displayed above is exactly what you wanted.
+            Your passphrase (UTF-8 encoding in hex): {bin_to_hex(passphrase.encode("utf-8"))}
+            It is recommended to keep the UTF-8 encoding in hex together with the passphrase at a safe place.
+            In case you should ever run into passphrase issues, it could sometimes help debugging them.
+            """
+            print(pw_msg, file=sys.stderr)
+
+    @staticmethod
+    def display_debug_info(passphrase):
+        if os.environ.get("BORG_DEBUG_PASSPHRASE") == "YES":
+            env_vars_str = ""
+            for env_var in ["BORG_PASSPHRASE", "BORG_PASSCOMMAND", "BORG_PASSPHRASE_FD"]:
+                env_var_value = os.environ.get(env_var)
+                if env_var_value is not None:
+                    env_vars_str += f'{env_var} = "{env_var_value}"\n'
+                else:
+                    env_vars_str += f"# {env_var} is not set\n"
+            passphrase_info = (
+                f"Incorrect passphrase!\n"
+                f'Passphrase used (between double-quotes): "{passphrase}"\n'
+                f"Same, UTF-8 encoded, in hex: {bin_to_hex(passphrase.encode('utf-8'))}\n"
+                f"Relevant Environment Variables:\n"
+                f"{env_vars_str}"
+            )
+            print(passphrase_info, file=sys.stderr)
 
     @classmethod
     def new(cls, allow_empty=False):

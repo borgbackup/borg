@@ -968,7 +968,7 @@ The integrity data of the ``files`` cache is stored in the cache ``config``.
 
 The ``[integrity]`` section is used:
 
-.. code-block:: ini
+.. code-block:: none
 
     [cache]
     version = 1

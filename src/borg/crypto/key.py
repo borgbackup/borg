@@ -364,7 +364,6 @@ class FlexiKey:
         target = key.find_key()
         prompt = "Enter passphrase for key %s: " % target
         passphrase = Passphrase.env_passphrase()
-        debug_enabled = os.environ.get("BORG_DEBUG_PASSPHRASE") == "YES"
         if passphrase is None:
             passphrase = Passphrase()
             if not key.load(target, passphrase):
@@ -372,14 +371,12 @@ class FlexiKey:
                     passphrase = Passphrase.getpass(prompt)
                     if key.load(target, passphrase):
                         break
-                    elif debug_enabled:
-                        Passphrase.display_debug_info(passphrase)
+                    Passphrase.display_debug_info(passphrase)
                 else:
                     raise PasswordRetriesExceeded
         else:
             if not key.load(target, passphrase):
-                if debug_enabled:
-                    Passphrase.display_debug_info(passphrase)
+                Passphrase.display_debug_info(passphrase)
                 raise PassphraseWrong
         key.init_ciphers(manifest_data)
         key._passphrase = passphrase

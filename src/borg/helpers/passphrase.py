@@ -3,6 +3,7 @@ import os
 import shlex
 import subprocess
 import sys
+import textwrap
 
 from . import bin_to_hex
 from . import Error
@@ -109,13 +110,15 @@ class Passphrase(str):
             retry=True,
             env_var_override="BORG_DISPLAY_PASSPHRASE",
         ):
-            pw_msg = f"""
+            pw_msg = textwrap.dedent(
+                f"""
             Your passphrase (between double-quotes): "{passphrase}"
             Make sure the passphrase displayed above is exactly what you wanted.
             Your passphrase (UTF-8 encoding in hex): {bin_to_hex(passphrase.encode("utf-8"))}
             It is recommended to keep the UTF-8 encoding in hex together with the passphrase at a safe place.
             In case you should ever run into passphrase issues, it could sometimes help debugging them.
             """
+            )
             print(pw_msg, file=sys.stderr)
 
     @staticmethod

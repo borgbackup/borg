@@ -111,7 +111,7 @@ class Passphrase(str):
             env_var_override="BORG_DISPLAY_PASSPHRASE",
         ):
             pw_msg = textwrap.dedent(
-                f"""
+                f"""\
             Your passphrase (between double-quotes): "{passphrase}"
             Make sure the passphrase displayed above is exactly what you wanted.
             Your passphrase (UTF-8 encoding in hex): {bin_to_hex(passphrase.encode("utf-8"))}
@@ -123,20 +123,24 @@ class Passphrase(str):
 
     @staticmethod
     def display_debug_info(passphrase):
+        def fmt_var(env_var):
+            env_var_value = os.environ.get(env_var)
+            if env_var_value is not None:
+                return f'{env_var} = "{env_var_value}"'
+            else:
+                return f"# {env_var} is not set"
+
         if os.environ.get("BORG_DEBUG_PASSPHRASE") == "YES":
-            env_vars_str = ""
-            for env_var in ["BORG_PASSPHRASE", "BORG_PASSCOMMAND", "BORG_PASSPHRASE_FD"]:
-                env_var_value = os.environ.get(env_var)
-                if env_var_value is not None:
-                    env_vars_str += f'{env_var} = "{env_var_value}"\n'
-                else:
-                    env_vars_str += f"# {env_var} is not set\n"
-            passphrase_info = (
-                f"Incorrect passphrase!\n"
-                f'Passphrase used (between double-quotes): "{passphrase}"\n'
-                f"Same, UTF-8 encoded, in hex: {bin_to_hex(passphrase.encode('utf-8'))}\n"
-                f"Relevant Environment Variables:\n"
-                f"{env_vars_str}"
+            passphrase_info = textwrap.dedent(
+                f"""\
+                Incorrect passphrase!
+                Passphrase used (between double-quotes): "{passphrase}"
+                Same, UTF-8 encoded, in hex: {bin_to_hex(passphrase.encode('utf-8'))}
+                Relevant Environment Variables:
+                {fmt_var("BORG_PASSPHRASE")}
+                {fmt_var("BORG_PASSCOMMAND")}
+                {fmt_var("BORG_PASSPHRASE_FD")}
+                """
             )
             print(passphrase_info, file=sys.stderr)
 

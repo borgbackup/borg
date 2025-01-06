@@ -63,12 +63,12 @@ def test_date_matching(archivers, request):
     create_src_archive(archiver, "archive-now")
     cmd(archiver, "check", "-v", "--archives-only", "--oldest=23e", exit_code=2)
 
-    output = cmd(archiver, "check", "-v", "--archives-only", "--oldest=1Y", exit_code=0)
+    output = cmd(archiver, "check", "-v", "--archives-only", "--oldest=1y", exit_code=0)
     assert "archive-2022-11-20" in output
     assert "archive-2022-12-18" in output
     assert "archive-now" not in output
 
-    output = cmd(archiver, "check", "-v", "--archives-only", "--newest=1Y", exit_code=0)
+    output = cmd(archiver, "check", "-v", "--archives-only", "--newest=1y", exit_code=0)
     assert "archive-2022-11-20" not in output
     assert "archive-2022-12-18" not in output
     assert "archive-now" in output
@@ -79,6 +79,16 @@ def test_date_matching(archivers, request):
     assert "archive-now" not in output
 
     output = cmd(archiver, "check", "-v", "--archives-only", "--newest=1m", exit_code=0)
+    assert "archive-2022-11-20" not in output
+    assert "archive-2022-12-18" not in output
+    assert "archive-now" in output
+
+    output = cmd(archiver, "check", "-v", "--archives-only", "--oldest=4w", exit_code=0)
+    assert "archive-2022-11-20" in output
+    assert "archive-2022-12-18" in output
+    assert "archive-now" not in output
+
+    output = cmd(archiver, "check", "-v", "--archives-only", "--newest=4w", exit_code=0)
     assert "archive-2022-11-20" not in output
     assert "archive-2022-12-18" not in output
     assert "archive-now" in output

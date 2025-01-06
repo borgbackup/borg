@@ -64,12 +64,12 @@ def test_date_matching(archivers, request):
 
     cmd(archiver, "check", "-v", "--oldest=23e", exit_code=2)
 
-    output = cmd(archiver, "repo-list", "-v", "--oldest=1Y", exit_code=0)
+    output = cmd(archiver, "repo-list", "-v", "--oldest=1y", exit_code=0)
     assert "archive-2022-11-20" in output
     assert "archive-2022-12-18" in output
     assert "archive-now" not in output
 
-    output = cmd(archiver, "repo-list", "-v", "--newest=1Y", exit_code=0)
+    output = cmd(archiver, "repo-list", "-v", "--newest=1y", exit_code=0)
     assert "archive-2022-11-20" not in output
     assert "archive-2022-12-18" not in output
     assert "archive-now" in output
@@ -80,6 +80,16 @@ def test_date_matching(archivers, request):
     assert "archive-now" not in output
 
     output = cmd(archiver, "repo-list", "-v", "--newest=1m", exit_code=0)
+    assert "archive-2022-11-20" not in output
+    assert "archive-2022-12-18" not in output
+    assert "archive-now" in output
+
+    output = cmd(archiver, "repo-list", "-v", "--oldest=4w", exit_code=0)
+    assert "archive-2022-11-20" in output
+    assert "archive-2022-12-18" in output
+    assert "archive-now" not in output
+
+    output = cmd(archiver, "repo-list", "-v", "--newest=4w", exit_code=0)
     assert "archive-2022-11-20" not in output
     assert "archive-2022-12-18" not in output
     assert "archive-now" in output

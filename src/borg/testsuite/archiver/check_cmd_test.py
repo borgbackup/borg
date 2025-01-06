@@ -58,32 +58,70 @@ def test_date_matching(archivers, request):
 
     shutil.rmtree(archiver.repository_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    earliest_ts = "2022-11-20T23:59:59"
-    ts_in_between = "2022-12-18T23:59:59"
-    create_src_archive(archiver, "archive1", ts=earliest_ts)
-    create_src_archive(archiver, "archive2", ts=ts_in_between)
-    create_src_archive(archiver, "archive3")
+    create_src_archive(archiver, "archive-2022-11-20", ts="2022-11-20T23:59:59")
+    create_src_archive(archiver, "archive-2022-12-18", ts="2022-12-18T23:59:59")
+    create_src_archive(archiver, "archive-now")
     cmd(archiver, "check", "-v", "--archives-only", "--oldest=23e", exit_code=2)
 
+    output = cmd(archiver, "check", "-v", "--archives-only", "--oldest=1Y", exit_code=0)
+    assert "archive-2022-11-20" in output
+    assert "archive-2022-12-18" in output
+    assert "archive-now" not in output
+
+    output = cmd(archiver, "check", "-v", "--archives-only", "--newest=1Y", exit_code=0)
+    assert "archive-2022-11-20" not in output
+    assert "archive-2022-12-18" not in output
+    assert "archive-now" in output
+
     output = cmd(archiver, "check", "-v", "--archives-only", "--oldest=1m", exit_code=0)
-    assert "archive1" in output
-    assert "archive2" in output
-    assert "archive3" not in output
+    assert "archive-2022-11-20" in output
+    assert "archive-2022-12-18" in output
+    assert "archive-now" not in output
 
     output = cmd(archiver, "check", "-v", "--archives-only", "--newest=1m", exit_code=0)
-    assert "archive3" in output
-    assert "archive2" not in output
-    assert "archive1" not in output
+    assert "archive-2022-11-20" not in output
+    assert "archive-2022-12-18" not in output
+    assert "archive-now" in output
 
     output = cmd(archiver, "check", "-v", "--archives-only", "--newer=1d", exit_code=0)
-    assert "archive3" in output
-    assert "archive1" not in output
-    assert "archive2" not in output
+    assert "archive-2022-11-20" not in output
+    assert "archive-2022-12-18" not in output
+    assert "archive-now" in output
 
     output = cmd(archiver, "check", "-v", "--archives-only", "--older=1d", exit_code=0)
-    assert "archive1" in output
-    assert "archive2" in output
-    assert "archive3" not in output
+    assert "archive-2022-11-20" in output
+    assert "archive-2022-12-18" in output
+    assert "archive-now" not in output
+
+    output = cmd(archiver, "check", "-v", "--archives-only", "--newer=24H", exit_code=0)
+    assert "archive-2022-11-20" not in output
+    assert "archive-2022-12-18" not in output
+    assert "archive-now" in output
+
+    output = cmd(archiver, "check", "-v", "--archives-only", "--older=24H", exit_code=0)
+    assert "archive-2022-11-20" in output
+    assert "archive-2022-12-18" in output
+    assert "archive-now" not in output
+
+    output = cmd(archiver, "check", "-v", "--archives-only", "--newer=1440M", exit_code=0)
+    assert "archive-2022-11-20" not in output
+    assert "archive-2022-12-18" not in output
+    assert "archive-now" in output
+
+    output = cmd(archiver, "check", "-v", "--archives-only", "--older=1440M", exit_code=0)
+    assert "archive-2022-11-20" in output
+    assert "archive-2022-12-18" in output
+    assert "archive-now" not in output
+
+    output = cmd(archiver, "check", "-v", "--archives-only", "--newer=86400S", exit_code=0)
+    assert "archive-2022-11-20" not in output
+    assert "archive-2022-12-18" not in output
+    assert "archive-now" in output
+
+    output = cmd(archiver, "check", "-v", "--archives-only", "--older=86400S", exit_code=0)
+    assert "archive-2022-11-20" in output
+    assert "archive-2022-12-18" in output
+    assert "archive-now" not in output
 
     # check for output when timespan older than the earliest archive is given. Issue #1711
     output = cmd(archiver, "check", "-v", "--archives-only", "--older=9999m", exit_code=0)

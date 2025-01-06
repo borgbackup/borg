@@ -13,5 +13,6 @@ Internally, we store and process date and time as UTC.
 .. rubric:: TIMESPAN
 
 Some options accept a TIMESPAN parameter, which can be given as a
-number of days (e.g. ``7d``) or months (e.g. ``12m``).
+number of years (e.g. ``2Y``), months (e.g. ``12m``), days (e.g. ``7d``),
+hours (e.g. ``8H``), minutes (e.g. ``30M``), or seconds (e.g. ``84600s``).
 

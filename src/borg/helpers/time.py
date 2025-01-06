@@ -119,7 +119,7 @@ def calculate_relative_offset(format_string, from_ts, earlier=False):
         from_ts = archive_ts_now()
 
     if format_string is not None:
-        offset_regex = re.compile(r"(?P<offset>\d+)(?P<unit>[md])")
+        offset_regex = re.compile(r"(?P<offset>\d+)(?P<unit>[YmdHMS])")
         match = offset_regex.search(format_string)
 
         if match:
@@ -131,6 +131,14 @@ def calculate_relative_offset(format_string, from_ts, earlier=False):
                 return from_ts + timedelta(days=offset)
             elif unit == "m":
                 return offset_n_months(from_ts, offset)
+            elif unit == "Y":
+                return from_ts.replace(year=from_ts.year+offset)
+            elif unit == "H":
+                return from_ts + timedelta(seconds=offset*60*60)
+            elif unit == "M":
+                return from_ts + timedelta(seconds=offset*60)
+            elif unit == "S":
+                return from_ts + timedelta(seconds=offset)
 
     raise ValueError(f"Invalid relative ts offset format: {format_string}")
 

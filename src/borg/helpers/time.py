@@ -131,8 +131,10 @@ def calculate_relative_offset(format_string, from_ts, earlier=False):
                 return from_ts + timedelta(days=offset)
             elif unit == "m":
                 return offset_n_months(from_ts, offset)
-            elif unit == "Y":
+            elif unit == "y":
                 return from_ts.replace(year=from_ts.year + offset)
+            elif unit == "w":
+                return from_ts + timedelta(days=offset * 7)
             elif unit == "H":
                 return from_ts + timedelta(seconds=offset * 60 * 60)
             elif unit == "M":

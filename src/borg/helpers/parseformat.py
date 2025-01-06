@@ -579,10 +579,10 @@ def location_validator(proto=None, other=False):
 
 
 def relative_time_marker_validator(text: str):
-    time_marker_regex = r"^\d+[YmdHMS]$"
+    time_marker_regex = r"^\d+[ymwdHMS]$"
     match = re.compile(time_marker_regex).search(text)
     if not match:
-        raise argparse.ArgumentTypeError(f"Invalid relative time marker used: {text}, choose from Y, m, d, H, M, S")
+        raise argparse.ArgumentTypeError(f"Invalid relative time marker used: {text}, choose from y, m, w, d, H, M, S")
     else:
         return text
 

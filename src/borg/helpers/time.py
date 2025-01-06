@@ -119,7 +119,7 @@ def calculate_relative_offset(format_string, from_ts, earlier=False):
         from_ts = archive_ts_now()
 
     if format_string is not None:
-        offset_regex = re.compile(r"(?P<offset>\d+)(?P<unit>[YmdHMS])")
+        offset_regex = re.compile(r"(?P<offset>\d+)(?P<unit>[ymwdHMS])")
         match = offset_regex.search(format_string)
 
         if match:

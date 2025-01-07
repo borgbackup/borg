@@ -127,14 +127,14 @@ def calculate_relative_offset(format_string, from_ts, earlier=False):
             offset = int(match.group("offset"))
             offset *= -1 if earlier else 1
 
-            if unit == "d":
-                return from_ts + timedelta(days=offset)
+            if unit == "y":
+                return from_ts.replace(year=from_ts.year + offset)
             elif unit == "m":
                 return offset_n_months(from_ts, offset)
-            elif unit == "y":
-                return from_ts.replace(year=from_ts.year + offset)
             elif unit == "w":
                 return from_ts + timedelta(days=offset * 7)
+            elif unit == "d":
+                return from_ts + timedelta(days=offset)
             elif unit == "H":
                 return from_ts + timedelta(seconds=offset * 60 * 60)
             elif unit == "M":

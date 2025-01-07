@@ -126,26 +126,40 @@ def positive_int_validator(value):
 
 
 def interval(s):
-    """Convert a string representing a valid interval to a number of hours."""
-    multiplier = {"H": 1, "d": 24, "w": 24 * 7, "m": 24 * 31, "y": 24 * 365}
+    """Convert a string representing a valid interval to a number of seconds."""
+    seconds_in_a_minute = 60
+    seconds_in_an_hour = 60 * seconds_in_a_minute
+    seconds_in_a_day = 24 * seconds_in_an_hour
+    seconds_in_a_week = 7 * seconds_in_a_day
+    seconds_in_a_month = 31 * seconds_in_a_day
+    seconds_in_a_year = 365 * seconds_in_a_day
+    multiplier = dict(
+        S = 1,
+        M = seconds_in_a_minute,
+        H = seconds_in_an_hour,
+        d = seconds_in_a_day,
+        w = seconds_in_a_week,
+        m = seconds_in_a_month,
+        y = seconds_in_a_year,
+    )
 
     if s.endswith(tuple(multiplier.keys())):
         number = s[:-1]
         suffix = s[-1]
     else:
-        # range suffixes in ascending multiplier order
-        ranges = [k for k, v in sorted(multiplier.items(), key=lambda t: t[1])]
-        raise argparse.ArgumentTypeError(f'Unexpected interval time unit "{s[-1]}": expected one of {ranges!r}')
+        raise argparse.ArgumentTypeError(
+            f'Unexpected time unit "{s[-1]}": choose from {", ".join(multiplier)}'
+        )
 
     try:
-        hours = int(number) * multiplier[suffix]
+        seconds = int(number) * multiplier[suffix]
     except ValueError:
-        hours = -1
+        seconds = -1
 
-    if hours <= 0:
-        raise argparse.ArgumentTypeError('Unexpected interval number "%s": expected an integer greater than 0' % number)
+    if seconds <= 0:
+        raise argparse.ArgumentTypeError(f'Invalid number "{number}": expected positive integer')
 
-    return hours
+    return seconds
 
 
 def ChunkerParams(s):
@@ -565,7 +579,10 @@ class Location:
 def location_validator(proto=None, other=False):
     def validator(text):
         try:
-            loc = Location(text, other=other)
+            try:
+                loc = Location(text, other=other)
+            except Exception as e:
+                assert False
         except ValueError as err:
             raise argparse.ArgumentTypeError(str(err)) from None
         if proto is not None and loc.proto != proto:

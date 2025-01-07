@@ -134,22 +134,20 @@ def interval(s):
     seconds_in_a_month = 31 * seconds_in_a_day
     seconds_in_a_year = 365 * seconds_in_a_day
     multiplier = dict(
-        S = 1,
-        M = seconds_in_a_minute,
-        H = seconds_in_an_hour,
-        d = seconds_in_a_day,
-        w = seconds_in_a_week,
-        m = seconds_in_a_month,
-        y = seconds_in_a_year,
+        y=seconds_in_a_year,
+        m=seconds_in_a_month,
+        w=seconds_in_a_week,
+        d=seconds_in_a_day,
+        H=seconds_in_an_hour,
+        M=seconds_in_a_minute,
+        S=1,
     )
 
     if s.endswith(tuple(multiplier.keys())):
         number = s[:-1]
         suffix = s[-1]
     else:
-        raise argparse.ArgumentTypeError(
-            f'Unexpected time unit "{s[-1]}": choose from {", ".join(multiplier)}'
-        )
+        raise argparse.ArgumentTypeError(f'Unexpected time unit "{s[-1]}": choose from {", ".join(multiplier)}')
 
     try:
         seconds = int(number) * multiplier[suffix]
@@ -579,10 +577,7 @@ class Location:
 def location_validator(proto=None, other=False):
     def validator(text):
         try:
-            try:
-                loc = Location(text, other=other)
-            except Exception as e:
-                assert False
+            loc = Location(text, other=other)
         except ValueError as err:
             raise argparse.ArgumentTypeError(str(err)) from None
         if proto is not None and loc.proto != proto:

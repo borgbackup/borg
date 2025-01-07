@@ -553,15 +553,18 @@ def test_prune_split_no_archives():
     assert kept_because == {}
 
 
-@pytest.mark.parametrize("timeframe, num_hours", [
-    ("5S", 5),
-    ("2M", 120),
-    ("1H", 3600),
-    ("1d", 86_400),
-    ("1w", 604_800),
-    ("1m", 2_678_400),
-    ("1y", 31_536_000)
-])
+@pytest.mark.parametrize(
+    "timeframe, num_hours",
+    [
+        ("5S", 5),
+        ("2M", 2 * 60),
+        ("1H", 60 * 60),
+        ("1d", 24 * 60 * 60),
+        ("1w", 7 * 24 * 68 * 60),
+        ("1m", 31 * 24 * 68 * 60),
+        ("1y", 365 * 24 * 68 * 60),
+    ],
+)
 def test_interval(timeframe, num_secs):
     assert interval(timeframe) == num_secs
 
@@ -571,7 +574,7 @@ def test_interval(timeframe, num_secs):
     [
         ("H", ('Unexpected number "": expected positive integer',)),
         ("-1d", ('Unexpected number "-1": expected positive integer',)),
-        ("food", ('Unexpectedinterval number "foo": expected positive integer',)),
+        ("food", ('Unexpected number "foo": expected positive integer',)),
     ],
 )
 def test_interval_time_unit(invalid_interval, error_tuple):

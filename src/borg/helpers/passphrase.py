@@ -3,6 +3,7 @@ import os
 import shlex
 import subprocess
 import sys
+import textwrap
 
 from . import bin_to_hex
 from . import Error
@@ -109,20 +110,39 @@ class Passphrase(str):
             retry=True,
             env_var_override="BORG_DISPLAY_PASSPHRASE",
         ):
-            print('Your passphrase (between double-quotes): "%s"' % passphrase, file=sys.stderr)
-            print("Make sure the passphrase displayed above is exactly what you wanted.", file=sys.stderr)
-            try:
-                passphrase.encode("ascii")
-            except UnicodeEncodeError:
-                print(
-                    "Your passphrase (UTF-8 encoding in hex): %s" % bin_to_hex(passphrase.encode("utf-8")),
-                    file=sys.stderr,
-                )
-                print(
-                    "As you have a non-ASCII passphrase, it is recommended to keep the "
-                    "UTF-8 encoding in hex together with the passphrase at a safe place.",
-                    file=sys.stderr,
-                )
+            pw_msg = textwrap.dedent(
+                f"""\
+            Your passphrase (between double-quotes): "{passphrase}"
+            Make sure the passphrase displayed above is exactly what you wanted.
+            Your passphrase (UTF-8 encoding in hex): {bin_to_hex(passphrase.encode("utf-8"))}
+            It is recommended to keep the UTF-8 encoding in hex together with the passphrase at a safe place.
+            In case you should ever run into passphrase issues, it could sometimes help debugging them.
+            """
+            )
+            print(pw_msg, file=sys.stderr)
+
+    @staticmethod
+    def display_debug_info(passphrase):
+        def fmt_var(env_var):
+            env_var_value = os.environ.get(env_var)
+            if env_var_value is not None:
+                return f'{env_var} = "{env_var_value}"'
+            else:
+                return f"# {env_var} is not set"
+
+        if os.environ.get("BORG_DEBUG_PASSPHRASE") == "YES":
+            passphrase_info = textwrap.dedent(
+                f"""\
+                Incorrect passphrase!
+                Passphrase used (between double-quotes): "{passphrase}"
+                Same, UTF-8 encoded, in hex: {bin_to_hex(passphrase.encode('utf-8'))}
+                Relevant Environment Variables:
+                {fmt_var("BORG_PASSPHRASE")}
+                {fmt_var("BORG_PASSCOMMAND")}
+                {fmt_var("BORG_PASSPHRASE_FD")}
+                """
+            )
+            print(passphrase_info, file=sys.stderr)
 
     @classmethod
     def new(cls, allow_empty=False):

@@ -560,9 +560,9 @@ def test_prune_split_no_archives():
         ("2M", 2 * 60),
         ("1H", 60 * 60),
         ("1d", 24 * 60 * 60),
-        ("1w", 7 * 24 * 68 * 60),
-        ("1m", 31 * 24 * 68 * 60),
-        ("1y", 365 * 24 * 68 * 60),
+        ("1w", 7 * 24 * 60 * 60),
+        ("1m", 31 * 24 * 60 * 60),
+        ("1y", 365 * 24 * 60 * 60),
     ],
 )
 def test_interval(timeframe, num_secs):
@@ -572,9 +572,9 @@ def test_interval(timeframe, num_secs):
 @pytest.mark.parametrize(
     "invalid_interval, error_tuple",
     [
-        ("H", ('Unexpected number "": expected positive integer',)),
-        ("-1d", ('Unexpected number "-1": expected positive integer',)),
-        ("food", ('Unexpected number "foo": expected positive integer',)),
+        ("H", ('Invalid number "": expected positive integer',)),
+        ("-1d", ('Invalid number "-1": expected positive integer',)),
+        ("food", ('Invalid number "foo": expected positive integer',)),
     ],
 )
 def test_interval_time_unit(invalid_interval, error_tuple):
@@ -586,7 +586,7 @@ def test_interval_time_unit(invalid_interval, error_tuple):
 def test_interval_number():
     with pytest.raises(ArgumentTypeError) as exc:
         interval("5")
-    assert exc.value.args == ('Unexpected time unit "5": expected one of S, M, H, d, w, m, y',)
+    assert exc.value.args == ('Unexpected time unit "5": choose from y, m, w, d, H, M, S',)
 
 
 def test_prune_within():

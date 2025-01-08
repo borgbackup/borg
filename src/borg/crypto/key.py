@@ -371,10 +371,12 @@ class FlexiKey:
                     passphrase = Passphrase.getpass(prompt)
                     if key.load(target, passphrase):
                         break
+                    Passphrase.display_debug_info(passphrase)
                 else:
                     raise PasswordRetriesExceeded
         else:
             if not key.load(target, passphrase):
+                Passphrase.display_debug_info(passphrase)
                 raise PassphraseWrong
         key.init_ciphers(manifest_data)
         key._passphrase = passphrase

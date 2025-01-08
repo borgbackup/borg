@@ -553,17 +553,28 @@ def test_prune_split_no_archives():
     assert kept_because == {}
 
 
-@pytest.mark.parametrize("timeframe, num_hours", [("1H", 1), ("1d", 24), ("1w", 168), ("1m", 744), ("1y", 8760)])
-def test_interval(timeframe, num_hours):
-    assert interval(timeframe) == num_hours
+@pytest.mark.parametrize(
+    "timeframe, num_secs",
+    [
+        ("5S", 5),
+        ("2M", 2 * 60),
+        ("1H", 60 * 60),
+        ("1d", 24 * 60 * 60),
+        ("1w", 7 * 24 * 60 * 60),
+        ("1m", 31 * 24 * 60 * 60),
+        ("1y", 365 * 24 * 60 * 60),
+    ],
+)
+def test_interval(timeframe, num_secs):
+    assert interval(timeframe) == num_secs
 
 
 @pytest.mark.parametrize(
     "invalid_interval, error_tuple",
     [
-        ("H", ('Unexpected interval number "": expected an integer greater than 0',)),
-        ("-1d", ('Unexpected interval number "-1": expected an integer greater than 0',)),
-        ("food", ('Unexpected interval number "foo": expected an integer greater than 0',)),
+        ("H", ('Invalid number "": expected positive integer',)),
+        ("-1d", ('Invalid number "-1": expected positive integer',)),
+        ("food", ('Invalid number "foo": expected positive integer',)),
     ],
 )
 def test_interval_time_unit(invalid_interval, error_tuple):
@@ -575,7 +586,7 @@ def test_interval_time_unit(invalid_interval, error_tuple):
 def test_interval_number():
     with pytest.raises(ArgumentTypeError) as exc:
         interval("5")
-    assert exc.value.args == ("Unexpected interval time unit \"5\": expected one of ['H', 'd', 'w', 'm', 'y']",)
+    assert exc.value.args == ('Unexpected time unit "5": choose from y, m, w, d, H, M, S',)
 
 
 def test_prune_within():
@@ -595,6 +606,8 @@ def test_prune_within():
     test_dates = [now - timedelta(seconds=s) for s in test_offsets]
     test_archives = [MockArchive(date, i) for i, date in enumerate(test_dates)]
 
+    dotest(test_archives, "15S", [])
+    dotest(test_archives, "2M", [0])
     dotest(test_archives, "1H", [0])
     dotest(test_archives, "2H", [0, 1])
     dotest(test_archives, "3H", [0, 1, 2])

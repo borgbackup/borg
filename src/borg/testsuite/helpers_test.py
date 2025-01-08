@@ -554,7 +554,7 @@ def test_prune_split_no_archives():
 
 
 @pytest.mark.parametrize(
-    "timeframe, num_hours",
+    "timeframe, num_secs",
     [
         ("5S", 5),
         ("2M", 2 * 60),

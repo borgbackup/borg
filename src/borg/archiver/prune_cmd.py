@@ -18,8 +18,8 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-def prune_within(archives, hours, kept_because):
-    target = datetime.now(timezone.utc) - timedelta(seconds=hours * 3600)
+def prune_within(archives, seconds, kept_because):
+    target = datetime.now(timezone.utc) - timedelta(seconds=seconds)
     kept_counter = 0
     result = []
     for a in archives:
@@ -241,10 +241,10 @@ class PruneMixIn:
         series.
 
         The ``--keep-within`` option takes an argument of the form "<int><char>",
-        where char is "H", "d", "w", "m", "y". For example, ``--keep-within 2d`` means
-        to keep all archives that were created within the past 48 hours.
-        "1m" is taken to mean "31d". The archives kept with this option do not
-        count towards the totals specified by any other options.
+        where char is "y", "m", "w", "d", "H", "M", or "S".  For example,
+        ``--keep-within 2d`` means to keep all archives that were created within
+        the past 2 days.  "1m" is taken to mean "31d". The archives kept with
+        this option do not count towards the totals specified by any other options.
 
         A good procedure is to thin out more and more the older your backups get.
         As an example, ``--keep-daily 7`` means to keep the latest backup on each day,

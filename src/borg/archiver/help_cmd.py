@@ -107,7 +107,7 @@ class HelpMixIn:
         Using bash, the following command line option would match and exclude "item name":
         ``--pattern='-path/item name'``
         Note that when patterns are used within a pattern file directly read by borg,  
-        e.g. when using ``--exclude-from`` or ``--patterns-from`, there is no shell 
+        e.g. when using ``--exclude-from`` or ``--patterns-from``, there is no shell 
         involved and thus no quotation marks are required.
         
         The ``--exclude-from`` option permits loading exclusion patterns from a text

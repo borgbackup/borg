@@ -719,6 +719,63 @@ Duration: {0.duration}
                 # In this case, we *want* to extract twice, because there is no other way.
                 pass
 
+    def compare_and_extract_chunks(self, item, fs_path, *, st, pi=None):
+        """Compare file chunks and patch if needed. Returns True if patching succeeded."""
+        if st is None:
+            return False
+        try:
+            # First pass: Build fs chunks list
+            fs_chunks = []
+            with backup_io("open"):
+                fs_file = open(fs_path, "rb")
+            with fs_file:
+                for chunk in item.chunks:
+                    with backup_io("read"):
+                        data = fs_file.read(chunk.size)
+
+                    fs_chunks.append(ChunkListEntry(id=self.key.id_hash(data), size=len(data)))
+
+            # Compare chunks and collect needed chunk IDs
+            needed_chunks = []
+            for fs_chunk, item_chunk in zip(fs_chunks, item.chunks):
+                if fs_chunk != item_chunk:
+                    needed_chunks.append(item_chunk)
+
+            # Fetch all needed chunks and iterate through ALL of them
+            chunk_data_iter = self.pipeline.fetch_many([chunk.id for chunk in needed_chunks], ro_type=ROBJ_FILE_STREAM)
+
+            # Second pass: Update file
+            with backup_io("open"):
+                fs_file = open(fs_path, "rb+")
+            with fs_file:
+                for fs_chunk, item_chunk in zip(fs_chunks, item.chunks):
+                    if fs_chunk == item_chunk:
+                        with backup_io("seek"):
+                            fs_file.seek(item_chunk.size, 1)
+                    else:
+                        chunk_data = next(chunk_data_iter)
+
+                        with backup_io("write"):
+                            fs_file.write(chunk_data)
+                    if pi:
+                        pi.show(increase=len(chunk_data), info=[remove_surrogates(item.path)])
+
+                final_size = fs_file.tell()
+                with backup_io("truncate_and_attrs"):
+                    fs_file.truncate(item.size)
+                    fs_file.flush()
+                    self.restore_attrs(fs_path, item, fd=fs_file.fileno())
+
+            if "size" in item and item.size != final_size:
+                raise BackupError(f"Size inconsistency detected: size {item.size}, chunks size {final_size}")
+
+            if "chunks_healthy" in item and not item.chunks_healthy:
+                raise BackupError("File has damaged (all-zero) chunks. Try running borg check --repair.")
+
+            return True
+        except OSError:
+            return False
+
     def extract_item(
         self,
         item,
@@ -802,12 +859,14 @@ Duration: {0.duration}
                 return  # done! we already have fully extracted this file in a previous run.
             elif stat.S_ISDIR(st.st_mode):
                 os.rmdir(path)
+                st = None
             else:
                 os.unlink(path)
+                st = None
         except UnicodeEncodeError:
             raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
-            pass
+            st = None
 
         def make_parent(path):
             parent_dir = os.path.dirname(path)
@@ -821,6 +880,9 @@ Duration: {0.duration}
             with self.extract_helper(item, path, hlm) as hardlink_set:
                 if hardlink_set:
                     return
+                if self.compare_and_extract_chunks(item, path, st=st, pi=pi):
+                    return
+
                 with backup_io("open"):
                     fd = open(path, "wb")
                 with fd:

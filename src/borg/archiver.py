@@ -2414,6 +2414,15 @@ class Archiver:
         from within a shell, the patterns should be quoted to protect them from
         expansion.
 
+        Patterns matching special characters, e.g. white space, within a shell may 
+        require adjustments, such as putting quotation marks around the arguments.
+        Example: 
+        Using bash, the following command line option would match and exclude "item name":
+        ``--pattern='-path/item name'``
+        Note that when patterns are used within a pattern file directly read by borg,  
+        e.g. when using ``--exclude-from`` or ``--patterns-from``, there is no shell 
+        involved and thus no quotation marks are required.
+
         The ``--exclude-from`` option permits loading exclusion patterns from a text
         file with one pattern per line. Lines empty or starting with the number sign
         ('#') after removing whitespace on both ends are ignored. The optional style

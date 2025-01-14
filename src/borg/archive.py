@@ -719,6 +719,40 @@ Duration: {0.duration}
                 # In this case, we *want* to extract twice, because there is no other way.
                 pass
 
+    def compare_and_extract_chunks(self, item, fs_path):
+        """Compare file chunks and patch if needed. Returns True if patching succeeded."""
+        try:
+            st = os.stat(fs_path, follow_symlinks=False)
+            if not stat.S_ISREG(st.st_mode):
+                return False
+
+            with open(fs_path, "rb+") as fs_file:
+                chunk_offset = 0
+                for chunk_entry in item.chunks:
+                    chunkid_A = chunk_entry.id
+                    size = chunk_entry.size
+
+                    fs_file.seek(chunk_offset)
+                    data_F = fs_file.read(size)
+
+                    needs_update = True
+                    if len(data_F) == size:
+                        chunkid_F = self.key.id_hash(data_F)
+                        needs_update = chunkid_A != chunkid_F
+
+                    if needs_update:
+                        chunk_data = b"".join(self.pipeline.fetch_many([chunkid_A], ro_type=ROBJ_FILE_STREAM))
+                        fs_file.seek(chunk_offset)
+                        fs_file.write(chunk_data)
+
+                    chunk_offset += size
+
+                fs_file.truncate(item.size)
+                return True
+
+        except (OSError, Exception):
+            return False
+
     def extract_item(
         self,
         item,
@@ -821,6 +855,9 @@ Duration: {0.duration}
             with self.extract_helper(item, path, hlm) as hardlink_set:
                 if hardlink_set:
                     return
+                if self.compare_and_extract_chunks(item, path):
+                    return
+
                 with backup_io("open"):
                     fd = open(path, "wb")
                 with fd:

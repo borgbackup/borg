@@ -132,6 +132,11 @@ class MockCache:
         self.objects[id] = data
         return id, len(data)
 
+    def fetch_many(self, ids, ro_type=None):
+        """Mock implementation of fetch_many"""
+        for id in ids:
+            yield self.objects[id]
+
 
 def test_cache_chunk_buffer():
     data = [Item(path="p1"), Item(path="p2")]
@@ -402,3 +407,154 @@ def test_reject_non_sanitized_item():
     for path in rejected_dotdot_paths:
         with pytest.raises(ValueError, match="unexpected '..' element in path"):
             Item(path=path, user="root", group="root")
+
+
+@pytest.fixture
+def setup_extractor(tmpdir):
+    """Setup common test infrastructure"""
+
+    class MockCache:
+        def __init__(self):
+            self.objects = {}
+
+    repository = Mock()
+    key = PlaintextKey(repository)
+    manifest = Manifest(key, repository)
+    cache = MockCache()
+
+    extractor = Archive(manifest=manifest, name="test", create=True)
+    extractor.pipeline = cache
+    extractor.key = key
+    extractor.cwd = str(tmpdir)
+
+    # Track fetched chunks across tests
+    fetched_chunks = []
+
+    def create_mock_chunks(test_data, chunk_size=512):
+        """Helper function to create mock chunks from test data"""
+        chunks = []
+        for i in range(0, len(test_data), chunk_size):
+            chunk_data = test_data[i : i + chunk_size]
+            chunk_id = key.id_hash(chunk_data)
+            chunks.append(Mock(id=chunk_id, size=len(chunk_data)))
+            cache.objects[chunk_id] = chunk_data
+
+        item = Mock(chunks=chunks, size=len(test_data))
+        target_path = str(tmpdir.join("test.txt"))
+        return item, target_path
+
+    def mock_fetch_many(chunk_ids, ro_type):
+        """Helper function to track and mock chunk fetching"""
+        fetched_chunks.extend(chunk_ids)
+        return [cache.objects[chunk_id] for chunk_id in chunk_ids]
+
+    def clear_fetched_chunks():
+        """Helper function to clear tracked chunks between tests"""
+        fetched_chunks.clear()
+
+    def get_fetched_chunks():
+        """Helper function to get the list of fetched chunks"""
+        return fetched_chunks
+
+    cache.fetch_many = mock_fetch_many
+
+    return extractor, key, cache, tmpdir, create_mock_chunks, get_fetched_chunks, clear_fetched_chunks
+
+
+@pytest.mark.parametrize(
+    "name, test_data, initial_data, expected_fetched_chunks, expected_success",
+    [
+        (
+            "no_changes",
+            b"A" * 512,  # One complete chunk, no changes needed
+            b"A" * 512,  # Identical content
+            0,  # No chunks should be fetched
+            True,
+        ),
+        (
+            "single_chunk_change",
+            b"A" * 512 + b"B" * 512,  # Two chunks
+            b"A" * 512 + b"X" * 512,  # Second chunk different
+            1,  # Only second chunk should be fetched
+            True,
+        ),
+        (
+            "cross_boundary_change",
+            b"A" * 512 + b"B" * 512,  # Two chunks
+            b"A" * 500 + b"X" * 24,  # Change crosses chunk boundary
+            2,  # Both chunks need update
+            True,
+        ),
+        (
+            "exact_multiple_chunks",
+            b"A" * 512 + b"B" * 512 + b"C" * 512,  # Three complete chunks
+            b"A" * 512 + b"X" * 512 + b"C" * 512,  # Middle chunk different
+            1,  # Only middle chunk fetched
+            True,
+        ),
+        (
+            "first_chunk_change",
+            b"A" * 512 + b"B" * 512,  # Two chunks
+            b"X" * 512 + b"B" * 512,  # First chunk different
+            1,  # Only first chunk should be fetched
+            True,
+        ),
+        (
+            "all_chunks_different",
+            b"A" * 512 + b"B" * 512,  # Two chunks
+            b"X" * 512 + b"Y" * 512,  # Both chunks different
+            2,  # Both chunks should be fetched
+            True,
+        ),
+        (
+            "partial_last_chunk",
+            b"A" * 512 + b"B" * 100,  # One full chunk + partial
+            b"A" * 512 + b"X" * 100,  # Partial chunk different
+            1,  # Only second chunk should be fetched
+            True,
+        ),
+    ],
+)
+def test_compare_and_extract_chunks(
+    setup_extractor, name, test_data, initial_data, expected_fetched_chunks, expected_success
+):
+    """Test chunk comparison and extraction"""
+    extractor, key, cache, tmpdir, create_mock_chunks, get_fetched_chunks, clear_fetched_chunks = setup_extractor
+    clear_fetched_chunks()
+
+    item, target_path = create_mock_chunks(test_data, chunk_size=512)
+
+    original_chunk_ids = [chunk.id for chunk in item.chunks]
+
+    # Write initial file state
+    with open(target_path, "wb") as f:
+        f.write(initial_data)
+
+    result = extractor.compare_and_extract_chunks(item, target_path)
+    assert result == expected_success
+
+    if expected_success:
+        # Verify only the expected chunks were fetched
+        fetched_chunks = get_fetched_chunks()
+        assert (
+            len(fetched_chunks) == expected_fetched_chunks
+        ), f"Expected {expected_fetched_chunks} chunks to be fetched, got {len(fetched_chunks)}"
+
+        # For single chunk changes, verify it's the correct chunk
+        if expected_fetched_chunks == 1:
+            # Find which chunk should have changed by comparing initial_data with test_data
+            for i, (orig_chunk, mod_chunk) in enumerate(
+                zip(
+                    [test_data[i : i + 512] for i in range(0, len(test_data), 512)],
+                    [initial_data[i : i + 512] for i in range(0, len(initial_data), 512)],
+                )
+            ):
+                if orig_chunk != mod_chunk:
+                    assert (
+                        fetched_chunks[0] == original_chunk_ids[i]
+                    ), f"Wrong chunk fetched. Expected chunk at position {i}"
+                    break
+
+        # Verify final content
+        with open(target_path, "rb") as f:
+            assert f.read() == test_data

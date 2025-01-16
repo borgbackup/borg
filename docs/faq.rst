@@ -372,7 +372,7 @@ Why backups are slow on a Linux server that is a member of a windows domain?
 ----------------------------------------------------------------------------
 
 By default, if a Linux server is a member of a windows domain, username 
-resolution is done via winbind. This can cause a noticeable performance 
+resolution is perfomed via winbind. This can cause a noticeable performance 
 degradation during the backup process. To avoid this, you should use a caching 
 service such as ``nscd``.
 

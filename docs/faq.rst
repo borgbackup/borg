@@ -368,13 +368,12 @@ using ``nfs=nostale_ro``. Doing so implies mounting the filesystem read-only.
 Another option is to not consider inode numbers in the files cache by passing
 ``--files-cache=ctime,size``.
 
-Why backups are slow on a Linux server that is a member of a windows domain?
+Why are backups slow on a Linux server that is a member of a Windows domain?
 ----------------------------------------------------------------------------
 
-By default, if a Linux server is a member of a windows domain, username 
-resolution is perfomed via winbind. This can cause a noticeable performance 
-degradation during the backup process. To avoid this, you should use a caching 
-service such as ``nscd``.
+If a Linux server is a member of a Windows domain, username to userid resolution might be 
+performed via ``winbind`` without caching, which can slow down backups significantly. 
+You can use e.g. ``nscd`` to add caching and improve the speed.
 
 Security
 ########

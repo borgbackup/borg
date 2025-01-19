@@ -32,7 +32,7 @@ All configuration goes into this directory.
 Find out the ID of the partition table of your backup disk (here assumed to be /dev/sdz):
     lsblk --fs -o +PTUUID /dev/sdz
 
-Then, create ``/etc/backups/40-backup.rules`` with the following content (all on one line)::
+Then, create ``/etc/backups/80-backup.rules`` with the following content (all on one line)::
 
     ACTION=="add", SUBSYSTEM=="block", ENV{ID_PART_TABLE_UUID}=="<the PTUUID you just noted>", TAG+="systemd", ENV{SYSTEMD_WANTS}="automatic-backup.service"
 
@@ -164,7 +164,7 @@ The last part is to actually enable the udev rules and services:
 
 .. code-block:: bash
 
-    ln -s /etc/backups/40-backup.rules /etc/udev/rules.d/40-backup.rules
+    ln -s /etc/backups/80-backup.rules /etc/udev/rules.d/80-backup.rules
     ln -s /etc/backups/automatic-backup.service /etc/systemd/system/automatic-backup.service
     systemctl daemon-reload
     udevadm control --reload

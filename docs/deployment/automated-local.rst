@@ -34,7 +34,7 @@ Find out the ID of the partition table of your backup disk (here assumed to be /
 
 Then, create ``/etc/backups/80-backup.rules`` with the following content (all on one line)::
 
-    ACTION=="add", SUBSYSTEM=="block", ENV{ID_PART_TABLE_UUID}=="<the PTUUID you just noted>", TAG+="systemd", ENV{SYSTEMD_WANTS}="automatic-backup.service"
+    ACTION=="add", SUBSYSTEM=="block", ENV{ID_PART_TABLE_UUID}=="<the PTUUID you just noted>", TAG+="systemd", ENV{SYSTEMD_WANTS}+="automatic-backup.service"
 
 The "systemd" tag in conjunction with the SYSTEMD_WANTS environment variable has systemd
 launch the "automatic-backup" service, which we will create next, as the

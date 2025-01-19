@@ -59,7 +59,7 @@ jobs:
             - os: ubuntu-22.04
               python-version: '3.10'
               toxenv: py310-fuse3
-            - os: ubuntu-22.04
+            - os: ubuntu-24.04
               python-version: '3.11'
               toxenv: py311-fuse3
             - os: ubuntu-24.04-arm

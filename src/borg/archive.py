@@ -747,29 +747,60 @@ Duration: {0.duration}
             # Second pass: Update file
             with backup_io("open"):
                 fs_file = open(fs_path, "rb+")
-            with fs_file:
                 for fs_chunk, item_chunk in zip(fs_chunks, item.chunks):
                     if fs_chunk == item_chunk:
                         with backup_io("seek"):
-                            fs_file.seek(item_chunk.size, 1)
+                            fs_file.seek(item_chunk.size, os.SEEK_CUR)
+                            size = item_chunk.size
                     else:
                         chunk_data = next(chunk_data_iter)
 
                         with backup_io("write"):
                             fs_file.write(chunk_data)
+                            size = len(chunk_data)
                     if pi:
-                        pi.show(increase=len(chunk_data), info=[remove_surrogates(item.path)])
+                        pi.show(increase=size, info=[remove_surrogates(item.path)])
 
-                final_size = fs_file.tell()
                 with backup_io("truncate_and_attrs"):
-                    fs_file.truncate(item.size)
+                    pos = item_chunks_size = fs_file.tell()
+                    fs_file.truncate(pos)
                     fs_file.flush()
+
+                    if not self.noacls:
+                        try:
+                            # Clear ACLs by setting empty ACL entries
+                            acl_set(fs_path, {"acl_entries": []}, self.numeric_ids, fd=fs_file.fileno())
+                        except OSError as e:
+                            if e.errno != errno.ENOTSUP:  # Ignore if ACLs not supported
+                                raise
+                    if not self.noflags:
+                        try:
+                            # Clear all BSD flags
+                            set_flags(fs_path, 0, fd=fs_file.fileno())
+                        except OSError:
+                            pass
+                    if not self.noxattrs:
+                        try:
+                            # Clear ALL xattrs
+                            attrs = xattr.listxattr(fs_file.fileno(), follow_symlinks=False)
+                            for attr in attrs:
+                                try:
+                                    xattr.setxattr(fs_file.fileno(), attr, b"", follow_symlinks=False)
+                                except OSError as e:
+                                    if e.errno != xattr.ENOATTR:  # Ignore if already removed
+                                        raise
+                        except OSError as e:
+                            if e.errno != errno.ENOTSUP:  # Ignore if xattrs not supported
+                                raise
                     self.restore_attrs(fs_path, item, fd=fs_file.fileno())
 
-            if "size" in item and item.size != final_size:
-                raise BackupError(f"Size inconsistency detected: size {item.size}, chunks size {final_size}")
+            if "size" in item:
+                item_size = item.size
+                if item_size != item_chunks_size:
+                    raise BackupError(f"Size inconsistency detected: size {item.size}, chunks size {item_chunks_size}")
 
-            if "chunks_healthy" in item and not item.chunks_healthy:
+            has_damaged_chunks = "chunks_healthy" in item
+            if has_damaged_chunks:
                 raise BackupError("File has damaged (all-zero) chunks. Try running borg check --repair.")
 
             return True
@@ -857,16 +888,17 @@ Duration: {0.duration}
             st = os.stat(path, follow_symlinks=False)
             if continue_extraction and same_item(item, st):
                 return  # done! we already have fully extracted this file in a previous run.
+            if stat.S_ISREG(st.st_mode) and not continue_extraction:
+                if self.compare_and_extract_chunks(item, path, st=st, pi=pi):
+                    return
             elif stat.S_ISDIR(st.st_mode):
                 os.rmdir(path)
-                st = None
             else:
                 os.unlink(path)
-                st = None
         except UnicodeEncodeError:
             raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
-            st = None
+            pass
 
         def make_parent(path):
             parent_dir = os.path.dirname(path)
@@ -879,8 +911,6 @@ Duration: {0.duration}
                 make_parent(path)
             with self.extract_helper(item, path, hlm) as hardlink_set:
                 if hardlink_set:
-                    return
-                if self.compare_and_extract_chunks(item, path, st=st, pi=pi):
                     return
 
                 with backup_io("open"):

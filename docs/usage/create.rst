@@ -11,7 +11,7 @@ Examples
     $ borg create --list my-documents ~/Documents
 
     # Backup /mnt/disk/docs, but strip path prefix using the slashdot hack
-    $ borg create /path/to/repo::docs /mnt/disk/./docs
+    $ borg create --repo /path/to/repo docs /mnt/disk/./docs
 
     # Backup ~/Documents and ~/src but exclude pyc files
     $ borg create my-files                \

@@ -144,8 +144,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b14 (2024-11-17)
------------------------------
+Version 2.0.0b15 (not released yet)
+-----------------------------------
 
 Please note:
 
@@ -153,6 +153,51 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- extract: --dry-run now displays +/- status flags (included/excluded), #8564
+- compact: with --stats it will be as slow as before, listing all repo objs.
+  without --stats, it will be faster by using the cached chunks index.
+- compact: support --dry-run (do nothing), #8300
+- allow timespan to be specified with common time units, #8624
+- enhance passphrase handling, #8496.
+  Setting `BORG_DEBUG_PASSPHRASE=YES` enables passphrase debug logging to
+  stderr, showing passphrase, hex utf-8 byte sequence and related env vars if
+  a wrong passphrase was encountered.
+  Setting `BORG_DISPLAY_PASSPHRASE=YES` now always shows passphrase and its hex
+  utf-8 byte sequence.
+
+Bug fixes:
+
+- yes(): deal with UnicodeDecodeError in input(), #6984
+
+Other changes:
+
+- adapt to and require borghash 0.1.0
+- iter_items: decouple item iteration and content data chunks preloading
+- remote: simplify code, add debug logging
+- OpenBSD fixes:
+
+  - support other OpenSSL versions on OpenBSD, #8553
+  - vagrant: fix OpenBSD box, #8506
+  - Filter test output with LibreSSL related warnings on OpenBSD
+- macOS: fix brew's broken pkg-config -> pkgconf transition
+- docs:
+
+  - automated backup: append to SYSTEMD_WANTS rather than overwrite, #8641
+  - fix udev rule priority in automated-local.rst, #8639
+  - FAQ: Why backups are slow on a Linux server that is a member of a windows domain? #8636
+  - within a shell, cli options with special characters may require quoting, #8578
+  - update prune documentation for new --keep-within intervals, #8630
+  - borg serve: recommend using a simple shell, #3818
+  - update install docs (requirements, pkgconfig, fuse), #8342
+  - libffi-dev is required for argon2-cffi-bindings
+  - add undelete command to index
+
+
+Version 2.0.0b14 (2024-11-17)
+-----------------------------
 
 New features:
 

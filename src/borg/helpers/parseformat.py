@@ -13,7 +13,6 @@ import uuid
 from typing import Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING, Literal
 from collections import OrderedDict
 from datetime import datetime, timezone
-import time
 from functools import partial
 from string import Formatter
 
@@ -281,7 +280,7 @@ def _replace_placeholders(text, overrides={}):
         "hostname": hostname,
         "now": DatetimeWrapper(current_time.astimezone()),
         "utcnow": DatetimeWrapper(current_time),
-        "unixtime": int(time.time()),
+        "unixtime": int(current_time.timestamp()),
         "user": getosusername(),
         "uuid4": str(uuid.uuid4()),
         "borgversion": borg_version,

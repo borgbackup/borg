@@ -280,6 +280,7 @@ def _replace_placeholders(text, overrides={}):
         "hostname": hostname,
         "now": DatetimeWrapper(current_time.astimezone()),
         "utcnow": DatetimeWrapper(current_time),
+        "unixtime": int(current_time.timestamp()),
         "user": getosusername(),
         "uuid4": str(uuid.uuid4()),
         "borgversion": borg_version,

@@ -212,19 +212,19 @@ def replace_placeholders(text, overrides={}):
     from ..platform import fqdn, hostname, getosusername
     current_time = datetime.now(timezone.utc)
     data = {
-        "pid": os.getpid(),
-        "fqdn": fqdn,
-        "reverse-fqdn": ".".join(reversed(fqdn.split("."))),
-        "hostname": hostname,
-        "now": DatetimeWrapper(current_time.astimezone()),
-        "utcnow": DatetimeWrapper(current_time),
-        "unixtime": int(current_time.timestamp()),
-        "user": getosusername(),
-        "uuid4": str(uuid.uuid4()),
-        "borgversion": borg_version,
-        "borgmajor": "%d" % borg_version_tuple[:1],
-        "borgminor": "%d.%d" % borg_version_tuple[:2],
-        "borgpatch": "%d.%d.%d" % borg_version_tuple[:3],
+        'pid': os.getpid(),
+        'fqdn': fqdn,
+        'reverse-fqdn': '.'.join(reversed(fqdn.split('.'))),
+        'hostname': hostname,
+        'now': DatetimeWrapper(current_time.astimezone(None)),
+        'utcnow': DatetimeWrapper(current_time),
+        'unixtime': int(current_time.timestamp()),
+        'user': getosusername(),
+        'uuid4': str(uuid.uuid4()),
+        'borgversion': borg_version,
+        'borgmajor': '%d' % borg_version_tuple[:1],
+        'borgminor': '%d.%d' % borg_version_tuple[:2],
+        'borgpatch': '%d.%d.%d' % borg_version_tuple[:3],
         **overrides,
     }
     return format_line(text, data)

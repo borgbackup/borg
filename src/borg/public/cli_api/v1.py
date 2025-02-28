@@ -10,9 +10,9 @@ The different types of log lines are defined in the other models.
 
 import json
 import logging
-import typing
 from datetime import datetime
 from pathlib import Path
+from typing import Any, List, Literal, Optional, Self
 
 import pydantic
 
@@ -42,30 +42,30 @@ class FinishedArchiveProgress(BaseBorgLogLine):
     """JSON object printed on stdout when an archive is finished."""
 
     time: float
-    type: typing.Literal["archive_progress"]
+    type: Literal["archive_progress"]
     finished: bool
 
 
 class ProgressMessage(BaseBorgLogLine):
     operation: int
-    msgid: typing.Optional[str]
+    msgid: Optional[str]
     finished: bool
-    message: typing.Optional[str]
+    message: Optional[str]
     time: float
 
 
 class ProgressPercent(BaseBorgLogLine):
     operation: int
-    msgid: typing.Optional[str] = pydantic.Field(None)
+    msgid: Optional[str] = pydantic.Field(None)
     finished: bool
-    message: typing.Optional[str] = pydantic.Field(None)
-    current: typing.Optional[float] = pydantic.Field(None)
-    info: list[str] | None = pydantic.Field(None)
-    total: typing.Optional[float] = pydantic.Field(None)
+    message: Optional[str] = pydantic.Field(None)
+    current: Optional[float] = pydantic.Field(None)
+    info: Optional[list[str]] = pydantic.Field(None)
+    total: Optional[float] = pydantic.Field(None)
     time: float
 
     @pydantic.model_validator(mode="after")
-    def fields_depending_on_finished(self) -> typing.Self:
+    def fields_depending_on_finished(self) -> Self:
         if self.finished:
             if self.message is not None:
                 raise ValueError("message must be None if finished is True")
@@ -94,10 +94,10 @@ class FileStatus(BaseBorgLogLine):
 
 class LogMessage(BaseBorgLogLine):
     time: float
-    levelname: typing.Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    levelname: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
     name: str
     message: str
-    msgid: typing.Optional[str]
+    msgid: Optional[str] = None
 
     def get_level(self) -> int:
         try:
@@ -117,7 +117,11 @@ _BorgLogLinePossibleTypes = (
 
 
 class BorgLogLine(pydantic.RootModel[_BorgLogLinePossibleTypes]):
-    """A log line from Borg with the `--log-json` argument."""
+    """A log line from Borg with the `--log-json` argument.
+
+    Those are typically printed by borg on stderr.
+
+    """
 
     def get_level(self) -> int:
         return self.root.get_level()
@@ -153,8 +157,8 @@ class _BorgDetailedArchive(_BorgArchive):
     duration: float
     stats: _BorgArchiveStatistics
     limits: _BorgLimitUsage
-    command_line: typing.List[str]
-    chunker_params: typing.Optional[typing.Any] = None
+    command_line: List[str]
+    chunker_params: Optional[Any] = None
 
 
 class BorgCreateResult(pydantic.BaseModel):
@@ -166,4 +170,4 @@ class BorgCreateResult(pydantic.BaseModel):
 class BorgListResult(pydantic.BaseModel):
     """JSON object printed at the end of `borg list`."""
 
-    archives: typing.List[_BorgArchive]
+    archives: List[_BorgArchive]

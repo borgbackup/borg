@@ -1,4 +1,4 @@
-# borgbackup - main setup code (extension building here, rest see pyproject.toml)
+## borgbackup - main setup code (extension building here, rest see pyproject.toml)
 
 import os
 import re

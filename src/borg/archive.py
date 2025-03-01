@@ -325,8 +325,14 @@ class DownloadPipeline:
             sizes = [None] * len(ids)
         else:
             raise TypeError(f"unsupported or mixed element types: {chunks}")
-        for id, size, cdata in zip(ids, sizes, self.repository.get_many(ids, is_preloaded=is_preloaded)):
-            _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
+        for id, size, cdata in zip(
+            ids, sizes, self.repository.get_many(ids, is_preloaded=is_preloaded, raise_missing=False)
+        ):
+            if cdata is None:
+                logger.error(f"repository object {bin_to_hex(id)} missing, returning {size} zero bytes.")
+                data = zeros[:size] if size is not None else None
+            else:
+                _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
             assert size is None or len(data) == size
             yield data
 

@@ -943,7 +943,9 @@ class RemoteRepository:
                             self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))
                     if not self.to_send and self.preload_ids:
                         chunk_id = self.preload_ids.pop(0)
-                        args = {"id": chunk_id, "raise_missing": True}
+                        # for preloading chunks, the raise_missing behaviour is defined HERE,
+                        # not in the get_many / fetch_many call that later fetches the preloaded chunks.
+                        args = {"id": chunk_id, "raise_missing": False}
                         self.msgid += 1
                         self.chunkid_to_msgids.setdefault(chunk_id, []).append(self.msgid)
                         self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: "get", ARGS: args}))

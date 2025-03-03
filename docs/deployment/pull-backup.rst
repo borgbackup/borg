@@ -98,7 +98,7 @@ create the backup, retaining the original paths, excluding the repository:
 
 ::
 
-    borg create --exclude borgrepo --files-cache ctime,size --repo borgrepo archive  /
+    borg create --exclude borgrepo --files-cache ctime,size --repo /borgrepo archive  /
 
 For the sake of simplicity only ``borgrepo`` is excluded here. You may want to
 set up an exclude file with additional files and folders to be excluded. Also

@@ -80,7 +80,8 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
             flags = self.F_USED
         else:
             flags = v.flags | self.F_USED
-            assert v.size == 0 or v.size == size
+            if v.size != 0 and v.size != size:
+                raise ValueError(f"Invalid size: expected 0 or {size}, got {v.size}")
         self[key] = ChunkIndexEntry(
             flags=flags, size=size, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
         )

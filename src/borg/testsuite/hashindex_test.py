@@ -32,7 +32,7 @@ def test_chunkindex_add():
     assert chunks[x] == ChunkIndexEntry(
         flags=ChunkIndex.F_USED, size=2, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
     )
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         chunks.add(x, 3)  # inconsistent size (we already have a different size)
 
 

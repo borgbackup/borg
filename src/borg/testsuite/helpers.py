@@ -2,7 +2,6 @@ import hashlib
 import os
 import shutil
 import sys
-import time
 from argparse import ArgumentTypeError
 from datetime import datetime, timezone, timedelta
 from io import StringIO, BytesIO
@@ -393,12 +392,6 @@ class MockArchive:
     def __repr__(self):
         return f"{self.id}: {self.ts.isoformat()}"
 
-@pytest.fixture
-def set_prune_test_timezone(monkeypatch):
-    """Run prune tests in a specific full hour timezone"""
-    monkeypatch.setenv("TZ", "Etc/GMT-1")
-    if hasattr(time, "tzset"):  # Only call tzset() on Unix
-        time.tzset()
 
 @pytest.mark.parametrize(
     "rule,num_to_keep,expected_ids", [
@@ -406,15 +399,13 @@ def set_prune_test_timezone(monkeypatch):
         ("monthly", 3, (13, 8, 4)),
         ("weekly", 2, (13, 8)),
         ("daily", 3, (13, 8, 7)),
-        # the "hourly" test case fails if the timezone is not a full-hour offset from UTC. 
-        # therefore, timezone is set to Etc/GMT-1 in set_prune_test_timezone.
         ("hourly", 3, (13, 10, 8)),
         ("minutely", 3, (13, 10, 9)),
         ("secondly", 4, (13, 12, 11, 10)),
         ("daily", 0, []),
     ]
 )
-def test_prune_split(rule, num_to_keep, expected_ids, set_prune_test_timezone):
+def test_prune_split(rule, num_to_keep, expected_ids):
     def subset(lst, ids):
         return {i for i in lst if i.id in ids}
 

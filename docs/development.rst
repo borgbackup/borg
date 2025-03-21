@@ -19,7 +19,7 @@ Some guidance for contributors:
 
 - Discuss changes on the GitHub issue tracker, on IRC or on the mailing list.
 
-- Make your PRs on the ``master`` branch (see `Branching Model`_ for details).
+- Make your PRs on the ``master`` branch (see `Branching Model`_ for details and exceptions).
 
 - Do clean changesets:
 

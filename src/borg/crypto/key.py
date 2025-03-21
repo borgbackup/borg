@@ -7,7 +7,12 @@ import shlex
 import sys
 import textwrap
 import subprocess
-from hashlib import sha256, sha512, pbkdf2_hmac
+from hashlib import sha256, sha512
+
+if sys.version_info >= (3, 13):
+    from _hashlib import pbkdf2_hmac
+else:
+    from hashlib import pbkdf2_hmac
 
 from ..logger import create_logger
 

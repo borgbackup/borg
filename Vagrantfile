@@ -247,6 +247,9 @@ def install_borg(fuse)
     cd borg
     pip install -r requirements.d/development.lock.txt
     python3 scripts/make.py clean
+    # install borgstore WITH sftp support, so it pulls in paramiko also,
+    # so sftp support will also get into the binaries built. #8574
+    pip install borgstore[sftp]
     pip install -e .[#{fuse}]
   EOF
 end

@@ -156,10 +156,10 @@ above.
 
 New features:
 
-- extract: --dry-run now displays +/- status flags (included/excluded), #8564
-- compact: with --stats it will be as slow as before, listing all repo objs.
-  without --stats, it will be faster by using the cached chunks index.
+- compact: without --stats, it will be faster by using the cached chunks index.
+  with --stats it will be as slow as before, listing all repo objs.
 - compact: support --dry-run (do nothing), #8300
+- extract: --dry-run now displays +/- status flags (included/excluded), #8564
 - allow timespan to be specified with common time units, #8624
 - enhance passphrase handling, #8496.
   Setting `BORG_DEBUG_PASSPHRASE=YES` enables passphrase debug logging to
@@ -167,6 +167,7 @@ New features:
   a wrong passphrase was encountered.
   Setting `BORG_DISPLAY_PASSPHRASE=YES` now always shows passphrase and its hex
   utf-8 byte sequence.
+- add {unixtime} placeholder, #8522
 
 Bug fixes:
 

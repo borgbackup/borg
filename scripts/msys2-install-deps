@@ -2,7 +2,7 @@
 
 pacman -S --needed --noconfirm git mingw-w64-ucrt-x86_64-{toolchain,pkgconf,zstd,lz4,xxhash,openssl,rclone,python-msgpack,python-argon2_cffi,python-platformdirs,python,cython,python-setuptools,python-wheel,python-build,python-pkgconfig,python-packaging,python-pip,python-paramiko}
 python -m pip install --upgrade pip
-pip install pyinstaller==6.10.0
+pip install pyinstaller==6.11.1
 
 if [ "$1" = "development" ]; then
 	pacman -S --needed --noconfirm mingw-w64-ucrt-x86_64-python-{pytest,pytest-benchmark,pytest-cov,pytest-forked,pytest-xdist}

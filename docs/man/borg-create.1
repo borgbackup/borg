@@ -270,7 +270,7 @@ $ borg create my\-documents ~/Documents
 $ borg create \-\-list my\-documents ~/Documents
 
 # Backup /mnt/disk/docs, but strip path prefix using the slashdot hack
-$ borg create /path/to/repo::docs /mnt/disk/./docs
+$ borg create  --repo /path/to/repo docs /mnt/disk/./docs
 
 # Backup ~/Documents and ~/src but exclude pyc files
 $ borg create my\-files                \e
@@ -434,7 +434,7 @@ pipe directly to borg:
 .sp
 .nf
 .ft C
-backup\-vm \-\-id myvm \-\-stdout | borg create REPO::ARCHIVE \-
+backup\-vm \-\-id myvm \-\-stdout | borg create --repo REPO ARCHIVE \-
 .ft P
 .fi
 .UNINDENT
@@ -449,7 +449,7 @@ to the command:
 .sp
 .nf
 .ft C
-borg create \-\-content\-from\-command REPO::ARCHIVE \-\- backup\-vm \-\-id myvm \-\-stdout
+borg create \-\-content\-from\-command --repo REPO ARCHIVE \-\- backup\-vm \-\-id myvm \-\-stdout
 .ft P
 .fi
 .UNINDENT

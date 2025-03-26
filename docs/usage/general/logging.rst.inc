@@ -10,7 +10,7 @@ If you want to capture the log output to a file, just redirect it:
 
 ::
 
-    borg create repo::archive myfiles 2>> logfile
+    borg create --repo repo archive myfiles 2>> logfile
 
 
 Custom logging configurations can be implemented via BORG_LOGGING_CONF.

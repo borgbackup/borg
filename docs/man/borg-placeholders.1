@@ -78,7 +78,7 @@ If literal curly braces need to be used, double them for escaping:
 .sp
 .nf
 .ft C
-borg create /path/to/repo::{{literal_text}}
+borg create --repo /path/to/repo {{literal_text}}
 .ft P
 .fi
 .UNINDENT
@@ -90,8 +90,8 @@ Examples:
 .sp
 .nf
 .ft C
-borg create /path/to/repo::{hostname}\-{user}\-{utcnow} ...
-borg create /path/to/repo::{hostname}\-{now:%Y\-%m\-%d_%H:%M:%S%z} ...
+borg create --repo /path/to/repo {hostname}\-{user}\-{utcnow} ...
+borg create --repo /path/to/repo {hostname}\-{now:%Y\-%m\-%d_%H:%M:%S%z} ...
 borg prune \-a \(aqsh:{hostname}\-*\(aq ...
 .ft P
 .fi

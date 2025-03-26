@@ -329,14 +329,14 @@ Reading backup data from stdin
 There are two methods to read from stdin. Either specify ``-`` as path and
 pipe directly to borg::
 
-    backup-vm --id myvm --stdout | borg create REPO::ARCHIVE -
+    backup-vm --id myvm --stdout | borg create --repo REPO ARCHIVE -
 
 Or use ``--content-from-command`` to have Borg manage the execution of the
 command and piping. If you do so, the first PATH argument is interpreted
 as command to execute and any further arguments are treated as arguments
 to the command::
 
-    borg create --content-from-command REPO::ARCHIVE -- backup-vm --id myvm --stdout
+    borg create --content-from-command  --repo REPO ARCHIVE -- backup-vm --id myvm --stdout
 
 ``--`` is used to ensure ``--id`` and ``--stdout`` are **not** considered
 arguments to ``borg`` but rather ``backup-vm``.

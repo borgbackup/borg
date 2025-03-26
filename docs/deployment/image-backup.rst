@@ -63,28 +63,28 @@ deduplicating. For backup, save the disk header and the contents of each partiti
 
     HEADER_SIZE=$(sfdisk -lo Start $DISK | grep -A1 -P 'Start$' | tail -n1 | xargs echo)
     PARTITIONS=$(sfdisk -lo Device,Type $DISK | sed -e '1,/Device\s*Type/d')
-    dd if=$DISK count=$HEADER_SIZE | borg create repo::hostname-partinfo -
+    dd if=$DISK count=$HEADER_SIZE | borg create --repo repo hostname-partinfo -
     echo "$PARTITIONS" | grep NTFS | cut -d' ' -f1 | while read x; do
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
-        ntfsclone -so - $x | borg create repo::hostname-part$PARTNUM -
+        ntfsclone -so - $x | borg create --repo repo hostname-part$PARTNUM -
     done
     # to back up non-NTFS partitions as well:
     echo "$PARTITIONS" | grep -v NTFS | cut -d' ' -f1 | while read x; do
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
-        borg create --read-special repo::hostname-part$PARTNUM $x
+        borg create --read-special --repo repo hostname-part$PARTNUM $x
     done
 
 Restoration is a similar process::
 
-    borg extract --stdout repo::hostname-partinfo | dd of=$DISK && partprobe
+    borg extract --stdout --repo repo hostname-partinfo | dd of=$DISK && partprobe
     PARTITIONS=$(sfdisk -lo Device,Type $DISK | sed -e '1,/Device\s*Type/d')
     borg list --format {archive}{NL} repo | grep 'part[0-9]*$' | while read x; do
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
         PARTITION=$(echo "$PARTITIONS" | grep -E "$DISKp?$PARTNUM" | head -n1)
         if echo "$PARTITION" | cut -d' ' -f2- | grep -q NTFS; then
-            borg extract --stdout repo::$x | ntfsclone -rO $(echo "$PARTITION" | cut -d' ' -f1) -
+            borg extract --stdout --repo repo $x | ntfsclone -rO $(echo "$PARTITION" | cut -d' ' -f1) -
         else
-            borg extract --stdout repo::$x | dd of=$(echo "$PARTITION" | cut -d' ' -f1)
+            borg extract --stdout --repo repo $x | dd of=$(echo "$PARTITION" | cut -d' ' -f1)
         fi
     done
 
@@ -105,11 +105,11 @@ except it works in place, zeroing the original partition. This makes the backup 
 a bit simpler::
 
     sfdisk -lo Device,Type $DISK | sed -e '1,/Device\s*Type/d' | grep Linux | cut -d' ' -f1 | xargs -n1 zerofree
-    borg create --read-special repo::hostname-disk $DISK
+    borg create --read-special --repo repo hostname-disk $DISK
 
 Because the partitions were zeroed in place, restoration is only one command::
 
-    borg extract --stdout repo::hostname-disk | dd of=$DISK
+    borg extract --stdout --repo repo hostname-disk | dd of=$DISK
 
 .. note:: The "traditional" way to zero out space on a partition, especially one already
           mounted, is simply to ``dd`` from ``/dev/zero`` to a temporary file and delete

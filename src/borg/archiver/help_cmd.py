@@ -362,12 +362,12 @@ class HelpMixIn:
 
         If literal curly braces need to be used, double them for escaping::
 
-            borg create /path/to/repo::{{literal_text}}
+            borg create --repo /path/to/repo {{literal_text}}
 
         Examples::
 
-            borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
-            borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S%z} ...
+            borg create --repo /path/to/repo {hostname}-{user}-{utcnow} ...
+            borg create --repo /path/to/repo {hostname}-{now:%Y-%m-%d_%H:%M:%S%z} ...
             borg prune -a 'sh:{hostname}-*' ...
 
         .. note::
@@ -472,12 +472,12 @@ class HelpMixIn:
 
         Examples::
 
-            borg create --compression lz4 REPO::ARCHIVE data
-            borg create --compression zstd REPO::ARCHIVE data
-            borg create --compression zstd,10 REPO::ARCHIVE data
-            borg create --compression zlib REPO::ARCHIVE data
-            borg create --compression zlib,1 REPO::ARCHIVE data
-            borg create --compression auto,lzma,6 REPO::ARCHIVE data
+            borg create --compression lz4 --repo REPO ARCHIVE data
+            borg create --compression zstd --repo REPO ARCHIVE data
+            borg create --compression zstd,10 --repo REPO ARCHIVE data
+            borg create --compression zlib --repo REPO ARCHIVE data
+            borg create --compression zlib,1 --repo REPO ARCHIVE data
+            borg create --compression auto,lzma,6 --repo REPO ARCHIVE data
             borg create --compression auto,lzma ...
             borg create --compression obfuscate,110,none ...
             borg create --compression obfuscate,3,auto,zstd,10 ...

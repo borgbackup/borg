@@ -233,15 +233,19 @@ def test_fuse_allow_damaged_files(archivers, request):
                 break
         else:
             assert False  # missed the file
-    cmd(archiver, "check", "--repair", exit_code=0)
 
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     with fuse_mount(archiver, mountpoint, "-a", "archive"):
-        with pytest.raises(OSError) as excinfo:
-            open(os.path.join(mountpoint, "archive", path))
-        assert excinfo.value.errno == errno.EIO
+        with open(os.path.join(mountpoint, "archive", path), "rb") as f:
+            with pytest.raises(OSError) as excinfo:
+                f.read()
+            assert excinfo.value.errno == errno.EIO
+
     with fuse_mount(archiver, mountpoint, "-a", "archive", "-o", "allow_damaged_files"):
-        open(os.path.join(mountpoint, "archive", path)).close()
+        with open(os.path.join(mountpoint, "archive", path), "rb") as f:
+            # no exception raised, missing data will be all-zero
+            data = f.read()
+        assert data.endswith(b"\0\0")
 
 
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")

@@ -16,11 +16,11 @@ decompressor.
 """
 
 from argparse import ArgumentTypeError
+import math
 import random
+
 from struct import Struct
 import zlib
-
-import math
 
 try:
     import lzma

@@ -1,7 +1,8 @@
 import argparse
 import os
-import zlib
 import pytest
+import zlib
+
 
 from ..compress import get_compressor, Compressor, CompressionSpec, CNONE, ZLIB, LZ4, LZMA, ZSTD, Auto
 

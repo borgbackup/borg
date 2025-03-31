@@ -610,11 +610,7 @@ class ObfuscateSize(CompressorBase):
             return 0
 
         E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)
-        
-        # Prevent math domain error when E=0
-        if E < 1:
-            return 0  
-
+         
         S = math.floor(math.log2(E)) + 1
         lastBits = E - S
         bitMask = (2 ** lastBits - 1)

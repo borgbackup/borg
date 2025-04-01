@@ -604,7 +604,7 @@ class ObfuscateSize(CompressorBase):
 
     
     def _padme_obfuscate(self, compr_size):
-        if compr_size <= 0 or math.log2(compr_size) < 1:
+        if compr_size < 2:
             return 0
 
         E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)

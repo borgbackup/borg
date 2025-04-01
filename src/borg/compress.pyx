@@ -15,18 +15,16 @@ which compressor has been used to compress the data and dispatch to the correct
 decompressor.
 """
 
-from argparse import ArgumentTypeError
 import math
 import random
-
-from struct import Struct
 import zlib
+from argparse import ArgumentTypeError
+from struct import Struct
 
 try:
     import lzma
 except ImportError:
     lzma = None
-
 
 from .constants import MAX_DATA_SIZE
 from .helpers import Buffer, DecompressionError

@@ -9,7 +9,7 @@ import pytest
 from ... import xattr
 from ...chunker import has_seek_hole
 from ...constants import *  # NOQA
-from ...helpers import EXIT_WARNING, BackupPermissionError
+from ...helpers import EXIT_WARNING, BackupPermissionError, bin_to_hex
 from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
@@ -24,6 +24,9 @@ from . import (
     _extract_hardlinks_setup,
     assert_creates_file,
     generate_archiver_tests,
+    create_src_archive,
+    open_archive,
+    src_file,
 )
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -737,3 +740,22 @@ def test_dry_run_extraction_flags(archivers, request):
         print(output)
 
     assert not os.listdir("output"), "Output directory should be empty after dry-run"
+
+
+def test_extract_file_with_missing_chunk(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_src_archive(archiver, "archive")
+    # Get rid of a chunk
+    archive, repository = open_archive(archiver.repository_path, "archive")
+    with repository:
+        for item in archive.iter_items():
+            if item.path.endswith(src_file):
+                chunk = item.chunks[-1]
+                repository.delete(chunk.id)
+                break
+        else:
+            assert False  # missed the file
+    output = cmd(archiver, "extract", "archive")
+    # TODO: this is a bit dirty still: no warning/error rc, no filename output for the damaged file.
+    assert f"repository object {bin_to_hex(chunk.id)} missing, returning {chunk.size} zero bytes." in output

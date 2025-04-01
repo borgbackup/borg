@@ -155,28 +155,19 @@ def test_missing_file_chunk(archivers, request):
         else:
             pytest.fail("should not happen")  # convert 'fail'
 
-    cmd(archiver, "check", exit_code=1)
+    output = cmd(archiver, "check", exit_code=1)
+    assert "Missing file chunk detected" in output
     output = cmd(archiver, "check", "--repair", exit_code=0)
-    assert "New missing file chunk detected" in output
+    assert "Missing file chunk detected" in output  # repair is not changing anything, just reporting.
 
-    cmd(archiver, "check", exit_code=0)
-    output = cmd(archiver, "list", "archive1", "--format={health}#{path}{NL}", exit_code=0)
-    assert "broken#" in output
-
-    # check that the file in the old archives has now a different chunk list without the killed chunk.
-    # also check that the correct original chunks list is preserved in item.chunks_healthy.
+    # check does not modify the chunks list.
     for archive_name in ("archive1", "archive2"):
         archive, repository = open_archive(archiver.repository_path, archive_name)
         with repository:
             for item in archive.iter_items():
                 if item.path.endswith(src_file):
                     assert len(valid_chunks) == len(item.chunks)
-                    assert killed_chunk not in item.chunks
-                    assert valid_chunks != item.chunks
-                    assert "chunks_healthy" in item
-                    assert len(valid_chunks) == len(item.chunks_healthy)
-                    assert killed_chunk in item.chunks_healthy
-                    assert valid_chunks == item.chunks_healthy
+                    assert valid_chunks == item.chunks
                     break
             else:
                 pytest.fail("should not happen")  # convert 'fail'
@@ -185,32 +176,9 @@ def test_missing_file_chunk(archivers, request):
     with patch.object(ChunkBuffer, "BUFFER_SIZE", 10):
         create_src_archive(archiver, "archive3")
 
-    # check should be able to heal the file now:
+    # check should not complain anymore about missing chunks:
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert "Healed previously missing file chunk" in output
-    assert f"{src_file}: Completely healed previously damaged file!" in output
-
-    # check that the file in the old archives has the correct chunks again.
-    # also check that chunks_healthy list is removed as it is not needed any more.
-    for archive_name in ("archive1", "archive2"):
-        archive, repository = open_archive(archiver.repository_path, archive_name)
-        with repository:
-            for item in archive.iter_items():
-                if item.path.endswith(src_file):
-                    assert valid_chunks == item.chunks
-                    assert "chunks_healthy" not in item
-                    break
-            else:
-                pytest.fail("should not happen")
-
-    # list is also all-healthy again
-    output = cmd(archiver, "list", "archive1", "--format={health}#{path}{NL}", exit_code=0)
-    assert "broken#" not in output
-
-    # check should be fine now (and not show it has healed anything).
-    output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
-    assert "Healed previously missing file chunk" not in output
-    assert "testsuite/archiver.py: Completely healed previously damaged file!" not in output
+    assert "Missing file chunk detected" not in output
 
 
 def test_missing_archive_item_chunk(archivers, request):
@@ -425,13 +393,14 @@ def test_verify_data(archivers, request, init_args):
         output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
         assert f"{bin_to_hex(chunk.id)}, integrity error" in output
 
-        # repair (heal is tested in another test)
+        # repair will find the defect chunk and remove it
         output = cmd(archiver, "check", "--repair", "--verify-data", exit_code=0)
         assert f"{bin_to_hex(chunk.id)}, integrity error" in output
-        assert f"{src_file}: New missing file chunk detected" in output
+        assert f"{src_file}: Missing file chunk detected" in output
 
-        # run with --verify-data again, all fine now (file was patched with a replacement chunk).
-        cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=0)
+        # run with --verify-data again, it will notice the missing chunk.
+        output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
+        assert f"{src_file}: Missing file chunk detected" in output
 
 
 @pytest.mark.parametrize("init_args", [["--encryption=repokey-aes-ocb"], ["--encryption", "none"]])
@@ -457,13 +426,15 @@ def test_corrupted_file_chunk(archivers, request, init_args):
     output = cmd(archiver, "check", "--repository-only", exit_code=1)
     assert f"{bin_to_hex(chunk.id)} is corrupted: data does not match checksum." in output
 
-    # repair (heal is tested in another test)
+    # repair: the defect chunk will be removed by repair.
     output = cmd(archiver, "check", "--repair", exit_code=0)
     assert f"{bin_to_hex(chunk.id)} is corrupted: data does not match checksum." in output
-    assert f"{src_file}: New missing file chunk detected" in output
+    assert f"{src_file}: Missing file chunk detected" in output
 
-    # run normal check again, all fine now (file was patched with a replacement chunk).
+    # run normal check again
     cmd(archiver, "check", "--repository-only", exit_code=0)
+    output = cmd(archiver, "check", "--archives-only", exit_code=1)
+    assert f"{src_file}: Missing file chunk detected" in output
 
 
 def test_empty_repository(archivers, request):

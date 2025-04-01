@@ -273,7 +273,9 @@ class DownloadPipeline:
         """
         self.hlids_preloaded = set()
         unpacker = msgpack.Unpacker(use_list=False)
-        for data in self.fetch_many(ids, ro_type=ROBJ_ARCHIVE_STREAM):
+        for data in self.fetch_many(ids, ro_type=ROBJ_ARCHIVE_STREAM, replacement_chunk=False):
+            if data is None:
+                continue  # archive stream chunk missing
             unpacker.feed(data)
             for _item in unpacker:
                 item = Item(internal_dict=_item)
@@ -312,7 +314,7 @@ class DownloadPipeline:
                 self.repository.preload([c.id for c in item.chunks])
         return preload_chunks
 
-    def fetch_many(self, chunks, is_preloaded=False, ro_type=None):
+    def fetch_many(self, chunks, is_preloaded=False, ro_type=None, replacement_chunk=True):
         assert ro_type is not None
         ids = []
         sizes = []
@@ -329,8 +331,12 @@ class DownloadPipeline:
             ids, sizes, self.repository.get_many(ids, is_preloaded=is_preloaded, raise_missing=False)
         ):
             if cdata is None:
-                logger.error(f"repository object {bin_to_hex(id)} missing, returning {size} zero bytes.")
-                data = zeros[:size] if size is not None else None
+                if replacement_chunk and size is not None:
+                    logger.error(f"repository object {bin_to_hex(id)} missing, returning {size} zero bytes.")
+                    data = zeros[:size]  # return an all-zero replacement chunk of correct size
+                else:
+                    logger.error(f"repository object {bin_to_hex(id)} missing, returning None.")
+                    data = None
             else:
                 _, data = self.repo_objs.parse(id, cdata, ro_type=ro_type)
             assert size is None or len(data) == size

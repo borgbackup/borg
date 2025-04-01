@@ -118,7 +118,7 @@ General:
             This workaround is **only** for emergencies and **only** to extract data
             from an affected repository (read-only access)::
 
-                BORG_WORKAROUNDS=authenticated_no_key borg extract repo::archive
+                BORG_WORKAROUNDS=authenticated_no_key borg extract --repo repo archive
 
             After you have extracted all data you need, you MUST delete the repository::
 

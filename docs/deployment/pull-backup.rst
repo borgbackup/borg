@@ -98,7 +98,7 @@ create the backup, retaining the original paths, excluding the repository:
 
 ::
 
-    borg create --exclude borgrepo --files-cache ctime,size /borgrepo::archive /
+    borg create --exclude borgrepo --files-cache ctime,size --repo /borgrepo archive  /
 
 For the sake of simplicity only ``borgrepo`` is excluded here. You may want to
 set up an exclude file with additional files and folders to be excluded. Also
@@ -159,7 +159,7 @@ Now we can run
 
 ::
 
-    borg extract /borgrepo::archive PATH
+    borg extract --repo /borgrepo archive PATH
 
 to restore whatever we like partially. Finally, do the clean-up:
 
@@ -187,7 +187,7 @@ and extract a backup, utilizing the ``--numeric-ids`` option:
 
     sshfs root@host:/ /mnt/sshfs
     cd /mnt/sshfs
-    borg extract --numeric-ids /path/to/repo::archive
+    borg extract --numeric-ids --repo /path/to/repo archive
     cd ~
     umount /mnt/sshfs
 
@@ -199,7 +199,7 @@ directly extract it without the need of mounting with SSHFS:
 
 ::
 
-    borg export-tar /path/to/repo::archive - | ssh root@host 'tar -C / -x'
+    borg export-tar --repo /path/to/repo archive - | ssh root@host 'tar -C / -x'
 
 Note that in this scenario the tar format is the limiting factor – it cannot
 restore all the advanced features that BorgBackup supports. See
@@ -301,7 +301,7 @@ ignore all arguments intended for the SSH command.
 All Borg commands can now be executed on *borg-client*. For example to create a
 backup execute the ``borg create`` command::
 
-   borg-client:~$ borg create ssh://borg-server/path/to/repo::archive /path_to_backup
+   borg-client:~$ borg create --repo ssh://borg-server/path/to/repo archive /path_to_backup
 
 When automating backup creation, the
 interactive ssh session may seem inappropriate. An alternative way of creating
@@ -312,7 +312,7 @@ a backup may be the following command::
       borgc@borg-client \
       borg create \
       --rsh "sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'" \
-      ssh://borg-server/path/to/repo::archive /path_to_backup \
+      --repo ssh://borg-server/path/to/repo archive /path_to_backup \
       ';' rm /run/borg/reponame.sock
 
 This command also automatically removes the socket file after the ``borg

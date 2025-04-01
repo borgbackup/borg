@@ -15,11 +15,11 @@ which compressor has been used to compress the data and dispatch to the correct
 decompressor.
 """
 
+from argparse import ArgumentTypeError
 import math
 import random
-import zlib
-from argparse import ArgumentTypeError
 from struct import Struct
+import zlib
 
 try:
     import lzma
@@ -604,7 +604,7 @@ class ObfuscateSize(CompressorBase):
 
     
     def _padme_obfuscate(self, compr_size):
-        if compr_size <= 0:
+        if compr_size <= 0 or math.log2(compr_size) < 1:
             return 0
 
         E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)

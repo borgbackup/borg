@@ -216,6 +216,7 @@ def test_invalid_compression_level(invalid_spec):
     "data_length, expected_padding",
     [
         (0, 0),
+        (1, 0),
         (10, 0),
         (100, 4),
         (1000, 24),

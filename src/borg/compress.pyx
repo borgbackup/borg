@@ -16,17 +16,15 @@ decompressor.
 """
 
 from argparse import ArgumentTypeError
+import math
 import random
 from struct import Struct
 import zlib
-
-import math
 
 try:
     import lzma
 except ImportError:
     lzma = None
-
 
 from .constants import MAX_DATA_SIZE
 from .helpers import Buffer, DecompressionError
@@ -605,7 +603,7 @@ class ObfuscateSize(CompressorBase):
         return self.compressor.decompress(meta, compressed_data)  # decompress data
 
     def _padme_obfuscate(self, compr_size):
-        if compr_size <= 0:
+        if compr_size < 2:
             return 0
 
         E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)

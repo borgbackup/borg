@@ -1,7 +1,7 @@
 import argparse
 import os
 import zlib
-import math
+
 import pytest
 
 from ..compress import get_compressor, Compressor, CompressionSpec, CNONE, ZLIB, LZ4, LZMA, ZSTD, Auto
@@ -212,30 +212,31 @@ def test_invalid_compression_level(invalid_spec):
         CompressionSpec(invalid_spec)
 
 
-
-
-
-@pytest.mark.parametrize("data_length", [100, 500, 1000, 4000, 8192, 16384])
-def test_padme_obfuscation(data_length):
-    compressor = Compressor(name='obfuscate', level=250, compressor=Compressor('none'))
-    data = b"x" * data_length  # Varying data size
+@pytest.mark.parametrize(
+    "data_length, expected_padding",
+    [
+        (0, 0),
+        (1, 0),
+        (10, 0),
+        (100, 4),
+        (1000, 24),
+        (10000, 240),
+        (20000, 480),
+        (50000, 1200),
+        (100000, 352),
+        (1000000, 15808),
+        (5000000, 111808),
+        (10000000, 223616),
+        (20000000, 447232),
+    ],
+)
+def test_padme_obfuscation(data_length, expected_padding):
+    compressor = Compressor(name="obfuscate", level=250, compressor=Compressor("none"))
+    data = b"x" * data_length
     meta, compressed = compressor.compress({}, data)
 
-    # Ensure padded size is within the correct bounds
-    assert len(compressed) >= data_length  # Padded size is at least the original size
-    assert len(compressed) <= data_length * 1.12  # Max 12% overhead per Padmé spec
+    expected_padded_size = data_length + expected_padding
 
-    # Verify Padmé behavior: Ensure padded size is a valid Padmé padded value
-    padded_size = len(compressed)
-
-    # Compute expected Padmé padded size
-    E = math.floor(math.log2(data_length))
-    S = math.floor(math.log2(E)) + 1
-    lastBits = E - S
-    bitMask = (2 ** lastBits - 1)
-    expected_padded_size = (data_length + bitMask) & ~bitMask  # Apply rounding
-
-    max_allowed_size = int(data_length * 1.12)
-    expected_padded_size = min(expected_padded_size, max_allowed_size)
-
-    assert padded_size == expected_padded_size  # Ensure it follows Padmé's rule
+    assert (
+        len(compressed) == expected_padded_size
+    ), f"For {data_length}, expected {expected_padded_size}, got {len(compressed)}"

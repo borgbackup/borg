@@ -105,7 +105,6 @@ class Repository:
         lock=True,
         append_only=False,
         storage_quota=None,
-        make_parent_dirs=False,
         send_log_cb=None,
     ):
         if isinstance(path_or_location, Location):

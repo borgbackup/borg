@@ -246,12 +246,6 @@ class RepoCreateMixIn:
             help="Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.",
         )
         subparser.add_argument(
-            "--make-parent-dirs",
-            dest="make_parent_dirs",
-            action="store_true",
-            help="create the parent directories of the repository directory, if they are missing.",
-        )
-        subparser.add_argument(
             "--copy-crypt-key",
             dest="copy_crypt_key",
             action="store_true",

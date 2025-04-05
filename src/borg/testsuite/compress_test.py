@@ -210,3 +210,33 @@ def test_specified_compression_level(c_type, c_name, c_levels):
 def test_invalid_compression_level(invalid_spec):
     with pytest.raises(argparse.ArgumentTypeError):
         CompressionSpec(invalid_spec)
+
+
+@pytest.mark.parametrize(
+    "data_length, expected_padding",
+    [
+        (0, 0),
+        (1, 0),
+        (10, 0),
+        (100, 4),
+        (1000, 24),
+        (10000, 240),
+        (20000, 480),
+        (50000, 1200),
+        (100000, 352),
+        (1000000, 15808),
+        (5000000, 111808),
+        (10000000, 223616),
+        (20000000, 447232),
+    ],
+)
+def test_padme_obfuscation(data_length, expected_padding):
+    compressor = Compressor(name="obfuscate", level=250, compressor=Compressor("none"))
+    data = b"x" * data_length
+    meta, compressed = compressor.compress({}, data)
+
+    expected_padded_size = data_length + expected_padding
+
+    assert (
+        len(compressed) == expected_padded_size
+    ), f"For {data_length}, expected {expected_padded_size}, got {len(compressed)}"

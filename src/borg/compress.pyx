@@ -16,6 +16,7 @@ decompressor.
 """
 
 from argparse import ArgumentTypeError
+import math
 import random
 from struct import Struct
 import zlib
@@ -24,7 +25,6 @@ try:
     import lzma
 except ImportError:
     lzma = None
-
 
 from .constants import MAX_DATA_SIZE
 from .helpers import Buffer, DecompressionError
@@ -556,6 +556,8 @@ class ObfuscateSize(CompressorBase):
         elif 110 <= level <= 123:
             self._obfuscate = self._random_padding_obfuscate
             self.max_padding_size = 2 ** (level - 100)  # 1kiB .. 8MiB
+        elif level == 250:  # Padmé
+            self._obfuscate = self._padme_obfuscate
 
     def _obfuscate(self, compr_size):
         # implementations need to return the size of obfuscation data,
@@ -600,6 +602,22 @@ class ObfuscateSize(CompressorBase):
             self.compressor = compressor_cls()
         return self.compressor.decompress(meta, compressed_data)  # decompress data
 
+    def _padme_obfuscate(self, compr_size):
+        if compr_size < 2:
+            return 0
+
+        E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)
+        S = math.floor(math.log2(E)) + 1       # Second log component
+        lastBits = E - S                       # Bits to be zeroed
+        bitMask = (2 ** lastBits - 1)          # Mask for rounding
+
+        padded_size = (compr_size + bitMask) & ~bitMask  # Apply rounding
+
+        # Ensure max 12% overhead
+        max_allowed = int(compr_size * 1.12)
+        final_size = min(padded_size, max_allowed)
+
+        return final_size - compr_size  # Return only the additional padding size
 
 # Maps valid compressor names to their class
 COMPRESSOR_TABLE = {

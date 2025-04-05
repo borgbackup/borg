@@ -470,6 +470,15 @@ class HelpMixIn:
               ...
               123: 8MiB (max.)
 
+            *Padmé padding* (deterministic)
+
+            ::
+
+              250: pads to sums of powers of 2, max 12% overhead
+
+            Uses the Padmé algorithm to deterministically pad the compressed size to a sum of
+            powers of 2, limiting overhead to 12%. See https://lbarman.ch/blog/padme/ for details.
+
         Examples::
 
             borg create --compression lz4 --repo REPO ARCHIVE data
@@ -481,7 +490,8 @@ class HelpMixIn:
             borg create --compression auto,lzma ...
             borg create --compression obfuscate,110,none ...
             borg create --compression obfuscate,3,auto,zstd,10 ...
-            borg create --compression obfuscate,2,zstd,6 ...\n\n"""
+            borg create --compression obfuscate,2,zstd,6 ...
+            borg create --compression obfuscate,250,zstd,3 ...\n\n"""
     )
 
     def do_help(self, parser, commands, args):

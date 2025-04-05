@@ -2423,13 +2423,13 @@ class Archiver:
         from within a shell, the patterns should be quoted to protect them from
         expansion.
 
-        Patterns matching special characters, e.g. white space, within a shell may 
+        Patterns matching special characters, e.g. white space, within a shell may
         require adjustments, such as putting quotation marks around the arguments.
-        Example: 
+        Example:
         Using bash, the following command line option would match and exclude "item name":
         ``--pattern='-path/item name'``
-        Note that when patterns are used within a pattern file directly read by borg,  
-        e.g. when using ``--exclude-from`` or ``--patterns-from``, there is no shell 
+        Note that when patterns are used within a pattern file directly read by borg,
+        e.g. when using ``--exclude-from`` or ``--patterns-from``, there is no shell
         involved and thus no quotation marks are required.
 
         The ``--exclude-from`` option permits loading exclusion patterns from a text
@@ -2742,6 +2742,15 @@ class Archiver:
               ...
               123: 8MiB (max.)
 
+            *Padmé padding* (deterministic)
+
+            ::
+
+              250: pads to sums of powers of 2, max 12% overhead
+
+            Uses the Padmé algorithm to deterministically pad the compressed size to a sum of
+            powers of 2, limiting overhead to 12%. See https://lbarman.ch/blog/padme/ for details.
+
         Examples::
 
             borg create --compression lz4 REPO::ARCHIVE data
@@ -2753,7 +2762,8 @@ class Archiver:
             borg create --compression auto,lzma ...
             borg create --compression obfuscate,110,none ...
             borg create --compression obfuscate,3,auto,zstd,10 ...
-            borg create --compression obfuscate,2,zstd,6 ...\n\n''')
+            borg create --compression obfuscate,2,zstd,6 ...
+            borg create --compression obfuscate,250,zstd,3 ...\n\n''')
 
     def do_help(self, parser, commands, args):
         if not args.topic:

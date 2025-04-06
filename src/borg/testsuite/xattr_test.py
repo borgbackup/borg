@@ -19,7 +19,7 @@ def tempfile_symlink(tmp_path):
 
 def assert_equal_se(is_x, want_x):
     # check 2 xattr lists for equality, but ignore security.selinux attr
-    is_x = set(is_x) - {b"security.selinux"}
+    is_x = set(is_x) - {b"security.selinux", b"com.apple.provenance"}
     want_x = set(want_x)
     assert is_x == want_x
 

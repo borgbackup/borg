@@ -202,7 +202,6 @@ class LegacyRepository:
         lock=True,
         append_only=False,
         storage_quota=None,
-        make_parent_dirs=False,
         send_log_cb=None,
     ):
         self.path = os.path.abspath(path)
@@ -234,7 +233,6 @@ class LegacyRepository:
         self.storage_quota = storage_quota
         self.storage_quota_use = 0
         self.transaction_doomed = None
-        self.make_parent_dirs = make_parent_dirs
         # v2 is the default repo version for borg 2.0
         # v1 repos must only be used in a read-only way, e.g. for
         # --other-repo=V1_REPO with borg init and borg transfer!
@@ -336,14 +334,7 @@ class LegacyRepository:
     def create(self, path):
         """Create a new empty repository at `path`"""
         self.check_can_create_repository(path)
-        if self.make_parent_dirs:
-            parent_path = os.path.join(path, os.pardir)
-            os.makedirs(parent_path, exist_ok=True)
-        if not os.path.exists(path):
-            try:
-                os.mkdir(path)
-            except FileNotFoundError as err:
-                raise self.ParentPathDoesNotExist(path) from err
+        os.makedirs(path, exist_ok=True)
         with open(os.path.join(path, "README"), "w") as fd:
             fd.write(REPOSITORY_README)
         os.mkdir(os.path.join(path, "data"))

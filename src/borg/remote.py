@@ -365,17 +365,7 @@ class RepositoryServer:  # pragma: no cover
         path = os.path.realpath(path)
         return path
 
-    def open(
-        self,
-        path,
-        create=False,
-        lock_wait=None,
-        lock=True,
-        exclusive=None,
-        append_only=False,
-        make_parent_dirs=False,
-        v1_or_v2=False,
-    ):
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False, v1_or_v2=False):
         self.RepoCls = LegacyRepository if v1_or_v2 else Repository
         self.rpc_methods = self._legacy_rpc_methods if v1_or_v2 else self._rpc_methods
         logging.debug("Resolving repository path %r", path)
@@ -411,7 +401,6 @@ class RepositoryServer:  # pragma: no cover
             append_only=append_only,
             storage_quota=self.storage_quota,
             exclusive=exclusive,
-            make_parent_dirs=make_parent_dirs,
             send_log_cb=self.send_queued_log,
         )
         self.repository.__enter__()  # clean exit handled by serve() method
@@ -580,17 +569,7 @@ class RemoteRepository:
         def required_version(self):
             return self.args[1]
 
-    def __init__(
-        self,
-        location,
-        create=False,
-        exclusive=False,
-        lock_wait=1.0,
-        lock=True,
-        append_only=False,
-        make_parent_dirs=False,
-        args=None,
-    ):
+    def __init__(self, location, create=False, exclusive=False, lock_wait=1.0, lock=True, append_only=False, args=None):
         self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
@@ -673,7 +652,6 @@ class RemoteRepository:
                 lock=lock,
                 exclusive=exclusive,
                 append_only=append_only,
-                make_parent_dirs=make_parent_dirs,
             )
             info = self.info()
             self.version = info["version"]
@@ -976,20 +954,9 @@ class RemoteRepository:
     @api(
         since=parse_version("1.0.0"),
         append_only={"since": parse_version("1.0.7"), "previously": False},
-        make_parent_dirs={"since": parse_version("1.1.9"), "previously": False},
         v1_or_v2={"since": parse_version("2.0.0b8"), "previously": True},  # TODO fix version
     )
-    def open(
-        self,
-        path,
-        create=False,
-        lock_wait=None,
-        lock=True,
-        exclusive=False,
-        append_only=False,
-        make_parent_dirs=False,
-        v1_or_v2=False,
-    ):
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, append_only=False, v1_or_v2=False):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("2.0.0a3"))

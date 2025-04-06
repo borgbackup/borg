@@ -30,9 +30,7 @@ from ..logger import create_logger
 logger = create_logger(__name__)
 
 
-def get_repository(
-    location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args, v1_or_v2
-):
+def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, storage_quota, args, v1_or_v2):
     if location.proto in ("ssh", "socket"):
         RemoteRepoCls = LegacyRemoteRepository if v1_or_v2 else RemoteRepository
         repository = RemoteRepoCls(
@@ -42,7 +40,6 @@ def get_repository(
             lock_wait=lock_wait,
             lock=lock,
             append_only=append_only,
-            make_parent_dirs=make_parent_dirs,
             args=args,
         )
 
@@ -54,7 +51,6 @@ def get_repository(
             lock_wait=lock_wait,
             lock=lock,
             append_only=append_only,
-            make_parent_dirs=make_parent_dirs,
             storage_quota=storage_quota,
         )
 
@@ -67,7 +63,6 @@ def get_repository(
             lock_wait=lock_wait,
             lock=lock,
             append_only=append_only,
-            make_parent_dirs=make_parent_dirs,
             storage_quota=storage_quota,
         )
     return repository
@@ -133,7 +128,6 @@ def with_repository(
             lock = getattr(args, "lock", _lock)
             append_only = getattr(args, "append_only", False)
             storage_quota = getattr(args, "storage_quota", None)
-            make_parent_dirs = getattr(args, "make_parent_dirs", False)
 
             repository = get_repository(
                 location,
@@ -142,7 +136,6 @@ def with_repository(
                 lock_wait=self.lock_wait,
                 lock=lock,
                 append_only=append_only,
-                make_parent_dirs=make_parent_dirs,
                 storage_quota=storage_quota,
                 args=args,
                 v1_or_v2=False,
@@ -212,7 +205,6 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                 lock_wait=self.lock_wait,
                 lock=True,
                 append_only=False,
-                make_parent_dirs=False,
                 storage_quota=None,
                 args=args,
                 v1_or_v2=v1_or_v2,

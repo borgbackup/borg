@@ -2,6 +2,7 @@ import os
 
 from libc.stdint cimport uint32_t
 from libc cimport errno
+from posix.time cimport timespec
 
 from .posix import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
@@ -36,6 +37,13 @@ cdef extern from "sys/acl.h":
     acl_t acl_from_text(const char *buf)
     char *acl_to_text(acl_t acl, ssize_t *len_p)
     int ACL_TYPE_EXTENDED
+
+cdef extern from "sys/stat.h":
+    cdef struct stat64:
+        timespec st_birthtimespec
+
+    int c_stat64 "stat64" (const char *path, stat64 *buf)
+    int c_lstat64 "lstat64" (const char *path, stat64 *buf)
 
 
 def listxattr(path, *, follow_symlinks=False):
@@ -161,3 +169,17 @@ def acl_set(path, item, numeric_ids=False, fd=None):
                     raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
             acl_free(acl)
+
+
+def get_birthtime_ns(path, follow_symlinks=False):
+    if isinstance(path, str):
+        path = os.fsencode(path)
+    cdef stat64 stat_info
+    cdef int result
+    if follow_symlinks:
+        result = c_stat64(path, &stat_info)
+    else:
+        result = c_lstat64(path, &stat_info)
+    if result != 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    return stat_info.st_birthtimespec.tv_sec * 1_000_000_000 + stat_info.st_birthtimespec.tv_nsec

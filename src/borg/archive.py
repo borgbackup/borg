@@ -15,8 +15,11 @@ from itertools import groupby, zip_longest
 from typing import Iterator
 from shutil import get_terminal_size
 
-from .platformflags import is_win32
+from .platformflags import is_win32, is_darwin
 from .logger import create_logger
+
+if is_darwin:
+    from .platform.darwin import get_birthtime_ns
 
 logger = create_logger()
 
@@ -1060,7 +1063,7 @@ class MetadataCollector:
         self.noxattrs = noxattrs
         self.nobirthtime = nobirthtime
 
-    def stat_simple_attrs(self, st):
+    def stat_simple_attrs(self, st, path):
         attrs = {}
         attrs["mode"] = st.st_mode
         # borg can work with archives only having mtime (very old borg archives do not have
@@ -1072,8 +1075,11 @@ class MetadataCollector:
         if not self.noctime:
             attrs["ctime"] = safe_ns(st.st_ctime_ns)
         if not self.nobirthtime and hasattr(st, "st_birthtime"):
-            # sadly, there's no stat_result.st_birthtime_ns
-            attrs["birthtime"] = safe_ns(int(st.st_birthtime * 10**9))
+            if is_darwin:
+                attrs["birthtime"] = safe_ns(get_birthtime_ns(path, follow_symlinks=False))
+            else:
+                # sadly, there's no stat_result.st_birthtime_ns
+                attrs["birthtime"] = safe_ns(int(st.st_birthtime * 10**9))
         attrs["uid"] = st.st_uid
         attrs["gid"] = st.st_gid
         if not self.numeric_ids:
@@ -1107,7 +1113,7 @@ class MetadataCollector:
         return attrs
 
     def stat_attrs(self, st, path, fd=None):
-        attrs = self.stat_simple_attrs(st)
+        attrs = self.stat_simple_attrs(st, path)
         attrs.update(self.stat_ext_attrs(st, path, fd=fd))
         return attrs
 
@@ -1354,7 +1360,7 @@ class FilesystemObjectProcessors:
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
                 with backup_io("fstat"):
                     st = stat_update_check(st, os.fstat(fd))
-                item.update(self.metadata_collector.stat_simple_attrs(st))
+                item.update(self.metadata_collector.stat_simple_attrs(st, path))
                 is_special_file = is_special(st.st_mode)
                 if is_special_file:
                     # we process a special file like a regular file. reflect that in mode,

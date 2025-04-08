@@ -106,7 +106,7 @@ class Repository:
         if isinstance(path_or_location, Location):
             location = path_or_location
             if location.proto == "file":
-                url = Path(location.path).as_uri()  # frequently users give without file:// prefix
+                url = Path(location.path).absolute().as_uri()  # frequently users give without file:// prefix
             else:
                 url = location.processed  # location as given by user, processed placeholders
         else:

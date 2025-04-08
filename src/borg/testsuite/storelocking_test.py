@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 
 import pytest
 
@@ -12,7 +13,7 @@ ID2 = "bar", 2, 2
 
 @pytest.fixture()
 def lockstore(tmpdir):
-    store = Store("file://" + str(tmpdir / "lockstore"), levels={"locks/": [0]})
+    store = Store(Path(tmpdir / "lockstore").as_uri(), levels={"locks/": [0]})
     store.create()
     with store:
         yield store

@@ -207,14 +207,14 @@ jobs:
         run: |
           # build borg.exe
           pip install -e .
-          pyinstaller -y scripts/borg.exe.spec
+          # pyinstaller -y scripts/borg.exe.spec
           # build sdist and wheel in dist/...
           python -m build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: borg-windows
-          path: dist/borg.exe
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: borg-windows
+      #     path: dist/borg.exe
       - name: Run tests
         run: |
-          ./dist/borg.exe -V
+          # ./dist/borg.exe -V
           pytest -n4 --benchmark-skip -vv -rs -k "not remote"

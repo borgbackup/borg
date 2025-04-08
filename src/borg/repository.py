@@ -1,5 +1,6 @@
 import os
 import time
+from pathlib import Path
 
 from borgstore.store import Store
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
@@ -105,11 +106,11 @@ class Repository:
         if isinstance(path_or_location, Location):
             location = path_or_location
             if location.proto == "file":
-                url = f"file://{location.path}"  # frequently users give without file:// prefix
+                url = Path(location.path).as_uri()  # frequently users give without file:// prefix
             else:
                 url = location.processed  # location as given by user, processed placeholders
         else:
-            url = "file://%s" % os.path.abspath(path_or_location)
+            url = Path(path_or_location).absolute().as_uri()
             location = Location(url)
         self._location = location
         self.url = url

@@ -39,12 +39,12 @@ cdef extern from "sys/acl.h":
     int ACL_TYPE_EXTENDED
 
 cdef extern from "sys/stat.h":
-    cdef struct stat64:
+    cdef struct stat:
         timespec st_birthtimespec
 
-    int c_stat64 "stat64" (const char *path, stat64 *buf)
-    int c_lstat64 "lstat64" (const char *path, stat64 *buf)
-    int c_fstat64 "fstat64" (int filedes, stat64 *buf)
+    int c_stat "stat" (const char *path, stat *buf)
+    int c_lstat "lstat" (const char *path, stat *buf)
+    int c_fstat "fstat" (int filedes, stat *buf)
 
 
 def listxattr(path, *, follow_symlinks=False):
@@ -175,15 +175,15 @@ def acl_set(path, item, numeric_ids=False, fd=None):
 def get_birthtime_ns(path, follow_symlinks=False):
     if isinstance(path, str):
         path = os.fsencode(path)
-    cdef stat64 stat_info
+    cdef stat stat_info
     cdef int result
     if isinstance(path, int):
-        result = c_fstat64(path, &stat_info)
+        result = c_fstat(path, &stat_info)
     else:
         if follow_symlinks:
-            result = c_stat64(path, &stat_info)
+            result = c_stat(path, &stat_info)
         else:
-            result = c_lstat64(path, &stat_info)
+            result = c_lstat(path, &stat_info)
     if result != 0:
         raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
     return stat_info.st_birthtimespec.tv_sec * 1_000_000_000 + stat_info.st_birthtimespec.tv_nsec

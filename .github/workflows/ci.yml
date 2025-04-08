@@ -209,7 +209,7 @@ jobs:
           pip install -e .
           # pyinstaller -y scripts/borg.exe.spec
           # build sdist and wheel in dist/...
-          python -m build
+          # python -m build
       # - uses: actions/upload-artifact@v4
       #   with:
       #     name: borg-windows

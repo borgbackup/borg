@@ -195,7 +195,7 @@ jobs:
 
   windows:
 
-    if: false  # build temporary disabled
+    if: true  # enable/disable windows build
     runs-on: windows-latest
     timeout-minutes: 120
     needs: linux

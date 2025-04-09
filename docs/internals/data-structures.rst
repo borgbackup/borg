@@ -1147,7 +1147,7 @@ cache ``config``, since all three are transacted together.
 
 The ``[integrity]`` section is used:
 
-.. code-block:: ini
+.. code-block:: none
 
     [cache]
     version = 1

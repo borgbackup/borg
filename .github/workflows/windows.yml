@@ -21,7 +21,7 @@ jobs:
         run: ./scripts/msys2-build
       - name: Test
         run: ./dist/borg.exe -V
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: borg-windows
           path: dist/borg.exe

@@ -67,7 +67,10 @@ platforms).
 
 Reporting issues
 ----------------
-If you find issues, please open a ticket on our issue tracker:
+
+Please first check the FAQ and whether a github issue already exists.
+
+If you find a NEW issue, please open a ticket on our issue tracker:
 
 https://github.com/borgbackup/borg/issues/
 

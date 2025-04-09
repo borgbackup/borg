@@ -414,7 +414,7 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.1 (2024-12-xx)
+Version 1.4.1 (2025-04-xx)
 --------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
@@ -427,9 +427,11 @@ New features:
   borg shall use chunks.archive.d/ cache directory. the previous "hack" to
   create a non-directory file at that place is still supported.
 - compact: support --dry-run (do nothing) to simplify scripting, #8300
+- add {unixtime} placeholder, #8522
 
 Fixes:
 
+- borg exits when assertions are disabled with Python optimizations, #8649
 - config: fix acceptance of storage_quota 0, #8499
 - config: reject additional_free_space < 10M (but accept 0), #6066
 - check: more consistent messaging considering --repair, #8533
@@ -466,10 +468,17 @@ Other changes:
   - align /etc/backups path references in automated backups deployment guide
   - mount docs: apply jdchristensen's suggestion, better phrasing.
   - FAQ: Why is backing up an unmodified FAT filesystem slow on Linux?
+  - FAQ: Why are backups slow on a Linux server that is a member of a windows domain?
+  - FAQ: add entry about pure-python msgpack warning, #8323
+  - modify docs for automated backup to append to SYSTEMD_WANTS
+  - modify docs for automated backup to append to SYSTEMD_WANTS rather than overwrite, #8641
+  - fix udev rule priority in automated-local.rst, #8639
+  - clarify requirements when using command line options with special characters within a shell, #8628
 - tests:
 
   - github CI: windows msys2 build: broken, disable it for now, #8264
   - improve borg check --repair healing tests, #8302
+  - fix hourly prune test failure due to local timezone
 - vagrant:
 
   - misc. cleanups/updates

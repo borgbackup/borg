@@ -168,6 +168,7 @@ New features:
   Setting `BORG_DISPLAY_PASSPHRASE=YES` now always shows passphrase and its hex
   utf-8 byte sequence.
 - add {unixtime} placeholder, #8522
+- implement padme chunk size obfuscation (SPEC 250), #8705
 
 Bug fixes:
 
@@ -176,6 +177,7 @@ Bug fixes:
 Other changes:
 
 - adapt to and require borghash 0.1.0
+- create: remove --make-parent-dirs option (borgstore now does this automatically), #8619
 - iter_items: decouple item iteration and content data chunks preloading
 - remote: simplify code, add debug logging
 - OpenBSD fixes:
@@ -184,6 +186,12 @@ Other changes:
   - vagrant: fix OpenBSD box, #8506
   - Filter test output with LibreSSL related warnings on OpenBSD
 - macOS: fix brew's broken pkg-config -> pkgconf transition
+- tests: ignore 'com.apple.provenance' xattr (macOS specific)
+- vagrant updates:
+
+  - use pyinstaller 6.11.1 (also use this in msys2 build scripts)
+  - use python 3.12.8
+  - build binaries with borgstore[sftp], #8574
 - docs:
 
   - automated backup: append to SYSTEMD_WANTS rather than overwrite, #8641
@@ -195,6 +203,7 @@ Other changes:
   - update install docs (requirements, pkgconfig, fuse), #8342
   - libffi-dev is required for argon2-cffi-bindings
   - add undelete command to index
+  - borg commands updated with --repo option, #8550
 
 
 Version 2.0.0b14 (2024-11-17)

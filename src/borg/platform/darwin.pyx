@@ -10,6 +10,18 @@ from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_str
 
 API_VERSION = '1.2_05'
 
+cdef extern from *:
+    """
+    #ifdef _DARWIN_FEATURE_64_BIT_INODE
+    #define DARWIN_FEATURE_64_BIT_INODE_DEFINED 1
+    #else
+    #define DARWIN_FEATURE_64_BIT_INODE_DEFINED 0
+    #endif
+    """
+    int DARWIN_FEATURE_64_BIT_INODE_DEFINED
+
+is_darwin_feature_64_bit_inode = DARWIN_FEATURE_64_BIT_INODE_DEFINED != 0
+
 cdef extern from "sys/xattr.h":
     ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size, int flags)
     ssize_t c_flistxattr "flistxattr" (int filedes, char *list, size_t size, int flags)

@@ -18,9 +18,6 @@ from shutil import get_terminal_size
 from .platformflags import is_win32, is_darwin
 from .logger import create_logger
 
-if is_darwin:
-    from .platform.darwin import get_birthtime_ns
-
 logger = create_logger()
 
 from . import xattr
@@ -55,6 +52,9 @@ from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import RemoteRepository, cache_if_remote
 from .repository import Repository, NoManifestError
 from .repoobj import RepoObj
+
+if is_darwin:
+    from .platform import is_darwin_feature_64_bit_inode, get_birthtime_ns
 
 has_link = hasattr(os, "link")
 
@@ -1074,10 +1074,12 @@ class MetadataCollector:
             attrs["atime"] = safe_ns(st.st_atime_ns)
         if not self.noctime:
             attrs["ctime"] = safe_ns(st.st_ctime_ns)
-        if not self.nobirthtime and hasattr(st, "st_birthtime"):
-            if is_darwin:
+        if not self.nobirthtime:
+            if hasattr(st, "st_birthtime_ns"):
+                attrs["birthtime"] = safe_ns(st.st_birthtime_ns)
+            elif is_darwin and is_darwin_feature_64_bit_inode:
                 attrs["birthtime"] = safe_ns(get_birthtime_ns(fd or path, follow_symlinks=False))
-            else:
+            elif hasattr(st, "st_birthtime"):
                 # sadly, there's no stat_result.st_birthtime_ns
                 attrs["birthtime"] = safe_ns(int(st.st_birthtime * 10**9))
         attrs["uid"] = st.st_uid

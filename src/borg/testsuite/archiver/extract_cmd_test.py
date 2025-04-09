@@ -27,7 +27,7 @@ from . import (
 )
 
 if is_darwin:
-    from ...platform.darwin import get_birthtime_ns
+    from ...platform import get_birthtime_ns, is_darwin_feature_64_bit_inode
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -579,20 +579,32 @@ def test_extract_xattrs_errors(archivers, request):
 
 @pytest.mark.skipif(not is_darwin, reason="only for macOS")
 def test_extract_xattrs_resourcefork(archivers, request):
+
+    def darwin_get_birthtime_ns(path):
+        st = os.stat(input_path)
+        if hasattr(st, "st_birthtime_ns"):
+            return st.st_birthtime_ns
+        elif is_darwin_feature_64_bit_inode:
+            return get_birthtime_ns(path, follow_symlinks=False)
+        elif hasattr(st, "st_birthtime"):
+            return int(st.st_birthtime * 10**9)
+        else:
+            return None
+
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file")
     cmd(archiver, "repo-create", "-e" "none")
     input_path = os.path.abspath("input/file")
     xa_key, xa_value = b"com.apple.ResourceFork", b"whatshouldbehere"  # issue #7234
     xattr.setxattr(input_path.encode(), xa_key, xa_value)
-    birthtime_expected = get_birthtime_ns(input_path)
+    birthtime_expected = darwin_get_birthtime_ns(input_path)
     mtime_expected = os.stat(input_path).st_mtime_ns
     # atime_expected = os.stat(input_path).st_atime_ns
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         cmd(archiver, "extract", "test")
         extracted_path = os.path.abspath("input/file")
-        birthtime_extracted = get_birthtime_ns(extracted_path)
+        birthtime_extracted = darwin_get_birthtime_ns(extracted_path)
         mtime_extracted = os.stat(extracted_path).st_mtime_ns
         # atime_extracted = os.stat(extracted_path).st_atime_ns
         xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)

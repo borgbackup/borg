@@ -1,2 +1,3 @@
 sphinx
+sphinxcontrib-jquery
 guzzle_sphinx_theme

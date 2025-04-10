@@ -104,6 +104,9 @@ import guzzle_sphinx_theme
 html_theme_path = guzzle_sphinx_theme.html_theme_path()
 html_theme = "guzzle_sphinx_theme"
 
+# Register the theme as an extension to generate a sitemap.xml
+extensions.append("guzzle_sphinx_theme")
+
 
 def set_rst_settings(app):
     app.env.settings.update({"field_name_limit": 0, "option_limit": 0})

@@ -15,7 +15,7 @@ from itertools import groupby, zip_longest
 from typing import Iterator
 from shutil import get_terminal_size
 
-from .platformflags import is_win32, is_darwin
+from .platformflags import is_win32
 from .logger import create_logger
 
 logger = create_logger()
@@ -33,7 +33,7 @@ from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
-from .platform import uid2user, user2uid, gid2group, group2gid
+from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
 from .helpers import parse_timestamp, archive_ts_now
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd, remove_dotdot_prefixes
@@ -52,9 +52,6 @@ from .platform import acl_get, acl_set, set_flags, get_flags, swidth, hostname
 from .remote import RemoteRepository, cache_if_remote
 from .repository import Repository, NoManifestError
 from .repoobj import RepoObj
-
-if is_darwin:
-    from .platform import is_darwin_feature_64_bit_inode, get_birthtime_ns
 
 has_link = hasattr(os, "link")
 
@@ -1075,13 +1072,7 @@ class MetadataCollector:
         if not self.noctime:
             attrs["ctime"] = safe_ns(st.st_ctime_ns)
         if not self.nobirthtime:
-            if hasattr(st, "st_birthtime_ns"):
-                attrs["birthtime"] = safe_ns(st.st_birthtime_ns)
-            elif is_darwin and is_darwin_feature_64_bit_inode:
-                attrs["birthtime"] = safe_ns(get_birthtime_ns(fd or path, follow_symlinks=False))
-            elif hasattr(st, "st_birthtime"):
-                # sadly, there's no stat_result.st_birthtime_ns
-                attrs["birthtime"] = safe_ns(int(st.st_birthtime * 10**9))
+            attrs["birthtime"] = safe_ns(get_birthtime_ns(st, path, fd=fd))
         attrs["uid"] = st.st_uid
         attrs["gid"] = st.st_gid
         if not self.numeric_ids:

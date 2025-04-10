@@ -184,7 +184,7 @@ def acl_set(path, item, numeric_ids=False, fd=None):
             acl_free(acl)
 
 
-def get_birthtime_ns(path, follow_symlinks=False):
+def _get_birthtime_ns(path, follow_symlinks=False):
     if isinstance(path, str):
         path = os.fsencode(path)
     cdef stat stat_info

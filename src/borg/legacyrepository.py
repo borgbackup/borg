@@ -1202,18 +1202,21 @@ class LegacyRepository:
             self.index = self.open_index(self.get_transaction_id())
         return [id_ for id_, _ in islice(self.index.iteritems(marker=marker), limit)]
 
-    def get(self, id, read_data=True):
+    def get(self, id, read_data=True, raise_missing=True):
         if not self.index:
             self.index = self.open_index(self.get_transaction_id())
         try:
             in_index = NSIndex1Entry(*(self.index[id][:2]))  # legacy: index entries have no size element
             return self.io.read(in_index.segment, in_index.offset, id, read_data=read_data)
         except KeyError:
-            raise self.ObjectNotFound(id, self.path) from None
+            if raise_missing:
+                raise self.ObjectNotFound(id, self.path) from None
+            else:
+                return None
 
-    def get_many(self, ids, read_data=True, is_preloaded=False):
+    def get_many(self, ids, read_data=True, is_preloaded=False, raise_missing=True):
         for id_ in ids:
-            yield self.get(id_, read_data=read_data)
+            yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
 
     def put(self, id, data, wait=True):
         """put a repo object

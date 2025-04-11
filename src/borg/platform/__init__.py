@@ -4,8 +4,6 @@ Platform-specific APIs.
 Public APIs are documented in platform.base.
 """
 
-import os
-
 from ..platformflags import is_win32, is_linux, is_freebsd, is_darwin, is_cygwin
 
 from .base import ENOATTR, API_VERSION
@@ -75,4 +73,4 @@ def get_birthtime_ns(st, path, fd=None):
     elif hasattr(st, "st_birthtime"):
         return int(st.st_birthtime * 10**9)
     else:
-        raise OSError(ENOATTR, os.strerror(ENOATTR), path)
+        return None

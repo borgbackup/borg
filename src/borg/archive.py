@@ -1072,7 +1072,9 @@ class MetadataCollector:
         if not self.noctime:
             attrs["ctime"] = safe_ns(st.st_ctime_ns)
         if not self.nobirthtime:
-            attrs["birthtime"] = safe_ns(get_birthtime_ns(st, path, fd=fd))
+            birthtime_ns = get_birthtime_ns(st, path, fd=fd)
+            if birthtime_ns is not None:
+                attrs["birthtime"] = safe_ns(birthtime_ns)
         attrs["uid"] = st.st_uid
         attrs["gid"] = st.st_gid
         if not self.numeric_ids:

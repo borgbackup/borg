@@ -33,7 +33,7 @@ from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
-from .platform import uid2user, user2uid, gid2group, group2gid
+from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
 from .helpers import parse_timestamp, archive_ts_now
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd, remove_dotdot_prefixes
@@ -1076,7 +1076,7 @@ class MetadataCollector:
         self.noxattrs = noxattrs
         self.nobirthtime = nobirthtime
 
-    def stat_simple_attrs(self, st):
+    def stat_simple_attrs(self, st, path, fd=None):
         attrs = {}
         attrs["mode"] = st.st_mode
         # borg can work with archives only having mtime (very old borg archives do not have
@@ -1087,9 +1087,10 @@ class MetadataCollector:
             attrs["atime"] = safe_ns(st.st_atime_ns)
         if not self.noctime:
             attrs["ctime"] = safe_ns(st.st_ctime_ns)
-        if not self.nobirthtime and hasattr(st, "st_birthtime"):
-            # sadly, there's no stat_result.st_birthtime_ns
-            attrs["birthtime"] = safe_ns(int(st.st_birthtime * 10**9))
+        if not self.nobirthtime:
+            birthtime_ns = get_birthtime_ns(st, path, fd=fd)
+            if birthtime_ns is not None:
+                attrs["birthtime"] = safe_ns(birthtime_ns)
         attrs["uid"] = st.st_uid
         attrs["gid"] = st.st_gid
         if not self.numeric_ids:
@@ -1123,7 +1124,7 @@ class MetadataCollector:
         return attrs
 
     def stat_attrs(self, st, path, fd=None):
-        attrs = self.stat_simple_attrs(st)
+        attrs = self.stat_simple_attrs(st, path, fd=fd)
         attrs.update(self.stat_ext_attrs(st, path, fd=fd))
         return attrs
 
@@ -1366,7 +1367,7 @@ class FilesystemObjectProcessors:
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
                 with backup_io("fstat"):
                     st = stat_update_check(st, os.fstat(fd))
-                item.update(self.metadata_collector.stat_simple_attrs(st))
+                item.update(self.metadata_collector.stat_simple_attrs(st, path, fd=fd))
                 is_special_file = is_special(st.st_mode)
                 if is_special_file:
                     # we process a special file like a regular file. reflect that in mode,

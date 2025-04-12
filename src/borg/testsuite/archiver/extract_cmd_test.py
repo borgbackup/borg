@@ -13,6 +13,7 @@ from ...helpers import EXIT_WARNING, BackupPermissionError, bin_to_hex
 from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
+from ...platform import get_birthtime_ns
 from ...platformflags import is_darwin, is_win32
 from . import (
     RK_ENCRYPTION,
@@ -585,20 +586,20 @@ def test_extract_xattrs_resourcefork(archivers, request):
     input_path = os.path.abspath("input/file")
     xa_key, xa_value = b"com.apple.ResourceFork", b"whatshouldbehere"  # issue #7234
     xattr.setxattr(input_path.encode(), xa_key, xa_value)
-    birthtime_expected = os.stat(input_path).st_birthtime
+    birthtime_expected = get_birthtime_ns(os.stat(input_path), input_path)
     mtime_expected = os.stat(input_path).st_mtime_ns
     # atime_expected = os.stat(input_path).st_atime_ns
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         cmd(archiver, "extract", "test")
         extracted_path = os.path.abspath("input/file")
-        birthtime_extracted = os.stat(extracted_path).st_birthtime
+        birthtime_extracted = get_birthtime_ns(os.stat(extracted_path), extracted_path)
         mtime_extracted = os.stat(extracted_path).st_mtime_ns
         # atime_extracted = os.stat(extracted_path).st_atime_ns
         xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
     assert xa_value_extracted == xa_value
     # cope with small birthtime deviations of less than 1000ns:
-    assert -1000 <= (birthtime_extracted - birthtime_expected) * 1e9 <= 1000
+    assert birthtime_extracted == birthtime_expected
     assert mtime_extracted == mtime_expected
     # assert atime_extracted == atime_expected  # still broken, but not really important.
 

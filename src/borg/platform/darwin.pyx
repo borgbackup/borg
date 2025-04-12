@@ -2,12 +2,25 @@ import os
 
 from libc.stdint cimport uint32_t
 from libc cimport errno
+from posix.time cimport timespec
 
 from .posix import user2uid, group2gid
 from ..helpers import safe_decode, safe_encode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
 
 API_VERSION = '1.2_05'
+
+cdef extern from *:
+    """
+    #ifdef _DARWIN_FEATURE_64_BIT_INODE
+    #define DARWIN_FEATURE_64_BIT_INODE_DEFINED 1
+    #else
+    #define DARWIN_FEATURE_64_BIT_INODE_DEFINED 0
+    #endif
+    """
+    int DARWIN_FEATURE_64_BIT_INODE_DEFINED
+
+is_darwin_feature_64_bit_inode = DARWIN_FEATURE_64_BIT_INODE_DEFINED != 0
 
 cdef extern from "sys/xattr.h":
     ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size, int flags)
@@ -36,6 +49,14 @@ cdef extern from "sys/acl.h":
     acl_t acl_from_text(const char *buf)
     char *acl_to_text(acl_t acl, ssize_t *len_p)
     int ACL_TYPE_EXTENDED
+
+cdef extern from "sys/stat.h":
+    cdef struct stat:
+        timespec st_birthtimespec
+
+    int c_stat "stat" (const char *path, stat *buf)
+    int c_lstat "lstat" (const char *path, stat *buf)
+    int c_fstat "fstat" (int filedes, stat *buf)
 
 
 def listxattr(path, *, follow_symlinks=False):
@@ -161,3 +182,20 @@ def acl_set(path, item, numeric_ids=False, fd=None):
                     raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
             acl_free(acl)
+
+
+def _get_birthtime_ns(path, follow_symlinks=False):
+    if isinstance(path, str):
+        path = os.fsencode(path)
+    cdef stat stat_info
+    cdef int result
+    if isinstance(path, int):
+        result = c_fstat(path, &stat_info)
+    else:
+        if follow_symlinks:
+            result = c_stat(path, &stat_info)
+        else:
+            result = c_lstat(path, &stat_info)
+    if result != 0:
+        raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
+    return stat_info.st_birthtimespec.tv_sec * 1_000_000_000 + stat_info.st_birthtimespec.tv_nsec

@@ -40,3 +40,16 @@ elif is_darwin:  # pragma: darwin only
     from .darwin import API_VERSION as OS_API_VERSION
     from .darwin import listxattr, getxattr, setxattr
     from .darwin import acl_get, acl_set
+    from .darwin import is_darwin_feature_64_bit_inode, _get_birthtime_ns
+
+
+def get_birthtime_ns(st, path, fd=None):
+    if hasattr(st, "st_birthtime_ns"):
+        # added in Python 3.12 but not always available.
+        return st.st_birthtime_ns
+    elif is_darwin and is_darwin_feature_64_bit_inode:
+        return _get_birthtime_ns(fd or path, follow_symlinks=False)
+    elif hasattr(st, "st_birthtime"):
+        return int(st.st_birthtime * 10**9)
+    else:
+        return None

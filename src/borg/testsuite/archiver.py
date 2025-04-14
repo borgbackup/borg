@@ -1516,19 +1516,19 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         input_path = os.path.abspath('input/file')
         xa_key, xa_value = b'com.apple.ResourceFork', b'whatshouldbehere'  # issue #7234
         xattr.setxattr(input_path.encode(), xa_key, xa_value)
-        birthtime_expected = os.stat(input_path).st_birthtime
+        birthtime_expected = platform.get_birthtime_ns(os.stat(input_path), input_path)
         mtime_expected = os.stat(input_path).st_mtime_ns
         # atime_expected = os.stat(input_path).st_atime_ns
         self.cmd('create', self.repository_location + '::test', 'input')
         with changedir('output'):
             self.cmd('extract', self.repository_location + '::test')
             extracted_path = os.path.abspath('input/file')
-            birthtime_extracted = os.stat(extracted_path).st_birthtime
+            birthtime_extracted = platform.get_birthtime_ns(os.stat(extracted_path), extracted_path)
             mtime_extracted = os.stat(extracted_path).st_mtime_ns
             # atime_extracted = os.stat(extracted_path).st_atime_ns
             xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
         assert xa_value_extracted == xa_value
-        assert same_ts_ns(birthtime_extracted * 1e9, birthtime_expected * 1e9)
+        assert same_ts_ns(birthtime_extracted, birthtime_expected)
         assert same_ts_ns(mtime_extracted, mtime_expected)
         # assert same_ts_ns(atime_extracted, atime_expected)  # still broken, but not really important.
 

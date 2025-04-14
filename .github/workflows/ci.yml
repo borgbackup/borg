@@ -114,7 +114,11 @@ jobs:
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
-        tox --skip-missing-interpreters
+        tox --skip-missing-interpreters -- --junitxml=test-results.xml
+    - name: Upload test results to Codecov
+      uses: codecov/test-results-action@v1
+      with:
+        files: test-results.xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       env:
@@ -186,7 +190,11 @@ jobs:
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
-        tox --skip-missing-interpreters
+        tox --skip-missing-interpreters -- --junitxml=test-results.xml
+    - name: Upload test results to Codecov
+      uses: codecov/test-results-action@v1
+      with:
+        files: test-results.xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       env:
@@ -236,4 +244,8 @@ jobs:
       - name: Run tests
         run: |
           ./dist/borg.exe -V
-          pytest -n4 --benchmark-skip -vv -rs -k "not remote"
+          pytest -n4 --benchmark-skip -vv -rs -k "not remote" --junitxml=test-results.xml
+      - name: Upload test results to Codecov
+        uses: codecov/test-results-action@v1
+        with:
+          files: test-results.xml

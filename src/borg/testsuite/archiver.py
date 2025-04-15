@@ -3935,6 +3935,17 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.cmd('create', self.repository_location + '::test2', 'input')
         assert os.path.exists(nonce)
 
+    def test_exit_codes(self):
+        # we create the repo path, but do NOT initialize the borg repo,
+        # so the borg create commands are expected to fail with InvalidRepository.
+        os.makedirs(self.repository_path, exist_ok=True)
+        with environment_variable(BORG_EXIT_CODES='classic'):
+            self.cmd('create', self.repository_location + '::archive', 'input', fork=True,
+                     exit_code=EXIT_ERROR)
+        with environment_variable(BORG_EXIT_CODES='modern'):
+            self.cmd('create', self.repository_location + '::archive', 'input', fork=True,
+                     exit_code=Repository.InvalidRepository.exit_mcode)
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):

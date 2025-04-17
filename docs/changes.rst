@@ -428,10 +428,12 @@ New features:
   create a non-directory file at that place is still supported.
 - compact: support --dry-run (do nothing) to simplify scripting, #8300
 - add {unixtime} placeholder, #8522
+- macOS: retrieve `birthtime` in nanosecond precision via system call, #8724
 
 Fixes:
 
 - borg exits when assertions are disabled with Python optimizations, #8649
+- fix remote repository exception handling / modern exit codes, #8631
 - config: fix acceptance of storage_quota 0, #8499
 - config: reject additional_free_space < 10M (but accept 0), #6066
 - check: more consistent messaging considering --repair, #8533
@@ -447,6 +449,9 @@ Fixes:
   - ensure that 0B changes are hidden from text diffs, too.
   - remove 0-added,0-removed modified entries from JSON output.
 - try to rebuild cache if an exception is raised, #5213
+- freebsd: fix nfs4 acl processing, #8756.
+  This issue only affected borg extract --numeric-ids when processing NFS4
+  ACLs, it didn't affect POSIX ACL processing.
 
 Other changes:
 
@@ -474,6 +479,11 @@ Other changes:
   - modify docs for automated backup to append to SYSTEMD_WANTS rather than overwrite, #8641
   - fix udev rule priority in automated-local.rst, #8639
   - clarify requirements when using command line options with special characters within a shell, #8628
+  - work around sudden failure of sphinx ini lexer
+  - readthedocs theme fixes
+
+    - bring back highlighted content preview in search results.
+    - fix erroneous warning about missing javascript support.
 - tests:
 
   - github CI: windows msys2 build: broken, disable it for now, #8264
@@ -482,7 +492,7 @@ Other changes:
 - vagrant:
 
   - misc. cleanups/updates
-  - pyenv: only use Python 3.11.11, use this for binary build
+  - pyenv: only use Python 3.11.12, use this for binary build
   - macos: give more memory
   - install rust on BSD
   - add FreeBSD 13 box, for #8266

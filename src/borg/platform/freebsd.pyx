@@ -199,7 +199,7 @@ cdef _nfs4_use_stored_uid_gid(acl):
         if entry:
             if entry.startswith('user:') or entry.startswith('group:'):
                 fields = entry.split(':')
-                entries.append(':'.join(fields[0], fields[5], *fields[2:-1]))
+                entries.append(':'.join([fields[0], fields[5]] + fields[2:-1]))
             else:
                 entries.append(entry)
     return safe_encode('\n'.join(entries))

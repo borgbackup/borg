@@ -54,10 +54,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-            - os: ubuntu-20.04
+            - os: ubuntu-22.04
               python-version: '3.8'
               toxenv: py38-fuse2
-            - os: ubuntu-20.04
+            - os: ubuntu-22.04
               python-version: '3.9'
               toxenv: py39-fuse3
             - os: ubuntu-22.04
@@ -66,7 +66,7 @@ jobs:
             - os: ubuntu-22.04
               python-version: '3.11'
               toxenv: py311-fuse2
-            - os: ubuntu-22.04
+            - os: ubuntu-24.04
               python-version: '3.12'
               toxenv: py312-fuse3
             - os: macos-14

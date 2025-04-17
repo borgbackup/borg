@@ -251,6 +251,19 @@ class RepositoryServer:  # pragma: no cover
                         args = self.filter_args(f, args)
                         res = f(**args)
                     except BaseException as e:
+                        # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                        # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                        # for these, except ErrorWithTraceback, which should always display a traceback.
+                        reconstructed_exceptions = (
+                            Repository.InvalidRepository,
+                            Repository.InvalidRepositoryConfig,
+                            Repository.DoesNotExist,
+                            Repository.AlreadyExists,
+                            Repository.PathAlreadyExists,
+                            PathNotAllowed,
+                            Repository.InsufficientFreeSpaceError,
+                            Repository.StorageQuotaExceeded,
+                        )
                         if dictFormat:
                             ex_short = traceback.format_exception_only(e.__class__, e)
                             ex_full = traceback.format_exception(*sys.exc_info())
@@ -258,12 +271,7 @@ class RepositoryServer:  # pragma: no cover
                             if isinstance(e, Error):
                                 ex_short = [e.get_message()]
                                 ex_trace = e.traceback
-                            if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
-                                # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
-                                # and will be handled just like locally raised exceptions. Suppress the remote traceback
-                                # for these, except ErrorWithTraceback, which should always display a traceback.
-                                pass
-                            else:
+                            if not isinstance(e, reconstructed_exceptions):
                                 logging.debug('\n'.join(ex_full))
 
                             try:
@@ -286,12 +294,7 @@ class RepositoryServer:  # pragma: no cover
 
                             os_write(stdout_fd, msg)
                         else:
-                            if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
-                                # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
-                                # and will be handled just like locally raised exceptions. Suppress the remote traceback
-                                # for these, except ErrorWithTraceback, which should always display a traceback.
-                                pass
-                            else:
+                            if not isinstance(e, reconstructed_exceptions):
                                 if isinstance(e, Error):
                                     tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
                                     msg = e.get_message()
@@ -759,6 +762,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                 raise Error(args[0].decode())
             elif error == 'ErrorWithTraceback':
                 raise ErrorWithTraceback(args[0].decode())
+            elif error == 'InvalidRepository':
+                raise Repository.InvalidRepository(self.location.processed)
             elif error == 'DoesNotExist':
                 raise Repository.DoesNotExist(self.location.processed)
             elif error == 'AlreadyExists':
@@ -782,6 +787,8 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     raise PathNotAllowed(args[0].decode())
             elif error == 'PathPermissionDenied':
                 raise Repository.PathPermissionDenied(args[0].decode())
+            elif error == 'PathAlreadyExists':
+                raise Repository.PathAlreadyExists(args[0].decode())
             elif error == 'ParentPathDoesNotExist':
                 raise Repository.ParentPathDoesNotExist(args[0].decode())
             elif error == 'ObjectNotFound':
@@ -814,6 +821,12 @@ This problem will go away as soon as the server has been upgraded to 1.0.7+.
                     raise NotMyLock('(not available)')
                 else:
                     raise NotMyLock(args[0].decode())
+            elif error == 'InsufficientFreeSpaceError':
+                raise Repository.InsufficientFreeSpaceError(args[0].decode(), args[1].decode())
+            elif error == 'InvalidRepositoryConfig':
+                raise Repository.InvalidRepositoryConfig(self.location.processed, args[1].decode())
+            elif error == 'StorageQuotaExceeded':
+                raise Repository.StorageQuotaExceeded(args[0].decode(), args[1].decode())
             else:
                 raise self.RPCError(unpacked)
 

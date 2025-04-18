@@ -198,6 +198,37 @@ def test_obfuscate():
     assert 6 + 2 + 1100 <= len(compressed) <= 6 + 2 + 1100 + 1024
 
 
+@pytest.mark.parametrize(
+    "data_length, expected_padding",
+    [
+        (10, 0),
+        (100, 4),
+        (1000, 24),
+        (10000, 240),
+        (20000, 480),
+        (50000, 1200),
+        (100000, 352),
+        (1000000, 15808),
+        (5000000, 111808),
+        (10000000, 223616),
+        (20000000, 447232),
+    ],
+)
+def test_padme_obfuscation(data_length, expected_padding):
+    compressor = Compressor(name="obfuscate", level=250, compressor=Compressor("none"))
+    # the innner compressor will add an inner header of 2 bytes, so we reduce the data length by 2 bytes
+    # to be able to use (almost) the same test cases as in master branch.
+    data = b"x" * (data_length - 2)
+    compressed = compressor.compress(data)
+
+    # the outer "obfuscate" pseudo-compressor adds an outer header of 6 bytes.
+    expected_padded_size = 6 + data_length + expected_padding
+
+    assert (
+        len(compressed) == expected_padded_size
+    ), f"For {data_length}, expected {expected_padded_size}, got {len(compressed)}"
+
+
 def test_compression_specs():
     with pytest.raises(argparse.ArgumentTypeError):
         CompressionSpec('')

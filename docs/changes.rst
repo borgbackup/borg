@@ -414,7 +414,7 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.1 (2025-04-xx)
+Version 1.4.1 (2025-04-19)
 --------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
@@ -428,7 +428,8 @@ New features:
   create a non-directory file at that place is still supported.
 - compact: support --dry-run (do nothing) to simplify scripting, #8300
 - add {unixtime} placeholder, #8522
-- macOS: retrieve `birthtime` in nanosecond precision via system call, #8724
+- macOS: retrieve birthtime in nanosecond precision via system call, #8724
+- implement padme chunk size obfuscation (SPEC 250), #8705
 
 Fixes:
 
@@ -456,7 +457,7 @@ Fixes:
 Other changes:
 
 - support and test on Python 3.13
-- use Cython 3.0.11
+- use Cython 3.0.12
 - filter LibreSSL related warnings on OpenBSD
 - docs:
 
@@ -475,7 +476,6 @@ Other changes:
   - FAQ: Why is backing up an unmodified FAT filesystem slow on Linux?
   - FAQ: Why are backups slow on a Linux server that is a member of a windows domain?
   - FAQ: add entry about pure-python msgpack warning, #8323
-  - modify docs for automated backup to append to SYSTEMD_WANTS
   - modify docs for automated backup to append to SYSTEMD_WANTS rather than overwrite, #8641
   - fix udev rule priority in automated-local.rst, #8639
   - clarify requirements when using command line options with special characters within a shell, #8628
@@ -489,9 +489,9 @@ Other changes:
   - github CI: windows msys2 build: broken, disable it for now, #8264
   - improve borg check --repair healing tests, #8302
   - fix hourly prune test failure due to local timezone
+  - ignore `com.apple.provenance` xattr (macOS specific)
 - vagrant:
 
-  - misc. cleanups/updates
   - pyenv: only use Python 3.11.12, use this for binary build
   - macos: give more memory
   - install rust on BSD

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-VERSION" 1 "2024-07-02" "" "borg backup tool"
+.TH "BORG-VERSION" "1" "2025-04-18" "" "borg backup tool"
 .SH NAME
 borg-version \- Display the borg client / borg server version
 .SH SYNOPSIS
@@ -47,8 +47,7 @@ Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # local repo (client uses 1.4.0 alpha version)
 $ borg version /mnt/backup
 1.4.0a / 1.4.0a
@@ -56,8 +55,7 @@ $ borg version /mnt/backup
 # remote repo (client uses 1.4.0 alpha, server uses 1.2.7 release)
 $ borg version ssh://borg@borgbackup:repo
 1.4.0a / 1.2.7
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

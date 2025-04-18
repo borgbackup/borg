@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORGFS" 1 "2024-07-02" "" "borg backup tool"
+.TH "BORGFS" "1" "2025-04-18" "" "borg backup tool"
 .SH NAME
 borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
@@ -35,10 +35,29 @@ borgfs \- Mount archive or an entire repository as a FUSE filesystem
 borgfs [options] REPOSITORY_OR_ARCHIVE MOUNTPOINT [PATH...]
 .SH DESCRIPTION
 .sp
-This command mounts an archive as a FUSE filesystem. This can be useful for
-browsing an archive or restoring individual files. Unless the \fB\-\-foreground\fP
-option is given the command will run in the background until the filesystem
-is \fBumounted\fP\&.
+This command mounts a repository or an archive as a FUSE filesystem.
+This can be useful for browsing or restoring individual files.
+.sp
+When restoring, take into account that the current FUSE implementation does
+not support special fs flags and ACLs.
+.sp
+When mounting a repository, the top directories will be named like the
+archives and the directory structure below these will be loaded on\-demand from
+the repository when entering these directories, so expect some delay.
+.sp
+Unless the \fB\-\-foreground\fP option is given the command will run in the
+background until the filesystem is \fBumounted\fP\&.
+.sp
+Performance tips:
+.INDENT 0.0
+.IP \(bu 2
+when doing a \(dqwhole repository\(dq mount:
+do not enter archive dirs if not needed, this avoids on\-demand loading.
+.IP \(bu 2
+only mount a specific archive, not the whole repository.
+.IP \(bu 2
+only mount specific paths in a specific archive, not the complete archive.
+.UNINDENT
 .sp
 The command \fBborgfs\fP provides a wrapper for \fBborg mount\fP\&. This can also be
 used in fstab entries:
@@ -90,8 +109,8 @@ When the daemonized process receives a signal or crashes, it does not unmount.
 Unmounting in these cases could cause an active rsync or similar process
 to unintentionally delete data.
 .sp
-When running in the foreground ^C/SIGINT unmounts cleanly, but other
-signals or crashes do not.
+When running in the foreground, ^C/SIGINT cleanly unmounts the filesystem,
+but other signals or crashes do not.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -107,7 +126,7 @@ where to mount filesystem
 .B PATH
 paths to extract; patterns are supported
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-V\fP,\fB  \-\-version

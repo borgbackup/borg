@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2024-07-02" "" "borg backup tool"
+.TH "BORG-PRUNE" "1" "2025-04-18" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -42,7 +42,8 @@ Important: Repository disk space is \fBnot\fP freed until you run \fBborg compac
 .sp
 This command is normally used by automated backup scripts wanting to keep a
 certain number of historic backups. This retention policy is commonly referred to as
-\fI\%GFS\fP
+GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>
+
 (Grandfather\-father\-son) backup rotation scheme.
 .sp
 Also, prune automatically removes checkpoint archives (incomplete archives left
@@ -76,9 +77,13 @@ starts is used for pruning purposes. Dates and times are interpreted in
 the local timezone, and weeks go from Monday to Sunday. Specifying a
 negative number of archives to keep means that there is no limit. As of borg
 1.2.0, borg will retain the oldest archive if any of the secondly, minutely,
-hourly, daily, weekly, monthly, or yearly rules was not otherwise able to meet
-its retention target. This enables the first chronological archive to continue
-aging until it is replaced by a newer archive that meets the retention criteria.
+hourly, daily, weekly, monthly, quarterly, or yearly rules was not otherwise
+able to meet its retention target. This enables the first chronological archive
+to continue aging until it is replaced by a newer archive that meets the
+retention criteria.
+.sp
+The \fB\-\-keep\-13weekly\fP and \fB\-\-keep\-3monthly\fP rules are two different
+strategies for keeping archives every quarter year.
 .sp
 The \fB\-\-keep\-last N\fP option is doing the same as \fB\-\-keep\-secondly N\fP (and it will
 keep the last N archives under the assumption that you do not create more than one
@@ -97,7 +102,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B REPOSITORY
 repository to prune
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -133,6 +138,12 @@ number of weekly archives to keep
 .B  \-m\fP,\fB  \-\-keep\-monthly
 number of monthly archives to keep
 .TP
+.B  \-\-keep\-13weekly
+number of quarterly archives to keep (13 week strategy)
+.TP
+.B  \-\-keep\-3monthly
+number of quarterly archives to keep (3 month strategy)
+.TP
 .B  \-y\fP,\fB  \-\-keep\-yearly
 number of yearly archives to keep
 .TP
@@ -166,8 +177,7 @@ first so you will see what it would do without it actually doing anything.
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Keep 7 end of day and 4 additional end of week archives.
 # Do a dry\-run without actually deleting anything.
 $ borg prune \-v \-\-list \-\-dry\-run \-\-keep\-daily=7 \-\-keep\-weekly=4 /path/to/repo
@@ -185,8 +195,7 @@ $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-\-keep\-monthly
 # Keep all backups in the last 10 days, 4 additional end of week archives,
 # and an end of month archive for every month:
 $ borg prune \-v \-\-list \-\-keep\-within=10d \-\-keep\-weekly=4 \-\-keep\-monthly=\-1 /path/to/repo
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

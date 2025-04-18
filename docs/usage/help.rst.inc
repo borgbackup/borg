@@ -91,6 +91,15 @@ Exclusions can be passed via the command line option ``--exclude``. When used
 from within a shell, the patterns should be quoted to protect them from
 expansion.
 
+Patterns matching special characters, e.g. white space, within a shell may
+require adjustments, such as putting quotation marks around the arguments.
+Example:
+Using bash, the following command line option would match and exclude "item name":
+``--pattern='-path/item name'``
+Note that when patterns are used within a pattern file directly read by borg,
+e.g. when using ``--exclude-from`` or ``--patterns-from``, there is no shell
+involved and thus no quotation marks are required.
+
 The ``--exclude-from`` option permits loading exclusion patterns from a text
 file with one pattern per line. Lines empty or starting with the number sign
 ('#') after removing whitespace on both ends are ignored. The optional style
@@ -369,7 +378,8 @@ auto,C[,L]
     The heuristic tries with lz4 whether the data is compressible.
     For incompressible data, it will not use compression (uses "none").
     For compressible data, it uses the given C[,L] compression - with C[,L]
-    being any valid compression specifier.
+    being any valid compression specifier. This can be helpful for media files
+    which often cannot be compressed much more.
 
 obfuscate,SPEC,C[,L]
     Use compressed-size obfuscation to make fingerprinting attacks based on
@@ -412,6 +422,15 @@ obfuscate,SPEC,C[,L]
       ...
       123: 8MiB (max.)
 
+    *Padmé padding* (deterministic)
+
+    ::
+
+      250: pads to sums of powers of 2, max 12% overhead
+
+    Uses the Padmé algorithm to deterministically pad the compressed size to a sum of
+    powers of 2, limiting overhead to 12%. See https://lbarman.ch/blog/padme/ for details.
+
 Examples::
 
     borg create --compression lz4 REPO::ARCHIVE data
@@ -424,4 +443,5 @@ Examples::
     borg create --compression obfuscate,110,none ...
     borg create --compression obfuscate,3,auto,zstd,10 ...
     borg create --compression obfuscate,2,zstd,6 ...
+    borg create --compression obfuscate,250,zstd,3 ...
 

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2024-07-02" "" "borg backup tool"
+.TH "BORG-DELETE" "1" "2025-04-18" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete an existing repository or archives
 .SH SYNOPSIS
@@ -71,7 +71,7 @@ repository or archive to delete
 .B ARCHIVE
 archives to delete
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -120,8 +120,7 @@ consider last N archives after other filters were applied
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # delete a single backup archive:
 $ borg delete /path/to/repo::Monday
 # actually free disk space:
@@ -143,8 +142,7 @@ repo                                 Mon, 2016\-02\-15 19:26:54
 root\-2016\-02\-15                      Mon, 2016\-02\-15 19:36:29
 newname                              Mon, 2016\-02\-15 19:50:19
 Type \(aqYES\(aq if you understand this and want to continue: YES
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

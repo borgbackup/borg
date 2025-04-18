@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-COMPRESSION" 1 "2024-07-02" "" "borg backup tool"
+.TH "BORG-COMPRESSION" "1" "2025-04-18" "" "borg backup tool"
 .SH NAME
 borg-compression \- Details regarding compression
 .SH DESCRIPTION
@@ -78,7 +78,8 @@ Use a built\-in heuristic to decide per chunk whether to compress or not.
 The heuristic tries with lz4 whether the data is compressible.
 For incompressible data, it will not use compression (uses \(dqnone\(dq).
 For compressible data, it uses the given C[,L] compression \- with C[,L]
-being any valid compression specifier.
+being any valid compression specifier. This can be helpful for media files
+which often cannot be compressed much more.
 .TP
 .B obfuscate,SPEC,C[,L]
 Use compressed\-size obfuscation to make fingerprinting attacks based on
@@ -103,16 +104,14 @@ Available factors:
 .INDENT 7.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 1:     0.01 ..        100
 2:     0.1  ..      1,000
 3:     1    ..     10,000
 4:    10    ..    100,000
 5:   100    ..  1,000,000
 6: 1,000    .. 10,000,000
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -120,14 +119,12 @@ Example probabilities for SPEC \fB1\fP:
 .INDENT 7.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 90   %  0.01 ..   0.1
  9   %  0.1  ..   1
  0.9 %  1    ..  10
  0.09% 10    .. 100
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -135,25 +132,35 @@ Example probabilities for SPEC \fB1\fP:
 .INDENT 7.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 110: 1kiB (2 ^ (SPEC \- 100))
 \&...
 120: 1MiB
 \&...
 123: 8MiB (max.)
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
+.sp
+\fIPadmé padding\fP (deterministic)
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.EX
+250: pads to sums of powers of 2, max 12% overhead
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+Uses the Padmé algorithm to deterministically pad the compressed size to a sum of
+powers of 2, limiting overhead to 12%. See  <https://lbarman.ch/blog/padme/>  for details.
 .UNINDENT
 .sp
 Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 borg create \-\-compression lz4 REPO::ARCHIVE data
 borg create \-\-compression zstd REPO::ARCHIVE data
 borg create \-\-compression zstd,10 REPO::ARCHIVE data
@@ -164,8 +171,8 @@ borg create \-\-compression auto,lzma ...
 borg create \-\-compression obfuscate,110,none ...
 borg create \-\-compression obfuscate,3,auto,zstd,10 ...
 borg create \-\-compression obfuscate,2,zstd,6 ...
-.ft P
-.fi
+borg create \-\-compression obfuscate,250,zstd,3 ...
+.EE
 .UNINDENT
 .UNINDENT
 .SH AUTHOR

@@ -613,11 +613,7 @@ class ObfuscateSize(CompressorBase):
 
         padded_size = (compr_size + bitMask) & ~bitMask  # Apply rounding
 
-        # Ensure max 12% overhead
-        max_allowed = int(compr_size * 1.12)
-        final_size = min(padded_size, max_allowed)
-
-        return final_size - compr_size  # Return only the additional padding size
+        return padded_size - compr_size  # Return only the additional padding size
 
 # Maps valid compressor names to their class
 COMPRESSOR_TABLE = {

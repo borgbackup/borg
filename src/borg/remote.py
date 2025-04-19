@@ -265,6 +265,19 @@ class RepositoryServer:  # pragma: no cover
                             args = self.filter_args(f, args)
                             res = f(**args)
                         except BaseException as e:
+                            # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                            # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                            # for these, except ErrorWithTraceback, which should always display a traceback.
+                            reconstructed_exceptions = (
+                                Repository.InvalidRepository,
+                                Repository.InvalidRepositoryConfig,
+                                Repository.DoesNotExist,
+                                Repository.AlreadyExists,
+                                Repository.PathAlreadyExists,
+                                PathNotAllowed,
+                                Repository.InsufficientFreeSpaceError,
+                                Repository.StorageQuotaExceeded,
+                            )
                             # logger.exception(e)
                             ex_short = traceback.format_exception_only(e.__class__, e)
                             ex_full = traceback.format_exception(*sys.exc_info())
@@ -272,12 +285,7 @@ class RepositoryServer:  # pragma: no cover
                             if isinstance(e, Error):
                                 ex_short = [e.get_message()]
                                 ex_trace = e.traceback
-                            if isinstance(e, (self.RepoCls.DoesNotExist, self.RepoCls.AlreadyExists, PathNotAllowed)):
-                                # These exceptions are reconstructed on the client end in RemoteRepository*.call_many(),
-                                # and will be handled just like locally raised exceptions. Suppress the remote traceback
-                                # for these, except ErrorWithTraceback, which should always display a traceback.
-                                pass
-                            else:
+                            if not isinstance(e, reconstructed_exceptions):
                                 logging.debug("\n".join(ex_full))
 
                             sys_info = sysinfo()
@@ -790,6 +798,8 @@ class RemoteRepository:
                 raise Error(args[0])
             elif error == "ErrorWithTraceback":
                 raise ErrorWithTraceback(args[0])
+            elif error == "InvalidRepository":
+                raise Repository.InvalidRepository(self.location.processed)
             elif error == "DoesNotExist":
                 raise Repository.DoesNotExist(self.location.processed)
             elif error == "AlreadyExists":
@@ -802,6 +812,8 @@ class RemoteRepository:
                 raise PathNotAllowed(args[0])
             elif error == "PathPermissionDenied":
                 raise Repository.PathPermissionDenied(args[0])
+            elif error == "PathAlreadyExists":
+                raise Repository.PathAlreadyExists(args[0])
             elif error == "ParentPathDoesNotExist":
                 raise Repository.ParentPathDoesNotExist(args[0])
             elif error == "ObjectNotFound":
@@ -818,6 +830,12 @@ class RemoteRepository:
                 raise NotMyLock(args[0])
             elif error == "NoManifestError":
                 raise NoManifestError
+            elif error == "InsufficientFreeSpaceError":
+                raise Repository.InsufficientFreeSpaceError(args[0], args[1])
+            elif error == "InvalidRepositoryConfig":
+                raise Repository.InvalidRepositoryConfig(self.location.processed, args[1])
+            elif error == "StorageQuotaExceeded":
+                raise Repository.StorageQuotaExceeded(args[0], args[1])
             else:
                 raise self.RPCError(unpacked)
 

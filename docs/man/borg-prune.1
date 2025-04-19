@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2024-03-29" "" "borg backup tool"
+.TH "BORG-PRUNE" "1" "2025-04-19" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -42,7 +42,8 @@ Important: Repository disk space is \fBnot\fP freed until you run \fBborg compac
 .sp
 This command is normally used by automated backup scripts wanting to keep a
 certain number of historic backups. This retention policy is commonly referred to as
-\fI\%GFS\fP
+GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>
+
 (Grandfather\-father\-son) backup rotation scheme.
 .sp
 Also, prune automatically removes checkpoint archives (incomplete archives left
@@ -97,7 +98,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B REPOSITORY
 repository to prune
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -166,8 +167,7 @@ first so you will see what it would do without it actually doing anything.
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Keep 7 end of day and 4 additional end of week archives.
 # Do a dry\-run without actually deleting anything.
 $ borg prune \-v \-\-list \-\-dry\-run \-\-keep\-daily=7 \-\-keep\-weekly=4 /path/to/repo
@@ -185,8 +185,7 @@ $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-\-keep\-monthly
 # Keep all backups in the last 10 days, 4 additional end of week archives,
 # and an end of month archive for every month:
 $ borg prune \-v \-\-list \-\-keep\-within=10d \-\-keep\-weekly=4 \-\-keep\-monthly=\-1 /path/to/repo
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

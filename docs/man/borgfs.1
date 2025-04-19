@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORGFS" 1 "2024-03-29" "" "borg backup tool"
+.TH "BORGFS" "1" "2025-04-19" "" "borg backup tool"
 .SH NAME
 borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
@@ -90,8 +90,8 @@ When the daemonized process receives a signal or crashes, it does not unmount.
 Unmounting in these cases could cause an active rsync or similar process
 to unintentionally delete data.
 .sp
-When running in the foreground ^C/SIGINT unmounts cleanly, but other
-signals or crashes do not.
+When running in the foreground, ^C/SIGINT cleanly unmounts the filesystem,
+but other signals or crashes do not.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -107,7 +107,7 @@ where to mount filesystem
 .B PATH
 paths to extract; patterns are supported
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-V\fP,\fB  \-\-version

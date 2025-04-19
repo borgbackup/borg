@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-SERVE" 1 "2024-03-29" "" "borg backup tool"
+.TH "BORG-SERVE" "1" "2025-04-19" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -39,7 +39,7 @@ This command starts a repository server process. This command is usually not use
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .BI \-\-restrict\-to\-path \ PATH
@@ -77,8 +77,7 @@ locations like \fB/etc/environment\fP or in the forced command itself (example b
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Allow an SSH keypair to only run borg, and only have access to /path/to/repo.
 # Use key options to disable unneeded and potentially dangerous SSH functionality.
 # This will help to secure an automated remote backup system.
@@ -88,8 +87,7 @@ command=\(dqborg serve \-\-restrict\-to\-path /path/to/repo\(dq,restrict ssh\-rs
 # Set a BORG_XXX environment variable on the \(dqborg serve\(dq side
 $ cat ~/.ssh/authorized_keys
 command=\(dqexport BORG_XXX=value; borg serve [...]\(dq,restrict ssh\-rsa [...]
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -108,7 +106,8 @@ in this case.
 .UNINDENT
 .UNINDENT
 .sp
-Details about sshd usage: \fI\%sshd(8)\fP
+Details about sshd usage: sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenBSD-current/man8/sshd.8>
+
 .SS SSH Configuration
 .sp
 \fBborg serve\fP\(aqs pipes (\fBstdin\fP/\fBstdout\fP/\fBstderr\fP) are connected to the \fBsshd\fP process on the server side. In the event that the SSH connection between \fBborg serve\fP and the client is disconnected or stuck abnormally (for example, due to a network outage), it can take a long time for \fBsshd\fP to notice the client is disconnected. In the meantime, \fBsshd\fP continues running, and as a result so does the \fBborg serve\fP process holding the lock on the repository. This can cause subsequent \fBborg\fP operations on the remote repository to fail with the error: \fBFailed to create/acquire the lock\fP\&.
@@ -119,13 +118,11 @@ Either in the client side\(aqs \fB~/.ssh/config\fP file, or in the client\(aqs \
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 Host backupserver
         ServerAliveInterval 10
         ServerAliveCountMax 30
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -137,12 +134,10 @@ On the server side\(aqs \fBsshd\fP configuration file (typically \fB/etc/ssh/ssh
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 ClientAliveInterval 10
 ClientAliveCountMax 30
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

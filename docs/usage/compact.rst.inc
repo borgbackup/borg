@@ -17,7 +17,9 @@ borg compact
     +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
     |                                                       | ``REPOSITORY``          | repository to compact                                          |
     +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
-    | **optional arguments**                                                                                                                           |
+    | **options**                                                                                                                                      |
+    +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
+    |                                                       | ``-n``, ``--dry-run``   | do nothing                                                     |
     +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
     |                                                       | ``--cleanup-commits``   | cleanup commit-only 17-byte segment files                      |
     +-------------------------------------------------------+-------------------------+----------------------------------------------------------------+
@@ -42,9 +44,10 @@ borg compact
         repository to compact
 
 
-    optional arguments
-        --cleanup-commits       cleanup commit-only 17-byte segment files
-        --threshold PERCENT     set minimum threshold for saved space in PERCENT (Default: 10)
+    options
+        -n, --dry-run     do nothing
+        --cleanup-commits    cleanup commit-only 17-byte segment files
+        --threshold PERCENT    set minimum threshold for saved space in PERCENT (Default: 10)
 
 
     :ref:`common_options`

@@ -1,3 +1,4 @@
+'\" t
 .\" Man page generated from reStructuredText.
 .
 .
@@ -27,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-INIT" 1 "2024-03-29" "" "borg backup tool"
+.TH "BORG-INIT" "1" "2025-04-19" "" "borg backup tool"
 .SH NAME
 borg-init \- Initialize an empty repository
 .SH SYNOPSIS
@@ -47,11 +48,9 @@ Use \fBrepokey\fP:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 borg init \-\-encryption repokey /path/to/repo
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -59,11 +58,9 @@ Or \fBrepokey\-blake2\fP depending on which is faster on your client machines (s
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 borg init \-\-encryption repokey\-blake2 /path/to/repo
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -133,9 +130,8 @@ the hashing is done on your local machine.
 .\" nanorst: inline-fill
 .
 .TS
-center;
-|l|l|l|l|.
-_
+box center;
+l|l|l|l.
 T{
 Hash/MAC
 T}	T{
@@ -170,7 +166,6 @@ T}	T{
 \fIrepokey\-blake2\fP
 \fIkeyfile\-blake2\fP
 T}
-_
 .TE
 .\" nanorst: inline-replace
 .
@@ -225,7 +220,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B REPOSITORY
 repository to create
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .BI \-e \ MODE\fR,\fB \ \-\-encryption \ MODE
@@ -244,8 +239,7 @@ create the parent directories of the repository directory, if they are missing.
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Local repository, repokey encryption, BLAKE2b (often faster, since Borg 1.1)
 $ borg init \-\-encryption=repokey\-blake2 /path/to/repo
 
@@ -259,8 +253,7 @@ $ borg init \-\-encryption=repokey\-blake2 user@hostname:backup
 # Remote repository (accesses a remote borg via ssh)
 # keyfile: stores the (encrypted) key into ~/.config/borg/keys/
 $ borg init \-\-encryption=keyfile user@hostname:backup
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

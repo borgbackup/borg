@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-INFO" 1 "2024-03-29" "" "borg backup tool"
+.TH "BORG-INFO" "1" "2025-04-19" "" "borg backup tool"
 .SH NAME
 borg-info \- Show archive details such as disk space used
 .SH SYNOPSIS
@@ -59,7 +59,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B REPOSITORY_OR_ARCHIVE
 repository or archive to display information about
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-json
@@ -87,8 +87,7 @@ consider last N archives after other filters were applied
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg info /path/to/repo::2017\-06\-29T11:00\-srv
 Archive name: 2017\-06\-29T11:00\-srv
 Archive fingerprint: b2f1beac2bd553b34e06358afa45a3c1689320d39163890c5bbbd49125f00fe5
@@ -141,8 +140,7 @@ All archives:              121.82 TB            112.41 TB            215.42 GB
 
                        Unique chunks         Total chunks
 Chunk index:                 1015213            626934122
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

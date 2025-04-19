@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-KEY-EXPORT" 1 "2024-03-29" "" "borg backup tool"
+.TH "BORG-KEY-EXPORT" "1" "2025-04-19" "" "borg backup tool"
 .SH NAME
 borg-key-export \- Export the repository key for backup
 .SH SYNOPSIS
@@ -61,8 +61,7 @@ Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 borg key export /path/to/repo > encrypted\-key\-backup
 borg key export \-\-paper /path/to/repo > encrypted\-key\-backup.txt
 borg key export \-\-qr\-html /path/to/repo > encrypted\-key\-backup.html
@@ -70,8 +69,7 @@ borg key export \-\-qr\-html /path/to/repo > encrypted\-key\-backup.html
 borg key export /path/to/repo encrypted\-key\-backup
 borg key export \-\-paper /path/to/repo encrypted\-key\-backup.txt
 borg key export \-\-qr\-html /path/to/repo encrypted\-key\-backup.html
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH OPTIONS
@@ -85,7 +83,7 @@ REPOSITORY
 .B PATH
 where to store the backup
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-paper

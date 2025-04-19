@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import logging
 from operator import attrgetter
 import os
@@ -17,8 +17,8 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-def prune_within(archives, seconds, kept_because):
-    target = datetime.now(timezone.utc) - timedelta(seconds=seconds)
+def prune_within(archives, delta, kept_because):
+    target = datetime.now(timezone.utc) - delta
     kept_counter = 0
     result = []
     for a in archives:

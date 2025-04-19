@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 from typing import ClassVar, Any, TYPE_CHECKING, Literal
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import partial
 from hashlib import sha256
 from string import Formatter
@@ -129,9 +129,14 @@ def decode_dict(d, keys, encoding="utf-8", errors="surrogateescape"):
 
 
 def interval(s):
-    """Convert a string representing a valid interval to a number of seconds."""
-    if isinstance(s, int):
+    """Parse an interval string (e.g. ``7d``, ``2w``, ``30M``) into a timedelta.
+
+    Supported units: y (years, 365d), m (months, 31d), w (weeks), d (days),
+    H (hours), M (minutes), S (seconds).  The value must be nonnegative.
+    """
+    if isinstance(s, timedelta):
         return s
+
     seconds_in_a_minute = 60
     seconds_in_an_hour = 60 * seconds_in_a_minute
     seconds_in_a_day = 24 * seconds_in_an_hour
@@ -159,10 +164,37 @@ def interval(s):
     except ValueError:
         seconds = -1
 
-    if seconds <= 0:
-        raise ArgumentTypeError(f'Invalid number "{number}": expected positive integer')
+    if seconds < 0:
+        raise ArgumentTypeError(f'Invalid number "{number}": expected nonnegative integer')
 
-    return seconds
+    return timedelta(seconds=seconds)
+
+
+def int_or_interval(s):
+    """Parse *s* as an :class:`int` or, failing that, as an interval string.
+
+    Returns :class:`int` if *s* can be parsed as an integer (e.g. ``"7"``),
+    or :class:`datetime.timedelta` if *s* is a valid interval (e.g. ``"7d"``).
+
+    Raises :class:`ArgumentTypeError` if *s* is neither an integer nor
+    a valid interval.
+    """
+    if isinstance(s, (int, timedelta)):
+        return s
+
+    # Explicitly check 'all' as a shortcut to 'infinite' sentinel value `-1`.
+    if s == "all":
+        return -1
+
+    try:
+        return int(s)
+    except ValueError:
+        pass
+
+    try:
+        return interval(s)
+    except ArgumentTypeError as e:
+        raise ArgumentTypeError(f"Value is neither an integer nor an interval: {e}")
 
 
 class CompressionSpec:

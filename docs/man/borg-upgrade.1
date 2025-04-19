@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UPGRADE" 1 "2024-03-29" "" "borg backup tool"
+.TH "BORG-UPGRADE" "1" "2025-04-19" "" "borg backup tool"
 .SH NAME
 borg-upgrade \- upgrade a repository from a previous version
 .SH SYNOPSIS
@@ -86,7 +86,7 @@ If you routinely do this you might not want to enable this upgrade
 reverse the upgrade by issuing \fBborg upgrade \-\-disable\-tam REPO\fP\&.
 .sp
 See
-\fI\%https://borgbackup.readthedocs.io/en/stable/changes.html#pre\-1\-0\-9\-manifest\-spoofing\-vulnerability\fP
+ <https://borgbackup.readthedocs.io/en/stable/changes.html#pre\-1\-0\-9\-manifest\-spoofing\-vulnerability> 
 for details.
 .SS Attic and Borg 0.xx to Borg 1.x
 .sp
@@ -118,11 +118,9 @@ make sure the cache files are also removed:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 borg delete borg
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -148,7 +146,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B REPOSITORY
 path to the repository to be upgraded
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -179,8 +177,7 @@ add TAM authentication for all archives.
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Upgrade the borg repository to the most recent version.
 $ borg upgrade \-v /path/to/repo
 making a hardlink copy in /path/to/repo.before\-upgrade\-2016\-02\-15\-20:51:55
@@ -190,8 +187,7 @@ converting repo index /path/to/repo/index.0
 converting 1 segments...
 converting borg 0.xx to borg current
 no key file found for repository
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SS Upgrading a passphrase encrypted attic repo

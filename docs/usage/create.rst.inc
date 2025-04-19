@@ -19,7 +19,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``PATH``                                          | paths to archive                                                                                                                                                  |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                                                                                        |
+    | **options**                                                                                                                                                                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-n``, ``--dry-run``                             | do not create a backup archive                                                                                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -130,7 +130,7 @@ borg create
         paths to archive
 
 
-    optional arguments
+    options
         -n, --dry-run    do not create a backup archive
         -s, --stats     print statistics for the created archive
         --list          output verbose list of items (files, dirs, ...)
@@ -329,8 +329,8 @@ borg usually just stores their metadata:
 Other flags used include:
 
 - 'i' = backup data was read from standard input (stdin)
-- '-' = item would be included in archive(s) (if not in dry-run mode)
-- 'x' = item was excluded - or would be excluded from archive(s) (if not in dry-run mode) 
+- '-' = dry run, item was *not* backed up
+- 'x' = excluded, item was *not* backed up
 - '?' = missing status code (if you see this, please file a bug report!)
 
 Reading from stdin

@@ -1,3 +1,4 @@
+'\" t
 .\" Man page generated from reStructuredText.
 .
 .
@@ -27,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" 1 "2024-03-29" "" "borg backup tool"
+.TH "BORG" "1" "2025-04-19" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -58,11 +59,9 @@ Before a backup can be made a repository has to be initialized:
 .INDENT 3.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg init \-\-encryption=repokey /path/to/repo
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .IP 2. 3
@@ -71,11 +70,9 @@ Backup the \fB~/src\fP and \fB~/Documents\fP directories into an archive called
 .INDENT 3.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg create /path/to/repo::Monday ~/src ~/Documents
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .IP 3. 3
@@ -83,11 +80,9 @@ The next day create a new archive called \fITuesday\fP:
 .INDENT 3.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg create \-\-stats /path/to/repo::Tuesday ~/src ~/Documents
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -98,8 +93,7 @@ data (not shared with other archives):
 .INDENT 3.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 \-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
 Archive name: Tuesday
 Archive fingerprint: bd31004d58f51ea06ff735d2e5ac49376901b21d58035f8fb05dbf866566e3c2
@@ -116,8 +110,7 @@ All archives:                8.33 MB              8.34 MB              4.19 MB
                       Unique chunks         Total chunks
 Chunk index:                     132                  261
 \-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .IP 4. 3
@@ -125,13 +118,11 @@ List all archives in the repository:
 .INDENT 3.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg list /path/to/repo
 Monday                               Mon, 2016\-02\-15 19:14:44
 Tuesday                              Tue, 2016\-02\-16 19:15:11
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .IP 5. 3
@@ -139,14 +130,12 @@ List the contents of the \fIMonday\fP archive:
 .INDENT 3.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg list /path/to/repo::Monday
 drwxr\-xr\-x user   group          0 Mon, 2016\-02\-15 18:22:30 home/user/Documents
 \-rw\-r\-\-r\-\- user   group       7961 Mon, 2016\-02\-15 18:22:30 home/user/Documents/Important.doc
 \&...
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .IP 6. 3
@@ -154,11 +143,9 @@ Restore the \fIMonday\fP archive by extracting the files relative to the current
 .INDENT 3.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg extract /path/to/repo::Monday
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .IP 7. 3
@@ -166,11 +153,9 @@ Delete the \fIMonday\fP archive (please note that this does \fBnot\fP free repo 
 .INDENT 3.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg delete /path/to/repo::Monday
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .IP 8. 3
@@ -178,11 +163,9 @@ Recover disk space by compacting the segment files in the repo:
 .INDENT 3.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg compact /path/to/repo
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .UNINDENT
@@ -206,18 +189,16 @@ in the example), but not in between them:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 borg create \-s \-\-progress repo::archive path  # good and preferred
 borg create repo::archive path \-s \-\-progress  # also works
 borg create \-s repo::archive path \-\-progress  # works, but ugly
 borg create repo::archive \-s \-\-progress path  # BAD
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
-This is due to a problem in the argparse module: \fI\%https://bugs.python.org/issue15112\fP
+This is due to a problem in the argparse module:  <https://bugs.python.org/issue15112> 
 .SS Repository URLs
 .sp
 \fBLocal filesystem\fP (or locally mounted network filesystem):
@@ -231,13 +212,21 @@ expanded by your shell).
 .sp
 Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style.
 .sp
-\fBRemote repositories\fP accessed via ssh \fI\%user@host\fP:
+\fBRemote repositories\fP accessed via ssh  <user@host> :
 .sp
-\fBuser@host:/path/to/repo\fP \- remote repo, absolute path
+\fBssh://user@host:port/path/to/repo\fP \- remote repo, absolute path, port can be given
 .sp
-\fBssh://user@host:port/path/to/repo\fP \- same, alternative syntax, port can be given
+\fBuser@host:/path/to/repo\fP \- remote repo, absolute path, deprecated syntax
 .sp
-\fBRemote repositories with relative paths\fP can be given using this syntax:
+\fBRemote repositories with relative paths, URL style syntax with port\fP:
+.sp
+\fBssh://user@host:port/./path/to/repo\fP \- path relative to current directory
+.sp
+\fBssh://user@host:port/~/path/to/repo\fP \- path relative to user\(aqs home directory
+.sp
+\fBssh://user@host:port/~other/path/to/repo\fP \- path relative to other\(aqs home directory (deprecated)
+.sp
+\fBRemote repositories with relative paths, deprecated SCP style syntax\fP:
 .sp
 \fBuser@host:path/to/repo\fP \- path relative to current directory
 .sp
@@ -248,24 +237,14 @@ Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style
 Note: giving \fBuser@host:/./path/to/repo\fP or \fBuser@host:/~/path/to/repo\fP or
 \fBuser@host:/~other/path/to/repo\fP is also supported, but not required here.
 .sp
-\fBRemote repositories with relative paths, alternative syntax with port\fP:
-.sp
-\fBssh://user@host:port/./path/to/repo\fP \- path relative to current directory
-.sp
-\fBssh://user@host:port/~/path/to/repo\fP \- path relative to user\(aqs home directory
-.sp
-\fBssh://user@host:port/~other/path/to/repo\fP \- path relative to other\(aqs home directory
-.sp
 If you frequently need the same repo URL, it is a good idea to set the
 \fBBORG_REPO\fP environment variable to set a default for the repo URL:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 export BORG_REPO=\(aqssh://user@host:port/path/to/repo\(aq
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -297,11 +276,9 @@ If you want to capture the log output to a file, just redirect it:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 borg create repo::archive myfiles 2>> logfile
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -343,9 +320,8 @@ their usage is not recommended as you might miss important information.
 .sp
 Borg can exit with the following return codes (rc):
 .TS
-center;
-|l|l|.
-_
+box center;
+l|l.
 T{
 Return code
 T}	T{
@@ -377,7 +353,6 @@ T{
 T}	T{
 killed by signal N (e.g. 137 == kill \-9)
 T}
-_
 .TE
 .sp
 If you use \fB\-\-show\-rc\fP, the return code is also logged at the indicated
@@ -433,10 +408,11 @@ a unique id based on the MAC address of the network interface. Except if that MA
 that case it returns a random value, which is not what we want (because it kills automatic stale lock removal).
 So, if you have a all\-zero MAC address or other reasons to better externally control the host id, just set this
 environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
-use \fI\%fqdn@uniqueid\fP\&.
+use  <fqdn@uniqueid> \&.
 .TP
 .B BORG_LOGGING_CONF
-When set, use the given filename as \fI\%INI\fP\-style logging configuration.
+When set, use the given filename as INI <https://docs.python.org/3/library/logging.config.html#configuration-file-format>
+\-style logging configuration.
 A basic example conf can be found at \fBdocs/misc/logging.conf\fP\&.
 .TP
 .B BORG_RSH
@@ -518,11 +494,9 @@ from an affected repository (read\-only access):
 .INDENT 7.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 BORG_WORKAROUNDS=authenticated_no_key borg extract repo::archive
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -530,11 +504,9 @@ After you have extracted all data you need, you MUST delete the repository:
 .INDENT 7.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 BORG_WORKAROUNDS=authenticated_no_key borg delete repo
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -583,14 +555,16 @@ to modify \fBBORG_BASE_DIR\fP: the other paths for cache, config etc. will adapt
 .TP
 .B BORG_CACHE_DIR
 Defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
-\fI\%XDG env var\fP \fBXDG_CACHE_HOME\fP is set, then \fB$XDG_CACHE_HOME/borg\fP is being used instead.
+XDG env var <https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html>
+ \fBXDG_CACHE_HOME\fP is set, then \fB$XDG_CACHE_HOME/borg\fP is being used instead.
 This directory contains the local cache and might need a lot
 of space for dealing with big repositories. Make sure you\(aqre aware of the associated
 security aspects of the cache location: \fIcache_security\fP
 .TP
 .B BORG_CONFIG_DIR
 Defaults to \fB$BORG_BASE_DIR/.config/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
-\fI\%XDG env var\fP \fBXDG_CONFIG_HOME\fP is set, then \fB$XDG_CONFIG_HOME/borg\fP is being used instead.
+XDG env var <https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html>
+ \fBXDG_CONFIG_HOME\fP is set, then \fB$XDG_CONFIG_HOME/borg\fP is being used instead.
 This directory contains all borg configuration directories, see the FAQ
 for a security advisory about the data in this directory: \fIhome_config_borg\fP
 .TP
@@ -625,7 +599,8 @@ you need to point to the correct key file matching the repository the command wi
 .TP
 .B TMPDIR
 This is where temporary files are stored (might need a lot of temporary space for some
-operations), see \fI\%tempfile\fP for details.
+operations), see tempfile <https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir>
+ for details.
 .UNINDENT
 .TP
 .B Building:
@@ -691,16 +666,19 @@ config file), but the code tries to work also if hardlinks are not supported.
 .SS Units
 .sp
 To display quantities, Borg takes care of respecting the
-usual conventions of scale. Disk sizes are displayed in \fI\%decimal\fP, using powers of ten (so
-\fBkB\fP means 1000 bytes). For memory usage, \fI\%binary prefixes\fP are used, and are
-indicated using the \fI\%IEC binary prefixes\fP,
+usual conventions of scale. Disk sizes are displayed in decimal <https://en.wikipedia.org/wiki/Decimal>
+, using powers of ten (so
+\fBkB\fP means 1000 bytes). For memory usage, binary prefixes <https://en.wikipedia.org/wiki/Binary_prefix>
+ are used, and are
+indicated using the IEC binary prefixes <https://en.wikipedia.org/wiki/IEC_80000-13#Prefixes_for_binary_multiples>
+,
 using powers of two (so \fBKiB\fP means 1024 bytes).
 .SS Date and Time
 .sp
 We format date and time conforming to ISO\-8601, that is: YYYY\-MM\-DD and
 HH:MM:SS (24h clock).
 .sp
-For more information about that, see: \fI\%https://xkcd.com/1179/\fP
+For more information about that, see:  <https://xkcd.com/1179/> 
 .sp
 Unless otherwise noted, we display local date and time.
 Internally, we store and process date and time as UTC.
@@ -747,7 +725,7 @@ borg check: the repository check computes the checksums of all chunks
 borg delete repo: low CPU usage
 .TP
 .B CPU (only for client/server operation):
-When using borg in a client/server way with a \fI\%ssh:\-type\fP repo, the ssh
+When using borg in a client/server way with a  <ssh:\-type>  repo, the ssh
 processes used for the transport layer will need some CPU on the client and
 on the server due to the crypto they are doing \- esp. if you are pumping
 big amounts of data.
@@ -847,9 +825,8 @@ On some platforms additional features are supported:
 .\" Yes/No's are grouped by reason/mechanism/reference.
 .
 .TS
-center;
-|l|l|l|l|.
-_
+box center;
+l|l|l|l.
 T{
 Platform
 T}	T{
@@ -932,7 +909,6 @@ No
 T}	T{
 No
 T}
-_
 .TE
 .sp
 Other Unix\-like operating systems may work as well, but have not been tested at all.
@@ -970,15 +946,15 @@ The BSDs define additional flags.
 \fIborg\-compression(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP
 .INDENT 0.0
 .IP \(bu 2
-Main web site \fI\%https://www.borgbackup.org/\fP
+Main web site  <https://www.borgbackup.org/> 
 .IP \(bu 2
-Releases \fI\%https://github.com/borgbackup/borg/releases\fP
+Releases  <https://github.com/borgbackup/borg/releases> 
 .IP \(bu 2
-Changelog \fI\%https://github.com/borgbackup/borg/blob/master/docs/changes.rst\fP
+Changelog  <https://github.com/borgbackup/borg/blob/master/docs/changes.rst> 
 .IP \(bu 2
-GitHub \fI\%https://github.com/borgbackup/borg\fP
+GitHub  <https://github.com/borgbackup/borg> 
 .IP \(bu 2
-Security contact \fI\%https://borgbackup.readthedocs.io/en/latest/support.html#security\-contact\fP
+Security contact  <https://borgbackup.readthedocs.io/en/latest/support.html#security\-contact> 
 .UNINDENT
 .SH AUTHOR
 The Borg Collective

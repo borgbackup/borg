@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PATTERNS" 1 "2024-03-29" "" "borg backup tool"
+.TH "BORG-PATTERNS" "1" "2025-04-19" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
@@ -52,7 +52,8 @@ style for a specific pattern, prefix it with two characters followed
 by a colon \(aq:\(aq (i.e. \fBfm:path/*\fP, \fBsh:path/**\fP).
 .INDENT 0.0
 .TP
-.B \fI\%Fnmatch\fP, selector \fIfm:\fP
+.B Fnmatch <https://docs.python.org/3/library/fnmatch.html>
+, selector \fIfm:\fP
 This is the default style for \fB\-\-exclude\fP and \fB\-\-exclude\-from\fP\&.
 These patterns use a variant of shell pattern syntax, with \(aq*\(aq matching
 any number of characters, \(aq?\(aq matching any single character, \(aq[...]\(aq
@@ -82,8 +83,9 @@ path and any substring match is sufficient. It is strongly recommended to
 anchor patterns to the start (\(aq^\(aq), to the end (\(aq$\(aq) or both. Path
 separators (backslash for Windows and \(aq/\(aq on other systems) in paths are
 always normalized to a forward slash (\(aq/\(aq) before applying a pattern. The
-regular expression syntax is described in the \fI\%Python documentation for
-the re module\fP\&.
+regular expression syntax is described in the Python documentation for
+the re module <https://docs.python.org/3/library/re.html>
+\&.
 .TP
 .B Path prefix, selector \fIpp:\fP
 This pattern style is useful to match whole sub\-directories. The pattern
@@ -136,8 +138,7 @@ Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Exclude \(aq/home/user/file.o\(aq but not \(aq/home/user/file.odt\(aq:
 $ borg create \-e \(aq*.o\(aq backup /
 
@@ -167,8 +168,7 @@ sh:home/*/.thumbnails
 some file with spaces.txt
 EOF
 $ borg create \-\-exclude\-from exclude.txt backup /
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -222,8 +222,7 @@ Example:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Define the recursion root
 R /
 # Exclude all iso files in any directory
@@ -240,8 +239,7 @@ R /
 # Exclude all other files and directories
 # that are not specifically included earlier.
 \- **
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -266,16 +264,14 @@ Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # backup pics, but not the ones from 2018, except the good ones:
 # note: using = is essential to avoid cmdline argument parsing issues.
 borg create \-\-pattern=+pics/2018/good \-\-pattern=\-pics/2018 repo::arch pics
 
 # use a file with patterns:
 borg create \-\-patterns\-from patterns.lst repo::arch
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -283,8 +279,7 @@ The patterns.lst file could look like that:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # \(dqsh:\(dq pattern style is the default, so the following line is not needed:
 P sh
 R /
@@ -301,8 +296,7 @@ R /
 \- home/*
 # don\(aqt even look in /proc
 ! proc
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -310,13 +304,11 @@ You can specify recursion roots either on the command line or in a patternfile:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # these two commands do the same thing
 borg create \-\-exclude home/bobby/junk repo::arch /home/bobby /home/susan
 borg create \-\-patterns\-from patternfile.lst repo::arch
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -324,8 +316,7 @@ The patternfile:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # note that excludes use fm: by default and patternfiles use sh: by default.
 # therefore, we need to specify fm: to have the same exact behavior.
 P fm
@@ -333,8 +324,7 @@ R /home/bobby
 R /home/susan
 
 \- home/bobby/junk
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

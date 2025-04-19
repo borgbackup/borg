@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UMOUNT" 1 "2024-03-29" "" "borg backup tool"
+.TH "BORG-UMOUNT" "1" "2025-04-19" "" "borg backup tool"
 .SH NAME
 borg-umount \- un-mount the FUSE filesystem
 .SH SYNOPSIS
@@ -52,8 +52,7 @@ mountpoint of the filesystem to umount
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Mounting the repository shows all archives.
 # Archives are loaded lazily, expect some delay when navigating to an archive
 # for the first time.
@@ -87,16 +86,21 @@ $ borg mount \-o versions \-\-glob\-archives \(aq*\-my\-home\(aq \-\-last 10 /pa
 # These can speed up mounting and lower memory needs significantly.
 $ borg mount /path/to/repo /tmp/mymountpoint only/that/path
 $ borg mount \-\-exclude \(aq...\(aq /path/to/repo /tmp/mymountpoint
-.ft P
-.fi
+
+# When using BORG_REPO env var, use :: as positional argument:
+export BORG_REPO=/path/to/repo
+# Mount the whole repo:
+borg mount :: /tmp/mymountpoint
+# Mount some specific archive:
+borg mount ::root\-2016\-02\-15 /tmp/mymountpoint
+.EE
 .UNINDENT
 .UNINDENT
 .SS borgfs
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ echo \(aq/mnt/backup /tmp/myrepo fuse.borgfs defaults,noauto 0 0\(aq >> /etc/fstab
 $ echo \(aq/mnt/backup::root\-2016\-02\-15 /tmp/myarchive fuse.borgfs defaults,noauto 0 0\(aq >> /etc/fstab
 $ mount /tmp/myrepo
@@ -105,8 +109,7 @@ $ ls /tmp/myrepo
 root\-2016\-02\-01 root\-2016\-02\-2015
 $ ls /tmp/myarchive
 bin  boot  etc      home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

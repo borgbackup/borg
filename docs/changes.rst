@@ -418,6 +418,7 @@ Fixes:
 
 Other changes:
 
+- use Python 3.9.22 for the binary build
 - allow msgpack 1.1.0
 - changed insufficiently reserved length for log message, #8152
 - docs:

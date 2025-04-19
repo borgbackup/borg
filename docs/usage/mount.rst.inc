@@ -21,7 +21,7 @@ borg mount
     +-----------------------------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``PATH``                              | paths to extract; patterns are supported                                                                                          |
     +-----------------------------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                                                                  |
+    | **options**                                                                                                                                                                                                                                             |
     +-----------------------------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--consider-checkpoints``            | Show checkpoint archives in the repository contents list (default: hidden).                                                       |
     +-----------------------------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------+
@@ -80,7 +80,7 @@ borg mount
         paths to extract; patterns are supported
 
 
-    optional arguments
+    options
         --consider-checkpoints    Show checkpoint archives in the repository contents list (default: hidden).
         -f, --foreground    stay in foreground, do not daemonize
         -o     Extra mount options
@@ -161,5 +161,5 @@ When the daemonized process receives a signal or crashes, it does not unmount.
 Unmounting in these cases could cause an active rsync or similar process
 to unintentionally delete data.
 
-When running in the foreground ^C/SIGINT unmounts cleanly, but other
-signals or crashes do not.
+When running in the foreground, ^C/SIGINT cleanly unmounts the filesystem,
+but other signals or crashes do not.

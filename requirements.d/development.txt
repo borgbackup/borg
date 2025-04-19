@@ -12,6 +12,7 @@ pytest-xdist
 coverage[toml]
 pytest-cov
 pytest-benchmark
+freezegun
 Cython
 pre-commit
 bandit[toml]

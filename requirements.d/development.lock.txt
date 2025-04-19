@@ -11,6 +11,7 @@ pytest-xdist==3.8.0
 coverage[toml]==7.14.0
 pytest-cov==7.1.0
 pytest-benchmark==5.2.3
+freezegun==1.5.5
 Cython==3.2.5
 pre-commit==4.6.0
 types-PyYAML==6.0.12.20260518

@@ -3,6 +3,7 @@ import errno
 import getpass
 import hashlib
 import os
+import re
 import shutil
 import sys
 from argparse import ArgumentTypeError
@@ -26,7 +27,7 @@ from ..helpers import (
     replace_placeholders,
 )
 from ..helpers import remove_dotdot_prefixes, make_path_safe, clean_lines
-from ..helpers import interval
+from ..helpers import interval, int_or_interval
 from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir, get_runtime_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import msgpack
@@ -556,6 +557,7 @@ def test_prune_split_no_archives():
 @pytest.mark.parametrize(
     "timeframe, num_secs",
     [
+        ("0S", 0),
         ("5S", 5),
         ("2M", 2 * 60),
         ("1H", 60 * 60),
@@ -572,9 +574,9 @@ def test_interval(timeframe, num_secs):
 @pytest.mark.parametrize(
     "invalid_interval, error_tuple",
     [
-        ("H", ('Invalid number "": expected positive integer',)),
-        ("-1d", ('Invalid number "-1": expected positive integer',)),
-        ("food", ('Invalid number "foo": expected positive integer',)),
+        ("H", ('Invalid number "": expected nonnegative integer',)),
+        ("-1d", ('Invalid number "-1": expected nonnegative integer',)),
+        ("food", ('Invalid number "foo": expected nonnegative integer',)),
     ],
 )
 def test_interval_time_unit(invalid_interval, error_tuple):
@@ -583,10 +585,49 @@ def test_interval_time_unit(invalid_interval, error_tuple):
     assert exc.value.args == error_tuple
 
 
-def test_interval_number():
+@pytest.mark.parametrize(
+    "invalid_input, error_regex",
+    [
+        ("x", r'^Unexpected time unit "x": choose from'),
+        ("-1t", r'^Unexpected time unit "t": choose from'),
+        ("fool", r'^Unexpected time unit "l": choose from'),
+        ("abc", r'^Unexpected time unit "c": choose from'),
+        (" abc ", r'^Unexpected time unit " ": choose from'),
+    ],
+)
+def test_interval_invalid_time_format(invalid_input, error_regex):
     with pytest.raises(ArgumentTypeError) as exc:
-        interval("5")
-    assert exc.value.args == ('Unexpected time unit "5": choose from y, m, w, d, H, M, S',)
+        interval(invalid_input)
+    assert re.search(error_regex, exc.value.args[0])
+
+
+@pytest.mark.parametrize(
+    "input, result",
+    [
+        ("0", 0),
+        ("5", 5),
+        (" 999 ", 999),
+        ("0S", timedelta(seconds=0)),
+        ("5S", timedelta(seconds=5)),
+        ("1m", timedelta(days=31)),
+    ],
+)
+def test_int_or_interval(input, result):
+    assert int_or_interval(input) == result
+
+
+@pytest.mark.parametrize(
+    "invalid_input, error_regex",
+    [
+        ("H", r"Value is neither an integer nor an interval:"),
+        ("-1d", r"Value is neither an integer nor an interval:"),
+        ("food", r"Value is neither an integer nor an interval:"),
+    ],
+)
+def test_int_or_interval_time_unit(invalid_input, error_regex):
+    with pytest.raises(ArgumentTypeError) as exc:
+        int_or_interval(invalid_input)
+    assert re.search(error_regex, exc.value.args[0])
 
 
 def test_prune_within():

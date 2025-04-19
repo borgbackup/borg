@@ -1,7 +1,8 @@
 import base64
 import os
+import re
 from argparse import ArgumentTypeError
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -16,6 +17,7 @@ from ...helpers.parseformat import (
     format_file_size,
     parse_file_size,
     interval,
+    int_or_interval,
     partial_format,
     clean_lines,
     format_line,
@@ -376,6 +378,7 @@ def test_format_timedelta():
 @pytest.mark.parametrize(
     "timeframe, num_secs",
     [
+        ("0S", 0),
         ("5S", 5),
         ("2M", 2 * 60),
         ("1H", 60 * 60),
@@ -392,9 +395,9 @@ def test_interval(timeframe, num_secs):
 @pytest.mark.parametrize(
     "invalid_interval, error_tuple",
     [
-        ("H", ('Invalid number "": expected positive integer',)),
-        ("-1d", ('Invalid number "-1": expected positive integer',)),
-        ("food", ('Invalid number "foo": expected positive integer',)),
+        ("H", ('Invalid number "": expected nonnegative integer',)),
+        ("-1d", ('Invalid number "-1": expected nonnegative integer',)),
+        ("food", ('Invalid number "foo": expected nonnegative integer',)),
     ],
 )
 def test_interval_time_unit(invalid_interval, error_tuple):
@@ -403,10 +406,49 @@ def test_interval_time_unit(invalid_interval, error_tuple):
     assert exc.value.args == error_tuple
 
 
-def test_interval_number():
+@pytest.mark.parametrize(
+    "invalid_input, error_regex",
+    [
+        ("x", r'^Unexpected time unit "x": choose from'),
+        ("-1t", r'^Unexpected time unit "t": choose from'),
+        ("fool", r'^Unexpected time unit "l": choose from'),
+        ("abc", r'^Unexpected time unit "c": choose from'),
+        (" abc ", r'^Unexpected time unit " ": choose from'),
+    ],
+)
+def test_interval_invalid_time_format(invalid_input, error_regex):
     with pytest.raises(ArgumentTypeError) as exc:
-        interval("5")
-    assert exc.value.args == ('Unexpected time unit "5": choose from y, m, w, d, H, M, S',)
+        interval(invalid_input)
+    assert re.search(error_regex, exc.value.args[0])
+
+
+@pytest.mark.parametrize(
+    "input, result",
+    [
+        ("0", 0),
+        ("5", 5),
+        (" 999 ", 999),
+        ("0S", timedelta(seconds=0)),
+        ("5S", timedelta(seconds=5)),
+        ("1m", timedelta(days=31)),
+    ],
+)
+def test_int_or_interval(input, result):
+    assert int_or_interval(input) == result
+
+
+@pytest.mark.parametrize(
+    "invalid_input, error_regex",
+    [
+        ("H", r"Value is neither an integer nor an interval:"),
+        ("-1d", r"Value is neither an integer nor an interval:"),
+        ("food", r"Value is neither an integer nor an interval:"),
+    ],
+)
+def test_int_or_interval_time_unit(invalid_input, error_regex):
+    with pytest.raises(ArgumentTypeError) as exc:
+        int_or_interval(invalid_input)
+    assert re.search(error_regex, exc.value.args[0])
 
 
 def test_parse_timestamp():

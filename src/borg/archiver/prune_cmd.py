@@ -1,16 +1,17 @@
 import argparse
 from collections import OrderedDict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import logging
 from operator import attrgetter
 import os
+import itertools
 
 from ._common import with_repository, Highlander
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
-from ..helpers import archivename_validator
+from ..helpers import interval, int_or_interval, sig_int, archivename_validator
+from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -18,20 +19,23 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-def prune_within(archives, seconds, kept_because):
-    target = datetime.now(timezone.utc) - timedelta(seconds=seconds)
-    kept_counter = 0
-    result = []
-    for a in archives:
-        if a.ts > target:
-            kept_counter += 1
-            kept_because[a.id] = ("within", kept_counter)
-            result.append(a)
-    return result
+# The *_period_func group of functions create period grouping keys to group together archives falling within a certain
+# period. Among archives in each of these groups, only the latest (by creation timestamp) is kept.
 
 
-def default_period_func(pattern):
+def unique_period_func():
+    counter = itertools.count()
+
+    def unique_values(_a):
+        """Group archives by an incrementing counter, practically making each archive a group of 1"""
+        return next(counter)
+
+    return unique_values
+
+
+def pattern_period_func(pattern):
     def inner(a):
+        """Group archives by extracting given strftime-pattern from their creation timestamp"""
         # compute in local timezone
         return a.ts.astimezone().strftime(pattern)
 
@@ -39,6 +43,7 @@ def default_period_func(pattern):
 
 
 def quarterly_13weekly_period_func(a):
+    """Group archives by extracting the ISO-8601 13-week quarter from their creation timestamp"""
     (year, week, _) = a.ts.astimezone().isocalendar()  # local time
     if week <= 13:
         # Weeks containing Jan 4th to Mar 28th (leap year) or 29th- 91 (13*7)
@@ -60,6 +65,7 @@ def quarterly_13weekly_period_func(a):
 
 
 def quarterly_3monthly_period_func(a):
+    """Group archives by extracting the 3-month quarter from their creation timestamp"""
     lt = a.ts.astimezone()  # local time
     if lt.month <= 3:
         # 1-1 to 3-31
@@ -77,42 +83,64 @@ def quarterly_3monthly_period_func(a):
 
 PRUNING_PATTERNS = OrderedDict(
     [
-        ("secondly", default_period_func("%Y-%m-%d %H:%M:%S")),
-        ("minutely", default_period_func("%Y-%m-%d %H:%M")),
-        ("hourly", default_period_func("%Y-%m-%d %H")),
-        ("daily", default_period_func("%Y-%m-%d")),
-        ("weekly", default_period_func("%G-%V")),
-        ("monthly", default_period_func("%Y-%m")),
+        # Each archive is considered for keeping
+        ("within", unique_period_func()),
+        ("last", unique_period_func()),
+        ("keep", unique_period_func()),
+        # Last archive (by creation timestamp) within period group is consiedered for keeping
+        ("secondly", pattern_period_func("%Y-%m-%d %H:%M:%S")),
+        ("minutely", pattern_period_func("%Y-%m-%d %H:%M")),
+        ("hourly", pattern_period_func("%Y-%m-%d %H")),
+        ("daily", pattern_period_func("%Y-%m-%d")),
+        ("weekly", pattern_period_func("%G-%V")),
+        ("monthly", pattern_period_func("%Y-%m")),
         ("quarterly_13weekly", quarterly_13weekly_period_func),
         ("quarterly_3monthly", quarterly_3monthly_period_func),
-        ("yearly", default_period_func("%Y")),
+        ("yearly", pattern_period_func("%Y")),
     ]
 )
 
 
-def prune_split(archives, rule, n, kept_because=None):
-    last = None
+# Datetime cannot represent times before datetime.min, so a day is added to allow for time zone offset.
+DATETIME_MIN_WITH_ZONE = datetime.min.replace(tzinfo=timezone.utc)
+
+
+def prune_split(archives, rule, n_or_interval, base_timestamp, kept_because={}):
+    if isinstance(n_or_interval, int):
+        n, earliest_timestamp = n_or_interval, None
+    else:
+        n, earliest_timestamp = None, base_timestamp - n_or_interval
+
+    def can_retain(a, keep):
+        if n is not None:
+            return len(keep) < n
+        else:
+            return a.ts > earliest_timestamp
+
     keep = []
-    period_func = PRUNING_PATTERNS[rule]
-    if kept_because is None:
-        kept_because = {}
-    if n == 0:
+    if n == 0 or len(archives) == 0:
         return keep
 
     a = None
-    for a in sorted(archives, key=attrgetter("ts"), reverse=True):
+    last = None
+    period_func = PRUNING_PATTERNS[rule]
+    sorted_archives = sorted(archives, key=attrgetter("ts"), reverse=True)
+    for a in sorted_archives:
+        if not can_retain(a, keep):
+            break
         period = period_func(a)
         if period != last:
             last = period
             if a.id not in kept_because:
                 keep.append(a)
                 kept_because[a.id] = (rule, len(keep))
-                if len(keep) == n:
-                    break
+
     # Keep oldest archive if we didn't reach the target retention count
-    if a is not None and len(keep) < n and a.id not in kept_because:
+    a = sorted_archives[-1]
+    if a is not None and a.id not in kept_because and can_retain(a, keep):
         keep.append(a)
         kept_because[a.id] = (rule + "[oldest]", len(keep))
+
     return keep
 
 
@@ -120,8 +148,13 @@ class PruneMixIn:
     @with_repository(compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest):
         """Prune archives according to specified rules."""
-        if not any(
-            (
+        if all(
+            # Needs explicit None-check as interval arg may be 0 (Falsey)
+            e is None
+            for e in (
+                args.keep,
+                args.within,
+                args.last,
                 args.secondly,
                 args.minutely,
                 args.hourly,
@@ -131,11 +164,10 @@ class PruneMixIn:
                 args.quarterly_13weekly,
                 args.quarterly_3monthly,
                 args.yearly,
-                args.within,
             )
         ):
             raise CommandError(
-                'At least one of the "keep-within", "keep-last", '
+                'At least one of the "keep", "keep-within", "keep-last", '
                 '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                 '"keep-weekly", "keep-monthly", "keep-13weekly", "keep-3monthly", '
                 'or "keep-yearly" settings must be specified.'
@@ -159,15 +191,12 @@ class PruneMixIn:
         #   (<rulename>, <how many archives were kept by this rule so far >)
         kept_because = {}
 
-        # find archives which need to be kept because of the keep-within rule
-        if args.within:
-            keep += prune_within(archives, args.within, kept_because)
-
+        base_timestamp = datetime.now().astimezone()
         # find archives which need to be kept because of the various time period rules
         for rule in PRUNING_PATTERNS.keys():
-            num = getattr(args, rule, None)
-            if num is not None:
-                keep += prune_split(archives, rule, num, kept_because)
+            num_or_interval = getattr(args, rule, None)
+            if num_or_interval is not None:
+                keep += prune_split(archives, rule, num_or_interval, base_timestamp, kept_because)
 
         to_delete = set(archives) - set(keep)
         with Cache(repository, manifest, iec=args.iec) as cache:
@@ -312,81 +341,81 @@ class PruneMixIn:
             help="keep all archives within this time interval",
         )
         subparser.add_argument(
-            "--keep-last",
+            "--keep-last", dest="last", type=int, action=Highlander, help="number of archives to keep"
+        )
+        subparser.add_argument(
+            "--keep",
+            dest="keep",
+            type=int_or_interval,
+            action=Highlander,
+            help="number or time interval of archives to keep",
+        )
+        subparser.add_argument(
             "--keep-secondly",
             dest="secondly",
-            type=int,
-            default=0,
+            type=int_or_interval,
             action=Highlander,
-            help="number of secondly archives to keep",
+            help="number or time interval of secondly archives to keep",
         )
         subparser.add_argument(
             "--keep-minutely",
             dest="minutely",
-            type=int,
-            default=0,
+            type=int_or_interval,
             action=Highlander,
-            help="number of minutely archives to keep",
+            help="number or time interval of minutely archives to keep",
         )
         subparser.add_argument(
             "-H",
             "--keep-hourly",
             dest="hourly",
-            type=int,
-            default=0,
+            type=int_or_interval,
             action=Highlander,
-            help="number of hourly archives to keep",
+            help="number or time interval of hourly archives to keep",
         )
         subparser.add_argument(
             "-d",
             "--keep-daily",
             dest="daily",
-            type=int,
-            default=0,
+            type=int_or_interval,
             action=Highlander,
-            help="number of daily archives to keep",
+            help="number or time interval of daily archives to keep",
         )
         subparser.add_argument(
             "-w",
             "--keep-weekly",
             dest="weekly",
-            type=int,
-            default=0,
+            type=int_or_interval,
             action=Highlander,
-            help="number of weekly archives to keep",
+            help="number or time interval of weekly archives to keep",
         )
         subparser.add_argument(
             "-m",
             "--keep-monthly",
             dest="monthly",
-            type=int,
-            default=0,
+            type=int_or_interval,
             action=Highlander,
-            help="number of monthly archives to keep",
+            help="number or time interval of monthly archives to keep",
         )
         quarterly_group = subparser.add_mutually_exclusive_group()
         quarterly_group.add_argument(
             "--keep-13weekly",
             dest="quarterly_13weekly",
-            type=int,
-            default=0,
-            help="number of quarterly archives to keep (13 week strategy)",
+            type=int_or_interval,
+            help="number or time interval of quarterly archives to keep (13 week strategy)",
         )
         quarterly_group.add_argument(
             "--keep-3monthly",
             dest="quarterly_3monthly",
-            type=int,
-            default=0,
-            help="number of quarterly archives to keep (3 month strategy)",
+            type=int_or_interval,
+            help="number or time interval of quarterly archives to keep (3 month strategy)",
         )
         subparser.add_argument(
             "-y",
             "--keep-yearly",
             dest="yearly",
-            type=int,
-            default=0,
+            type=int_or_interval,
             action=Highlander,
-            help="number of yearly archives to keep",
+            help="number or time interval of yearly archives to keep",
         )
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
         subparser.add_argument(

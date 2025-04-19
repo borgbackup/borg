@@ -10,5 +10,6 @@ pytest
 pytest-xdist
 pytest-cov
 pytest-benchmark
+freezegun
 Cython
 pre-commit

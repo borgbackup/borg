@@ -12,7 +12,7 @@ from io import StringIO, BytesIO
 
 import pytest
 
-from ..archiver.prune_cmd import prune_within, prune_split
+from ..archiver.prune_cmd import prune_split
 from .. import platform
 from ..constants import *  # NOQA
 from ..helpers import Location
@@ -628,38 +628,6 @@ def test_int_or_interval_time_unit(invalid_input, error_regex):
     with pytest.raises(ArgumentTypeError) as exc:
         int_or_interval(invalid_input)
     assert re.search(error_regex, exc.value.args[0])
-
-
-def test_prune_within():
-    def subset(lst, indices):
-        return {lst[i] for i in indices}
-
-    def dotest(test_archives, within, indices):
-        for ta in test_archives, reversed(test_archives):
-            kept_because = {}
-            keep = prune_within(ta, interval(within), kept_because)
-            assert set(keep) == subset(test_archives, indices)
-            assert all("within" == kept_because[a.id][0] for a in keep)
-
-    # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours
-    test_offsets = [60, 90 * 60, 150 * 60, 210 * 60, 25 * 60 * 60, 49 * 60 * 60]
-    now = datetime.now(timezone.utc)
-    test_dates = [now - timedelta(seconds=s) for s in test_offsets]
-    test_archives = [MockArchive(date, i) for i, date in enumerate(test_dates)]
-
-    dotest(test_archives, "15S", [])
-    dotest(test_archives, "2M", [0])
-    dotest(test_archives, "1H", [0])
-    dotest(test_archives, "2H", [0, 1])
-    dotest(test_archives, "3H", [0, 1, 2])
-    dotest(test_archives, "24H", [0, 1, 2, 3])
-    dotest(test_archives, "26H", [0, 1, 2, 3, 4])
-    dotest(test_archives, "2d", [0, 1, 2, 3, 4])
-    dotest(test_archives, "50H", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "3d", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "1w", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "1m", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "1y", [0, 1, 2, 3, 4, 5])
 
 
 def test_stable_dict():

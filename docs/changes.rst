@@ -392,11 +392,59 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.2.8 (2024-03-29)
+Version 1.2.9 (2025-04-19)
 --------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- compact: support --dry-run (do nothing) to simplify scripting, #8300
+
+Fixes:
+
+- config: fix acceptance of storage_quota 0, #8499
+- config: reject additional_free_space < 10M (but accept 0), #6066
+- yes: deal with UnicodeDecodeError in input(), #6984
+- fix WORKAROUNDS=authenticated_no_key support for archive TAM authentication,
+  #8400
+- freebsd: fix nfs4 acl processing, #8756.
+  This issue only affected borg extract --numeric-ids when processing NFS4
+  ACLs, it didn't affect POSIX ACL processing.
+- setup.py: fix import error reporting for cythonize import, #8208
+- setup.py: detect noexec build fs issue, #8208
+- Fix paper key import error message
+
+Other changes:
+
+- allow msgpack 1.1.0
+- changed insufficiently reserved length for log message, #8152
+- docs:
+
+  - clarify excluded and included flags for dry-run, #8556
+  - update repository URLs in docs to use new syntax, #8361
+  - mount docs: apply jdchristensen's suggestion, better phrasing.
+  - FAQ: Why is backing up an unmodified FAT filesystem slow on Linux?
+  - FAQ: Why are backups slow on a Linux server that is a member of a windows domain?
+  - FAQ: add entry about pure-python msgpack warning, #8323
+  - work around sudden failure of sphinx ini lexer
+  - readthedocs theme fixes
+
+    - bring back highlighted content preview in search results.
+    - fix erroneous warning about missing javascript support.
+  - mount: add examples using :: positional argument, #8255
+  - Installation: update Arch Linux repo name
+  - recreate: remove experimental status
+- tests:
+
+  - ignore `com.apple.provenance` xattr (macOS specific)
+  - fix pytest_report_header, #8232
+- github CI: fix PKG_CONFIG_PATH for openssl 3.0
+
+
+Version 1.2.8 (2024-03-29)
+--------------------------
 
 Fixes:
 

@@ -100,7 +100,7 @@ PRUNING_PATTERNS = OrderedDict(
 )
 
 
-def prune_split(archives, rule, n_or_interval, kept_because=None):
+def prune_split(archives, rule, n_or_interval, base_timestamp, kept_because=None):
     if isinstance(n_or_interval, int):
         n, interval = n_or_interval, None
     else:
@@ -119,7 +119,7 @@ def prune_split(archives, rule, n_or_interval, kept_because=None):
         period = period_func(a)
         if period != last:
             last = period
-            if a.id not in kept_because and (interval is None or a.ts >= datetime.now().astimezone() - interval):
+            if a.id not in kept_because and (interval is None or a.ts >= base_timestamp - interval):
                 keep.append(a)
                 kept_because[a.id] = (rule, len(keep))
                 if len(keep) == n:
@@ -179,11 +179,12 @@ class PruneMixIn:
         #   (<rulename>, <how many archives were kept by this rule so far >)
         kept_because = {}
 
+        base_timestamp = datetime.now().astimezone()
         # find archives which need to be kept because of the various time period rules
         for rule in PRUNING_PATTERNS.keys():
             num_or_interval = getattr(args, rule, None)
             if num_or_interval is not None:
-                keep += prune_split(archives, rule, num_or_interval, kept_because)
+                keep += prune_split(archives, rule, num_or_interval, base_timestamp, kept_because)
 
         to_delete = set(archives) - set(keep)
         with Cache(repository, manifest, iec=args.iec) as cache:

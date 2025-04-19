@@ -14,7 +14,7 @@ logger = create_logger()
 from .constants import *  # NOQA
 from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex, hex_to_bin
-from .helpers.time import parse_timestamp, calculate_relative_offset, archive_ts_now
+from .helpers.time import parse_timestamp, calculate_relative_offset, archive_ts_now, compile_date_pattern, DatePatternError
 from .helpers.errors import Error, CommandError
 from .item import ArchiveItem
 from .patterns import get_regex_from_pattern
@@ -198,6 +198,13 @@ class Archives:
                 elif match.startswith("host:"):
                     wanted_host = match.removeprefix("host:")
                     archive_infos = [x for x in archive_infos if x.host == wanted_host]
+                elif match.startswith("date:"):
+                    wanted_date = match.removeprefix("date:")
+                    try:
+                        pred = compile_date_pattern(wanted_date)
+                    except DatePatternError as e:
+                        raise CommandError(f"Invalid date pattern: {match} ({e})")
+                    archive_infos = [x for x in archive_infos if pred(x.ts)]
                 else:  #  do a match on the name
                     match = match.removeprefix("name:")  # accept optional name: prefix
                     regex = get_regex_from_pattern(match)

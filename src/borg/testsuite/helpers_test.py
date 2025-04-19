@@ -456,17 +456,6 @@ class MockArchive:
         return f"{self.id}: {self.ts.isoformat()}"
 
 
-# This is the local timezone of the system running the tests.
-# We need this e.g. to construct archive timestamps for the prune tests,
-# because borg prune operates in the local timezone (it first converts the
-# archive timestamp to the local timezone). So, if we want the y/m/d/h/m/s
-# values which prune uses to be exactly the ones we give [and NOT shift them
-# by tzoffset], we need to give the timestamps in the same local timezone.
-# Please note that the timestamps in a real borg archive or manifest are
-# stored in UTC timezone.
-local_tz = datetime.now(tz=timezone.utc).astimezone(tz=None).tzinfo
-
-
 @pytest.mark.parametrize(
     "rule,num_to_keep,expected_ids",
     [
@@ -486,23 +475,23 @@ def test_prune_split(rule, num_to_keep, expected_ids):
 
     archives = [
         # years apart
-        MockArchive(datetime(2015, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
-        MockArchive(datetime(2016, 1, 1, 10, 0, 0, tzinfo=local_tz), 2),
-        MockArchive(datetime(2017, 1, 1, 10, 0, 0, tzinfo=local_tz), 3),
+        MockArchive(datetime(2015, 1, 1, 10, 0, 0, tzinfo=None), 1),
+        MockArchive(datetime(2016, 1, 1, 10, 0, 0, tzinfo=None), 2),
+        MockArchive(datetime(2017, 1, 1, 10, 0, 0, tzinfo=None), 3),
         # months apart
-        MockArchive(datetime(2017, 2, 1, 10, 0, 0, tzinfo=local_tz), 4),
-        MockArchive(datetime(2017, 3, 1, 10, 0, 0, tzinfo=local_tz), 5),
+        MockArchive(datetime(2017, 2, 1, 10, 0, 0, tzinfo=None), 4),
+        MockArchive(datetime(2017, 3, 1, 10, 0, 0, tzinfo=None), 5),
         # days apart
-        MockArchive(datetime(2017, 3, 2, 10, 0, 0, tzinfo=local_tz), 6),
-        MockArchive(datetime(2017, 3, 3, 10, 0, 0, tzinfo=local_tz), 7),
-        MockArchive(datetime(2017, 3, 4, 10, 0, 0, tzinfo=local_tz), 8),
+        MockArchive(datetime(2017, 3, 2, 10, 0, 0, tzinfo=None), 6),
+        MockArchive(datetime(2017, 3, 3, 10, 0, 0, tzinfo=None), 7),
+        MockArchive(datetime(2017, 3, 4, 10, 0, 0, tzinfo=None), 8),
         # minutes apart
-        MockArchive(datetime(2017, 10, 1, 9, 45, 0, tzinfo=local_tz), 9),
-        MockArchive(datetime(2017, 10, 1, 9, 55, 0, tzinfo=local_tz), 10),
+        MockArchive(datetime(2017, 10, 1, 9, 45, 0, tzinfo=None), 9),
+        MockArchive(datetime(2017, 10, 1, 9, 55, 0, tzinfo=None), 10),
         # seconds apart
-        MockArchive(datetime(2017, 10, 1, 10, 0, 1, tzinfo=local_tz), 11),
-        MockArchive(datetime(2017, 10, 1, 10, 0, 3, tzinfo=local_tz), 12),
-        MockArchive(datetime(2017, 10, 1, 10, 0, 5, tzinfo=local_tz), 13),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 1, tzinfo=None), 11),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 3, tzinfo=None), 12),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 5, tzinfo=None), 13),
     ]
     kept_because = {}
     keep = prune_split(archives, rule, num_to_keep, kept_because)
@@ -518,12 +507,12 @@ def test_prune_split_keep_oldest():
 
     archives = [
         # oldest backup, but not last in its year
-        MockArchive(datetime(2018, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
+        MockArchive(datetime(2018, 1, 1, 10, 0, 0, tzinfo=None), 1),
         # an interim backup
-        MockArchive(datetime(2018, 12, 30, 10, 0, 0, tzinfo=local_tz), 2),
+        MockArchive(datetime(2018, 12, 30, 10, 0, 0, tzinfo=None), 2),
         # year-end backups
-        MockArchive(datetime(2018, 12, 31, 10, 0, 0, tzinfo=local_tz), 3),
-        MockArchive(datetime(2019, 12, 31, 10, 0, 0, tzinfo=local_tz), 4),
+        MockArchive(datetime(2018, 12, 31, 10, 0, 0, tzinfo=None), 3),
+        MockArchive(datetime(2019, 12, 31, 10, 0, 0, tzinfo=None), 4),
     ]
 
     # Keep oldest when retention target can't otherwise be met

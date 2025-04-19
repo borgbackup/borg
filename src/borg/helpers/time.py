@@ -185,3 +185,100 @@ class OutputTimestamp:
 def archive_ts_now():
     """return tz-aware datetime obj for current time for usage as archive timestamp"""
     return datetime.now(timezone.utc)  # utc time / utc timezone
+
+class DatePatternError(ValueError):
+    """Raised when a date: archive pattern cannot be parsed."""
+
+
+def local(dt: datetime) -> datetime:
+    """Attach the system local timezone to naive dt without converting."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.now().astimezone().tzinfo)
+    return dt
+
+
+def exact_predicate(dt: datetime):
+    """Return predicate matching archives whose ts equals dt (UTC)."""
+    dt_utc = local(dt).astimezone(timezone.utc)
+    return lambda ts: ts == dt_utc
+
+
+def interval_predicate(start: datetime, end: datetime):
+    start_utc = local(start).astimezone(timezone.utc)
+    end_utc   = local(end).astimezone(timezone.utc)
+    return lambda ts: start_utc <= ts < end_utc
+
+
+def compile_date_pattern(expr: str):
+    """
+    Turn a date: expression into a predicate ts->bool.
+    Supports:
+      1) Full ISO‑8601 timestamps with minute (and optional seconds/fraction)
+      2) Hour-only:   YYYY‑MM‑DDTHH      -> interval of 1 hour
+      3) Minute-only: YYYY‑MM‑DDTHH:MM   -> interval of 1 minute
+      4) YYYY, YYYY‑MM, YYYY‑MM‑DD       -> day/month/year intervals
+      5) Unix epoch (@123456789)         -> exact match
+    Naive inputs are assumed local, then converted into UTC.
+    TODO: verify working for fractional seconds; add timezone support.
+    """
+    expr = expr.strip()
+
+    # 1) Full timestamp (with fraction)
+    full_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+")
+    if full_re.match(expr):
+        dt = parse_local_timestamp(expr, tzinfo=timezone.utc)
+        return exact_predicate(dt) # no interval, since we have a fractional timestamp
+
+    # 2) Seconds-only
+    second_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
+    if second_re.match(expr):
+        start = parse_local_timestamp(expr, tzinfo=timezone.utc)
+        return interval_predicate(start, start + timedelta(seconds=1))
+
+    # 3) Minute-only
+    minute_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$")
+    if minute_re.match(expr):
+        start = parse_local_timestamp(expr + ":00", tzinfo=timezone.utc)
+        return interval_predicate(start, start + timedelta(minutes=1))
+
+    # 4) Hour-only
+    hour_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}$")
+    if hour_re.match(expr):
+        start = parse_local_timestamp(expr + ":00:00", tzinfo=timezone.utc)
+        return interval_predicate(start, start + timedelta(hours=1))
+
+
+    # Unix epoch (@123456789) - Note: We don't support fractional seconds here, since Unix epochs are almost always whole numbers.
+    if expr.startswith("@"):
+        try:
+            epoch = int(expr[1:])
+        except ValueError:
+            raise DatePatternError(f"invalid epoch: {expr!r}")
+        start = datetime.fromtimestamp(epoch, tz=timezone.utc)
+        return interval_predicate(start, start + timedelta(seconds=1)) # match within the second
+
+    # Year/Year-month/Year-month-day
+    parts = expr.split("-")
+    try:
+        if len(parts) == 1:                    # YYYY
+            year = int(parts[0])
+            start = datetime(year, 1, 1)
+            end   = datetime(year + 1, 1, 1)
+
+        elif len(parts) == 2:                  # YYYY‑MM
+            year, month = map(int, parts)
+            start = datetime(year, month, 1)
+            end   = offset_n_months(start, 1)
+
+        elif len(parts) == 3:                  # YYYY‑MM‑DD
+            year, month, day = map(int, parts)
+            start = datetime(year, month, day)
+            end   = start + timedelta(days=1)
+
+        else:
+            raise DatePatternError(f"unrecognised date: {expr!r}")
+
+    except ValueError as e:
+        raise DatePatternError(str(e)) from None
+
+    return interval_predicate(start, end)

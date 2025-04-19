@@ -208,7 +208,7 @@ def with_archive(method):
 
 def parse_storage_quota(storage_quota):
     parsed = parse_file_size(storage_quota)
-    if parsed < parse_file_size('10M'):
+    if parsed != 0 and parsed < parse_file_size('10M'):
         raise argparse.ArgumentTypeError('quota is too small (%s). At least 10M are required.' % storage_quota)
     return parsed
 
@@ -1913,11 +1913,12 @@ class Archiver:
     @with_repository(manifest=False, exclusive=True)
     def do_compact(self, args, repository):
         """compact segment files in the repository"""
-        # see the comment in do_with_lock about why we do it like this:
-        data = repository.get(Manifest.MANIFEST_ID)
-        repository.put(Manifest.MANIFEST_ID, data)
-        threshold = args.threshold / 100
-        repository.commit(compact=True, threshold=threshold, cleanup_commits=args.cleanup_commits)
+        if not args.dry_run:  # support --dry-run to simplify scripting
+            # see the comment in do_with_lock about why we do it like this:
+            data = repository.get(Manifest.MANIFEST_ID)
+            repository.put(Manifest.MANIFEST_ID, data)
+            threshold = args.threshold / 100
+            repository.commit(compact=True, threshold=threshold, cleanup_commits=args.cleanup_commits)
         return EXIT_SUCCESS
 
     @with_repository(exclusive=True, manifest=False)
@@ -1940,8 +1941,15 @@ class Archiver:
                     except ValueError:
                         raise ValueError('Invalid value') from None
                     if name == 'storage_quota':
-                        if parse_file_size(value) < parse_file_size('10M'):
+                        wanted = parse_file_size(value)
+                        minimum = parse_file_size('10M')
+                        if wanted != 0 and wanted < minimum:
                             raise ValueError('Invalid value: storage_quota < 10M')
+                    elif name == 'additional_free_space':
+                        wanted = parse_file_size(value)
+                        minimum = parse_file_size('10M')
+                        if wanted != 0 and wanted < minimum:
+                            raise ValueError('Invalid value: additional_free_space < 10M')
                     elif name == 'max_segment_size':
                         if parse_file_size(value) >= MAX_SEGMENT_SIZE_LIMIT:
                             raise ValueError('Invalid value: max_segment_size >= %d' % MAX_SEGMENT_SIZE_LIMIT)
@@ -3188,8 +3196,8 @@ class Archiver:
         Unmounting in these cases could cause an active rsync or similar process
         to unintentionally delete data.
 
-        When running in the foreground ^C/SIGINT unmounts cleanly, but other
-        signals or crashes do not.
+        When running in the foreground, ^C/SIGINT cleanly unmounts the filesystem,
+        but other signals or crashes do not.
         """)
 
         if parser.prog == 'borgfs':
@@ -3456,6 +3464,7 @@ class Archiver:
         subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
                                type=location_validator(archive=False),
                                help='repository to compact')
+        subparser.add_argument('-n', '--dry-run', dest='dry_run', action='store_true', help='do nothing')
         subparser.add_argument('--cleanup-commits', dest='cleanup_commits', action='store_true',
                                help='cleanup commit-only 17-byte segment files')
         subparser.add_argument('--threshold', metavar='PERCENT', dest='threshold',

@@ -26,10 +26,15 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-def unique_func():
+# The *_period_func group of functions create period grouping keys to group together archives falling within a certain
+# period. Among archives in each of these groups, only the latest (by creation timestamp) is kept.
+
+
+def unique_period_func():
     counter = 0
 
-    def inner(a):
+    def inner(_a):
+        """Group archives by an incrementing counter, practically making each archive a group of 1"""
         nonlocal counter
         counter += 1
         return counter
@@ -37,8 +42,9 @@ def unique_func():
     return inner
 
 
-def default_period_func(pattern):
+def pattern_period_func(pattern):
     def inner(a):
+        """Group archives by extracting given strftime-pattern from their creation timestamp"""
         # compute in local timezone
         return a.ts.astimezone().strftime(pattern)
 
@@ -46,6 +52,7 @@ def default_period_func(pattern):
 
 
 def quarterly_13weekly_period_func(a):
+    """Group archives by extracting from their creation timestamp their ISO-8601 week numbers"""
     (year, week, _) = a.ts.astimezone().isocalendar()  # local time
     if week <= 13:
         # Weeks containing Jan 4th to Mar 28th (leap year) or 29th- 91 (13*7)
@@ -67,6 +74,7 @@ def quarterly_13weekly_period_func(a):
 
 
 def quarterly_3monthly_period_func(a):
+    """Group archives by extracting month number from their creation timestamp"""
     lt = a.ts.astimezone()  # local time
     if lt.month <= 3:
         # 1-1 to 3-31
@@ -84,18 +92,20 @@ def quarterly_3monthly_period_func(a):
 
 PRUNING_PATTERNS = OrderedDict(
     [
-        ("within", unique_func()),
-        ("last", unique_func()),
-        ("keep", unique_func()),
-        ("secondly", default_period_func("%Y-%m-%d %H:%M:%S")),
-        ("minutely", default_period_func("%Y-%m-%d %H:%M")),
-        ("hourly", default_period_func("%Y-%m-%d %H")),
-        ("daily", default_period_func("%Y-%m-%d")),
-        ("weekly", default_period_func("%G-%V")),
-        ("monthly", default_period_func("%Y-%m")),
+        # Each archive is considered for keeping
+        ("within", unique_period_func()),
+        ("last", unique_period_func()),
+        ("keep", unique_period_func()),
+        # Last archive (by creation timestamp) within period group is consiedered for keeping
+        ("secondly", pattern_period_func("%Y-%m-%d %H:%M:%S")),
+        ("minutely", pattern_period_func("%Y-%m-%d %H:%M")),
+        ("hourly", pattern_period_func("%Y-%m-%d %H")),
+        ("daily", pattern_period_func("%Y-%m-%d")),
+        ("weekly", pattern_period_func("%G-%V")),
+        ("monthly", pattern_period_func("%Y-%m")),
         ("quarterly_13weekly", quarterly_13weekly_period_func),
         ("quarterly_3monthly", quarterly_3monthly_period_func),
-        ("yearly", default_period_func("%Y")),
+        ("yearly", pattern_period_func("%Y")),
     ]
 )
 

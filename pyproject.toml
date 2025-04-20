@@ -12,7 +12,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: BSD License",
     "Operating System :: POSIX :: BSD :: FreeBSD",
     "Operating System :: POSIX :: BSD :: OpenBSD",
     "Operating System :: POSIX :: BSD :: NetBSD",
@@ -28,7 +27,8 @@ classifiers = [
     "Topic :: Security :: Cryptography",
     "Topic :: System :: Archiving :: Backup",
 ]
-license = {text="BSD"}
+license = "BSD-3-Clause"
+license-files = ["LICENSE", "AUTHORS"]
 dependencies = [
   "borghash ~= 0.1.0",
   "borgstore ~= 0.1.0",
@@ -68,7 +68,7 @@ where = ["src"]
 "*" = ["*.c", "*.h", "*.pyx"]
 
 [build-system]
-requires = ["setuptools", "wheel", "pkgconfig", "Cython>=3.0.3", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=77.0.0", "wheel", "pkgconfig", "Cython>=3.0.3", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]

@@ -1,6 +1,6 @@
 import argparse
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from operator import attrgetter
 import os
@@ -100,11 +100,17 @@ PRUNING_PATTERNS = OrderedDict(
 )
 
 
+# Datetime cannot represent times than datetime.min, so a day is added to allow for time zone offset.
+DATETIME_MIN_WITH_ZONE = (datetime.min + timedelta(days=1)).astimezone()
+
+
 def prune_split(archives, rule, n_or_interval, base_timestamp, kept_because=None):
     if isinstance(n_or_interval, int):
-        n, interval = n_or_interval, None
+        # If no interval, assume given interval is "infinite"
+        n, earliest_timestamp = n_or_interval, DATETIME_MIN_WITH_ZONE
     else:
-        n, interval = None, n_or_interval
+        # If no n, assume given n is "infinite"
+        n, earliest_timestamp = -1, base_timestamp - n_or_interval
 
     last = None
     keep = []
@@ -116,17 +122,17 @@ def prune_split(archives, rule, n_or_interval, base_timestamp, kept_because=None
 
     a = None
     for a in sorted(archives, key=attrgetter("ts"), reverse=True):
+        if a.ts < earliest_timestamp or len(keep) == n:
+            break
         period = period_func(a)
         if period != last:
             last = period
-            if a.id not in kept_because and (interval is None or a.ts >= base_timestamp - interval):
+            if a.id not in kept_because:
                 keep.append(a)
                 kept_because[a.id] = (rule, len(keep))
-                if len(keep) == n:
-                    break
 
     # Keep oldest archive if we didn't reach the target retention count
-    if a is not None and (n is not None and len(keep) < n) and a.id not in kept_because:
+    if a is not None and len(keep) < n and a.id not in kept_because:
         keep.append(a)
         kept_because[a.id] = (rule + "[oldest]", len(keep))
 

@@ -9,16 +9,8 @@ from ._common import with_repository, Highlander
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import (
-    ArchiveFormatter,
-    interval,
-    int_or_interval,
-    sig_int,
-    ProgressIndicatorPercent,
-    CommandError,
-    Error,
-)
-from ..helpers import archivename_validator
+from ..helpers import interval, int_or_interval, sig_int, archivename_validator
+from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
 from ..manifest import Manifest
 
 from ..logger import create_logger

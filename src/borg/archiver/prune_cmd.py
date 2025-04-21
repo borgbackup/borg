@@ -1,6 +1,6 @@
 import argparse
 from collections import OrderedDict
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 import logging
 from operator import attrgetter
 import os
@@ -102,7 +102,7 @@ PRUNING_PATTERNS = OrderedDict(
 
 
 # Datetime cannot represent times before datetime.min, so a day is added to allow for time zone offset.
-DATETIME_MIN_WITH_ZONE = (datetime.min + timedelta(days=1)).astimezone()
+DATETIME_MIN_WITH_ZONE = datetime.min.replace(tzinfo=timezone.utc)
 
 
 def prune_split(archives, rule, n_or_interval, base_timestamp, kept_because=None):

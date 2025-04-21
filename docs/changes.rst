@@ -144,8 +144,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b15 (not released yet)
------------------------------------
+Version 2.0.0b15 (2025-04-22)
+-----------------------------
 
 Please note:
 
@@ -169,10 +169,16 @@ New features:
   utf-8 byte sequence.
 - add {unixtime} placeholder, #8522
 - implement padme chunk size obfuscation (SPEC 250), #8705
+- macOS: retrieve birthtime in nanosecond precision via system call, #8724
 
 Bug fixes:
 
+- borg exits when assertions are disabled with Python optimizations, #8649
 - yes(): deal with UnicodeDecodeError in input(), #6984
+- fix remote repository exception handling / modern exit codes, #8631
+- freebsd: fix nfs4 acl processing, #8756.
+  This issue only affected borg extract --numeric-ids when processing NFS4
+  ACLs, it didn't affect POSIX ACL processing.
 
 Other changes:
 
@@ -180,6 +186,8 @@ Other changes:
 - create: remove --make-parent-dirs option (borgstore now does this automatically), #8619
 - iter_items: decouple item iteration and content data chunks preloading
 - remote: simplify code, add debug logging
+- pyproject.toml: SPDX expression for license, add license-files, #8771
+- Item: remove .chunks_healthy, #8559
 - OpenBSD fixes:
 
   - support other OpenSSL versions on OpenBSD, #8553
@@ -204,6 +212,11 @@ Other changes:
   - libffi-dev is required for argon2-cffi-bindings
   - add undelete command to index
   - borg commands updated with --repo option, #8550
+  - FAQ: add entry about pure-python msgpack warning, #8323
+  - readthedocs theme fixes
+
+    - bring back highlighted content preview in search results.
+    - fix erroneous warning about missing javascript support.
 
 
 Version 2.0.0b14 (2024-11-17)

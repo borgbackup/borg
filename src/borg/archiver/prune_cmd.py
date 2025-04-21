@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import logging
 from operator import attrgetter
 import os
+import itertools
 
 from ._common import with_repository, Highlander
 from ..archive import Archive
@@ -23,15 +24,13 @@ logger = create_logger()
 
 
 def unique_period_func():
-    counter = 0
+    counter = itertools.count()
 
-    def inner(_a):
+    def unique_values(_a):
         """Group archives by an incrementing counter, practically making each archive a group of 1"""
-        nonlocal counter
-        counter += 1
-        return counter
+        return next(counter)
 
-    return inner
+    return unique_values
 
 
 def pattern_period_func(pattern):

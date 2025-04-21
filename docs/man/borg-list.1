@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-LIST" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-LIST" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive contents
 .SH SYNOPSIS
@@ -50,7 +50,7 @@ specify the archive name
 .B PATH
 paths to list; patterns are supported
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-short
@@ -81,8 +81,7 @@ read include/exclude patterns from PATTERNFILE, one per line
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg list root\-2016\-02\-15
 drwxr\-xr\-x root   root          0 Mon, 2016\-02\-15 17:44:27 .
 drwxrwxr\-x root   root          0 Mon, 2016\-02\-15 19:04:49 bin
@@ -114,21 +113,20 @@ $ borg list archiveA \-\-pattern \(aq+ re:.ext$\(aq \-\-pattern \(aq\- re:^.*$\(
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.ext
 \-rw\-rw\-r\-\- user   user    1416192 Sun, 2015\-02\-01 11:00:00 code/myproject/file.text
 \&...
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH NOTES
 .SS The FORMAT specifier syntax
 .sp
-The \fB\-\-format\fP option uses python\(aqs \fI\%format string syntax\fP\&.
+The \fB\-\-format\fP option uses python\(aqs format string syntax <https://docs.python.org/3.9/library/string.html#formatstrings>
+\&.
 .sp
 Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg list \-\-format \(aq{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}\(aq ArchiveFoo
 \-rw\-rw\-r\-\- user   user       1024 Thu, 2021\-12\-09 10:22:17 file\-foo
 \&...
@@ -138,8 +136,7 @@ $ borg list \-\-format \(aq{mode} {user:6} {group:6} {size:8} {mtime} {path}{ext
 $ borg list \-\-format \(aq{mode} {user:>6} {group:>6} {size:<8} {mtime} {path}{extra}{NL}\(aq ArchiveFoo
 \-rw\-rw\-r\-\-   user   user 1024     Thu, 2021\-12\-09 10:22:17 file\-foo
 \&...
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -231,8 +228,6 @@ archiveid: internal ID of the archive
 archivename: name of the archive
 .IP \(bu 2
 extra: prepends {target} with \(dq \-> \(dq for soft links and \(dq link to \(dq for hard links
-.IP \(bu 2
-health: either \(dqhealthy\(dq (file ok) or \(dqbroken\(dq (if file has all\-zero replacement chunks)
 .UNINDENT
 .SH SEE ALSO
 .sp

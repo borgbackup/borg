@@ -1,3 +1,4 @@
+'\" t
 .\" Man page generated from reStructuredText.
 .
 .
@@ -27,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-EXPORT-TAR" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-EXPORT-TAR" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-export-tar \- Export archive contents as a tarball
 .SH SYNOPSIS
@@ -61,9 +62,8 @@ tar stream to stdout.
 .sp
 Depending on the \fB\-tar\-format\fP option, these formats are created:
 .TS
-center;
-|l|l|l|.
-_
+box center;
+l|l|l.
 T{
 \-\-tar\-format
 T}	T{
@@ -97,7 +97,6 @@ T}	T{
 mtime s, no atime/ctime,
 no ACLs/xattrs/bsdflags
 T}
-_
 .TE
 .sp
 A \fB\-\-sparse\fP option (as found in borg extract) is not supported.
@@ -125,7 +124,7 @@ output tar file. \(dq\-\(dq to write to stdout instead.
 .B PATH
 paths to extract; patterns are supported
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-tar\-filter

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DIFF" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-DIFF" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-diff \- Diff contents of two archives
 .SH SYNOPSIS
@@ -53,7 +53,7 @@ ARCHIVE2 name
 .B PATH
 paths of items inside the archives to compare; patterns are supported
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-numeric\-ids
@@ -93,8 +93,7 @@ read include/exclude patterns from PATTERNFILE, one per line
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg diff archive1 archive2
     +17 B      \-5 B [\-rw\-r\-\-r\-\- \-> \-rwxr\-xr\-x] file1
    +135 B    \-252 B file2
@@ -106,21 +105,20 @@ $ borg diff archive1 archive2
 {\(dqpath\(dq: \(dqfile2\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqmodified\(dq, \(dqadded\(dq: 135, \(dqremoved\(dq: 252}]}
 {\(dqpath\(dq: \(dqfile4\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqadded\(dq, \(dqsize\(dq: 0}]}
 {\(dqpath\(dq: \(dqfile3\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqremoved\(dq, \(dqsize\(dq: 0}]}
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH NOTES
 .SS The FORMAT specifier syntax
 .sp
-The \fB\-\-format\fP option uses python\(aqs \fI\%format string syntax\fP\&.
+The \fB\-\-format\fP option uses python\(aqs format string syntax <https://docs.python.org/3.9/library/string.html#formatstrings>
+\&.
 .sp
 Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg diff \-\-format \(aq{content:30} {path}{NL}\(aq ArchiveFoo ArchiveBar
 modified:  +4.1 kB  \-1.0 kB    file\-diff
 \&...
@@ -130,8 +128,7 @@ modified:  +4.1 kB  \-1.0 kB    file\-diff
 $ borg diff \-\-format \(aq{content:>30} {path}{NL}\(aq ArchiveFoo ArchiveBar
    modified:  +4.1 kB  \-1.0 kB file\-diff
 \&...
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

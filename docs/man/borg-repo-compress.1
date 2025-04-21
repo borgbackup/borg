@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-COMPRESS" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-REPO-COMPRESS" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-repo-compress \- Repository (re-)compression
 .SH SYNOPSIS
@@ -58,7 +58,7 @@ You do \fBnot\fP need to run \fBborg compact\fP after \fBborg repo\-compress\fP\
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
@@ -71,15 +71,13 @@ print statistics
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # recompress repo contents
 $ borg repo\-compress \-\-progress \-\-compression=zstd,3
 
 # recompress and obfuscate repo contents
 $ borg repo\-compress \-\-progress \-\-compression=obfuscate,1,zstd,3
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

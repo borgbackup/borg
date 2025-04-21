@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-DELETE" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete archives
 .SH SYNOPSIS
@@ -61,7 +61,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B NAME
 specify the archive name
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -101,8 +101,7 @@ consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # delete all backup archives named \(dqkenny\-files\(dq:
 $ borg delete \-a kenny\-files
 # actually free disk space:
@@ -119,8 +118,7 @@ $ borg delete \-a \(aqsh:*\-2012\-*\(aq
 
 # see what would be deleted if delete was run without \-\-dry\-run
 $ borg delete \-\-list \-\-dry\-run \-a \(aqsh:*\-May\-*\(aq
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

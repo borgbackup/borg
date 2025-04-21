@@ -1,3 +1,4 @@
+'\" t
 .\" Man page generated from reStructuredText.
 .
 .
@@ -27,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-CREATE" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-REPO-CREATE" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-repo-create \- Create a new, empty repository
 .SH SYNOPSIS
@@ -50,11 +51,9 @@ tips will come below):
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 borg repo\-create \-\-encryption repokey\-aes\-ocb
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -122,9 +121,8 @@ in the upper part of the table, in the lower part is the old and/or unsafe(r) st
 .\" nanorst: inline-fill
 .
 .TS
-center;
-|l|l|l|l|.
-_
+box center;
+l|l|l|l.
 T{
 Mode (K = keyfile or repokey)
 T}	T{
@@ -204,7 +202,6 @@ none
 T}	T{
 none
 T}
-_
 .TE
 .\" nanorst: inline-replace
 .
@@ -239,7 +236,7 @@ Then use \fBborg transfer \-\-other\-repo ORIG_REPO \-\-from\-borg1 ...\fP to tr
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .BI \-\-other\-repo \ SRC_REPOSITORY
@@ -257,9 +254,6 @@ create an append\-only mode repository. Note that this only affects the low leve
 .BI \-\-storage\-quota \ QUOTA
 Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 .TP
-.B  \-\-make\-parent\-dirs
-create the parent directories of the repository directory, if they are missing.
-.TP
 .B  \-\-copy\-crypt\-key
 copy the crypt_key (used for authenticated encryption) from the key of the other repo (default: new random key).
 .UNINDENT
@@ -267,8 +261,7 @@ copy the crypt_key (used for authenticated encryption) from the key of the other
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Local repository
 $ export BORG_REPO=/path/to/repo
 # recommended repokey AEAD crypto modes
@@ -287,8 +280,7 @@ $ export BORG_REPO=ssh://user@hostname/~/backup
 $ borg repo\-create \-\-encryption=repokey\-aes\-ocb
 # keyfile: stores the (encrypted) key into ~/.config/borg/keys/
 $ borg repo\-create \-\-encryption=keyfile\-aes\-ocb
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

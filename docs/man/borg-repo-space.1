@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-SPACE" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-REPO-SPACE" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-repo-space \- Manage reserved space in repository
 .SH SYNOPSIS
@@ -51,8 +51,7 @@ Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Create a new repository:
 $ borg repo\-create ...
 # Reserve approx. 1GB of space for emergencies:
@@ -67,8 +66,7 @@ $ borg prune ...
 $ borg delete ...
 $ borg compact \-v  # only this actually frees space of deleted archives
 $ borg repo\-space \-\-reserve 1G  # reserve space again for next time
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -76,7 +74,7 @@ Reserved space is always rounded up to use full reservation blocks of 64MiB.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .BI \-\-reserve \ SPACE

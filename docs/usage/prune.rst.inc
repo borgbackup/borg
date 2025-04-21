@@ -17,7 +17,7 @@ borg prune
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``NAME``                                     | specify the archive name                                                                          |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                                         |
+    | **options**                                                                                                                                                                                                                    |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
     |                                                                             | ``-n``, ``--dry-run``                        | do not change repository                                                                          |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------+
@@ -82,7 +82,7 @@ borg prune
         specify the archive name
 
 
-    optional arguments
+    options
         -n, --dry-run         do not change repository
         --list                output verbose list of archives it keeps/prunes
         --short               use a less wide archive part format
@@ -144,10 +144,9 @@ from different machines) in one shared repository, use one prune call per
 series.
 
 The ``--keep-within`` option takes an argument of the form "<int><char>",
-where char is "y", "m", "w", "d", "H", "M", or "S" and represents years, months, 
-weeks, days, hours, minutes or seconds.  For example, ``--keep-within 2d`` means
-to keep all archives that were created within the past 48 hours.
-"1m" is taken to mean "31d" and "1y" represents "365d". The archives kept with 
+where char is "y", "m", "w", "d", "H", "M", or "S".  For example,
+``--keep-within 2d`` means to keep all archives that were created within
+the past 2 days.  "1m" is taken to mean "31d". The archives kept with
 this option do not count towards the totals specified by any other options.
 
 A good procedure is to thin out more and more the older your backups get.

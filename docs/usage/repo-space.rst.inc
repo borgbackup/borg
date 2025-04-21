@@ -13,7 +13,7 @@ borg repo-space
     .. class:: borg-options-table
 
     +-------------------------------------------------------+---------------------+---------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                            |
+    | **options**                                                                                                                                       |
     +-------------------------------------------------------+---------------------+---------------------------------------------------------------------+
     |                                                       | ``--reserve SPACE`` | Amount of space to reserve (e.g. 100M, 1G). Default: 0.             |
     +-------------------------------------------------------+---------------------+---------------------------------------------------------------------+
@@ -36,7 +36,7 @@ borg repo-space
 
 
 
-    optional arguments
+    options
         --reserve SPACE     Amount of space to reserve (e.g. 100M, 1G). Default: 0.
         --free              Free all reserved space. Don't forget to reserve space later again.
 

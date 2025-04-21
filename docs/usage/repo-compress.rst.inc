@@ -13,7 +13,7 @@ borg repo-compress
     .. class:: borg-options-table
 
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                       |
+    | **options**                                                                                                                                                                                                  |
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
     |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details. |
     +-------------------------------------------------------+---------------------------------------------------+--------------------------------------------------------------------------------------------------+
@@ -36,7 +36,7 @@ borg repo-compress
 
 
 
-    optional arguments
+    options
         -C COMPRESSION, --compression COMPRESSION    select compression algorithm, see the output of the "borg help compression" command for details.
         -s, --stats     print statistics
 

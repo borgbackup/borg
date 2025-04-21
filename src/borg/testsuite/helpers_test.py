@@ -494,7 +494,7 @@ def test_prune_split(rule, num_to_keep, expected_ids):
         MockArchive(datetime(2017, 10, 1, 10, 0, 5, tzinfo=None), 13),
     ]
     kept_because = {}
-    keep = prune_split(archives, rule, num_to_keep, datetime.now().astimezone(), kept_because)
+    keep = prune_split(archives, rule, num_to_keep, None, kept_because)
 
     assert set(keep) == subset(archives, expected_ids)
     for item in keep:
@@ -517,7 +517,7 @@ def test_prune_split_keep_oldest():
 
     # Keep oldest when retention target can't otherwise be met
     kept_because = {}
-    keep = prune_split(archives, "yearly", 3, datetime.now().astimezone(), kept_because)
+    keep = prune_split(archives, "yearly", 3, None, kept_because)
 
     assert set(keep) == subset(archives, [1, 3, 4])
     assert kept_because[1][0] == "yearly[oldest]"
@@ -526,7 +526,7 @@ def test_prune_split_keep_oldest():
 
     # Otherwise, prune it
     kept_because = {}
-    keep = prune_split(archives, "yearly", 2, datetime.now().astimezone(), kept_because)
+    keep = prune_split(archives, "yearly", 2, None, kept_because)
 
     assert set(keep) == subset(archives, [3, 4])
     assert kept_because[3][0] == "yearly"
@@ -537,7 +537,7 @@ def test_prune_split_no_archives():
     archives = []
 
     kept_because = {}
-    keep = prune_split(archives, "yearly", 3, datetime.now().astimezone(), kept_because)
+    keep = prune_split(archives, "yearly", 3, None, kept_because)
 
     assert keep == []
     assert kept_because == {}

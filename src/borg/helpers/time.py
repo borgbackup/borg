@@ -191,22 +191,22 @@ class DatePatternError(ValueError):
 
 
 def local(dt: datetime) -> datetime:
-    """Attach the system local timezone to naive dt without converting."""
+    """Interpret naive dt as local time, attach timezone info from the local tz."""
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=datetime.now().astimezone().tzinfo)
+        dt = dt.astimezone()
     return dt
 
 
 def exact_predicate(dt: datetime):
     """Return predicate matching archives whose ts equals dt (UTC)."""
     dt_utc = local(dt).astimezone(timezone.utc)
-    return lambda ts: ts == dt_utc
+    return lambda ts: ts.astimezone(timezone.utc) == dt_utc
 
 
 def interval_predicate(start: datetime, end: datetime):
     start_utc = local(start).astimezone(timezone.utc)
     end_utc   = local(end).astimezone(timezone.utc)
-    return lambda ts: start_utc <= ts < end_utc
+    return lambda ts: start_utc <= ts.astimezone(timezone.utc) < end_utc
 
 
 def compile_date_pattern(expr: str):

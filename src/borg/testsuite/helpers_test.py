@@ -449,7 +449,8 @@ def test_invalid_make_path_safe(path):
 
 class MockArchive:
     def __init__(self, ts, id):
-        self.ts = ts
+        # Real archive objects have UTC zoned timestamps
+        self.ts = ts.replace(tzinfo=timezone.utc)
         self.id = id
 
     def __repr__(self):
@@ -475,23 +476,23 @@ def test_prune_split(rule, num_to_keep, expected_ids):
 
     archives = [
         # years apart
-        MockArchive(datetime(2015, 1, 1, 10, 0, 0, tzinfo=None), 1),
-        MockArchive(datetime(2016, 1, 1, 10, 0, 0, tzinfo=None), 2),
-        MockArchive(datetime(2017, 1, 1, 10, 0, 0, tzinfo=None), 3),
+        MockArchive(datetime(2015, 1, 1, 10, 0, 0), 1),
+        MockArchive(datetime(2016, 1, 1, 10, 0, 0), 2),
+        MockArchive(datetime(2017, 1, 1, 10, 0, 0), 3),
         # months apart
-        MockArchive(datetime(2017, 2, 1, 10, 0, 0, tzinfo=None), 4),
-        MockArchive(datetime(2017, 3, 1, 10, 0, 0, tzinfo=None), 5),
+        MockArchive(datetime(2017, 2, 1, 10, 0, 0), 4),
+        MockArchive(datetime(2017, 3, 1, 10, 0, 0), 5),
         # days apart
-        MockArchive(datetime(2017, 3, 2, 10, 0, 0, tzinfo=None), 6),
-        MockArchive(datetime(2017, 3, 3, 10, 0, 0, tzinfo=None), 7),
-        MockArchive(datetime(2017, 3, 4, 10, 0, 0, tzinfo=None), 8),
+        MockArchive(datetime(2017, 3, 2, 10, 0, 0), 6),
+        MockArchive(datetime(2017, 3, 3, 10, 0, 0), 7),
+        MockArchive(datetime(2017, 3, 4, 10, 0, 0), 8),
         # minutes apart
-        MockArchive(datetime(2017, 10, 1, 9, 45, 0, tzinfo=None), 9),
-        MockArchive(datetime(2017, 10, 1, 9, 55, 0, tzinfo=None), 10),
+        MockArchive(datetime(2017, 10, 1, 9, 45, 0), 9),
+        MockArchive(datetime(2017, 10, 1, 9, 55, 0), 10),
         # seconds apart
-        MockArchive(datetime(2017, 10, 1, 10, 0, 1, tzinfo=None), 11),
-        MockArchive(datetime(2017, 10, 1, 10, 0, 3, tzinfo=None), 12),
-        MockArchive(datetime(2017, 10, 1, 10, 0, 5, tzinfo=None), 13),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 1), 11),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 3), 12),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 5), 13),
     ]
     kept_because = {}
     keep = prune_split(archives, rule, num_to_keep, None, kept_because)
@@ -507,12 +508,12 @@ def test_prune_split_keep_oldest():
 
     archives = [
         # oldest backup, but not last in its year
-        MockArchive(datetime(2018, 1, 1, 10, 0, 0, tzinfo=None), 1),
+        MockArchive(datetime(2018, 1, 1, 10, 0, 0), 1),
         # an interim backup
-        MockArchive(datetime(2018, 12, 30, 10, 0, 0, tzinfo=None), 2),
+        MockArchive(datetime(2018, 12, 30, 10, 0, 0), 2),
         # year-end backups
-        MockArchive(datetime(2018, 12, 31, 10, 0, 0, tzinfo=None), 3),
-        MockArchive(datetime(2019, 12, 31, 10, 0, 0, tzinfo=None), 4),
+        MockArchive(datetime(2018, 12, 31, 10, 0, 0), 3),
+        MockArchive(datetime(2019, 12, 31, 10, 0, 0), 4),
     ]
 
     # Keep oldest when retention target can't otherwise be met

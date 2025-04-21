@@ -347,7 +347,6 @@ class PruneMixIn:
             "--keep-secondly",
             dest="secondly",
             type=int_or_interval,
-            default=0,
             action=Highlander,
             help="number or time interval of secondly archives to keep",
         )
@@ -355,7 +354,6 @@ class PruneMixIn:
             "--keep-minutely",
             dest="minutely",
             type=int_or_interval,
-            default=0,
             action=Highlander,
             help="number or time interval of minutely archives to keep",
         )
@@ -364,7 +362,6 @@ class PruneMixIn:
             "--keep-hourly",
             dest="hourly",
             type=int_or_interval,
-            default=0,
             action=Highlander,
             help="number or time interval of hourly archives to keep",
         )
@@ -373,7 +370,6 @@ class PruneMixIn:
             "--keep-daily",
             dest="daily",
             type=int_or_interval,
-            default=0,
             action=Highlander,
             help="number or time interval of daily archives to keep",
         )
@@ -382,7 +378,6 @@ class PruneMixIn:
             "--keep-weekly",
             dest="weekly",
             type=int_or_interval,
-            default=0,
             action=Highlander,
             help="number or time interval of weekly archives to keep",
         )
@@ -391,7 +386,6 @@ class PruneMixIn:
             "--keep-monthly",
             dest="monthly",
             type=int_or_interval,
-            default=0,
             action=Highlander,
             help="number or time interval of monthly archives to keep",
         )
@@ -400,14 +394,13 @@ class PruneMixIn:
             "--keep-13weekly",
             dest="quarterly_13weekly",
             type=int_or_interval,
-            default=0,
             help="number or time interval of quarterly archives to keep (13 week strategy)",
         )
         quarterly_group.add_argument(
             "--keep-3monthly",
             dest="quarterly_3monthly",
             type=int_or_interval,
-            default=0,
+            default=None,
             help="number or time interval of quarterly archives to keep (3 month strategy)",
         )
         subparser.add_argument(
@@ -415,7 +408,6 @@ class PruneMixIn:
             "--keep-yearly",
             dest="yearly",
             type=int_or_interval,
-            default=0,
             action=Highlander,
             help="number or time interval of yearly archives to keep",
         )

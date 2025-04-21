@@ -1,8 +1,10 @@
+import pytest
 import re
 from datetime import datetime
 from freezegun import freeze_time
 
 from ...constants import *  # NOQA
+from ...helpers import CommandError
 from . import cmd, RK_ENCRYPTION, src_dir, generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -445,3 +447,28 @@ def test_prune_keep_yearly_int_or_interval(archivers, request):
         assert re.search(r"Would prune:\s+test-3", output)
         assert re.search(r"Keeping archive \(rule: yearly #3\):\s+test-4", output)
         assert re.search(r"Would prune:\s+test-5", output)
+
+
+def test_prune_no_args(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    with pytest.raises(CommandError) as error:
+        cmd(archiver, "prune")
+    output = str(error.value)
+    assert re.search(r"At least one of the .* settings must be specified.", output)
+    assert re.search(r"keep(?!-)", output)
+    flags = [
+        "last",
+        "within",
+        "secondly",
+        "minutely",
+        "hourly",
+        "daily",
+        "weekly",
+        "monthly",
+        "yearly",
+        "13weekly",
+        "3monthly",
+    ]
+    for flag in flags:
+        assert f"keep-{flag}" in output

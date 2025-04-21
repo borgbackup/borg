@@ -101,7 +101,7 @@ PRUNING_PATTERNS = OrderedDict(
 )
 
 
-# Datetime cannot represent times than datetime.min, so a day is added to allow for time zone offset.
+# Datetime cannot represent times before datetime.min, so a day is added to allow for time zone offset.
 DATETIME_MIN_WITH_ZONE = (datetime.min + timedelta(days=1)).astimezone()
 
 

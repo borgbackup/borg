@@ -1,8 +1,8 @@
-setuptools==77.0.3
+setuptools==78.1.1
 setuptools-scm==8.2.0
 pip==25.0.1
 wheel==0.45.1
-virtualenv==20.29.3
+virtualenv==20.30.0
 build==1.2.2
 pkgconfig==1.5.5
 tox==4.24.2

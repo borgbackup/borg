@@ -43,7 +43,7 @@ def pattern_period_func(pattern):
 
 
 def quarterly_13weekly_period_func(a):
-    """Group archives by extracting from their creation timestamp their ISO-8601 week numbers"""
+    """Group archives by extracting ISO-8601 13-weekly quarter from their creation timestamp"""
     (year, week, _) = a.ts.astimezone().isocalendar()  # local time
     if week <= 13:
         # Weeks containing Jan 4th to Mar 28th (leap year) or 29th- 91 (13*7)
@@ -65,7 +65,7 @@ def quarterly_13weekly_period_func(a):
 
 
 def quarterly_3monthly_period_func(a):
-    """Group archives by extracting month number from their creation timestamp"""
+    """Group archives by extracting monthly quarter from their creation timestamp"""
     lt = a.ts.astimezone()  # local time
     if lt.month <= 3:
         # 1-1 to 3-31

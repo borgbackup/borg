@@ -212,73 +212,74 @@ def interval_predicate(start: datetime, end: datetime):
 
 def compile_date_pattern(expr: str):
     """
-    Turn a date: expression into a predicate ts->bool.
-    Supports:
-      1) Full ISO‑8601 timestamps with minute (and optional seconds/fraction)
-      2) Hour-only:   YYYY‑MM‑DDTHH      -> interval of 1 hour
-      3) Minute-only: YYYY‑MM‑DDTHH:MM   -> interval of 1 minute
-      4) YYYY, YYYY‑MM, YYYY‑MM‑DD       -> day/month/year intervals
-      5) Unix epoch (@123456789)         -> exact match
-    Naive inputs are assumed local, then converted into UTC.
-    TODO: verify working for fractional seconds; add timezone support.
+    Accepts any of:
+      YYYY
+      YYYY-MM
+      YYYY-MM-DD
+      YYYY-MM-DDTHH
+      YYYY-MM-DDTHH:MM
+      YYYY-MM-DDTHH:MM:SS
+    and returns a predicate that is True for timestamps in that interval.
     """
     expr = expr.strip()
+    pattern = r"""
+        ^
+        (?:
+            (?P<fraction>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+)   # full timestamp with fraction
+          | (?P<second>  \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})      # no fraction
+          | (?P<minute>  \d{4}-\d{2}-\d{2}T\d{2}:\d{2})            # minute precision
+          | (?P<hour>    \d{4}-\d{2}-\d{2}T\d{2})                 # hour precision
+          | (?P<day>     \d{4}-\d{2}-\d{2})                       # day precision
+          | (?P<month>   \d{4}-\d{2})                             # month precision
+          | (?P<year>    \d{4})                                   # year precision
+          | @(?P<epoch>\d+)                                       # unix epoch
+        )
+        $
+    """
+    m = re.match(pattern, expr, re.VERBOSE)
+    if not m:
+        raise DatePatternError(f"unrecognised date: {expr!r}")
 
-    # 1) Full timestamp (with fraction)
-    full_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+")
-    if full_re.match(expr):
-        dt = parse_local_timestamp(expr, tzinfo=timezone.utc)
-        return exact_predicate(dt)  # no interval, since we have a fractional timestamp
-
-    # 2) Seconds-only
-    second_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
-    if second_re.match(expr):
-        start = parse_local_timestamp(expr, tzinfo=timezone.utc)
+    gd = m.groupdict()
+    # 1) fractional‐second exact match
+    if gd["fraction"]:
+        dt = parse_local_timestamp(gd["fraction"], tzinfo=timezone.utc)
+        return exact_predicate(dt)
+    # 2) second‐precision interval
+    if gd["second"]:
+        start = parse_local_timestamp(gd["second"], tzinfo=timezone.utc)
+        return interval_predicate(start, start + timedelta(seconds=1))
+    # 3) minute‐precision interval
+    if gd["minute"]:
+        start = parse_local_timestamp(gd["minute"] + ":00", tzinfo=timezone.utc)
+        return interval_predicate(start, start + timedelta(minutes=1))
+    # 4) hour‐precision interval
+    if gd["hour"]:
+        start = parse_local_timestamp(gd["hour"] + ":00:00", tzinfo=timezone.utc)
+        return interval_predicate(start, start + timedelta(hours=1))
+    # 5a) day‐precision interval
+    if gd["day"]:
+        y, mo, d = map(int, gd["day"].split("-"))
+        start = datetime(y, mo, d)
+        end = start + timedelta(days=1)
+        return interval_predicate(start, end)
+    # 5b) month‐precision interval
+    if gd["month"]:
+        y, mo = map(int, gd["month"].split("-"))
+        start = datetime(y, mo, 1)
+        end = offset_n_months(start, 1)
+        return interval_predicate(start, end)
+    # 5c) year‐precision interval
+    if gd["year"]:
+        y = int(gd["year"])
+        start = datetime(y, 1, 1)
+        end = datetime(y + 1, 1, 1)
+        return interval_predicate(start, end)
+    # 6) unix‐epoch exact‐second match
+    if gd["epoch"]:
+        epoch = int(gd["epoch"])
+        start = datetime.fromtimestamp(epoch, tz=timezone.utc)
         return interval_predicate(start, start + timedelta(seconds=1))
 
-    # 3) Minute-only
-    minute_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$")
-    if minute_re.match(expr):
-        start = parse_local_timestamp(expr + ":00", tzinfo=timezone.utc)
-        return interval_predicate(start, start + timedelta(minutes=1))
-
-    # 4) Hour-only
-    hour_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}$")
-    if hour_re.match(expr):
-        start = parse_local_timestamp(expr + ":00:00", tzinfo=timezone.utc)
-        return interval_predicate(start, start + timedelta(hours=1))
-
-    # Unix epoch (@123456789) - Note: We don't support fractional seconds here, since Unix epochs are almost always whole numbers.
-    if expr.startswith("@"):
-        try:
-            epoch = int(expr[1:])
-        except ValueError:
-            raise DatePatternError(f"invalid epoch: {expr!r}")
-        start = datetime.fromtimestamp(epoch, tz=timezone.utc)
-        return interval_predicate(start, start + timedelta(seconds=1))  # match within the second
-
-    # Year/Year-month/Year-month-day
-    parts = expr.split("-")
-    try:
-        if len(parts) == 1:  # YYYY
-            year = int(parts[0])
-            start = datetime(year, 1, 1)
-            end = datetime(year + 1, 1, 1)
-
-        elif len(parts) == 2:  # YYYY‑MM
-            year, month = map(int, parts)
-            start = datetime(year, month, 1)
-            end = offset_n_months(start, 1)
-
-        elif len(parts) == 3:  # YYYY‑MM‑DD
-            year, month, day = map(int, parts)
-            start = datetime(year, month, day)
-            end = start + timedelta(days=1)
-
-        else:
-            raise DatePatternError(f"unrecognised date: {expr!r}")
-
-    except ValueError as e:
-        raise DatePatternError(str(e)) from None
-
-    return interval_predicate(start, end)
+    # should never get here
+    raise DatePatternError(f"unrecognised date: {expr!r}")

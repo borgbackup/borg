@@ -3,6 +3,17 @@
 import sys
 import traceback
 
+# quickfix to disallow running borg with assertions switched off
+try:
+    assert False
+except AssertionError:
+    pass  # OK
+else:
+    print(
+        "Borg requires working assertions. Please run Python without -O and/or unset PYTHONOPTIMIZE.", file=sys.stderr
+    )
+    sys.exit(2)  # == EXIT_ERROR
+
 try:
     import argparse
     import faulthandler

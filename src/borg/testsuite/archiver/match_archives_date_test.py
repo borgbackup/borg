@@ -1,7 +1,9 @@
+import pytest
 from datetime import datetime, timezone
 
 from ...constants import *  # NOQA
 from . import cmd, create_src_archive, generate_archiver_tests, RK_ENCRYPTION
+from ...helpers.errors import CommandError
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -168,3 +170,94 @@ def test_unix_timestamps(archivers, request):
     assert "archive-sec-target" in output
     assert "archive-sec-before" not in output
     assert "archive-sec-after" not in output
+
+
+TIMEZONE_ARCHIVES = [("archive-la", "2025-01-01T12:01:00-08:00"), ("archive-utc", "2025-01-02T12:01:00+00:00")]
+
+
+@pytest.mark.parametrize("timezone_variant", ["2025-01-01T12:01:00-08:00", "2025-01-01T12:01:00[America/Los_Angeles]"])
+def test_match_la_equivalents(archivers, request, timezone_variant):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name, ts in TIMEZONE_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    output = cmd(archiver, "repo-list", "-v", f"--match-archives=date:{timezone_variant}", exit_code=0)
+    assert "archive-la" in output
+    assert "archive-utc" not in output
+
+
+@pytest.mark.parametrize(
+    "timezone_variant", ["2025-01-02T12:01:00+00:00", "2025-01-02T12:01:00Z", "2025-01-02T12:01:00[Etc/UTC]"]
+)
+def test_match_utc_equivalents(archivers, request, timezone_variant):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name, ts in TIMEZONE_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    output = cmd(archiver, "repo-list", "-v", f"--match-archives=date:{timezone_variant}", exit_code=0)
+    assert "archive-utc" in output
+    assert "archive-la" not in output
+
+
+HOUR_TZ_ARCHIVES = [
+    ("archive-hour-diff", "2025-01-01T09:59:00Z"),
+    ("archive-hour-start", "2025-01-01T10:00:00Z"),
+    ("archive-hour-same", "2025-01-01T10:59:59Z"),
+]
+
+
+def test_match_hour_from_different_tz(archivers, request):
+    """
+    Test that the date filter works for hours with archives created in a different timezone.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name, ts in HOUR_TZ_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # We're filtering “local 11:00” in +01:00 zone, which is 10:00–10:59:59 UTC
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-01-01T11+01:00", exit_code=0)
+    assert "archive-hour-start" in out
+    assert "archive-hour-same" in out
+    assert "archive-hour-diff" not in out
+
+
+def test_match_day_from_different_tz(archivers, request):
+    """
+    Test that the date filter works for days with archives created in a different timezone.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # Local 2025‑03‑02T00:30:00+02:00 → UTC 2025‑03‑01T22:30:00Z
+    create_src_archive(archiver, "archive-utc-bound", ts="2025-03-02T00:30:00+02:00")
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-03-01[Etc/UTC]", exit_code=0)
+    assert "archive-utc-bound" in out
+
+
+@pytest.mark.parametrize(
+    "invalid_expr",
+    [
+        "2025-01-01T00:00:00+14:01",  # beyond +14:00 (ISO 8601 boundary)
+        "2025-01-01T00:00:00-12:01",  # beyond -12:00 (ISO 8601 boundary)
+        "2025-01-01T00:00:00+09:99",  # invalid minutes
+        "2025-01-01T00:00:00[garbage]",  # invalid region
+        "2025-01-01T00:00:00[Not/AZone]",  # structured but nonexistent
+    ],
+)
+def test_invalid_timezones_rejected(archivers, request, invalid_expr):
+    """
+    Test that invalid timezone expressions are rejected.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    with pytest.raises(CommandError) as excinfo:
+        cmd(archiver, "repo-list", "-v", f"--match-archives=date:{invalid_expr}")
+
+    msg = str(excinfo.value)
+    assert "Invalid date pattern" in msg
+    assert invalid_expr in msg

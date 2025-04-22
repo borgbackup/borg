@@ -1,6 +1,7 @@
 import os
 import re
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
@@ -191,23 +192,46 @@ class DatePatternError(ValueError):
     """Raised when a date: archive pattern cannot be parsed."""
 
 
-def local(dt: datetime) -> datetime:
-    """Interpret naive dt as local time, attach timezone info from the local tz."""
-    if dt.tzinfo is None:
-        dt = dt.astimezone()
-    return dt
-
-
 def exact_predicate(dt: datetime):
     """Return predicate matching archives whose ts equals dt (UTC)."""
-    dt_utc = local(dt).astimezone(timezone.utc)
+    dt_utc = dt.astimezone(timezone.utc)
     return lambda ts: ts.astimezone(timezone.utc) == dt_utc
 
 
 def interval_predicate(start: datetime, end: datetime):
-    start_utc = local(start).astimezone(timezone.utc)
-    end_utc = local(end).astimezone(timezone.utc)
+    start_utc = start.astimezone(timezone.utc)
+    end_utc = end.astimezone(timezone.utc)
     return lambda ts: start_utc <= ts.astimezone(timezone.utc) < end_utc
+
+
+def parse_tz(tzstr: str):
+    """
+    Parses a UTC offset like +08:00 or [Region/Name] into a timezone object.
+    """
+    if not tzstr:
+        return None
+    if tzstr == "Z":
+        return timezone.utc
+    if tzstr[0] in "+-":
+        sign = 1 if tzstr[0] == "+" else -1
+        try:
+            hh, mm = map(int, tzstr[1:].split(":"))
+            if not (0 <= mm < 60):
+                raise ValueError
+        except Exception:
+            raise DatePatternError("invalid UTC offset format")
+        # we do it this way so that, for example, -8:30 is
+        # -8 hours and -30 minutes, not -8 hours and +30 minutes
+        total_minutes = sign * (hh * 60 + mm)
+        # enforce ISO-8601 bounds (-12:00 to +14:00)
+        if not (-12 * 60 <= total_minutes <= 14 * 60):
+            raise DatePatternError("UTC offset outside ISO-8601 bounds")
+        return timezone(timedelta(minutes=total_minutes))
+    # [Region/Name]
+    try:
+        return ZoneInfo(tzstr.strip("[]"))
+    except Exception:
+        raise DatePatternError("invalid timezone format")
 
 
 def compile_date_pattern(expr: str):
@@ -219,7 +243,9 @@ def compile_date_pattern(expr: str):
       YYYY-MM-DDTHH
       YYYY-MM-DDTHH:MM
       YYYY-MM-DDTHH:MM:SS
-    and returns a predicate that is True for timestamps in that interval.
+      Unix epoch (@123456789)
+    …with an optional trailing timezone (Z or ±HH:MM or [Region/City]).
+    Returns a predicate that is True for timestamps in that interval.
     """
     expr = expr.strip()
     pattern = r"""
@@ -234,6 +260,7 @@ def compile_date_pattern(expr: str):
           | (?P<year>    \d{4})                                   # year precision
           | @(?P<epoch>\d+)                                       # unix epoch
         )
+        (?P<tz>Z|[+\-]\d{2}:\d{2}|\[[^\]]+\])?                   # optional timezone or [Region/City]
         $
     """
     m = re.match(pattern, expr, re.VERBOSE)
@@ -241,40 +268,55 @@ def compile_date_pattern(expr: str):
         raise DatePatternError(f"unrecognised date: {expr!r}")
 
     gd = m.groupdict()
+    tz = parse_tz(gd.get("tz"))  # will be None if tzstr is empty -> local timezone
+
+    # unix epoch and user-specified timezone are mutually exclusive
+    if gd["epoch"] and tz is not None:
+        raise DatePatternError("unix‐epoch patterns (@123456789) are UTC and must not include a timezone suffix")
+
     # 1) fractional‐second exact match
     if gd["fraction"]:
-        dt = parse_local_timestamp(gd["fraction"], tzinfo=timezone.utc)
+        ts = gd["fraction"]
+        dt = parse_timestamp(ts, tzinfo=tz)
         return exact_predicate(dt)
+
     # 2) second‐precision interval
     if gd["second"]:
-        start = parse_local_timestamp(gd["second"], tzinfo=timezone.utc)
+        ts = gd["second"]
+        start = parse_timestamp(ts, tzinfo=tz)
+        # within one second
         return interval_predicate(start, start + timedelta(seconds=1))
+
     # 3) minute‐precision interval
     if gd["minute"]:
-        start = parse_local_timestamp(gd["minute"] + ":00", tzinfo=timezone.utc)
+        ts = gd["minute"] + ":00"
+        start = parse_timestamp(ts, tzinfo=tz)
         return interval_predicate(start, start + timedelta(minutes=1))
+
     # 4) hour‐precision interval
     if gd["hour"]:
-        start = parse_local_timestamp(gd["hour"] + ":00:00", tzinfo=timezone.utc)
+        ts = gd["hour"] + ":00:00"
+        start = parse_timestamp(ts, tzinfo=tz)
         return interval_predicate(start, start + timedelta(hours=1))
+
     # 5a) day‐precision interval
     if gd["day"]:
-        y, mo, d = map(int, gd["day"].split("-"))
-        start = datetime(y, mo, d)
-        end = start + timedelta(days=1)
-        return interval_predicate(start, end)
+        ts = gd["day"] + "T00:00:00"
+        start = parse_timestamp(ts, tzinfo=tz)
+        return interval_predicate(start, start + timedelta(days=1))
+
     # 5b) month‐precision interval
     if gd["month"]:
-        y, mo = map(int, gd["month"].split("-"))
-        start = datetime(y, mo, 1)
-        end = offset_n_months(start, 1)
-        return interval_predicate(start, end)
+        ts = gd["month"] + "-01T00:00:00"
+        start = parse_timestamp(ts, tzinfo=tz)
+        return interval_predicate(start, offset_n_months(start, 1))
+
     # 5c) year‐precision interval
     if gd["year"]:
-        y = int(gd["year"])
-        start = datetime(y, 1, 1)
-        end = datetime(y + 1, 1, 1)
-        return interval_predicate(start, end)
+        ts = gd["year"] + "-01-01T00:00:00"
+        start = parse_timestamp(ts, tzinfo=tz)
+        return interval_predicate(start, offset_n_months(start, 12))
+
     # 6) unix‐epoch exact‐second match
     if gd["epoch"]:
         epoch = int(gd["epoch"])

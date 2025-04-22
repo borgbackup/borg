@@ -186,6 +186,7 @@ def archive_ts_now():
     """return tz-aware datetime obj for current time for usage as archive timestamp"""
     return datetime.now(timezone.utc)  # utc time / utc timezone
 
+
 class DatePatternError(ValueError):
     """Raised when a date: archive pattern cannot be parsed."""
 
@@ -205,7 +206,7 @@ def exact_predicate(dt: datetime):
 
 def interval_predicate(start: datetime, end: datetime):
     start_utc = local(start).astimezone(timezone.utc)
-    end_utc   = local(end).astimezone(timezone.utc)
+    end_utc = local(end).astimezone(timezone.utc)
     return lambda ts: start_utc <= ts.astimezone(timezone.utc) < end_utc
 
 
@@ -227,7 +228,7 @@ def compile_date_pattern(expr: str):
     full_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+")
     if full_re.match(expr):
         dt = parse_local_timestamp(expr, tzinfo=timezone.utc)
-        return exact_predicate(dt) # no interval, since we have a fractional timestamp
+        return exact_predicate(dt)  # no interval, since we have a fractional timestamp
 
     # 2) Seconds-only
     second_re = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
@@ -247,33 +248,34 @@ def compile_date_pattern(expr: str):
         start = parse_local_timestamp(expr + ":00:00", tzinfo=timezone.utc)
         return interval_predicate(start, start + timedelta(hours=1))
 
-
-    # Unix epoch (@123456789) - Note: We don't support fractional seconds here, since Unix epochs are almost always whole numbers.
+    # Unix epoch (@123456789) - Note: We don't support fractional seconds here,
+    # since Unix epochs are almost always whole numbers.
     if expr.startswith("@"):
         try:
             epoch = int(expr[1:])
         except ValueError:
             raise DatePatternError(f"invalid epoch: {expr!r}")
         start = datetime.fromtimestamp(epoch, tz=timezone.utc)
-        return interval_predicate(start, start + timedelta(seconds=1)) # match within the second
+        # match within the second
+        return interval_predicate(start, start + timedelta(seconds=1))
 
     # Year/Year-month/Year-month-day
     parts = expr.split("-")
     try:
-        if len(parts) == 1:                    # YYYY
+        if len(parts) == 1:  # YYYY
             year = int(parts[0])
             start = datetime(year, 1, 1)
-            end   = datetime(year + 1, 1, 1)
+            end = datetime(year + 1, 1, 1)
 
-        elif len(parts) == 2:                  # YYYY‑MM
+        elif len(parts) == 2:  # YYYY‑MM
             year, month = map(int, parts)
             start = datetime(year, month, 1)
-            end   = offset_n_months(start, 1)
+            end = offset_n_months(start, 1)
 
-        elif len(parts) == 3:                  # YYYY‑MM‑DD
+        elif len(parts) == 3:  # YYYY‑MM‑DD
             year, month, day = map(int, parts)
             start = datetime(year, month, day)
-            end   = start + timedelta(days=1)
+            end = start + timedelta(days=1)
 
         else:
             raise DatePatternError(f"unrecognised date: {expr!r}")

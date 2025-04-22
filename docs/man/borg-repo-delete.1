@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-DELETE" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-REPO-DELETE" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-repo-delete \- Delete a repository
 .SH SYNOPSIS
@@ -46,7 +46,7 @@ Always first use \fB\-\-dry\-run \-\-list\fP to see what would be deleted.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -68,8 +68,7 @@ keep the local security info when deleting a repository
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # delete the whole repository and the related local cache:
 $ borg repo\-delete
 You requested to DELETE the repository completely *including* all archives it contains:
@@ -77,8 +76,7 @@ repo                                 Mon, 2016\-02\-15 19:26:54
 root\-2016\-02\-15                      Mon, 2016\-02\-15 19:36:29
 newname                              Mon, 2016\-02\-15 19:50:19
 Type \(aqYES\(aq if you understand this and want to continue: YES
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

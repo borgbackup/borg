@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-BENCHMARK-CRUD" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-BENCHMARK-CRUD" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-benchmark-crud \- Benchmark Create, Read, Update, Delete for archives.
 .SH SYNOPSIS
@@ -47,11 +47,9 @@ If your repository is encrypted and borg needs a passphrase to unlock the key, u
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 BORG_PASSPHRASE=mysecret borg benchmark crud REPO PATH
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

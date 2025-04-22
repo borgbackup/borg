@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-INFO" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-REPO-INFO" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-repo-info \- Show repository infos
 .SH SYNOPSIS
@@ -39,7 +39,7 @@ This command displays detailed information about the repository.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-json
@@ -49,8 +49,7 @@ format output as JSON
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg repo\-info
 Repository ID: 0e85a7811022326c067acb2a7181d5b526b7d2f61b34470fb8670c440a67f1a9
 Location: /Users/tw/w/borg/path/to/repo
@@ -61,8 +60,7 @@ Original size: 152.14 MB
 Deduplicated size: 30.38 MB
 Unique chunks: 654
 Total chunks: 3302
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

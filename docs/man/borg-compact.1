@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-COMPACT" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-COMPACT" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-compact \- Collect garbage in repository
 .SH SYNOPSIS
@@ -70,19 +70,36 @@ archives directory corruption. Such archives could potentially be restored with
 might not want to do that unless there are signs of lost archives (e.g. when
 seeing fatal errors when creating backups or when archives are missing in
 \fBborg repo\-list\fP).
+.sp
+When giving the \fB\-\-stats\fP option, borg will internally list all repository
+objects to determine their existence AND stored size. It will build a fresh
+chunks index from that information and cache it in the repository. For some
+types of repositories, this might be very slow. It will tell you the sum of
+stored object sizes, before and after compaction.
+.sp
+Without \fB\-\-stats\fP, borg will rely on the cached chunks index to determine
+existing object IDs (but there is no stored size information in the index,
+thus it can\(aqt compute before/after compaction size statistics).
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS options
+.INDENT 0.0
+.TP
+.B  \-n\fP,\fB  \-\-dry\-run
+do nothing
+.TP
+.B  \-s\fP,\fB  \-\-stats
+print statistics (might be much slower)
+.UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # compact segments and free repo disk space
 $ borg compact
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

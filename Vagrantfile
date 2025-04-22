@@ -214,7 +214,7 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
-    pyenv install 3.12.8
+    pyenv install 3.12.10
     pyenv rehash
   EOF
 end
@@ -232,8 +232,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.12 release
-    pyenv global 3.12.8
-    pyenv virtualenv 3.12.8 borg-env
+    pyenv global 3.12.10
+    pyenv virtualenv 3.12.10 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -247,9 +247,9 @@ def install_borg(fuse)
     cd borg
     pip install -r requirements.d/development.lock.txt
     python3 scripts/make.py clean
-    # install borgstore WITH sftp support, so it pulls in paramiko also,
-    # so sftp support will also get into the binaries built. #8574
-    pip install borgstore[sftp]
+    # install borgstore WITH all options, so it pulls in the needed
+    # requirements, so they will also get into the binaries built. #8574
+    pip install borgstore[sftp,s3]
     pip install -e .[#{fuse}]
   EOF
 end
@@ -282,8 +282,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.12.8
-      pyenv local 3.12.8
+      pyenv global 3.12.10
+      pyenv local 3.12.10
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:

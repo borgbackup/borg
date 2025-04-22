@@ -12,11 +12,17 @@ borg compact
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+
-    | .. class:: borg-common-opt-ref                        |
-    |                                                       |
-    | :ref:`common_options`                                 |
-    +-------------------------------------------------------+
+    +-------------------------------------------------------+-----------------------+-----------------------------------------+
+    | **options**                                                                                                             |
+    +-------------------------------------------------------+-----------------------+-----------------------------------------+
+    |                                                       | ``-n``, ``--dry-run`` | do nothing                              |
+    +-------------------------------------------------------+-----------------------+-----------------------------------------+
+    |                                                       | ``-s``, ``--stats``   | print statistics (might be much slower) |
+    +-------------------------------------------------------+-----------------------+-----------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                          |
+    |                                                                                                                         |
+    | :ref:`common_options`                                                                                                   |
+    +-------------------------------------------------------+-----------------------+-----------------------------------------+
 
     .. raw:: html
 
@@ -28,6 +34,11 @@ borg compact
 
 .. only:: latex
 
+
+
+    options
+        -n, --dry-run    do nothing
+        -s, --stats     print statistics (might be much slower)
 
 
     :ref:`common_options`
@@ -66,3 +77,13 @@ archives directory corruption. Such archives could potentially be restored with
 might not want to do that unless there are signs of lost archives (e.g. when
 seeing fatal errors when creating backups or when archives are missing in
 ``borg repo-list``).
+
+When giving the ``--stats`` option, borg will internally list all repository
+objects to determine their existence AND stored size. It will build a fresh
+chunks index from that information and cache it in the repository. For some
+types of repositories, this might be very slow. It will tell you the sum of
+stored object sizes, before and after compaction.
+
+Without ``--stats``, borg will rely on the cached chunks index to determine
+existing object IDs (but there is no stored size information in the index,
+thus it can't compute before/after compaction size statistics).

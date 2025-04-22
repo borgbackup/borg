@@ -19,7 +19,7 @@ borg list
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``PATH``                              | paths to list; patterns are supported                                                                                                                                                 |
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                                                                                                |
+    | **options**                                                                                                                                                                                                                                                                           |
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--short``                           | only print file/directory names, nothing else                                                                                                                                         |
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -58,7 +58,7 @@ borg list
         paths to list; patterns are supported
 
 
-    optional arguments
+    options
         --short     only print file/directory names, nothing else
         --format FORMAT    specify format for file listing (default: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")
         --json-lines    Format output as JSON Lines. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
@@ -153,5 +153,3 @@ Keys available only when listing files in an archive:
 - archiveid: internal ID of the archive
 - archivename: name of the archive
 - extra: prepends {target} with " -> " for soft links and " link to " for hard links
-
-- health: either "healthy" (file ok) or "broken" (if file has all-zero replacement chunks)

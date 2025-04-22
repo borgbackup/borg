@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CHECK" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-CHECK" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-check \- Check repository consistency
 .SH SYNOPSIS
@@ -44,7 +44,7 @@ the file magic headers, and both the metadata and data of all objects in
 the repository. The read data is checked by size and hash. Bit rot and other
 types of accidental damage can be detected this way. Running the repository
 check can be split into multiple partial checks using \fB\-\-max\-duration\fP\&.
-When checking a \fI\%ssh://\fP remote repository, please note that the checks run on
+When checking a  <ssh://>  remote repository, please note that the checks run on
 the server and do not cause significant network traffic.
 .IP 2. 3
 Checking consistency and correctness of the archive metadata and optionally
@@ -137,29 +137,8 @@ objects from the repository after it did a 2nd try to read them correctly.
 .IP 2. 3
 When checking the consistency and correctness of archives, repair mode might
 remove whole archives from the manifest if their archive metadata chunk is
-corrupt or lost. On a chunk level (i.e. the contents of files), repair mode
-will replace corrupt or lost chunks with a same\-size replacement chunk of
-zeroes. If a previously zeroed chunk reappears, repair mode will restore
-this lost chunk using the new chunk.
+corrupt or lost. Borg will also report files that reference missing chunks.
 .UNINDENT
-.sp
-Most steps taken by repair mode have a one\-time effect on the repository, like
-removing a lost archive from the repository. However, replacing a corrupt or
-lost chunk with an all\-zero replacement will have an ongoing effect on the
-repository: When attempting to extract a file referencing an all\-zero chunk,
-the \fBextract\fP command will distinctly warn about it. The FUSE filesystem
-created by the \fBmount\fP command will reject reading such a \(dqzero\-patched\(dq
-file unless a special mount option is given.
-.sp
-As mentioned earlier, Borg might be able to \(dqheal\(dq a \(dqzero\-patched\(dq file in
-repair mode, if all its previously lost chunks reappear (e.g. via a later
-backup). This is achieved by Borg not only keeping track of the all\-zero
-replacement chunks, but also by keeping metadata about the lost chunks. In
-repair mode Borg will check whether a previously lost chunk reappeared and will
-replace the all\-zero replacement chunk by the reappeared chunk. If all lost
-chunks of a \(dqzero\-patched\(dq file reappear, this effectively \(dqheals\(dq the file.
-Consequently, if lost chunks were repaired earlier, it is advised to run
-\fB\-\-repair\fP a second time after creating some new backups.
 .sp
 If \fB\-\-repair \-\-find\-lost\-archives\fP is given, previously lost entries will
 be recreated in the archive directory. This is only possible before
@@ -167,7 +146,7 @@ be recreated in the archive directory. This is only possible before
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-repository\-only

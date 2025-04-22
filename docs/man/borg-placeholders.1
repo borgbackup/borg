@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PLACEHOLDERS" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-PLACEHOLDERS" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-placeholders \- Details regarding placeholders
 .SH DESCRIPTION
@@ -47,11 +47,13 @@ The full name of the machine in reverse domain name notation.
 .TP
 .B {now}
 The current local date and time, by default in ISO\-8601 format.
-You can also supply your own \fI\%format string\fP, e.g. {now:%Y\-%m\-%d_%H:%M:%S}
+You can also supply your own format string <https://docs.python.org/3.9/library/datetime.html#strftime-and-strptime-behavior>
+, e.g. {now:%Y\-%m\-%d_%H:%M:%S}
 .TP
 .B {utcnow}
 The current UTC date and time, by default in ISO\-8601 format.
-You can also supply your own \fI\%format string\fP, e.g. {utcnow:%Y\-%m\-%d_%H:%M:%S}
+You can also supply your own format string <https://docs.python.org/3.9/library/datetime.html#strftime-and-strptime-behavior>
+, e.g. {utcnow:%Y\-%m\-%d_%H:%M:%S}
 .TP
 .B {user}
 The user name (or UID, if no name is available) of the user running borg.
@@ -76,11 +78,9 @@ If literal curly braces need to be used, double them for escaping:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
-borg create /path/to/repo::{{literal_text}}
-.ft P
-.fi
+.EX
+borg create \-\-repo /path/to/repo {{literal_text}}
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -88,13 +88,11 @@ Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
-borg create /path/to/repo::{hostname}\-{user}\-{utcnow} ...
-borg create /path/to/repo::{hostname}\-{now:%Y\-%m\-%d_%H:%M:%S%z} ...
+.EX
+borg create \-\-repo /path/to/repo {hostname}\-{user}\-{utcnow} ...
+borg create \-\-repo /path/to/repo {hostname}\-{now:%Y\-%m\-%d_%H:%M:%S%z} ...
 borg prune \-a \(aqsh:{hostname}\-*\(aq ...
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

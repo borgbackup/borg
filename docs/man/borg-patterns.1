@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PATTERNS" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-PATTERNS" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
@@ -65,7 +65,8 @@ style for a specific pattern, prefix it with two characters followed
 by a colon \(aq:\(aq (i.e. \fBfm:path/*\fP, \fBsh:path/**\fP).
 .INDENT 0.0
 .TP
-.B \fI\%Fnmatch\fP, selector \fBfm:\fP
+.B Fnmatch <https://docs.python.org/3/library/fnmatch.html>
+, selector \fBfm:\fP
 This is the default style for \fB\-\-exclude\fP and \fB\-\-exclude\-from\fP\&.
 These patterns use a variant of shell pattern syntax, with \(aq*\(aq matching
 any number of characters, \(aq?\(aq matching any single character, \(aq[...]\(aq
@@ -89,7 +90,8 @@ levels, \fB*\fP for matching zero or more arbitrary characters with the
 exception of any path separator, \fB{}\fP containing comma\-separated
 alternative patterns. A leading path separator is always removed.
 .TP
-.B \fI\%Regular expressions\fP, selector \fBre:\fP
+.B Regular expressions <https://docs.python.org/3/library/re.html>
+, selector \fBre:\fP
 Unlike shell patterns, regular expressions are not required to match the full
 path and any substring match is sufficient. It is strongly recommended to
 anchor patterns to the start (\(aq^\(aq), to the end (\(aq$\(aq) or both. Path
@@ -134,6 +136,15 @@ Exclusions can be passed via the command line option \fB\-\-exclude\fP\&. When u
 from within a shell, the patterns should be quoted to protect them from
 expansion.
 .sp
+Patterns matching special characters, e.g. white space, within a shell may
+require adjustments, such as putting quotation marks around the arguments.
+Example:
+Using bash, the following command line option would match and exclude \(dqitem name\(dq:
+\fB\-\-pattern=\(aq\-path/item name\(aq\fP
+Note that when patterns are used within a pattern file directly read by borg,
+e.g. when using \fB\-\-exclude\-from\fP or \fB\-\-patterns\-from\fP, there is no shell
+involved and thus no quotation marks are required.
+.sp
 The \fB\-\-exclude\-from\fP option permits loading exclusion patterns from a text
 file with one pattern per line. Lines empty or starting with the hash sign
 \(aq#\(aq after removing whitespace on both ends are ignored. The optional style
@@ -148,8 +159,7 @@ Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Exclude \(aq/home/user/file.o\(aq but not \(aq/home/user/file.odt\(aq:
 $ borg create \-e \(aq*.o\(aq archive /
 
@@ -179,8 +189,7 @@ sh:home/*/.thumbnails
 some file with spaces.txt
 EOF
 $ borg create \-\-exclude\-from exclude.txt archive /
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -225,8 +234,7 @@ Example:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Define the recursion root
 R /
 # Exclude all iso files in any directory
@@ -243,8 +251,7 @@ R /
 # Exclude all other files and directories
 # that are not specifically included earlier.
 \- **
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -252,11 +259,9 @@ R /
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg create \-\-dry\-run \-\-list \-\-patterns\-from patterns.txt archive
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -281,8 +286,7 @@ Examples:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # back up pics, but not the ones from 2018, except the good ones:
 # note: using = is essential to avoid cmdline argument parsing issues.
 borg create \-\-pattern=+pics/2018/good \-\-pattern=\-pics/2018 archive pics
@@ -295,8 +299,7 @@ borg create \-\-exclude \(aqre:\e.iso(?i)$\(aq \-\-exclude \(aqsh:home/**/.*\(aq
 
 # use a file with patterns (recursion root \(aq/\(aq via command line):
 borg create \-\-patterns\-from patterns.lst archive /
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -304,8 +307,7 @@ The patterns.lst file could look like that:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # \(dqsh:\(dq pattern style is the default
 # exclude caches
 \- home/*/.cache
@@ -317,8 +319,7 @@ The patterns.lst file could look like that:
 \- home/*
 # don\(aqt even look in /dev, /proc, /run, /sys, /tmp (note: would exclude files like /device, too)
 ! re:^(dev|proc|run|sys|tmp)
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -326,13 +327,11 @@ You can specify recursion roots either on the command line or in a patternfile:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # these two commands do the same thing
 borg create \-\-exclude home/bobby/junk archive /home/bobby /home/susan
 borg create \-\-patterns\-from patternfile.lst archive
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -340,16 +339,14 @@ patternfile.lst:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # note that excludes use fm: by default and patternfiles use sh: by default.
 # therefore, we need to specify fm: to have the same exact behavior.
 P fm
 R /home/bobby
 R /home/susan
 \- home/bobby/junk
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

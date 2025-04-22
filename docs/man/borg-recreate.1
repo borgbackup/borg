@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RECREATE" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-RECREATE" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .SH SYNOPSIS
@@ -69,16 +69,10 @@ When rechunking, space usage can be substantial \- expect
 at least the entire deduplicated size of the archives using the previous
 chunker params.
 .sp
-If you recently ran borg check \-\-repair and it had to fix lost chunks with all\-zero
-replacement chunks, please first run another backup for the same data and re\-run
-borg check \-\-repair afterwards to heal any archives that had lost chunks which are
-still generated from the input data.
-.sp
-Important: running borg recreate to re\-chunk will remove the chunks_healthy
-metadata of all items with replacement chunks, so healing will not be possible
-any more after re\-chunking (it is also unlikely it would ever work: due to the
-change of chunking parameters, the missing chunk likely will never be seen again
-even if you still have the data that produced it).
+If your most recent borg check found missing chunks, please first run another
+backup for the same data, before doing any rechunking. If you are lucky, that
+will re\-create the missing chunks. Optionally, do another borg check, to see
+if the chunks are still missing).
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -88,7 +82,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B PATH
 paths to recreate; patterns are supported
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-list
@@ -119,7 +113,7 @@ include/exclude paths matching PATTERN
 read include/exclude patterns from PATTERNFILE, one per line
 .TP
 .B  \-\-exclude\-caches
-exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.bford.info/cachedir/spec.html\fP)
+exclude directories that contain a CACHEDIR.TAG file ( <http://www.bford.info/cachedir/spec.html> )
 .TP
 .BI \-\-exclude\-if\-present \ NAME
 exclude directories that are tagged by containing a filesystem object with the given NAME
@@ -173,8 +167,7 @@ rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Create a backup with little but fast compression
 $ borg create archive /some/files \-\-compression lz4
 # Then compress it \- this might take longer, but the backup has already completed,
@@ -198,8 +191,7 @@ Name: archivename
 Fingerprint: ...
 Comment: This is a better comment
 \&...
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-KEY-EXPORT" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-KEY-EXPORT" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-key-export \- Export the repository key for backup
 .SH SYNOPSIS
@@ -65,7 +65,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B PATH
 where to store the backup
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-paper
@@ -78,8 +78,7 @@ Create an html file suitable for printing and later type\-in or qr scan
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 borg key export > encrypted\-key\-backup
 borg key export \-\-paper > encrypted\-key\-backup.txt
 borg key export \-\-qr\-html > encrypted\-key\-backup.html
@@ -87,8 +86,7 @@ borg key export \-\-qr\-html > encrypted\-key\-backup.html
 borg key export encrypted\-key\-backup
 borg key export \-\-paper encrypted\-key\-backup.txt
 borg key export \-\-qr\-html encrypted\-key\-backup.html
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

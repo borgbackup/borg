@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-PRUNE" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -50,7 +50,8 @@ you run \fBborg compact\fP\&.
 .sp
 This command is normally used by automated backup scripts wanting to keep a
 certain number of historic backups. This retention policy is commonly referred to as
-\fI\%GFS\fP
+GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>
+
 (Grandfather\-father\-son) backup rotation scheme.
 .sp
 The recommended way to use prune is to give the archive series name to it via the
@@ -67,10 +68,10 @@ from different machines) in one shared repository, use one prune call per
 series.
 .sp
 The \fB\-\-keep\-within\fP option takes an argument of the form \(dq<int><char>\(dq,
-where char is \(dqH\(dq, \(dqd\(dq, \(dqw\(dq, \(dqm\(dq, \(dqy\(dq. For example, \fB\-\-keep\-within 2d\fP means
-to keep all archives that were created within the past 48 hours.
-\(dq1m\(dq is taken to mean \(dq31d\(dq. The archives kept with this option do not
-count towards the totals specified by any other options.
+where char is \(dqy\(dq, \(dqm\(dq, \(dqw\(dq, \(dqd\(dq, \(dqH\(dq, \(dqM\(dq, or \(dqS\(dq.  For example,
+\fB\-\-keep\-within 2d\fP means to keep all archives that were created within
+the past 2 days.  \(dq1m\(dq is taken to mean \(dq31d\(dq. The archives kept with
+this option do not count towards the totals specified by any other options.
 .sp
 A good procedure is to thin out more and more the older your backups get.
 As an example, \fB\-\-keep\-daily 7\fP means to keep the latest backup on each day,
@@ -106,7 +107,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B NAME
 specify the archive name
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -199,8 +200,7 @@ Don\(aqt forget to run \fBborg compact \-v\fP after prune to actually free disk 
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Keep 7 end of day and 4 additional end of week archives.
 # Do a dry\-run without actually deleting anything.
 $ borg prune \-v \-\-list \-\-dry\-run \-\-keep\-daily=7 \-\-keep\-weekly=4
@@ -219,8 +219,7 @@ $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-\-keep\-monthly
 # Keep all backups in the last 10 days, 4 additional end of week archives,
 # and an end of month archive for every month:
 $ borg prune \-v \-\-list \-\-keep\-within=10d \-\-keep\-weekly=4 \-\-keep\-monthly=\-1
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

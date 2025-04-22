@@ -13,7 +13,7 @@ borg check
     .. class:: borg-options-table
 
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                                                                   |
+    | **options**                                                                                                                                                                                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--repository-only``                        | only perform repository checks                                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
@@ -62,7 +62,7 @@ borg check
 
 
 
-    optional arguments
+    options
         --repository-only    only perform repository checks
         --archives-only    only perform archives checks
         --verify-data     perform cryptographic archive data integrity verification (conflicts with ``--repository-only``)
@@ -186,28 +186,7 @@ In practice, repair mode hooks into both the repository and archive checks:
 
 2. When checking the consistency and correctness of archives, repair mode might
    remove whole archives from the manifest if their archive metadata chunk is
-   corrupt or lost. On a chunk level (i.e. the contents of files), repair mode
-   will replace corrupt or lost chunks with a same-size replacement chunk of
-   zeroes. If a previously zeroed chunk reappears, repair mode will restore
-   this lost chunk using the new chunk.
-
-Most steps taken by repair mode have a one-time effect on the repository, like
-removing a lost archive from the repository. However, replacing a corrupt or
-lost chunk with an all-zero replacement will have an ongoing effect on the
-repository: When attempting to extract a file referencing an all-zero chunk,
-the ``extract`` command will distinctly warn about it. The FUSE filesystem
-created by the ``mount`` command will reject reading such a "zero-patched"
-file unless a special mount option is given.
-
-As mentioned earlier, Borg might be able to "heal" a "zero-patched" file in
-repair mode, if all its previously lost chunks reappear (e.g. via a later
-backup). This is achieved by Borg not only keeping track of the all-zero
-replacement chunks, but also by keeping metadata about the lost chunks. In
-repair mode Borg will check whether a previously lost chunk reappeared and will
-replace the all-zero replacement chunk by the reappeared chunk. If all lost
-chunks of a "zero-patched" file reappear, this effectively "heals" the file.
-Consequently, if lost chunks were repaired earlier, it is advised to run
-``--repair`` a second time after creating some new backups.
+   corrupt or lost. Borg will also report files that reference missing chunks.
 
 If ``--repair --find-lost-archives`` is given, previously lost entries will
 be recreated in the archive directory. This is only possible before

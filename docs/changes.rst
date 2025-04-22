@@ -162,9 +162,11 @@ New features:
 - extract: --dry-run now displays +/- status flags (included/excluded), #8564
 - allow timespan to be specified with common time units, #8624
 - enhance passphrase handling, #8496.
+
   Setting `BORG_DEBUG_PASSPHRASE=YES` enables passphrase debug logging to
   stderr, showing passphrase, hex utf-8 byte sequence and related env vars if
   a wrong passphrase was encountered.
+
   Setting `BORG_DISPLAY_PASSPHRASE=YES` now always shows passphrase and its hex
   utf-8 byte sequence.
 - add {unixtime} placeholder, #8522
@@ -183,6 +185,7 @@ Bug fixes:
 Other changes:
 
 - adapt to and require borghash 0.1.0
+- adapt to and require borgstore 0.2.0 (new s3/b2 backend, fixes/improvements)
 - create: remove --make-parent-dirs option (borgstore now does this automatically), #8619
 - iter_items: decouple item iteration and content data chunks preloading
 - remote: simplify code, add debug logging
@@ -198,7 +201,7 @@ Other changes:
 - vagrant updates:
 
   - use pyinstaller 6.11.1 (also use this in msys2 build scripts)
-  - use python 3.12.8
+  - use python 3.12.10
   - build binaries with borgstore[sftp], #8574
 - docs:
 

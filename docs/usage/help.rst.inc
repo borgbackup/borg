@@ -97,6 +97,15 @@ Exclusions can be passed via the command line option ``--exclude``. When used
 from within a shell, the patterns should be quoted to protect them from
 expansion.
 
+Patterns matching special characters, e.g. white space, within a shell may 
+require adjustments, such as putting quotation marks around the arguments.
+Example: 
+Using bash, the following command line option would match and exclude "item name":
+``--pattern='-path/item name'``
+Note that when patterns are used within a pattern file directly read by borg,  
+e.g. when using ``--exclude-from`` or ``--patterns-from``, there is no shell 
+involved and thus no quotation marks are required.
+
 The ``--exclude-from`` option permits loading exclusion patterns from a text
 file with one pattern per line. Lines empty or starting with the hash sign
 '#' after removing whitespace on both ends are ignored. The optional style
@@ -357,12 +366,12 @@ and ``--remote-path`` values support these placeholders:
 
 If literal curly braces need to be used, double them for escaping::
 
-    borg create /path/to/repo::{{literal_text}}
+    borg create --repo /path/to/repo {{literal_text}}
 
 Examples::
 
-    borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
-    borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S%z} ...
+    borg create --repo /path/to/repo {hostname}-{user}-{utcnow} ...
+    borg create --repo /path/to/repo {hostname}-{now:%Y-%m-%d_%H:%M:%S%z} ...
     borg prune -a 'sh:{hostname}-*' ...
 
 .. note::
@@ -469,16 +478,26 @@ obfuscate,SPEC,C[,L]
       ...
       123: 8MiB (max.)
 
+    *Padmé padding* (deterministic)
+
+    ::
+
+      250: pads to sums of powers of 2, max 12% overhead
+
+    Uses the Padmé algorithm to deterministically pad the compressed size to a sum of
+    powers of 2, limiting overhead to 12%. See https://lbarman.ch/blog/padme/ for details.
+
 Examples::
 
-    borg create --compression lz4 REPO::ARCHIVE data
-    borg create --compression zstd REPO::ARCHIVE data
-    borg create --compression zstd,10 REPO::ARCHIVE data
-    borg create --compression zlib REPO::ARCHIVE data
-    borg create --compression zlib,1 REPO::ARCHIVE data
-    borg create --compression auto,lzma,6 REPO::ARCHIVE data
+    borg create --compression lz4 --repo REPO ARCHIVE data
+    borg create --compression zstd --repo REPO ARCHIVE data
+    borg create --compression zstd,10 --repo REPO ARCHIVE data
+    borg create --compression zlib --repo REPO ARCHIVE data
+    borg create --compression zlib,1 --repo REPO ARCHIVE data
+    borg create --compression auto,lzma,6 --repo REPO ARCHIVE data
     borg create --compression auto,lzma ...
     borg create --compression obfuscate,110,none ...
     borg create --compression obfuscate,3,auto,zstd,10 ...
     borg create --compression obfuscate,2,zstd,6 ...
+    borg create --compression obfuscate,250,zstd,3 ...
 

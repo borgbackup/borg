@@ -106,12 +106,6 @@ class Archives:
         if not self.legacy:
             try:
                 infos = list(self.repository.store_list("archives", deleted=deleted))
-                if deleted:
-                    # hack: store_list(deleted=True) yields deleted AND not deleted items,
-                    # guess this should be fixed in a future borgstore release.
-                    # for now, we remove the not-deleted archives here:
-                    not_deleted_infos = set(self.repository.store_list("archives", deleted=False))
-                    infos = [info for info in infos if info not in not_deleted_infos]
             except ObjectNotFound:
                 infos = []
             for info in infos:

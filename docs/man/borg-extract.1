@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-EXTRACT" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-EXTRACT" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-extract \- Extract archive contents
 .SH SYNOPSIS
@@ -72,7 +72,7 @@ specify the archive name
 .B PATH
 paths to extract; patterns are supported
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-list
@@ -124,8 +124,7 @@ Remove the specified number of leading path elements. Paths with fewer elements 
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Extract entire archive
 $ borg extract my\-files
 
@@ -143,8 +142,7 @@ $ borg extract my\-files home/USERNAME/src \-\-exclude \(aq*.o\(aq
 
 # Restore a raw device (must not be active/in use/mounted at that time)
 $ borg extract \-\-stdout my\-sdx | dd of=/dev/sdx bs=10M
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

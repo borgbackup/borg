@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-INFO" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-INFO" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-info \- Show archive details such as disk space used
 .SH SYNOPSIS
@@ -54,7 +54,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .B NAME
 specify the archive name
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-json
@@ -91,8 +91,7 @@ consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg info aid:f7dea078
 Archive name: source\-backup
 Archive fingerprint: f7dea0788dfc026cc2be1c0f5b94beb4e4084eb3402fc40c38d8719b1bf2d943
@@ -107,8 +106,7 @@ Utilization of maximum supported archive size: 0%
 Number of files: 244
 Original size: 13.80 MB
 Deduplicated size: 531 B
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

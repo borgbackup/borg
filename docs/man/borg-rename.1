@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RENAME" 1 "2024-11-16" "" "borg backup tool"
+.TH "BORG-RENAME" "1" "2025-04-21" "" "borg backup tool"
 .SH NAME
 borg-rename \- Rename an existing archive
 .SH SYNOPSIS
@@ -54,8 +54,7 @@ specify the new archive name
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 $ borg create archivename ~
 $ borg repo\-list
 archivename                          Mon, 2016\-02\-15 19:50:19
@@ -63,8 +62,7 @@ archivename                          Mon, 2016\-02\-15 19:50:19
 $ borg rename archivename newname
 $ borg repo\-list
 newname                              Mon, 2016\-02\-15 19:50:19
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH SEE ALSO

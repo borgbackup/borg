@@ -899,7 +899,8 @@ class ChunksMixin:
 
     def _maybe_write_chunks_cache(self, now, force=False, clear=False):
         if force or now > self.chunks_cache_last_write + self.chunks_cache_write_td:
-            write_chunkindex_to_repo_cache(self.repository, self._chunks, clear=clear)
+            if self._chunks is not None:
+                write_chunkindex_to_repo_cache(self.repository, self._chunks, clear=clear)
             self.chunks_cache_last_write = now
 
     def refresh_lock(self, now):

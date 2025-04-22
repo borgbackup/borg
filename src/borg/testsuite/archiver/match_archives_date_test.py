@@ -19,6 +19,12 @@ MONTH_ARCHIVES = [
     ("archive-mon-diff", "2025-01-31T23:59:59"),
 ]
 
+DAY_ARCHIVES = [
+    ("archive-day-start", "2025-01-02T00:00:00"),
+    ("archive-day-same", "2025-01-02T23:59:59"),
+    ("archive-day-diff", "2025-01-01T23:59:59"),
+]
+
 HOUR_ARCHIVES = [
     ("archive-hour-start", "2025-01-01T14:00:00"),
     ("archive-hour-same", "2025-01-01T14:59:59"),
@@ -74,6 +80,25 @@ def test_match_archives_month(archivers, request):
     assert "archive-mon-start" in out_feb
     assert "archive-mon-same" in out_feb
     assert "archive-mon-diff" not in out_feb
+
+
+def test_match_archives_day(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name, ts in DAY_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # 2025-01-01 only includes 2025-01-01
+    out_01 = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-01-01", exit_code=0)
+    assert "archive-day-diff" in out_01
+    assert "archive-day-start" not in out_01
+    assert "archive-day-same" not in out_01
+
+    # 2025-01-02 includes minimum and maximum possible times in 2025-01-02
+    out_02 = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-01-02", exit_code=0)
+    assert "archive-day-start" in out_02
+    assert "archive-day-same" in out_02
+    assert "archive-day-diff" not in out_02
 
 
 def test_match_archives_hour(archivers, request):

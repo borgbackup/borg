@@ -1000,7 +1000,8 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
                 logger.debug(f"Chunks index stats: {key}: {value}")
             pi.output("Saving chunks cache")
             # note: cache/chunks.* in repo has a different integrity mechanism
-            self._maybe_write_chunks_cache(self._chunks, force=True, clear=True)
+            now = datetime.now(timezone.utc)
+            self._maybe_write_chunks_cache(now, force=True, clear=True)
             self._chunks = None  # nothing there (cleared!)
         pi.output("Saving cache config")
         self.cache_config.save(self.manifest)

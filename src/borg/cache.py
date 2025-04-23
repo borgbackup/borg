@@ -899,7 +899,8 @@ class ChunksMixin:
 
     def _maybe_write_chunks_cache(self, now, force=False, clear=False):
         if force or now > self.chunks_cache_last_write + self.chunks_cache_write_td:
-            write_chunkindex_to_repo_cache(self.repository, self._chunks, clear=clear)
+            if self._chunks is not None:
+                write_chunkindex_to_repo_cache(self.repository, self._chunks, clear=clear)
             self.chunks_cache_last_write = now
 
     def refresh_lock(self, now):
@@ -999,7 +1000,8 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
                 logger.debug(f"Chunks index stats: {key}: {value}")
             pi.output("Saving chunks cache")
             # note: cache/chunks.* in repo has a different integrity mechanism
-            self._maybe_write_chunks_cache(self._chunks, force=True, clear=True)
+            now = datetime.now(timezone.utc)
+            self._maybe_write_chunks_cache(now, force=True, clear=True)
             self._chunks = None  # nothing there (cleared!)
         pi.output("Saving cache config")
         self.cache_config.save(self.manifest)

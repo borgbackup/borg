@@ -26,7 +26,7 @@ try:
 except ImportError:
     lzma = None
 
-from .constants import MAX_DATA_SIZE
+from .constants import MAX_DATA_SIZE, ROBJ_FILE_STREAM
 from .helpers import Buffer, DecompressionError
 
 API_VERSION = '1.2_02'
@@ -596,7 +596,9 @@ class ObfuscateSize(CompressorBase):
         compr_size = len(compressed_data)
         assert "csize" in meta, repr(meta)
         meta["psize"] = meta["csize"]  # psize (payload size) is the csize (compressed size) of the inner compressor
-        addtl_size = self._obfuscate(compr_size)
+        # we only want to obfuscate the size of file content chunks (ROBJ_FILE_STREAM repo objects).
+        # for all other types of repo objects (e.g. borg metadata chunks), add 0 length:
+        addtl_size = self._obfuscate(compr_size) if meta["type"] == ROBJ_FILE_STREAM else 0
         addtl_size = max(0, addtl_size)  # we can only make it longer, not shorter!
         addtl_size = min(MAX_DATA_SIZE - 1024 - compr_size, addtl_size)  # stay away from MAX_DATA_SIZE
         trailer = bytes(addtl_size)

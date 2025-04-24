@@ -26,7 +26,7 @@ try:
 except ImportError:
     lzma = None
 
-from .constants import MAX_DATA_SIZE
+from .constants import MAX_DATA_SIZE, ROBJ_FILE_STREAM
 from .helpers import Buffer, DecompressionError
 
 API_VERSION = '1.2_02'
@@ -577,13 +577,28 @@ class ObfuscateSize(CompressorBase):
     def _random_padding_obfuscate(self, compr_size):
         return int(self.max_padding_size * random.random())
 
+    def _padme_obfuscate(self, compr_size):
+        if compr_size < 2:
+            return 0
+
+        E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)
+        S = math.floor(math.log2(E)) + 1       # Second log component
+        lastBits = E - S                       # Bits to be zeroed
+        bitMask = (2 ** lastBits - 1)          # Mask for rounding
+
+        padded_size = (compr_size + bitMask) & ~bitMask  # Apply rounding
+
+        return padded_size - compr_size  # Return only the additional padding size
+
     def compress(self, meta, data):
         assert not self.legacy_mode  # we never call this in legacy mode
         meta, compressed_data = self.compressor.compress(meta, data)  # compress data
         compr_size = len(compressed_data)
         assert "csize" in meta, repr(meta)
         meta["psize"] = meta["csize"]  # psize (payload size) is the csize (compressed size) of the inner compressor
-        addtl_size = self._obfuscate(compr_size)
+        # we only want to obfuscate the size of file content chunks (ROBJ_FILE_STREAM repo objects).
+        # for all other types of repo objects (e.g. borg metadata chunks), add 0 length:
+        addtl_size = self._obfuscate(compr_size) if meta["type"] == ROBJ_FILE_STREAM else 0
         addtl_size = max(0, addtl_size)  # we can only make it longer, not shorter!
         addtl_size = min(MAX_DATA_SIZE - 1024 - compr_size, addtl_size)  # stay away from MAX_DATA_SIZE
         trailer = bytes(addtl_size)
@@ -602,18 +617,6 @@ class ObfuscateSize(CompressorBase):
             self.compressor = compressor_cls()
         return self.compressor.decompress(meta, compressed_data)  # decompress data
 
-    def _padme_obfuscate(self, compr_size):
-        if compr_size < 2:
-            return 0
-
-        E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)
-        S = math.floor(math.log2(E)) + 1       # Second log component
-        lastBits = E - S                       # Bits to be zeroed
-        bitMask = (2 ** lastBits - 1)          # Mask for rounding
-
-        padded_size = (compr_size + bitMask) & ~bitMask  # Apply rounding
-
-        return padded_size - compr_size  # Return only the additional padding size
 
 # Maps valid compressor names to their class
 COMPRESSOR_TABLE = {

@@ -123,7 +123,7 @@ def prune_split(archives, rule, n_or_interval, base_timestamp, kept_because=None
 
     a = None
     for a in sorted(archives, key=attrgetter("ts"), reverse=True):
-        if a.ts < earliest_timestamp or len(keep) == n:
+        if a.ts <= earliest_timestamp or len(keep) == n:
             break
         period = period_func(a)
         if period != last:

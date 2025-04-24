@@ -139,6 +139,7 @@ EXIT_SIGNAL_BASE = 128  # terminated due to signal, rc = 128 + sig_no
 ISO_FORMAT_NO_USECS = "%Y-%m-%dT%H:%M:%S"
 ISO_FORMAT_NO_USECS_ZONE = ISO_FORMAT_NO_USECS + "%z"
 ISO_FORMAT = ISO_FORMAT_NO_USECS + ".%f"
+ISO_FORMAT_ZONE = ISO_FORMAT + "%z"
 
 DASHES = "-" * 78
 

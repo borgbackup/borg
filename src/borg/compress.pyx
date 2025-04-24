@@ -577,6 +577,19 @@ class ObfuscateSize(CompressorBase):
     def _random_padding_obfuscate(self, compr_size):
         return int(self.max_padding_size * random.random())
 
+    def _padme_obfuscate(self, compr_size):
+        if compr_size < 2:
+            return 0
+
+        E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)
+        S = math.floor(math.log2(E)) + 1       # Second log component
+        lastBits = E - S                       # Bits to be zeroed
+        bitMask = (2 ** lastBits - 1)          # Mask for rounding
+
+        padded_size = (compr_size + bitMask) & ~bitMask  # Apply rounding
+
+        return padded_size - compr_size  # Return only the additional padding size
+
     def compress(self, meta, data):
         assert not self.legacy_mode  # we never call this in legacy mode
         meta, compressed_data = self.compressor.compress(meta, data)  # compress data
@@ -602,18 +615,6 @@ class ObfuscateSize(CompressorBase):
             self.compressor = compressor_cls()
         return self.compressor.decompress(meta, compressed_data)  # decompress data
 
-    def _padme_obfuscate(self, compr_size):
-        if compr_size < 2:
-            return 0
-
-        E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)
-        S = math.floor(math.log2(E)) + 1       # Second log component
-        lastBits = E - S                       # Bits to be zeroed
-        bitMask = (2 ** lastBits - 1)          # Mask for rounding
-
-        padded_size = (compr_size + bitMask) & ~bitMask  # Apply rounding
-
-        return padded_size - compr_size  # Return only the additional padding size
 
 # Maps valid compressor names to their class
 COMPRESSOR_TABLE = {

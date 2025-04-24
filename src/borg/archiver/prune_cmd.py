@@ -400,7 +400,6 @@ class PruneMixIn:
             "--keep-3monthly",
             dest="quarterly_3monthly",
             type=int_or_interval,
-            default=None,
             help="number or time interval of quarterly archives to keep (3 month strategy)",
         )
         subparser.add_argument(

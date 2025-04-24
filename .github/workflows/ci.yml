@@ -48,17 +48,14 @@ jobs:
       matrix:
         include:
             - os: ubuntu-22.04
-              python-version: '3.9'
+              python-version: '3.10'
               toxenv: mypy
             - os: ubuntu-22.04
               python-version: '3.11'
               toxenv: docs
             - os: ubuntu-22.04
-              python-version: '3.9'
-              toxenv: py39-fuse2
-            - os: ubuntu-22.04
               python-version: '3.10'
-              toxenv: py310-fuse3
+              toxenv: py310-fuse2
             - os: ubuntu-22.04
               python-version: '3.11'
               toxenv: py311-fuse3

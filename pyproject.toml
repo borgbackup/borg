@@ -6,7 +6,7 @@ maintainers = [
     {name="Thomas Waldmann", email="tw@waldmann-edv.de"},
 ]
 description = "Deduplicated, encrypted, authenticated and compressed backups"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["backup", "borgbackup"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -19,7 +19,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -141,7 +140,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 markers = []
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 strict_optional = false
 local_partial_types = true
 show_error_codes = true

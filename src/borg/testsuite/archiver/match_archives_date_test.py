@@ -724,3 +724,99 @@ def test_match_keyword_exact(archivers, request):
     assert "k3" in out
     assert "k2" not in out
     assert "k1" not in out
+
+
+# ISO week-date and ordinal-date support tests
+
+
+def test_match_iso_week(archivers, request):
+    """
+    Test matching archives by ISO week number (YYYY-Www).
+    Week 10 of 2025 runs from 2025-03-03 to 2025-03-09 inclusive.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    WEEK10_ARCHIVES = [
+        ("iso-week-before", "2025-03-02T23:59:59"),
+        ("iso-week-start", "2025-03-03T00:00:00"),
+        ("iso-week-mid", "2025-03-05T12:00:00"),
+        ("iso-week-end", "2025-03-09T23:59:59"),
+        ("iso-week-after", "2025-03-10T00:00:00"),
+    ]
+    for name, ts in WEEK10_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-W10", exit_code=0)
+    assert "iso-week-before" not in out
+    assert "iso-week-start" in out
+    assert "iso-week-mid" in out
+    assert "iso-week-end" in out
+    assert "iso-week-after" not in out
+
+
+def test_match_iso_weekday(archivers, request):
+    """
+    Test matching archives by ISO week and weekday (YYYY-Www-D).
+    Week 10 Day 3 of 2025 is Wednesday 2025-03-05.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    WEEKDAY_ARCHIVES = [
+        ("iso-wed", "2025-03-05T08:00:00"),
+        ("iso-tue", "2025-03-04T12:00:00"),
+        ("iso-thu", "2025-03-06T18:00:00"),
+    ]
+    for name, ts in WEEKDAY_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-W10-3", exit_code=0)
+    assert "iso-wed" in out
+    assert "iso-tue" not in out
+    assert "iso-thu" not in out
+
+
+def test_match_ordinal_date(archivers, request):
+    """
+    Test matching archives by ordinal day of year (YYYY-DDD).
+    Day 032 of 2025 is 2025-02-01.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    ORDINAL_ARCHIVES = [
+        ("ord-jan31", "2025-01-31T23:59:59"),  # day 031
+        ("ord-feb1", "2025-02-01T00:00:00"),  # day 032
+        ("ord-feb1-end", "2025-02-01T23:59:59"),
+        ("ord-feb2", "2025-02-02T00:00:00"),  # day 033
+    ]
+    for name, ts in ORDINAL_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-032", exit_code=0)
+    assert "ord-jan31" not in out
+    assert "ord-feb1" in out
+    assert "ord-feb1-end" in out
+    assert "ord-feb2" not in out
+
+
+def test_match_rfc3339(archivers, request):
+    """
+    Test matching archives by RFC 3339 date format (use ' ' as delimiter rather than 'T').
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    RFC_ARCHIVES = [
+        ("rfc-start", "2025-01-01T00:00:00Z"),
+        ("rfc-mid", "2025-01-01T12:00:00Z"),
+        ("rfc-max", "2025-01-01T23:59:59Z"),
+        ("rfc-after", "2025-01-02T00:00:00Z"),
+    ]
+    for name, ts in RFC_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(
+        archiver, "repo-list", "-v", "--match-archives=date:2025-01-01 00:00:00Z/2025-01-02 00:00:00Z", exit_code=0
+    )
+    assert "rfc-start" in out
+    assert "rfc-mid" in out
+    assert "rfc-max" in out
+    assert "rfc-after" not in out

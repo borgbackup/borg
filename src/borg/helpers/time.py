@@ -1,6 +1,6 @@
 import os
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from zoneinfo import ZoneInfo
 
 
@@ -268,25 +268,38 @@ def build_datetime_from_groups(gd: dict, tz: timezone) -> datetime:
     return datetime(year, month, day, hour, minute, second, microsecond, tzinfo=tz)
 
 
+# Regex for ISO-8601 timestamps:
+# Accepts both 'T' and space as separators between date and time per RFC-3339/IXDTF.
 MAIN_RE = r"""
   ^
   (?:
-     @(?P<epoch>\d+)                      # unix epoch
-   | (?P<year>   \d{4}|\*)                # year (YYYY or *)
-     (?:-(?P<month>  \d{2}|\*)            # month (MM or *)
-        (?:-(?P<day>    \d{2}|\*)         # day (DD or *)
-           (?:[T ](?P<hour>   \d{2}|\*)   # hour (HH or *)
-             (?::(?P<minute>\d{2}|\*)     # minute (MM or *)
-               (?::(?P<second>\d{2}(?:\.\d+)?|\*))?  # second (SS or SS.fff or *)
+     # ISO week date: YYYY-Www or YYYY-Www-D
+     (?P<isoweek_year>\d{4})-W(?P<isoweek_week>\d{2})(?:-(?P<isoweek_day>\d))?
+   | # Ordinal date: YYYY-DDD
+     (?P<ordinal_year>\d{4})-(?P<ordinal_day>\d{3})
+   | # Unix epoch
+     @(?P<epoch>\d+)
+   | # Calendar date
+     (?P<year>\d{4}|\*)                # year (YYYY or *)
+     (?:-                              # start month/day/time block
+         (?P<month>\d{2}|\*)           # month (MM or *)
+         (?:-                          # start day/time block
+             (?P<day>\d{2}|\*)         # day (DD or *)
+             (?:[T ]                  # date/time separator (T or space)
+                 (?P<hour>\d{2}|\*)   # hour (HH or *)
+                 (?:
+                     :(?P<minute>\d{2}|\*)     # minute (MM or *)
+                     (?:
+                         :(?P<second>\d{2}(?:\.\d+)?|\*)  # second (SS or SS.fff or *)
+                     )?
+                 )?
              )?
-           )?
-        )?
+         )?
      )?
   )
-  (?P<tz>Z|[+\-]\d\d:\d\d|\[[^\]]+\])?    # optional timezone suffix
+  (?P<tz>Z|[+\-]\d\d:\d\d|\[[^\]]+\])?    # optional timezone suffix (Z, ±HH:MM or [Zone])
   $
 """
-
 
 DURATION_RE = re.compile(
     r"^D"
@@ -328,7 +341,33 @@ def parse_to_interval(expr: str) -> tuple[datetime, datetime]:
     m = re.match(MAIN_RE, expr, re.VERBOSE)
     if not m:
         raise DatePatternError(f"unrecognised date: {expr!r}")
+
     gd = m.groupdict()
+    tz = parse_tz(gd["tz"])
+    # ISO week-date support (YYYY-Www or YYYY-Www-D)
+    if gd.get("isoweek_year"):
+        y = int(gd["isoweek_year"])
+        w = int(gd["isoweek_week"])
+        d = int(gd.get("isoweek_day") or 1)
+        # fromisocalendar returns a date
+        iso_date = date.fromisocalendar(y, w, d)
+        start = datetime(iso_date.year, iso_date.month, iso_date.day, tzinfo=tz)
+        if gd.get("isoweek_day"):
+            # if we have a day, we want to end at the next day
+            end = start + timedelta(days=1)
+        else:
+            # match the whole week
+            end = start + timedelta(weeks=1)
+        return start, end
+
+    # Ordinal date support (YYYY-DDD)
+    if gd.get("ordinal_year"):
+        y = int(gd["ordinal_year"])
+        doy = int(gd["ordinal_day"])
+        start = datetime(y, 1, 1, tzinfo=tz) + timedelta(days=doy - 1)
+        end = start + timedelta(days=1)
+        return start, end
+
     # handle unix-epoch forms directly
     if gd["epoch"]:
         epoch = int(gd["epoch"])
@@ -336,7 +375,6 @@ def parse_to_interval(expr: str) -> tuple[datetime, datetime]:
         end = start + timedelta(seconds=1)
         return start, end
 
-    tz = parse_tz(gd["tz"])
     # build the start moment
     start = build_datetime_from_groups(gd, tz)
     # determine the end moment based on the highest precision present
@@ -365,9 +403,8 @@ def compile_date_pattern(expr: str):
       YYYY
       YYYY-MM
       YYYY-MM-DD
-      YYYY-MM-DDTHH
-      YYYY-MM-DDTHH:MM
-      YYYY-MM-DDTHH:MM:SS
+      YYYY-MM-DDTHH (with 'T') or YYYY-MM-DD HH:MM (with space)
+      YYYY-MM-DD HH:MM:SS (RFC-3339 space-separated)
       Unix epoch (@123456789)
     …with an optional trailing timezone (Z or ±HH:MM or [Region/City]).
     Additionally supports wildcards (`*`) in year, month, or day (or any combination), e.g.:

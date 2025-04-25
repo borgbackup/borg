@@ -246,130 +246,131 @@ def compile_date_pattern(expr: str):
       Unix epoch (@123456789)
     …with an optional trailing timezone (Z or ±HH:MM or [Region/City]).
     Additionally supports wildcards (`*`) in year, month, or day (or any combination), e.g.:
-      "*-04-22"       # April 22 of any year
+      "*-04-22"       # April 22 of any year
       "2025-*-01"     # 1st day of any month in 2025
       "*-*-15"        # 15th of every month, any year
     Returns a predicate that is True for timestamps in that interval.
     """
     expr = expr.strip()
     pattern = r"""
-        ^
-        (?:
-            (?P<fraction>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+)   # full timestamp with fraction
-          | (?P<second>  \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})          # no fraction
-          | (?P<minute>  \d{4}-\d{2}-\d{2}T\d{2}:\d{2})               # minute precision
-          | (?P<hour>    \d{4}-\d{2}-\d{2}T\d{2})                     # hour precision
-          | (?P<day>     \d{4}-\d{2}-\d{2})                           # day precision
-          | (?P<month>   \d{4}-\d{2})                                  # month precision
-          | (?P<year>    \d{4})                                        # year precision
-          | @(?P<epoch>  \d+)                                         # unix epoch
-          | (?P<wild>
-              (?:\d{4}|\*)                                          # year or *
-              (?:-(?:\d{2}|\*)){0,2}                                 # optional month/day or wildcards
-              (?:T(?:\d{2}|\*)(?::(?:\d{2}|\*)){0,2})?             # optional time with wildcards
-            )
-        )
-        (?P<tz>Z|[+\-]\d{2}:\d{2}|\[[^\]]+\])?                     # optional timezone or [Region/City]
-        $
+      ^
+      (?:
+         @(?P<epoch>\d+)                      # unix epoch
+       | (?P<year>   \d{4}|\*)                # year (YYYY or *)
+         (?:-(?P<month>  \d{2}|\*)            # month (MM or *)
+            (?:-(?P<day>    \d{2}|\*)         # day (DD or *)
+               (?:[T ](?P<hour>   \d{2}|\*)   # hour (HH or *)
+                 (?::(?P<minute>\d{2}|\*)     # minute (MM or *)
+                   (?::(?P<second>\d{2}(?:\.\d+)?|\*))?  # second (SS or SS.fff or *)
+                 )?
+               )?
+            )?
+         )?
+      )
+      (?P<tz>Z|[+\-]\d\d:\d\d|\[[^\]]+\])?    # optional timezone suffix
+      $
     """
     m = re.match(pattern, expr, re.VERBOSE)
     if not m:
         raise DatePatternError(f"unrecognised date: {expr!r}")
 
     gd = m.groupdict()
-    tz = parse_tz(gd.get("tz"))  # None => local timezone
+    tz = parse_tz(gd["tz"])
 
-    # Wildcard branch: match each specified component
-    if gd["wild"]:
-        if gd["epoch"]:
-            raise DatePatternError("wildcards and epoch cannot be used together")
-        part = gd["wild"]
-        date_part, *time_rest = part.split("T", 1)
-        time_part = time_rest[0] if time_rest else ""
+    # 1) epoch is checked first because it is syntactically and semantically incompatible
+    #    with other datetime components (e.g., year/month/day/wildcards).
+    if gd["epoch"]:
+        e = int(gd["epoch"])
+        start = datetime.fromtimestamp(e, tz=timezone.utc)
+        return interval_predicate(start, start + timedelta(seconds=1))
 
-        dfields = date_part.split("-")
-        y_pat = dfields[0]
-        m_pat = dfields[1] if len(dfields) > 1 else "*"
-        d_pat = dfields[2] if len(dfields) > 2 else "*"
+    # 2) detect explicit wildcards (*) in any named group
+    wildcard_fields = ("year", "month", "day", "hour", "minute", "second")
+    if any(gd[f] == "*" for f in wildcard_fields if f in gd):
+        # build a discrete‐match predicate
+        yi = None if gd["year"] == "*" else int(gd["year"])
+        mi = None if gd["month"] == "*" else int(gd["month"]) if gd["month"] else None
+        di = None if gd["day"] == "*" else int(gd["day"]) if gd["day"] else None
+        hi = None if gd["hour"] == "*" else int(gd["hour"]) if gd["hour"] else None
+        ni = None if gd["minute"] == "*" else int(gd["minute"]) if gd["minute"] else None
+        si = None
+        if gd["second"]:
+            if gd["second"] != "*":
+                si = float(gd["second"])
 
-        tfields = time_part.split(":") if time_part else []
-        h_pat = tfields[0] if len(tfields) > 0 else "*"
-        M_pat = tfields[1] if len(tfields) > 1 else "*"
-        S_pat = tfields[2] if len(tfields) > 2 else "*"
-
-        def to_int(p):
-            return None if p == "*" else int(p)
-
-        def to_float(p):
-            return None if p == "*" else float(p)
-
-        yi = to_int(y_pat)
-        mi = to_int(m_pat)
-        di = to_int(d_pat)
-        hi = to_int(h_pat)
-        ni = to_int(M_pat)
-        si = to_float(S_pat)
-
-        def wildcard_pred(ts: datetime):
+        def wildcard_pred(ts):
             dt = ts.astimezone(tz)
-            if yi is not None and dt.year != yi:
-                return False
-            if mi is not None and dt.month != mi:
-                return False
-            if di is not None and dt.day != di:
-                return False
-            if hi is not None and dt.hour != hi:
-                return False
-            if ni is not None and dt.minute != ni:
-                return False
-            if si is not None:
-                sec = dt.second + dt.microsecond / 1e6
-                if not (si <= sec < si + 1):
-                    return False
-            return True
+            return (
+                (yi is None or dt.year == yi)
+                and (mi is None or dt.month == mi)
+                and (di is None or dt.day == di)
+                and (hi is None or dt.hour == hi)
+                and (ni is None or dt.minute == ni)
+                and (si is None or (si <= dt.second + dt.microsecond / 1e6 < si + 1))
+            )
 
         return wildcard_pred
 
-    # 1) fractional-second exact match
-    if gd["fraction"]:
-        dt = parse_timestamp(gd["fraction"], tzinfo=tz)
-        return exact_predicate(dt)
+    # 3) fraction‐precision exact match
+    if gd["second"] and "." in gd["second"]:
+        start = datetime(
+            int(gd["year"]),
+            int(gd["month"]),
+            int(gd["day"]),
+            int(gd["hour"]),
+            int(gd["minute"]),
+            int(float(gd["second"])),
+            tzinfo=tz,
+        )
+        return exact_predicate(start)
 
-    # 2) second-precision interval
+    # 4) second‐precision interval
     if gd["second"]:
-        start = parse_timestamp(gd["second"], tzinfo=tz)
+        start = datetime(
+            int(gd["year"]),
+            int(gd["month"]),
+            int(gd["day"]),
+            int(gd["hour"] or 0),
+            int(gd["minute"] or 0),
+            int(gd["second"]),
+            tzinfo=tz,
+        )
         return interval_predicate(start, start + timedelta(seconds=1))
 
-    # 3) minute-precision interval
+    # 5) minute‐precision
     if gd["minute"]:
-        start = parse_timestamp(gd["minute"] + ":00", tzinfo=tz)
+        start = datetime(
+            int(gd["year"]),
+            int(gd["month"]),
+            int(gd["day"]),
+            int(gd["hour"] or 0),
+            int(gd["minute"]),
+            second=0,
+            tzinfo=tz,
+        )
         return interval_predicate(start, start + timedelta(minutes=1))
 
-    # 4) hour-precision interval
+    # 6) hour‐precision
     if gd["hour"]:
-        start = parse_timestamp(gd["hour"] + ":00:00", tzinfo=tz)
+        start = datetime(
+            int(gd["year"]), int(gd["month"]), int(gd["day"]), int(gd["hour"]), minute=0, second=0, tzinfo=tz
+        )
         return interval_predicate(start, start + timedelta(hours=1))
 
-    # 5a) day-precision interval
+    # 7) day‐precision
     if gd["day"]:
-        start = parse_timestamp(gd["day"] + "T00:00:00", tzinfo=tz)
+        start = datetime(int(gd["year"]), int(gd["month"]), int(gd["day"]), hour=0, minute=0, second=0, tzinfo=tz)
         return interval_predicate(start, start + timedelta(days=1))
 
-    # 5b) month-precision interval
+    # 8) month‐precision
     if gd["month"]:
-        start = parse_timestamp(gd["month"] + "-01T00:00:00", tzinfo=tz)
+        start = datetime(int(gd["year"]), int(gd["month"]), day=1, hour=0, minute=0, second=0, tzinfo=tz)
         return interval_predicate(start, offset_n_months(start, 1))
 
-    # 5c) year-precision interval
+    # 9) year‐precision
     if gd["year"]:
-        start = parse_timestamp(gd["year"] + "-01-01T00:00:00", tzinfo=tz)
+        start = datetime(int(gd["year"]), month=1, day=1, hour=0, minute=0, second=0, tzinfo=tz)
         return interval_predicate(start, offset_n_months(start, 12))
 
-    # 6) unix-epoch exact-second match
-    if gd["epoch"]:
-        epoch = int(gd["epoch"])
-        start = datetime.fromtimestamp(epoch, tz=timezone.utc)
-        return interval_predicate(start, start + timedelta(seconds=1))
-
-    # unreachable
+    # fallback
     raise DatePatternError(f"unrecognised date: {expr!r}")

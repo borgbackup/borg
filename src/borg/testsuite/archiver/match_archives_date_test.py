@@ -427,3 +427,178 @@ def test_match_explicit_interval_with_timezone(archivers, request):
     assert "tz-start" in out
     assert "tz-mid" in out
     assert "tz-end" not in out
+
+
+# Duration-based interval tests
+
+
+# Test duration prefix (duration/timestamp): 1-day before midnight
+def test_match_duration_prefix_day(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    DURATION_ARCHIVES = [
+        ("dur-start", "2025-04-01T00:00:00"),
+        ("dur-mid", "2025-04-01T12:00:00"),
+        ("dur-end", "2025-04-02T00:00:00"),
+        ("dur-after", "2025-04-02T00:00:01"),
+    ]
+    for name, ts in DURATION_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # D1D/2025-04-02T00:00:00 should cover 2025-04-01 inclusive to 2025-04-02 exclusive
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:D1D/2025-04-02T00:00:00", exit_code=0)
+    assert "dur-start" in out
+    assert "dur-mid" in out
+    assert "dur-end" not in out
+    assert "dur-after" not in out
+
+
+# Test duration suffix (timestamp/duration): 1-day after midnight
+def test_match_duration_suffix_day(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    DURATION_ARCHIVES = [
+        ("dur2-before", "2025-03-31T23:59:59"),
+        ("dur2-start", "2025-04-01T00:00:00"),
+        ("dur2-mid", "2025-04-01T12:00:00"),
+        ("dur2-end", "2025-04-02T00:00:00"),
+    ]
+    for name, ts in DURATION_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # 2025-04-01T00:00:00/D1D should cover 2025-04-01 00:00 inclusive to 2025-04-02 exclusive
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-04-01T00:00:00/D1D", exit_code=0)
+    assert "dur2-before" not in out
+    assert "dur2-start" in out
+    assert "dur2-mid" in out
+    assert "dur2-end" not in out
+
+
+# Test duration prefix for 1-month
+def test_match_duration_prefix_month(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    MONTH_DUR_ARCHIVES = [
+        ("dpm-start", "2025-01-01T00:00:00"),
+        ("dpm-mid", "2025-01-15T12:00:00"),
+        ("dpm-end", "2025-02-01T00:00:00"),
+        ("dpm-after", "2025-02-01T00:00:01"),
+    ]
+    for name, ts in MONTH_DUR_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # D1M/2025-02-01T00:00:00 should cover entire January 2025
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:D1M/2025-02-01T00:00:00", exit_code=0)
+    assert "dpm-start" in out
+    assert "dpm-mid" in out
+    assert "dpm-end" not in out
+    assert "dpm-after" not in out
+
+
+# Test duration suffix for 1-week
+def test_match_duration_suffix_week(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    WEEK_DUR_ARCHIVES = [
+        ("dw-before", "2025-01-01T00:00:00"),
+        ("dw-start", "2025-01-08T00:00:00"),
+        ("dw-mid", "2025-01-10T12:00:00"),
+        ("dw-end", "2025-01-15T00:00:00"),
+    ]
+    for name, ts in WEEK_DUR_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # 2025-01-08T00:00:00/D1W should cover 2025-01-08 to 2025-01-15
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-01-08T00:00:00/D1W", exit_code=0)
+    assert "dw-before" not in out
+    assert "dw-start" in out
+    assert "dw-mid" in out
+    assert "dw-end" not in out
+
+
+# Test composite duration prefix (1 month + 1 day)
+def test_match_duration_composite_prefix(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    COMP_ARCHIVES = [
+        ("cp-start", "2025-01-01T00:00:00"),
+        ("cp-mid", "2025-02-01T00:00:00"),
+        ("cp-end", "2025-02-02T00:00:00"),
+        ("cp-after", "2025-02-02T00:00:01"),
+    ]
+    for name, ts in COMP_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # D1M1D/2025-02-02T00:00:00 should cover 2025-01-01 to 2025-02-02
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:D1M1D/2025-02-02T00:00:00", exit_code=0)
+    assert "cp-start" in out
+    assert "cp-mid" in out
+    assert "cp-end" not in out
+    assert "cp-after" not in out
+
+
+# Test duration suffix for hours (timestamp/D3h)
+def test_match_duration_suffix_hours(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    HOUR_DUR_ARCHIVES = [
+        ("dh-before", "2025-04-01T09:59:59"),
+        ("dh-start", "2025-04-01T10:00:00"),
+        ("dh-mid", "2025-04-01T11:30:00"),
+        ("dh-end", "2025-04-01T12:59:59"),
+        ("dh-after", "2025-04-01T13:00:00"),
+    ]
+    for name, ts in HOUR_DUR_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # 2025-04-01T10:00:00/D3h should cover 10:00 to 13:00 exclusive
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-04-01T10:00:00/D3h", exit_code=0)
+    assert "dh-before" not in out
+    assert "dh-start" in out
+    assert "dh-mid" in out
+    assert "dh-end" in out
+    assert "dh-after" not in out
+
+
+# Test duration prefix for minutes (D30m/timestamp)
+def test_match_duration_prefix_minutes(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    MIN_DUR_ARCHIVES = [
+        ("dm-before", "2025-04-01T00:29:59"),
+        ("dm-start", "2025-04-01T00:30:00"),
+        ("dm-end", "2025-04-01T00:59:59"),
+        ("dm-after", "2025-04-01T01:00:00"),
+    ]
+    for name, ts in MIN_DUR_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # D30m/2025-04-01T01:00:00 should cover 00:30 to 01:00 exclusive
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:D30m/2025-04-01T01:00:00", exit_code=0)
+    assert "dm-before" not in out
+    assert "dm-start" in out
+    assert "dm-end" in out
+    assert "dm-after" not in out
+
+
+# Test composite duration suffix (timestamp/D1h30m)
+def test_match_duration_suffix_composite_h_m(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    COMP_HM_ARCHIVES = [
+        ("chm-before", "2025-04-01T00:59:59"),
+        ("chm-start", "2025-04-01T01:00:00"),
+        ("chm-mid", "2025-04-01T02:15:00"),
+        ("chm-end", "2025-04-01T02:29:59"),
+        ("chm-after", "2025-04-01T02:30:00"),
+    ]
+    for name, ts in COMP_HM_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # 2025-04-01T01:00:00/D1h30m should cover 01:00 to 02:30 exclusive
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-04-01T01:00:00/D1h30m", exit_code=0)
+    assert "chm-before" not in out
+    assert "chm-start" in out
+    assert "chm-mid" in out
+    assert "chm-end" in out
+    assert "chm-after" not in out

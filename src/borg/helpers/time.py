@@ -160,8 +160,15 @@ def offset_n_months(from_ts, n_months):
     following_month, year_of_following_month = get_month_and_year_from_total(total_months + 1)
     max_days_in_month = (datetime(year_of_following_month, following_month, 1) - timedelta(1)).day
 
-    return datetime(day=min(from_ts.day, max_days_in_month), month=target_month, year=target_year).replace(
-        tzinfo=from_ts.tzinfo
+    return datetime(
+        year=target_year,
+        month=target_month,
+        day=min(from_ts.day, max_days_in_month),
+        hour=from_ts.hour,
+        minute=from_ts.minute,
+        second=from_ts.second,
+        microsecond=from_ts.microsecond,
+        tzinfo=from_ts.tzinfo,
     )
 
 
@@ -279,6 +286,38 @@ pattern = r"""
 """
 
 
+#
+# duration parsing for strings like D1Y2M3W4D5h6m7s
+_DURATION_RE = re.compile(
+    r"^D"
+    r"(?:(?P<years>\d+)Y)?"
+    r"(?:(?P<months>\d+)M)?"
+    r"(?:(?P<weeks>\d+)W)?"
+    r"(?:(?P<days>\d+)D)?"
+    r"(?:(?P<hours>\d+)h)?"
+    r"(?:(?P<minutes>\d+)m)?"
+    r"(?:(?P<seconds>\d+)s)?"
+    r"$"
+)
+
+
+def _parse_duration(expr: str) -> tuple[int, timedelta]:
+    """
+    Parse D… duration into (months, timedelta of days/weeks/hours/minutes/seconds).
+    """
+    m = _DURATION_RE.match(expr)
+    if not m:
+        raise DatePatternError(f"invalid duration: {expr!r}")
+    gd = m.groupdict(default="0")
+    total_months = int(gd["years"]) * 12 + int(gd["months"])
+    days = int(gd["weeks"]) * 7 + int(gd["days"])
+    hours = int(gd["hours"])
+    minutes = int(gd["minutes"])
+    seconds = int(gd["seconds"])
+    td = timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
+    return total_months, td
+
+
 def _parse_to_interval(expr: str) -> tuple[datetime, datetime]:
     """
     Parse a possibly incomplete ISO-8601 timestamp (with optional timezone) into
@@ -343,9 +382,23 @@ def compile_date_pattern(expr: str):
     parts = re.split(r"/(?![^\[]*\])", expr, maxsplit=1)
     if len(parts) == 2:
         left, right = parts
+        # duration / timestamp
+        if left.startswith("D") and not right.startswith("D"):
+            # months are handled separately via offset_n_months() because month lengths vary
+            months, td = _parse_duration(left)
+            end_dt, _ = _parse_to_interval(right)
+            start_dt = offset_n_months(end_dt, -months) - td
+            return interval_predicate(start_dt, end_dt)
+        # timestamp / duration
+        if right.startswith("D") and not left.startswith("D"):
+            start_dt, _ = _parse_to_interval(left)
+            # months are handled separately via offset_n_months() because month lengths vary
+            months, td = _parse_duration(right)
+            mid_dt = offset_n_months(start_dt, months)
+            end_dt = mid_dt + td
+            return interval_predicate(start_dt, end_dt)
+        # timestamp / timestamp
         start_left, _ = _parse_to_interval(left)
-        # use the start here to make it an exclusive upper bound, for behavior consistent with
-        # the rest of the date pattern matching
         start_right, _ = _parse_to_interval(right)
         return interval_predicate(start_left, start_right)
     m = re.match(pattern, expr, re.VERBOSE)

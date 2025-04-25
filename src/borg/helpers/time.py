@@ -338,6 +338,16 @@ def compile_date_pattern(expr: str):
     Returns a predicate that is True for timestamps in that interval.
     """
     expr = expr.strip()
+
+    # 1) detect explicit user-defined intervals (split slash outside brackets to allow for [Region/Name])
+    parts = re.split(r"/(?![^\[]*\])", expr, maxsplit=1)
+    if len(parts) == 2:
+        left, right = parts
+        start_left, _ = _parse_to_interval(left)
+        # use the start here to make it an exclusive upper bound, for behavior consistent with
+        # the rest of the date pattern matching
+        start_right, _ = _parse_to_interval(right)
+        return interval_predicate(start_left, start_right)
     m = re.match(pattern, expr, re.VERBOSE)
     if not m:
         raise DatePatternError(f"unrecognised date: {expr!r}")
@@ -345,7 +355,7 @@ def compile_date_pattern(expr: str):
     gd = m.groupdict()
     tz = parse_tz(gd["tz"])
 
-    # 1) detect explicit wildcards (*) in any named group
+    # 2) detect explicit wildcards (*) in any named group
     wildcard_fields = ("year", "month", "day", "hour", "minute", "second")
     if any(gd[f] == "*" for f in wildcard_fields if f in gd):
         # build a discrete‐match predicate
@@ -372,11 +382,11 @@ def compile_date_pattern(expr: str):
 
         return wildcard_pred
 
-    # 2) fraction‐precision exact match
+    # 3) fraction‐precision exact match
     if gd["second"] and "." in gd["second"]:
         dt = _build_datetime_from_groups(gd, tz)
         return exact_predicate(dt)
 
-    # 3) remaining precisions: use _parse_to_interval to get start/end
+    # 4) remaining precisions: use _parse_to_interval to get start/end
     start, end = _parse_to_interval(expr)
     return interval_predicate(start, end)

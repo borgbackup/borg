@@ -372,3 +372,58 @@ def test_match_wildcard_mixed_day_and_hour(archivers, request):
     assert "wmix-hit2" in out
     assert "wmix-miss1" not in out
     assert "wmix-miss2" not in out
+
+
+# Interval matching tests
+
+INTERVAL_ARCHIVES = [
+    ("int-before", "2025-03-31T23:59:59"),
+    ("int-start", "2025-04-01T00:00:00"),
+    ("int-mid", "2025-04-15T12:00:00"),
+    ("int-end", "2025-05-01T00:00:00"),
+    ("int-after", "2025-05-01T00:00:01"),
+]
+
+
+# Explicit interval match tests
+def test_match_explicit_interval(archivers, request):
+    """
+    Test matching archives between two explicit, fully-specified timestamps.
+    The interval is inclusive of the start and exclusive of the end.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    for name, ts in INTERVAL_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-04-01T00:00:00/2025-05-01T00:00:00", exit_code=0)
+    assert "int-start" in out
+    assert "int-mid" in out
+    assert "int-before" not in out
+    assert "int-end" not in out  # exclusive end
+    assert "int-after" not in out
+
+
+def test_match_explicit_interval_with_timezone(archivers, request):
+    """
+    Test matching archives between two explicit timestamps with timezone offsets.
+    Interval is inclusive of the start and exclusive of the end.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    TZ_INTERVAL_ARCHIVES = [
+        ("tz-start", "2025-06-01T00:00:00+02:00"),  # UTC 2025-05-31T22:00:00Z
+        ("tz-mid", "2025-06-01T12:00:00+02:00"),  # UTC 2025-06-01T10:00:00Z
+        ("tz-end", "2025-06-02T00:00:00+02:00"),  # UTC 2025-06-01T22:00:00Z
+    ]
+    for name, ts in TZ_INTERVAL_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # Express the interval in UTC, matching the UTC equivalents.
+    out = cmd(
+        archiver, "repo-list", "-v", "--match-archives=date:2025-05-31T22:00:00Z/2025-06-01T22:00:00Z", exit_code=0
+    )
+    assert "tz-start" in out
+    assert "tz-mid" in out
+    assert "tz-end" not in out

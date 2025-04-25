@@ -208,6 +208,8 @@ def exact_predicate(dt: datetime):
 def interval_predicate(start: datetime, end: datetime):
     start_utc = start.astimezone(timezone.utc)
     end_utc = end.astimezone(timezone.utc)
+    if start_utc > end_utc:
+        raise DatePatternError("start date must be before end date")
     return lambda ts: start_utc <= ts.astimezone(timezone.utc) < end_utc
 
 

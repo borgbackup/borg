@@ -602,3 +602,125 @@ def test_match_duration_suffix_composite_h_m(archivers, request):
     assert "chm-mid" in out
     assert "chm-end" in out
     assert "chm-after" not in out
+
+
+# Keyword-based interval tests (oldest/newest)
+
+
+def test_match_keyword_oldest_to_timestamp(archivers, request):
+    """
+    Test 'oldest/TIMESTAMP' selects from the earliest archive up to the given timestamp (exclusive).
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    KEYWORD_ARCHIVES = [
+        ("arch1", "2025-01-01T00:00:00"),
+        ("arch2", "2025-01-02T00:00:00"),
+        ("arch3", "2025-01-03T00:00:00"),
+    ]
+    for name, ts in KEYWORD_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # oldest is arch1; oldest/arch2 => interval [arch1, arch2)
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:oldest/2025-01-02T00:00:00", exit_code=0)
+    assert "arch1" in out
+    assert "arch2" not in out
+    assert "arch3" not in out
+
+
+def test_match_keyword_timestamp_to_newest(archivers, request):
+    """
+    Test 'TIMESTAMP/newest' selects from the given timestamp up to the latest archive (inclusive).
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    KEYWORD_ARCHIVES = [
+        ("arch1", "2025-01-01T00:00:00"),
+        ("arch2", "2025-01-02T00:00:00"),
+        ("arch3", "2025-01-03T00:00:00"),
+    ]
+    for name, ts in KEYWORD_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    # newest is arch3; arch2/newest => interval [arch2, arch3)
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-01-02T00:00:00/newest", exit_code=0)
+    assert "arch1" not in out
+    assert "arch2" in out
+    assert "arch3" in out
+
+
+def test_match_keyword_oldest_to_newest(archivers, request):
+    """
+    Test 'oldest/newest' selects from the earliest archive up to the latest (exclusive).
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    KEYWORD_ARCHIVES = [
+        ("arch1", "2025-01-01T00:00:00"),
+        ("arch2", "2025-01-02T00:00:00"),
+        ("arch3", "2025-01-03T00:00:00"),
+    ]
+    for name, ts in KEYWORD_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:oldest/newest", exit_code=0)
+    assert "arch1" in out
+    assert "arch2" in out
+    assert "arch3" in out
+
+
+# Keyword permutations tests: oldest/now and now/newest
+
+
+def test_match_keyword_oldest_to_now(archivers, request):
+    """
+    Test 'oldest/now' selects all archives since the earliest up to now.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    KEYWORD_ARCHIVES = [("k1", "2025-01-01T00:00:00"), ("k2", "2025-02-01T00:00:00"), ("k3", "2025-03-01T00:00:00")]
+    for name, ts in KEYWORD_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:oldest/now", exit_code=0)
+    # all created archives are before 'now', so should all match
+    assert "k1" in out
+    assert "k2" in out
+    assert "k3" in out
+
+
+def test_match_keyword_now_to_newest_invalid(archivers, request):
+    """
+    Test 'now/newest' should error, since newest will always be before 'now'.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    KEYWORD_ARCHIVES = [("kA", "2025-01-01T00:00:00"), ("kB", "2025-02-01T00:00:00"), ("kC", "2025-03-01T00:00:00")]
+    for name, ts in KEYWORD_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+    with pytest.raises(CommandError) as excinfo:
+        cmd(archiver, "repo-list", "-v", "--match-archives=date:now/newest")
+
+    msg = str(excinfo.value)
+    assert "Invalid date pattern" in msg
+
+
+def test_match_keyword_exact(archivers, request):
+    """
+    Test date:oldest returns the oldest archive, and date:newest returns the newest archive.
+    """
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    KEYWORD_ARCHIVES = [("k1", "2025-01-01T00:00:00"), ("k2", "2025-02-01T00:00:00"), ("k3", "2025-03-01T00:00:00")]
+    for name, ts in KEYWORD_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:oldest", exit_code=0)
+    assert "k1" in out
+    assert "k2" not in out
+    assert "k3" not in out
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:newest", exit_code=0)
+    assert "k3" in out
+    assert "k2" not in out
+    assert "k1" not in out

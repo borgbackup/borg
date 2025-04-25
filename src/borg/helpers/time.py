@@ -281,6 +281,8 @@ def compile_date_pattern(expr: str):
 
     # Wildcard branch: match each specified component
     if gd["wild"]:
+        if gd["epoch"]:
+            raise DatePatternError("wildcards and epoch cannot be used together")
         part = gd["wild"]
         date_part, *time_rest = part.split("T", 1)
         time_part = time_rest[0] if time_rest else ""
@@ -309,7 +311,7 @@ def compile_date_pattern(expr: str):
         si = to_float(S_pat)
 
         def wildcard_pred(ts: datetime):
-            dt = ts.astimezone(timezone.utc)
+            dt = ts.astimezone(tz)
             if yi is not None and dt.year != yi:
                 return False
             if mi is not None and dt.month != mi:

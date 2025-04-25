@@ -61,14 +61,11 @@ class ArchiveGarbageCollector:
         return chunks
 
     def save_chunk_index(self):
-        if self.stats:
-            # write_chunkindex_to_repo now removes all flags and size infos.
-            # we need this, as we put the wrong size in there to support --stats computations.
-            write_chunkindex_to_repo_cache(
-                self.repository, self.chunks, clear=True, force_write=True, delete_other=True
-            )
-        else:
-            self.chunks.clear()  # we already have updated the repo cache in get_repository_chunks
+        # as we may have deleted some chunks, we must write a full updated chunkindex to the repo
+        # and also remove all older cached chunk indexes.
+        # write_chunkindex_to_repo now removes all flags and size infos.
+        # we need this, as we put the wrong size in there to support --stats computations.
+        write_chunkindex_to_repo_cache(self.repository, self.chunks, clear=True, force_write=True, delete_other=True)
         self.chunks = None  # nothing there (cleared!)
 
     def analyze_archives(self) -> Tuple[Set, int, int, int]:

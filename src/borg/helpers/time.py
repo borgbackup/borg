@@ -399,7 +399,7 @@ def parse_to_interval(expr: str) -> tuple[datetime, datetime]:
 
 def compile_date_pattern(expr: str):
     """
-    Accepts any of:
+    Accepts any TIMESTAMP of:
       YYYY
       YYYY-MM
       YYYY-MM-DD
@@ -407,11 +407,19 @@ def compile_date_pattern(expr: str):
       YYYY-MM-DD HH:MM:SS (RFC-3339 space-separated)
       Unix epoch (@123456789)
     …with an optional trailing timezone (Z or ±HH:MM or [Region/City]).
+
+    Also supports:
+      TIMESTAMP/TIMESTAMP
+      TIMESTAMP/DURATION
+      DURATION/TIMESTAMP.
+    DURATION is a string of the form:
+      D[years]Y[months]M[weeks]W[days]D[hours]h[minutes]m[seconds]s (any combination).
+
     Additionally supports wildcards (`*`) in year, month, or day (or any combination), e.g.:
       "*-04-22"       # April 22 of any year
       "2025-*-01"     # 1st day of any month in 2025
       "*-*-15"        # 15th of every month, any year
-    Returns a predicate that is True for timestamps in that interval.
+    Returns a predicate that is True for timestamps in that interval (inclusive, exclusive).
     """
     expr = expr.strip()
 

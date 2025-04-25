@@ -234,6 +234,92 @@ def parse_tz(tzstr: str):
         raise DatePatternError("invalid timezone format")
 
 
+def _build_datetime_from_groups(gd: dict, tz: timezone) -> datetime:
+    """
+    Construct a datetime from partial ISO groups, filling missing fields with
+    the earliest valid value, and attaching tzinfo.
+    """
+    year = int(gd["year"])
+    month = int(gd.get("month") or 1)
+    day = int(gd.get("day") or 1)
+    hour = int(gd.get("hour") or 0)
+    minute = int(gd.get("minute") or 0)
+    # handle fractional seconds
+    microsecond = 0
+    second = 0
+    sec_str = gd.get("second")
+    if sec_str:
+        if "." in sec_str:
+            whole, frac = sec_str.split(".", 1)
+            second = int(whole)
+            # pad or trim frac to microseconds
+            microsecond = int(float(f"0.{frac}") * 1_000_000)
+        else:
+            second = int(sec_str)
+    return datetime(year, month, day, hour, minute, second, microsecond, tzinfo=tz)
+
+
+pattern = r"""
+  ^
+  (?:
+     @(?P<epoch>\d+)                      # unix epoch
+   | (?P<year>   \d{4}|\*)                # year (YYYY or *)
+     (?:-(?P<month>  \d{2}|\*)            # month (MM or *)
+        (?:-(?P<day>    \d{2}|\*)         # day (DD or *)
+           (?:[T ](?P<hour>   \d{2}|\*)   # hour (HH or *)
+             (?::(?P<minute>\d{2}|\*)     # minute (MM or *)
+               (?::(?P<second>\d{2}(?:\.\d+)?|\*))?  # second (SS or SS.fff or *)
+             )?
+           )?
+        )?
+     )?
+  )
+  (?P<tz>Z|[+\-]\d\d:\d\d|\[[^\]]+\])?    # optional timezone suffix
+  $
+"""
+
+
+def _parse_to_interval(expr: str) -> tuple[datetime, datetime]:
+    """
+    Parse a possibly incomplete ISO-8601 timestamp (with optional timezone) into
+    a start and end datetime representing the full interval.
+    """
+    # note: we match the same pattern that supports wildcards, but at the point this function is called,
+    #       we know that the pattern contains no wildcards. This is to allow us to reuse the same regex.
+    m = re.match(pattern, expr, re.VERBOSE)
+    if not m:
+        raise DatePatternError(f"unrecognised date: {expr!r}")
+    gd = m.groupdict()
+    # handle unix-epoch forms directly
+    if gd["epoch"]:
+        epoch = int(gd["epoch"])
+        start = datetime.fromtimestamp(epoch, tz=timezone.utc)
+        end = start + timedelta(seconds=1)
+        return start, end
+
+    tz = parse_tz(gd["tz"])
+    # build the start moment
+    start = _build_datetime_from_groups(gd, tz)
+    # determine the end moment based on the highest precision present
+    if gd["second"]:
+        # fractional or whole second precision
+        end = start + timedelta(seconds=1)
+    elif gd["minute"]:
+        end = start + timedelta(minutes=1)
+    elif gd["hour"]:
+        end = start + timedelta(hours=1)
+    elif gd["day"]:
+        end = start + timedelta(days=1)
+    elif gd["month"]:
+        end = offset_n_months(start, 1)
+    elif gd["year"]:
+        end = offset_n_months(start, 12)
+    else:
+        # fallback to one-second window (shouldn't occur)
+        end = start + timedelta(seconds=1)
+    return start, end
+
+
 def compile_date_pattern(expr: str):
     """
     Accepts any of:
@@ -252,24 +338,6 @@ def compile_date_pattern(expr: str):
     Returns a predicate that is True for timestamps in that interval.
     """
     expr = expr.strip()
-    pattern = r"""
-      ^
-      (?:
-         @(?P<epoch>\d+)                      # unix epoch
-       | (?P<year>   \d{4}|\*)                # year (YYYY or *)
-         (?:-(?P<month>  \d{2}|\*)            # month (MM or *)
-            (?:-(?P<day>    \d{2}|\*)         # day (DD or *)
-               (?:[T ](?P<hour>   \d{2}|\*)   # hour (HH or *)
-                 (?::(?P<minute>\d{2}|\*)     # minute (MM or *)
-                   (?::(?P<second>\d{2}(?:\.\d+)?|\*))?  # second (SS or SS.fff or *)
-                 )?
-               )?
-            )?
-         )?
-      )
-      (?P<tz>Z|[+\-]\d\d:\d\d|\[[^\]]+\])?    # optional timezone suffix
-      $
-    """
     m = re.match(pattern, expr, re.VERBOSE)
     if not m:
         raise DatePatternError(f"unrecognised date: {expr!r}")
@@ -277,14 +345,7 @@ def compile_date_pattern(expr: str):
     gd = m.groupdict()
     tz = parse_tz(gd["tz"])
 
-    # 1) epoch is checked first because it is syntactically and semantically incompatible
-    #    with other datetime components (e.g., year/month/day/wildcards).
-    if gd["epoch"]:
-        e = int(gd["epoch"])
-        start = datetime.fromtimestamp(e, tz=timezone.utc)
-        return interval_predicate(start, start + timedelta(seconds=1))
-
-    # 2) detect explicit wildcards (*) in any named group
+    # 1) detect explicit wildcards (*) in any named group
     wildcard_fields = ("year", "month", "day", "hour", "minute", "second")
     if any(gd[f] == "*" for f in wildcard_fields if f in gd):
         # build a discrete‐match predicate
@@ -311,66 +372,11 @@ def compile_date_pattern(expr: str):
 
         return wildcard_pred
 
-    # 3) fraction‐precision exact match
+    # 2) fraction‐precision exact match
     if gd["second"] and "." in gd["second"]:
-        start = datetime(
-            int(gd["year"]),
-            int(gd["month"]),
-            int(gd["day"]),
-            int(gd["hour"]),
-            int(gd["minute"]),
-            int(float(gd["second"])),
-            tzinfo=tz,
-        )
-        return exact_predicate(start)
+        dt = _build_datetime_from_groups(gd, tz)
+        return exact_predicate(dt)
 
-    # 4) second‐precision interval
-    if gd["second"]:
-        start = datetime(
-            int(gd["year"]),
-            int(gd["month"]),
-            int(gd["day"]),
-            int(gd["hour"] or 0),
-            int(gd["minute"] or 0),
-            int(gd["second"]),
-            tzinfo=tz,
-        )
-        return interval_predicate(start, start + timedelta(seconds=1))
-
-    # 5) minute‐precision
-    if gd["minute"]:
-        start = datetime(
-            int(gd["year"]),
-            int(gd["month"]),
-            int(gd["day"]),
-            int(gd["hour"] or 0),
-            int(gd["minute"]),
-            second=0,
-            tzinfo=tz,
-        )
-        return interval_predicate(start, start + timedelta(minutes=1))
-
-    # 6) hour‐precision
-    if gd["hour"]:
-        start = datetime(
-            int(gd["year"]), int(gd["month"]), int(gd["day"]), int(gd["hour"]), minute=0, second=0, tzinfo=tz
-        )
-        return interval_predicate(start, start + timedelta(hours=1))
-
-    # 7) day‐precision
-    if gd["day"]:
-        start = datetime(int(gd["year"]), int(gd["month"]), int(gd["day"]), hour=0, minute=0, second=0, tzinfo=tz)
-        return interval_predicate(start, start + timedelta(days=1))
-
-    # 8) month‐precision
-    if gd["month"]:
-        start = datetime(int(gd["year"]), int(gd["month"]), day=1, hour=0, minute=0, second=0, tzinfo=tz)
-        return interval_predicate(start, offset_n_months(start, 1))
-
-    # 9) year‐precision
-    if gd["year"]:
-        start = datetime(int(gd["year"]), month=1, day=1, hour=0, minute=0, second=0, tzinfo=tz)
-        return interval_predicate(start, offset_n_months(start, 12))
-
-    # fallback
-    raise DatePatternError(f"unrecognised date: {expr!r}")
+    # 3) remaining precisions: use _parse_to_interval to get start/end
+    start, end = _parse_to_interval(expr)
+    return interval_predicate(start, end)

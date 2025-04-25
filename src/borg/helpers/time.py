@@ -243,7 +243,7 @@ def parse_tz(tzstr: str):
         raise DatePatternError("invalid timezone format")
 
 
-def _build_datetime_from_groups(gd: dict, tz: timezone) -> datetime:
+def build_datetime_from_groups(gd: dict, tz: timezone) -> datetime:
     """
     Construct a datetime from partial ISO groups, filling missing fields with
     the earliest valid value, and attaching tzinfo.
@@ -268,7 +268,7 @@ def _build_datetime_from_groups(gd: dict, tz: timezone) -> datetime:
     return datetime(year, month, day, hour, minute, second, microsecond, tzinfo=tz)
 
 
-pattern = r"""
+MAIN_RE = r"""
   ^
   (?:
      @(?P<epoch>\d+)                      # unix epoch
@@ -288,9 +288,7 @@ pattern = r"""
 """
 
 
-#
-# duration parsing for strings like D1Y2M3W4D5h6m7s
-_DURATION_RE = re.compile(
+DURATION_RE = re.compile(
     r"^D"
     r"(?:(?P<years>\d+)Y)?"
     r"(?:(?P<months>\d+)M)?"
@@ -303,11 +301,11 @@ _DURATION_RE = re.compile(
 )
 
 
-def _parse_duration(expr: str) -> tuple[int, timedelta]:
+def parse_duration(expr: str) -> tuple[int, timedelta]:
     """
     Parse D… duration into (months, timedelta of days/weeks/hours/minutes/seconds).
     """
-    m = _DURATION_RE.match(expr)
+    m = DURATION_RE.match(expr)
     if not m:
         raise DatePatternError(f"invalid duration: {expr!r}")
     gd = m.groupdict(default="0")
@@ -320,14 +318,14 @@ def _parse_duration(expr: str) -> tuple[int, timedelta]:
     return total_months, td
 
 
-def _parse_to_interval(expr: str) -> tuple[datetime, datetime]:
+def parse_to_interval(expr: str) -> tuple[datetime, datetime]:
     """
     Parse a possibly incomplete ISO-8601 timestamp (with optional timezone) into
     a start and end datetime representing the full interval.
     """
     # note: we match the same pattern that supports wildcards, but at the point this function is called,
     #       we know that the pattern contains no wildcards. This is to allow us to reuse the same regex.
-    m = re.match(pattern, expr, re.VERBOSE)
+    m = re.match(MAIN_RE, expr, re.VERBOSE)
     if not m:
         raise DatePatternError(f"unrecognised date: {expr!r}")
     gd = m.groupdict()
@@ -340,7 +338,7 @@ def _parse_to_interval(expr: str) -> tuple[datetime, datetime]:
 
     tz = parse_tz(gd["tz"])
     # build the start moment
-    start = _build_datetime_from_groups(gd, tz)
+    start = build_datetime_from_groups(gd, tz)
     # determine the end moment based on the highest precision present
     if gd["second"]:
         # fractional or whole second precision
@@ -387,23 +385,23 @@ def compile_date_pattern(expr: str):
         # duration / timestamp
         if left.startswith("D") and not right.startswith("D"):
             # months are handled separately via offset_n_months() because month lengths vary
-            months, td = _parse_duration(left)
-            end_dt, _ = _parse_to_interval(right)
+            months, td = parse_duration(left)
+            end_dt, _ = parse_to_interval(right)
             start_dt = offset_n_months(end_dt, -months) - td
             return interval_predicate(start_dt, end_dt)
         # timestamp / duration
         if right.startswith("D") and not left.startswith("D"):
-            start_dt, _ = _parse_to_interval(left)
+            start_dt, _ = parse_to_interval(left)
             # months are handled separately via offset_n_months() because month lengths vary
-            months, td = _parse_duration(right)
+            months, td = parse_duration(right)
             mid_dt = offset_n_months(start_dt, months)
             end_dt = mid_dt + td
             return interval_predicate(start_dt, end_dt)
         # timestamp / timestamp
-        start_left, _ = _parse_to_interval(left)
-        start_right, _ = _parse_to_interval(right)
+        start_left, _ = parse_to_interval(left)
+        start_right, _ = parse_to_interval(right)
         return interval_predicate(start_left, start_right)
-    m = re.match(pattern, expr, re.VERBOSE)
+    m = re.match(MAIN_RE, expr, re.VERBOSE)
     if not m:
         raise DatePatternError(f"unrecognised date: {expr!r}")
 
@@ -439,9 +437,9 @@ def compile_date_pattern(expr: str):
 
     # 3) fraction‐precision exact match
     if gd["second"] and "." in gd["second"]:
-        dt = _build_datetime_from_groups(gd, tz)
+        dt = build_datetime_from_groups(gd, tz)
         return exact_predicate(dt)
 
     # 4) remaining precisions: use _parse_to_interval to get start/end
-    start, end = _parse_to_interval(expr)
+    start, end = parse_to_interval(expr)
     return interval_predicate(start, end)

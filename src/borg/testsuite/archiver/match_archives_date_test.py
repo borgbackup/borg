@@ -261,3 +261,114 @@ def test_invalid_timezones_rejected(archivers, request, invalid_expr):
     msg = str(excinfo.value)
     assert "Invalid date pattern" in msg
     assert invalid_expr in msg
+
+
+WILDCARD_DAY_ARCHIVES = [
+    ("wd-jan12", "2025-01-12T00:00:00"),
+    ("wd-feb12", "2025-02-12T23:59:59"),
+    ("wd-jan13", "2025-01-13T00:00:00"),
+]
+
+
+# Day-only wildcard: *-*-12
+def test_match_wildcard_specific_day(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name, ts in WILDCARD_DAY_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:*-*-12", exit_code=0)
+    assert "wd-jan12" in out
+    assert "wd-feb12" in out
+    assert "wd-jan13" not in out
+
+
+WILDCARD_MONTH_ARCHIVES = [
+    ("wm-apr1", "2025-04-01T00:00:00"),
+    ("wm-apr30", "2025-04-30T23:59:59"),
+    ("wm-mar31", "2025-03-31T23:59:59"),
+]
+
+
+# Month-only wildcard: *-04
+def test_match_wildcard_every_april(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name, ts in WILDCARD_MONTH_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:*-04", exit_code=0)
+    assert "wm-apr1" in out
+    assert "wm-apr30" in out
+    assert "wm-mar31" not in out
+
+
+WILDCARD_MINUTE_ARCHIVES = [
+    ("w-min-a", "2025-01-01T12:10:00"),
+    ("w-min-b", "2025-01-01T12:59:00"),
+    ("w-min-c", "2025-01-01T12:10:01"),  # should not match
+]
+
+
+# Time-of-day wildcard (minute‐level): 2025-01-01T12:*:00
+def test_match_wildcard_any_minute_at_second_zero(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name, ts in WILDCARD_MINUTE_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-01-01T12:*:00", exit_code=0)
+    assert "w-min-a" in out
+    assert "w-min-b" in out
+    assert "w-min-c" not in out
+
+
+# Wildcard plus timezone: day in America/Detroit
+WILDCARD_TZ_ARCHIVES = [
+    # UTC 2025-04-12T03:59:59Z -> local EDT = 2025-04-11T23:59:59 (before - should not match)
+    ("w-tz-before", "2025-04-12T03:59:59Z"),
+    # UTC 2025-04-12T04:00:00Z -> local EDT = 2025-04-12T00:00:00 (start - should match)
+    ("w-tz-start", "2025-04-12T04:00:00Z"),
+    # UTC 2025-04-12T16:30:00Z -> local EDT = 2025-04-12T12:30:00 (halfway - should match)
+    ("w-tz-mid", "2025-04-12T16:30:00Z"),
+    # UTC 2025-04-13T03:59:59Z -> local EDT = 2025-04-12T23:59:59 (inclusive end - should still match)
+    ("w-tz-same", "2025-04-13T03:59:59Z"),
+    # UTC 2025-04-13T04:00:00Z -> local EDT = 2025-04-13T00:00:00 (after)
+    ("w-tz-after", "2025-04-13T04:00:00Z"),
+]
+
+
+def test_match_wildcard_day_with_tz(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name, ts in WILDCARD_TZ_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:2025-04-12T*:*:*[America/Detroit]", exit_code=0)
+    # only the three in the EDT-local-Apr-12 window with second=0 should match
+    assert "w-tz-start" in out
+    assert "w-tz-mid" in out
+    assert "w-tz-same" in out
+    assert "w-tz-before" not in out
+    assert "w-tz-after" not in out
+
+
+WILDCARD_MIXED_ARCHIVES = [
+    ("wmix-hit1", "2025-01-01T12:00:00"),  # matches: 01-01 12:00
+    ("wmix-hit2", "2025-01-01T12:59:59"),  # matches: 01-01 12:*
+    ("wmix-miss1", "2025-01-01T13:00:00"),  # wrong hour
+    ("wmix-miss2", "2025-01-02T12:00:00"),  # wrong day
+]
+
+
+def test_match_wildcard_mixed_day_and_hour(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    for name, ts in WILDCARD_MIXED_ARCHIVES:
+        create_src_archive(archiver, name, ts=ts)
+
+    out = cmd(archiver, "repo-list", "-v", "--match-archives=date:*-01-01T12:*", exit_code=0)
+    assert "wmix-hit1" in out
+    assert "wmix-hit2" in out
+    assert "wmix-miss1" not in out
+    assert "wmix-miss2" not in out

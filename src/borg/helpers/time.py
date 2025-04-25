@@ -245,7 +245,7 @@ def compile_date_pattern(expr: str):
       YYYY-MM-DDTHH:MM:SS
       Unix epoch (@123456789)
     …with an optional trailing timezone (Z or ±HH:MM or [Region/City]).
-    Additionally supports wildcards (`*`) in year, month, or day (or any combination), e.g.:  
+    Additionally supports wildcards (`*`) in year, month, or day (or any combination), e.g.:
       "*-04-22"       # April 22 of any year
       "2025-*-01"     # 1st day of any month in 2025
       "*-*-15"        # 15th of every month, any year
@@ -282,21 +282,24 @@ def compile_date_pattern(expr: str):
     # Wildcard branch: match each specified component
     if gd["wild"]:
         part = gd["wild"]
-        date_part, *time_rest = part.split('T', 1)
-        time_part = time_rest[0] if time_rest else ''
+        date_part, *time_rest = part.split("T", 1)
+        time_part = time_rest[0] if time_rest else ""
 
-        dfields = date_part.split('-')
+        dfields = date_part.split("-")
         y_pat = dfields[0]
-        m_pat = dfields[1] if len(dfields) > 1 else '*'
-        d_pat = dfields[2] if len(dfields) > 2 else '*'
+        m_pat = dfields[1] if len(dfields) > 1 else "*"
+        d_pat = dfields[2] if len(dfields) > 2 else "*"
 
-        tfields = time_part.split(':') if time_part else []
-        h_pat = tfields[0] if len(tfields) > 0 else '*'
-        M_pat = tfields[1] if len(tfields) > 1 else '*'
-        S_pat = tfields[2] if len(tfields) > 2 else '*'
+        tfields = time_part.split(":") if time_part else []
+        h_pat = tfields[0] if len(tfields) > 0 else "*"
+        M_pat = tfields[1] if len(tfields) > 1 else "*"
+        S_pat = tfields[2] if len(tfields) > 2 else "*"
 
-        to_int   = lambda p: None if p == '*' else int(p)
-        to_float = lambda p: None if p == '*' else float(p)
+        def to_int(p):
+            return None if p == "*" else int(p)
+
+        def to_float(p):
+            return None if p == "*" else float(p)
 
         yi = to_int(y_pat)
         mi = to_int(m_pat)
@@ -307,14 +310,20 @@ def compile_date_pattern(expr: str):
 
         def wildcard_pred(ts: datetime):
             dt = ts.astimezone(timezone.utc)
-            if yi is not None and dt.year   != yi: return False
-            if mi is not None and dt.month  != mi: return False
-            if di is not None and dt.day    != di: return False
-            if hi is not None and dt.hour   != hi: return False
-            if ni is not None and dt.minute != ni: return False
+            if yi is not None and dt.year != yi:
+                return False
+            if mi is not None and dt.month != mi:
+                return False
+            if di is not None and dt.day != di:
+                return False
+            if hi is not None and dt.hour != hi:
+                return False
+            if ni is not None and dt.minute != ni:
+                return False
             if si is not None:
-                sec = dt.second + dt.microsecond/1e6
-                if not (si <= sec < si + 1): return False
+                sec = dt.second + dt.microsecond / 1e6
+                if not (si <= sec < si + 1):
+                    return False
             return True
 
         return wildcard_pred

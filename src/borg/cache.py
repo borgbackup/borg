@@ -701,7 +701,7 @@ def delete_chunkindex_cache(repository):
     logger.debug(f"cached chunk indexes deleted: {hashes}")
 
 
-CHUNKINDEX_HASH_SEED = 2
+CHUNKINDEX_HASH_SEED = 3
 
 
 def write_chunkindex_to_repo_cache(

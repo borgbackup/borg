@@ -88,7 +88,6 @@ complete -c borg         -l 'rsh'                   -d 'Use COMMAND instead of s
 # borg init options
 set -l encryption_modes "none keyfile keyfile-blake2 repokey repokey-blake2 authenticated authenticated-blake2"
 complete -c borg -f -s e -l 'encryption'            -d 'Encryption key MODE' -a "$encryption_modes" -n "__fish_seen_subcommand_from init"
-complete -c borg -f      -l 'append-only'           -d 'Create an append-only mode repository'      -n "__fish_seen_subcommand_from init"
 complete -c borg -f      -l 'make-parent-dirs'      -d 'Create parent directories'                  -n "__fish_seen_subcommand_from init"
 
 # borg create options
@@ -314,7 +313,6 @@ complete -c borg -f      -l 'strip-components'      -d 'Remove NUMBER of leading
 # borg serve
 complete -c borg         -l 'restrict-to-path'      -d 'Restrict repository access to PATH'         -n "__fish_seen_subcommand_from serve"
 complete -c borg         -l 'restrict-to-repository' -d 'Restrict repository access at PATH'        -n "__fish_seen_subcommand_from serve"
-complete -c borg -f      -l 'append-only'           -d 'Only allow appending to repository'         -n "__fish_seen_subcommand_from serve"
 
 # borg config
 complete -c borg -f -s c -l 'cache'                 -d 'Get/set/list values in the repo cache'      -n "__fish_seen_subcommand_from config"

@@ -126,7 +126,7 @@ class TestCommonOptions:
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         subparser.set_defaults(func=1234)
-        subparser.add_argument("--append-only", dest="append_only", action="store_true")
+        subparser.add_argument("--foo-bar", dest="foo_bar", action="store_true")
 
         def parse_vars_from_line(*line):
             print(line)
@@ -149,19 +149,19 @@ class TestCommonOptions:
             "lock_wait": 1,
             "log_level": "critical",
             "progress": False,
-            "append_only": False,
+            "foo_bar": False,
             "func": 1234,
         }
 
         with pytest.raises(SystemExit):
-            parse_vars_from_line("--append-only", "subcommand")
+            parse_vars_from_line("--foo-bar", "subcommand")
 
         assert parse_vars_from_line("--append=foo", "--append", "bar", "subcommand", "--append", "baz") == {
             "append": ["foo", "bar", "baz"],
             "lock_wait": 1,
             "log_level": "warning",
             "progress": False,
-            "append_only": False,
+            "foo_bar": False,
             "func": 1234,
         }
 
@@ -180,7 +180,7 @@ class TestCommonOptions:
             "lock_wait": 1,
             "log_level": "warning",
             "progress": False,
-            "append_only": False,
+            "foo_bar": False,
             "func": 1234,
             args_key: args_value,
         }

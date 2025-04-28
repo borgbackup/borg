@@ -36,7 +36,6 @@ class RepoInfoMixIn:
             Repository ID: {id}
             Location: {location}
             Repository version: {version}
-            Append only: {append_only}
             {encryption}
             """
                 )
@@ -45,7 +44,6 @@ class RepoInfoMixIn:
                     id=bin_to_hex(repository.id),
                     location=repository._location.canonical_path(),
                     version=repository.version,
-                    append_only=repository.append_only,
                     encryption=info["encryption"],
                 )
             )

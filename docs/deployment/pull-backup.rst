@@ -247,7 +247,7 @@ to *borg-client* has to have read and write permissions on ``/run/borg``::
 On *borg-server*, we have to start the command ``borg serve`` and make its
 standard input and output available to a unix socket::
 
-   borg-server:~$ socat UNIX-LISTEN:/run/borg/reponame.sock,fork EXEC:"borg serve --append-only --restrict-to-path /path/to/repo"
+   borg-server:~$ socat UNIX-LISTEN:/run/borg/reponame.sock,fork EXEC:"borg serve --restrict-to-path /path/to/repo"
 
 Socat will wait until a connection is opened. Then socat will execute the
 command given, redirecting Standard Input and Output to the unix socket. The
@@ -350,7 +350,7 @@ dedicated ssh key:
 
   borgs@borg-server$ install -m 700 -d ~/.ssh/
   borgs@borg-server$ ssh-keygen -N '' -t rsa  -f ~/.ssh/borg-client_key
-  borgs@borg-server$ { echo -n 'command="borg serve --append-only --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys
+  borgs@borg-server$ { echo -n 'command="borg serve --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys
   borgs@borg-server$ chmod 600 ~/.ssh/authorized_keys
 
 ``install -m 700 -d ~/.ssh/``
@@ -365,12 +365,10 @@ dedicated ssh key:
   Another more complex approach is using a unique ssh key for each pull operation.
   This is more secure as it guarantees that the key will not be used for other purposes.
 
-``{ echo -n 'command="borg serve --append-only --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys``
+``{ echo -n 'command="borg serve --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys``
 
   Add borg-client's ssh public key to ~/.ssh/authorized_keys with forced command and restricted mode.
-  The borg client is restricted to use one repo at the specified path and to append-only operation.
-  Commands like *delete*, *prune* and *compact* have to be executed another way, for example directly on *borg-server*
-  side or from a privileged, less restricted client (using another authorized_keys entry).
+  The borg client is restricted to use one repo at the specified path.
 
 ``chmod 600 ~/.ssh/authorized_keys``
 

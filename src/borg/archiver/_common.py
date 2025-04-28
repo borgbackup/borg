@@ -30,7 +30,7 @@ from ..logger import create_logger
 logger = create_logger(__name__)
 
 
-def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, storage_quota, args, v1_or_v2):
+def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, args, v1_or_v2):
     if location.proto in ("ssh", "socket"):
         RemoteRepoCls = LegacyRemoteRepository if v1_or_v2 else RemoteRepository
         repository = RemoteRepoCls(
@@ -45,25 +45,13 @@ def get_repository(location, *, create, exclusive, lock_wait, lock, append_only,
 
     elif location.proto in ("sftp", "file", "rclone") and not v1_or_v2:  # stuff directly supported by borgstore
         repository = Repository(
-            location,
-            create=create,
-            exclusive=exclusive,
-            lock_wait=lock_wait,
-            lock=lock,
-            append_only=append_only,
-            storage_quota=storage_quota,
+            location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, append_only=append_only
         )
 
     else:
         RepoCls = LegacyRepository if v1_or_v2 else Repository
         repository = RepoCls(
-            location.path,
-            create=create,
-            exclusive=exclusive,
-            lock_wait=lock_wait,
-            lock=lock,
-            append_only=append_only,
-            storage_quota=storage_quota,
+            location.path, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, append_only=append_only
         )
     return repository
 
@@ -127,7 +115,6 @@ def with_repository(
             assert isinstance(exclusive, bool)
             lock = getattr(args, "lock", _lock)
             append_only = getattr(args, "append_only", False)
-            storage_quota = getattr(args, "storage_quota", None)
 
             repository = get_repository(
                 location,
@@ -136,7 +123,6 @@ def with_repository(
                 lock_wait=self.lock_wait,
                 lock=lock,
                 append_only=append_only,
-                storage_quota=storage_quota,
                 args=args,
                 v1_or_v2=False,
             )
@@ -205,7 +191,6 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                 lock_wait=self.lock_wait,
                 lock=True,
                 append_only=False,
-                storage_quota=None,
                 args=args,
                 v1_or_v2=v1_or_v2,
             )

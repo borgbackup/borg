@@ -183,10 +183,7 @@ class LegacyRepository:
 
         exit_mcode = 19
 
-    class StorageQuotaExceeded(Error):
-        """The storage quota ({}) has been exceeded ({}). Try deleting some archives."""
-
-        exit_mcode = 20
+    # StorageQuotaExceeded was exit_mcode = 20
 
     class PathPermissionDenied(Error):
         """Permission denied to {}."""
@@ -194,15 +191,7 @@ class LegacyRepository:
         exit_mcode = 21
 
     def __init__(
-        self,
-        path,
-        create=False,
-        exclusive=False,
-        lock_wait=None,
-        lock=True,
-        append_only=False,
-        storage_quota=None,
-        send_log_cb=None,
+        self, path, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False, send_log_cb=None
     ):
         self.path = os.path.abspath(path)
         self._location = Location("file://%s" % self.path)
@@ -230,8 +219,6 @@ class LegacyRepository:
         self.created = False
         self.exclusive = exclusive
         self.append_only = append_only
-        self.storage_quota = storage_quota
-        self.storage_quota_use = 0
         self.transaction_doomed = None
         # v2 is the default repo version for borg 2.0
         # v1 repos must only be used in a read-only way, e.g. for
@@ -290,13 +277,9 @@ class LegacyRepository:
         """
         Raise an exception if a repository already exists at *path* or any parent directory.
 
-        Checking parent directories is done for two reasons:
-        (1) It's just a weird thing to do, and usually not intended. A Borg using the "parent" repository
-            may be confused, or we may accidentally put stuff into the "data/" or "data/<n>/" directories.
-        (2) When implementing repository quotas (which we currently don't), it's important to prohibit
-            folks from creating quota-free repositories. Since no one can create a repository within another
-            repository, user's can only use the quota'd repository, when their --restrict-to-path points
-            at the user's repository.
+        Checking parent directories is done because it's just a weird thing to do, and usually not intended.
+        A Borg using the "parent" repository may be confused, or we may accidentally put stuff into the "data/" or
+        "data/<n>/" directories.
         """
         try:
             st = os.stat(path)
@@ -345,10 +328,6 @@ class LegacyRepository:
         config.set("repository", "segments_per_dir", str(DEFAULT_SEGMENTS_PER_DIR))
         config.set("repository", "max_segment_size", str(DEFAULT_MAX_SEGMENT_SIZE))
         config.set("repository", "append_only", str(int(self.append_only)))
-        if self.storage_quota:
-            config.set("repository", "storage_quota", str(self.storage_quota))
-        else:
-            config.set("repository", "storage_quota", "0")
         config.set("repository", "additional_free_space", "0")
         config.set("repository", "id", bin_to_hex(os.urandom(32)))
         self.save_config(path, config)
@@ -492,9 +471,6 @@ class LegacyRepository:
         # append_only can be set in the constructor
         # it shouldn't be overridden (True -> False) here
         self.append_only = self.append_only or self.config.getboolean("repository", "append_only", fallback=False)
-        if self.storage_quota is None:
-            # self.storage_quota is None => no explicit storage_quota was specified, use repository setting.
-            self.storage_quota = parse_file_size(self.config.get("repository", "storage_quota", fallback=0))
         self.id = hex_to_bin(self.config.get("repository", "id").strip(), length=32)
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
@@ -504,15 +480,12 @@ class LegacyRepository:
             return
         hints = self._unpack_hints(transaction_id)
         self.version = hints["version"]
-        self.storage_quota_use = hints["storage_quota_use"]
         self.shadow_index = hints["shadow_index"]
 
     def info(self):
         """return some infos about the repo (must be opened first)"""
         info = dict(id=self.id, version=self.version, append_only=self.append_only)
         self._load_hints()
-        info["storage_quota"] = self.storage_quota
-        info["storage_quota_use"] = self.storage_quota_use
         return info
 
     def close(self):
@@ -604,7 +577,6 @@ class LegacyRepository:
         if transaction_id is None:
             self.segments = {}  # XXX bad name: usage_count_of_segment_x = self.segments[x]
             self.compact = FreeSpace()  # XXX bad name: freeable_space_of_segment_x = self.compact[x]
-            self.storage_quota_use = 0
             self.shadow_index.clear()
         else:
             if do_cleanup:
@@ -626,7 +598,6 @@ class LegacyRepository:
                 logger.debug("Upgrading from v1 hints.%d", transaction_id)
                 self.segments = hints["segments"]
                 self.compact = FreeSpace()
-                self.storage_quota_use = 0
                 self.shadow_index = {}
                 for segment in sorted(hints["compact"]):
                     logger.debug("Rebuilding sparse info for segment %d", segment)
@@ -637,7 +608,6 @@ class LegacyRepository:
             else:
                 self.segments = hints["segments"]
                 self.compact = FreeSpace(hints["compact"])
-                self.storage_quota_use = hints.get("storage_quota_use", 0)
                 self.shadow_index = hints.get("shadow_index", {})
             # Drop uncommitted segments in the shadow index
             for key, shadowed_segments in self.shadow_index.items():
@@ -653,13 +623,7 @@ class LegacyRepository:
         def rename_tmp(file):
             os.replace(file + ".tmp", file)
 
-        hints = {
-            "version": 2,
-            "segments": self.segments,
-            "compact": self.compact,
-            "storage_quota_use": self.storage_quota_use,
-            "shadow_index": self.shadow_index,
-        }
+        hints = {"version": 2, "segments": self.segments, "compact": self.compact, "shadow_index": self.shadow_index}
         integrity = {
             # Integrity version started at 2, the current hints version.
             # Thus, integrity version == hints version, for now.
@@ -783,7 +747,6 @@ class LegacyRepository:
         if not self.compact:
             logger.debug("Nothing to do: compact empty")
             return
-        quota_use_before = self.storage_quota_use
         index_transaction_id = self.get_index_transaction_id()
         segments = self.segments
         unused = []  # list of segments, that are not used anymore
@@ -855,9 +818,6 @@ class LegacyRepository:
                     segments.setdefault(new_segment, 0)
                     segments[new_segment] += 1
                     segments[segment] -= 1
-                    if tag == TAG_PUT:
-                        # old tag is PUT, but new will be PUT2 and use a bit more storage
-                        self.storage_quota_use += self.io.ENTRY_HASH_SIZE
                 elif tag in (TAG_PUT2, TAG_PUT) and not is_index_object:
                     # If this is a PUT shadowed by a later tag, then it will be gone when this segment is deleted after
                     # this loop. Therefore it is removed from the shadow index.
@@ -867,7 +827,6 @@ class LegacyRepository:
                         # do not remove entry with empty shadowed_segments list here,
                         # it is needed for shadowed_put_exists code (see below)!
                         pass
-                    self.storage_quota_use -= header_size(tag) + len(data)
                 elif tag == TAG_DELETE and not in_index:
                     # If the shadow index doesn't contain this key, then we can't say if there's a shadowed older tag,
                     # therefore we do not drop the delete, but write it to a current segment.
@@ -945,8 +904,6 @@ class LegacyRepository:
         self._send_log()
         complete_xfer(intermediate=False)
         self.io.clear_empty_dirs()
-        quota_use_after = self.storage_quota_use
-        logger.info("Compaction freed about %s repository space.", format_file_size(quota_use_before - quota_use_after))
         logger.debug("Compaction completed.")
 
     def replay_segments(self, index_transaction_id, segments_transaction_id):
@@ -990,7 +947,6 @@ class LegacyRepository:
                     pass
                 self.index[key] = NSIndex1Entry(segment, offset)
                 self.segments[segment] += 1
-                self.storage_quota_use += header_size(tag) + size
             elif tag == TAG_DELETE:
                 try:
                     # if the deleted PUT is not in the index, there is nothing to clean up
@@ -1232,20 +1188,14 @@ class LegacyRepository:
             pass
         else:
             # this put call supersedes a previous put to same id.
-            # it is essential to do a delete first to get correct quota bookkeeping
-            # and also a correctly updated shadow_index, so that the compaction code
-            # does not wrongly resurrect an old PUT by dropping a DEL that is still needed.
+            # it is essential to do a delete first to get a correctly updated shadow_index,
+            # so that the compaction code does not wrongly resurrect an old PUT by
+            # dropping a DEL that is still needed.
             self._delete(id, in_index.segment, in_index.offset, 0)
         segment, offset = self.io.write_put(id, data)
-        self.storage_quota_use += header_size(TAG_PUT2) + len(data)
         self.segments.setdefault(segment, 0)
         self.segments[segment] += 1
         self.index[id] = NSIndex1Entry(segment, offset)
-        if self.storage_quota and self.storage_quota_use > self.storage_quota:
-            self.transaction_doomed = self.StorageQuotaExceeded(
-                format_file_size(self.storage_quota), format_file_size(self.storage_quota_use)
-            )
-            raise self.transaction_doomed
 
     def delete(self, id, wait=True):
         """delete a repo object

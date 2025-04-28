@@ -1,8 +1,7 @@
 import argparse
 
-from ._common import Highlander
 from ..constants import *  # NOQA
-from ..helpers import parse_storage_quota, CommandError
+from ..helpers import CommandError
 from ..remote import RepositoryServer
 
 from ..logger import create_logger
@@ -15,13 +14,10 @@ class ServeMixIn:
         """Start in server mode. This command is usually not used manually."""
         if args.append_only:
             raise CommandError("append-only is not supported (yet?)")
-        if args.storage_quota is not None:
-            raise CommandError("storage-quota is not supported (yet?)")
         RepositoryServer(
             restrict_to_paths=args.restrict_to_paths,
             restrict_to_repositories=args.restrict_to_repositories,
             append_only=args.append_only,
-            storage_quota=args.storage_quota,
             use_socket=args.use_socket,
         ).serve()
 
@@ -83,15 +79,4 @@ class ServeMixIn:
             "affects the low level structure of the repository, and running `delete` "
             "or `prune` will still be allowed. See :ref:`append_only_mode` in Additional "
             "Notes for more details.",
-        )
-        subparser.add_argument(
-            "--storage-quota",
-            metavar="QUOTA",
-            dest="storage_quota",
-            type=parse_storage_quota,
-            default=None,
-            action=Highlander,
-            help="Override storage quota of the repository (e.g. 5G, 1.5T). "
-            "When a new repository is initialized, sets the storage quota on the new "
-            "repository as well. Default: no quota.",
         )

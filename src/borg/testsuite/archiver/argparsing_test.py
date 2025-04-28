@@ -1,7 +1,6 @@
 import argparse
 import pytest
 
-from ...helpers import parse_storage_quota
 from . import Archiver, RK_ENCRYPTION, cmd
 
 
@@ -187,9 +186,3 @@ class TestCommonOptions:
         }
 
         assert parse_vars_from_line(*line) == result
-
-
-def test_parse_storage_quota():
-    assert parse_storage_quota("50M") == 50 * 1000**2
-    with pytest.raises(argparse.ArgumentTypeError):
-        parse_storage_quota("5M")

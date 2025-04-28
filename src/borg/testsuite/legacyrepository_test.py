@@ -511,39 +511,6 @@ def test_shadow_index_rollback(repository):
         assert repository.shadow_index[H(1)] == []  # because the deletion is considered unstable
 
 
-def test_destroy_append_only(repository):
-    with repository:
-        # can't destroy append only repo (via the API)
-        repository.append_only = True
-        with pytest.raises(ValueError):
-            repository.destroy()
-        assert repository.append_only
-
-
-def test_append_only(repository):
-    def segments_in_repository(repo):
-        return len(list(repo.io.segment_iterator()))
-
-    with repository:
-        repository.append_only = True
-        repository.put(H(0), fchunk(b"foo"))
-        repository.commit(compact=False)
-
-        repository.append_only = False
-        assert segments_in_repository(repository) == 2
-        repository.put(H(0), fchunk(b"foo"))
-        repository.commit(compact=True)
-        # normal: compact squashes the data together, only one segment
-        assert segments_in_repository(repository) == 2
-
-        repository.append_only = True
-        assert segments_in_repository(repository) == 2
-        repository.put(H(0), fchunk(b"foo"))
-        repository.commit(compact=False)
-        # append only: does not compact, only new segments written
-        assert segments_in_repository(repository) == 4
-
-
 def test_additional_free_space(repository):
     with repository:
         add_keys(repository)
@@ -680,7 +647,6 @@ def test_unknown_integrity_version(repository):
 
 def _subtly_corrupted_hints_setup(repository):
     with repository:
-        repository.append_only = True
         assert len(repository) == 1
         assert pdchunk(repository.get(H(0))) == b"foo"
         repository.put(H(1), fchunk(b"bar"))
@@ -703,7 +669,6 @@ def test_subtly_corrupted_hints(repository):
     make_auxiliary(repository)
     _subtly_corrupted_hints_setup(repository)
     with repository:
-        repository.append_only = False
         repository.put(H(3), fchunk(b"1234"))
         # do a compaction run, which succeeds since the failed checksum prompted a rebuild of the index+hints.
         repository.commit(compact=True)
@@ -719,7 +684,6 @@ def test_subtly_corrupted_hints_without_integrity(repository):
     integrity_path = os.path.join(repository.path, "integrity.5")
     os.unlink(integrity_path)
     with repository:
-        repository.append_only = False
         repository.put(H(3), fchunk(b"1234"))
         # do a compaction run, which fails since the corrupted refcount wasn't detected and causes an assertion failure.
         with pytest.raises(AssertionError) as exc_info:

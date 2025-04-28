@@ -4,7 +4,7 @@ from ._common import with_repository, with_other_repository, Highlander
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names
-from ..helpers import CancelledByUser, CommandError
+from ..helpers import CancelledByUser
 from ..helpers import location_validator, Location
 from ..manifest import Manifest
 
@@ -18,8 +18,6 @@ class RepoCreateMixIn:
     @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
     def do_repo_create(self, args, repository, *, other_repository=None, other_manifest=None):
         """Create a new, empty repository"""
-        if args.append_only:
-            raise CommandError("append-only is not supported (yet?)")
         other_key = other_manifest.key if other_manifest is not None else None
         path = args.location.canonical_path()
         logger.info('Initializing repository at "%s"' % path)
@@ -223,15 +221,6 @@ class RepoCreateMixIn:
             choices=key_argument_names(),
             action=Highlander,
             help="select encryption key mode **(required)**",
-        )
-        subparser.add_argument(
-            "--append-only",
-            dest="append_only",
-            action="store_true",
-            help="create an append-only mode repository. Note that this only affects "
-            "the low level structure of the repository, and running `delete` "
-            "or `prune` will still be allowed. See :ref:`append_only_mode` in "
-            "Additional Notes for more details.",
         )
         subparser.add_argument(
             "--copy-crypt-key",

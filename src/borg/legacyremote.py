@@ -245,9 +245,7 @@ class LegacyRemoteRepository:
         def required_version(self):
             return self.args[1]
 
-    def __init__(
-        self, location, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False, args=None
-    ):
+    def __init__(self, location, create=False, exclusive=False, lock_wait=None, lock=True, args=None):
         self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
@@ -329,12 +327,10 @@ class LegacyRemoteRepository:
                 lock_wait=lock_wait,
                 lock=lock,
                 exclusive=exclusive,
-                append_only=append_only,
                 v1_or_v2=True,  # make remote use LegacyRepository
             )
             info = self.info()
             self.version = info["version"]
-            self.append_only = info["append_only"]
 
         except Exception:
             self.close()
@@ -625,10 +621,9 @@ class LegacyRemoteRepository:
 
     @api(
         since=parse_version("1.0.0"),
-        append_only={"since": parse_version("1.0.7"), "previously": False},
         v1_or_v2={"since": parse_version("2.0.0b8"), "previously": True},  # TODO fix version
     )
-    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, append_only=False, v1_or_v2=False):
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, v1_or_v2=False):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("2.0.0a3"))

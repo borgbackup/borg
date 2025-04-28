@@ -1,7 +1,6 @@
 import argparse
 
 from ..constants import *  # NOQA
-from ..helpers import CommandError
 from ..remote import RepositoryServer
 
 from ..logger import create_logger
@@ -12,12 +11,9 @@ logger = create_logger()
 class ServeMixIn:
     def do_serve(self, args):
         """Start in server mode. This command is usually not used manually."""
-        if args.append_only:
-            raise CommandError("append-only is not supported (yet?)")
         RepositoryServer(
             restrict_to_paths=args.restrict_to_paths,
             restrict_to_repositories=args.restrict_to_repositories,
-            append_only=args.append_only,
             use_socket=args.use_socket,
         ).serve()
 
@@ -70,13 +66,4 @@ class ServeMixIn:
             "PATH needs to point directly at a repository location. "
             "PATH may be an empty directory or the last element of PATH may not exist, in which case "
             "the client may initialize a repository there.",
-        )
-        subparser.add_argument(
-            "--append-only",
-            dest="append_only",
-            action="store_true",
-            help="only allow appending to repository segment files. Note that this only "
-            "affects the low level structure of the repository, and running `delete` "
-            "or `prune` will still be allowed. See :ref:`append_only_mode` in Additional "
-            "Notes for more details.",
         )

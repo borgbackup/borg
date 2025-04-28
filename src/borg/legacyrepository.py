@@ -7,7 +7,6 @@ import struct
 import time
 from collections import defaultdict
 from configparser import ConfigParser
-from datetime import datetime, timezone
 from functools import partial
 from itertools import islice
 from typing import Callable, DefaultDict
@@ -190,9 +189,7 @@ class LegacyRepository:
 
         exit_mcode = 21
 
-    def __init__(
-        self, path, create=False, exclusive=False, lock_wait=None, lock=True, append_only=False, send_log_cb=None
-    ):
+    def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True, send_log_cb=None):
         self.path = os.path.abspath(path)
         self._location = Location("file://%s" % self.path)
         self.version = None
@@ -218,7 +215,6 @@ class LegacyRepository:
         self.do_create = create
         self.created = False
         self.exclusive = exclusive
-        self.append_only = append_only
         self.transaction_doomed = None
         # v2 is the default repo version for borg 2.0
         # v1 repos must only be used in a read-only way, e.g. for
@@ -327,7 +323,6 @@ class LegacyRepository:
         config.set("repository", "version", str(self.version))
         config.set("repository", "segments_per_dir", str(DEFAULT_SEGMENTS_PER_DIR))
         config.set("repository", "max_segment_size", str(DEFAULT_MAX_SEGMENT_SIZE))
-        config.set("repository", "append_only", str(int(self.append_only)))
         config.set("repository", "additional_free_space", "0")
         config.set("repository", "id", bin_to_hex(os.urandom(32)))
         self.save_config(path, config)
@@ -385,8 +380,6 @@ class LegacyRepository:
 
     def destroy(self):
         """Destroy the repository at `self.path`"""
-        if self.append_only:
-            raise ValueError(self.path + " is in append-only mode")
         self.close()
         os.remove(os.path.join(self.path, "config"))  # kill config first
         shutil.rmtree(self.path)
@@ -468,9 +461,6 @@ class LegacyRepository:
             raise self.InvalidRepositoryConfig(path, "max_segment_size >= %d" % MAX_SEGMENT_SIZE_LIMIT)  # issue 3592
         self.segments_per_dir = self.config.getint("repository", "segments_per_dir")
         self.additional_free_space = parse_file_size(self.config.get("repository", "additional_free_space", fallback=0))
-        # append_only can be set in the constructor
-        # it shouldn't be overridden (True -> False) here
-        self.append_only = self.append_only or self.config.getboolean("repository", "append_only", fallback=False)
         self.id = hex_to_bin(self.config.get("repository", "id").strip(), length=32)
         self.io = LoggedIO(self.path, self.max_segment_size, self.segments_per_dir)
 
@@ -484,7 +474,7 @@ class LegacyRepository:
 
     def info(self):
         """return some infos about the repo (must be opened first)"""
-        info = dict(id=self.id, version=self.version, append_only=self.append_only)
+        info = dict(id=self.id, version=self.version)
         self._load_hints()
         return info
 
@@ -506,7 +496,7 @@ class LegacyRepository:
         segment = self.io.write_commit()
         self.segments.setdefault(segment, 0)
         self.compact[segment] += LoggedIO.header_fmt.size
-        if compact and not self.append_only:
+        if compact:
             self.compact_segments(threshold)
         self.write_index()
         self.rollback()
@@ -632,15 +622,6 @@ class LegacyRepository:
         transaction_id = self.io.get_segments_transaction_id()
         assert transaction_id is not None
 
-        # Log transaction in append-only mode
-        if self.append_only:
-            with open(os.path.join(self.path, "transactions"), "a") as log:
-                print(
-                    "transaction %d, UTC time %s"
-                    % (transaction_id, datetime.now(tz=timezone.utc).isoformat(timespec="microseconds")),
-                    file=log,
-                )
-
         # Write hints file
         hints_name = "hints.%d" % transaction_id
         hints_file = os.path.join(self.path, hints_name)
@@ -704,7 +685,7 @@ class LegacyRepository:
         required_free_space += hints_size
 
         required_free_space += self.additional_free_space
-        if not self.append_only:
+        if True:
             full_segment_size = self.max_segment_size + MAX_OBJECT_SIZE
             if len(self.compact) < 10:
                 # This is mostly for the test suite to avoid overestimated free space needs. This can be annoying
@@ -723,7 +704,7 @@ class LegacyRepository:
                 )
                 required_free_space += compact_working_space
             else:
-                # Keep one full worst-case segment free in non-append-only mode
+                # Keep one full worst-case segment free.
                 required_free_space += full_segment_size
 
         try:
@@ -1002,8 +983,6 @@ class LegacyRepository:
         This method verifies all segment checksums and makes sure
         the index is consistent with the data stored in the segments.
         """
-        if self.append_only and repair:
-            raise ValueError(self.path + " is in append-only mode")
         error_found = False
 
         def report_error(msg, *args):

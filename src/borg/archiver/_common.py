@@ -30,29 +30,19 @@ from ..logger import create_logger
 logger = create_logger(__name__)
 
 
-def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, args, v1_or_v2):
+def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_or_v2):
     if location.proto in ("ssh", "socket"):
         RemoteRepoCls = LegacyRemoteRepository if v1_or_v2 else RemoteRepository
         repository = RemoteRepoCls(
-            location,
-            create=create,
-            exclusive=exclusive,
-            lock_wait=lock_wait,
-            lock=lock,
-            append_only=append_only,
-            args=args,
+            location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, args=args
         )
 
     elif location.proto in ("sftp", "file", "rclone") and not v1_or_v2:  # stuff directly supported by borgstore
-        repository = Repository(
-            location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, append_only=append_only
-        )
+        repository = Repository(location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
 
     else:
         RepoCls = LegacyRepository if v1_or_v2 else Repository
-        repository = RepoCls(
-            location.path, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, append_only=append_only
-        )
+        repository = RepoCls(location.path, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
     return repository
 
 
@@ -114,7 +104,6 @@ def with_repository(
                 raise Error("missing repository, please use --repo or BORG_REPO env var!")
             assert isinstance(exclusive, bool)
             lock = getattr(args, "lock", _lock)
-            append_only = getattr(args, "append_only", False)
 
             repository = get_repository(
                 location,
@@ -122,7 +111,6 @@ def with_repository(
                 exclusive=exclusive,
                 lock_wait=self.lock_wait,
                 lock=lock,
-                append_only=append_only,
                 args=args,
                 v1_or_v2=False,
             )
@@ -190,7 +178,6 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                 exclusive=True,
                 lock_wait=self.lock_wait,
                 lock=True,
-                append_only=False,
                 args=args,
                 v1_or_v2=v1_or_v2,
             )

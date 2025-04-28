@@ -93,16 +93,7 @@ class Repository:
 
         exit_mcode = 21
 
-    def __init__(
-        self,
-        path_or_location,
-        create=False,
-        exclusive=False,
-        lock_wait=1.0,
-        lock=True,
-        append_only=False,
-        send_log_cb=None,
-    ):
+    def __init__(self, path_or_location, create=False, exclusive=False, lock_wait=1.0, lock=True, send_log_cb=None):
         if isinstance(path_or_location, Location):
             location = path_or_location
             if location.proto == "file":
@@ -139,7 +130,6 @@ class Repository:
         self.created = False
         self.acceptable_repo_versions = (3,)
         self.opened = False
-        self.append_only = append_only  # XXX not implemented / not implementable
         self.lock = None
         self.do_lock = lock
         self.lock_wait = lock_wait
@@ -254,7 +244,7 @@ class Repository:
         """return some infos about the repo (must be opened first)"""
         # note: don't do anything expensive here or separate the lock refresh into a separate method.
         self._lock_refresh()  # do not remove, see do_with_lock()
-        info = dict(id=self.id, version=self.version, append_only=self.append_only)
+        info = dict(id=self.id, version=self.version)
         return info
 
     def check(self, repair=False, max_duration=0):

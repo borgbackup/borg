@@ -146,13 +146,6 @@ How can I restore huge file(s) over an unstable connection?
 Try using ``borg mount`` and ``rsync`` (or a similar tool that supports
 resuming a partial file copy from what's already copied).
 
-How can I switch append-only mode on and off?
----------------------------------------------
-
-You could do that (via borg config REPO append_only 0/1), but using different
-ssh keys and different entries in ``authorized_keys`` is much easier and also
-maybe has less potential of things going wrong somehow.
-
 My machine goes to sleep causing `Broken pipe`
 ----------------------------------------------
 
@@ -371,8 +364,8 @@ Another option is to not consider inode numbers in the files cache by passing
 Why are backups slow on a Linux server that is a member of a Windows domain?
 ----------------------------------------------------------------------------
 
-If a Linux server is a member of a Windows domain, username to userid resolution might be 
-performed via ``winbind`` without caching, which can slow down backups significantly. 
+If a Linux server is a member of a Windows domain, username to userid resolution might be
+performed via ``winbind`` without caching, which can slow down backups significantly.
 You can use e.g. ``nscd`` to add caching and improve the speed.
 
 Security
@@ -553,7 +546,6 @@ C to delete all backups residing on S.
 
 These are your options to protect against that:
 
-- Do not allow to delete data permanently from the repo, see :ref:`append_only_mode`.
 - Use a pull-mode setup using ``ssh -R``, see :ref:`pull_backup` for more information.
 - Mount C's filesystem on another machine and then create a backup of it.
 - Do not give C filesystem-level access to S.

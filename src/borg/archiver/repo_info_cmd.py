@@ -3,7 +3,7 @@ import textwrap
 
 from ._common import with_repository
 from ..constants import *  # NOQA
-from ..helpers import bin_to_hex, json_print, basic_json_data, format_file_size
+from ..helpers import bin_to_hex, json_print, basic_json_data
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -49,15 +49,6 @@ class RepoInfoMixIn:
                     encryption=info["encryption"],
                 )
             )
-
-            response = repository.info()
-            storage_quota = response["storage_quota"]
-            used = format_file_size(response["storage_quota_use"], iec=args.iec)
-
-            output += f"\nStorage quota: {used} used"
-            if storage_quota:
-                output += f" out of {format_file_size(storage_quota, iec=args.iec)}"
-            output += "\n"
 
             if hasattr(info["cache"], "path"):
                 output += "Cache: {cache.path}\n".format(**info)

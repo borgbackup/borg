@@ -409,9 +409,6 @@ class LegacyRemoteRepository:
                     topic = "borg.debug." + topic
                 if "repository" in topic:
                     opts.append("--debug-topic=%s" % topic)
-
-            if "storage_quota" in args and args.storage_quota:
-                opts.append("--storage-quota=%s" % args.storage_quota)
         env_vars = []
         if testing:
             return env_vars + [sys.executable, "-m", "borg", "serve"] + opts + self.extra_test_args

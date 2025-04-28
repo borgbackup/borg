@@ -610,8 +610,6 @@ Errors
         The parent path of the repo directory [{}] does not exist.
     Repository.PathAlreadyExists rc: 19 traceback: no
         There is already something at {}.
-    Repository.StorageQuotaExceeded rc: 20 traceback: no
-        The storage quota ({}) has been exceeded ({}). Try deleting some archives.
     Repository.PathPermissionDenied rc: 21 traceback: no
         Permission denied to {}.
 

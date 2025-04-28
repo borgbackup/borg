@@ -6,7 +6,6 @@ Hosting repositories
 ====================
 
 This sections shows how to provide repository storage securely for users.
-Optionally, each user can have a storage quota.
 
 Repositories are accessed through SSH. Each user of the service should
 have her own login which is only able to access the user's files.
@@ -55,18 +54,6 @@ multiple times to permit access to more than one repository.
 
 The repository may not exist yet; it can be initialized by the user,
 which allows for encryption.
-
-**Storage quotas** can be enabled by adding the ``--storage-quota`` option
-to the ``borg serve`` command line::
-
-    restrict,command="borg serve --storage-quota 20G ..." ...
-
-The storage quotas of repositories are completely independent. If a
-client is able to access multiple repositories, each repository
-can be filled to the specified quota.
-
-If storage quotas are used, ensure that all deployed Borg releases
-support storage quotas.
 
 **Specificities: Append-only repositories**
 

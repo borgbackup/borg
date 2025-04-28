@@ -401,7 +401,7 @@ class Archiver(
                 # client is allowed to specify the allowlisted options,
                 # everything else comes from the forced "borg serve" command (or the defaults).
                 # stuff from denylist must never be used from the client.
-                denylist = {"restrict_to_paths", "restrict_to_repositories", "append_only", "storage_quota", "umask"}
+                denylist = {"restrict_to_paths", "restrict_to_repositories", "append_only", "umask"}
                 allowlist = {"debug_topics", "lock_wait", "log_level"}
                 not_present = object()
                 for attr_name in allowlist:

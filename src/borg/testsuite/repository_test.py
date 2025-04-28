@@ -263,15 +263,7 @@ def test_remote_borg_cmd(remote_repository):
             "--debug-topic=borg.debug.repository_compaction",
         ]
         args = _get_mock_args()
-        args.storage_quota = 0
         assert remote_repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
-        args.storage_quota = 314159265
-        assert remote_repository.borg_cmd(args, testing=False) == [
-            "borg",
-            "serve",
-            "--info",
-            "--storage-quota=314159265",
-        ]
         args.rsh = "ssh -i foo"
         remote_repository._args = args
         assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]

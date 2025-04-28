@@ -41,7 +41,7 @@ class TestSleepingBandwidthLimiter:
 
         now = 100
 
-        it = SleepingBandwidthLimiter(100)
+        it = SleepingBandwidthLimiter(100)  # bandwidth quota
 
         # all fits
         self.expect_write(5, b"test")

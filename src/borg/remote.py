@@ -183,7 +183,7 @@ class RepositoryServer:  # pragma: no cover
         "store_move",
     )
 
-    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota, use_socket):
+    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, use_socket):
         self.repository = None
         self.RepoCls = None
         self.rpc_methods = ("open", "close", "negotiate")
@@ -194,7 +194,6 @@ class RepositoryServer:  # pragma: no cover
         # whatever the client wants, except when initializing a new repository
         # (see RepositoryServer.open below).
         self.append_only = append_only
-        self.storage_quota = storage_quota
         self.client_version = None  # we update this after client sends version information
         if use_socket is False:
             self.socket_path = None
@@ -276,7 +275,6 @@ class RepositoryServer:  # pragma: no cover
                                 Repository.PathAlreadyExists,
                                 PathNotAllowed,
                                 Repository.InsufficientFreeSpaceError,
-                                Repository.StorageQuotaExceeded,
                             )
                             # logger.exception(e)
                             ex_short = traceback.format_exception_only(e.__class__, e)
@@ -407,7 +405,6 @@ class RepositoryServer:  # pragma: no cover
             lock_wait=lock_wait,
             lock=lock,
             append_only=append_only,
-            storage_quota=self.storage_quota,
             exclusive=exclusive,
             send_log_cb=self.send_queued_log,
         )
@@ -735,9 +732,6 @@ class RemoteRepository:
                     topic = "borg.debug." + topic
                 if "repository" in topic:
                     opts.append("--debug-topic=%s" % topic)
-
-            if "storage_quota" in args and args.storage_quota:
-                opts.append("--storage-quota=%s" % args.storage_quota)
         env_vars = []
         if testing:
             return env_vars + [sys.executable, "-m", "borg", "serve"] + opts + self.extra_test_args
@@ -834,8 +828,6 @@ class RemoteRepository:
                 raise Repository.InsufficientFreeSpaceError(args[0], args[1])
             elif error == "InvalidRepositoryConfig":
                 raise Repository.InvalidRepositoryConfig(self.location.processed, args[1])
-            elif error == "StorageQuotaExceeded":
-                raise Repository.StorageQuotaExceeded(args[0], args[1])
             else:
                 raise self.RPCError(unpacked)
 

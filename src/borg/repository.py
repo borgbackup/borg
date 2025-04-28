@@ -86,10 +86,7 @@ class Repository:
 
         exit_mcode = 19
 
-    class StorageQuotaExceeded(Error):
-        """The storage quota ({}) has been exceeded ({}). Try deleting some archives."""
-
-        exit_mcode = 20
+    # StorageQuotaExceeded was exit_mcode = 20
 
     class PathPermissionDenied(Error):
         """Permission denied to {}."""
@@ -104,7 +101,6 @@ class Repository:
         lock_wait=1.0,
         lock=True,
         append_only=False,
-        storage_quota=None,
         send_log_cb=None,
     ):
         if isinstance(path_or_location, Location):
@@ -144,8 +140,6 @@ class Repository:
         self.acceptable_repo_versions = (3,)
         self.opened = False
         self.append_only = append_only  # XXX not implemented / not implementable
-        self.storage_quota = storage_quota  # XXX not implemented
-        self.storage_quota_use = 0  # XXX not implemented
         self.lock = None
         self.do_lock = lock
         self.lock_wait = lock_wait
@@ -260,13 +254,7 @@ class Repository:
         """return some infos about the repo (must be opened first)"""
         # note: don't do anything expensive here or separate the lock refresh into a separate method.
         self._lock_refresh()  # do not remove, see do_with_lock()
-        info = dict(
-            id=self.id,
-            version=self.version,
-            storage_quota_use=self.storage_quota_use,
-            storage_quota=self.storage_quota,
-            append_only=self.append_only,
-        )
+        info = dict(id=self.id, version=self.version, append_only=self.append_only)
         return info
 
     def check(self, repair=False, max_duration=0):

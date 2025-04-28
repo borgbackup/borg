@@ -6,7 +6,6 @@ from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names
 from ..helpers import CancelledByUser, CommandError
 from ..helpers import location_validator, Location
-from ..helpers import parse_storage_quota
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -19,8 +18,6 @@ class RepoCreateMixIn:
     @with_other_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
     def do_repo_create(self, args, repository, *, other_repository=None, other_manifest=None):
         """Create a new, empty repository"""
-        if args.storage_quota is not None:
-            raise CommandError("storage-quota is not supported (yet?)")
         if args.append_only:
             raise CommandError("append-only is not supported (yet?)")
         other_key = other_manifest.key if other_manifest is not None else None
@@ -235,15 +232,6 @@ class RepoCreateMixIn:
             "the low level structure of the repository, and running `delete` "
             "or `prune` will still be allowed. See :ref:`append_only_mode` in "
             "Additional Notes for more details.",
-        )
-        subparser.add_argument(
-            "--storage-quota",
-            metavar="QUOTA",
-            dest="storage_quota",
-            default=None,
-            type=parse_storage_quota,
-            action=Highlander,
-            help="Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.",
         )
         subparser.add_argument(
             "--copy-crypt-key",

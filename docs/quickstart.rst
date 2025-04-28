@@ -47,7 +47,7 @@ Also helpful:
   does not have free space any more.
 - if you use LVM: use a LV + a filesystem that you can resize later and have
   some unallocated PEs you can add to the LV.
-- consider using quotas
+- consider using quotas (e.g. fs quota, quota settings of storage provider)
 - use `prune` and `compact` regularly
 
 

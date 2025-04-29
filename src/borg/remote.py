@@ -50,25 +50,6 @@ MAX_INFLIGHT = 100
 RATELIMIT_PERIOD = 0.1
 
 
-def os_write(fd, data):
-    """os.write wrapper so we do not lose data for partial writes."""
-    # TODO: this issue is fixed in cygwin since at least 2.8.0, remove this
-    #       wrapper / workaround when this version is considered ancient.
-    # This is happening frequently on cygwin due to its small pipe buffer size of only 64kiB
-    # and also due to its different blocking pipe behaviour compared to Linux/*BSD.
-    # Neither Linux nor *BSD ever do partial writes on blocking pipes, unless interrupted by a
-    # signal, in which case serve() would terminate.
-    amount = remaining = len(data)
-    while remaining:
-        count = os.write(fd, data)
-        remaining -= count
-        if not remaining:
-            break
-        data = data[count:]
-        time.sleep(count * 1e-09)
-    return amount
-
-
 class ConnectionClosed(Error):
     """Connection closed by remote host"""
 
@@ -215,7 +196,7 @@ class RepositoryServer:  # pragma: no cover
                 break
             else:
                 msg = msgpack.packb({LOG: lr_dict})
-                os_write(self.stdout_fd, msg)
+                os.write(self.stdout_fd, msg)
 
     def serve(self):
         def inner_serve():
@@ -312,9 +293,9 @@ class RepositoryServer:  # pragma: no cover
                                         "sysinfo": sys_info,
                                     }
                                 )
-                            os_write(self.stdout_fd, msg)
+                            os.write(self.stdout_fd, msg)
                         else:
-                            os_write(self.stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
+                            os.write(self.stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
                 if es:
                     shutdown_serve = True
                     continue

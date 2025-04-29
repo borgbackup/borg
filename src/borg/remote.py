@@ -946,10 +946,7 @@ class RemoteRepository:
                 send_buffer()
         self.ignore_responses |= set(waiting_for)  # we lose order here
 
-    @api(
-        since=parse_version("1.0.0"),
-        v1_or_v2={"since": parse_version("2.0.0b8"), "previously": True},  # TODO fix version
-    )
+    @api(since=parse_version("1.0.0"), v1_or_v2={"since": parse_version("2.0.0b9"), "previously": True})
     def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, v1_or_v2=False):
         """actual remoting is done via self.call in the @api decorator"""
 
@@ -1048,9 +1045,7 @@ class RemoteRepository:
     def put_manifest(self, data):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(
-        since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b13"), "previously": False}  # TODO -> b14
-    )
+    @api(since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b14"), "previously": False})
     def store_list(self, name, *, deleted=False):
         """actual remoting is done via self.call in the @api decorator"""
 
@@ -1062,13 +1057,11 @@ class RemoteRepository:
     def store_store(self, name, value):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(
-        since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b13"), "previously": False}
-    )  # TODO -> b14)
+    @api(since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b14"), "previously": False})
     def store_delete(self, name, *, deleted=False):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version("2.0.0b13"))  # TODO -> b14
+    @api(since=parse_version("2.0.0b14"))
     def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
         """actual remoting is done via self.call in the @api decorator"""
 

@@ -89,9 +89,9 @@ def safe_timestamp(item_timestamp_ns):
 
 def format_time(ts: datetime, format_spec=""):
     """
-    Convert *ts* to a human-friendly format with textual weekday.
+    Convert *ts* to a human-friendly format with textual weekday (in local timezone).
     """
-    return ts.strftime("%a, %Y-%m-%d %H:%M:%S %z" if format_spec == "" else format_spec)
+    return ts.astimezone().strftime("%a, %Y-%m-%d %H:%M:%S %z" if format_spec == "" else format_spec)
 
 
 def format_timedelta(td):

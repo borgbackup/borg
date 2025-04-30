@@ -1659,6 +1659,7 @@ class RobustUnpacker:
 class ArchiveChecker:
     def __init__(self):
         self.error_found = False
+        self.key = None
 
     def check(
         self,
@@ -1696,7 +1697,8 @@ class ArchiveChecker:
         # Repository.check already did a full repository-level check and has built and cached a fresh chunkindex -
         # we can use that here, so we don't disable the caches (also no need to cache immediately, again):
         self.chunks = build_chunkindex_from_repo(self.repository, disable_caches=False, cache_immediately=False)
-        self.key = self.make_key(repository)
+        if self.key is None:
+            self.key = self.make_key(repository)
         self.repo_objs = RepoObj(self.key)
         if verify_data:
             self.verify_data()
@@ -1728,11 +1730,10 @@ class ArchiveChecker:
             logger.info("Archive consistency check complete, no problems found.")
         return self.repair or not self.error_found
 
-    def make_key(self, repository):
+    def make_key(self, repository, manifest_only=False):
         attempt = 0
 
         #  try the manifest first!
-        attempt += 1
         try:
             cdata = repository.get_manifest()
         except NoManifestError:
@@ -1744,19 +1745,24 @@ class ArchiveChecker:
                 # we get here, if the cdata we got has a corrupted key type byte
                 pass  # ignore it, just continue trying
 
-        for chunkid, _ in self.chunks.iteritems():
-            attempt += 1
-            if attempt > 999:
-                # we did a lot of attempts, but could not create the key via key_factory, give up.
-                break
-            cdata = repository.get(chunkid)
-            try:
-                return key_factory(repository, cdata)
-            except UnsupportedPayloadError:
-                # we get here, if the cdata we got has a corrupted key type byte
-                pass  # ignore it, just try the next chunk
+        if not manifest_only:
+            for chunkid, _ in self.chunks.iteritems():
+                attempt += 1
+                if attempt > 999:
+                    # we did a lot of attempts, but could not create the key via key_factory, give up.
+                    break
+                cdata = repository.get(chunkid)
+                try:
+                    return key_factory(repository, cdata)
+                except UnsupportedPayloadError:
+                    # we get here, if the cdata we got has a corrupted key type byte
+                    pass  # ignore it, just try the next chunk
+
         if attempt == 0:
-            msg = "make_key: repository has no chunks at all!"
+            if manifest_only:
+                msg = "make_key: failed to create the key (tried only the manifest)"
+            else:
+                msg = "make_key: repository has no chunks at all!"
         else:
             msg = "make_key: failed to create the key (tried %d chunks)" % attempt
         raise IntegrityError(msg)

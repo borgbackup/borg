@@ -2,7 +2,7 @@ import argparse
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
-from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError
+from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
 from ..helpers import yes
 
 from ..logger import create_logger
@@ -44,10 +44,17 @@ class CheckMixIn:
             # archives check requires that a full repo check was done before and has built/cached a ChunkIndex.
             # also, there is no max_duration support in the archives check code anyway.
             raise CommandError("--repository-only is required for --max-duration support.")
+        if not args.repo_only:
+            # if we need the key later for the archives check, ask NOW for the passphrase! #1931
+            archive_checker = ArchiveChecker()
+            try:
+                archive_checker.key = archive_checker.make_key(repository, manifest_only=True)
+            except IntegrityError:
+                pass  # will try to make key later again
         if not args.archives_only:
             if not repository.check(repair=args.repair, max_duration=args.max_duration):
                 set_ec(EXIT_WARNING)
-        if not args.repo_only and not ArchiveChecker().check(
+        if not args.repo_only and not archive_checker.check(
             repository,
             verify_data=args.verify_data,
             repair=args.repair,

@@ -58,3 +58,7 @@ borg serve can currently support:
 - Getting started by some other means (not by the borg client) as a long-running socket
   server to be used for borg clients using a socket://... repository (see the `--socket`
   option if you do not want to use the default path for the socket and pid file).
+
+Please note that `borg serve` does not support giving a specific repository via the
+`--repo` option or `BORG_REPO` environment variable. It is always the borg client which
+specifies the repo to use when talking to `borg serve`.

@@ -101,10 +101,10 @@ def identify_key(manifest_data):
         raise UnsupportedPayloadError(key_type)
 
 
-def key_factory(repository, manifest_chunk, *, ro_cls=RepoObj):
+def key_factory(repository, manifest_chunk, *, other=False, ro_cls=RepoObj):
     manifest_data = ro_cls.extract_crypted_data(manifest_chunk)
     assert manifest_data, "manifest data must not be zero bytes long"
-    return identify_key(manifest_data).detect(repository, manifest_data)
+    return identify_key(manifest_data).detect(repository, manifest_data, other=other)
 
 
 def uses_same_chunker_secret(other_key, key):
@@ -236,7 +236,7 @@ class PlaintextKey(KeyBase):
         return cls(repository)
 
     @classmethod
-    def detect(cls, repository, manifest_data):
+    def detect(cls, repository, manifest_data, *, other=False):
         return cls(repository)
 
     def id_hash(self, data):
@@ -359,11 +359,11 @@ class FlexiKey:
     STORAGE: ClassVar[str] = KeyBlobStorage.NO_STORAGE  # override in subclass
 
     @classmethod
-    def detect(cls, repository, manifest_data):
+    def detect(cls, repository, manifest_data, *, other=False):
         key = cls(repository)
         target = key.find_key()
         prompt = "Enter passphrase for key %s: " % target
-        passphrase = Passphrase.env_passphrase()
+        passphrase = Passphrase.env_passphrase(other=other)
         if passphrase is None:
             passphrase = Passphrase()
             if not key.load(target, passphrase):
@@ -541,10 +541,9 @@ class FlexiKey:
                 # borg transfer re-encrypts all data anyway, thus we can default to a new, random AE key
                 crypt_key = os.urandom(64)
             key.init_from_given_data(crypt_key=crypt_key, id_key=other_key.id_key, chunk_seed=other_key.chunk_seed)
-            passphrase = other_key._passphrase
         else:
             key.init_from_random_data()
-            passphrase = Passphrase.new(allow_empty=True)
+        passphrase = Passphrase.new(allow_empty=True)
         key.init_ciphers()
         target = key.get_new_target(args)
         key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS["argon2"])

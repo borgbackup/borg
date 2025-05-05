@@ -13,7 +13,7 @@ from . import cmd, create_test_files, RK_ENCRYPTION, open_archive, generate_arch
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
-def test_transfer(archivers, request):
+def test_transfer(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     original_location, input_path = archiver.repository_location, archiver.input_path
 
@@ -29,6 +29,7 @@ def test_transfer(archivers, request):
     create_test_files(input_path)
     archiver.repository_location = original_location + "1"
 
+    monkeypatch.setenv("BORG_PASSPHRASE", "pw1")
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "arch1", "input")
     cmd(archiver, "create", "arch2", "input")
@@ -36,6 +37,8 @@ def test_transfer(archivers, request):
 
     archiver.repository_location = original_location + "2"
     other_repo1 = f"--other-repo={original_location}1"
+    monkeypatch.setenv("BORG_PASSPHRASE", "pw2")
+    monkeypatch.setenv("BORG_OTHER_PASSPHRASE", "pw1")
     cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1)
     cmd(archiver, "transfer", other_repo1, "--dry-run")
     cmd(archiver, "transfer", other_repo1)
@@ -43,7 +46,7 @@ def test_transfer(archivers, request):
     check_repo()
 
 
-def test_transfer_upgrade(archivers, request):
+def test_transfer_upgrade(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() in ["remote", "binary"]:
         pytest.skip("only works locally")
@@ -72,7 +75,8 @@ def test_transfer_upgrade(archivers, request):
     other_repo1 = f"--other-repo={original_location}1"
     archiver.repository_location = original_location + "2"
 
-    assert os.environ.get("BORG_PASSPHRASE") == "waytooeasyonlyfortests"
+    monkeypatch.setenv("BORG_PASSPHRASE", "pw2")
+    monkeypatch.setenv("BORG_OTHER_PASSPHRASE", "waytooeasyonlyfortests")
     os.environ["BORG_TESTONLY_WEAKEN_KDF"] = "0"  # must use the strong kdf here or it can't decrypt the key
 
     cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1, "--from-borg1")

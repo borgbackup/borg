@@ -123,7 +123,7 @@ def with_repository(
                         f"You can use 'borg transfer' to copy archives from old to new repos."
                     )
                 if manifest or cache:
-                    manifest_ = Manifest.load(repository, compatibility)
+                    manifest_ = Manifest.load(repository, compatibility, other=False)
                     kwargs["manifest"] = manifest_
                     if "compression" in args:
                         manifest_.repo_objs.compressor = args.compression.compressor
@@ -192,7 +192,7 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                 kwargs["other_repository"] = repository
                 if manifest or cache:
                     manifest_ = Manifest.load(
-                        repository, compatibility, ro_cls=RepoObj if repository.version > 1 else RepoObj1
+                        repository, compatibility, other=True, ro_cls=RepoObj if repository.version > 1 else RepoObj1
                     )
                     assert_secure(repository, manifest_)
                     if manifest:

@@ -47,20 +47,22 @@ class Passphrase(str):
             return cls(passphrase)
 
     @classmethod
-    def env_passphrase(cls, default=None):
-        passphrase = cls._env_passphrase("BORG_PASSPHRASE", default)
+    def env_passphrase(cls, default=None, other=False):
+        env_var = "BORG_OTHER_PASSPHRASE" if other else "BORG_PASSPHRASE"
+        passphrase = cls._env_passphrase(env_var, default)
         if passphrase is not None:
             return passphrase
-        passphrase = cls.env_passcommand()
+        passphrase = cls.env_passcommand(other=other)
         if passphrase is not None:
             return passphrase
-        passphrase = cls.fd_passphrase()
+        passphrase = cls.fd_passphrase(other=other)
         if passphrase is not None:
             return passphrase
 
     @classmethod
-    def env_passcommand(cls, default=None):
-        passcommand = os.environ.get("BORG_PASSCOMMAND", None)
+    def env_passcommand(cls, default=None, other=False):
+        env_var = "BORG_OTHER_PASSCOMMAND" if other else "BORG_PASSCOMMAND"
+        passcommand = os.environ.get(env_var, None)
         if passcommand is not None:
             # passcommand is a system command (not inside pyinstaller env)
             env = prepare_subprocess_env(system=True)
@@ -71,9 +73,10 @@ class Passphrase(str):
             return cls(passphrase.rstrip("\n"))
 
     @classmethod
-    def fd_passphrase(cls):
+    def fd_passphrase(cls, other=False):
+        env_var = "BORG_OTHER_PASSPHRASE_FD" if other else "BORG_PASSPHRASE_FD"
         try:
-            fd = int(os.environ.get("BORG_PASSPHRASE_FD"))
+            fd = int(os.environ.get(env_var))
         except (ValueError, TypeError):
             return None
         with os.fdopen(fd, mode="r") as f:

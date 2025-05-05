@@ -9,12 +9,12 @@ General:
         Use this so you do not need to type ``--repo /path/to/my/repo`` all the time.
     BORG_OTHER_REPO
         Similar to BORG_REPO, but gives the default for ``--other-repo``.
-    BORG_PASSPHRASE
+    BORG_PASSPHRASE (and BORG_OTHER_PASSPHRASE)
         When set, use the value to answer the passphrase question for encrypted repositories.
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
         passphrase should be initially set when initializing an encrypted repo.
         See also BORG_NEW_PASSPHRASE.
-    BORG_PASSCOMMAND
+    BORG_PASSCOMMAND (and BORG_OTHER_PASSCOMMAND)
         When set, use the standard output of the command (trailing newlines are stripped) to answer the
         passphrase question for encrypted repositories.
         It is used when a passphrase is needed to access an encrypted repo as well as when a new
@@ -22,7 +22,7 @@ General:
         is executed without a shell. So variables, like ``$HOME`` will work, but ``~`` won't.
         If BORG_PASSPHRASE is also set, it takes precedence.
         See also BORG_NEW_PASSPHRASE.
-    BORG_PASSPHRASE_FD
+    BORG_PASSPHRASE_FD (and BORG_OTHER_PASSPHRASE_FD)
         When set, specifies a file descriptor to read a passphrase
         from. Programs starting borg may choose to open an anonymous pipe
         and use it to pass a passphrase. This is safer than passing via

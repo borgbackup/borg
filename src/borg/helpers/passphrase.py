@@ -143,6 +143,9 @@ class Passphrase(str):
                 {fmt_var("BORG_PASSPHRASE")}
                 {fmt_var("BORG_PASSCOMMAND")}
                 {fmt_var("BORG_PASSPHRASE_FD")}
+                {fmt_var("BORG_OTHER_PASSPHRASE")}
+                {fmt_var("BORG_OTHER_PASSCOMMAND")}
+                {fmt_var("BORG_OTHER_PASSPHRASE_FD")}
                 """
             )
             print(passphrase_info, file=sys.stderr)

@@ -36,6 +36,8 @@ General:
         Main usecase for this is to automate fully ``borg change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
+    BORG_DEBUG_PASSPHRASE
+        When set to YES, display debugging information that includes passphrases used and passphrase related env vars set.
     BORG_EXIT_CODES
         When set to "modern", the borg process will return more specific exit codes (rc).
         When set to "legacy", the borg process will return rc 2 for all errors, 1 for all warnings, 0 for success.

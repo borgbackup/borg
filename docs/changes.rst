@@ -144,7 +144,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b15 (2025-04-22)
+Version 2.0.0b16 (2025-05-06)
 -----------------------------
 
 Please note:
@@ -153,6 +153,35 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Fixes:
+
+- chunks cache: invalidate old chunk index cache, #8795
+- compact: always write updated chunkindex to repo, #8791
+- ChunksMixin: don't use self._chunks until it is demand-built, #8785
+- AdhocWithFilesCache: fix call to _maybe_write_chunks_cache
+- format_time: output date/time in local tz, #8802
+- check: ask for key passphrase early, #1931
+- only obfuscate the size of file content chunks, #7559
+- better support other repo by misc. passphrase env vars, #8457
+
+  - passphrases now come from `BORG_[OTHER_]PASSPHRASE`, `BORG_[OTHER_]PASSCOMMAND`
+    or `BORG_[OTHER_]PASSPHRASE_FD`.
+  - `borg repo-create --repo B --other-repo A` does not silently copy the
+    passphrase of key A to key B anymore, but either asks for the passphrase
+    or reads it from env vars.
+
+Other changes:
+
+- remove support for / testing on Python 3.9
+- docs: borg serve --repo is not supported, #8591
+- remove remainders of append-only and quota support
+- remove cygwin < 2.8.0 bug workaround
+- fix remote api versioning
+
+
+Version 2.0.0b15 (2025-04-22)
+-----------------------------
 
 New features:
 

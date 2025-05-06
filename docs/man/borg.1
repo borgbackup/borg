@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" "1" "2025-04-28" "" "borg backup tool"
+.TH "BORG" "1" "2025-05-05" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -374,13 +374,13 @@ Use this so you do not need to type \fB\-\-repo /path/to/my/repo\fP all the time
 .B BORG_OTHER_REPO
 Similar to BORG_REPO, but gives the default for \fB\-\-other\-repo\fP\&.
 .TP
-.B BORG_PASSPHRASE
+.B BORG_PASSPHRASE (and BORG_OTHER_PASSPHRASE)
 When set, use the value to answer the passphrase question for encrypted repositories.
 It is used when a passphrase is needed to access an encrypted repo as well as when a new
 passphrase should be initially set when initializing an encrypted repo.
 See also BORG_NEW_PASSPHRASE.
 .TP
-.B BORG_PASSCOMMAND
+.B BORG_PASSCOMMAND (and BORG_OTHER_PASSCOMMAND)
 When set, use the standard output of the command (trailing newlines are stripped) to answer the
 passphrase question for encrypted repositories.
 It is used when a passphrase is needed to access an encrypted repo as well as when a new
@@ -389,7 +389,7 @@ is executed without a shell. So variables, like \fB$HOME\fP will work, but \fB~\
 If BORG_PASSPHRASE is also set, it takes precedence.
 See also BORG_NEW_PASSPHRASE.
 .TP
-.B BORG_PASSPHRASE_FD
+.B BORG_PASSPHRASE_FD (and BORG_OTHER_PASSPHRASE_FD)
 When set, specifies a file descriptor to read a passphrase
 from. Programs starting borg may choose to open an anonymous pipe
 and use it to pass a passphrase. This is safer than passing via
@@ -405,6 +405,9 @@ Main usecase for this is to automate fully \fBborg change\-passphrase\fP\&.
 .TP
 .B BORG_DISPLAY_PASSPHRASE
 When set, use the value to answer the \(dqdisplay the passphrase for verification\(dq question when defining a new passphrase for encrypted repositories.
+.TP
+.B BORG_DEBUG_PASSPHRASE
+When set to YES, display debugging information that includes passphrases used and passphrase related env vars set.
 .TP
 .B BORG_EXIT_CODES
 When set to \(dqmodern\(dq, the borg process will return more specific exit codes (rc).

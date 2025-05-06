@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-SERVE" "1" "2025-04-28" "" "borg backup tool"
+.TH "BORG-SERVE" "1" "2025-05-05" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -48,6 +48,10 @@ Getting started by some other means (not by the borg client) as a long\-running 
 server to be used for borg clients using a socket://... repository (see the \fI\-\-socket\fP
 option if you do not want to use the default path for the socket and pid file).
 .UNINDENT
+.sp
+Please note that \fIborg serve\fP does not support giving a specific repository via the
+\fI\-\-repo\fP option or \fIBORG_REPO\fP environment variable. It is always the borg client which
+specifies the repo to use when talking to \fIborg serve\fP\&.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

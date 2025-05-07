@@ -59,3 +59,23 @@ def test_compact_after_deleting_some_archives(archivers, request, stats):
     else:
         assert "Repository has data stored in 0 objects." not in output
     assert "Finished compaction" in output
+
+
+def test_compact_index_corruption(archivers, request):
+    # see issue #8813 (borg did not write a complete index)
+    archiver = request.getfixturevalue(archivers)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_src_archive(archiver, "archive1")
+
+    output = cmd(archiver, "compact", "-v", "--stats", exit_code=0)
+    assert "missing objects" not in output
+
+    output = cmd(archiver, "compact", "-v", exit_code=0)
+    assert "missing objects" not in output
+
+    output = cmd(archiver, "compact", "-v", exit_code=0)
+    assert "missing objects" not in output
+
+    output = cmd(archiver, "compact", "-v", "--stats", exit_code=0)
+    assert "missing objects" not in output

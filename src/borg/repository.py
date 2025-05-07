@@ -362,7 +362,9 @@ class Repository:
                     # if we did a full pass in one go, we built a complete, uptodate ChunkIndex, cache it!
                     from .cache import write_chunkindex_to_repo_cache
 
-                    write_chunkindex_to_repo_cache(self, chunks, clear=True, force_write=True, delete_other=True)
+                    write_chunkindex_to_repo_cache(
+                        self, chunks, incremental=False, clear=True, force_write=True, delete_other=True
+                    )
         except StoreObjectNotFound:
             # it can be that there is no "data/" at all, then it crashes when iterating infos.
             pass

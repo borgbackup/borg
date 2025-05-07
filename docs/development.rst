@@ -226,7 +226,6 @@ We use `black`_ for automatically formatting the code.
 If you work on the code, it is recommended that you run black **before each commit**
 (so that new code is always using the desired formatting and no additional commits
 are required to fix the formatting).
-
 ::
 
     pip install -r requirements.d/codestyle.txt     # everybody use same black version
@@ -281,7 +280,6 @@ will have to be installed separately. Run this command to install the pre-commit
 
   pre-commit install
 
-
 Running the tests
 -----------------
 
@@ -289,7 +287,7 @@ The tests are in the borg/testsuite package.
 
 To run all the tests, you need to have fakeroot installed. If you do not have
 fakeroot, you still will be able to run most tests, just leave away the
-`fakeroot -u` from the given command lines.
+``fakeroot -u`` from the given command lines.
 
 To run the test suite use the following command::
 
@@ -312,13 +310,13 @@ Important notes:
 
 - When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
 
-
 Running the tests (using the pypi package)
 ------------------------------------------
 
 Since borg 1.4, it is also possible to run the tests without a development
 environment, using the borgbackup dist package (downloaded from pypi.org or
-github releases page)::
+github releases page):
+::
 
     # optional: create and use a virtual env:
     python3 -m venv env
@@ -330,7 +328,6 @@ github releases page)::
 
     # run the tests
     pytest -v -rs --benchmark-skip --pyargs borg.testsuite
-
 
 Adding a compression algorithm
 ------------------------------
@@ -408,7 +405,6 @@ Usage::
    # To copy files from the VM (in this case, the generated binary):
    vagrant scp OS:/vagrant/borg/borg.exe .
 
-
 Creating standalone binaries
 ----------------------------
 
@@ -426,7 +422,6 @@ If you encounter issues, see also our `Vagrantfile` for details.
 .. note:: Standalone binaries built with pyinstaller are supposed to
           work on same OS, same architecture (x86 32bit, amd64 64bit)
           without external dependencies.
-
 
 .. _releasing:
 
@@ -485,16 +480,16 @@ Checklist:
   new version number and release date.
 - Announce on:
 
- - Mailing list.
- - Mastodon / BlueSky / X (aka Twitter).
- - IRC channel (change ``/topic``).
+  - Mailing list.
+  - Mastodon / BlueSky / X (aka Twitter).
+  - IRC channel (change ``/topic``).
 
 - Create a GitHub release, include:
 
-  * pypi dist package and signature
-  * Standalone binaries (see above for how to create them).
+  - pypi dist package and signature
+  - Standalone binaries (see above for how to create them).
 
-    + For macOS, document the macFUSE version in the README of the binaries.
+    - For macOS, document the macFUSE version in the README of the binaries.
       macFUSE uses a kernel extension that needs to be compatible with the
       code contained in the binary.
-  * A link to ``CHANGES.rst``.
+  - A link to ``CHANGES.rst``.

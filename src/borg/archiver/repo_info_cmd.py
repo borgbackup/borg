@@ -37,6 +37,7 @@ class RepoInfoMixIn:
             Location: {location}
             Repository version: {version}
             {encryption}
+            Security dir: {security_dir}
             """
                 )
                 .strip()
@@ -45,12 +46,12 @@ class RepoInfoMixIn:
                     location=repository._location.canonical_path(),
                     version=repository.version,
                     encryption=info["encryption"],
+                    security_dir=info["security_dir"],
                 )
             )
 
             if hasattr(info["cache"], "path"):
-                output += "Cache: {cache.path}\n".format(**info)
-            output += "Security dir: {security_dir}\n".format(**info)
+                output += "\nCache: {cache.path}\n".format(**info)
 
             print(output)
 

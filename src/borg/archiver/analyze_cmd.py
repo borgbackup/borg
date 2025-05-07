@@ -43,11 +43,15 @@ class ArchiveAnalyzer:
         i = 0
         info = archive_infos[i]
         pi.show(i)
-        logger.info(f"Analyzing archive {info.name} {info.ts} {bin_to_hex(info.id)} ({i + 1}/{num_archives})")
+        logger.info(
+            f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 1}/{num_archives})"
+        )
         base = self.analyze_archive(info.id)
         for i, info in enumerate(archive_infos[1:]):
             pi.show(i + 1)
-            logger.info(f"Analyzing archive {info.name} {info.ts} {bin_to_hex(info.id)} ({i + 2}/{num_archives})")
+            logger.info(
+                f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 2}/{num_archives})"
+            )
             new = self.analyze_archive(info.id)
             self.analyze_change(base, new)
             base = new

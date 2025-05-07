@@ -2059,7 +2059,9 @@ class ArchiveChecker:
             for i, info in enumerate(archive_infos):
                 pi.show(i)
                 archive_id, archive_id_hex = info.id, bin_to_hex(info.id)
-                logger.info(f"Analyzing archive {info.name} {info.ts} {archive_id_hex} ({i + 1}/{num_archives})")
+                logger.info(
+                    f"Analyzing archive {info.name} {info.ts.astimezone()} {archive_id_hex} ({i + 1}/{num_archives})"
+                )
                 if archive_id not in self.chunks:
                     logger.error(f"Archive metadata block {archive_id_hex} is missing!")
                     self.error_found = True

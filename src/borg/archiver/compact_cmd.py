@@ -90,7 +90,9 @@ class ArchiveGarbageCollector:
         total_size, total_files = 0, 0
         for i, info in enumerate(archive_infos):
             pi.show(i)
-            logger.info(f"Analyzing archive {info.name} {info.ts} {bin_to_hex(info.id)} ({i + 1}/{num_archives})")
+            logger.info(
+                f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 1}/{num_archives})"
+            )
             archive = Archive(self.manifest, info.id)
             # archive metadata size unknown, but usually small/irrelevant:
             use_it(archive.id)

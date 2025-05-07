@@ -2,6 +2,8 @@ import argparse
 import math
 import os
 
+from borgstore.store import ItemInfo
+
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import parse_file_size, format_file_size
@@ -29,6 +31,7 @@ class RepoSpaceMixIn:
             infos = repository.store_list("config")
             size = 0
             for info in infos:
+                info = ItemInfo(*info)  # RPC does not give namedtuple
                 if info.name.startswith("space-reserve."):
                     size += info.size
                     repository.store_delete(f"config/{info.name}")
@@ -39,6 +42,7 @@ class RepoSpaceMixIn:
             infos = repository.store_list("config")
             size = 0
             for info in infos:
+                info = ItemInfo(*info)  # RPC does not give namedtuple
                 if info.name.startswith("space-reserve."):
                     size += info.size
             print(f"There is {format_file_size(size, iec=False)} reserved space in this repository.")

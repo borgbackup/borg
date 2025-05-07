@@ -383,7 +383,7 @@ Checklist:
 - Announce on:
 
  - Mailing list.
- - Twitter.
+ - Mastodon / BlueSky / X (aka Twitter).
  - IRC channel (change ``/topic``).
 
 - Create a GitHub release, include:

@@ -119,6 +119,11 @@ to your local machine. The instructions for forking and cloning a repository
 can be found there:
 `<https://docs.github.com/en/get-started/quickstart/fork-a-repo>`_ .
 
+Make sure you also fetched the git tags, because without them, ``setuptools-scm``
+will run into issues determining the correct borg version. Check if ``git tag``
+shows a lot of release tags (version numbers).
+If it does not, use ``git fetch --tags`` to fetch them.
+
 To work on your contribution, you first need to decide which branch your pull
 request should be against. Often, this might be master branch (esp. for big /
 risky contributions), but it could be also a maintenance branch like e.g.

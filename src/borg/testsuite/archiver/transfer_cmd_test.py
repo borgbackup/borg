@@ -365,16 +365,16 @@ def test_transfer_archive_metadata(archivers, request, monkeypatch):
 
 
 @pytest.mark.parametrize("recompress_mode", ["never", "always"])
-def test_transfer_recompress_modes(archivers, request, monkeypatch, recompress_mode):
-    """Test transfer with different recompression modes"""
+def test_transfer_recompress(archivers, request, monkeypatch, recompress_mode):
+    """Test transfer with recompression"""
     archiver = request.getfixturevalue(archivers)
 
     with setup_repos(archiver, monkeypatch) as other_repo1:
         create_test_files(archiver.input_path)
         cmd(archiver, "create", "--compression=lz4", "archive", "input")
 
-    # Test with --recompress
-    cmd(archiver, "transfer", other_repo1, f"--recompress={recompress_mode}")
+    # Test with --recompress and a different compression algorithm
+    cmd(archiver, "transfer", other_repo1, f"--recompress={recompress_mode}", "--compression=zstd")
 
     # Verify that the transfer succeeded
     listing = cmd(archiver, "repo-list")

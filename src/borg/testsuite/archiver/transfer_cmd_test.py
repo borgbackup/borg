@@ -278,9 +278,9 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
 @contextmanager
 def setup_repos(archiver, mp):
     """
-    set up repos for transfer tests: REPO1 / PW1  <---transfer--- OTHER_REPO2 / PW2
-    when the context manager is entered, archiver will work with REPO2 (so one can prepare it as the source repo).
-    when the context manager is exited, archiver will work with REPO1 (so the transfer can be run).
+    set up repos for transfer tests: OTHER_REPO1  ---transfer---> REPO2
+    when the context manager is entered, archiver will work with REPO1 (so one can prepare it as the source repo).
+    when the context manager is exited, archiver will work with REPO2 (so the transfer can be run).
     """
     original_location = archiver.repository_location
 

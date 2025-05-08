@@ -2,6 +2,7 @@ import json
 import os
 import stat
 import tarfile
+from contextlib import contextmanager
 
 import pytest
 
@@ -13,9 +14,30 @@ from . import cmd, create_test_files, RK_ENCRYPTION, open_archive, generate_arch
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
+@contextmanager
+def setup_repos(archiver, mp):
+    """
+    set up repos for transfer tests: REPO1 / PW1  <---transfer--- OTHER_REPO2 / PW2
+    when the context manager is entered, archiver will work with REPO2 (so one can prepare it as the source repo).
+    when the context manager is exited, archiver will work with REPO1 (so the transfer can be run).
+    """
+    original_location = archiver.repository_location
+
+    mp.setenv("BORG_PASSPHRASE", "pw1")
+    archiver.repository_location = original_location + "1"
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    other_repo1 = f"--other-repo={original_location}1"
+    yield other_repo1
+
+    mp.setenv("BORG_PASSPHRASE", "pw2")
+    mp.setenv("BORG_OTHER_PASSPHRASE", "pw1")
+    archiver.repository_location = original_location + "2"
+    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1)
+
+
 def test_transfer(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
-    original_location, input_path = archiver.repository_location, archiver.input_path
 
     def check_repo():
         listing = cmd(archiver, "repo-list")
@@ -26,20 +48,14 @@ def test_transfer(archivers, request, monkeypatch):
         assert "dir2/file2" in listing
         cmd(archiver, "check")
 
-    create_test_files(input_path)
-    archiver.repository_location = original_location + "1"
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        # prepare the source repo:
+        create_test_files(archiver.input_path)
+        cmd(archiver, "create", "arch1", "input")
+        cmd(archiver, "create", "arch2", "input")
+        check_repo()
 
-    monkeypatch.setenv("BORG_PASSPHRASE", "pw1")
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "arch1", "input")
-    cmd(archiver, "create", "arch2", "input")
-    check_repo()
-
-    archiver.repository_location = original_location + "2"
-    other_repo1 = f"--other-repo={original_location}1"
-    monkeypatch.setenv("BORG_PASSPHRASE", "pw2")
-    monkeypatch.setenv("BORG_OTHER_PASSPHRASE", "pw1")
-    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1)
+    # test the transfer:
     cmd(archiver, "transfer", other_repo1, "--dry-run")
     cmd(archiver, "transfer", other_repo1)
     cmd(archiver, "transfer", other_repo1, "--dry-run")
@@ -305,3 +321,38 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
             assert hlid1 == hlid2
             assert size1 == size2 == 16 + 1  # 16 text chars + \n
             assert chunks1 == chunks2
+
+
+def test_transfer_with_comment(archivers, request, monkeypatch):
+    """Test transfer with an archive comment"""
+    archiver = request.getfixturevalue(archivers)
+
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        create_test_files(archiver.input_path)
+        # Create an archive with a comment
+        test_comment = "This is a test comment for transfer"
+        cmd(archiver, "create", "--comment", test_comment, "archive", "input")
+
+    # Transfer should succeed
+    cmd(archiver, "transfer", other_repo1)
+
+    # Verify the archive was transferred with the comment
+    info_output = cmd(archiver, "info", "archive")
+    assert test_comment in info_output
+
+
+@pytest.mark.parametrize("recompress_mode", ["never", "always"])
+def test_transfer_recompress_modes(archivers, request, monkeypatch, recompress_mode):
+    """Test transfer with different recompression modes"""
+    archiver = request.getfixturevalue(archivers)
+
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        create_test_files(archiver.input_path)
+        cmd(archiver, "create", "--compression=lz4", "archive", "input")
+
+    # Test with --recompress
+    cmd(archiver, "transfer", other_repo1, f"--recompress={recompress_mode}")
+
+    # Verify that the transfer succeeded
+    listing = cmd(archiver, "repo-list")
+    assert "archive" in listing

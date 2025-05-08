@@ -65,7 +65,9 @@ class ArchiveGarbageCollector:
         # and also remove all older cached chunk indexes.
         # write_chunkindex_to_repo now removes all flags and size infos.
         # we need this, as we put the wrong size in there to support --stats computations.
-        write_chunkindex_to_repo_cache(self.repository, self.chunks, clear=True, force_write=True, delete_other=True)
+        write_chunkindex_to_repo_cache(
+            self.repository, self.chunks, incremental=False, clear=True, force_write=True, delete_other=True
+        )
         self.chunks = None  # nothing there (cleared!)
 
     def analyze_archives(self) -> Tuple[Set, int, int, int]:
@@ -113,6 +115,8 @@ class ArchiveGarbageCollector:
     def report_and_delete(self):
         if self.missing_chunks:
             logger.error(f"Repository has {len(self.missing_chunks)} missing objects!")
+            for id in sorted(self.missing_chunks):
+                logger.debug(f"Missing object {bin_to_hex(id)}")
             set_ec(EXIT_ERROR)
 
         logger.info("Cleaning archives directory from soft-deleted archives...")

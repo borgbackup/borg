@@ -705,20 +705,24 @@ CHUNKINDEX_HASH_SEED = 3
 
 
 def write_chunkindex_to_repo_cache(
-    repository, chunks, *, clear=False, force_write=False, delete_other=False, delete_these=None
+    repository, chunks, *, incremental=True, clear=False, force_write=False, delete_other=False, delete_these=None
 ):
-    # the borghash code has no means to only serialize the F_NEW table entries,
-    # thus we copy only the new entries to a temporary table:
-    new_chunks = ChunkIndex()
     # for now, we don't want to serialize the flags or the size, just the keys (chunk IDs):
     cleaned_value = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=0)
-    for key, _ in chunks.iteritems(only_new=True):
-        new_chunks[key] = cleaned_value
+    chunks_to_write = ChunkIndex()
+    # incremental==True:
+    # the borghash code has no means to only serialize the F_NEW table entries,
+    # thus we copy only the new entries to a temporary table.
+    # incremental==False:
+    # maybe copying the stuff into a new ChunkIndex is not needed here,
+    # but for simplicity, we do it anyway.
+    for key, _ in chunks.iteritems(only_new=incremental):
+        chunks_to_write[key] = cleaned_value
     with io.BytesIO() as f:
-        new_chunks.write(f)
+        chunks_to_write.write(f)
         data = f.getvalue()
-    logger.debug(f"caching {len(new_chunks)} new chunks.")
-    new_chunks.clear()  # free memory of the temporary table
+    logger.debug(f"caching {len(chunks_to_write)} chunks (incremental={incremental}).")
+    chunks_to_write.clear()  # free memory of the temporary table
     if clear:
         # if we don't need the in-memory chunks index anymore:
         chunks.clear()  # free memory, immediately

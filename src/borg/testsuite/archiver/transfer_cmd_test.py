@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import stat
 import tarfile
 from contextlib import contextmanager
@@ -8,6 +9,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...helpers.time import parse_timestamp
+from ...helpers.parseformat import parse_file_size
 from ..platform_test import is_win32
 from . import cmd, create_test_files, RK_ENCRYPTION, open_archive, generate_archiver_tests
 
@@ -369,13 +371,32 @@ def test_transfer_recompress(archivers, request, monkeypatch, recompress_mode):
     """Test transfer with recompression"""
     archiver = request.getfixturevalue(archivers)
 
+    def repo_size(archiver):
+        output = cmd(archiver, "compact", "-v", "--stats")
+        match = re.search(r"Repository size is ([^B]+)B", output, re.MULTILINE)
+        size = parse_file_size(match.group(1))
+        return size
+
     with setup_repos(archiver, monkeypatch) as other_repo1:
         create_test_files(archiver.input_path)
-        cmd(archiver, "create", "--compression=lz4", "archive", "input")
+        cmd(archiver, "create", "--compression=none", "archive", "input")
+        source_size = repo_size(archiver)
 
     # Test with --recompress and a different compression algorithm
     cmd(archiver, "transfer", other_repo1, f"--recompress={recompress_mode}", "--compression=zstd")
+    dest_size = repo_size(archiver)
 
     # Verify that the transfer succeeded
     listing = cmd(archiver, "repo-list")
     assert "archive" in listing
+
+    # Check repository size difference based on recompress_mode
+    if recompress_mode == "always":
+        # zstd compression is better than none.
+        assert source_size > dest_size, f"dest_size ({dest_size}) should be smaller than source_size ({source_size})."
+    else:  # recompress_mode == "never"
+        # When not recompressing, the data chunks should remain the same size.
+        # There might be small differences due to metadata, but they should be minimal
+        # We allow a small percentage difference to account for metadata changes.
+        size_diff_percent = abs(source_size - dest_size) / source_size * 100
+        assert size_diff_percent < 5, f"dest_size ({dest_size}) should be similar as source_size ({source_size})."

@@ -14,54 +14,6 @@ from . import cmd, create_test_files, RK_ENCRYPTION, open_archive, generate_arch
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
-@contextmanager
-def setup_repos(archiver, mp):
-    """
-    set up repos for transfer tests: REPO1 / PW1  <---transfer--- OTHER_REPO2 / PW2
-    when the context manager is entered, archiver will work with REPO2 (so one can prepare it as the source repo).
-    when the context manager is exited, archiver will work with REPO1 (so the transfer can be run).
-    """
-    original_location = archiver.repository_location
-
-    mp.setenv("BORG_PASSPHRASE", "pw1")
-    archiver.repository_location = original_location + "1"
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-
-    other_repo1 = f"--other-repo={original_location}1"
-    yield other_repo1
-
-    mp.setenv("BORG_PASSPHRASE", "pw2")
-    mp.setenv("BORG_OTHER_PASSPHRASE", "pw1")
-    archiver.repository_location = original_location + "2"
-    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1)
-
-
-def test_transfer(archivers, request, monkeypatch):
-    archiver = request.getfixturevalue(archivers)
-
-    def check_repo():
-        listing = cmd(archiver, "repo-list")
-        assert "arch1" in listing
-        assert "arch2" in listing
-        listing = cmd(archiver, "list", "--short", "arch1")
-        assert "file1" in listing
-        assert "dir2/file2" in listing
-        cmd(archiver, "check")
-
-    with setup_repos(archiver, monkeypatch) as other_repo1:
-        # prepare the source repo:
-        create_test_files(archiver.input_path)
-        cmd(archiver, "create", "arch1", "input")
-        cmd(archiver, "create", "arch2", "input")
-        check_repo()
-
-    # test the transfer:
-    cmd(archiver, "transfer", other_repo1, "--dry-run")
-    cmd(archiver, "transfer", other_repo1)
-    cmd(archiver, "transfer", other_repo1, "--dry-run")
-    check_repo()
-
-
 def test_transfer_upgrade(archivers, request, monkeypatch):
     archiver = request.getfixturevalue(archivers)
     if archiver.get_kind() in ["remote", "binary"]:
@@ -321,6 +273,54 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
             assert hlid1 == hlid2
             assert size1 == size2 == 16 + 1  # 16 text chars + \n
             assert chunks1 == chunks2
+
+
+@contextmanager
+def setup_repos(archiver, mp):
+    """
+    set up repos for transfer tests: REPO1 / PW1  <---transfer--- OTHER_REPO2 / PW2
+    when the context manager is entered, archiver will work with REPO2 (so one can prepare it as the source repo).
+    when the context manager is exited, archiver will work with REPO1 (so the transfer can be run).
+    """
+    original_location = archiver.repository_location
+
+    mp.setenv("BORG_PASSPHRASE", "pw1")
+    archiver.repository_location = original_location + "1"
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    other_repo1 = f"--other-repo={original_location}1"
+    yield other_repo1
+
+    mp.setenv("BORG_PASSPHRASE", "pw2")
+    mp.setenv("BORG_OTHER_PASSPHRASE", "pw1")
+    archiver.repository_location = original_location + "2"
+    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1)
+
+
+def test_transfer(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+
+    def check_repo():
+        listing = cmd(archiver, "repo-list")
+        assert "arch1" in listing
+        assert "arch2" in listing
+        listing = cmd(archiver, "list", "--short", "arch1")
+        assert "file1" in listing
+        assert "dir2/file2" in listing
+        cmd(archiver, "check")
+
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        # prepare the source repo:
+        create_test_files(archiver.input_path)
+        cmd(archiver, "create", "arch1", "input")
+        cmd(archiver, "create", "arch2", "input")
+        check_repo()
+
+    # test the transfer:
+    cmd(archiver, "transfer", other_repo1, "--dry-run")
+    cmd(archiver, "transfer", other_repo1)
+    cmd(archiver, "transfer", other_repo1, "--dry-run")
+    check_repo()
 
 
 def test_transfer_with_comment(archivers, request, monkeypatch):

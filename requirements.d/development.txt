@@ -10,5 +10,5 @@ pytest
 pytest-xdist
 pytest-cov
 pytest-benchmark
-Cython
+Cython < 3.1
 pre-commit

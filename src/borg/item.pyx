@@ -238,7 +238,7 @@ cdef class PropDictProperty:
         except KeyError:
             raise AttributeError(self.attr_error_msg) from None
 
-    cpdef __set_name__(self, name):
+    cpdef __set_name__(self, owner, name):
        self.key = name
        self.__doc__ = "%s (%s)" % (name, self.value_type_name)
        self.type_error_msg = "%s value must be %s" % (name, self.value_type_name)
@@ -613,12 +613,12 @@ cdef class ManifestItem(PropDict):
 
 cpdef _init_names():
     """
-    re-implements python __set_name__
+    re-implements python __set_name__ for Cython<3.1
     """
     for cls in PropDict.__subclasses__():
         for name, value in vars(cls).items():
             if isinstance(value, PropDictProperty):
-                value.__set_name__(name)
+                value.__set_name__(cls, name)
 
 _init_names()
 

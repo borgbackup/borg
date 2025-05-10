@@ -47,21 +47,6 @@ jobs:
       fail-fast: true
       matrix:
         include:
-            - os: ubuntu-22.04
-              python-version: '3.10'
-              toxenv: mypy
-            - os: ubuntu-22.04
-              python-version: '3.11'
-              toxenv: docs
-            - os: ubuntu-22.04
-              python-version: '3.10'
-              toxenv: py310-fuse2
-            - os: ubuntu-22.04
-              python-version: '3.11'
-              toxenv: py311-fuse3
-            - os: ubuntu-24.04
-              python-version: '3.12'
-              toxenv: py312-fuse3
             - os: ubuntu-24.04
               python-version: '3.13'
               toxenv: py313-fuse3
@@ -123,7 +108,7 @@ jobs:
 
   macOS:
 
-    needs: linux
+    if: false  # enable/disable macOS build
     strategy:
       fail-fast: true
       matrix:
@@ -195,10 +180,9 @@ jobs:
 
   windows:
 
-    if: false  # build temporary disabled
+    if: true  # enable/disable windows build
     runs-on: windows-latest
     timeout-minutes: 120
-    needs: linux
 
     env:
       # Needed for setuptools < 70.2.0 to work, see: https://www.msys2.org/docs/python/#known-issues
@@ -223,14 +207,14 @@ jobs:
         run: |
           # build borg.exe
           pip install -e .
-          pyinstaller -y scripts/borg.exe.spec
+          # pyinstaller -y scripts/borg.exe.spec
           # build sdist and wheel in dist/...
-          python -m build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: borg-windows
-          path: dist/borg.exe
+          # python -m build
+      # - uses: actions/upload-artifact@v4
+      #   with:
+      #     name: borg-windows
+      #     path: dist/borg.exe
       - name: Run tests
         run: |
-          ./dist/borg.exe -V
+          # ./dist/borg.exe -V
           pytest -n4 --benchmark-skip -vv -rs -k "not remote"

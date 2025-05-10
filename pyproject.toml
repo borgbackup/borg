@@ -67,7 +67,7 @@ where = ["src"]
 "*" = ["*.c", "*.h", "*.pyx"]
 
 [build-system]
-requires = ["setuptools>=77.0.0", "wheel", "pkgconfig", "Cython>=3.0.3,<3.1.0", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=77.0.0", "wheel", "pkgconfig", "Cython>=3.0.3", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]

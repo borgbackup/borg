@@ -347,6 +347,7 @@ def parse_file_size(s):
     """Return int from file size (1234, 55G, 1.7T)."""
     if not s:
         return int(s)  # will raise
+    s = s.upper()
     suffix = s[-1]
     power = 1000
     try:

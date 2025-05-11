@@ -69,3 +69,16 @@ def test_repo_compress(archiver):
     cname, ctype, clevel, olevel = ZLIB.name, ZLIB.ID, 2, 111
     cmd(archiver, "repo-compress", "-C", f"obfuscate,{olevel},auto,{cname},{clevel}")
     check_compression(ctype, clevel, olevel)
+
+
+def test_repo_compress_stats(archiver):
+    create_regular_file(archiver.input_path, "file1", size=1024 * 10)
+    create_regular_file(archiver.input_path, "file2", contents=os.urandom(1024 * 10))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    cname, clevel = ZLIB.name, 3
+    cmd(archiver, "create", "test", "input", "-C", f"{cname},{clevel}")
+
+    cname, clevel = ZSTD.name, 1  # change compressor (and level)
+    output = cmd(archiver, "repo-compress", "-C", f"{cname},{clevel}", "--stats")
+    assert "Recompression stats:" in output

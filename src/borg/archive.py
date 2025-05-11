@@ -663,10 +663,10 @@ Duration: {0.duration}
 
     def save(self, name=None, comment=None, timestamp=None, stats=None, additional_metadata=None):
         name = name or self.name
-        self.items_buffer.flush(flush=True)
+        self.items_buffer.flush(flush=True)  # this adds the size of metadata stream chunks to stats.osize
         item_ptrs = archive_put_items(
             self.items_buffer.chunks, repo_objs=self.repo_objs, cache=self.cache, stats=self.stats
-        )
+        )  # this adds the sizes of the item ptrs chunks to stats.osize
         duration = timedelta(seconds=time.monotonic() - self.start_monotonic)
         if timestamp is None:
             end = archive_ts_now()

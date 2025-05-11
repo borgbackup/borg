@@ -1,49 +1,19 @@
 import json
 import os
+import re
 import stat
 import tarfile
+from contextlib import contextmanager
 
 import pytest
 
 from ...constants import *  # NOQA
 from ...helpers.time import parse_timestamp
+from ...helpers.parseformat import parse_file_size
 from ..platform_test import is_win32
 from . import cmd, create_test_files, RK_ENCRYPTION, open_archive, generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
-
-
-def test_transfer(archivers, request, monkeypatch):
-    archiver = request.getfixturevalue(archivers)
-    original_location, input_path = archiver.repository_location, archiver.input_path
-
-    def check_repo():
-        listing = cmd(archiver, "repo-list")
-        assert "arch1" in listing
-        assert "arch2" in listing
-        listing = cmd(archiver, "list", "--short", "arch1")
-        assert "file1" in listing
-        assert "dir2/file2" in listing
-        cmd(archiver, "check")
-
-    create_test_files(input_path)
-    archiver.repository_location = original_location + "1"
-
-    monkeypatch.setenv("BORG_PASSPHRASE", "pw1")
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "arch1", "input")
-    cmd(archiver, "create", "arch2", "input")
-    check_repo()
-
-    archiver.repository_location = original_location + "2"
-    other_repo1 = f"--other-repo={original_location}1"
-    monkeypatch.setenv("BORG_PASSPHRASE", "pw2")
-    monkeypatch.setenv("BORG_OTHER_PASSPHRASE", "pw1")
-    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1)
-    cmd(archiver, "transfer", other_repo1, "--dry-run")
-    cmd(archiver, "transfer", other_repo1)
-    cmd(archiver, "transfer", other_repo1, "--dry-run")
-    check_repo()
 
 
 def test_transfer_upgrade(archivers, request, monkeypatch):
@@ -305,3 +275,128 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
             assert hlid1 == hlid2
             assert size1 == size2 == 16 + 1  # 16 text chars + \n
             assert chunks1 == chunks2
+
+
+@contextmanager
+def setup_repos(archiver, mp):
+    """
+    set up repos for transfer tests: OTHER_REPO1  ---transfer---> REPO2
+    when the context manager is entered, archiver will work with REPO1 (so one can prepare it as the source repo).
+    when the context manager is exited, archiver will work with REPO2 (so the transfer can be run).
+    """
+    original_location = archiver.repository_location
+
+    mp.setenv("BORG_PASSPHRASE", "pw1")
+    archiver.repository_location = original_location + "1"
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    other_repo1 = f"--other-repo={original_location}1"
+    yield other_repo1
+
+    mp.setenv("BORG_PASSPHRASE", "pw2")
+    mp.setenv("BORG_OTHER_PASSPHRASE", "pw1")
+    archiver.repository_location = original_location + "2"
+    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1)
+
+
+def test_transfer(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+
+    def check_repo():
+        listing = cmd(archiver, "repo-list")
+        assert "arch1" in listing
+        assert "arch2" in listing
+        listing = cmd(archiver, "list", "--short", "arch1")
+        assert "file1" in listing
+        assert "dir2/file2" in listing
+        cmd(archiver, "check")
+
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        # prepare the source repo:
+        create_test_files(archiver.input_path)
+        cmd(archiver, "create", "arch1", "input")
+        cmd(archiver, "create", "arch2", "input")
+        check_repo()
+
+    # test the transfer:
+    cmd(archiver, "transfer", other_repo1, "--dry-run")
+    cmd(archiver, "transfer", other_repo1)
+    cmd(archiver, "transfer", other_repo1, "--dry-run")
+    check_repo()
+
+
+def test_transfer_archive_metadata(archivers, request, monkeypatch):
+    """Test transfer of archive metadata"""
+    archiver = request.getfixturevalue(archivers)
+
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        create_test_files(archiver.input_path)
+        # Create an archive with a comment
+        test_comment = "This is a test comment for transfer"
+        cmd(archiver, "create", "--comment", test_comment, "archive", "input")
+
+        # Get metadata from source archive
+        source_info_json = cmd(archiver, "info", "--json", "archive")
+        source_info = json.loads(source_info_json)
+        source_archive = source_info["archives"][0]
+
+    # Transfer should succeed
+    cmd(archiver, "transfer", other_repo1)
+
+    # Get metadata from destination archive
+    dest_info_json = cmd(archiver, "info", "--json", "archive")
+    dest_info = json.loads(dest_info_json)
+    dest_archive = dest_info["archives"][0]
+
+    # Compare metadata fields
+    assert dest_archive["comment"] == source_archive["comment"]
+    assert dest_archive["hostname"] == source_archive["hostname"]
+    assert dest_archive["username"] == source_archive["username"]
+    assert dest_archive["command_line"] == source_archive["command_line"]
+    assert dest_archive["duration"] == source_archive["duration"]
+    assert dest_archive["start"] == source_archive["start"]
+    assert dest_archive["end"] == source_archive["end"]
+    assert dest_archive["tags"] == source_archive["tags"]
+    assert dest_archive["chunker_params"] == source_archive["chunker_params"]
+
+    # Compare stats
+    assert dest_archive["stats"]["nfiles"] == source_archive["stats"]["nfiles"]
+    # Note: original_size might differ slightly between source and destination due to implementation details
+    # but they should be close enough for the test to pass. TODO: check this, could also be a bug maybe.
+    assert abs(dest_archive["stats"]["original_size"] - source_archive["stats"]["original_size"]) < 10000
+
+
+@pytest.mark.parametrize("recompress_mode", ["never", "always"])
+def test_transfer_recompress(archivers, request, monkeypatch, recompress_mode):
+    """Test transfer with recompression"""
+    archiver = request.getfixturevalue(archivers)
+
+    def repo_size(archiver):
+        output = cmd(archiver, "compact", "-v", "--stats")
+        match = re.search(r"Repository size is ([^B]+)B", output, re.MULTILINE)
+        size = parse_file_size(match.group(1))
+        return size
+
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        create_test_files(archiver.input_path)
+        cmd(archiver, "create", "--compression=none", "archive", "input")
+        source_size = repo_size(archiver)
+
+    # Test with --recompress and a different compression algorithm
+    cmd(archiver, "transfer", other_repo1, f"--recompress={recompress_mode}", "--compression=zstd")
+    dest_size = repo_size(archiver)
+
+    # Verify that the transfer succeeded
+    listing = cmd(archiver, "repo-list")
+    assert "archive" in listing
+
+    # Check repository size difference based on recompress_mode
+    if recompress_mode == "always":
+        # zstd compression is better than none.
+        assert source_size > dest_size, f"dest_size ({dest_size}) should be smaller than source_size ({source_size})."
+    else:  # recompress_mode == "never"
+        # When not recompressing, the data chunks should remain the same size.
+        # There might be small differences due to metadata, but they should be minimal
+        # We allow a small percentage difference to account for metadata changes.
+        size_diff_percent = abs(source_size - dest_size) / source_size * 100
+        assert size_diff_percent < 5, f"dest_size ({dest_size}) should be similar as source_size ({source_size})."

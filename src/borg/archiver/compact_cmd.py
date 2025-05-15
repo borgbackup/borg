@@ -27,7 +27,7 @@ class ArchiveGarbageCollector:
         self.total_size = None  # overall size of source file content data written to all archives
         self.archives_count = None  # number of archives
         self.stats = stats  # compute repo space usage before/after - lists all repo objects, can be slow.
-        self.iec = iec # formats statistics using IEC units (1KiB = 1024B)
+        self.iec = iec  # formats statistics using IEC units (1KiB = 1024B)
 
     @property
     def repository_size(self):
@@ -148,19 +148,19 @@ class ArchiveGarbageCollector:
 
         count = len(self.chunks)
         logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
-        logger.info((
+        logger.info(
             f"Source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)} "
             f"in {self.total_files} files."
-        ))
+        )
         if self.stats:
-            logger.info((
+            logger.info(
                 f"Repository size is {format_file_size(repo_size_after, precision=0, iec=self.iec)}"
                 f"in {count} objects."
-            ))
-            logger.info((
+            )
+            logger.info(
                 f"Compaction saved "
                 f"{format_file_size(repo_size_before - repo_size_after, precision=0, iec=self.iec)}."
-            ))
+            )
         else:
             logger.info(f"Repository has data stored in {count} objects.")
 

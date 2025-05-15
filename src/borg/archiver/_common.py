@@ -31,6 +31,12 @@ logger = create_logger(__name__)
 
 
 def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_or_v2):
+    # Get permissions from environment variable
+    permissions = os.environ.get("BORG_REPO_PERMISSIONS", "all")
+    supported_permissions = ("all", "read-only", "no-delete")
+    if permissions not in supported_permissions:
+        raise Error(f"Invalid BORG_REPO_PERMISSIONS value: {permissions}, should be one of: {supported_permissions}")
+
     if location.proto in ("ssh", "socket"):
         RemoteRepoCls = LegacyRemoteRepository if v1_or_v2 else RemoteRepository
         repository = RemoteRepoCls(
@@ -38,11 +44,24 @@ def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_or_
         )
 
     elif location.proto in ("sftp", "file", "rclone") and not v1_or_v2:  # stuff directly supported by borgstore
-        repository = Repository(location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
+        repository = Repository(
+            location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, permissions=permissions
+        )
 
     else:
-        RepoCls = LegacyRepository if v1_or_v2 else Repository
-        repository = RepoCls(location.path, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
+        if v1_or_v2:
+            repository = LegacyRepository(
+                location.path, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock
+            )
+        else:
+            repository = Repository(
+                location.path,
+                create=create,
+                exclusive=exclusive,
+                lock_wait=lock_wait,
+                lock=lock,
+                permissions=permissions,
+            )
     return repository
 
 

@@ -93,7 +93,16 @@ class Repository:
 
         exit_mcode = 21
 
-    def __init__(self, path_or_location, create=False, exclusive=False, lock_wait=1.0, lock=True, send_log_cb=None):
+    def __init__(
+        self,
+        path_or_location,
+        create=False,
+        exclusive=False,
+        lock_wait=1.0,
+        lock=True,
+        send_log_cb=None,
+        permissions="all",
+    ):
         if isinstance(path_or_location, Location):
             location = path_or_location
             if location.proto == "file":
@@ -115,8 +124,22 @@ class Repository:
             "keys/": [0],
             "locks/": [0],
         }
+        if permissions == "all":  # not used, give all permissions
+            permissions = None
+        elif permissions == "read-only":  # r/o, except for the lock
+            permissions = {"": "lr", "locks": "lrwD"}  # borg needs to create/delete a shared lock here
+        elif permissions == "no-delete":
+            permissions = {
+                "": "lr",
+                "archives": "lrw",
+                "cache": "lrwWD",  # W for chunks.X
+                "config": "lrW",  # W for manifest, D for last-key-checked
+                "data": "lrw",
+                "keys": "lr",  # ?
+                "locks": "lrwD",  # borg needs to create/delete a shared lock here
+            }
         try:
-            self.store = Store(url, levels=levels_config)
+            self.store = Store(url, levels=levels_config, permissions=permissions)
         except StoreBackendError as e:
             raise Error(str(e))
         self.store_opened = False

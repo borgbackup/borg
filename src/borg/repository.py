@@ -115,8 +115,30 @@ class Repository:
             "keys/": [0],
             "locks/": [0],
         }
+        # Get permissions from environment variable
+        permissions = os.environ.get("BORG_REPO_PERMISSIONS", "all")
+
+        if permissions == "all":
+            permissions = None  # permissions system will not be used
+        elif permissions == "no-delete":  # mostly no delete, no overwrite
+            permissions = {
+                "": "lr",
+                "archives": "lrw",
+                "cache": "lrwWD",  # WD for chunks.X
+                "config": "lrWD",  # W for manifest, D for last-key-checked
+                "data": "lrw",
+                "keys": "lr",
+                "locks": "lrwD",  # borg needs to create/delete a shared lock here
+            }
+        elif permissions == "read-only":  # mostly r/o
+            permissions = {"": "lr", "locks": "lrwD"}
+        else:
+            raise Error(
+                f"Invalid BORG_REPO_PERMISSIONS value: {permissions}, should be one of: all, no-delete, read-only"
+            )
+
         try:
-            self.store = Store(url, levels=levels_config)
+            self.store = Store(url, levels=levels_config, permissions=permissions)
         except StoreBackendError as e:
             raise Error(str(e))
         self.store_opened = False

@@ -96,7 +96,7 @@ class ArchiveGarbageCollector:
             logger.info(
                 f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 1}/{num_archives})"
             )
-            archive = Archive(self.manifest, iec=self.iec, info.id)
+            archive = Archive(self.manifest, info.id, iec=self.iec)
             # archive metadata size unknown, but usually small/irrelevant:
             use_it(archive.id)
             for id in archive.metadata.item_ptrs:
@@ -233,4 +233,3 @@ class CompactMixIn:
         subparser.add_argument(
             "-s", "--stats", dest="stats", action="store_true", help="print statistics (might be much slower)"
         )
-        subparser.add_argument("--iec", dest="iec", action="store_true", help="format using IEC units (1KiB = 1024B)")

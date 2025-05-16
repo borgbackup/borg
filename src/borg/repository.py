@@ -124,8 +124,8 @@ class Repository:
             permissions = {
                 "": "lr",
                 "archives": "lrw",
-                "cache": "lrwWD",  # WD for chunks.X
-                "config": "lrWD",  # W for manifest, D for last-key-checked
+                "cache": "lrwWD",  # WD for chunks.<HASH>, last-key-checked, ...
+                "config": "lrW",  # W for manifest
                 "data": "lrw",
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
@@ -300,18 +300,19 @@ class Repository:
         partial = bool(max_duration)
         assert not (repair and partial)
         mode = "partial" if partial else "full"
+        LAST_KEY_CHECKED = "cache/last-key-checked"
         logger.info(f"Starting {mode} repository check")
         if partial:
             # continue a past partial check (if any) or from a checkpoint or start one from beginning
             try:
-                last_key_checked = self.store.load("config/last-key-checked").decode()
+                last_key_checked = self.store.load(LAST_KEY_CHECKED).decode()
             except StoreObjectNotFound:
                 last_key_checked = ""
         else:
             # start from the beginning and also forget about any potential past partial checks
             last_key_checked = ""
             try:
-                self.store.delete("config/last-key-checked")
+                self.store.delete(LAST_KEY_CHECKED)
             except StoreObjectNotFound:
                 pass
         if last_key_checked:
@@ -369,15 +370,15 @@ class Repository:
                 if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
                     t_last_checkpoint = now
                     logger.info(f"Checkpointing at key {key}.")
-                    self.store.store("config/last-key-checked", key.encode())
+                    self.store.store(LAST_KEY_CHECKED, key.encode())
                 if partial and now > t_start + max_duration:
                     logger.info(f"Finished partial repository check, last key checked is {key}.")
-                    self.store.store("config/last-key-checked", key.encode())
+                    self.store.store(LAST_KEY_CHECKED, key.encode())
                     break
             else:
                 logger.info("Finished repository check.")
                 try:
-                    self.store.delete("config/last-key-checked")
+                    self.store.delete(LAST_KEY_CHECKED)
                 except StoreObjectNotFound:
                     pass
                 if not partial:

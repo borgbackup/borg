@@ -154,7 +154,7 @@ class ArchiveGarbageCollector:
         )
         if self.stats:
             logger.info(
-                f"Repository size is {format_file_size(repo_size_after, precision=0, iec=self.iec)}"
+                f"Repository size is {format_file_size(repo_size_after, precision=0, iec=self.iec)} "
                 f"in {count} objects."
             )
             logger.info(

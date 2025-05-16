@@ -18,7 +18,7 @@ logger = create_logger()
 
 
 class ArchiveGarbageCollector:
-    def __init__(self, repository, manifest, *, stats):
+    def __init__(self, repository, manifest, *, stats, iec):
         self.repository = repository
         assert isinstance(repository, (Repository, RemoteRepository))
         self.manifest = manifest
@@ -27,6 +27,7 @@ class ArchiveGarbageCollector:
         self.total_size = None  # overall size of source file content data written to all archives
         self.archives_count = None  # number of archives
         self.stats = stats  # compute repo space usage before/after - lists all repo objects, can be slow.
+        self.iec = iec  # formats statistics using IEC units (1KiB = 1024B)
 
     @property
     def repository_size(self):
@@ -95,7 +96,7 @@ class ArchiveGarbageCollector:
             logger.info(
                 f"Analyzing archive {info.name} {info.ts.astimezone()} {bin_to_hex(info.id)} ({i + 1}/{num_archives})"
             )
-            archive = Archive(self.manifest, info.id)
+            archive = Archive(self.manifest, info.id, iec=self.iec)
             # archive metadata size unknown, but usually small/irrelevant:
             use_it(archive.id)
             for id in archive.metadata.item_ptrs:
@@ -148,11 +149,18 @@ class ArchiveGarbageCollector:
         count = len(self.chunks)
         logger.info(f"Overall statistics, considering all {self.archives_count} archives in this repository:")
         logger.info(
-            f"Source data size was {format_file_size(self.total_size, precision=0)} in {self.total_files} files."
+            f"Source data size was {format_file_size(self.total_size, precision=0, iec=self.iec)} "
+            f"in {self.total_files} files."
         )
         if self.stats:
-            logger.info(f"Repository size is {format_file_size(repo_size_after, precision=0)} in {count} objects.")
-            logger.info(f"Compaction saved {format_file_size(repo_size_before - repo_size_after, precision=0)}.")
+            logger.info(
+                f"Repository size is {format_file_size(repo_size_after, precision=0, iec=self.iec)} "
+                f"in {count} objects."
+            )
+            logger.info(
+                f"Compaction saved "
+                f"{format_file_size(repo_size_before - repo_size_after, precision=0, iec=self.iec)}."
+            )
         else:
             logger.info(f"Repository has data stored in {count} objects.")
 
@@ -162,7 +170,7 @@ class CompactMixIn:
     def do_compact(self, args, repository, manifest):
         """Collect garbage in repository"""
         if not args.dry_run:  # support --dry-run to simplify scripting
-            ArchiveGarbageCollector(repository, manifest, stats=args.stats).garbage_collect()
+            ArchiveGarbageCollector(repository, manifest, stats=args.stats, iec=args.iec).garbage_collect()
 
     def build_parser_compact(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

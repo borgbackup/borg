@@ -5,6 +5,7 @@ from libc cimport errno
 from posix.time cimport timespec
 
 from .posix import user2uid, group2gid
+from .base import get_binary_acl  # dummy
 from ..helpers import safe_decode, safe_encode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
 

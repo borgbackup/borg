@@ -30,6 +30,14 @@ For ssh and sftp URLs, the ``user@`` and ``:port`` parts are optional.
 
 ``rclone:remote:path`` - see the rclone docs for more details about remote:path.
 
+**Remote repositories** accessed via S3:
+
+``(s3|b2):[profile|(access_key_id:access_key_secret)@][schema://hostname[:port]]/bucket/path`` - see the boto3 docs for more details about the credentials.
+
+If you're connecting to AWS S3, ``[schema://hostname[:port]]`` is optional, but ``bucket`` and ``path`` are always required.
+
+Note: There is a known issue with some S3-compatible services, e.g., Backblaze B2. If you encounter problems, try using ``b2:`` instead of ``s3:`` in the url.
+
 
 If you frequently need the same repo URL, it is a good idea to set the
 ``BORG_REPO`` environment variable to set a default for the repo URL:

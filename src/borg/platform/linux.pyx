@@ -1,3 +1,5 @@
+from cpython.bytes cimport PyBytes_FromStringAndSize
+
 import os
 import re
 import stat
@@ -48,6 +50,7 @@ cdef extern from "sys/acl.h":
     int acl_set_fd(int fd, acl_t acl)
     acl_t acl_from_text(const char *buf)
     char *acl_to_text(acl_t acl, ssize_t *len)
+    ssize_t acl_size(acl_t)
 
 cdef extern from "acl/libacl.h":
     int acl_extended_file_nofollow(const char *path)
@@ -319,6 +322,31 @@ def acl_set(path, item, numeric_ids=False, fd=None):
                 raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
             acl_free(default_acl)
+
+
+def get_binary_acl(item, key, numeric_ids=False):
+    assert key in ("acl_access", "acl_default")
+    cdef acl_t acl = NULL
+    cdef ssize_t size
+
+    if numeric_ids:
+        converter = posix_acl_use_stored_uid_gid
+    else:
+        converter = acl_use_local_uid_gid
+    acl_text = item.get(key)
+    if acl_text is None:
+        raise KeyError(key)
+    try:
+        acl = acl_from_text(<bytes>converter(acl_text))
+        if acl == NULL:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(item.path))
+        size = acl_size(acl)
+        if size < 0:
+            raise OSError(errno.errno, "Failed to get ACL size")
+        # Create a bytes object from the ACL data structure:
+        return PyBytes_FromStringAndSize(<char *> acl, size)
+    finally:
+        acl_free(acl)
 
 
 cdef _sync_file_range(fd, offset, length, flags):

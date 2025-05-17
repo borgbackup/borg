@@ -80,6 +80,13 @@ def acl_set(path, item, numeric_ids=False, fd=None):
     """
 
 
+def get_binary_acl(item, key, numeric_ids=False):
+    """
+    Get binary ACL data for item and key (acl name).
+    """
+    raise KeyError(key)
+
+
 try:
     from os import lchflags  # type: ignore[attr-defined]
 

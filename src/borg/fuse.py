@@ -628,13 +628,23 @@ class FuseOperations(llfuse.Operations, FuseBackend):
     @async_wrapper
     def listxattr(self, inode, ctx=None):
         item = self.get_item(inode)
-        return item.get("xattrs", {}).keys()
+        xattrs = list(item.get("xattrs", {}).keys())
+        if "acl_access" in item:
+            xattrs.append(b"system.posix_acl_access")
+        if "acl_default" in item:
+            xattrs.append(b"system.posix_acl_default")
+        return xattrs
 
     @async_wrapper
     def getxattr(self, inode, name, ctx=None):
         item = self.get_item(inode)
         try:
-            return item.get("xattrs", {})[name] or b""
+            if name == b"system.posix_acl_access":
+                return item["acl_access"]
+            elif name == b"system.posix_acl_default":
+                return item["acl_default"]
+            else:
+                return item.get("xattrs", {})[name] or b""
         except KeyError:
             raise llfuse.FUSEError(llfuse.ENOATTR) from None
 

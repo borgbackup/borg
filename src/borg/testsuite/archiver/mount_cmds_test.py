@@ -299,7 +299,7 @@ def test_fuse_acl_support(archivers, request):
     mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
     with fuse_mount(archiver, mountpoint, "-a", "test"):
         # Verify file ACLs are preserved
-        mounted_file = os.path.join(mountpoint, "test", "aclfile")
+        mounted_file = os.path.join(mountpoint, "test", "input", "aclfile")
         assert os.path.exists(mounted_file)
         assert os.path.isfile(mounted_file)
         file_acl = {}
@@ -308,7 +308,7 @@ def test_fuse_acl_support(archivers, request):
         assert b"user::rw-" in file_acl["acl_access"]
         assert b"user:root:rw-" in file_acl["acl_access"]
         # Verify directory ACLs are preserved
-        mounted_dir = os.path.join(mountpoint, "test", "acldir")
+        mounted_dir = os.path.join(mountpoint, "test", "input", "acldir")
         assert os.path.exists(mounted_dir)
         assert os.path.isdir(mounted_dir)
         dir_acl = {}

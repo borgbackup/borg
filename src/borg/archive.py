@@ -498,6 +498,8 @@ class Archive:
         deleted=False,
     ):
         name_is_id = isinstance(name, bytes)
+        if not name_is_id:
+            assert len(name) <= 255
         self.cwd = os.getcwd()
         assert isinstance(manifest, Manifest)
         self.manifest = manifest

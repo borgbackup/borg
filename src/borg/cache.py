@@ -7,6 +7,8 @@ from collections import namedtuple
 from datetime import datetime, timezone, timedelta
 from time import perf_counter
 
+from borgstore.backends.errors import PermissionDenied
+
 from .logger import create_logger
 
 logger = create_logger()
@@ -443,7 +445,10 @@ class FilesCacheMixin:
         from .archive import Archive
 
         # get the latest archive with the IDENTICAL name, supporting archive series:
-        archives = self.manifest.archives.list(match=[self.archive_name], sort_by=["ts"], last=1)
+        try:
+            archives = self.manifest.archives.list(match=[self.archive_name], sort_by=["ts"], last=1)
+        except PermissionDenied:  # maybe repo is in write-only mode?
+            archives = None
         if not archives:
             # nothing found
             return

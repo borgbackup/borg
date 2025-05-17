@@ -553,7 +553,6 @@ class Manifest:
             self.timestamp = max_ts.isoformat(timespec="microseconds")
         # include checks for limits as enforced by limited unpacker (used by load())
         assert self.archives.count() <= MAX_ARCHIVES
-        assert all(len(name) <= 255 for name in self.archives.names())
         assert len(self.item_keys) <= 100
         self.config["item_keys"] = tuple(sorted(self.item_keys))
         manifest_archives = self.archives.finish(self)

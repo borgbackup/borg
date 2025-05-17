@@ -130,11 +130,22 @@ class Repository:
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
             }
+        elif permissions == "write-only":  # mostly no reading
+            permissions = {
+                "": "l",
+                "archives": "lw",
+                "cache": "lrwWD",  # read allowed, e.g. for chunks.<HASH> cache
+                "config": "lrW",  # W for manifest
+                "data": "lw",  # no r!
+                "keys": "lr",
+                "locks": "lrwD",  # borg needs to create/delete a shared lock here
+            }
         elif permissions == "read-only":  # mostly r/o
             permissions = {"": "lr", "locks": "lrwD"}
         else:
             raise Error(
-                f"Invalid BORG_REPO_PERMISSIONS value: {permissions}, should be one of: all, no-delete, read-only"
+                f"Invalid BORG_REPO_PERMISSIONS value: {permissions}, should be one of: "
+                f"all, no-delete, write-only, read-only."
             )
 
         try:

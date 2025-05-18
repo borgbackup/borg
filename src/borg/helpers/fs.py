@@ -178,40 +178,60 @@ def get_config_dir(*, legacy=False, create=True):
     return config_dir
 
 
-def dir_is_cachedir(path):
-    """Determines whether the specified path is a cache directory (and
+def dir_is_cachedir(path=None, dir_fd=None):
+    """Determines whether the specified directory is a cache directory (and
     therefore should potentially be excluded from the backup) according to
-    the CACHEDIR.TAG protocol
-    (http://www.bford.info/cachedir/spec.html).
+    the CACHEDIR.TAG protocol (http://www.bford.info/cachedir/spec.html).
+
+    If dir_fd is provided, operations will be based on the directory file descriptor.
+    Otherwise (path is provided), operations will be based on the directory path.
     """
-
-    tag_path = os.path.join(path, CACHE_TAG_NAME)
+    tag_fd = None
     try:
-        if os.path.exists(tag_path):
-            with open(tag_path, "rb") as tag_file:
-                tag_data = tag_file.read(len(CACHE_TAG_CONTENTS))
-                if tag_data == CACHE_TAG_CONTENTS:
-                    return True
-    except OSError:
-        pass
-    return False
+        if dir_fd is not None:
+            tag_fd = os.open(CACHE_TAG_NAME, os.O_RDONLY, dir_fd=dir_fd)
+        else:
+            tag_fd = os.open(os.path.join(path, CACHE_TAG_NAME), os.O_RDONLY)
+        return os.read(tag_fd, len(CACHE_TAG_CONTENTS)) == CACHE_TAG_CONTENTS
+    except (FileNotFoundError, OSError):
+        return False
+    finally:
+        if tag_fd is not None:
+            os.close(tag_fd)
 
 
-def dir_is_tagged(path, exclude_caches, exclude_if_present):
+def dir_is_tagged(path=None, exclude_caches=None, exclude_if_present=None, dir_fd=None):
     """Determines whether the specified path is excluded by being a cache
     directory or containing user-specified tag files/directories. Returns a
     list of the names of the tag files/directories (either CACHEDIR.TAG or the
     matching user-specified files/directories).
+
+    If dir_fd is provided, operations will be based on the directory file descriptor.
+    Otherwise (path is provided), operations will be based on the directory path.
     """
-    # TODO: do operations based on the directory fd
     tag_names = []
-    if exclude_caches and dir_is_cachedir(path):
-        tag_names.append(CACHE_TAG_NAME)
-    if exclude_if_present is not None:
-        for tag in exclude_if_present:
-            tag_path = os.path.join(path, tag)
-            if os.path.exists(tag_path):
-                tag_names.append(tag)
+
+    if dir_fd is not None:
+        # Use file descriptor-based operations
+        if exclude_caches and dir_is_cachedir(dir_fd=dir_fd):
+            tag_names.append(CACHE_TAG_NAME)
+        if exclude_if_present is not None:
+            for tag in exclude_if_present:
+                try:
+                    os.stat(tag, dir_fd=dir_fd)
+                    tag_names.append(tag)
+                except FileNotFoundError:
+                    pass
+    else:
+        # Use path-based operations (for backward compatibility)
+        if exclude_caches and dir_is_cachedir(path=path):
+            tag_names.append(CACHE_TAG_NAME)
+        if exclude_if_present is not None:
+            for tag in exclude_if_present:
+                tag_path = os.path.join(path, tag)
+                if os.path.exists(tag_path):
+                    tag_names.append(tag)
+
     return tag_names
 
 

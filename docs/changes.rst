@@ -144,7 +144,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b16 (2025-05-06)
+Version 2.0.0b17 (2025-05-xx)
 -----------------------------
 
 Please note:
@@ -153,6 +153,37 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- transfer: implement --chunker-params to re-chunk while transferring, #8706
+- `BORG_REPO_PERMISSIONS=all|no-delete|write-only|read-only`, #8823
+
+  The posixfs borgstore backend implements permissions to make
+  testing with differently permissive stores easier.
+
+  The env var selects from pre-defined permission configurations
+  within borg and gives the chosen permissions config to borgstore.
+  borg uses borgstore's posixfs backend only for file: and ssh: repos.
+
+Fixes:
+
+- correct the signature of __set_name__ as cython 3.1 added support,
+  fixing build on Cython 3.1, #6858
+- compact/check: fix bug not writing the complete index, #8813
+- compact: add --iec option, #8831
+- check/compact/analyze: show archive timestamp in local tz, #8814
+- repo-space: enable ssh: repo testing, fix AttributeError, #8815
+- repo-info: fix output formatting
+
+Other changes:
+
+- tests: add/improve tests for repo-compress --stats, transfer, repo-space
+- docs: must have the release tags in the local repo, #8582
+
+
+Version 2.0.0b16 (2025-05-06)
+-----------------------------
 
 Fixes:
 

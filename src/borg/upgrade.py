@@ -10,8 +10,8 @@ logger = create_logger(__name__)
 
 
 class UpgraderNoOp:
-    def __init__(self, *, cache):
-        pass
+    def __init__(self, *, cache, args):
+        self.args = args
 
     def new_archive(self, *, archive):
         pass
@@ -37,14 +37,19 @@ class UpgraderNoOp:
         ):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
+        rechunking = self.args.chunker_params is not None
+        if rechunking:
+            # if we are rechunking while transferring, we take the new chunker_params.
+            new_metadata["chunker_params"] = self.args.chunker_params
         return new_metadata
 
 
 class UpgraderFrom12To20:
     borg1_header_fmt = Struct(">I")
 
-    def __init__(self, *, cache):
+    def __init__(self, *, cache, args):
         self.cache = cache
+        self.args = args
 
     def new_archive(self, *, archive):
         self.archive = archive
@@ -144,10 +149,15 @@ class UpgraderFrom12To20:
         for attr in ("hostname", "username", "comment", "chunker_params"):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
-        if chunker_params := new_metadata.get("chunker_params"):
-            if len(chunker_params) == 4 and isinstance(chunker_params[0], int):
-                # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
-                new_metadata["chunker_params"] = (CH_BUZHASH,) + chunker_params
+        rechunking = self.args.chunker_params is not None
+        if rechunking:
+            # if we are rechunking while transferring, we take the new chunker_params.
+            new_metadata["chunker_params"] = self.args.chunker_params
+        else:
+            if chunker_params := new_metadata.get("chunker_params"):
+                if len(chunker_params) == 4 and isinstance(chunker_params[0], int):
+                    # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
+                    new_metadata["chunker_params"] = (CH_BUZHASH,) + chunker_params
         # old borg used UTC timestamps, but did not have the explicit tz offset in them.
         for attr in ("time", "time_end"):
             if hasattr(metadata, attr):

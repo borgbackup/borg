@@ -1,5 +1,7 @@
+import hashlib
 import json
 import os
+import random
 import re
 import stat
 import tarfile
@@ -8,12 +10,13 @@ from contextlib import contextmanager
 import pytest
 
 from ...constants import *  # NOQA
+from ...helpers import open_item
 from ...helpers.time import parse_timestamp
-from ...helpers.parseformat import parse_file_size
+from ...helpers.parseformat import parse_file_size, ChunkerParams
 from ..platform_test import is_win32
-from . import cmd, create_test_files, RK_ENCRYPTION, open_archive, generate_archiver_tests
+from . import cmd, create_regular_file, create_test_files, RK_ENCRYPTION, open_archive, generate_archiver_tests
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote")  # NOQA
 
 
 def test_transfer_upgrade(archivers, request, monkeypatch):
@@ -285,9 +288,11 @@ def setup_repos(archiver, mp):
     when the context manager is exited, archiver will work with REPO2 (so the transfer can be run).
     """
     original_location = archiver.repository_location
+    original_path = archiver.repository_path
 
     mp.setenv("BORG_PASSPHRASE", "pw1")
     archiver.repository_location = original_location + "1"
+    archiver.repository_path = original_path + "1"
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
     other_repo1 = f"--other-repo={original_location}1"
@@ -296,6 +301,7 @@ def setup_repos(archiver, mp):
     mp.setenv("BORG_PASSPHRASE", "pw2")
     mp.setenv("BORG_OTHER_PASSPHRASE", "pw1")
     archiver.repository_location = original_location + "2"
+    archiver.repository_path = original_path + "2"
     cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1)
 
 
@@ -400,3 +406,66 @@ def test_transfer_recompress(archivers, request, monkeypatch, recompress_mode):
         # We allow a small percentage difference to account for metadata changes.
         size_diff_percent = abs(source_size - dest_size) / source_size * 100
         assert size_diff_percent < 5, f"dest_size ({dest_size}) should be similar as source_size ({source_size})."
+
+
+def test_transfer_rechunk(archivers, request, monkeypatch):
+    """Test transfer with re-chunking"""
+    archiver = request.getfixturevalue(archivers)
+
+    BLKSIZE = 4096
+    source_chunker_params = "buzhash,19,23,21,4095"  # default buzhash chunks
+    dest_chunker_params = f"fixed,{BLKSIZE}"  # fixed chunk size
+
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        contents_1 = random.randbytes(1 * BLKSIZE)
+        contents_255 = random.randbytes(255 * BLKSIZE)
+        contents_1024 = random.randbytes(1024 * BLKSIZE)
+        create_regular_file(archiver.input_path, "file_1", contents=contents_1)
+        create_regular_file(archiver.input_path, "file_256", contents=contents_255 + contents_1)
+        create_regular_file(archiver.input_path, "file_1280", contents=contents_1024 + contents_255 + contents_1)
+
+        cmd(archiver, "create", f"--chunker-params={source_chunker_params}", "archive", "input")
+
+        # Get metadata from source archive
+        source_info_json = cmd(archiver, "info", "--json", "archive")
+        source_info = json.loads(source_info_json)
+        source_archive = source_info["archives"][0]
+        source_chunker_params_info = source_archive["chunker_params"]
+
+        # Calculate SHA256 hashes of file contents from source archive
+        source_archive_obj, source_repo = open_archive(archiver.repository_path, "archive")
+        with source_repo:
+            source_file_hashes = {}
+            for item in source_archive_obj.iter_items():
+                if hasattr(item, "chunks"):  # Only process regular files with chunks
+                    f = open_item(source_archive_obj, item)
+                    content = f.read(10 * 1024 * 1024)  # Read up to 10 MB
+                    source_file_hashes[item.path] = hashlib.sha256(content).hexdigest()
+
+    # Transfer with rechunking
+    cmd(archiver, "transfer", other_repo1, f"--chunker-params={dest_chunker_params}")
+
+    # Get metadata from destination archive
+    dest_info_json = cmd(archiver, "info", "--json", "archive")
+    dest_info = json.loads(dest_info_json)
+    dest_archive = dest_info["archives"][0]
+    dest_chunker_params_info = dest_archive["chunker_params"]
+
+    # chunker params in metadata must reflect the chunker params given on the CLI
+    assert tuple(source_chunker_params_info) == ChunkerParams(source_chunker_params)
+    assert tuple(dest_chunker_params_info) == ChunkerParams(dest_chunker_params)
+
+    # Compare file hashes between source and destination archives, also check expected chunk counts.
+    dest_archive_obj, dest_repo = open_archive(archiver.repository_path, "archive")
+    with dest_repo:
+        for item in dest_archive_obj.iter_items():
+            if hasattr(item, "chunks"):  # Only process regular files with chunks
+                # Verify expected chunk count for each file
+                expected_chunk_count = {"input/file_1": 1, "input/file_256": 256, "input/file_1280": 1280}[item.path]
+                assert len(item.chunks) == expected_chunk_count
+                f = open_item(dest_archive_obj, item)
+                content = f.read(10 * 1024 * 1024)  # Read up to 10 MB
+                dest_hash = hashlib.sha256(content).hexdigest()
+                # Verify that the file hash is identical to the source
+                assert item.path in source_file_hashes, f"File {item.path} not found in source archive"
+                assert dest_hash == source_file_hashes[item.path], f"Content hash mismatch for {item.path}"

@@ -484,7 +484,7 @@ class CreateMixIn:
                         with backup_io("fstat"):
                             st = stat_update_check(st, os.fstat(child_fd))
                     if recurse:
-                        tag_names = dir_is_tagged(path, exclude_caches, exclude_if_present)
+                        tag_names = dir_is_tagged(path, exclude_caches, exclude_if_present, dir_fd=child_fd)
                         if tag_names:
                             # if we are already recursing in an excluded dir, we do not need to do anything else than
                             # returning (we do not need to archive or recurse into tagged directories), see #3991:

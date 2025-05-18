@@ -195,14 +195,12 @@ jobs:
 
   windows:
 
-    if: false  # build temporary disabled
+    if: true  # can be used to temporary disable build
     runs-on: windows-latest
     timeout-minutes: 120
     needs: linux
 
     env:
-      # Needed for setuptools < 70.2.0 to work, see: https://www.msys2.org/docs/python/#known-issues
-      # SETUPTOOLS_USE_DISTUTILS: stdlib
       PY_COLORS: 1
 
     defaults:
@@ -217,11 +215,20 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-      - name: Install dependencies
+      - name: Install system packages
         run: ./scripts/msys2-install-deps development
+      - name: Build python venv
+        run: |
+          # building cffi / argon2-cffi in the venv fails, so we try to use the system packages
+          python -m venv --system-site-packages env
+          . env/bin/activate
+          # python -m pip install --upgrade pip
+          # pip install --upgrade setuptools build wheel
+          pip install pyinstaller==6.11.1
       - name: Build
         run: |
           # build borg.exe
+          . env/bin/activate
           pip install -e .
           pyinstaller -y scripts/borg.exe.spec
           # build sdist and wheel in dist/...
@@ -233,4 +240,6 @@ jobs:
       - name: Run tests
         run: |
           ./dist/borg.exe -V
-          pytest -n4 --benchmark-skip -vv -rs -k "not remote"
+          . env/bin/activate
+          borg -V
+          python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote"

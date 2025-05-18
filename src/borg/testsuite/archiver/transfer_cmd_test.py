@@ -16,7 +16,7 @@ from ...helpers.parseformat import parse_file_size, ChunkerParams
 from ..platform_test import is_win32
 from . import cmd, create_regular_file, create_test_files, RK_ENCRYPTION, open_archive, generate_archiver_tests
 
-pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local")  # NOQA
+pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote")  # NOQA
 
 
 def test_transfer_upgrade(archivers, request, monkeypatch):
@@ -288,9 +288,11 @@ def setup_repos(archiver, mp):
     when the context manager is exited, archiver will work with REPO2 (so the transfer can be run).
     """
     original_location = archiver.repository_location
+    original_path = archiver.repository_path
 
     mp.setenv("BORG_PASSPHRASE", "pw1")
     archiver.repository_location = original_location + "1"
+    archiver.repository_path = original_path + "1"
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
     other_repo1 = f"--other-repo={original_location}1"
@@ -299,6 +301,7 @@ def setup_repos(archiver, mp):
     mp.setenv("BORG_PASSPHRASE", "pw2")
     mp.setenv("BORG_OTHER_PASSPHRASE", "pw1")
     archiver.repository_location = original_location + "2"
+    archiver.repository_path = original_path + "2"
     cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1)
 
 
@@ -430,7 +433,7 @@ def test_transfer_rechunk(archivers, request, monkeypatch):
         source_chunker_params_info = source_archive["chunker_params"]
 
         # Calculate SHA256 hashes of file contents from source archive
-        source_archive_obj, source_repo = open_archive(archiver.repository_location, "archive")
+        source_archive_obj, source_repo = open_archive(archiver.repository_path, "archive")
         with source_repo:
             source_file_hashes = {}
             for item in source_archive_obj.iter_items():
@@ -453,7 +456,7 @@ def test_transfer_rechunk(archivers, request, monkeypatch):
     assert tuple(dest_chunker_params_info) == ChunkerParams(dest_chunker_params)
 
     # Compare file hashes between source and destination archives, also check expected chunk counts.
-    dest_archive_obj, dest_repo = open_archive(archiver.repository_location, "archive")
+    dest_archive_obj, dest_repo = open_archive(archiver.repository_path, "archive")
     with dest_repo:
         for item in dest_archive_obj.iter_items():
             if hasattr(item, "chunks"):  # Only process regular files with chunks

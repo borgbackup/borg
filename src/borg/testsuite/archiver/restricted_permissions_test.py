@@ -136,3 +136,65 @@ def test_repository_permissions_read_only(archivers, request, monkeypatch):
     # Try to compact the repo, which should fail.
     with pytest.raises(PermissionDenied):
         cmd(archiver, "compact")
+
+
+def test_repository_permissions_write_only(archivers, request, monkeypatch):
+    """Test repository with 'write-only' permissions setting"""
+    archiver = request.getfixturevalue(archivers)
+
+    # Create a repository first (need unrestricted permissions for that).
+    monkeypatch.setenv("BORG_REPO_PERMISSIONS", "all")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # Create an initial archive to test with.
+    create_test_files(archiver.input_path)
+    cmd(archiver, "create", "archive1", "input")
+
+    # Switch to write-only permissions.
+    monkeypatch.setenv("BORG_REPO_PERMISSIONS", "write-only")
+
+    # Try to create a new archive, which should succeed
+    cmd(archiver, "create", "archive2", "input")
+
+    # Try to list archives, which should fail (requires reading from data directory).
+    with pytest.raises(PermissionDenied):
+        cmd(archiver, "repo-list")
+
+    # Try to list files in an archive, which should fail (requires reading from data directory).
+    with pytest.raises(PermissionDenied):
+        cmd(archiver, "list", "archive1")
+    with pytest.raises(PermissionDenied):
+        cmd(archiver, "list", "archive2")
+
+    # Try to extract the archive, which should fail (data dir has "lw" permissions, no reading).
+    with pytest.raises(PermissionDenied):
+        with changedir("output"):
+            cmd(archiver, "extract", "archive1")
+
+    # Try to delete an archive, which should fail (requires reading from data directory to identify the archive).
+    with pytest.raises(PermissionDenied):
+        cmd(archiver, "delete", "archive1")
+
+    # Try to compact the repo, which should fail (data dir has "lw" permissions, no reading).
+    with pytest.raises(PermissionDenied):
+        cmd(archiver, "compact")
+
+    # Try to check the repo, which should fail (data dir has "lw" permissions, no reading).
+    with pytest.raises(PermissionDenied):
+        cmd(archiver, "check")
+
+    # Try to delete the repo, which should fail (no "D" permission on data dir).
+    with pytest.raises(PermissionDenied):
+        cmd(archiver, "repo-delete")
+
+    # Switch to read-only permissions.
+    monkeypatch.setenv("BORG_REPO_PERMISSIONS", "read-only")
+
+    # Try to list archives, should work now.
+    output = cmd(archiver, "repo-list")
+    assert "archive1" in output
+    assert "archive2" in output
+
+    # Try to list files in an archive, should work now.
+    cmd(archiver, "list", "archive1")
+    cmd(archiver, "list", "archive2")

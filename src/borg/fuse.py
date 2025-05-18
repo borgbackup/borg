@@ -54,8 +54,10 @@ def fuse_main():
     if has_pyfuse3:
         try:
             trio.run(llfuse.main)
+        except KeyboardInterrupt:
+            return SIGINT
         except:  # noqa
-            return 1  # TODO return signal number if it was killed by signal
+            return -1  # avoid colliding with signal numbers
         else:
             return None
     else:

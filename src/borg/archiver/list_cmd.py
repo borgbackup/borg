@@ -32,7 +32,21 @@ class ListMixIn:
         def _list_inner(cache):
             archive = Archive(manifest, archive_info.id, cache=cache)
             formatter = ItemFormatter(archive, format)
-            for item in archive.iter_items(lambda item: matcher.match(item.path)):
+
+            def item_filter(item):
+                # Check if the item matches the patterns/paths.
+                if not matcher.match(item.path):
+                    return False
+                # If depth is specified, also check the depth of the path.
+                if args.depth is not None:
+                    # Count path separators to determine depth.
+                    # For paths like "dir/subdir/file.txt", the depth is 2.
+                    path_depth = item.path.count("/")
+                    if path_depth > args.depth:
+                        return False
+                return True
+
+            for item in archive.iter_items(item_filter):
                 sys.stdout.write(formatter.format_item(item, args.json_lines, sort=True))
 
         # Only load the cache if it will be used
@@ -116,6 +130,13 @@ class ListMixIn:
             "The form of ``--format`` is ignored, "
             "but keys used in it are added to the JSON output. "
             "Some keys are always present. Note: JSON can only represent text.",
+        )
+        subparser.add_argument(
+            "--depth",
+            metavar="N",
+            dest="depth",
+            type=int,
+            help="only list files up to the specified directory level depth",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(

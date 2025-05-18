@@ -74,3 +74,64 @@ def test_list_json(archivers, request):
     file1 = items[1]
     assert file1["path"] == "input/file1"
     assert file1["sha256"] == "b2915eb69f260d8d3c25249195f2c8f4f716ea82ec760ae929732c0262442b2b"
+
+
+def test_list_depth(archivers, request):
+    """Test the --depth option for the list command."""
+    archiver = request.getfixturevalue(archivers)
+
+    # Create repository
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # Create files at different directory depths
+    create_regular_file(archiver.input_path, "file_at_depth_1.txt", size=1)
+    create_regular_file(archiver.input_path, "dir1/file_at_depth_2.txt", size=1)
+    create_regular_file(archiver.input_path, "dir1/dir2/file_at_depth_3.txt", size=1)
+
+    # Create archive
+    cmd(archiver, "create", "test", "input")
+
+    # Test with depth=0 (only the root directory)
+    output_depth_0 = cmd(archiver, "list", "test", "--depth=0")
+    assert "input" in output_depth_0
+    assert "input/file_at_depth_1.txt" not in output_depth_0
+    assert "input/dir1" not in output_depth_0
+    assert "input/dir1/file_at_depth_2.txt" not in output_depth_0
+    assert "input/dir1/dir2" not in output_depth_0
+    assert "input/dir1/dir2/file_at_depth_3.txt" not in output_depth_0
+
+    # Test with depth=1 (only input directory and files directly in it)
+    output_depth_1 = cmd(archiver, "list", "test", "--depth=1")
+    assert "input" in output_depth_1
+    assert "input/file_at_depth_1.txt" in output_depth_1
+    assert "input/dir1" in output_depth_1
+    assert "input/dir1/file_at_depth_2.txt" not in output_depth_1
+    assert "input/dir1/dir2" not in output_depth_1
+    assert "input/dir1/dir2/file_at_depth_3.txt" not in output_depth_1
+
+    # Test with depth=2 (files up to one level inside input)
+    output_depth_2 = cmd(archiver, "list", "test", "--depth=2")
+    assert "input" in output_depth_2
+    assert "input/file_at_depth_1.txt" in output_depth_2
+    assert "input/dir1" in output_depth_2
+    assert "input/dir1/file_at_depth_2.txt" in output_depth_2
+    assert "input/dir1/dir2" in output_depth_2
+    assert "input/dir1/dir2/file_at_depth_3.txt" not in output_depth_2
+
+    # Test with depth=3 (files up to two levels inside input)
+    output_depth_3 = cmd(archiver, "list", "test", "--depth=3")
+    assert "input" in output_depth_3
+    assert "input/file_at_depth_1.txt" in output_depth_3
+    assert "input/dir1" in output_depth_3
+    assert "input/dir1/file_at_depth_2.txt" in output_depth_3
+    assert "input/dir1/dir2" in output_depth_3
+    assert "input/dir1/dir2/file_at_depth_3.txt" in output_depth_3
+
+    # Test without depth parameter (should show all files)
+    output_no_depth = cmd(archiver, "list", "test")
+    assert "input" in output_no_depth
+    assert "input/file_at_depth_1.txt" in output_no_depth
+    assert "input/dir1" in output_no_depth
+    assert "input/dir1/file_at_depth_2.txt" in output_no_depth
+    assert "input/dir1/dir2" in output_no_depth
+    assert "input/dir1/dir2/file_at_depth_3.txt" in output_no_depth

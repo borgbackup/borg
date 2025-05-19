@@ -1,9 +1,12 @@
 import argparse
+import os
 from typing import Tuple, Set
 
 from ._common import with_repository
 from ..archive import Archive
 from ..cache import write_chunkindex_to_repo_cache, build_chunkindex_from_repo
+from ..cache import files_cache_name, discover_files_cache_names
+from ..helpers import get_cache_dir
 from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..helpers import set_ec, EXIT_ERROR, format_file_size, bin_to_hex
@@ -43,6 +46,7 @@ class ArchiveGarbageCollector:
         (self.missing_chunks, self.total_files, self.total_size, self.archives_count) = self.analyze_archives()
         self.report_and_delete()
         self.save_chunk_index()
+        self.cleanup_files_cache()
         logger.info("Finished compaction / garbage collection...")
 
     def get_repository_chunks(self) -> ChunkIndex:
@@ -70,6 +74,43 @@ class ArchiveGarbageCollector:
             self.repository, self.chunks, incremental=False, clear=True, force_write=True, delete_other=True
         )
         self.chunks = None  # nothing there (cleared!)
+
+    def cleanup_files_cache(self):
+        """
+        Clean up files cache files for archive series names that no longer exist in the repository.
+
+        Note: this only works perfectly if the files cache filename suffixes are automatically generated
+        and the user does not manually control them via more than one BORG_FILES_CACHE_SUFFIX env var value.
+        """
+        logger.info("Cleaning up files cache...")
+
+        cache_dir = os.path.join(get_cache_dir(), self.repository.id_str)
+        if not os.path.exists(cache_dir):
+            logger.debug("Cache directory does not exist, skipping files cache cleanup")
+            return
+
+        # Get all existing archive series names
+        existing_series = set(self.manifest.archives.names())
+        logger.debug(f"Found {len(existing_series)} existing archive series.")
+
+        # Get the set of all existing files cache file names.
+        try:
+            files_cache_names = set(discover_files_cache_names(cache_dir))
+            logger.debug(f"Found {len(files_cache_names)} files cache files.")
+        except (FileNotFoundError, PermissionError) as e:
+            logger.warning(f"Could not access cache directory: {e}")
+            return
+
+        used_files_cache_names = set(files_cache_name(series_name) for series_name in existing_series)
+        unused_files_cache_names = files_cache_names - used_files_cache_names
+
+        for cache_filename in unused_files_cache_names:
+            cache_path = os.path.join(cache_dir, cache_filename)
+            try:
+                os.unlink(cache_path)
+            except (FileNotFoundError, PermissionError) as e:
+                logger.warning(f"Could not access cache file: {e}")
+        logger.info(f"Removed {len(unused_files_cache_names)} unused files cache files.")
 
     def analyze_archives(self) -> Tuple[Set, int, int, int]:
         """Iterate over all items in all archives, create the dicts id -> size of all used chunks."""

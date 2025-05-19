@@ -37,6 +37,35 @@ from .platform import SaveFile
 from .remote import RemoteRepository
 from .repository import LIST_SCAN_LIMIT, Repository, StoreObjectNotFound, repo_lister
 
+
+def files_cache_name(archive_name, files_cache_name="files"):
+    """
+    Return the name of the files cache file for the given archive name.
+
+    :param archive_name: name of the archive (ideally a series name)
+    :param files_cache_name: base name of the files cache file
+    :return: name of the files cache file
+    """
+    suffix = os.environ.get("BORG_FILES_CACHE_SUFFIX", "")
+    # when using archive series, we automatically make up a separate cache file per series.
+    # when not, the user may manually do that by using the env var.
+    if not suffix:
+        # avoid issues with too complex or long archive_name by hashing it:
+        suffix = bin_to_hex(xxh64(archive_name.encode()))
+    return files_cache_name + "." + suffix
+
+
+def discover_files_cache_names(path, files_cache_name="files"):
+    """
+    Return a list of all files cache file names in the given directory.
+
+    :param path: path to the directory to search in
+    :param files_cache_name: base name of the files cache files
+    :return: list of files cache file names
+    """
+    return [fn for fn in os.listdir(path) if fn.startswith(files_cache_name + ".")]
+
+
 # chunks is a list of ChunkListEntry
 FileCacheEntry = namedtuple("FileCacheEntry", "age inode size ctime mtime chunks")
 
@@ -495,16 +524,10 @@ class FilesCacheMixin:
         return files
 
     def files_cache_name(self):
-        suffix = os.environ.get("BORG_FILES_CACHE_SUFFIX", "")
-        # when using archive series, we automatically make up a separate cache file per series.
-        # when not, the user may manually do that by using the env var.
-        if not suffix:
-            # avoid issues with too complex or long archive_name by hashing it:
-            suffix = bin_to_hex(xxh64(self.archive_name.encode()))
-        return self.FILES_CACHE_NAME + "." + suffix
+        return files_cache_name(self.archive_name, self.FILES_CACHE_NAME)
 
     def discover_files_cache_names(self, path):
-        return [fn for fn in os.listdir(path) if fn.startswith(self.FILES_CACHE_NAME + ".")]
+        return discover_files_cache_names(path, self.FILES_CACHE_NAME)
 
     def _read_files_cache(self):
         """read files cache from cache directory"""

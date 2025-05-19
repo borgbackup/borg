@@ -97,6 +97,7 @@ jobs:
         sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
         sudo apt-get install -y libfuse-dev fuse || true  # Required for Python llfuse module
         sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
+        sudo apt-get install -y bash zsh fish  # for shell completion tests
 
     - name: Install Python requirements
       run: |

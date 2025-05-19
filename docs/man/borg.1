@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" "1" "2025-05-05" "" "borg backup tool"
+.TH "BORG" "1" "2025-05-19" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -226,6 +226,14 @@ For ssh and sftp URLs, the \fBuser@\fP and \fB:port\fP parts are optional.
 \fBRemote repositories\fP accessed via rclone:
 .sp
 \fBrclone:remote:path\fP \- see the rclone docs for more details about remote:path.
+.sp
+\fBRemote repositories\fP accessed via S3:
+.sp
+\fB(s3|b2):[profile|(access_key_id:access_key_secret)@][schema://hostname[:port]]/bucket/path\fP \- see the boto3 docs for more details about the credentials.
+.sp
+If you\(aqre connecting to AWS S3, \fB[schema://hostname[:port]]\fP is optional, but \fBbucket\fP and \fBpath\fP are always required.
+.sp
+Note: There is a known issue with some S3\-compatible services, e.g., Backblaze B2. If you encounter problems, try using \fBb2:\fP instead of \fBs3:\fP in the url.
 .sp
 If you frequently need the same repo URL, it is a good idea to set the
 \fBBORG_REPO\fP environment variable to set a default for the repo URL:

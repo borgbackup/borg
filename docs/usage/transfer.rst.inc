@@ -27,6 +27,8 @@ borg transfer
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--recompress MODE``                             | recompress data chunks according to `MODE` and ``--compression``. Possible modes are `always`: recompress unconditionally; and `never`: do not recompress (faster: re-uses compressed data chunks w/o change).If no MODE is given, `always` will be used. Not passing --recompress is equivalent to "--recompress never". |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--chunker-params PARAMS``                       | rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. default: do not rechunk                                                                                                                                           |
+    +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                                                                                                                                                              |
     |                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
     | :ref:`common_options`                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -69,6 +71,7 @@ borg transfer
         --upgrader UPGRADER    use the upgrader to convert transferred data (default: no conversion)
         -C COMPRESSION, --compression COMPRESSION    select compression algorithm, see the output of the "borg help compression" command for details.
         --recompress MODE    recompress data chunks according to `MODE` and ``--compression``. Possible modes are `always`: recompress unconditionally; and `never`: do not recompress (faster: re-uses compressed data chunks w/o change).If no MODE is given, `always` will be used. Not passing --recompress is equivalent to "--recompress never".
+        --chunker-params PARAMS    rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. default: do not rechunk
 
 
     :ref:`common_options`
@@ -91,6 +94,7 @@ Description
 This command transfers archives from one repository to another repository.
 Optionally, it can also upgrade the transferred data.
 Optionally, it can also recompress the transferred data.
+Optionally, it can also re-chunk the transferred data using different chunker parameters.
 
 It is easiest (and fastest) to give ``--compression=COMPRESSION --recompress=never`` using
 the same COMPRESSION mode as in the SRC_REPO - borg will use that COMPRESSION for metadata (in
@@ -135,4 +139,8 @@ to the above, but you need the ``--from-borg1`` option::
     # alternatively, to recompress everything to zstd,3:
     borg --repo=DST_REPO transfer --other-repo=SRC_REPO --from-borg1 \
          --compress=zstd,3 --recompress=always
+
+    # to re-chunk using different chunker parameters:
+    borg --repo=DST_REPO transfer --other-repo=SRC_REPO \
+         --chunker-params=buzhash,19,23,21,4095
 

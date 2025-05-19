@@ -27,6 +27,8 @@ borg list
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--json-lines``                      | Format output as JSON Lines. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text. |
     +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--depth N``                         | only list files up to the specified directory level depth                                                                                                                             |
+    +-------------------------------------------------------+---------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                        |
     |                                                                                                                                                                                                                                                                                       |
     | :ref:`common_options`                                                                                                                                                                                                                                                                 |
@@ -62,6 +64,7 @@ borg list
         --short     only print file/directory names, nothing else
         --format FORMAT    specify format for file listing (default: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")
         --json-lines    Format output as JSON Lines. The form of ``--format`` is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
+        --depth N    only list files up to the specified directory level depth
 
 
     :ref:`common_options`

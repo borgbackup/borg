@@ -1566,6 +1566,12 @@ class TarfileObjectProcessors:
                         bkey = key.encode("utf-8", errors="surrogateescape")
                         bvalue = value.encode("utf-8", errors="surrogateescape")
                         xattrs[bkey] = bvalue
+                    elif key == SCHILY_ACL_ACCESS:
+                        # Process POSIX access ACL
+                        item.acl_access = value.encode("utf-8", errors="surrogateescape")
+                    elif key == SCHILY_ACL_DEFAULT:
+                        # Process POSIX default ACL
+                        item.acl_default = value.encode("utf-8", errors="surrogateescape")
                 if xattrs:
                     item.xattrs = xattrs
         yield item, status

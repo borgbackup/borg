@@ -56,6 +56,7 @@ _borg_commands() {
     'tag:tag archives'
     'transfer:transfer of archives from another repository'
     'umount:un-mount the FUSE filesystem'
+    'undelete:undelete archive'
     'version:display borg client version / borg server version'
     'with-lock:run a user specified command with the repository lock held'
   )
@@ -115,6 +116,8 @@ _borg-compact() {
   __borg_setup_common_options
 
   _arguments -s -w -S : \
+    '(-n --dry-run)'{-n,--dry-run}'[do nothing]' \
+    '(-s --stats)'{-s,--stats}'[print statistics (might be much slower)]' \
     $common_options
 }
 
@@ -140,7 +143,7 @@ _borg-create() {
     '--content-from-command[interpret PATH as command and store its stdout]' \
     '--exclude-nodump[exclude files flagged NODUMP]' \
     '(-x --one-file-system)'{-x,--one-file-system}'[stay in the same file system]' \
-    '--numeric-owner[only store numeric user and group identifiers]' \
+    '--numeric-ids[only store numeric user and group identifiers]' \
     '--atime[do store atime into archive]' \
     '--noctime[do not store ctime into archive]' \
     '--nobirthtime[do not store birthtime (creation date) into archive]' \
@@ -284,7 +287,7 @@ _borg-diff() {
   __borg_setup_common_exclude_options
 
   _arguments -s -w -S : \
-    '--numeric-owner[only obey numeric user and group identifiers]' \
+    '--numeric-ids[only obey numeric user and group identifiers]' \
     '--same-chunker-params[override check of chunker parameters]' \
     '--sort[sort the output lines by file path]' \
     '--json-lines[format output as JSON Lines]' \
@@ -304,6 +307,7 @@ _borg-export-tar() {
   _arguments -s -w -S : \
     '--tar-filter[filter program to pipe data through]: :_cmdstring' \
     '--list[output verbose list of items (files, dirs, ...)]' \
+    '--tar-format[select tar format: BORG, PAX or GNU]:(BORG PAX GNU)' \
     $common_exclude_extract_options \
     $common_options \
     ':ARCHIVE: _borg_archive -a' \
@@ -320,7 +324,7 @@ _borg-extract() {
   _arguments -s -w -S : \
     '--list[output verbose list of items (files, dirs, ...)]' \
     '(-n --dry-run)'{-n,--dry-run}'[do not actually change any files]' \
-    '--numeric-owner[only obey numeric user and group identifiers]' \
+    '--numeric-ids[only obey numeric user and group identifiers]' \
     '--noacls[do not extract/set ACLs]' \
     '--noxattrs[do not extract/set xattrs]' \
     '--noflags[do not extract/set flags (e.g. NODUMP, IMMUTABLE)]' \
@@ -352,8 +356,15 @@ _borg-import-tar() {
 
   _arguments -s -w -S : \
     '--tar-filter[filter program to pipe data through]: :_cmdstring' \
+    '(-s --stats)'{-s,--stats}'[print statistics for the created archive]' \
     '--list[output verbose list of items (files, dirs, ...)]' \
-    $common_exclude_extract_options \
+    '--filter[only display items with the given status characters]: :' \
+    '--json[output stats as JSON (implies --stats)]' \
+    '--ignore-zeros[ignore zero-filled blocks in the input tarball]' \
+    '--comment[add a comment text to the archive]: :' \
+    '--timestamp[manually specify the archive creation date/time]: :' \
+    '--chunker-params[specify the chunker parameters]: :' \
+    '(-C --compression)'{-C,--compression}'=[select compression algorithm]: :_borg_compression' \
     $common_options \
     ':ARCHIVE: _borg_archive -a' \
     ':FILE:_files' \
@@ -498,18 +509,9 @@ _borg-recreate() {
   __borg_setup_common_options
   __borg_setup_common_create_options
 
-  local -a mods=(
-    'if-different:recompress if current compression is with a different compression algorithm (the level is not considered)'
-    'always:recompress even if current compression is with the same compression algorithm (use this to change the compression level)'
-    'never:do not recompress (use this option explicitly to prevent recompression)'
-  )
-  mods=( ${(q)mods//\\/\\\\} )
-  mods=( ${mods//:/\\:} )
-
   _arguments -s -w -S : \
     $common_create_options \
     '--target=[create a new archive with the name ARCHIVE]:ARCHIVE: _borg_placeholder_or_archive "${line[1]%%\:\:*}"' \
-    '--recompress=[recompress data chunks according to "MODE" and "--compression"]:MODE:'"(($mods))" \
     $common_options \
     ':ARCHIVE: _borg_archive' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
@@ -628,6 +630,9 @@ _borg-tag() {
 
   _arguments -s -w -S : \
     $common_dry_run_stats_options \
+    '--set=[set tags (can be given multiple times)]:TAG' \
+    '--add=[add tags (can be given multiple times)]:TAG' \
+    '--remove=[remove tags (can be given multiple times)]:TAG' \
     $common_archive_filters_options \
     $common_options \
     ':ARCHIVE: _borg_archive' \
@@ -643,9 +648,28 @@ _borg-transfer() {
 
   _arguments -s -w -S : \
     $common_dry_run_stats_options \
+    '--other-repo=[transfer archives from the other repository]:SRC_REPOSITORY:_borg_repository' \
+    '--from-borg1[other repository is borg 1.x]' \
+    '--upgrader=[use the upgrader to convert transferred data]:UPGRADER:(From12To20 NoOp)' \
+    '(-C --compression)'{-C,--compression}'=[select compression algorithm]: :_borg_compression' \
+    '--recompress=[recompress chunks CONDITION]:WHEN:(always never)' \
+    '--chunker-params=[specify the chunker parameters]: :_borg_chunker_params_examples' \
+    $common_archive_filters_options \
+    $common_options
+}
+
+(( $+functions[_borg-undelete] )) ||
+_borg-undelete() {
+  local -a common_options common_archive_filters_options
+  __borg_setup_common_options
+  __borg_setup_common_archive_filters_options
+
+  _arguments -s -w -S : \
+    '(-n --dry-run)'{-n,--dry-run}'[do not change repository]' \
+    '--list[output verbose list of archives]' \
     $common_archive_filters_options \
     $common_options \
-    '(-C --compression)'{-C,--compression}'=[select compression algorithm]: :_borg_compression'
+    '::ARCHIVE: _borg_archive'
 }
 
 (( $+functions[_borg-umount] )) ||
@@ -708,8 +732,8 @@ __borg_setup_common_options() {
     '--show-rc[show/log the return code (rc)]'
     '--umask=[set umask to M (local only, default: 0077)]:M'
     '--remote-path=[set remote path to executable (default: "borg")]: :_cmdstring'
-    '--remote-ratelimit=[set remote network upload rate limit in kiByte/s (default: 0=unlimited)]: : _borg_guard_unsigned_number "RATE"'
-    '--remote-buffer=[set upload buffer size in MiB. (default: 0=no buffer)]: : _borg_guard_unsigned_number "UPLOAD_BUFFER"'
+    '--upload-ratelimit=[set network upload rate limit in kiByte/s (default: 0=unlimited)]: : _borg_guard_unsigned_number "RATE"'
+    '--upload-buffer=[set network upload buffer size in MiB. (default: 0=no buffer)]: : _borg_guard_unsigned_number "UPLOAD_BUFFER"'
     '--debug-profile=[write execution profile in Borg format into FILE]:FILE:_files'
     '--rsh=[use COMMAND instead of ssh]: :_cmdstring'
     '(-r --repo)'{-r,--repo}'=[repository]'
@@ -749,7 +773,7 @@ __borg_setup_common_archive_filters_options() {
   __borg_setup_common_match_archives_filter_options
   typeset -ga common_archive_filters_options=(
     $common_match_archives_filter_options
-    '--sort-by=[Comma-separated list of sorting keys, default: timestamp]:KEYS:(timestamp name id)'
+    '--sort-by=[Comma-separated list of sorting keys, default: timestamp]:KEYS:(timestamp archive name id tags host user)'
     '(--last)--first=[consider first N archives after other filters were applied]:N: _borg_archive -n "${line[1]%%\:\:*}"'
     '(--first)--last=[consider last N archives after other filters were applied]:N: _borg_archive -n "${line[1]%%\:\:*}"'
   )

@@ -619,10 +619,7 @@ class LegacyRemoteRepository:
                 send_buffer()
         self.ignore_responses |= set(waiting_for)  # we lose order here
 
-    @api(
-        since=parse_version("1.0.0"),
-        v1_or_v2={"since": parse_version("2.0.0b8"), "previously": True},  # TODO fix version
-    )
+    @api(since=parse_version("1.0.0"), v1_or_v2={"since": parse_version("2.0.0b10"), "previously": True})
     def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, v1_or_v2=False):
         """actual remoting is done via self.call in the @api decorator"""
 

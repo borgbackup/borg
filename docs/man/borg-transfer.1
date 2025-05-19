@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-TRANSFER" "1" "2025-05-05" "" "borg backup tool"
+.TH "BORG-TRANSFER" "1" "2025-05-19" "" "borg backup tool"
 .SH NAME
 borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
@@ -38,6 +38,7 @@ borg [common options] transfer [options]
 This command transfers archives from one repository to another repository.
 Optionally, it can also upgrade the transferred data.
 Optionally, it can also recompress the transferred data.
+Optionally, it can also re\-chunk the transferred data using different chunker parameters.
 .sp
 It is easiest (and fastest) to give \fB\-\-compression=COMPRESSION \-\-recompress=never\fP using
 the same COMPRESSION mode as in the SRC_REPO \- borg will use that COMPRESSION for metadata (in
@@ -86,6 +87,10 @@ borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-from\-borg1 \e
 # alternatively, to recompress everything to zstd,3:
 borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \-\-from\-borg1 \e
      \-\-compress=zstd,3 \-\-recompress=always
+
+# to re\-chunk using different chunker parameters:
+borg \-\-repo=DST_REPO transfer \-\-other\-repo=SRC_REPO \e
+     \-\-chunker\-params=buzhash,19,23,21,4095
 .EE
 .UNINDENT
 .UNINDENT
@@ -112,6 +117,9 @@ select compression algorithm, see the output of the \(dqborg help compression\(d
 .TP
 .BI \-\-recompress \ MODE
 recompress data chunks according to \fIMODE\fP and \fB\-\-compression\fP\&. Possible modes are \fIalways\fP: recompress unconditionally; and \fInever\fP: do not recompress (faster: re\-uses compressed data chunks w/o change).If no MODE is given, \fIalways\fP will be used. Not passing \-\-recompress is equivalent to \(dq\-\-recompress never\(dq.
+.TP
+.BI \-\-chunker\-params \ PARAMS
+rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or \fIdefault\fP to use the chunker defaults. default: do not rechunk
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0

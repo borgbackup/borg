@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-LIST" "1" "2025-05-05" "" "borg backup tool"
+.TH "BORG-LIST" "1" "2025-05-19" "" "borg backup tool"
 .SH NAME
 borg-list \- List archive contents
 .SH SYNOPSIS
@@ -61,6 +61,9 @@ specify format for file listing (default: \(dq{mode} {user:6} {group:6} {size:8}
 .TP
 .B  \-\-json\-lines
 Format output as JSON Lines. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
+.TP
+.BI \-\-depth \ N
+only list files up to the specified directory level depth
 .UNINDENT
 .SS Include/Exclude options
 .INDENT 0.0

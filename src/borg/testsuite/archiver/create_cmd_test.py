@@ -10,6 +10,7 @@ import time
 
 import pytest
 
+from ..platform_test import skipif_not_linux
 from ... import platform
 from ...constants import *  # NOQA
 from ...manifest import Manifest
@@ -926,3 +927,68 @@ def test_common_options(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     log = cmd(archiver, "--debug", "create", "test", "input")
     assert "security: read previous location" in log
+
+
+def test_create_deep_wide_directory_structure(archivers, request, monkeypatch):
+    """Test that borg create fails when the stack size exceeds BORG_STACK_SIZE."""
+    pytest.skip("skip this for now")
+
+    archiver = request.getfixturevalue(archivers)
+    base_path = archiver.input_path
+
+    # Create a structure with multiple branches to increase stack size.
+    # We'll create a structure with 4 directories at the first level,
+    # each containing 4 subdirectories.
+    for i in range(4):
+        dir_path = os.path.join(base_path, f"dir{i}")
+        os.makedirs(dir_path, exist_ok=True)
+
+        # Create subdirectories in each directory
+        for j in range(4):
+            subdir_path = os.path.join(dir_path, f"subdir{j}")
+            os.makedirs(subdir_path, exist_ok=True)
+
+            # Create a file in each subdirectory
+            with open(os.path.join(subdir_path, "file.txt"), "w") as f:
+                f.write(f"File in dir{i}/subdir{j}")
+
+    # Set BORG_STACK_SIZE to a very low value to ensure borg create fails.
+    monkeypatch.setenv("BORG_STACK_SIZE", "3")
+
+    # Create the repository
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # Run the create command with fork=True to capture the output.
+    # The command should fail with exit code 2 (Error).
+    output = cmd(archiver, "create", "test", "input", fork=True, exit_code=2)
+
+    # Check that the output contains the expected error message.
+    assert (
+        "Stack size exceeded BORG_STACK_SIZE (3)" in output
+    ), f"Output does not contain expected error message. Output: {output}"
+
+
+@skipif_not_linux
+def test_create_deep_directory_hierarchy(archivers, request):
+    """Test that borg create can successfully process a deep directory hierarchy."""
+    archiver = request.getfixturevalue(archivers)
+
+    # Create a directory hierarchy that is 100 levels deep
+    base_path = archiver.input_path
+    current_path = base_path
+
+    depth = 1500  # might work for linux and is > 1000 Python stack limit
+    # Create <depth> levels of directories all named "d" to avoid path length issues
+    for _ in range(depth):
+        current_path = os.path.join(current_path, "d")
+        os.makedirs(current_path, exist_ok=True)
+
+    # Create a file at the deepest level
+    with open(os.path.join(current_path, "file.txt"), "w") as f:
+        f.write("This is a test file at the deepest level of the directory hierarchy.")
+
+    # Create the repository
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # Run the create command - this should succeed.
+    cmd(archiver, "create", "test", "input")

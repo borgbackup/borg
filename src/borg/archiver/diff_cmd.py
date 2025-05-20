@@ -48,11 +48,11 @@ class DiffMixIn:
             )
 
         def print_text_output(diff, formatter):
-            actual_changes = dict(
-                (name, change)
+            actual_changes = {
+                name: change
                 for name, change in diff.changes().items()
                 if actual_change(change) and (not args.content_only or (name not in DiffFormatter.METADATA))
-            )
+            }
             diff._changes = actual_changes
             res: str = formatter.format_item(diff)
             if res.strip():

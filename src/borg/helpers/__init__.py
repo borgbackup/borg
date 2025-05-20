@@ -67,7 +67,7 @@ warning_info = namedtuple("warning_info", "wc,msg,args,wt")
 """
 The global warnings_list variable is used to collect warning_info elements while borg is running.
 """
-_warnings_list: List[warning_info] = []
+_warnings_list: list[warning_info] = []
 
 
 def add_warning(msg, *args, **kwargs):
@@ -159,7 +159,7 @@ def get_ec(ec=None):
         # we do not have any warnings in warnings list, return success exit code
         return _exit_code
     # looks like we have some warning(s)
-    rcs = sorted(set(w_info.wc for w_info in _warnings_list))
+    rcs = sorted({w_info.wc for w_info in _warnings_list})
     logger.debug(f"rcs: {rcs!r}")
     if len(rcs) == 1:
         # easy: there was only one kind of warning, so we can be specific

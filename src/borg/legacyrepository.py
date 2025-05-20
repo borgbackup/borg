@@ -9,7 +9,8 @@ from collections import defaultdict
 from configparser import ConfigParser
 from functools import partial
 from itertools import islice
-from typing import Callable, DefaultDict
+from typing import DefaultDict
+from collections.abc import Callable
 
 from .constants import *  # NOQA
 from .hashindex import NSIndex1Entry, NSIndex1

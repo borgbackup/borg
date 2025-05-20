@@ -3,7 +3,8 @@ import hmac
 import os
 import textwrap
 from hashlib import sha256, pbkdf2_hmac
-from typing import Literal, Callable, ClassVar
+from typing import Literal, ClassVar
+from collections.abc import Callable
 
 from ..logger import create_logger
 
@@ -563,7 +564,7 @@ class FlexiKey:
                 raise KeyfileMismatchError(self.repository._location.canonical_path(), filename)
         # we get here if it really looks like a borg key for this repo,
         # do some more checks that are close to how borg reads/parses the key.
-        with open(filename, "r") as fd:
+        with open(filename) as fd:
             lines = fd.readlines()
             if len(lines) < 2:
                 logger.warning(f"borg key sanity check: expected 2+ lines total. [{filename}]")

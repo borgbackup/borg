@@ -29,8 +29,7 @@ def repo_lister(repository, *, limit=None):
         finished = (len(result) < limit) if limit is not None else (len(result) == 0)
         if not finished:
             marker = result[-1][0]
-        for id, stored_size in result:
-            yield id, stored_size
+        yield from result
 
 
 class Repository:

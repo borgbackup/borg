@@ -3,7 +3,7 @@ import io
 import json
 import os
 from hmac import compare_digest
-from typing import Callable
+from collections.abc import Callable
 
 from ..helpers import IntegrityError
 from ..logger import create_logger

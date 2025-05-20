@@ -164,8 +164,8 @@ def test_buzhash_chunksize_distribution():
     chunks_count = len(chunks)
     min_chunksize_observed = min(chunk_sizes)
     max_chunksize_observed = max(chunk_sizes)
-    min_count = sum((int(size == 2**min_exp) for size in chunk_sizes))
-    max_count = sum((int(size == 2**max_exp) for size in chunk_sizes))
+    min_count = sum(int(size == 2**min_exp) for size in chunk_sizes)
+    max_count = sum(int(size == 2**max_exp) for size in chunk_sizes)
     print(
         f"count: {chunks_count} min: {min_chunksize_observed} max: {max_chunksize_observed} "
         f"min count: {min_count} max count: {max_count}"

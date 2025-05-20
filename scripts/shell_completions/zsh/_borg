@@ -277,7 +277,7 @@ _borg-delete() {
     $common_archive_filters_options \
     $common_options \
     ':ARCHIVE: _borg_archive' \
-    '*:ARCHIVE: _borg_archive "${line[1]%%::*}"'
+    '*:ARCHIVE: _borg_archive'
 }
 
 (( $+functions[_borg-diff] )) ||
@@ -294,7 +294,7 @@ _borg-diff() {
     $common_exclude_options \
     $common_options \
     ':ARCHIVE1: _borg_archive -a' \
-    ':ARCHIVE2: _borg_archive "${line[1]%%::*}"' \
+    ':ARCHIVE2: _borg_archive' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
 }
 
@@ -453,7 +453,7 @@ _borg-list() {
     $common_archive_filters_options \
     $common_exclude_options \
     $common_options \
-    ':ARCHIVE: _borg_archive' \
+    ':ARCHIVE: _borg_archive -a' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
 }
 
@@ -511,7 +511,7 @@ _borg-recreate() {
 
   _arguments -s -w -S : \
     $common_create_options \
-    '--target=[create a new archive with the name ARCHIVE]:ARCHIVE: _borg_placeholder_or_archive "${line[1]%%\:\:*}"' \
+    '--target=[create a new archive with the name ARCHIVE]:ARCHIVE: _borg_placeholder_or_archive' \
     $common_options \
     ':ARCHIVE: _borg_archive' \
     '*: : _borg_style_selector_or_archive_files -e "$line[1]" pp'
@@ -636,7 +636,7 @@ _borg-tag() {
     $common_archive_filters_options \
     $common_options \
     ':ARCHIVE: _borg_archive' \
-    '*:ARCHIVE: _borg_archive "${line[1]%%::*}"'
+    '*:ARCHIVE: _borg_archive'
 }
 
 (( $+functions[_borg-transfer] )) ||
@@ -814,8 +814,6 @@ __borg_setup_common_repo_options() {
   __borg_setup_common_options
   typeset -ga common_repo_options=(
     $common_options
-    '--append-only[only allow appending to repository segment files]'
-    '--storage-quota=[override storage quota of the repository]: :_borg_quota_suffixes'
   )
 }
 
@@ -1017,70 +1015,33 @@ _borg_archive() {
       local -a sort_by=( --sort-by=${(M)^asort:#(timestamp|name|id)} )
       # NOTE: in case of option repetition, the later one takes precedence
 
-      if (( ! $+__borg_archives_need_update )); then
-        comppostfuncs+=( __borg_unset_archives_need_update )
-        typeset -gHi __borg_archives_need_update=1
-        if (( ! $#archive_filters && ! $+opts[-n] )); then
-          local erepo
-          [[ -n $1 ]] && __borg_expand_path ${(Q)qrepo} erepo
-          local -a newest_file=( $erepo/(hints|index|integrity).<1->(#qN.om[1]) )
-          if [[ -n $newest_file ]]; then
-            if zmodload -F zsh/stat b:zstat 2>/dev/null; then
-              local -a stats
-              zstat -A stats +mtime $newest_file
-              local -i mtime=$stats[1]
-              if [[ $__borg_prev_repo    ==  $erepo
-                 && __borg_prev_mtime    -ge mtime
-                 && $__borg_prev_order   ==  $reversed_order
-                 && $__borg_prev_sort_by ==  $sort_by ]]
-              then
-                __borg_archives_need_update=0
-              else
-                typeset -gH  __borg_prev_repo=$erepo
-                typeset -gHi __borg_prev_mtime=mtime __borg_prev_order=reversed_order
-                typeset -gHa __borg_prev_sort_by=( $sort_by )
-              fi
-            fi
-          fi
-        else
-          unset __borg_prev_{repo,mtime,order,sort_by}
-          comppostfuncs+=( __borg_unset_archives )
-        fi
-      fi
-
       if zstyle -t ":completion:${curcontext}:archives" verbose; then
-        if (( __borg_archives_need_update || ! $+__borg_archive_names || ! $+__borg_archive_descriptions )); then
-          __borg_archives_need_update=0
-          typeset -gHa __borg_archive_names=() __borg_archive_descriptions=()
-          local fmt descfmt name desc
-          zstyle -s ":completion:${curcontext}:archives" archive-description-format descfmt ||
-            descfmt='{archive:<36} {time} [{id}]'
-          fmt="{barchive}{NUL}$descfmt{NUL}"
-          _call_program -p archive-descriptions \
-            ${(q)__borg_command:-borg} repo-list --format=${(q)fmt} ${(q)sort_by} $archive_filters $qrepo 2>/dev/null |
-          while IFS= read -r -d $'\0' name && IFS= read -r -d $'\0' descr; do
-            __borg_archive_names[1,0]=( $name )
-            __borg_archive_descriptions[1,0]=( "$descr" )
-          done
-          (( $pipestatus[1] )) && {
-            _message "couldn't list repository: ${(Q)qrepo}"
-            unset __borg_prev_{repo,mtime,order,sort_by}
-            return 1
-          }
-          (( ! reversed_order )) &&
-            __borg_archive_names=( "${(@aO)__borg_archive_names}" ) &&
-            __borg_archive_descriptions=( "${(@aO)__borg_archive_descriptions}" )
-        fi
+        typeset -gHa __borg_archive_names=() __borg_archive_descriptions=()
+        local fmt descfmt name desc
+        zstyle -s ":completion:${curcontext}:archives" archive-description-format descfmt ||
+          descfmt='{id:.8}  {time}  {archive:<15}  {tags:<10}  {username:<10}  {hostname:<10}  {comment:.40}'
+        fmt="{barchive}{NUL}$descfmt{NUL}"
+        _call_program -p archive-descriptions \
+          ${(q)__borg_command:-borg} repo-list --format=${(q)fmt} ${(q)sort_by} $archive_filters $qrepo 2>/dev/null |
+        while IFS= read -r -d $'\0' name && IFS= read -r -d $'\0' descr; do
+          __borg_archive_names[1,0]=( $name )
+          __borg_archive_descriptions[1,0]=( "$descr" )
+        done
+        (( $pipestatus[1] )) && {
+          _message "couldn't list repository: ${(Q)qrepo}"
+          return 1
+        }
+        (( ! reversed_order )) &&
+          __borg_archive_names=( "${(@aO)__borg_archive_names}" ) &&
+          __borg_archive_descriptions=( "${(@aO)__borg_archive_descriptions}" )
         disp+=( -ld __borg_archive_descriptions )
-      elif (( __borg_archives_need_update || ! $+__borg_archive_names )); then
-        __borg_archives_need_update=0
+      else
         typeset -gHa __borg_archive_names=()
         local fmt='{barchive}{NUL}'
         __borg_archive_names=( ${(@0aO)"$(_call_program -p archives \
           ${(q)__borg_command:-borg} repo-list --format=${(q)fmt} ${(q)sort_by} $archive_filters $qrepo 2>/dev/null)"} )
         (( $pipestatus[1] )) && {
           _message "couldn't list repository: ${(Q)qrepo}"
-          unset __borg_prev_{repo,mtime,order,sort_by}
           return 1
         }
         (( ! reversed_order )) &&
@@ -1098,15 +1059,6 @@ _borg_archive() {
   return 1
 }
 
-(( $+functions[__borg_unset_archives] )) ||
-__borg_unset_archives() {
-  unset __borg_archive_names __borg_archive_descriptions
-}
-
-(( $+functions[__borg_unset_archives_need_update] )) ||
-__borg_unset_archives_need_update() {
-  unset __borg_archives_need_update
-}
 
 (( $+functions[__borg_expand_path] )) ||
 __borg_expand_path() {
@@ -1150,7 +1102,7 @@ _borg_placeholders() {
 
 (( $+functions[_borg_format_keys] )) ||
 _borg_format_keys() {
-  local repo_or_arch=${(Q)1}
+  local archive=${(Q)1}
 
   local -a keys=( NEWLINE NL NUL SPACE TAB CR LF )
   local -a repository_keys=( archive name barchive comment bcomment id start time end command_line hostname username )
@@ -1162,10 +1114,9 @@ _borg_format_keys() {
   akeys='archive-keys:archive keys:compadd -a archive_keys'
   rkeys='repository-keys:repository keys:compadd -a repository_keys'
   local -a alts=( 'keys:keys:compadd -a keys' )
-  if [[ $repo_or_arch == *::?* ]]; then
+  # If an archive is specified, show archive keys, otherwise show both repository and archive keys
+  if [[ -n $archive ]]; then
     alts+=( $akeys )
-  elif [[ -n $repo_or_arch ]]; then
-    alts+=( $rkeys )
   else
     alts+=( $rkeys $akeys )
   fi
@@ -1295,7 +1246,7 @@ __borg_archive_files() {
   local arch=$1 default_style_selector=$2
   shift 2
 
-  if [[ -z $arch || $arch != *::?* ]]; then
+  if [[ -z $arch ]]; then
     _message 'no archive specified'
     return 1
   fi

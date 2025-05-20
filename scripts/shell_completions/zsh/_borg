@@ -1020,9 +1020,9 @@ _borg_archive() {
         local fmt descfmt name desc
         zstyle -s ":completion:${curcontext}:archives" archive-description-format descfmt ||
           descfmt='{id:.8}  {time}  {archive:<15}  {tags:<10}  {username:<10}  {hostname:<10}  {comment:.40}'
-        fmt="{barchive}{NUL}$descfmt{NUL}"
+        fmt="{archive}{NUL}$descfmt{NUL}"
         _call_program -p archive-descriptions \
-          ${(q)__borg_command:-borg} repo-list --format=${(q)fmt} ${(q)sort_by} $archive_filters $qrepo 2>/dev/null |
+          ${(q)__borg_command:-borg} repo-list --format=${(q)fmt} ${(q)sort_by} $archive_filters --repo $qrepo 2>/dev/null |
         while IFS= read -r -d $'\0' name && IFS= read -r -d $'\0' descr; do
           __borg_archive_names[1,0]=( $name )
           __borg_archive_descriptions[1,0]=( "$descr" )
@@ -1037,9 +1037,9 @@ _borg_archive() {
         disp+=( -ld __borg_archive_descriptions )
       else
         typeset -gHa __borg_archive_names=()
-        local fmt='{barchive}{NUL}'
+        local fmt='{archive}{NUL}'
         __borg_archive_names=( ${(@0aO)"$(_call_program -p archives \
-          ${(q)__borg_command:-borg} repo-list --format=${(q)fmt} ${(q)sort_by} $archive_filters $qrepo 2>/dev/null)"} )
+          ${(q)__borg_command:-borg} repo-list --format=${(q)fmt} ${(q)sort_by} $archive_filters --repo $qrepo 2>/dev/null)"} )
         (( $pipestatus[1] )) && {
           _message "couldn't list repository: ${(Q)qrepo}"
           return 1
@@ -1105,7 +1105,7 @@ _borg_format_keys() {
   local archive=${(Q)1}
 
   local -a keys=( NEWLINE NL NUL SPACE TAB CR LF )
-  local -a repository_keys=( archive name barchive comment bcomment id start time end command_line hostname username )
+  local -a repository_keys=( archive name comment bcomment id start time end command_line hostname username )
   local -a archive_keys=( type mode uid gid user group path bpath source linktarget flags size csize dsize dcsize
     num_chunks unique_chunks mtime ctime atime isomtime isoctime isoatime blake2b blake2s md5 sha1 sha224 sha256 sha384
     sha3_224 sha3_256 sha3_384 sha3_512 sha512 shake_128 shake_256 archiveid archivename extra health )

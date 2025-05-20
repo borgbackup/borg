@@ -3,6 +3,7 @@ import errno
 import getpass
 import hashlib
 import os
+import re
 import shutil
 import sys
 from argparse import ArgumentTypeError
@@ -12,7 +13,7 @@ from io import StringIO, BytesIO
 
 import pytest
 
-from ..archiver.prune_cmd import prune_within, prune_split
+from ..archiver.prune_cmd import prune_split
 from .. import platform
 from ..constants import *  # NOQA
 from ..constants import CACHE_TAG_NAME, CACHE_TAG_CONTENTS
@@ -29,7 +30,7 @@ from ..helpers import (
     replace_placeholders,
 )
 from ..helpers import remove_dotdot_prefixes, make_path_safe, clean_lines
-from ..helpers import interval
+from ..helpers import interval, int_or_interval
 from ..helpers import get_base_dir, get_cache_dir, get_keys_dir, get_security_dir, get_config_dir, get_runtime_dir
 from ..helpers import is_slow_msgpack
 from ..helpers import msgpack
@@ -451,22 +452,12 @@ def test_invalid_make_path_safe(path):
 
 class MockArchive:
     def __init__(self, ts, id):
-        self.ts = ts
+        # Real archive objects have UTC zoned timestamps
+        self.ts = ts.replace(tzinfo=timezone.utc)
         self.id = id
 
     def __repr__(self):
         return f"{self.id}: {self.ts.isoformat()}"
-
-
-# This is the local timezone of the system running the tests.
-# We need this e.g. to construct archive timestamps for the prune tests,
-# because borg prune operates in the local timezone (it first converts the
-# archive timestamp to the local timezone). So, if we want the y/m/d/h/m/s
-# values which prune uses to be exactly the ones we give [and NOT shift them
-# by tzoffset], we need to give the timestamps in the same local timezone.
-# Please note that the timestamps in a real borg archive or manifest are
-# stored in UTC timezone.
-local_tz = datetime.now(tz=timezone.utc).astimezone(tz=None).tzinfo
 
 
 @pytest.mark.parametrize(
@@ -488,26 +479,26 @@ def test_prune_split(rule, num_to_keep, expected_ids):
 
     archives = [
         # years apart
-        MockArchive(datetime(2015, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
-        MockArchive(datetime(2016, 1, 1, 10, 0, 0, tzinfo=local_tz), 2),
-        MockArchive(datetime(2017, 1, 1, 10, 0, 0, tzinfo=local_tz), 3),
+        MockArchive(datetime(2015, 1, 1, 10, 0, 0), 1),
+        MockArchive(datetime(2016, 1, 1, 10, 0, 0), 2),
+        MockArchive(datetime(2017, 1, 1, 10, 0, 0), 3),
         # months apart
-        MockArchive(datetime(2017, 2, 1, 10, 0, 0, tzinfo=local_tz), 4),
-        MockArchive(datetime(2017, 3, 1, 10, 0, 0, tzinfo=local_tz), 5),
+        MockArchive(datetime(2017, 2, 1, 10, 0, 0), 4),
+        MockArchive(datetime(2017, 3, 1, 10, 0, 0), 5),
         # days apart
-        MockArchive(datetime(2017, 3, 2, 10, 0, 0, tzinfo=local_tz), 6),
-        MockArchive(datetime(2017, 3, 3, 10, 0, 0, tzinfo=local_tz), 7),
-        MockArchive(datetime(2017, 3, 4, 10, 0, 0, tzinfo=local_tz), 8),
+        MockArchive(datetime(2017, 3, 2, 10, 0, 0), 6),
+        MockArchive(datetime(2017, 3, 3, 10, 0, 0), 7),
+        MockArchive(datetime(2017, 3, 4, 10, 0, 0), 8),
         # minutes apart
-        MockArchive(datetime(2017, 10, 1, 9, 45, 0, tzinfo=local_tz), 9),
-        MockArchive(datetime(2017, 10, 1, 9, 55, 0, tzinfo=local_tz), 10),
+        MockArchive(datetime(2017, 10, 1, 9, 45, 0), 9),
+        MockArchive(datetime(2017, 10, 1, 9, 55, 0), 10),
         # seconds apart
-        MockArchive(datetime(2017, 10, 1, 10, 0, 1, tzinfo=local_tz), 11),
-        MockArchive(datetime(2017, 10, 1, 10, 0, 3, tzinfo=local_tz), 12),
-        MockArchive(datetime(2017, 10, 1, 10, 0, 5, tzinfo=local_tz), 13),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 1), 11),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 3), 12),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 5), 13),
     ]
     kept_because = {}
-    keep = prune_split(archives, rule, num_to_keep, kept_because)
+    keep = prune_split(archives, rule, num_to_keep, None, kept_because)
 
     assert set(keep) == subset(archives, expected_ids)
     for item in keep:
@@ -520,17 +511,17 @@ def test_prune_split_keep_oldest():
 
     archives = [
         # oldest backup, but not last in its year
-        MockArchive(datetime(2018, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
+        MockArchive(datetime(2018, 1, 1, 10, 0, 0), 1),
         # an interim backup
-        MockArchive(datetime(2018, 12, 30, 10, 0, 0, tzinfo=local_tz), 2),
+        MockArchive(datetime(2018, 12, 30, 10, 0, 0), 2),
         # year-end backups
-        MockArchive(datetime(2018, 12, 31, 10, 0, 0, tzinfo=local_tz), 3),
-        MockArchive(datetime(2019, 12, 31, 10, 0, 0, tzinfo=local_tz), 4),
+        MockArchive(datetime(2018, 12, 31, 10, 0, 0), 3),
+        MockArchive(datetime(2019, 12, 31, 10, 0, 0), 4),
     ]
 
     # Keep oldest when retention target can't otherwise be met
     kept_because = {}
-    keep = prune_split(archives, "yearly", 3, kept_because)
+    keep = prune_split(archives, "yearly", 3, None, kept_because)
 
     assert set(keep) == subset(archives, [1, 3, 4])
     assert kept_because[1][0] == "yearly[oldest]"
@@ -539,7 +530,7 @@ def test_prune_split_keep_oldest():
 
     # Otherwise, prune it
     kept_because = {}
-    keep = prune_split(archives, "yearly", 2, kept_because)
+    keep = prune_split(archives, "yearly", 2, None, kept_because)
 
     assert set(keep) == subset(archives, [3, 4])
     assert kept_because[3][0] == "yearly"
@@ -550,7 +541,7 @@ def test_prune_split_no_archives():
     archives = []
 
     kept_because = {}
-    keep = prune_split(archives, "yearly", 3, kept_because)
+    keep = prune_split(archives, "yearly", 3, None, kept_because)
 
     assert keep == []
     assert kept_because == {}
@@ -559,6 +550,7 @@ def test_prune_split_no_archives():
 @pytest.mark.parametrize(
     "timeframe, num_secs",
     [
+        ("0S", 0),
         ("5S", 5),
         ("2M", 2 * 60),
         ("1H", 60 * 60),
@@ -575,9 +567,9 @@ def test_interval(timeframe, num_secs):
 @pytest.mark.parametrize(
     "invalid_interval, error_tuple",
     [
-        ("H", ('Invalid number "": expected positive integer',)),
-        ("-1d", ('Invalid number "-1": expected positive integer',)),
-        ("food", ('Invalid number "foo": expected positive integer',)),
+        ("H", ('Invalid number "": expected nonnegative integer',)),
+        ("-1d", ('Invalid number "-1": expected nonnegative integer',)),
+        ("food", ('Invalid number "foo": expected nonnegative integer',)),
     ],
 )
 def test_interval_time_unit(invalid_interval, error_tuple):
@@ -586,42 +578,49 @@ def test_interval_time_unit(invalid_interval, error_tuple):
     assert exc.value.args == error_tuple
 
 
-def test_interval_number():
+@pytest.mark.parametrize(
+    "invalid_input, error_regex",
+    [
+        ("x", r'^Unexpected time unit "x": choose from'),
+        ("-1t", r'^Unexpected time unit "t": choose from'),
+        ("fool", r'^Unexpected time unit "l": choose from'),
+        ("abc", r'^Unexpected time unit "c": choose from'),
+        (" abc ", r'^Unexpected time unit " ": choose from'),
+    ],
+)
+def test_interval_invalid_time_format(invalid_input, error_regex):
     with pytest.raises(ArgumentTypeError) as exc:
-        interval("5")
-    assert exc.value.args == ('Unexpected time unit "5": choose from y, m, w, d, H, M, S',)
+        interval(invalid_input)
+    assert re.search(error_regex, exc.value.args[0])
 
 
-def test_prune_within():
-    def subset(lst, indices):
-        return {lst[i] for i in indices}
+@pytest.mark.parametrize(
+    "input, result",
+    [
+        ("0", 0),
+        ("5", 5),
+        (" 999 ", 999),
+        ("0S", timedelta(seconds=0)),
+        ("5S", timedelta(seconds=5)),
+        ("1m", timedelta(days=31)),
+    ],
+)
+def test_int_or_interval(input, result):
+    assert int_or_interval(input) == result
 
-    def dotest(test_archives, within, indices):
-        for ta in test_archives, reversed(test_archives):
-            kept_because = {}
-            keep = prune_within(ta, interval(within), kept_because)
-            assert set(keep) == subset(test_archives, indices)
-            assert all("within" == kept_because[a.id][0] for a in keep)
 
-    # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours
-    test_offsets = [60, 90 * 60, 150 * 60, 210 * 60, 25 * 60 * 60, 49 * 60 * 60]
-    now = datetime.now(timezone.utc)
-    test_dates = [now - timedelta(seconds=s) for s in test_offsets]
-    test_archives = [MockArchive(date, i) for i, date in enumerate(test_dates)]
-
-    dotest(test_archives, "15S", [])
-    dotest(test_archives, "2M", [0])
-    dotest(test_archives, "1H", [0])
-    dotest(test_archives, "2H", [0, 1])
-    dotest(test_archives, "3H", [0, 1, 2])
-    dotest(test_archives, "24H", [0, 1, 2, 3])
-    dotest(test_archives, "26H", [0, 1, 2, 3, 4])
-    dotest(test_archives, "2d", [0, 1, 2, 3, 4])
-    dotest(test_archives, "50H", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "3d", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "1w", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "1m", [0, 1, 2, 3, 4, 5])
-    dotest(test_archives, "1y", [0, 1, 2, 3, 4, 5])
+@pytest.mark.parametrize(
+    "invalid_input, error_regex",
+    [
+        ("H", r"Value is neither an integer nor an interval:"),
+        ("-1d", r"Value is neither an integer nor an interval:"),
+        ("food", r"Value is neither an integer nor an interval:"),
+    ],
+)
+def test_int_or_interval_time_unit(invalid_input, error_regex):
+    with pytest.raises(ArgumentTypeError) as exc:
+        int_or_interval(invalid_input)
+    assert re.search(error_regex, exc.value.args[0])
 
 
 def test_stable_dict():

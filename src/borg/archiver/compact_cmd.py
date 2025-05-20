@@ -1,6 +1,5 @@
 import argparse
 import os
-from typing import Tuple, Set
 
 from ._common import with_repository
 from ..archive import Archive
@@ -101,7 +100,7 @@ class ArchiveGarbageCollector:
             logger.warning(f"Could not access cache directory: {e}")
             return
 
-        used_files_cache_names = set(files_cache_name(series_name) for series_name in existing_series)
+        used_files_cache_names = {files_cache_name(series_name) for series_name in existing_series}
         unused_files_cache_names = files_cache_names - used_files_cache_names
 
         for cache_filename in unused_files_cache_names:
@@ -112,7 +111,7 @@ class ArchiveGarbageCollector:
                 logger.warning(f"Could not access cache file: {e}")
         logger.info(f"Removed {len(unused_files_cache_names)} unused files cache files.")
 
-    def analyze_archives(self) -> Tuple[Set, int, int, int]:
+    def analyze_archives(self) -> tuple[set, int, int, int]:
         """Iterate over all items in all archives, create the dicts id -> size of all used chunks."""
 
         def use_it(id):

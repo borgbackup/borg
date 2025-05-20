@@ -1,7 +1,6 @@
 import logging
 import os
 import sys
-from typing import Optional
 
 import pytest
 
@@ -40,7 +39,7 @@ def get_repository_from_fixture(repo_fixtures, request):
     return request.getfixturevalue(repo_fixtures)
 
 
-def reopen(repository, exclusive: Optional[bool] = True, create=False):
+def reopen(repository, exclusive: bool | None = True, create=False):
     if isinstance(repository, Repository):
         if repository.opened:
             raise RuntimeError("Repo must be closed before a reopen. Cannot support nested repository contexts.")

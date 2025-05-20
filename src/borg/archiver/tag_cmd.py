@@ -18,7 +18,7 @@ class TagMixIn:
 
         def tags_set(tags):
             """return a set of tags, removing empty tags"""
-            return set(tag for tag in tags if tag)
+            return {tag for tag in tags if tag}
 
         if args.name:
             archive_infos = [manifest.archives.get_one([args.name])]

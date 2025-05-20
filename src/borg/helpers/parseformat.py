@@ -10,7 +10,7 @@ import re
 import shlex
 import stat
 import uuid
-from typing import Dict, Set, Tuple, ClassVar, Any, TYPE_CHECKING, Literal
+from typing import ClassVar, Any, TYPE_CHECKING, Literal
 from collections import OrderedDict
 from datetime import datetime, timezone
 from functools import partial
@@ -646,8 +646,8 @@ def archivename_validator(text):
 
 class BaseFormatter(metaclass=abc.ABCMeta):
     format: str
-    static_data: Dict[str, Any]
-    FIXED_KEYS: ClassVar[Dict[str, str]] = {
+    static_data: dict[str, Any]
+    FIXED_KEYS: ClassVar[dict[str, str]] = {
         # Formatting aids
         "LF": "\n",
         "SPACE": " ",
@@ -657,7 +657,7 @@ class BaseFormatter(metaclass=abc.ABCMeta):
         "NEWLINE": "\n",
         "NL": "\n",  # \n is automatically converted to os.linesep on write
     }
-    KEY_DESCRIPTIONS: ClassVar[Dict[str, str]] = {
+    KEY_DESCRIPTIONS: ClassVar[dict[str, str]] = {
         "NEWLINE": "OS dependent line separator",
         "NL": "alias of NEWLINE",
         "NUL": "NUL character for creating print0 / xargs -0 like output",
@@ -666,9 +666,9 @@ class BaseFormatter(metaclass=abc.ABCMeta):
         "CR": "carriage return character",
         "LF": "line feed character",
     }
-    KEY_GROUPS: ClassVar[Tuple[Tuple[str, ...], ...]] = (("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),)
+    KEY_GROUPS: ClassVar[tuple[tuple[str, ...], ...]] = (("NEWLINE", "NL", "NUL", "SPACE", "TAB", "CR", "LF"),)
 
-    def __init__(self, format: str, static: Dict[str, Any]) -> None:
+    def __init__(self, format: str, static: dict[str, Any]) -> None:
         self.format = partial_format(format, static)
         self.static_data = static
 
@@ -685,7 +685,7 @@ class BaseFormatter(metaclass=abc.ABCMeta):
     @classmethod
     def keys_help(cls):
         help = []
-        keys: Set[str] = set()
+        keys: set[str] = set()
         keys.update(cls.KEY_DESCRIPTIONS.keys())
         keys.update(key for group in cls.KEY_GROUPS for key in group)
 

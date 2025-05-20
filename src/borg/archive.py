@@ -12,7 +12,7 @@ from functools import partial
 from getpass import getuser
 from io import BytesIO
 from itertools import groupby, zip_longest
-from typing import Iterator
+from collections.abc import Iterator
 from shutil import get_terminal_size
 
 from .platformflags import is_win32

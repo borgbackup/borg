@@ -12,12 +12,12 @@ def test_bash_completion_is_valid():
 
     # Check if bash is available
     try:
-        subprocess.run(["bash", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(["bash", "--version"], capture_output=True, check=True)
     except (subprocess.SubprocessError, FileNotFoundError):
         pytest.skip("bash not available")
 
     # Test if the bash completion file can be sourced without errors
-    result = subprocess.run(["bash", "-n", bash_completion_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = subprocess.run(["bash", "-n", bash_completion_file], capture_output=True)
     assert result.returncode == 0, f"Bash completion file has syntax errors: {result.stderr.decode()}"
 
 
@@ -28,14 +28,12 @@ def test_fish_completion_is_valid():
 
     # Check if fish is available
     try:
-        subprocess.run(["fish", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(["fish", "--version"], capture_output=True, check=True)
     except (subprocess.SubprocessError, FileNotFoundError):
         pytest.skip("fish not available")
 
     # Test if the fish completion file can be sourced without errors
-    result = subprocess.run(
-        ["fish", "-c", f"source {fish_completion_file}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    result = subprocess.run(["fish", "-c", f"source {fish_completion_file}"], capture_output=True)
     assert result.returncode == 0, f"Fish completion file has syntax errors: {result.stderr.decode()}"
 
 
@@ -46,10 +44,10 @@ def test_zsh_completion_is_valid():
 
     # Check if zsh is available
     try:
-        subprocess.run(["zsh", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(["zsh", "--version"], capture_output=True, check=True)
     except (subprocess.SubprocessError, FileNotFoundError):
         pytest.skip("zsh not available")
 
     # Test if the zsh completion file can be sourced without errors
-    result = subprocess.run(["zsh", "-n", zsh_completion_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = subprocess.run(["zsh", "-n", zsh_completion_file], capture_output=True)
     assert result.returncode == 0, f"Zsh completion file has syntax errors: {result.stderr.decode()}"

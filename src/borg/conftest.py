@@ -1,5 +1,4 @@
 import os
-from typing import Optional, List
 
 import pytest
 
@@ -65,19 +64,19 @@ def set_env_variables():
 class ArchiverSetup:
     EXE: str = None  # python source based
     FORK_DEFAULT = False
-    BORG_EXES: List[str] = []
+    BORG_EXES: list[str] = []
 
     def __init__(self):
         self.archiver = None
-        self.tmpdir: Optional[str] = None
-        self.repository_path: Optional[str] = None
-        self.repository_location: Optional[str] = None
-        self.input_path: Optional[str] = None
-        self.output_path: Optional[str] = None
-        self.keys_path: Optional[str] = None
-        self.cache_path: Optional[str] = None
-        self.exclude_file_path: Optional[str] = None
-        self.patterns_file_path: Optional[str] = None
+        self.tmpdir: str | None = None
+        self.repository_path: str | None = None
+        self.repository_location: str | None = None
+        self.input_path: str | None = None
+        self.output_path: str | None = None
+        self.keys_path: str | None = None
+        self.cache_path: str | None = None
+        self.exclude_file_path: str | None = None
+        self.patterns_file_path: str | None = None
 
     def get_kind(self) -> str:
         if self.repository_location.startswith("ssh://__testsuite__"):

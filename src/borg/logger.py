@@ -57,10 +57,9 @@ import os
 import queue
 import sys
 import time
-from typing import Optional
 import warnings
 
-logging_debugging_path: Optional[str] = None  # if set, write borg.logger debugging log to path/borg-*.log
+logging_debugging_path: str | None = None  # if set, write borg.logger debugging log to path/borg-*.log
 
 configured = False
 borg_serve_log_queue: queue.SimpleQueue = queue.SimpleQueue()

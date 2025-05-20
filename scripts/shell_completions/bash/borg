@@ -160,7 +160,7 @@ _borg()
                 local opts="-n --dry-run --other-repo --upgrader ${common_opts} -a --match-archives ${archive_filter_opts}"
                 ;;
             *' serve '*)
-                local opts="--restrict-to-path --restrict-to-repository --append-only --storage-quota ${common_opts}"
+                local opts="--restrict-to-path --restrict-to-repository ${common_opts}"
                 ;;
             *' tag '*)
                 local opts="--set --add --remove -a --match-archives ${archive_filter_opts} ${common_opts}"

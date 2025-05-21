@@ -229,6 +229,7 @@ def test_max_data_size(repo_fixtures, request):
         assert pdchunk(repository.get(H(0))) == max_data
         with pytest.raises(IntegrityError):
             repository.put(H(1), fchunk(max_data + b"x"))
+        repository.delete(H(0))
 
 
 def _assert_sparse(repository):

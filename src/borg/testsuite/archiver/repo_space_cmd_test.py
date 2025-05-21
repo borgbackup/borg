@@ -54,6 +54,8 @@ def test_repo_space_modify_reservation(archivers, request):
 
     # note: --reserve can only INCREASE the amount of reserved space.
 
+    cmd(archiver, "repo-space", "--free")  # save space on TMPDIR
+
 
 def test_repo_space_edge_cases(archivers, request):
     archiver = request.getfixturevalue(archivers)
@@ -78,3 +80,5 @@ def test_repo_space_edge_cases(archivers, request):
     # Check that space is reserved (should be 64MiB).
     output = cmd(archiver, "repo-space")
     assert "There is 67.11 MB reserved space in this repository." in output
+
+    cmd(archiver, "repo-space", "--free")  # save space on TMPDIR

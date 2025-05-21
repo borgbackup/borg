@@ -244,3 +244,11 @@ jobs:
           . env/bin/activate
           borg -V
           python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote"
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        env:
+          OS: ${{ runner.os }}
+          python: '3.11'
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          env_vars: OS, python

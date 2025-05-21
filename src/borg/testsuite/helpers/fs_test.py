@@ -270,7 +270,16 @@ def test_safe_unlink_is_safe_ENOSPC(tmpdir, monkeypatch):
 
 @pytest.mark.parametrize(
     "original_path, expected_path",
-    [("foo", "foo"), ("foo/bar", "foo/bar"), ("/foo/bar", "foo/bar"), ("../foo/bar", "foo/bar")],
+    [
+        (".", "."),
+        ("..", "."),
+        ("/", "."),
+        ("//", "."),
+        ("foo", "foo"),
+        ("foo/bar", "foo/bar"),
+        ("/foo/bar", "foo/bar"),
+        ("../foo/bar", "foo/bar"),
+    ],
 )
 def test_remove_dotdot_prefixes(original_path, expected_path):
     assert remove_dotdot_prefixes(original_path) == expected_path

@@ -281,21 +281,9 @@ class TestLocationWithoutEnv:
 @pytest.mark.parametrize(
     "name",
     [
-        "foo",
-        "foo bar",
-        "foo_bar",
-        "foo-bar",
-        "foo.bar",
-        "foo[bar]",
-        "foo@2020-01-01T12:34:56",
-        "foo{now}",
-        "foo{now:%Y-%m-%d}",
-        "foo{hostname}",
-        "foo{hostname}-{now}",
-        "foo{hostname}-{now:%Y-%m-%d}",
-        "foo{hostname}-{now:%Y-%m-%d}@{now:%H:%M:%S}",
-        "foo{hostname}-{now:%Y-%m-%d}@{now:%H:%M:%S}",
-        "foo{hostname}-{now:%Y-%m-%d}@{now:%H:%M:%S}",
+        "foobar",
+        # placeholders
+        "foobar-{now}",
     ],
 )
 def test_archivename_ok(name):
@@ -305,31 +293,25 @@ def test_archivename_ok(name):
 @pytest.mark.parametrize(
     "name",
     [
-        "",  # empty name
-        " ",  # just a space
-        " foo",  # leading space
-        "foo ",  # trailing space
-        "foo/bar",  # / not allowed
-        "foo\\bar",  # \ not allowed
-        "foo\nbar",  # \n not allowed
-        "foo\rbar",  # \r not allowed
-        "foo\tbar",  # \t not allowed
-        "foo\0bar",  # \0 not allowed
-        "foo\x01bar",  # \x01 not allowed
-        "foo\x02bar",  # \x02 not allowed
-        "foo\x03bar",  # \x03 not allowed
-        "foo\x04bar",  # \x04 not allowed
-        "foo\x05bar",  # \x05 not allowed
-        "foo\x06bar",  # \x06 not allowed
-        "foo\x07bar",  # \x07 not allowed
-        "foo\x08bar",  # \x08 not allowed
-        "foo\x09bar",  # \x09 not allowed
-        "foo\x0abar",  # \x0a not allowed
-        "foo\x0bbar",  # \x0b not allowed
-        "foo\x0cbar",  # \x0c not allowed
-        "foo\x0dbar",  # \x0d not allowed
-        "foo\x0ebar",  # \x0e not allowed
-        "foo\x0fbar",  # \x0f not allowed
+        "",  # too short
+        "x" * 201,  # too long
+        # invalid chars:
+        "foo/bar",
+        "foo\\bar",
+        ">foo",
+        "<foo",
+        "|foo",
+        'foo"bar',
+        "foo?",
+        "*bar",
+        "foo\nbar",
+        "foo\0bar",
+        # leading/trailing blanks
+        " foo",
+        "bar  ",
+        # contains surrogate-escapes
+        "foo\udc80bar",
+        "foo\udcffbar",
     ],
 )
 def test_archivename_invalid(name):
@@ -337,7 +319,7 @@ def test_archivename_invalid(name):
         archivename_validator(name)
 
 
-@pytest.mark.parametrize("text", ["foo", "bar", "baz"])
+@pytest.mark.parametrize("text", ["", "single line", "multi\nline\ncomment"])
 def test_text_ok(text):
     assert text_validator(name="text", max_length=100)(text) == text
 
@@ -345,19 +327,12 @@ def test_text_ok(text):
 @pytest.mark.parametrize(
     "text",
     [
-        "",  # empty
-        "foo\0bar",  # contains null byte
-        "foo\nbar",  # contains newline
-        "foo\rbar",  # contains carriage return
-        "foo\tbar",  # contains tab
-        "foo\x01bar",  # contains control character
-        "foo\x02bar",  # contains control character
-        "foo\x03bar",  # contains control character
-        "foo\x04bar",  # contains control character
-        "foo\x05bar",  # contains control character
-        "foo\x06bar",  # contains control character
-        "foo\x07bar",  # contains control character
-        "foo\x08bar",  # contains control character
+        "x" * 101,  # too long
+        # invalid chars:
+        "foo\0bar",
+        # contains surrogate-escapes
+        "foo\udc80bar",
+        "foo\udcffbar",
     ],
 )
 def test_text_invalid(text):

@@ -1,6 +1,5 @@
 import base64
 import getpass
-import hashlib
 import os
 import shutil
 import sys
@@ -14,7 +13,6 @@ from ..archiver.prune_cmd import prune_within, prune_split
 from .. import platform
 from ..constants import *  # NOQA
 from ..helpers import Location
-from ..helpers import Buffer
 from ..helpers import (
     partial_format,
     format_file_size,
@@ -27,8 +25,7 @@ from ..helpers import (
 from ..helpers import clean_lines
 from ..helpers import interval
 from ..helpers import is_slow_msgpack
-from ..helpers import msgpack
-from ..helpers import StableDict, bin_to_hex
+from ..helpers import bin_to_hex
 from ..helpers import parse_timestamp, ChunkIteratorFileWrapper, ChunkerParams
 from ..helpers import archivename_validator, text_validator
 from ..helpers import ProgressIndicatorPercent
@@ -569,12 +566,6 @@ def test_prune_within():
     dotest(test_archives, "1y", [0, 1, 2, 3, 4, 5])
 
 
-def test_stable_dict():
-    d = StableDict(foo=1, bar=2, boo=3, baz=4)
-    assert list(d.items()) == [("bar", 2), ("baz", 4), ("boo", 3), ("foo", 1)]
-    assert hashlib.md5(msgpack.packb(d)).hexdigest() == "fc78df42cd60691b3ac3dd2a2b39903f"
-
-
 def test_parse_timestamp():
     assert parse_timestamp("2015-04-19T20:25:00.226410") == datetime(2015, 4, 19, 20, 25, 0, 226410, timezone.utc)
     assert parse_timestamp("2015-04-19T20:25:00") == datetime(2015, 4, 19, 20, 25, 0, 0, timezone.utc)
@@ -693,61 +684,6 @@ def test_is_slow_msgpack():
         msgpack.Packer = saved_packer
     # this tests that we have fast msgpack on test platform:
     assert not is_slow_msgpack()
-
-
-class TestBuffer:
-    def test_type(self):
-        buffer = Buffer(bytearray)
-        assert isinstance(buffer.get(), bytearray)
-        buffer = Buffer(bytes)  # don't do that in practice
-        assert isinstance(buffer.get(), bytes)
-
-    def test_len(self):
-        buffer = Buffer(bytearray, size=0)
-        b = buffer.get()
-        assert len(buffer) == len(b) == 0
-        buffer = Buffer(bytearray, size=1234)
-        b = buffer.get()
-        assert len(buffer) == len(b) == 1234
-
-    def test_resize(self):
-        buffer = Buffer(bytearray, size=100)
-        assert len(buffer) == 100
-        b1 = buffer.get()
-        buffer.resize(200)
-        assert len(buffer) == 200
-        b2 = buffer.get()
-        assert b2 is not b1  # new, bigger buffer
-        buffer.resize(100)
-        assert len(buffer) >= 100
-        b3 = buffer.get()
-        assert b3 is b2  # still same buffer (200)
-        buffer.resize(100, init=True)
-        assert len(buffer) == 100  # except on init
-        b4 = buffer.get()
-        assert b4 is not b3  # new, smaller buffer
-
-    def test_limit(self):
-        buffer = Buffer(bytearray, size=100, limit=200)
-        buffer.resize(200)
-        assert len(buffer) == 200
-        with pytest.raises(Buffer.MemoryLimitExceeded):
-            buffer.resize(201)
-        assert len(buffer) == 200
-
-    def test_get(self):
-        buffer = Buffer(bytearray, size=100, limit=200)
-        b1 = buffer.get(50)
-        assert len(b1) >= 50  # == 100
-        b2 = buffer.get(100)
-        assert len(b2) >= 100  # == 100
-        assert b2 is b1  # did not need resizing yet
-        b3 = buffer.get(200)
-        assert len(b3) == 200
-        assert b3 is not b2  # new, resized buffer
-        with pytest.raises(Buffer.MemoryLimitExceeded):
-            buffer.get(201)  # beyond limit
-        assert len(buffer) == 200
 
 
 def test_progress_percentage(capfd):

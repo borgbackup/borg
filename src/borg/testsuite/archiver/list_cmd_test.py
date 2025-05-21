@@ -35,11 +35,13 @@ def test_list_chunk_counts(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "empty_file", size=0)
     create_regular_file(archiver.input_path, "two_chunks")
-    with open(os.path.join(archiver.input_path, "two_chunks"), "wb") as fd:
+    filename = os.path.join(archiver.input_path, "two_chunks")
+    with open(filename, "wb") as fd:
         fd.write(b"abba" * 2000000)
         fd.write(b"baab" * 2000000)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
+    os.unlink(filename)  # save space on TMPDIR
     output = cmd(archiver, "list", "test", "--format", "{num_chunks} {path}{NL}")
     assert "0 input/empty_file" in output
     assert "2 input/two_chunks" in output

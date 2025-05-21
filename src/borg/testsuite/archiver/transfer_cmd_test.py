@@ -412,7 +412,7 @@ def test_transfer_rechunk(archivers, request, monkeypatch):
     """Test transfer with re-chunking"""
     archiver = request.getfixturevalue(archivers)
 
-    BLKSIZE = 4096
+    BLKSIZE = 512
     source_chunker_params = "buzhash,19,23,21,4095"  # default buzhash chunks
     dest_chunker_params = f"fixed,{BLKSIZE}"  # fixed chunk size
 

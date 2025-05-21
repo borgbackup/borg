@@ -1,4 +1,3 @@
-import shutil
 import sys
 from argparse import ArgumentTypeError
 from datetime import datetime, timezone
@@ -10,7 +9,6 @@ from ..archiver.prune_cmd import prune_split
 from ..constants import *  # NOQA
 from ..helpers import ChunkIteratorFileWrapper, ChunkerParams
 from ..helpers import chunkit
-from ..helpers import popen_with_error_handling
 from ..helpers import iter_separated
 from ..helpers import is_slow_msgpack
 from ..helpers import classify_ec, max_ec
@@ -213,29 +211,6 @@ def test_chunkit():
 
     it = chunkit("", 3)
     assert list(it) == []
-
-
-class TestPopenWithErrorHandling:
-    @pytest.mark.skipif(not shutil.which("test"), reason='"test" binary is needed')
-    def test_simple(self):
-        proc = popen_with_error_handling("test 1")
-        assert proc.wait() == 0
-
-    @pytest.mark.skipif(
-        shutil.which("borg-foobar-test-notexist"), reason='"borg-foobar-test-notexist" binary exists (somehow?)'
-    )
-    def test_not_found(self):
-        proc = popen_with_error_handling("borg-foobar-test-notexist 1234")
-        assert proc is None
-
-    @pytest.mark.parametrize("cmd", ('mismatched "quote', 'foo --bar="baz', ""))
-    def test_bad_syntax(self, cmd):
-        proc = popen_with_error_handling(cmd)
-        assert proc is None
-
-    def test_shell(self):
-        with pytest.raises(AssertionError):
-            popen_with_error_handling("", shell=True)
 
 
 def test_iter_separated():

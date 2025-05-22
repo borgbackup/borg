@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from ..helpers import shellpattern
+from ...helpers import shellpattern
 
 
 def check(path, pattern):

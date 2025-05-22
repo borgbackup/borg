@@ -1,8 +1,12 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+import pytest
 
 from ...constants import *  # NOQA
+from ...archiver.prune_cmd import prune_split, prune_within
 from . import cmd, RK_ENCRYPTION, src_dir, generate_archiver_tests
+from ...helpers import interval
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -257,3 +261,142 @@ def test_prune_ignore_protected(archivers, request):
     output = cmd(archiver, "repo-list")
     assert "archive1" in output  # @PROT protected archive1 from deletion
     assert "archive3" in output  # last one
+
+
+class MockArchive:
+    def __init__(self, ts, id):
+        self.ts = ts
+        self.id = id
+
+    def __repr__(self):
+        return f"{self.id}: {self.ts.isoformat()}"
+
+
+# This is the local timezone of the system running the tests.
+# We need this e.g. to construct archive timestamps for the prune tests,
+# because borg prune operates in the local timezone (it first converts the
+# archive timestamp to the local timezone). So, if we want the y/m/d/h/m/s
+# values which prune uses to be exactly the ones we give [and NOT shift them
+# by tzoffset], we need to give the timestamps in the same local timezone.
+# Please note that the timestamps in a real borg archive or manifest are
+# stored in UTC timezone.
+local_tz = datetime.now(tz=timezone.utc).astimezone(tz=None).tzinfo
+
+
+def test_prune_within():
+    def subset(lst, indices):
+        return {lst[i] for i in indices}
+
+    def dotest(test_archives, within, indices):
+        for ta in test_archives, reversed(test_archives):
+            kept_because = {}
+            keep = prune_within(ta, interval(within), kept_because)
+            assert set(keep) == subset(test_archives, indices)
+            assert all("within" == kept_because[a.id][0] for a in keep)
+
+    # 1 minute, 1.5 hours, 2.5 hours, 3.5 hours, 25 hours, 49 hours
+    test_offsets = [60, 90 * 60, 150 * 60, 210 * 60, 25 * 60 * 60, 49 * 60 * 60]
+    now = datetime.now(timezone.utc)
+    test_dates = [now - timedelta(seconds=s) for s in test_offsets]
+    test_archives = [MockArchive(date, i) for i, date in enumerate(test_dates)]
+
+    dotest(test_archives, "15S", [])
+    dotest(test_archives, "2M", [0])
+    dotest(test_archives, "1H", [0])
+    dotest(test_archives, "2H", [0, 1])
+    dotest(test_archives, "3H", [0, 1, 2])
+    dotest(test_archives, "24H", [0, 1, 2, 3])
+    dotest(test_archives, "26H", [0, 1, 2, 3, 4])
+    dotest(test_archives, "2d", [0, 1, 2, 3, 4])
+    dotest(test_archives, "50H", [0, 1, 2, 3, 4, 5])
+    dotest(test_archives, "3d", [0, 1, 2, 3, 4, 5])
+    dotest(test_archives, "1w", [0, 1, 2, 3, 4, 5])
+    dotest(test_archives, "1m", [0, 1, 2, 3, 4, 5])
+    dotest(test_archives, "1y", [0, 1, 2, 3, 4, 5])
+
+
+@pytest.mark.parametrize(
+    "rule,num_to_keep,expected_ids",
+    [
+        ("yearly", 3, (13, 2, 1)),
+        ("monthly", 3, (13, 8, 4)),
+        ("weekly", 2, (13, 8)),
+        ("daily", 3, (13, 8, 7)),
+        ("hourly", 3, (13, 10, 8)),
+        ("minutely", 3, (13, 10, 9)),
+        ("secondly", 4, (13, 12, 11, 10)),
+        ("daily", 0, []),
+    ],
+)
+def test_prune_split(rule, num_to_keep, expected_ids):
+    def subset(lst, ids):
+        return {i for i in lst if i.id in ids}
+
+    archives = [
+        # years apart
+        MockArchive(datetime(2015, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
+        MockArchive(datetime(2016, 1, 1, 10, 0, 0, tzinfo=local_tz), 2),
+        MockArchive(datetime(2017, 1, 1, 10, 0, 0, tzinfo=local_tz), 3),
+        # months apart
+        MockArchive(datetime(2017, 2, 1, 10, 0, 0, tzinfo=local_tz), 4),
+        MockArchive(datetime(2017, 3, 1, 10, 0, 0, tzinfo=local_tz), 5),
+        # days apart
+        MockArchive(datetime(2017, 3, 2, 10, 0, 0, tzinfo=local_tz), 6),
+        MockArchive(datetime(2017, 3, 3, 10, 0, 0, tzinfo=local_tz), 7),
+        MockArchive(datetime(2017, 3, 4, 10, 0, 0, tzinfo=local_tz), 8),
+        # minutes apart
+        MockArchive(datetime(2017, 10, 1, 9, 45, 0, tzinfo=local_tz), 9),
+        MockArchive(datetime(2017, 10, 1, 9, 55, 0, tzinfo=local_tz), 10),
+        # seconds apart
+        MockArchive(datetime(2017, 10, 1, 10, 0, 1, tzinfo=local_tz), 11),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 3, tzinfo=local_tz), 12),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 5, tzinfo=local_tz), 13),
+    ]
+    kept_because = {}
+    keep = prune_split(archives, rule, num_to_keep, kept_because)
+
+    assert set(keep) == subset(archives, expected_ids)
+    for item in keep:
+        assert kept_because[item.id][0] == rule
+
+
+def test_prune_split_keep_oldest():
+    def subset(lst, ids):
+        return {i for i in lst if i.id in ids}
+
+    archives = [
+        # oldest backup, but not last in its year
+        MockArchive(datetime(2018, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
+        # an interim backup
+        MockArchive(datetime(2018, 12, 30, 10, 0, 0, tzinfo=local_tz), 2),
+        # year-end backups
+        MockArchive(datetime(2018, 12, 31, 10, 0, 0, tzinfo=local_tz), 3),
+        MockArchive(datetime(2019, 12, 31, 10, 0, 0, tzinfo=local_tz), 4),
+    ]
+
+    # Keep oldest when retention target can't otherwise be met
+    kept_because = {}
+    keep = prune_split(archives, "yearly", 3, kept_because)
+
+    assert set(keep) == subset(archives, [1, 3, 4])
+    assert kept_because[1][0] == "yearly[oldest]"
+    assert kept_because[3][0] == "yearly"
+    assert kept_because[4][0] == "yearly"
+
+    # Otherwise, prune it
+    kept_because = {}
+    keep = prune_split(archives, "yearly", 2, kept_because)
+
+    assert set(keep) == subset(archives, [3, 4])
+    assert kept_because[3][0] == "yearly"
+    assert kept_because[4][0] == "yearly"
+
+
+def test_prune_split_no_archives():
+    archives = []
+
+    kept_because = {}
+    keep = prune_split(archives, "yearly", 3, kept_because)
+
+    assert keep == []
+    assert kept_because == {}

@@ -657,7 +657,7 @@ can be used to tune the chunker parameters, the default is:
 - CHUNK_MIN_EXP = 19 (minimum chunk size = 2^19 B = 512 kiB)
 - CHUNK_MAX_EXP = 23 (maximum chunk size = 2^23 B = 8 MiB)
 - HASH_MASK_BITS = 21 (target chunk size ~= 2^21 B = 2 MiB)
-- HASH_WINDOW_SIZE = 4095 [B] (`0xFFF`)
+- HASH_WINDOW_SIZE = 4095 [B] (`0xFFF`) (must be an odd number)
 
 The buzhash table is altered by XORing it with a seed randomly generated once
 for the repository, and stored encrypted in the keyfile. This is to prevent

@@ -157,6 +157,8 @@ above.
 New features:
 
 - transfer: implement --chunker-params to re-chunk while transferring, #8706
+- list --depth=N: list files up to N depth in path hierarchy, #8268
+- compact: also clean up files cache, #8852
 - `BORG_REPO_PERMISSIONS=all|no-delete|write-only|read-only`, #8823
 
   The posixfs borgstore backend implements permissions to make
@@ -178,8 +180,25 @@ Fixes:
 
 Other changes:
 
-- tests: add/improve tests for repo-compress --stats, transfer, repo-space
-- docs: must have the release tags in the local repo, #8582
+- some updates and fixes for shell completions, needs more work
+- dir_is_tagged/_is_cachedir: add fd-based operations
+- cython: suppress compiler warning about CYTHON_FALLTHROUGH in unreachable code
+- source code: pyupgrade --py310-plus ./**/*.py
+- tests:
+
+  - add/improve tests for repo-compress --stats, transfer, repo-space
+  - split helpers tests from a single module into borg.testsuite.helpers package
+  - save temp space (good for ramdisk users)
+  - fix diff cmd test on macOS HFS+, #8860
+  - test validity of shell completion files
+  - CI: fix and enable windows CI, #8728
+  - CI: upload coverage for windows tests
+  - CI: install zsh and fish so we can test shell completions
+- docs:
+
+  - must have the release tags in the local repo, #8582
+  - remove outdated docs/man files about borg change-passphrase
+  - add S3/B2 urls to documentation for repository urls, #8833
 
 
 Version 2.0.0b16 (2025-05-06)

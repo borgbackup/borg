@@ -142,6 +142,8 @@ def ChunkerParams(s):
             reject_or_warn('min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)', False)
         if chunk_max > 23:
             reject_or_warn('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)', True)
+        if window_size % 2 == 0:
+            reject_or_warn("window_size must be an uneven (odd) number", False)
         return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
     raise argparse.ArgumentTypeError('invalid chunker params')
 

@@ -465,7 +465,7 @@ class ObfuscateSize(CompressorBase):
     def _obfuscate(self, compr_size):
         # implementations need to return the size of obfuscation data,
         # that the caller shall add.
-        raise NotImplemented
+        raise NotImplementedError
 
     def _relative_random_reciprocal_obfuscate(self, compr_size):
         # effect for SPEC 1:

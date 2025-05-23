@@ -30,7 +30,7 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE", "AUTHORS"]
 dependencies = [
   "borghash ~= 0.1.0",
-  "borgstore @ git+https://github.com/borgbackup/borgstore.git@master",  # temporary until there is a release
+  "borgstore ~= 0.3.0",
   "msgpack >=1.0.3, <=1.1.0",
   "packaging",
   "platformdirs >=3.0.0, <5.0.0; sys_platform == 'darwin'",  # for macOS: breaking changes in 3.0.0,

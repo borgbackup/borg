@@ -144,7 +144,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b17 (2025-05-xx)
+Version 2.0.0b17 (2025-05-23)
 -----------------------------
 
 Please note:
@@ -180,10 +180,11 @@ Fixes:
 
 Other changes:
 
+- require borgstore 0.3.x
 - some updates and fixes for shell completions, needs more work
 - dir_is_tagged/_is_cachedir: add fd-based operations
 - cython: suppress compiler warning about CYTHON_FALLTHROUGH in unreachable code
-- source code: pyupgrade --py310-plus ./**/*.py
+- source code: `pyupgrade --py310-plus ./**/*.py`
 - tests:
 
   - add/improve tests for repo-compress --stats, transfer, repo-space

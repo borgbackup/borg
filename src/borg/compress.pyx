@@ -465,7 +465,7 @@ class ObfuscateSize(CompressorBase):
     def _obfuscate(self, compr_size):
         # implementations need to return the size of obfuscation data,
         # that the caller shall add.
-        raise NotImplemented
+        raise NotImplementedError
 
     def _relative_random_reciprocal_obfuscate(self, compr_size):
         # effect for SPEC 1:
@@ -479,6 +479,19 @@ class ObfuscateSize(CompressorBase):
 
     def _random_padding_obfuscate(self, compr_size):
         return int(self.max_padding_size * random.random())
+
+    def _padme_obfuscate(self, compr_size):
+        if compr_size < 2:
+            return 0
+
+        E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)
+        S = math.floor(math.log2(E)) + 1       # Second log component
+        lastBits = E - S                       # Bits to be zeroed
+        bitMask = (2 ** lastBits - 1)          # Mask for rounding
+
+        padded_size = (compr_size + bitMask) & ~bitMask  # Apply rounding
+
+        return padded_size - compr_size  # Return only the additional padding size
 
     def compress(self, data):
         compressed_data = self.compressor.compress(data)  # compress data
@@ -501,18 +514,6 @@ class ObfuscateSize(CompressorBase):
             self.compressor = Compressor.detect(compressed_data)()
         return self.compressor.decompress(compressed_data)  # decompress data
 
-    def _padme_obfuscate(self, compr_size):
-        if compr_size < 2:
-            return 0
-
-        E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)
-        S = math.floor(math.log2(E)) + 1       # Second log component
-        lastBits = E - S                       # Bits to be zeroed
-        bitMask = (2 ** lastBits - 1)          # Mask for rounding
-
-        padded_size = (compr_size + bitMask) & ~bitMask  # Apply rounding
-
-        return padded_size - compr_size  # Return only the additional padding size
 
 # Maps valid compressor names to their class
 COMPRESSOR_TABLE = {

@@ -4585,6 +4585,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file_replaced', contents=b'0' * 4096)
         os.unlink('input/file_removed')
         os.unlink('input/file_removed2')
+        time.sleep(1)  # macOS HFS+ has a 1s timestamp granularity
         Path('input/file_touched').touch()
         os.rmdir('input/dir_replaced_with_file')
         self.create_regular_file('dir_replaced_with_file', size=8192)

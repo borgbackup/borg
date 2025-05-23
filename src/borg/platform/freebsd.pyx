@@ -4,6 +4,7 @@ import stat
 from libc cimport errno
 
 from .posix import posix_acl_use_stored_uid_gid
+from .base import get_binary_acl  # dummy
 from ..helpers import safe_encode, safe_decode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
 

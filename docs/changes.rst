@@ -29,7 +29,7 @@ Compatibility notes:
   a new borg 2.0 repo, but it will need some time and space.
 
   Before using "borg transfer", you must have upgraded to borg >= 1.2.6 (or
-  another borg version that was patched to fix CVE-2023-CVE-2023-36811) and
+  another borg version that was patched to fix CVE-2023-36811) and
   you must have followed the upgrade instructions at top of the change log
   relating to manifest and archive TAMs (borg2 just requires these TAMs now).
 

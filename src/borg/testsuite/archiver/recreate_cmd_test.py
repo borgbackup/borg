@@ -138,7 +138,7 @@ def test_recreate_rechunkify(archivers, request):
         fd.write(b"a" * 280)
         fd.write(b"b" * 280)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "test1", "input", "--chunker-params", "7,9,8,128")
+    cmd(archiver, "create", "test1", "input", "--chunker-params", "7,9,8,127")
     cmd(archiver, "create", "test2", "input", "--files-cache=disabled")
     num_chunks1 = int(cmd(archiver, "list", "test1", "input/large_file", "--format", "{num_chunks}"))
     num_chunks2 = int(cmd(archiver, "list", "test2", "input/large_file", "--format", "{num_chunks}"))
@@ -159,7 +159,7 @@ def test_recreate_fixed_rechunkify(archivers, request):
     with open(os.path.join(archiver.input_path, "file"), "wb") as fd:
         fd.write(b"a" * 8192)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "test", "input", "--chunker-params", "7,9,8,128")
+    cmd(archiver, "create", "test", "input", "--chunker-params", "7,9,8,127")
     output = cmd(archiver, "list", "test", "input/file", "--format", "{num_chunks}")
     num_chunks = int(output)
     assert num_chunks > 2
@@ -175,7 +175,7 @@ def test_recreate_no_rechunkify(archivers, request):
         fd.write(b"a" * 8192)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     # first create an archive with non-default chunker params:
-    cmd(archiver, "create", "test", "input", "--chunker-params", "7,9,8,128")
+    cmd(archiver, "create", "test", "input", "--chunker-params", "7,9,8,127")
     output = cmd(archiver, "list", "test", "input/file", "--format", "{num_chunks}")
     num_chunks = int(output)
     # now recreate the archive and do NOT specify chunker params:

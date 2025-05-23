@@ -596,6 +596,7 @@ def test_valid_chunkerparams(chunker_params, expected_return):
         "buzhash,5,7,6,4095",  # too small min. size
         "buzhash,19,24,21,4095",  # too big max. size
         "buzhash,23,19,21,4095",  # violates min <= mask <= max
+        "buzhash,19,23,21,4096",  # even window size
         "fixed,63",  # too small block size
         "fixed,%d,%d" % (MAX_DATA_SIZE + 1, 4096),  # too big block size
         "fixed,%d,%d" % (4096, MAX_DATA_SIZE + 1),  # too big header size

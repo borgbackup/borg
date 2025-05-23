@@ -201,6 +201,8 @@ def ChunkerParams(s):
             raise argparse.ArgumentTypeError(
                 "max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)"
             )
+        if window_size % 2 == 0:
+            raise argparse.ArgumentTypeError("window_size must be an uneven (odd) number")
         return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
     raise argparse.ArgumentTypeError("invalid chunker params")
 

@@ -165,14 +165,9 @@ class ChunkerFailing:
                 return
 
 
-class ChunkerFixed:
+class FileReader:
     """
-    This is a simple chunker for input data with data usually staying at same
-    offset and / or with known block/record sizes:
-
-    - raw disk images
-    - block devices
-    - database files with simple header + fixed-size records layout
+    This is for reading blocks from a file.
 
     It optionally supports:
 
@@ -185,16 +180,18 @@ class ChunkerFixed:
     Note: the last block of a data or hole range may be less than the block size,
           this is supported and not considered to be an error.
     """
-    def __init__(self, block_size, header_size=0, sparse=False):
-        self.block_size = block_size
-        self.header_size = header_size
-        self.chunking_time = 0.0
+    def __init__(self, read_size, header_size=0, sparse=False):
+        self.read_size = read_size  # how much data we want to read at once
+        assert read_size <= len(zeros)
+        self.header_size = header_size  # size of the first block
+        assert read_size >= header_size
+        self.reading_time = 0.0  # time spent in reading/seeking
         # should borg try to do sparse input processing?
         # whether it actually can be done depends on the input file being seekable.
         self.try_sparse = sparse and has_seek_hole
-        assert block_size <= len(zeros)
 
     def _build_fmap(self, fd=None, fh=-1):
+        started_fmap = time.monotonic()
         fmap = None
         if self.try_sparse:
             try:
@@ -225,11 +222,12 @@ class ChunkerFixed:
                 header_map = []
                 body_map = [(0, 2 ** 62, True), ]
             fmap = header_map + body_map
+        self.reading_time += time.monotonic() - started_fmap
         return fmap
 
-    def chunkify(self, fd=None, fh=-1, fmap=None):
+    def blockify(self, fd=None, fh=-1, fmap=None):
         """
-        Cut a file into chunks.
+        Read <read_size> sized blocks from a file, optionally supporting a differently sized header block.
 
         :param fd: Python file object
         :param fh: OS-level file handle (if available),
@@ -238,6 +236,7 @@ class ChunkerFixed:
         """
         fmap =self._build_fmap(fd, fh) if fmap is None else fmap
         offset = 0
+        # note: the optional header block is implemented via the first fmap entry
         for range_start, range_size, is_data in fmap:
             if range_start != offset:
                 # this is for the case when the fmap does not cover the file completely,
@@ -245,8 +244,8 @@ class ChunkerFixed:
                 offset = range_start
                 dseek(offset, os.SEEK_SET, fd, fh)
             while range_size:
-                started_chunking = time.monotonic()
-                wanted = min(range_size, self.block_size)
+                started_reading = time.monotonic()
+                wanted = min(range_size, self.read_size)
                 if is_data:
                     # read block from the range
                     data = dread(offset, wanted, fd, fh)
@@ -265,11 +264,79 @@ class ChunkerFixed:
                 if got > 0:
                     offset += got
                     range_size -= got
-                    self.chunking_time += time.monotonic() - started_chunking
+                    self.reading_time += time.monotonic() - started_reading
                     yield Chunk(data, size=got, allocation=allocation)
                 if got < wanted:
                     # we did not get enough data, looks like EOF.
                     return
+
+
+class ChunkerFixed:
+    """
+    This is a simple chunker for input data with data usually staying at same
+    offset and / or with known block/record sizes:
+
+    - raw disk images
+    - block devices
+    - database files with simple header + fixed-size records layout
+
+    It optionally supports:
+
+    - a header block of different size
+    - using a sparsemap to read only data ranges and seek over hole ranges
+      for sparse files.
+    - using an externally given filemap to read only specific ranges from
+      a file.
+
+    Note: the last block of a data or hole range may be less than the block size,
+          this is supported and not considered to be an error.
+    """
+    def __init__(self, block_size, header_size=0, sparse=False):
+        self.block_size = block_size
+        self.header_size = header_size
+        self.chunking_time = 0.0  # likely will stay close to zero - not much to do here.
+        self.reader_block_size = self.block_size  # start simple
+        assert self.reader_block_size % self.block_size == 0, "reader_block_size must be N * block_size"
+        self.reader = FileReader(self.reader_block_size, header_size=self.header_size, sparse=sparse)
+
+    def chunkify(self, fd=None, fh=-1, fmap=None):
+        """
+        Cut a file into chunks.
+
+        :param fd: Python file object
+        :param fh: OS-level file handle (if available),
+                   defaults to -1 which means not to use OS-level fd.
+        :param fmap: a file map, same format as generated by sparsemap
+        """
+        in_header = self.header_size > 0  # first block is header, if header size is given
+        for block in self.reader.blockify(fd, fh, fmap):
+            if in_header:
+                assert self.header_size == block.meta["size"]
+                yield block  # just pass through the header block we get from the reader
+                in_header = False
+                continue
+            # not much to do in here
+            if self.reader_block_size == self.block_size:
+                # trivial, the reader already did all the work
+                yield block  # just pass through, avoid creating new objects
+            else:
+                # reader block size is a multiple of our block size
+                read_size = block.meta["size"]
+                allocation = block.meta["allocation"]
+                start = 0
+                while read_size:
+                    started_chunking = time.monotonic()
+                    size = min(read_size, self.block_size)
+                    if allocation == CH_DATA:
+                        data = block.data[start:start+size]  # TODO memoryview?
+                    elif allocation in (CH_ALLOC, CH_HOLE):
+                        data = None
+                    else:
+                        raise ValueError("unsupported allocation")
+                    self.chunking_time += time.monotonic() - started_chunking
+                    yield Chunk(data, size=size, allocation=allocation)
+                    start += size
+                    read_size -= size
 
 
 # Cyclic polynomial / buzhash

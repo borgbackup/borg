@@ -330,9 +330,12 @@ table_base = [
     0xc5ae37bb, 0xa76ce12a, 0x8150d8f3, 0x2ec29218, 0xa35f0984, 0x48c0647e, 0x0b5ff98c, 0x71893f7b
 ]
 
-# Barrel shift macro from C
-cdef inline uint32_t BARREL_SHIFT(uint32_t v, uint32_t shift):
-    return ((v << shift) | (v >> ((32 - shift) & 0x1f)))
+# This seems to be the most reliable way to inline this code, using a C preprocessor macro:
+cdef extern from *:
+   """
+   #define BARREL_SHIFT(v, shift) (((v) << (shift)) | ((v) >> (((32 - (shift)) & 0x1f))))
+   """
+   uint32_t BARREL_SHIFT(uint32_t v, uint32_t shift)
 
 
 cdef uint32_t* buzhash_init_table(uint32_t seed):

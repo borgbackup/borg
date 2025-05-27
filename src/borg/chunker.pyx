@@ -183,8 +183,7 @@ class FileFMAPReader:
         assert fd is not None or fh >= 0
         self.fd = fd
         self.fh = fh
-        assert read_size > 0
-        assert read_size <= len(zeros)
+        assert 0 < read_size <= len(zeros)
         self.read_size = read_size  # how much data we want to read at once
         self.reading_time = 0.0  # time spent in reading/seeking
         # should borg try to do sparse input processing?
@@ -263,6 +262,7 @@ class FileReader:
     not need to match the Chunk sizes we got from the FileFMAPReader.
     """
     def __init__(self, *, fd=None, fh=-1, read_size=0, sparse=False, fmap=None):
+        assert read_size > 0
         self.reader = FileFMAPReader(fd=fd, fh=fh, read_size=read_size, sparse=sparse, fmap=fmap)
         self.buffer = []  # list of Chunk objects
         self.offset = 0  # offset into the first buffer object's data
@@ -569,6 +569,8 @@ cdef class Chunker:
     cdef size_t min_size, buf_size, window_size, remaining, position, last
     cdef long long bytes_read, bytes_yielded  # off_t in C, using long long for compatibility
     cdef readonly float chunking_time
+    cdef object file_reader  # FileReader instance
+    cdef size_t reader_block_size
 
     def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
         min_size = 1 << chunk_min_exp
@@ -593,6 +595,7 @@ cdef class Chunker:
         self.bytes_yielded = 0
         self._fd = None
         self.chunking_time = 0.0
+        self.reader_block_size = 1024 * 1024
 
     def __dealloc__(self):
         """Free the chunker's resources."""
@@ -606,7 +609,7 @@ cdef class Chunker:
     cdef int fill(self) except 0:
         """Fill the chunker's buffer with more data."""
         cdef ssize_t n
-        cdef object data_py
+        cdef object chunk
 
         # Move remaining data to the beginning of the buffer
         memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
@@ -617,32 +620,23 @@ cdef class Chunker:
         if self.eof or n == 0:
             return 1
 
-        if self.fh >= 0:
-            # Use OS-level file descriptor
-            with nogil:
-                n = read(self.fh, self.data + self.position + self.remaining, n)
+        # Use FileReader to read data
+        chunk = self.file_reader.read(n)
+        n = chunk.meta["size"]
 
-            if n > 0:
-                self.remaining += n
-                self.bytes_read += n
-            elif n == 0:
-                self.eof = 1
+        if n > 0:
+            # Only copy data if it's not a hole
+            if chunk.meta["allocation"] == CH_DATA:
+                # Copy data from chunk to our buffer
+                memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(chunk.data), n)
             else:
-                # Error occurred
-                raise OSError(errno.errno, os.strerror(errno.errno))
+                # For holes, fill with zeros
+                memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(zeros[:n]), n)
 
+            self.remaining += n
+            self.bytes_read += n
         else:
-            # Use Python file object
-            data_py = self._fd.read(n)
-            n = len(data_py)
-
-            if n:
-                # Copy data from Python bytes to our buffer
-                memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(data_py), n)
-                self.remaining += n
-                self.bytes_read += n
-            else:
-                self.eof = 1
+            self.eof = 1
 
         return 1
 
@@ -722,6 +716,7 @@ cdef class Chunker:
         """
         self._fd = fd
         self.fh = fh
+        self.file_reader = FileReader(fd=fd, fh=fh, read_size=self.reader_block_size)
         self.done = 0
         self.remaining = 0
         self.bytes_read = 0

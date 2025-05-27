@@ -414,8 +414,7 @@ class ChunkerFixed:
         self.block_size = block_size
         self.header_size = header_size
         self.chunking_time = 0.0  # likely will stay close to zero - not much to do here.
-        self.reader_block_size = self.block_size  # start simple
-        assert self.reader_block_size % self.block_size == 0, "reader_block_size must be N * block_size"
+        self.reader_block_size = 1024 * 1024
         self.reader = None
         self.sparse = sparse
 

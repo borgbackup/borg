@@ -171,24 +171,21 @@ class FileFMAPReader:
 
     It optionally supports:
 
-    - a header block of different size
     - using a sparsemap to read only data ranges and seek over hole ranges
       for sparse files.
     - using an externally given filemap to read only specific ranges from
       a file.
 
-    Note: the last block of a data or hole range may be less than the block size,
+    Note: the last block of a data or hole range may be less than the read_size,
           this is supported and not considered to be an error.
     """
-    def __init__(self, *, fd=None, fh=-1, read_size=0, header_size=0, sparse=False, fmap=None):
+    def __init__(self, *, fd=None, fh=-1, read_size=0, sparse=False, fmap=None):
         assert fd is not None or fh >= 0
         self.fd = fd
         self.fh = fh
         assert read_size > 0
         assert read_size <= len(zeros)
         self.read_size = read_size  # how much data we want to read at once
-        assert header_size <= read_size
-        self.header_size = header_size  # size of the first block
         self.reading_time = 0.0  # time spent in reading/seeking
         # should borg try to do sparse input processing?
         # whether it actually can be done depends on the input file being seekable.
@@ -200,45 +197,27 @@ class FileFMAPReader:
         fmap = None
         if self.try_sparse:
             try:
-                if self.header_size > 0:
-                    header_map = [(0, self.header_size, True), ]
-                    dseek(self.header_size, os.SEEK_SET, self.fd, self.fh)
-                    body_map = list(sparsemap(self.fd, self.fh))
-                    dseek(0, os.SEEK_SET, self.fd, self.fh)
-                else:
-                    header_map = []
-                    body_map = list(sparsemap(self.fd, self.fh))
+                fmap = list(sparsemap(self.fd, self.fh))
             except OSError as err:
                 # seeking did not work
                 pass
-            else:
-                fmap = header_map + body_map
 
         if fmap is None:
             # either sparse processing (building the fmap) was not tried or it failed.
             # in these cases, we just build a "fake fmap" that considers the whole file
             # as range(s) of data (no holes), so we can use the same code.
-            # we build different fmaps here for the purpose of correct block alignment
-            # with or without a header block (of potentially different size).
-            if self.header_size > 0:
-                header_map = [(0, self.header_size, True), ]
-                body_map = [(self.header_size, 2 ** 62, True), ]
-            else:
-                header_map = []
-                body_map = [(0, 2 ** 62, True), ]
-            fmap = header_map + body_map
+            fmap = [(0, 2 ** 62, True), ]
         self.reading_time += time.monotonic() - started_fmap
         return fmap
 
     def blockify(self):
         """
-        Read <read_size> sized blocks from a file, optionally supporting a differently sized header block.
+        Read <read_size> sized blocks from a file.
         """
         if self.fmap is None:
             self.fmap = self._build_fmap()
 
         offset = 0
-        # note: the optional header block is implemented via the first fmap entry
         for range_start, range_size, is_data in self.fmap:
             if range_start != offset:
                 # this is for the case when the fmap does not cover the file completely,
@@ -280,8 +259,8 @@ class FileReader:
     It maintains a buffer that is filled by using FileFMAPReader.blockify generator when needed.
     The data in that buffer is consumed by clients calling FileReader.read.
     """
-    def __init__(self, *, fd=None, fh=-1, read_size=0, header_size=0, sparse=False, fmap=None):
-        self.reader = FileFMAPReader(fd=fd, fh=fh, read_size=read_size, header_size=header_size, sparse=sparse, fmap=fmap)
+    def __init__(self, *, fd=None, fh=-1, read_size=0, sparse=False, fmap=None):
+        self.reader = FileFMAPReader(fd=fd, fh=fh, read_size=read_size, sparse=sparse, fmap=fmap)
         self.buffer = []  # list of (data, meta) tuples
         self.offset = 0  # offset into the first buffer object's data
         self.remaining_bytes = 0  # total bytes available in buffer
@@ -457,7 +436,7 @@ class ChunkerFixed:
         """
         # Initialize the reader with the file descriptors
         self.reader = FileReader(fd=fd, fh=fh, read_size=self.reader_block_size,
-                                header_size=self.header_size, sparse=self.sparse, fmap=fmap)
+                                sparse=self.sparse, fmap=fmap)
 
         # Handle header if present
         if self.header_size > 0:

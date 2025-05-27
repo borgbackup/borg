@@ -28,7 +28,6 @@ class FileFMAPReader:
         fd: BinaryIO = None,
         fh: int = -1,
         read_size: int = 0,
-        header_size: int = 0,
         sparse: bool = False,
         fmap: List[fmap_entry] = None,
     ) -> None: ...
@@ -42,7 +41,6 @@ class FileReader:
         fd: BinaryIO = None,
         fh: int = -1,
         read_size: int = 0,
-        header_size: int = 0,
         sparse: bool = False,
         fmap: List[fmap_entry] = None,
     ) -> None: ...

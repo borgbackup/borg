@@ -5,7 +5,7 @@ import tempfile
 import pytest
 
 from .chunker_test import cf
-from ..chunker import Chunker, ChunkerFixed, sparsemap, has_seek_hole, ChunkerFailing
+from ..chunker import Chunker, ChunkerFixed, sparsemap, has_seek_hole, ChunkerFailing, FileReader, Chunk
 from ..constants import *  # NOQA
 
 BS = 4096  # fs block size
@@ -178,3 +178,109 @@ def test_buzhash_chunksize_distribution():
     # most chunks should be cut due to buzhash triggering, not due to clipping at min/max size:
     assert min_count < 10
     assert max_count < 10
+
+
+@pytest.mark.parametrize(
+    "file_content, read_size, expected_data, expected_allocation, expected_size",
+    [
+        # Empty file
+        (b"", 1024, b"", CH_DATA, 0),
+        # Small data
+        (b"data", 1024, b"data", CH_DATA, 4),
+        # More data than read_size
+        (b"data", 2, b"da", CH_DATA, 2),
+    ],
+)
+def test_filereader_read_simple(file_content, read_size, expected_data, expected_allocation, expected_size):
+    """Test read with different file contents."""
+    reader = FileReader(fd=BytesIO(file_content), fh=-1, read_size=1024, sparse=False, fmap=None)
+    chunk = reader.read(read_size)
+    assert chunk.data == expected_data
+    assert chunk.meta["allocation"] == expected_allocation
+    assert chunk.meta["size"] == expected_size
+
+
+@pytest.mark.parametrize(
+    "file_content, read_sizes, expected_results",
+    [
+        # Partial data read
+        (
+            b"data1234",
+            [4, 4],
+            [{"data": b"data", "allocation": CH_DATA, "size": 4}, {"data": b"1234", "allocation": CH_DATA, "size": 4}],
+        ),
+        # Multiple calls with EOF
+        (
+            b"0123456789",
+            [4, 4, 4, 4],
+            [
+                {"data": b"0123", "allocation": CH_DATA, "size": 4},
+                {"data": b"4567", "allocation": CH_DATA, "size": 4},
+                {"data": b"89", "allocation": CH_DATA, "size": 2},
+                {"data": b"", "allocation": CH_DATA, "size": 0},
+            ],
+        ),
+    ],
+)
+def test_filereader_read_multiple(file_content, read_sizes, expected_results):
+    """Test multiple read calls with different file contents."""
+    reader = FileReader(fd=BytesIO(file_content), fh=-1, read_size=1024, sparse=False, fmap=None)
+
+    for i, read_size in enumerate(read_sizes):
+        chunk = reader.read(read_size)
+        assert chunk.data == expected_results[i]["data"]
+        assert chunk.meta["allocation"] == expected_results[i]["allocation"]
+        assert chunk.meta["size"] == expected_results[i]["size"]
+
+
+@pytest.mark.parametrize(
+    "mock_chunks, read_size, expected_data, expected_allocation, expected_size",
+    [
+        # Multiple chunks with mixed types
+        (
+            [
+                Chunk(b"chunk1", size=6, allocation=CH_DATA),
+                Chunk(None, size=4, allocation=CH_HOLE),
+                Chunk(b"chunk2", size=6, allocation=CH_DATA),
+            ],
+            16,
+            b"chunk1" + b"\0" * 4 + b"chunk2",
+            CH_DATA,
+            16,
+        ),
+        # Mixed allocation types (hole and alloc)
+        ([Chunk(None, size=4, allocation=CH_HOLE), Chunk(None, size=4, allocation=CH_ALLOC)], 8, None, CH_HOLE, 8),
+        # All alloc chunks
+        ([Chunk(None, size=4, allocation=CH_ALLOC), Chunk(None, size=4, allocation=CH_ALLOC)], 8, None, CH_ALLOC, 8),
+        # All hole chunks
+        ([Chunk(None, size=4, allocation=CH_HOLE), Chunk(None, size=4, allocation=CH_HOLE)], 8, None, CH_HOLE, 8),
+    ],
+)
+def test_filereader_read_with_mock(mock_chunks, read_size, expected_data, expected_allocation, expected_size):
+    """Test read with a mock FileFMAPReader."""
+
+    # Create a mock FileFMAPReader that yields specific chunks
+    class MockFileFMAPReader:
+        def __init__(self, chunks):
+            self.chunks = chunks
+            self.index = 0
+            # Add required attributes to satisfy FileReader
+            self.reading_time = 0.0
+
+        def blockify(self):
+            for chunk in self.chunks:
+                yield chunk
+
+    # Create a FileReader with a dummy BytesIO to satisfy the assertion
+    reader = FileReader(fd=BytesIO(b""), fh=-1, read_size=1024, sparse=False, fmap=None)
+    # Replace the reader with our mock
+    reader.reader = MockFileFMAPReader(mock_chunks)
+    reader.blockify_gen = reader.reader.blockify()
+
+    # Read all chunks at once
+    chunk = reader.read(read_size)
+
+    # Check the result
+    assert chunk.data == expected_data
+    assert chunk.meta["allocation"] == expected_allocation
+    assert chunk.meta["size"] == expected_size

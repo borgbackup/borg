@@ -323,7 +323,7 @@ class FileReader:
 
         # If we have no data at all, return an empty Chunk
         if not self.buffer:
-            return Chunk(None, size=0, allocation=CH_ALLOC)
+            return Chunk(b"", size=0, allocation=CH_DATA)
 
         # Prepare to collect the requested data
         result = bytearray()

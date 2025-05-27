@@ -294,8 +294,19 @@ class FileReader:
         """
         Read a Chunk of up to 'size' bytes from the file.
 
+        This method tries to yield a Chunk of the requested size, if possible, by considering
+        multiple chunks from the buffer.
+
+        The allocation type of the resulting chunk depends on the allocation types of the contributing chunks:
+        - If one of the chunks is CH_DATA, it will create all-zero bytes for other chunks that are not CH_DATA
+        - If all contributing chunks are CH_HOLE, the resulting chunk will also be CH_HOLE
+        - If the contributing chunks are a mix of CH_HOLE and CH_ALLOC, the resulting chunk will be CH_HOLE
+
         :param size: Number of bytes to read
-        :return: Chunk object containing the read data. If no data is available, returns Chunk(None, size=0, allocation=CH_DATA).
+        :return: Chunk object containing the read data.
+                 If no data is available, returns Chunk(None, size=0, allocation=CH_ALLOC).
+                 If less than requested bytes were available (at EOF), the returned chunk might be smaller
+                 than requested.
         """
         # Initialize if not already done
         if self.blockify_gen is None:
@@ -314,83 +325,69 @@ class FileReader:
         if not self.buffer:
             return Chunk(None, size=0, allocation=CH_ALLOC)
 
-        # Get the first chunk from the buffer
-        chunk = self.buffer[0]
-        chunk_size = chunk.meta["size"]
-        allocation = chunk.meta["allocation"]
-        data = chunk.data
-
-        # If this is a non-data chunk, handle it specially
-        if allocation != CH_DATA or data is None:
-            # For non-data chunks, we return a Chunk with the allocation type and size
-            size_to_return = min(size, chunk_size - self.offset)
-
-            # Update buffer state
-            if size_to_return == chunk_size - self.offset:
-                self.buffer.pop(0)
-                self.offset = 0
-            else:
-                self.offset += size_to_return
-
-            self.remaining_bytes -= size_to_return
-
-            return Chunk(None, size=size_to_return, allocation=allocation)
-
-        # For data chunks, proceed as before
         # Prepare to collect the requested data
         result = bytearray()
         bytes_to_read = min(size, self.remaining_bytes)
         bytes_read = 0
 
-        # Read data from the buffer
+        # Track if we've seen different allocation types
+        has_data = False
+        has_hole = False
+        has_alloc = False
+
+        # Read data from the buffer, combining chunks as needed
         while bytes_read < bytes_to_read and self.buffer:
             chunk = self.buffer[0]
             chunk_size = chunk.meta["size"]
             allocation = chunk.meta["allocation"]
             data = chunk.data
 
-            # We now handle all chunk types, so no need to skip non-data chunks
-
-            # If this is a non-data chunk, break to handle it
-            if allocation != CH_DATA or data is None:
-                if bytes_read > 0:
-                    # We've already read some data, so return that first
-                    break
-                else:
-                    # No data read yet, return info about this non-data chunk
-                    size_to_return = min(size, chunk_size - self.offset)
-
-                    # Update buffer state
-                    if size_to_return == chunk_size - self.offset:
-                        self.buffer.pop(0)
-                        self.offset = 0
-                    else:
-                        self.offset += size_to_return
-
-                    self.remaining_bytes -= size_to_return
-
-                    return Chunk(None, size=size_to_return, allocation=allocation)
+            # Track allocation types
+            if allocation == CH_DATA:
+                has_data = True
+            elif allocation == CH_HOLE:
+                has_hole = True
+            elif allocation == CH_ALLOC:
+                has_alloc = True
+            else:
+                raise ValueError(f"Invalid allocation type: {allocation}")
 
             # Calculate how much we can read from this chunk
             available = chunk_size - self.offset
             to_read = min(available, bytes_to_read - bytes_read)
 
-            # Read the data
-            if to_read > 0:
+            # Process the chunk based on its allocation type
+            if allocation == CH_DATA:
+                assert data is not None
+                # For data chunks, add the actual data
                 result.extend(data[self.offset:self.offset + to_read])
-                bytes_read += to_read
+            else:
+                # For non-data chunks, add zeros if we've seen a data chunk
+                if has_data:
+                    result.extend(b'\0' * to_read)
+                # Otherwise, we'll just track the size without adding data
 
-                # Update offset or remove chunk if fully consumed
-                if to_read < available:
-                    self.offset += to_read
-                else:
-                    self.offset = 0
-                    self.buffer.pop(0)
+            bytes_read += to_read
 
-                self.remaining_bytes -= to_read
+            # Update offset or remove chunk if fully consumed
+            if to_read < available:
+                self.offset += to_read
+            else:
+                self.offset = 0
+                self.buffer.pop(0)
 
-        # Return a Chunk object with the data
-        return Chunk(bytes(result), size=bytes_read, allocation=CH_DATA)
+            self.remaining_bytes -= to_read
+
+        # Determine the allocation type of the resulting chunk
+        if has_data:
+            # If any chunk was CH_DATA, the result is CH_DATA
+            return Chunk(bytes(result), size=bytes_read, allocation=CH_DATA)
+        elif has_hole:
+            # If any chunk was CH_HOLE (and none were CH_DATA), the result is CH_HOLE
+            return Chunk(None, size=bytes_read, allocation=CH_HOLE)
+        else:
+            # Otherwise, all chunks were CH_ALLOC
+            return Chunk(None, size=bytes_read, allocation=CH_ALLOC)
 
 
 class ChunkerFixed:

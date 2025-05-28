@@ -427,11 +427,13 @@ def test_filefmapreader_with_real_sparse_file(tmpdir):
         {"data_type": bytes, "allocation": CH_DATA, "size": BS},
     ]
 
-    # Expected chunks when reading with sparse=False
+    # Expected chunks when reading with sparse=False.
+    # Even though it is not differentiating data vs hole ranges, it still
+    # transforms detected all-zero blocks to CH_ALLOC chunks.
     expected_chunks_non_sparse = [
         {"data_type": bytes, "allocation": CH_DATA, "size": BS},
-        {"data_type": bytes, "allocation": CH_DATA, "size": BS},
-        {"data_type": bytes, "allocation": CH_DATA, "size": BS},
+        {"data_type": type(None), "allocation": CH_ALLOC, "size": BS},
+        {"data_type": type(None), "allocation": CH_ALLOC, "size": BS},
         {"data_type": bytes, "allocation": CH_DATA, "size": BS},
     ]
 

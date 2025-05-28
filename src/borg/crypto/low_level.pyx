@@ -368,7 +368,7 @@ cdef class AES256_CTR_HMAC_SHA256(AES256_CTR_BASE):
             raise IntegrityError('MAC Authentication failed')
 
 
-cdef class AES256_CTR_BLAKE2b(AES256_CTR_BASE):
+cdef class AES256_CTR_BLAKE2b_legacy(AES256_CTR_BASE):
     cdef unsigned char mac_key[128]
 
     def __init__(self, mac_key, enc_key, iv=None, header_len=1, aad_offset=1):
@@ -712,8 +712,13 @@ def hmac_sha256(key, data):
     return hmac.digest(key, data, 'sha256')
 
 
-def blake2b_256(key, data):
-    return hashlib.blake2b(key+data, digest_size=32).digest()
+def blake2b_256(key, data, legacy=False):
+    if legacy:
+        assert len(key) in (0, 128)  # borg 1.x 64B key + 64B zero padding (b"" used by tests)
+        return hashlib.blake2b(key+data, digest_size=32).digest()
+    else:
+        assert len(key) == 64  # borg 2.x 64B key
+        return hashlib.blake2b(data, key=key, digest_size=32).digest()
 
 
 def blake2b_128(data):

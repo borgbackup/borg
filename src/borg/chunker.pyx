@@ -1,10 +1,8 @@
 # cython: language_level=3
-# cython: cdivision=True
-# cython: boundscheck=False
-# cython: wraparound=False
 
 API_VERSION = '1.2_01'
 
+import cython
 import os
 import errno
 import time
@@ -13,7 +11,6 @@ from cpython.bytes cimport PyBytes_AsString
 from libc.stdint cimport uint8_t, uint32_t
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, memmove
-from posix.unistd cimport read
 
 from .constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
 
@@ -524,6 +521,8 @@ cdef extern from *:
    uint32_t BARREL_SHIFT(uint32_t v, uint32_t shift)
 
 
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)  # Deactivate negative indexing.
 cdef uint32_t* buzhash_init_table(uint32_t seed):
     """Initialize the buzhash table with the given seed."""
     cdef int i
@@ -532,6 +531,10 @@ cdef uint32_t* buzhash_init_table(uint32_t seed):
         table[i] = table_base[i] ^ seed
     return table
 
+
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)  # Deactivate negative indexing.
+@cython.cdivision(True)  # Use C division/modulo semantics for integer division.
 cdef uint32_t _buzhash(const unsigned char* data, size_t len, const uint32_t* h):
     """Calculate the buzhash of the given data."""
     cdef uint32_t i
@@ -542,9 +545,13 @@ cdef uint32_t _buzhash(const unsigned char* data, size_t len, const uint32_t* h)
         data += 1
     return sum ^ h[data[0]]
 
+
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)  # Deactivate negative indexing.
+@cython.cdivision(True)  # Use C division/modulo semantics for integer division.
 cdef uint32_t _buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t len, const uint32_t* h):
     """Update the buzhash with a new byte."""
-    cdef uint32_t lenmod = len & 0x1f  # Note: replace by constant to get small speedup
+    cdef uint32_t lenmod = len & 0x1f
     return BARREL_SHIFT(sum, 1) ^ BARREL_SHIFT(h[remove], lenmod) ^ h[add]
 
 

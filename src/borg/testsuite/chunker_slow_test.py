@@ -1,10 +1,14 @@
+from hashlib import sha256
 from io import BytesIO
 
 from .chunker_test import cf
 from ..chunker import Chunker
-from ..crypto.low_level import blake2b_256
 from ..constants import *  # NOQA
 from ..helpers import hex_to_bin
+
+
+def H(data):
+    return sha256(data).digest()
 
 
 def test_chunkpoints_unchanged():
@@ -28,10 +32,10 @@ def test_chunkpoints_unchanged():
                     for seed in (1849058162, 1234567653):
                         fh = BytesIO(data)
                         chunker = Chunker(seed, minexp, maxexp, maskbits, winsize)
-                        chunks = [blake2b_256(b"", c) for c in cf(chunker.chunkify(fh, -1))]
-                        runs.append(blake2b_256(b"", b"".join(chunks)))
+                        chunks = [H(c) for c in cf(chunker.chunkify(fh, -1))]
+                        runs.append(H(b"".join(chunks)))
 
     # The "correct" hash below matches the existing chunker behavior.
     # Future chunker optimisations must not change this, or existing repos will bloat.
-    overall_hash = blake2b_256(b"", b"".join(runs))
-    assert overall_hash == hex_to_bin("b559b0ac8df8daaa221201d018815114241ea5c6609d98913cd2246a702af4e3")
+    overall_hash = H(b"".join(runs))
+    assert overall_hash == hex_to_bin("a43d0ecb3ae24f38852fcc433a83dacd28fe0748d09cc73fc11b69cf3f1a7299")

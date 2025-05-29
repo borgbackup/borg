@@ -15,6 +15,7 @@ class ServeMixIn:
             restrict_to_paths=args.restrict_to_paths,
             restrict_to_repositories=args.restrict_to_repositories,
             use_socket=args.use_socket,
+            permissions=args.permissions,
         ).serve()
 
     def build_parser_serve(self, subparsers, common_parser, mid_common_parser):
@@ -70,4 +71,10 @@ class ServeMixIn:
             "PATH needs to point directly at a repository location. "
             "PATH may be an empty directory or the last element of PATH may not exist, in which case "
             "the client may initialize a repository there.",
+        )
+        subparser.add_argument(
+            "--permissions",
+            dest="permissions",
+            choices=["all", "no-delete", "write-only", "read-only"],
+            help="Set repository permission mode. Equivalent to setting BORG_REPO_PERMISSIONS environment variable.",
         )

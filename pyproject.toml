@@ -166,3 +166,53 @@ python_files = "testsuite/*.py"
 markers = [
     "allow_cache_wipe",
 ]
+
+# tox configuration - if you change anything here, run this to verify:
+# fakeroot -u tox --recreate
+[tool.tox]
+min_version = "4.19"
+requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
+env_list = ["py{39,310,311,312,313}-{none,fuse2,fuse3}", "ruff"]
+
+# Base configuration for test environments
+[tool.tox.env_run_base]
+description = "Run tests with pytest"
+package = "editable-legacy"  # without this it does not find setup_docs when running under fakeroot
+deps = ["-rrequirements.d/development.txt"]
+commands = [
+    ["pytest", "-v", "-n", "{env:XDISTN:1}", "-rs", "--cov=borg", "--cov-config=.coveragerc", "--benchmark-skip", "--pyargs", "{posargs:borg.testsuite}"]
+]
+pass_env = ["*"]  # fakeroot -u needs some env vars
+labels = ["test"]
+
+# Base configuration for package building
+[tool.tox.env_pkg_base]
+pass_env = ["*"]  # needed by tox4, so env vars are visible for building borg
+
+# Test environments with different FUSE implementations
+[tool.tox.env."py{39,310,311,312,313}-fuse2"]
+description = "Run tests with llfuse (FUSE2) implementation"
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+deps = ["-rrequirements.d/development.txt", "llfuse"]
+labels = ["test", "fuse"]
+
+[tool.tox.env."py{39,310,311,312,313}-fuse3"]
+description = "Run tests with pyfuse3 (FUSE3) implementation"
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+deps = ["-rrequirements.d/development.txt", "pyfuse3"]
+labels = ["test", "fuse"]
+
+[tool.tox.env."py{39,310,311,312,313}-none"]
+description = "Run tests without FUSE support"
+deps = ["-rrequirements.d/development.txt"]
+labels = ["test", "nofuse"]
+
+[tool.tox.env.ruff]
+description = "Run ruff linter and formatter"
+skip_install = true
+deps = ["ruff"]
+commands = [
+    ["ruff", "check", "."],
+    ["ruff", "format", "--check", "."]
+]
+labels = ["lint"]

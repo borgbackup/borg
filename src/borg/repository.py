@@ -92,7 +92,16 @@ class Repository:
 
         exit_mcode = 21
 
-    def __init__(self, path_or_location, create=False, exclusive=False, lock_wait=1.0, lock=True, send_log_cb=None):
+    def __init__(
+        self,
+        path_or_location,
+        create=False,
+        exclusive=False,
+        lock_wait=1.0,
+        lock=True,
+        send_log_cb=None,
+        permissions=None,
+    ):
         if isinstance(path_or_location, Location):
             location = path_or_location
             if location.proto == "file":
@@ -114,8 +123,8 @@ class Repository:
             "keys/": [0],
             "locks/": [0],
         }
-        # Get permissions from environment variable
-        permissions = os.environ.get("BORG_REPO_PERMISSIONS", "all")
+        # Get permissions from parameter or environment variable
+        permissions = permissions if permissions is not None else os.environ.get("BORG_REPO_PERMISSIONS", "all")
 
         if permissions == "all":
             permissions = None  # permissions system will not be used

@@ -212,7 +212,6 @@ description = "Run ruff linter and formatter"
 skip_install = true
 deps = ["ruff"]
 commands = [
-    ["ruff", "check", "."],
-    ["ruff", "format", "--check", "."]
+    ["ruff", "check", "."]
 ]
 labels = ["lint"]

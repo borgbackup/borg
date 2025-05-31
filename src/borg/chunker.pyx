@@ -1,10 +1,8 @@
 # cython: language_level=3
-# cython: cdivision=True
-# cython: boundscheck=False
-# cython: wraparound=False
 
 API_VERSION = '1.2_01'
 
+import cython
 import os
 import errno
 import time
@@ -13,7 +11,6 @@ from cpython.bytes cimport PyBytes_AsString
 from libc.stdint cimport uint8_t, uint32_t
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, memmove
-from posix.unistd cimport read
 
 from .constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
 
@@ -165,6 +162,231 @@ class ChunkerFailing:
                 return
 
 
+class FileFMAPReader:
+    """
+    This is for reading blocks from a file.
+
+    It optionally supports:
+
+    - using a sparsemap to read only data ranges and seek over hole ranges
+      for sparse files.
+    - using an externally given filemap to read only specific ranges from
+      a file.
+
+    Note: the last block of a data or hole range may be less than the read_size,
+          this is supported and not considered to be an error.
+    """
+    def __init__(self, *, fd=None, fh=-1, read_size=0, sparse=False, fmap=None):
+        assert fd is not None or fh >= 0
+        self.fd = fd
+        self.fh = fh
+        assert 0 < read_size <= len(zeros)
+        self.read_size = read_size  # how much data we want to read at once
+        self.reading_time = 0.0  # time spent in reading/seeking
+        # should borg try to do sparse input processing?
+        # whether it actually can be done depends on the input file being seekable.
+        self.try_sparse = sparse and has_seek_hole
+        self.fmap = fmap
+
+    def _build_fmap(self):
+        started_fmap = time.monotonic()
+        fmap = None
+        if self.try_sparse:
+            try:
+                fmap = list(sparsemap(self.fd, self.fh))
+            except OSError as err:
+                # seeking did not work
+                pass
+
+        if fmap is None:
+            # either sparse processing (building the fmap) was not tried or it failed.
+            # in these cases, we just build a "fake fmap" that considers the whole file
+            # as range(s) of data (no holes), so we can use the same code.
+            fmap = [(0, 2 ** 62, True), ]
+        self.reading_time += time.monotonic() - started_fmap
+        return fmap
+
+    def blockify(self):
+        """
+        Read <read_size> sized blocks from a file.
+        """
+        if self.fmap is None:
+            self.fmap = self._build_fmap()
+
+        offset = 0
+        for range_start, range_size, is_data in self.fmap:
+            if range_start != offset:
+                # this is for the case when the fmap does not cover the file completely,
+                # e.g. it could be without the ranges of holes or of unchanged data.
+                offset = range_start
+                dseek(offset, os.SEEK_SET, self.fd, self.fh)
+            while range_size:
+                started_reading = time.monotonic()
+                wanted = min(range_size, self.read_size)
+                if is_data:
+                    # read block from the range
+                    data = dread(offset, wanted, self.fd, self.fh)
+                    got = len(data)
+                    if zeros.startswith(data):
+                        data = None
+                        allocation = CH_ALLOC
+                    else:
+                        allocation = CH_DATA
+                else:  # hole
+                    # seek over block from the range
+                    pos = dseek(wanted, os.SEEK_CUR, self.fd, self.fh)
+                    got = pos - offset
+                    data = None
+                    allocation = CH_HOLE
+                self.reading_time += time.monotonic() - started_reading
+                if got > 0:
+                    offset += got
+                    range_size -= got
+                    yield Chunk(data, size=got, allocation=allocation)
+                if got < wanted:
+                    # we did not get enough data, looks like EOF.
+                    return
+
+
+class FileReader:
+    """
+    This is a buffered reader for file data.
+
+    It maintains a buffer that is filled with Chunks from the FileFMAPReader.blockify generator.
+    The data in that buffer is consumed by clients calling FileReader.read, which returns a Chunk.
+
+    Most complexity in here comes from the desired size when a user calls FileReader.read does
+    not need to match the Chunk sizes we got from the FileFMAPReader.
+    """
+    def __init__(self, *, fd=None, fh=-1, read_size=0, sparse=False, fmap=None):
+        assert read_size > 0
+        self.reader = FileFMAPReader(fd=fd, fh=fh, read_size=read_size, sparse=sparse, fmap=fmap)
+        self.buffer = []  # list of Chunk objects
+        self.offset = 0  # offset into the first buffer object's data
+        self.remaining_bytes = 0  # total bytes available in buffer
+        self.blockify_gen = None  # generator from FileFMAPReader.blockify
+        self.fd = fd
+        self.fh = fh
+        self.fmap = fmap
+
+    def _fill_buffer(self):
+        """
+        Fill the buffer with more data from the blockify generator.
+        Returns True if more data was added, False if EOF.
+        """
+        if self.blockify_gen is None:
+            return False
+
+        try:
+            chunk = next(self.blockify_gen)
+            # Store the Chunk object directly in the buffer
+            self.buffer.append(chunk)
+            self.remaining_bytes += chunk.meta["size"]
+            return True
+        except StopIteration:
+            self.blockify_gen = None
+            return False
+
+    def read(self, size):
+        """
+        Read a Chunk of up to 'size' bytes from the file.
+
+        This method tries to yield a Chunk of the requested size, if possible, by considering
+        multiple chunks from the buffer.
+
+        The allocation type of the resulting chunk depends on the allocation types of the contributing chunks:
+        - If one of the chunks is CH_DATA, it will create all-zero bytes for other chunks that are not CH_DATA
+        - If all contributing chunks are CH_HOLE, the resulting chunk will also be CH_HOLE
+        - If the contributing chunks are a mix of CH_HOLE and CH_ALLOC, the resulting chunk will be CH_HOLE
+
+        :param size: Number of bytes to read
+        :return: Chunk object containing the read data.
+                 If no data is available, returns Chunk(None, size=0, allocation=CH_ALLOC).
+                 If less than requested bytes were available (at EOF), the returned chunk might be smaller
+                 than requested.
+        """
+        # Initialize if not already done
+        if self.blockify_gen is None:
+            self.buffer = []
+            self.offset = 0
+            self.remaining_bytes = 0
+            self.blockify_gen = self.reader.blockify()
+
+        # If we don't have enough data in the buffer, try to fill it
+        while self.remaining_bytes < size:
+            if not self._fill_buffer():
+                # No more data available, return what we have
+                break
+
+        # If we have no data at all, return an empty Chunk
+        if not self.buffer:
+            return Chunk(b"", size=0, allocation=CH_DATA)
+
+        # Prepare to collect the requested data
+        result = bytearray()
+        bytes_to_read = min(size, self.remaining_bytes)
+        bytes_read = 0
+
+        # Track if we've seen different allocation types
+        has_data = False
+        has_hole = False
+        has_alloc = False
+
+        # Read data from the buffer, combining chunks as needed
+        while bytes_read < bytes_to_read and self.buffer:
+            chunk = self.buffer[0]
+            chunk_size = chunk.meta["size"]
+            allocation = chunk.meta["allocation"]
+            data = chunk.data
+
+            # Track allocation types
+            if allocation == CH_DATA:
+                has_data = True
+            elif allocation == CH_HOLE:
+                has_hole = True
+            elif allocation == CH_ALLOC:
+                has_alloc = True
+            else:
+                raise ValueError(f"Invalid allocation type: {allocation}")
+
+            # Calculate how much we can read from this chunk
+            available = chunk_size - self.offset
+            to_read = min(available, bytes_to_read - bytes_read)
+
+            # Process the chunk based on its allocation type
+            if allocation == CH_DATA:
+                assert data is not None
+                # For data chunks, add the actual data
+                result.extend(data[self.offset:self.offset + to_read])
+            else:
+                # For non-data chunks, add zeros if we've seen a data chunk
+                if has_data:
+                    result.extend(b'\0' * to_read)
+                # Otherwise, we'll just track the size without adding data
+
+            bytes_read += to_read
+
+            # Update offset or remove chunk if fully consumed
+            if to_read < available:
+                self.offset += to_read
+            else:
+                self.offset = 0
+                self.buffer.pop(0)
+
+            self.remaining_bytes -= to_read
+
+        # Determine the allocation type of the resulting chunk
+        if has_data:
+            # If any chunk was CH_DATA, the result is CH_DATA
+            return Chunk(bytes(result), size=bytes_read, allocation=CH_DATA)
+        elif has_hole:
+            # If any chunk was CH_HOLE (and none were CH_DATA), the result is CH_HOLE
+            return Chunk(None, size=bytes_read, allocation=CH_HOLE)
+        else:
+            # Otherwise, all chunks were CH_ALLOC
+            return Chunk(None, size=bytes_read, allocation=CH_ALLOC)
+
+
 class ChunkerFixed:
     """
     This is a simple chunker for input data with data usually staying at same
@@ -188,11 +410,10 @@ class ChunkerFixed:
     def __init__(self, block_size, header_size=0, sparse=False):
         self.block_size = block_size
         self.header_size = header_size
-        self.chunking_time = 0.0
-        # should borg try to do sparse input processing?
-        # whether it actually can be done depends on the input file being seekable.
-        self.try_sparse = sparse and has_seek_hole
-        assert block_size <= len(zeros)
+        self.chunking_time = 0.0  # likely will stay close to zero - not much to do here.
+        self.reader_block_size = 1024 * 1024
+        self.reader = None
+        self.sparse = sparse
 
     def chunkify(self, fd=None, fh=-1, fmap=None):
         """
@@ -203,70 +424,32 @@ class ChunkerFixed:
                    defaults to -1 which means not to use OS-level fd.
         :param fmap: a file map, same format as generated by sparsemap
         """
-        if fmap is None:
-            if self.try_sparse:
-                try:
-                    if self.header_size > 0:
-                        header_map = [(0, self.header_size, True), ]
-                        dseek(self.header_size, os.SEEK_SET, fd, fh)
-                        body_map = list(sparsemap(fd, fh))
-                        dseek(0, os.SEEK_SET, fd, fh)
-                    else:
-                        header_map = []
-                        body_map = list(sparsemap(fd, fh))
-                except OSError as err:
-                    # seeking did not work
-                    pass
-                else:
-                    fmap = header_map + body_map
+        # Initialize the reader with the file descriptors
+        self.reader = FileReader(fd=fd, fh=fh, read_size=self.reader_block_size,
+                                sparse=self.sparse, fmap=fmap)
 
-            if fmap is None:
-                # either sparse processing (building the fmap) was not tried or it failed.
-                # in these cases, we just build a "fake fmap" that considers the whole file
-                # as range(s) of data (no holes), so we can use the same code.
-                # we build different fmaps here for the purpose of correct block alignment
-                # with or without a header block (of potentially different size).
-                if self.header_size > 0:
-                    header_map = [(0, self.header_size, True), ]
-                    body_map = [(self.header_size, 2 ** 62, True), ]
-                else:
-                    header_map = []
-                    body_map = [(0, 2 ** 62, True), ]
-                fmap = header_map + body_map
+        # Handle header if present
+        if self.header_size > 0:
+            # Read the header block using read
+            started_chunking = time.monotonic()
+            header_chunk = self.reader.read(self.header_size)
+            self.chunking_time += time.monotonic() - started_chunking
 
-        offset = 0
-        for range_start, range_size, is_data in fmap:
-            if range_start != offset:
-                # this is for the case when the fmap does not cover the file completely,
-                # e.g. it could be without the ranges of holes or of unchanged data.
-                offset = range_start
-                dseek(offset, os.SEEK_SET, fd, fh)
-            while range_size:
-                started_chunking = time.monotonic()
-                wanted = min(range_size, self.block_size)
-                if is_data:
-                    # read block from the range
-                    data = dread(offset, wanted, fd, fh)
-                    got = len(data)
-                    if zeros.startswith(data):
-                        data = None
-                        allocation = CH_ALLOC
-                    else:
-                        allocation = CH_DATA
-                else:  # hole
-                    # seek over block from the range
-                    pos = dseek(wanted, os.SEEK_CUR, fd, fh)
-                    got = pos - offset
-                    data = None
-                    allocation = CH_HOLE
-                if got > 0:
-                    offset += got
-                    range_size -= got
-                    self.chunking_time += time.monotonic() - started_chunking
-                    yield Chunk(data, size=got, allocation=allocation)
-                if got < wanted:
-                    # we did not get enough data, looks like EOF.
-                    return
+            if header_chunk.meta["size"] > 0:
+                assert self.header_size == header_chunk.meta["size"]
+                # Yield the header chunk
+                yield header_chunk
+
+        # Process the rest of the file using read
+        while True:
+            started_chunking = time.monotonic()
+            chunk = self.reader.read(self.block_size)
+            self.chunking_time += time.monotonic() - started_chunking
+            size = chunk.meta["size"]
+            if size == 0:
+                break  # EOF
+            assert size <= self.block_size
+            yield chunk
 
 
 # Cyclic polynomial / buzhash
@@ -338,6 +521,8 @@ cdef extern from *:
    uint32_t BARREL_SHIFT(uint32_t v, uint32_t shift)
 
 
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)  # Deactivate negative indexing.
 cdef uint32_t* buzhash_init_table(uint32_t seed):
     """Initialize the buzhash table with the given seed."""
     cdef int i
@@ -346,6 +531,10 @@ cdef uint32_t* buzhash_init_table(uint32_t seed):
         table[i] = table_base[i] ^ seed
     return table
 
+
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)  # Deactivate negative indexing.
+@cython.cdivision(True)  # Use C division/modulo semantics for integer division.
 cdef uint32_t _buzhash(const unsigned char* data, size_t len, const uint32_t* h):
     """Calculate the buzhash of the given data."""
     cdef uint32_t i
@@ -356,9 +545,13 @@ cdef uint32_t _buzhash(const unsigned char* data, size_t len, const uint32_t* h)
         data += 1
     return sum ^ h[data[0]]
 
+
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)  # Deactivate negative indexing.
+@cython.cdivision(True)  # Use C division/modulo semantics for integer division.
 cdef uint32_t _buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t len, const uint32_t* h):
     """Update the buzhash with a new byte."""
-    cdef uint32_t lenmod = len & 0x1f  # Note: replace by constant to get small speedup
+    cdef uint32_t lenmod = len & 0x1f
     return BARREL_SHIFT(sum, 1) ^ BARREL_SHIFT(h[remove], lenmod) ^ h[add]
 
 
@@ -383,8 +576,11 @@ cdef class Chunker:
     cdef size_t min_size, buf_size, window_size, remaining, position, last
     cdef long long bytes_read, bytes_yielded  # off_t in C, using long long for compatibility
     cdef readonly float chunking_time
+    cdef object file_reader  # FileReader instance
+    cdef size_t reader_block_size
+    cdef bint sparse
 
-    def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size):
+    def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, bint sparse=False):
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
         assert max_size <= len(zeros)
@@ -407,6 +603,8 @@ cdef class Chunker:
         self.bytes_yielded = 0
         self._fd = None
         self.chunking_time = 0.0
+        self.reader_block_size = 1024 * 1024
+        self.sparse = sparse
 
     def __dealloc__(self):
         """Free the chunker's resources."""
@@ -420,7 +618,7 @@ cdef class Chunker:
     cdef int fill(self) except 0:
         """Fill the chunker's buffer with more data."""
         cdef ssize_t n
-        cdef object data_py
+        cdef object chunk
 
         # Move remaining data to the beginning of the buffer
         memmove(self.data, self.data + self.last, self.position + self.remaining - self.last)
@@ -431,32 +629,23 @@ cdef class Chunker:
         if self.eof or n == 0:
             return 1
 
-        if self.fh >= 0:
-            # Use OS-level file descriptor
-            with nogil:
-                n = read(self.fh, self.data + self.position + self.remaining, n)
+        # Use FileReader to read data
+        chunk = self.file_reader.read(n)
+        n = chunk.meta["size"]
 
-            if n > 0:
-                self.remaining += n
-                self.bytes_read += n
-            elif n == 0:
-                self.eof = 1
+        if n > 0:
+            # Only copy data if it's not a hole
+            if chunk.meta["allocation"] == CH_DATA:
+                # Copy data from chunk to our buffer
+                memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(chunk.data), n)
             else:
-                # Error occurred
-                raise OSError(errno.errno, os.strerror(errno.errno))
+                # For holes, fill with zeros
+                memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(zeros[:n]), n)
 
+            self.remaining += n
+            self.bytes_read += n
         else:
-            # Use Python file object
-            data_py = self._fd.read(n)
-            n = len(data_py)
-
-            if n:
-                # Copy data from Python bytes to our buffer
-                memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(data_py), n)
-                self.remaining += n
-                self.bytes_read += n
-            else:
-                self.eof = 1
+            self.eof = 1
 
         return 1
 
@@ -498,7 +687,7 @@ cdef class Chunker:
         self.remaining -= min_size
         sum = _buzhash(self.data + self.position, window_size, self.table)
 
-        while self.remaining > self.window_size and (sum & chunk_mask):
+        while self.remaining > self.window_size and (sum & chunk_mask) and not (self.eof and self.remaining <= window_size):
             p = self.data + self.position
             stop_at = p + self.remaining - window_size
 
@@ -526,16 +715,18 @@ cdef class Chunker:
         # Return a memory view of the chunk
         return memoryview((self.data + old_last)[:n])
 
-    def chunkify(self, fd, fh=-1):
+    def chunkify(self, fd, fh=-1, fmap=None):
         """
         Cut a file into chunks.
 
         :param fd: Python file object
         :param fh: OS-level file handle (if available),
                    defaults to -1 which means not to use OS-level fd.
+        :param fmap: a file map, same format as generated by sparsemap
         """
         self._fd = fd
         self.fh = fh
+        self.file_reader = FileReader(fd=fd, fh=fh, read_size=self.reader_block_size, sparse=self.sparse, fmap=fmap)
         self.done = 0
         self.remaining = 0
         self.bytes_read = 0
@@ -584,7 +775,8 @@ def buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t
 def get_chunker(algo, *params, **kw):
     if algo == 'buzhash':
         seed = kw['seed']
-        return Chunker(seed, *params)
+        sparse = kw['sparse']
+        return Chunker(seed, *params, sparse=sparse)
     if algo == 'fixed':
         sparse = kw['sparse']
         return ChunkerFixed(*params, sparse=sparse)

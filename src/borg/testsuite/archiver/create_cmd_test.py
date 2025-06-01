@@ -57,8 +57,8 @@ def test_basic_functionality(archivers, request):
     assert "borgbackup version" in output
     assert "terminating with success status, rc 0" in output
 
-    cmd(archiver, "create", "--exclude-nodump", "test", "input")
-    output = cmd(archiver, "create", "--exclude-nodump", "--stats", "test.2", "input")
+    cmd(archiver, "create", "test", "input")
+    output = cmd(archiver, "create", "--stats", "test.2", "input")
     assert "Archive name: test.2" in output
 
     with changedir("output"):
@@ -723,13 +723,13 @@ def test_file_status_excluded(archivers, request):
         create_regular_file(archiver.input_path, "file3", size=1024 * 80)
         platform.set_flags(os.path.join(archiver.input_path, "file3"), stat.UF_NODUMP)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    output = cmd(archiver, "create", "--list", "--exclude-nodump", "test", "input")
+    output = cmd(archiver, "create", "--list", "test", "input")
     assert "A input/file1" in output
     assert "A input/file2" in output
     if has_lchflags:
         assert "- input/file3" in output
     # should find second file as excluded
-    output = cmd(archiver, "create", "test", "input", "--list", "--exclude-nodump", "--exclude", "*/file2")
+    output = cmd(archiver, "create", "test", "input", "--list", "--exclude", "*/file2")
     assert "U input/file1" in output
     assert "- input/file2" in output
     if has_lchflags:

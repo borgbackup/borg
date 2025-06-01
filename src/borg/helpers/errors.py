@@ -182,3 +182,7 @@ class BackupFileNotFoundError(BackupOSError):
     """{}: {}"""
 
     exit_mcode = 107
+
+
+class BackupItemExcluded(Exception):
+    """used internally to skip an item from processing, when it is excluded."""

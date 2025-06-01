@@ -11,7 +11,7 @@ from io import TextIOWrapper
 from ._common import with_repository, Highlander
 from .. import helpers
 from ..archive import Archive, is_special
-from ..archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
+from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io, OsOpen, stat_update_check
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -33,7 +33,6 @@ from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
-from ..platform import get_flags
 
 from ..logger import create_logger
 
@@ -212,7 +211,6 @@ class CreateMixIn:
         self.noflags = args.noflags
         self.noacls = args.noacls
         self.noxattrs = args.noxattrs
-        self.exclude_nodump = args.exclude_nodump
         dry_run = args.dry_run
         self.start_backup = time.time_ns()
         t0 = archive_ts_now()
@@ -379,6 +377,8 @@ class CreateMixIn:
                 else:
                     self.print_warning("Unknown file type: %s", path)
                     return
+            except BackupItemExcluded:
+                return "-"
             except BackupError as err:
                 if isinstance(err, BackupOSError):
                     if err.errno in (errno.EPERM, errno.EACCES):
@@ -453,13 +453,6 @@ class CreateMixIn:
             # but we WILL save the mountpoint directory (or more precise: the root
             # directory of the mounted filesystem that shadows the mountpoint dir).
             recurse = restrict_dev is None or st.st_dev == restrict_dev
-
-            if self.exclude_nodump:
-                # Ignore if nodump flag is set
-                with backup_io("flags"):
-                    if get_flags(path=path, st=st) & stat.UF_NODUMP:
-                        self.print_file_status("-", path)  # excluded
-                        return
 
             if not stat.S_ISDIR(st.st_mode):
                 # directories cannot go in this branch because they can be excluded based on tag
@@ -843,10 +836,7 @@ class CreateMixIn:
             help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\\n``) ",
         )
 
-        exclude_group = define_exclusion_group(subparser, tag_files=True)
-        exclude_group.add_argument(
-            "--exclude-nodump", dest="exclude_nodump", action="store_true", help="exclude files flagged NODUMP"
-        )
+        define_exclusion_group(subparser, tag_files=True)
 
         fs_group = subparser.add_argument_group("Filesystem options")
         fs_group.add_argument(

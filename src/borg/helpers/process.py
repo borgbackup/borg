@@ -286,7 +286,7 @@ def popen_with_error_handling(cmd_line: str, log_prefix="", **kwargs):
         return
     logger.debug("%scommand line: %s", log_prefix, command)
     try:
-        return subprocess.Popen(command, **kwargs)
+        return subprocess.Popen(command, **kwargs)  # nosec B603
     except FileNotFoundError:
         logger.error("%sexecutable not found: %s", log_prefix, command[0])
         return

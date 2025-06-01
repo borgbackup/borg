@@ -201,7 +201,9 @@ class Lock:
                         logger.debug("LOCK-ACQUIRE: exclusive locks detected, deleting our shared lock.")
                         self._delete_lock(key, ignore_not_found=True, update_last_refresh=True)
             # wait a random bit before retrying
-            time.sleep(self.retry_delay_min + (self.retry_delay_max - self.retry_delay_min) * random.random())
+            time.sleep(
+                self.retry_delay_min + (self.retry_delay_max - self.retry_delay_min) * random.random()  # nosec B311
+            )
         logger.debug("LOCK-ACQUIRE: timeout while trying to acquire a lock.")
         raise LockTimeout(str(self.store))
 

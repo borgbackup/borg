@@ -73,7 +73,7 @@ class CreateMixIn:
                     try:
                         try:
                             env = prepare_subprocess_env(system=True)
-                            proc = subprocess.Popen(
+                            proc = subprocess.Popen(  # nosec B603
                                 args.paths,
                                 stdout=subprocess.PIPE,
                                 env=env,
@@ -97,7 +97,7 @@ class CreateMixIn:
                 if args.paths_from_command:
                     try:
                         env = prepare_subprocess_env(system=True)
-                        proc = subprocess.Popen(
+                        proc = subprocess.Popen(  # nosec B603
                             args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=None if is_win32 else ignore_sigint
                         )
                     except (FileNotFoundError, PermissionError) as e:

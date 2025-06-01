@@ -558,9 +558,9 @@ def umount(mountpoint):
 
     env = prepare_subprocess_env(system=True)
     try:
-        rc = subprocess.call(["fusermount", "-u", mountpoint], env=env)
+        rc = subprocess.call(["fusermount", "-u", mountpoint], env=env)  # nosec B603, B607
     except FileNotFoundError:
-        rc = subprocess.call(["umount", mountpoint], env=env)
+        rc = subprocess.call(["umount", mountpoint], env=env)  # nosec B603, B607
     set_ec(rc)
 
 

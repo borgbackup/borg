@@ -12,3 +12,4 @@ pytest-cov
 pytest-benchmark
 Cython
 pre-commit
+bandit[toml]

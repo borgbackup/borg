@@ -159,7 +159,7 @@ ignore_missing_imports = true
 
 [tool.tox]
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
-env_list = ["py{310,311,312,313}-{none,fuse2,fuse3}", "docs", "ruff", "mypy"]
+env_list = ["py{310,311,312,313}-{none,fuse2,fuse3}", "docs", "ruff", "mypy", "bandit"]
 
 [tool.tox.env_run_base]
 package = "editable-legacy"  # without this it does not find setup_docs when running under fakeroot
@@ -195,3 +195,15 @@ commands = [["mypy", "--ignore-missing-imports"]]
 change_dir = "docs"
 deps = ["sphinx", "sphinxcontrib-jquery", "guzzle_sphinx_theme"]
 commands = [["sphinx-build", "-n", "-v", "-W", "--keep-going", "-b", "html", "-d", "{envtmpdir}/doctrees", ".", "{envtmpdir}/html"]]
+
+[tool.bandit]
+exclude_dirs = [".cache", ".eggs", ".git", ".git-rewrite", ".idea", ".mypy_cache", ".ruff_cache", ".tox", "build", "dist", "src/borg/testsuite"]
+skips = [
+    "B101",  # skip assert warnings, we do not allow running borg with assertions disabled.
+    "B404",  # do not warn about just import subprocess
+]
+
+[tool.tox.env.bandit]
+skip_install = true
+deps = ["bandit[toml]"]
+commands = [["bandit", "-r", "src/borg", "-c", "pyproject.toml"]]

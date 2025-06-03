@@ -214,6 +214,7 @@ def test_import_concatenated_tar_without_ignore_zeros(archivers, request):
 def test_roundtrip_pax_borg(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
+    os.remove("input/flagfile")  # this would be automagically excluded due to NODUMP
     cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "create", "src", "input")
     cmd(archiver, "export-tar", "src", "simple.tar", "--tar-format=BORG")

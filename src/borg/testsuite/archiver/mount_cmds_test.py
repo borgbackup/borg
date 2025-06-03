@@ -78,8 +78,8 @@ def test_fuse(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_test_files(archiver.input_path)
     have_noatime = has_noatime("input/file1")
-    cmd(archiver, "create", "--exclude-nodump", "--atime", "archive", "input")
-    cmd(archiver, "create", "--exclude-nodump", "--atime", "archive2", "input")
+    cmd(archiver, "create", "--atime", "archive", "input")
+    cmd(archiver, "create", "--atime", "archive2", "input")
     if has_lchflags:
         # remove the file that we did not back up, so input and output become equal
         os.remove(os.path.join("input", "flagfile"))

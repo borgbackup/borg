@@ -265,22 +265,12 @@ def test_prune_ignore_protected(archivers, request):
 
 class MockArchive:
     def __init__(self, ts, id):
-        self.ts = ts
+        # Real archive objects have UTC zoned timestamps
+        self.ts = ts.replace(tzinfo=timezone.utc)
         self.id = id
 
     def __repr__(self):
         return f"{self.id}: {self.ts.isoformat()}"
-
-
-# This is the local timezone of the system running the tests.
-# We need this e.g. to construct archive timestamps for the prune tests,
-# because borg prune operates in the local timezone (it first converts the
-# archive timestamp to the local timezone). So, if we want the y/m/d/h/m/s
-# values which prune uses to be exactly the ones we give [and NOT shift them
-# by tzoffset], we need to give the timestamps in the same local timezone.
-# Please note that the timestamps in a real borg archive or manifest are
-# stored in UTC timezone.
-local_tz = datetime.now(tz=timezone.utc).astimezone(tz=None).tzinfo
 
 
 @pytest.mark.parametrize(
@@ -302,23 +292,23 @@ def test_prune_split(rule, num_to_keep, expected_ids):
 
     archives = [
         # years apart
-        MockArchive(datetime(2015, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
-        MockArchive(datetime(2016, 1, 1, 10, 0, 0, tzinfo=local_tz), 2),
-        MockArchive(datetime(2017, 1, 1, 10, 0, 0, tzinfo=local_tz), 3),
+        MockArchive(datetime(2015, 1, 1, 10, 0, 0), 1),
+        MockArchive(datetime(2016, 1, 1, 10, 0, 0), 2),
+        MockArchive(datetime(2017, 1, 1, 10, 0, 0), 3),
         # months apart
-        MockArchive(datetime(2017, 2, 1, 10, 0, 0, tzinfo=local_tz), 4),
-        MockArchive(datetime(2017, 3, 1, 10, 0, 0, tzinfo=local_tz), 5),
+        MockArchive(datetime(2017, 2, 1, 10, 0, 0), 4),
+        MockArchive(datetime(2017, 3, 1, 10, 0, 0), 5),
         # days apart
-        MockArchive(datetime(2017, 3, 2, 10, 0, 0, tzinfo=local_tz), 6),
-        MockArchive(datetime(2017, 3, 3, 10, 0, 0, tzinfo=local_tz), 7),
-        MockArchive(datetime(2017, 3, 4, 10, 0, 0, tzinfo=local_tz), 8),
+        MockArchive(datetime(2017, 3, 2, 10, 0, 0), 6),
+        MockArchive(datetime(2017, 3, 3, 10, 0, 0), 7),
+        MockArchive(datetime(2017, 3, 4, 10, 0, 0), 8),
         # minutes apart
-        MockArchive(datetime(2017, 10, 1, 9, 45, 0, tzinfo=local_tz), 9),
-        MockArchive(datetime(2017, 10, 1, 9, 55, 0, tzinfo=local_tz), 10),
+        MockArchive(datetime(2017, 10, 1, 9, 45, 0), 9),
+        MockArchive(datetime(2017, 10, 1, 9, 55, 0), 10),
         # seconds apart
-        MockArchive(datetime(2017, 10, 1, 10, 0, 1, tzinfo=local_tz), 11),
-        MockArchive(datetime(2017, 10, 1, 10, 0, 3, tzinfo=local_tz), 12),
-        MockArchive(datetime(2017, 10, 1, 10, 0, 5, tzinfo=local_tz), 13),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 1), 11),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 3), 12),
+        MockArchive(datetime(2017, 10, 1, 10, 0, 5), 13),
     ]
     kept_because = {}
     keep = prune_split(archives, rule, num_to_keep, None, kept_because)
@@ -334,17 +324,17 @@ def test_prune_split_keep_oldest():
 
     archives = [
         # oldest backup, but not last in its year
-        MockArchive(datetime(2018, 1, 1, 10, 0, 0, tzinfo=local_tz), 1),
+        MockArchive(datetime(2018, 1, 1, 10, 0, 0), 1),
         # an interim backup
-        MockArchive(datetime(2018, 12, 30, 10, 0, 0, tzinfo=local_tz), 2),
+        MockArchive(datetime(2018, 12, 30, 10, 0, 0), 2),
         # year-end backups
-        MockArchive(datetime(2018, 12, 31, 10, 0, 0, tzinfo=local_tz), 3),
-        MockArchive(datetime(2019, 12, 31, 10, 0, 0, tzinfo=local_tz), 4),
+        MockArchive(datetime(2018, 12, 31, 10, 0, 0), 3),
+        MockArchive(datetime(2019, 12, 31, 10, 0, 0), 4),
     ]
 
     # Keep oldest when retention target can't otherwise be met
     kept_because = {}
-    keep = prune_split(archives, "yearly", 3, kept_because)
+    keep = prune_split(archives, "yearly", 3, None, kept_because)
 
     assert set(keep) == subset(archives, [1, 3, 4])
     assert kept_because[1][0] == "yearly[oldest]"
@@ -353,7 +343,7 @@ def test_prune_split_keep_oldest():
 
     # Otherwise, prune it
     kept_because = {}
-    keep = prune_split(archives, "yearly", 2, kept_because)
+    keep = prune_split(archives, "yearly", 2, None, kept_because)
 
     assert set(keep) == subset(archives, [3, 4])
     assert kept_because[3][0] == "yearly"
@@ -364,10 +354,11 @@ def test_prune_split_no_archives():
     archives = []
 
     kept_because = {}
-    keep = prune_split(archives, "yearly", 3, kept_because)
+    keep = prune_split(archives, "yearly", 3, None, kept_because)
 
     assert keep == []
     assert kept_because == {}
+
 
 def test_prune_keep_last_same_second(archivers, request):
     archiver = request.getfixturevalue(archivers)

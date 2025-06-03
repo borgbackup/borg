@@ -22,7 +22,7 @@ class LocksMixIn:
         env = prepare_subprocess_env(system=True)
         try:
             # we exit with the return code we get from the subprocess
-            rc = subprocess.call([args.command] + args.args, env=env)
+            rc = subprocess.call([args.command] + args.args, env=env)  # nosec B603
             set_ec(rc)
         except (FileNotFoundError, OSError, ValueError) as e:
             raise CommandError(f"Error while trying to run '{args.command}': {e}")

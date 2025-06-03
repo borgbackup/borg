@@ -269,7 +269,7 @@ def getfqdn(name=""):
     An empty argument is interpreted as meaning the local host.
     """
     name = name.strip()
-    if not name or name == "0.0.0.0":
+    if not name or name == "0.0.0.0":  # nosec B104:hardcoded_bind_all_interfaces
         name = socket.gethostname()
     try:
         addrs = socket.getaddrinfo(name, None, 0, socket.SOCK_DGRAM, 0, socket.AI_CANONNAME)

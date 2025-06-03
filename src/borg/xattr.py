@@ -28,7 +28,7 @@ if sys.platform.startswith("linux"):
     for preload in preloads:
         if preload.startswith("libfakeroot"):
             env = prepare_subprocess_env(system=True)
-            fakeroot_output = subprocess.check_output(["fakeroot", "-v"], env=env)
+            fakeroot_output = subprocess.check_output(["fakeroot", "-v"], env=env)  # nosec B603, B607
             fakeroot_version = parse_version(fakeroot_output.decode("ascii").split()[-1])
             if fakeroot_version >= parse_version("1.20.2"):
                 # 1.20.2 has been confirmed to have xattr support

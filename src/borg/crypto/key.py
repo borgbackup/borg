@@ -658,7 +658,7 @@ class FlexiKey:
         elif self.STORAGE == KeyBlobStorage.REPO:
             # While the repository is encrypted, we consider a repokey repository with a blank
             # passphrase an unencrypted repository.
-            self.logically_encrypted = passphrase != ""
+            self.logically_encrypted = passphrase != ""  # nosec B105
 
             # what we get in target is just a repo location, but we already have the repo obj:
             target = self.repository
@@ -688,7 +688,7 @@ class FlexiKey:
                 fd.write(key_data)
                 fd.write("\n")
         elif self.STORAGE == KeyBlobStorage.REPO:
-            self.logically_encrypted = passphrase != ""
+            self.logically_encrypted = passphrase != ""  # nosec B105
             key_data = key_data.encode("utf-8")  # remote repo: msgpack issue #99, giving bytes
             target.save_key(key_data)
         else:

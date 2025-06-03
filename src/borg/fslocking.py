@@ -169,11 +169,11 @@ class ExclusiveLock:
                 # should be cleaned up anyway. Try to clean up, but don't crash.
                 try:
                     os.unlink(temp_unique_name)
-                except:  # noqa
+                except:  # nosec B110 # noqa
                     pass
                 try:
                     os.rmdir(temp_path)
-                except:  # noqa
+                except:  # nosec B110 # noqa
                     pass
 
     def release(self):

@@ -136,6 +136,6 @@ class ChunkerTestCase(BaseTestCase):
                 self.input = self.input[:-1]
                 return self.input[:1]
 
-        chunker = get_chunker(*CHUNKER_PARAMS, seed=0)
+        chunker = get_chunker(*CHUNKER_PARAMS, seed=0, sparse=False)
         reconstructed = b"".join(cf(chunker.chunkify(SmallReadFile())))
         assert reconstructed == b"a" * 20

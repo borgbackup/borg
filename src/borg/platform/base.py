@@ -21,6 +21,7 @@ are correctly composed into the base functionality.
 API_VERSION = "1.2_05"
 
 fdatasync = getattr(os, "fdatasync", os.fsync)
+has_posix_fadvise = hasattr(os, "posix_fadvise")
 
 from .xattr import ENOATTR
 
@@ -114,9 +115,11 @@ def sync_dir(path):
 
 
 def safe_fadvise(fd, offset, len, advice):
-    if hasattr(os, "posix_fadvise"):
+    if has_posix_fadvise:
         advice = getattr(os, "POSIX_FADV_" + advice)
         try:
+            # UNIX only and, in case of block sizes that are not a multiple of the system's page size,
+            # better be used with a bug fixed linux kernel > 4.6.0, see borgbackup issue #907.
             os.posix_fadvise(fd, offset, len, advice)
         except OSError:
             # usually, posix_fadvise can't fail for us, but there seem to

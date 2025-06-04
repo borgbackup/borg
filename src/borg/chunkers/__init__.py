@@ -1,5 +1,6 @@
 from .buzhash import *  # noqa
 from .chunker import *  # noqa
+from .failing import *  # noqa
 from .reader import *  # noqa
 
 

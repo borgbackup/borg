@@ -5,7 +5,7 @@ import tempfile
 import pytest
 
 from .chunker_test import cf
-from ..chunkers import (
+from ...chunkers import (
     Chunker,
     ChunkerFixed,
     sparsemap,
@@ -15,7 +15,7 @@ from ..chunkers import (
     FileFMAPReader,
     Chunk,
 )
-from ..constants import *  # NOQA
+from ...constants import *  # NOQA
 
 BS = 4096  # fs block size
 

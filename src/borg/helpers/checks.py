@@ -14,7 +14,8 @@ def check_python():
 
 
 def check_extension_modules():
-    from .. import platform, compress, crypto, item, chunker, hashindex
+    from .. import platform, compress, crypto, item, hashindex
+    from ..chunkers import chunker
 
     msg = """The Borg binary extension modules do not seem to be properly installed."""
     if hashindex.API_VERSION != "1.2_01":

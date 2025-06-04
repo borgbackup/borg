@@ -134,7 +134,7 @@ class BenchmarkMixIn:
         key_96 = os.urandom(12)
 
         import io
-        from ..chunker import get_chunker
+        from ..chunkers import get_chunker
 
         print("Chunkers =======================================================")
         size = "1GB"

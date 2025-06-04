@@ -12,8 +12,8 @@ from libc.stdint cimport uint8_t, uint32_t
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, memmove
 
-from .constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
-from .platform import safe_fadvise
+from ..constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
+from ..platform import safe_fadvise
 
 # this will be True if Python's seek implementation supports data/holes seeking.
 # this does not imply that it will actually work on the filesystem,

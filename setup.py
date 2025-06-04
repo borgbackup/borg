@@ -50,7 +50,7 @@ cflags = ["-Wall", "-Wextra", "-Wpointer-arith", "-Wno-unreachable-code-fallthro
 
 compress_source = "src/borg/compress.pyx"
 crypto_ll_source = "src/borg/crypto/low_level.pyx"
-chunker_source = "src/borg/chunker.pyx"
+chunker_source = "src/borg/chunkers/chunker.pyx"
 hashindex_source = "src/borg/hashindex.pyx"
 item_source = "src/borg/item.pyx"
 checksums_source = "src/borg/checksums.pyx"
@@ -182,7 +182,7 @@ if not on_rtd:
         Extension("borg.compress", **compress_ext_kwargs),
         Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags),
         Extension("borg.item", [item_source], extra_compile_args=cflags),
-        Extension("borg.chunker", [chunker_source], extra_compile_args=cflags, undef_macros=["NDEBUG"]),
+        Extension("borg.chunkers.chunker", [chunker_source], extra_compile_args=cflags, undef_macros=["NDEBUG"]),
         Extension("borg.checksums", **checksums_ext_kwargs),
     ]
 

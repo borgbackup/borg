@@ -2,7 +2,7 @@ import argparse
 
 from ._common import with_repository, with_other_repository, Highlander
 from ..archive import Archive, cached_hash, DownloadPipeline
-from ..chunker import get_chunker
+from ..chunkers import get_chunker
 from ..compress import CompressionSpec
 from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret

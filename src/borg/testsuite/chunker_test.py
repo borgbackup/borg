@@ -3,7 +3,7 @@
 
 from io import BytesIO
 
-from ..chunker import ChunkerFixed, Chunker, get_chunker, buzhash, buzhash_update
+from ..chunkers import ChunkerFixed, Chunker, get_chunker, buzhash, buzhash_update
 from ..constants import *  # NOQA
 from . import BaseTestCase
 

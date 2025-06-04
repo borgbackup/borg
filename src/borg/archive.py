@@ -21,7 +21,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import xattr
-from .chunker import get_chunker, Chunk
+from .chunkers import get_chunker, Chunk
 from .cache import ChunkListEntry, build_chunkindex_from_repo, delete_chunkindex_cache
 from .crypto.key import key_factory, UnsupportedPayloadError
 from .compress import CompressionSpec

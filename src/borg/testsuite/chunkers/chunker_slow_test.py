@@ -1,7 +1,7 @@
 from hashlib import sha256
 from io import BytesIO
 
-from .chunker_test import cf
+from . import cf
 from ...chunkers import Chunker
 from ...constants import *  # NOQA
 from ...helpers import hex_to_bin

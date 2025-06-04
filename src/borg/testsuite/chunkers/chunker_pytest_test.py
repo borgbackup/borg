@@ -4,7 +4,7 @@ import tempfile
 
 import pytest
 
-from .chunker_test import cf
+from . import cf
 from ...chunkers import (
     Chunker,
     ChunkerFixed,

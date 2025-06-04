@@ -1,3 +1,4 @@
+from .buzhash import *  # noqa
 from .chunker import *  # noqa
 from .reader import *  # noqa
 

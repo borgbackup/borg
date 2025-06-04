@@ -1,6 +1,6 @@
-from .buzhash import *  # noqa
-from .failing import *  # noqa
-from .fixed import *  # noqa
+from .buzhash import Chunker
+from .failing import ChunkerFailing
+from .fixed import ChunkerFixed
 from .reader import *  # noqa
 
 API_VERSION = "1.2_01"

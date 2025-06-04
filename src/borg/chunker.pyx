@@ -13,6 +13,7 @@ from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, memmove
 
 from .constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
+from .platform import safe_fadvise
 
 # this will be True if Python's seek implementation supports data/holes seeking.
 # this does not imply that it will actually work on the filesystem,
@@ -47,11 +48,7 @@ def dread(offset, size, fd=None, fh=-1):
     use_fh = fh >= 0
     if use_fh:
         data = os.read(fh, size)
-        if hasattr(os, 'posix_fadvise'):
-            # UNIX only and, in case of block sizes that are not a multiple of the
-            # system's page size, better be used with a bug fixed linux kernel > 4.6.0,
-            # see comment/workaround in _chunker.c and borgbackup issue #907.
-            os.posix_fadvise(fh, offset, len(data), os.POSIX_FADV_DONTNEED)
+        safe_fadvise(fh, offset, len(data), "DONTNEED")
         return data
     else:
         return fd.read(size)

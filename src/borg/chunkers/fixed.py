@@ -33,7 +33,7 @@ class ChunkerFixed:
         self.header_size = header_size
         self.chunking_time = 0.0  # likely will stay close to zero - not much to do here.
         self.reader_block_size = 1024 * 1024
-        self.reader = None
+        self.reader: FileReader = None
         self.sparse = sparse
 
     def chunkify(self, fd: BinaryIO = None, fh: int = -1, fmap: List = None) -> Iterator:

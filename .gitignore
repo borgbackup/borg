@@ -7,6 +7,7 @@ src/borg/compress.c
 src/borg/crypto/low_level.c
 src/borg/item.c
 src/borg/chunkers/chunker.c
+src/borg/chunkers/reader.c
 src/borg/checksums.c
 src/borg/platform/darwin.c
 src/borg/platform/freebsd.c

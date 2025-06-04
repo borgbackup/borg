@@ -1,51 +1,16 @@
-from typing import NamedTuple, Tuple, List, Dict, Any, Type, Iterator, BinaryIO
+from typing import List, Any, Iterator, BinaryIO
+
+from .reader import fmap_entry
 
 API_VERSION: str
 
-has_seek_hole: bool
-
-class _Chunk(NamedTuple):
-    data: bytes
-    meta: Dict[str, Any]
-
-def Chunk(data: bytes, **meta) -> Type[_Chunk]: ...
 def buzhash(data: bytes, seed: int) -> int: ...
 def buzhash_update(sum: int, remove: int, add: int, len: int, seed: int) -> int: ...
 def get_chunker(algo: str, *params, **kw) -> Any: ...
 
-fmap_entry = Tuple[int, int, bool]
-
-def sparsemap(fd: BinaryIO = None, fh: int = -1) -> List[fmap_entry]: ...
-
 class ChunkerFailing:
     def __init__(self, block_size: int, map: str) -> None: ...
     def chunkify(self, fd: BinaryIO = None, fh: int = -1) -> Iterator: ...
-
-class FileFMAPReader:
-    def __init__(
-        self,
-        *,
-        fd: BinaryIO = None,
-        fh: int = -1,
-        read_size: int = 0,
-        sparse: bool = False,
-        fmap: List[fmap_entry] = None,
-    ) -> None: ...
-    def _build_fmap(self) -> List[fmap_entry]: ...
-    def blockify(self) -> Iterator: ...
-
-class FileReader:
-    def __init__(
-        self,
-        *,
-        fd: BinaryIO = None,
-        fh: int = -1,
-        read_size: int = 0,
-        sparse: bool = False,
-        fmap: List[fmap_entry] = None,
-    ) -> None: ...
-    def _fill_buffer(self) -> bool: ...
-    def read(self, size: int) -> Type[_Chunk]: ...
 
 class ChunkerFixed:
     def __init__(self, block_size: int, header_size: int = 0, sparse: bool = False) -> None: ...
@@ -55,4 +20,4 @@ class Chunker:
     def __init__(
         self, seed: int, chunk_min_exp: int, chunk_max_exp: int, hash_mask_bits: int, hash_window_size: int
     ) -> None: ...
-    def chunkify(self, fd: BinaryIO = None, fh: int = -1) -> Iterator: ...
+    def chunkify(self, fd: BinaryIO = None, fh: int = -1, fmap: List[fmap_entry] = None) -> Iterator: ...

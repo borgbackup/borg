@@ -51,7 +51,6 @@ cflags = ["-Wall", "-Wextra", "-Wpointer-arith", "-Wno-unreachable-code-fallthro
 compress_source = "src/borg/compress.pyx"
 crypto_ll_source = "src/borg/crypto/low_level.pyx"
 buzhash_source = "src/borg/chunkers/buzhash.pyx"
-chunker_source = "src/borg/chunkers/chunker.pyx"
 reader_source = "src/borg/chunkers/reader.pyx"
 hashindex_source = "src/borg/hashindex.pyx"
 item_source = "src/borg/item.pyx"
@@ -67,7 +66,6 @@ cython_sources = [
     compress_source,
     crypto_ll_source,
     buzhash_source,
-    chunker_source,
     reader_source,
     hashindex_source,
     item_source,
@@ -187,7 +185,6 @@ if not on_rtd:
         Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags),
         Extension("borg.item", [item_source], extra_compile_args=cflags),
         Extension("borg.chunkers.buzhash", [buzhash_source], extra_compile_args=cflags, undef_macros=["NDEBUG"]),
-        Extension("borg.chunkers.chunker", [chunker_source], extra_compile_args=cflags, undef_macros=["NDEBUG"]),
         Extension("borg.chunkers.reader", [reader_source], extra_compile_args=cflags, undef_macros=["NDEBUG"]),
         Extension("borg.checksums", **checksums_ext_kwargs),
     ]

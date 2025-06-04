@@ -543,7 +543,6 @@ cython_sources = """
 src/borg/compress.pyx
 src/borg/crypto/low_level.pyx
 src/borg/chunkers/buzhash.pyx
-src/borg/chunkers/chunker.pyx
 src/borg/chunkers/reader.pyx
 src/borg/hashindex.pyx
 src/borg/item.pyx

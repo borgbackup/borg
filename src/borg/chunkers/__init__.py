@@ -1,7 +1,9 @@
 from .buzhash import *  # noqa
-from .chunker import *  # noqa
 from .failing import *  # noqa
+from .fixed import *  # noqa
 from .reader import *  # noqa
+
+API_VERSION = "1.2_01"
 
 
 def get_chunker(algo, *params, **kw):

@@ -14,13 +14,12 @@ def check_python():
 
 
 def check_extension_modules():
-    from .. import platform, compress, crypto, item, hashindex
-    from ..chunkers import chunker
+    from .. import platform, compress, crypto, item, hashindex, chunkers
 
     msg = """The Borg binary extension modules do not seem to be properly installed."""
     if hashindex.API_VERSION != "1.2_01":
         raise RTError(msg)
-    if chunker.API_VERSION != "1.2_01":
+    if chunkers.API_VERSION != "1.2_01":
         raise RTError(msg)
     if compress.API_VERSION != "1.2_02":
         raise RTError(msg)

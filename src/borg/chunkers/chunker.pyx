@@ -444,16 +444,3 @@ def buzhash_update(uint32_t sum, unsigned char remove, unsigned char add, size_t
     sum = _buzhash_update(sum, remove, add, len, table)
     free(table)
     return sum
-
-
-def get_chunker(algo, *params, **kw):
-    if algo == 'buzhash':
-        seed = kw['seed']
-        sparse = kw['sparse']
-        return Chunker(seed, *params, sparse=sparse)
-    if algo == 'fixed':
-        sparse = kw['sparse']
-        return ChunkerFixed(*params, sparse=sparse)
-    if algo == 'fail':
-        return ChunkerFailing(*params)
-    raise TypeError('unsupported chunker algo %r' % algo)

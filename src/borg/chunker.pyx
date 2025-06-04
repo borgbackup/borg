@@ -433,7 +433,6 @@ class ChunkerFixed:
             self.chunking_time += time.monotonic() - started_chunking
 
             if header_chunk.meta["size"] > 0:
-                assert self.header_size == header_chunk.meta["size"]
                 # Yield the header chunk
                 yield header_chunk
 

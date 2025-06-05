@@ -28,10 +28,6 @@ from .reader import FileReader, Chunk
 #     any repeating bytes at distance 64 within those 4095 bytes can cause cancellation within
 #     the hash function, e.g. in "X <any 63 bytes> X", the last X would cancel out the influence
 #     of the first X on the hash value.
-#
-# (2) if you would use a window size divisible by 128(?), the seed would cancel itself out completely.
-#     this is why we use a window size of 4095 bytes.
-#
 
 # This seems to be the most reliable way to inline this code, using a C preprocessor macro:
 cdef extern from *:

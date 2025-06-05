@@ -41,7 +41,7 @@ def transfer_chunks(
         file = ChunkIteratorFileWrapper(chunk_iterator)
 
         # Create a chunker with the specified parameters
-        chunker = get_chunker(*chunker_params, seed=archive.key.chunk_seed, sparse=False)
+        chunker = get_chunker(*chunker_params, key=archive.key, sparse=False)
         for chunk in chunker.chunkify(file):
             if not dry_run:
                 chunk_id, data = cached_hash(chunk, archive.key.id_hash)

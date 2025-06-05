@@ -72,6 +72,6 @@ class ChunkerBuzHash64TestCase(BaseTestCase):
                 self.input = self.input[:-1]
                 return self.input[:1]
 
-        chunker = get_chunker(*CHUNKER64_PARAMS, seed=0, sparse=False)
+        chunker = get_chunker(*CHUNKER64_PARAMS, sparse=False)
         reconstructed = b"".join(cf(chunker.chunkify(SmallReadFile())))
         assert reconstructed == b"a" * 20

@@ -92,6 +92,7 @@ MAX_SEGMENT_DIR_INDEX = 2**32 - 1
 
 # chunker algorithms
 CH_BUZHASH = "buzhash"
+CH_BUZHASH64 = "buzhash64"
 CH_FIXED = "fixed"
 CH_FAIL = "fail"
 
@@ -103,6 +104,7 @@ HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
 
 # defaults, use --chunker-params to override
 CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
+CHUNKER64_PARAMS = (CH_BUZHASH64, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
 
 # chunker params for the items metadata stream, finer granularity
 ITEMS_CHUNKER_PARAMS = (CH_BUZHASH, 15, 19, 17, HASH_WINDOW_SIZE)

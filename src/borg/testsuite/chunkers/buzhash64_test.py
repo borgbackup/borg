@@ -3,7 +3,7 @@ from io import BytesIO
 import os
 
 from . import cf
-from ...chunkers import Chunker
+from ...chunkers import ChunkerBuzHash64
 from ...constants import *  # NOQA
 from ...helpers import hex_to_bin
 
@@ -12,7 +12,7 @@ def H(data):
     return sha256(data).digest()
 
 
-def test_chunkpoints_unchanged():
+def test_chunkpoints64_unchanged():
     def twist(size):
         x = 1
         a = bytearray(size)
@@ -32,20 +32,20 @@ def test_chunkpoints_unchanged():
                 for maskbits in (4, 7, 10, 12):
                     for seed in (1849058162, 1234567653):
                         fh = BytesIO(data)
-                        chunker = Chunker(seed, minexp, maxexp, maskbits, winsize)
+                        chunker = ChunkerBuzHash64(seed, minexp, maxexp, maskbits, winsize)
                         chunks = [H(c) for c in cf(chunker.chunkify(fh, -1))]
                         runs.append(H(b"".join(chunks)))
 
     # The "correct" hash below matches the existing chunker behavior.
     # Future chunker optimisations must not change this, or existing repos will bloat.
     overall_hash = H(b"".join(runs))
-    assert overall_hash == hex_to_bin("a43d0ecb3ae24f38852fcc433a83dacd28fe0748d09cc73fc11b69cf3f1a7299")
+    assert overall_hash == hex_to_bin("fa9002758c0358721404f55f3020bb56b987cb3cd9a688ff9641f4023215f4e7")
 
 
-def test_buzhash_chunksize_distribution():
+def test_buzhash64_chunksize_distribution():
     data = os.urandom(1048576)
     min_exp, max_exp, mask = 10, 16, 14  # chunk size target 16kiB, clip at 1kiB and 64kiB
-    chunker = Chunker(0, min_exp, max_exp, mask, 4095)
+    chunker = ChunkerBuzHash64(0, min_exp, max_exp, mask, 4095)
     f = BytesIO(data)
     chunks = cf(chunker.chunkify(f))
     del chunks[-1]  # get rid of the last chunk, it can be smaller than 2**min_exp

@@ -1,4 +1,5 @@
 from .buzhash import Chunker
+from .buzhash64 import ChunkerBuzHash64
 from .failing import ChunkerFailing
 from .fixed import ChunkerFixed
 from .reader import *  # noqa
@@ -11,6 +12,10 @@ def get_chunker(algo, *params, **kw):
         seed = kw["seed"]
         sparse = kw["sparse"]
         return Chunker(seed, *params, sparse=sparse)
+    if algo == "buzhash64":
+        seed = kw["seed"]
+        sparse = kw["sparse"]
+        return ChunkerBuzHash64(seed, *params, sparse=sparse)
     if algo == "fixed":
         sparse = kw["sparse"]
         return ChunkerFixed(*params, sparse=sparse)

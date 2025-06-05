@@ -3,78 +3,11 @@
 
 from io import BytesIO
 
-from ..chunker import ChunkerFixed, Chunker, get_chunker, buzhash, buzhash_update
-from ..constants import *  # NOQA
-from . import BaseTestCase
-
-
-def cf(chunks):
-    """chunk filter"""
-
-    # this is to simplify testing: either return the data piece (bytes) or the hole length (int).
-    def _cf(chunk):
-        if chunk.meta["allocation"] == CH_DATA:
-            assert len(chunk.data) == chunk.meta["size"]
-            return bytes(chunk.data)  # make sure we have bytes, not memoryview
-        if chunk.meta["allocation"] in (CH_HOLE, CH_ALLOC):
-            assert chunk.data is None
-            return chunk.meta["size"]
-        assert False, "unexpected allocation value"
-
-    return [_cf(chunk) for chunk in chunks]
-
-
-class ChunkerFixedTestCase(BaseTestCase):
-    def test_chunkify_just_blocks(self):
-        data = b"foobar" * 1500
-        chunker = ChunkerFixed(4096)
-        parts = cf(chunker.chunkify(BytesIO(data)))
-        self.assert_equal(parts, [data[0:4096], data[4096:8192], data[8192:]])
-
-    def test_chunkify_header_and_blocks(self):
-        data = b"foobar" * 1500
-        chunker = ChunkerFixed(4096, 123)
-        parts = cf(chunker.chunkify(BytesIO(data)))
-        self.assert_equal(
-            parts, [data[0:123], data[123 : 123 + 4096], data[123 + 4096 : 123 + 8192], data[123 + 8192 :]]
-        )
-
-    def test_chunkify_just_blocks_fmap_complete(self):
-        data = b"foobar" * 1500
-        chunker = ChunkerFixed(4096)
-        fmap = [(0, 4096, True), (4096, 8192, True), (8192, 99999999, True)]
-        parts = cf(chunker.chunkify(BytesIO(data), fmap=fmap))
-        self.assert_equal(parts, [data[0:4096], data[4096:8192], data[8192:]])
-
-    def test_chunkify_header_and_blocks_fmap_complete(self):
-        data = b"foobar" * 1500
-        chunker = ChunkerFixed(4096, 123)
-        fmap = [(0, 123, True), (123, 4096, True), (123 + 4096, 4096, True), (123 + 8192, 4096, True)]
-        parts = cf(chunker.chunkify(BytesIO(data), fmap=fmap))
-        self.assert_equal(
-            parts, [data[0:123], data[123 : 123 + 4096], data[123 + 4096 : 123 + 8192], data[123 + 8192 :]]
-        )
-
-    def test_chunkify_header_and_blocks_fmap_zeros(self):
-        data = b"H" * 123 + b"_" * 4096 + b"X" * 4096 + b"_" * 4096
-        chunker = ChunkerFixed(4096, 123)
-        fmap = [(0, 123, True), (123, 4096, False), (123 + 4096, 4096, True), (123 + 8192, 4096, False)]
-        parts = cf(chunker.chunkify(BytesIO(data), fmap=fmap))
-        # because we marked the '_' ranges as holes, we will get hole ranges instead!
-        self.assert_equal(parts, [data[0:123], 4096, data[123 + 4096 : 123 + 8192], 4096])
-
-    def test_chunkify_header_and_blocks_fmap_partial(self):
-        data = b"H" * 123 + b"_" * 4096 + b"X" * 4096 + b"_" * 4096
-        chunker = ChunkerFixed(4096, 123)
-        fmap = [
-            (0, 123, True),
-            # (123, 4096, False),
-            (123 + 4096, 4096, True),
-            # (123+8192, 4096, False),
-        ]
-        parts = cf(chunker.chunkify(BytesIO(data), fmap=fmap))
-        # because we left out the '_' ranges from the fmap, we will not get them at all!
-        self.assert_equal(parts, [data[0:123], data[123 + 4096 : 123 + 8192]])
+from ...chunkers import get_chunker
+from ...chunkers.buzhash import buzhash, buzhash_update, Chunker
+from ...constants import *  # NOQA
+from .. import BaseTestCase
+from . import cf
 
 
 class ChunkerTestCase(BaseTestCase):

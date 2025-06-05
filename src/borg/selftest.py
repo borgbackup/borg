@@ -22,11 +22,12 @@ import time
 from unittest import TestResult, TestSuite, defaultTestLoader
 
 from .testsuite.crypto_test import CryptoTestCase
-from .testsuite.chunker_test import ChunkerTestCase
+from .testsuite.chunkers.buzhash_self_test import ChunkerTestCase
+from .testsuite.chunkers.fixed_self_test import ChunkerFixedTestCase
 
-SELFTEST_CASES = [CryptoTestCase, ChunkerTestCase]
+SELFTEST_CASES = [CryptoTestCase, ChunkerTestCase, ChunkerFixedTestCase]
 
-SELFTEST_COUNT = 11
+SELFTEST_COUNT = 17
 
 
 class SelfTestResult(TestResult):

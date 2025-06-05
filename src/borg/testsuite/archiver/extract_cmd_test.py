@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from ... import xattr
-from ...chunker import has_seek_hole
+from ...chunkers import has_seek_hole
 from ...constants import *  # NOQA
 from ...helpers import EXIT_WARNING, BackupPermissionError, bin_to_hex
 from ...helpers import flags_noatime, flags_normal

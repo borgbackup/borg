@@ -542,7 +542,8 @@ class BuildMan:
 cython_sources = """
 src/borg/compress.pyx
 src/borg/crypto/low_level.pyx
-src/borg/chunker.pyx
+src/borg/chunkers/buzhash.pyx
+src/borg/chunkers/reader.pyx
 src/borg/hashindex.pyx
 src/borg/item.pyx
 src/borg/checksums.pyx

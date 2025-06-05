@@ -22,7 +22,7 @@ import time
 from unittest import TestResult, TestSuite, defaultTestLoader
 
 from .testsuite.crypto_test import CryptoTestCase
-from .testsuite.chunkers.buzhash_test import ChunkerTestCase
+from .testsuite.chunkers.buzhash_self_test import ChunkerTestCase
 
 SELFTEST_CASES = [CryptoTestCase, ChunkerTestCase]
 

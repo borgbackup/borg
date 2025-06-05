@@ -1,59 +1,39 @@
-from io import BytesIO
+import pytest
 
-from ...chunkers.fixed import ChunkerFixed
+from . import cf, make_sparsefile, make_content, fs_supports_sparse
+from . import BS, map_sparse1, map_sparse2, map_onlysparse, map_notsparse
+from ...chunkers import ChunkerFixed
 from ...constants import *  # NOQA
-from .. import BaseTestCase
-from . import cf
 
 
-class ChunkerFixedTestCase(BaseTestCase):
-    def test_chunkify_just_blocks(self):
-        data = b"foobar" * 1500
-        chunker = ChunkerFixed(4096)
-        parts = cf(chunker.chunkify(BytesIO(data)))
-        self.assert_equal(parts, [data[0:4096], data[4096:8192], data[8192:]])
+@pytest.mark.skipif(not fs_supports_sparse(), reason="fs does not support sparse files")
+@pytest.mark.parametrize(
+    "fname, sparse_map, header_size, sparse",
+    [
+        ("sparse1", map_sparse1, 0, False),
+        ("sparse1", map_sparse1, 0, True),
+        ("sparse1", map_sparse1, BS, False),
+        ("sparse1", map_sparse1, BS, True),
+        ("sparse2", map_sparse2, 0, False),
+        ("sparse2", map_sparse2, 0, True),
+        ("sparse2", map_sparse2, BS, False),
+        ("sparse2", map_sparse2, BS, True),
+        ("onlysparse", map_onlysparse, 0, False),
+        ("onlysparse", map_onlysparse, 0, True),
+        ("onlysparse", map_onlysparse, BS, False),
+        ("onlysparse", map_onlysparse, BS, True),
+        ("notsparse", map_notsparse, 0, False),
+        ("notsparse", map_notsparse, 0, True),
+        ("notsparse", map_notsparse, BS, False),
+        ("notsparse", map_notsparse, BS, True),
+    ],
+)
+def test_chunkify_sparse(tmpdir, fname, sparse_map, header_size, sparse):
+    def get_chunks(fname, sparse, header_size):
+        chunker = ChunkerFixed(4096, header_size=header_size, sparse=sparse)
+        with open(fname, "rb") as fd:
+            return cf(chunker.chunkify(fd))
 
-    def test_chunkify_header_and_blocks(self):
-        data = b"foobar" * 1500
-        chunker = ChunkerFixed(4096, 123)
-        parts = cf(chunker.chunkify(BytesIO(data)))
-        self.assert_equal(
-            parts, [data[0:123], data[123 : 123 + 4096], data[123 + 4096 : 123 + 8192], data[123 + 8192 :]]
-        )
-
-    def test_chunkify_just_blocks_fmap_complete(self):
-        data = b"foobar" * 1500
-        chunker = ChunkerFixed(4096)
-        fmap = [(0, 4096, True), (4096, 8192, True), (8192, 99999999, True)]
-        parts = cf(chunker.chunkify(BytesIO(data), fmap=fmap))
-        self.assert_equal(parts, [data[0:4096], data[4096:8192], data[8192:]])
-
-    def test_chunkify_header_and_blocks_fmap_complete(self):
-        data = b"foobar" * 1500
-        chunker = ChunkerFixed(4096, 123)
-        fmap = [(0, 123, True), (123, 4096, True), (123 + 4096, 4096, True), (123 + 8192, 4096, True)]
-        parts = cf(chunker.chunkify(BytesIO(data), fmap=fmap))
-        self.assert_equal(
-            parts, [data[0:123], data[123 : 123 + 4096], data[123 + 4096 : 123 + 8192], data[123 + 8192 :]]
-        )
-
-    def test_chunkify_header_and_blocks_fmap_zeros(self):
-        data = b"H" * 123 + b"_" * 4096 + b"X" * 4096 + b"_" * 4096
-        chunker = ChunkerFixed(4096, 123)
-        fmap = [(0, 123, True), (123, 4096, False), (123 + 4096, 4096, True), (123 + 8192, 4096, False)]
-        parts = cf(chunker.chunkify(BytesIO(data), fmap=fmap))
-        # because we marked the '_' ranges as holes, we will get hole ranges instead!
-        self.assert_equal(parts, [data[0:123], 4096, data[123 + 4096 : 123 + 8192], 4096])
-
-    def test_chunkify_header_and_blocks_fmap_partial(self):
-        data = b"H" * 123 + b"_" * 4096 + b"X" * 4096 + b"_" * 4096
-        chunker = ChunkerFixed(4096, 123)
-        fmap = [
-            (0, 123, True),
-            # (123, 4096, False),
-            (123 + 4096, 4096, True),
-            # (123+8192, 4096, False),
-        ]
-        parts = cf(chunker.chunkify(BytesIO(data), fmap=fmap))
-        # because we left out the '_' ranges from the fmap, we will not get them at all!
-        self.assert_equal(parts, [data[0:123], data[123 + 4096 : 123 + 8192]])
+    fn = str(tmpdir / fname)
+    make_sparsefile(fn, sparse_map, header_size=header_size)
+    get_chunks(fn, sparse=sparse, header_size=header_size) == make_content(sparse_map, header_size=header_size)

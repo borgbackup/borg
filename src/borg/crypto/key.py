@@ -160,6 +160,12 @@ class KeyBase:
     # type is int
     chunk_seed: int = None
 
+    # crypt_key dummy, needs to be overwritten by subclass
+    crypt_key: bytes = None
+
+    # id_key dummy, needs to be overwritten by subclass
+    id_key: bytes = None
+
     # Whether this *particular instance* is encrypted from a practical point of view,
     # i.e. when it's using encryption with a empty passphrase, then
     # that may be *technically* called encryption, but for all intents and purposes
@@ -196,6 +202,21 @@ class KeyBase:
             id_str = bin_to_hex(id) if id is not None else "(unknown)"
             raise IntegrityError(f"Chunk {id_str}: Invalid encryption envelope")
 
+    def derive_key(self, *, salt, domain, size, from_id_key=False):
+        """
+        create a new crypto key (<size> bytes long) from existing key material, a given salt and domain.
+        from_id_key == False: derive from self.crypt_key (default)
+        from_id_key == True: derive from self.id_key (note: related repos have same ID key)
+        """
+        from_key = self.id_key if from_id_key else self.crypt_key
+        assert isinstance(from_key, bytes)
+        assert isinstance(salt, bytes)
+        assert isinstance(domain, bytes)
+        assert size <= 32  # sha256 gives us 32 bytes
+        # Because crypt_key is already a PRK, we do not need KDF security here, PRF security is good enough.
+        # See https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Cr2.pdf section 4 "one-step KDF".
+        return sha256(from_key + salt + domain).digest()[:size]
+
     def pack_metadata(self, metadata_dict):
         metadata_dict = StableDict(metadata_dict)
         return msgpack.packb(metadata_dict)
@@ -229,6 +250,9 @@ class PlaintextKey(KeyBase):
     ARG_NAME = "none"
 
     chunk_seed = 0
+    crypt_key = b""  # makes .derive_key() work, nothing secret here
+    id_key = b""  # makes .derive_key() work, nothing secret here
+
     logically_encrypted = False
 
     @classmethod
@@ -891,9 +915,7 @@ class AEADKeyBase(KeyBase):
         assert len(sessionid) == 24  # 192bit
         if domain is None:
             domain = b"borg-session-key-" + self.CIPHERSUITE.__name__.encode()
-        # Because crypt_key is already a PRK, we do not need KDF security here, PRF security is good enough.
-        # See https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Cr2.pdf section 4 "one-step KDF".
-        return sha256(self.crypt_key + sessionid + domain).digest()
+        return self.derive_key(salt=sessionid, domain=domain, size=32)  # 256bit
 
     def _get_cipher(self, sessionid, iv):
         assert isinstance(iv, int)

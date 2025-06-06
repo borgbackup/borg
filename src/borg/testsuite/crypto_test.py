@@ -7,7 +7,8 @@ import unittest
 from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, IntegrityError
 from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ..crypto.low_level import AES, hmac_sha256
-from ..crypto.key import CHPOKeyfileKey, AESOCBRepoKey, FlexiKey
+from hashlib import sha256
+from ..crypto.key import CHPOKeyfileKey, AESOCBRepoKey, FlexiKey, KeyBase, PlaintextKey
 from ..helpers import msgpack, bin_to_hex
 
 from . import BaseTestCase
@@ -276,3 +277,58 @@ def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
     repository.load_key.return_value = repository.save_key.call_args.args[0]
 
     AESOCBRepoKey.detect(repository, manifest_data=None)
+
+
+class TestDeriveKey(BaseTestCase):
+    # Create a simple KeyBase subclass with a non-empty crypt_key
+    class CustomKey(KeyBase):
+        def __init__(self, crypt_key, id_key):
+            self.crypt_key = crypt_key
+            self.id_key = id_key
+
+    def test_derive_key_with_plaintext_key(self):
+        """Test derive_key with PlaintextKey (empty crypt_key)"""
+        key = PlaintextKey(None)
+        salt, domain, size = b"salt", b"domain", 16
+
+        # PlaintextKey has an empty crypt_key, so the derived key should be based on salt and domain only
+        derived_key = key.derive_key(salt=salt, domain=domain, size=size)
+        expected = sha256(b"" + salt + domain).digest()[:size]
+        self.assert_equal(derived_key, expected)
+
+    def test_derive_key_with_custom_key(self):
+        """Test derive_key with a custom KeyBase subclass (non-empty crypt_key)"""
+        crypt_key, id_key = b"test_crypt_key", b"test_id_key"
+        key = self.CustomKey(crypt_key, id_key)
+        salt, domain, size = b"salt", b"domain", 32
+
+        # derived key size and value as expected
+        expected = sha256(crypt_key + salt + domain).digest()[:size]
+        derived_key = key.derive_key(salt=salt, domain=domain, size=size)
+        self.assert_equal(derived_key, expected)
+
+        # domain separation
+        derived_key = key.derive_key(salt=salt, domain=b"other_domain", size=size)
+        assert derived_key != expected
+        assert len(derived_key) == size
+
+        # salt separation
+        derived_key = key.derive_key(salt=b"other salt", domain=domain, size=size)
+        assert derived_key != expected
+        assert len(derived_key) == size
+
+    def test_derive_key_from_different_keys(self):
+        """Test derive_key with different key material"""
+        crypt_key, id_key = b"test_crypt_key", b"test_id_key"
+        key = self.CustomKey(crypt_key, id_key)
+        salt, domain, size = b"salt", b"domain", 32
+
+        # derived key size and value as expected (using the ID key)
+        expected = sha256(id_key + salt + domain).digest()[:size]
+        derived_key = key.derive_key(salt=salt, domain=domain, size=size, from_id_key=True)
+        self.assert_equal(derived_key, expected)
+
+        # generating different keys from crypt_key and id_key
+        derived_key_from_id = key.derive_key(salt=salt, domain=domain, size=size, from_id_key=True)
+        derived_key_from_crypt = key.derive_key(salt=salt, domain=domain, size=size, from_id_key=False)
+        assert derived_key_from_id != derived_key_from_crypt

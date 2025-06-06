@@ -187,6 +187,21 @@ def ChunkerParams(s):
         return algo, block_size, header_size
     if algo == "default" and count == 1:  # default
         return CHUNKER_PARAMS
+    if algo == CH_BUZHASH64 and count == 5:  # buzhash64, chunk_min, chunk_max, chunk_mask, window_size
+        chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[1:])
+        if not (chunk_min <= chunk_mask <= chunk_max):
+            raise argparse.ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
+        if chunk_min < 6:
+            # see comment in 'fixed' algo check
+            raise argparse.ArgumentTypeError(
+                "min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)"
+            )
+        if chunk_max > 23:
+            raise argparse.ArgumentTypeError(
+                "max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)"
+            )
+        # note that for buzhash64, there is no problem with even window_size.
+        return CH_BUZHASH64, chunk_min, chunk_max, chunk_mask, window_size
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):
     if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[count - 4 :])

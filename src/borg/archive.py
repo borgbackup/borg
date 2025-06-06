@@ -351,7 +351,7 @@ class ChunkBuffer:
         self.packer = msgpack.Packer()
         self.chunks = []
         self.key = key
-        self.chunker = get_chunker(*chunker_params, seed=self.key.chunk_seed, sparse=False)
+        self.chunker = get_chunker(*chunker_params, key=self.key, sparse=False)
         self.saved_chunks_len = None
 
     def add(self, item):
@@ -1227,7 +1227,7 @@ class FilesystemObjectProcessors:
         self.hlm = HardLinkManager(id_type=tuple, info_type=(list, type(None)))  # (dev, ino) -> chunks or None
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
-        self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=sparse)
+        self.chunker = get_chunker(*chunker_params, key=key, sparse=sparse)
 
     @contextmanager
     def create_helper(self, path, st, status=None, hardlinkable=True, strip_prefix=None):
@@ -1502,7 +1502,7 @@ class TarfileObjectProcessors:
         self.print_file_status = file_status_printer or (lambda *args: None)
 
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
-        self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=False)
+        self.chunker = get_chunker(*chunker_params, key=key, sparse=False)
         self.hlm = HardLinkManager(id_type=str, info_type=list)  # path -> chunks
 
     @contextmanager
@@ -2325,7 +2325,7 @@ class ArchiveRecreater:
         target.process_file_chunks = ChunksProcessor(
             cache=self.cache, key=self.key, add_item=target.add_item, rechunkify=target.recreate_rechunkify
         ).process_file_chunks
-        target.chunker = get_chunker(*target.chunker_params, seed=self.key.chunk_seed, sparse=False)
+        target.chunker = get_chunker(*target.chunker_params, key=self.key, sparse=False)
         return target
 
     def create_target_archive(self, name):

@@ -146,7 +146,8 @@ class BenchmarkMixIn:
                     pass
 
         for spec, func in [
-            ("buzhash,19,23,21,4095", lambda: chunkit("buzhash", 19, 23, 21, 4095, seed=0, sparse=False)),
+            ("buzhash,19,23,21,4095", lambda: chunkit("buzhash", 19, 23, 21, 4095, sparse=False)),
+            ("buzhash64,19,23,21,4095", lambda: chunkit("buzhash64", 19, 23, 21, 4095, sparse=False)),
             ("fixed,1048576", lambda: chunkit("fixed", 1048576, sparse=False)),
         ]:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")

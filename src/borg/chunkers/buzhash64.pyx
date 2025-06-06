@@ -39,13 +39,13 @@ cdef extern from *:
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)  # Deactivate negative indexing.
-cdef uint64_t* buzhash64_init_table(uint64_t seed):
-    """Initialize the buzhash table with the given seed."""
+cdef uint64_t* buzhash64_init_table(bytes key):
+    """Initialize the buzhash table using the given key."""
     cdef int i
     cdef uint64_t* table = <uint64_t*>malloc(2048)  # 256 * sizeof(uint64_t)
     for i in range(256):
-        # deterministically generate a pseudo-random 64-bit unsigned integer for table entry i involving the seed:
-        v = f"{i:02x}{seed:016x}".encode()
+        # deterministically generate a pseudo-random 64-bit unsigned integer for table entry i involving the key:
+        v = f"{i:02x}".encode() + key
         d64 = sha256(v).digest()[:8]
         table[i] = <uint64_t> int.from_bytes(d64, byteorder='little')
     return table
@@ -99,7 +99,7 @@ cdef class ChunkerBuzHash64:
     cdef size_t reader_block_size
     cdef bint sparse
 
-    def __cinit__(self, int seed, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, bint sparse=False):
+    def __cinit__(self, bytes key, int chunk_min_exp, int chunk_max_exp, int hash_mask_bits, int hash_window_size, bint sparse=False):
         min_size = 1 << chunk_min_exp
         max_size = 1 << chunk_max_exp
         assert max_size <= len(zeros)
@@ -109,7 +109,7 @@ cdef class ChunkerBuzHash64:
         self.window_size = hash_window_size
         self.chunk_mask = (1 << hash_mask_bits) - 1
         self.min_size = min_size
-        self.table = buzhash64_init_table(seed & 0xffffffffffffffff)
+        self.table = buzhash64_init_table(key)
         self.buf_size = max_size
         self.data = <uint8_t*>malloc(self.buf_size)
         self.fh = -1
@@ -274,18 +274,18 @@ cdef class ChunkerBuzHash64:
         return Chunk(data, size=got, allocation=allocation)
 
 
-def buzhash64(data, unsigned long seed):
+def buzhash64(data, bytes key):
     cdef uint64_t *table
     cdef uint64_t sum
-    table = buzhash64_init_table(seed & 0xffffffffffffffff)
+    table = buzhash64_init_table(key)
     sum = _buzhash64(<const unsigned char *> data, len(data), table)
     free(table)
     return sum
 
 
-def buzhash64_update(uint64_t sum, unsigned char remove, unsigned char add, size_t len, unsigned long seed):
+def buzhash64_update(uint64_t sum, unsigned char remove, unsigned char add, size_t len, bytes key):
     cdef uint64_t *table
-    table = buzhash64_init_table(seed & 0xffffffffffffffff)
+    table = buzhash64_init_table(key)
     sum = _buzhash64_update(sum, remove, add, len, table)
     free(table)
     return sum

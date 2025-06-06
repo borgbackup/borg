@@ -399,6 +399,7 @@ Borg has these chunkers:
   supporting a header block of different size.
 - "buzhash": variable, content-defined blocksize, uses a rolling hash
   computed by the Buzhash_ algorithm.
+- "buzhash64": similar to "buzhash", but improved 64bit implementation
 
 For some more general usage hints see also ``--chunker-params``.
 
@@ -468,6 +469,16 @@ The buzhash table is altered by XORing it with a seed randomly generated once
 for the repository, and stored encrypted in the keyfile. This is to prevent
 chunk size based fingerprinting attacks on your encrypted repo contents (to
 guess what files you have based on a specific set of chunk sizes).
+
+"buzhash64" chunker
++++++++++++++++++++
+
+Similar to "buzhash", but using 64bit wide hash values.
+
+The buzhash table is cryptographically derived from secret key material.
+
+These changes should improve resistance against attacks and also solve
+some of the issues of the original (32bit / XORed table) implementation.
 
 .. _cache:
 

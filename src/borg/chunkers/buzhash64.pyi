@@ -4,13 +4,13 @@ from .reader import fmap_entry
 
 API_VERSION: str
 
-def buzhash64(data: bytes, seed: int) -> int: ...
-def buzhash64_update(sum: int, remove: int, add: int, len: int, seed: int) -> int: ...
+def buzhash64(data: bytes, key: bytes) -> int: ...
+def buzhash64_update(sum: int, remove: int, add: int, len: int, key: bytes) -> int: ...
 
 class ChunkerBuzHash64:
     def __init__(
         self,
-        seed: int,
+        key: bytes,
         chunk_min_exp: int,
         chunk_max_exp: int,
         hash_mask_bits: int,

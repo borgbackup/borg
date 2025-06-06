@@ -30,22 +30,22 @@ def test_chunkpoints64_unchanged():
                 if minexp >= maxexp:
                     continue
                 for maskbits in (4, 7, 10, 12):
-                    for seed in (1849058162, 1234567653):
+                    for key in (b"first_key", b"second_key"):
                         fh = BytesIO(data)
-                        chunker = ChunkerBuzHash64(seed, minexp, maxexp, maskbits, winsize)
+                        chunker = ChunkerBuzHash64(key, minexp, maxexp, maskbits, winsize)
                         chunks = [H(c) for c in cf(chunker.chunkify(fh, -1))]
                         runs.append(H(b"".join(chunks)))
 
     # The "correct" hash below matches the existing chunker behavior.
     # Future chunker optimisations must not change this, or existing repos will bloat.
     overall_hash = H(b"".join(runs))
-    assert overall_hash == hex_to_bin("fa9002758c0358721404f55f3020bb56b987cb3cd9a688ff9641f4023215f4e7")
+    assert overall_hash == hex_to_bin("ab98713d28c5a544eeb8b6a2b5ba6405847bd6924d45fb7e267d173892ad0cdc")
 
 
 def test_buzhash64_chunksize_distribution():
     data = os.urandom(1048576)
     min_exp, max_exp, mask = 10, 16, 14  # chunk size target 16kiB, clip at 1kiB and 64kiB
-    chunker = ChunkerBuzHash64(0, min_exp, max_exp, mask, 4095)
+    chunker = ChunkerBuzHash64(b"", min_exp, max_exp, mask, 4095)
     f = BytesIO(data)
     chunks = cf(chunker.chunkify(f))
     del chunks[-1]  # get rid of the last chunk, it can be smaller than 2**min_exp

@@ -179,13 +179,18 @@ if not on_rtd:
             dict(sources=[platform_linux_source], libraries=["acl"], extra_compile_args=cflags)
         )
 
+    # Configure buzhash64 with OpenSSL support
+    buzhash64_ext_kwargs = members_appended(
+        dict(sources=[buzhash64_source]), crypto_ext_lib, dict(extra_compile_args=cflags)
+    )
+
     ext_modules += [
         Extension("borg.crypto.low_level", **crypto_ext_kwargs),
         Extension("borg.compress", **compress_ext_kwargs),
         Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags),
         Extension("borg.item", [item_source], extra_compile_args=cflags),
         Extension("borg.chunkers.buzhash", [buzhash_source], extra_compile_args=cflags),
-        Extension("borg.chunkers.buzhash64", [buzhash64_source], extra_compile_args=cflags),
+        Extension("borg.chunkers.buzhash64", **buzhash64_ext_kwargs),
         Extension("borg.chunkers.reader", [reader_source], extra_compile_args=cflags),
         Extension("borg.checksums", **checksums_ext_kwargs),
     ]

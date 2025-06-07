@@ -147,10 +147,17 @@ class BenchmarkMixIn:
 
         for spec, func in [
             ("buzhash,19,23,21,4095", lambda: chunkit("buzhash", 19, 23, 21, 4095, sparse=False)),
-            ("buzhash64,19,23,21,4095", lambda: chunkit("buzhash64", 19, 23, 21, 4095, sparse=False)),
+            (
+                "buzhash64,19,23,21,4095,enc=0",
+                lambda: chunkit("buzhash64", 19, 23, 21, 4095, sparse=False, do_encrypt=False),
+            ),
+            (
+                "buzhash64,19,23,21,4095,enc=1",
+                lambda: chunkit("buzhash64", 19, 23, 21, 4095, sparse=False, do_encrypt=True),
+            ),
             ("fixed,1048576", lambda: chunkit("fixed", 1048576, sparse=False)),
         ]:
-            print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
+            print(f"{spec:<30} {size:<10} {timeit(func, number=100):.3f}s")
 
         from ..checksums import crc32, xxh64
 

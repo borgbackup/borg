@@ -1,4 +1,6 @@
 import errno
+from pathlib import Path
+
 import mmap
 import os
 import shutil
@@ -192,7 +194,7 @@ class LegacyRepository:
 
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True, send_log_cb=None):
         self.path = os.path.abspath(path)
-        self._location = Location("file://%s" % self.path)
+        self._location = Location(Path(self.path).as_uri())
         self.version = None
         # long-running repository methods which emit log or progress output are responsible for calling
         # the ._send_log method periodically to get log and progress output transferred to the borg client

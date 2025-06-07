@@ -455,67 +455,97 @@ complete -c borg         -l 'restrict-to-repository' -d 'Restrict repository acc
 # no specific options
 
 
-# List repositories::archives
+function __fish_borg_archives
+    # additionally to aid:XXXXXXXX we show archive (series) name and timestamp
+    borg repo-list --format="aid:{id:.8}{TAB}{archive} {start}{NEWLINE}" 2>/dev/null
+end
 
-function __fish_borg_is_argument_n --description 'Test if current argument is on Nth place' --argument n
-    set tokens (commandline --current-process --tokenize --cut-at-cursor)
-    set -l tokencount 0
-    for token in $tokens
-        switch $token
-            case '-*'
-                # ignore command line switches
-            case '*'
-                set tokencount (math $tokencount+1)
-        end
+function __fish_borg_archive_arg --description 'Test if current command is a specific borg command with token count' --argument command token_count
+    # Check if we're in the context of a specific borg command
+    set -l tokens (commandline --tokenize)
+    set -l cmdline (commandline --current-process)
+
+    # Make sure we're in a borg command context
+    if not test $tokens[1] = "borg"
+        return 1
     end
-    return (test $tokencount -eq $n)
-end
 
-function __fish_borg_is_dir_a_repository
-    set -l config_content
-    if test -f $argv[1]/README
-    and test -f $argv[1]/config
-        read config_content < $argv[1]/config 2>/dev/null
+    # Make sure we're in the specific command context
+    if not test $tokens[2] = "$command"
+        return 1
     end
-    return (string match --quiet '[repository]' $config_content)
-end
 
-function __fish_borg_list_repos_or_archives
-    if string match --quiet --regex '.*::' '"'(commandline --current-token)'"'
-        # If the current token contains "::" then list the archives:
-        set -l repository_name (string replace --regex '::.*' '' (commandline --current-token))
-        borg list --format="$repository_name::{archive}{TAB}{comment}{NEWLINE}" "$repository_name" 2>/dev/null
-    else
-        # Otherwise list the repositories, directories and user@host entries:
-        set -l directories (commandline --cut-at-cursor --current-token)*/
-        for directoryname in $directories
-            if __fish_borg_is_dir_a_repository $directoryname
-                printf '%s::\t%s\n' (string trim --right --chars='/' $directoryname) "Repository"
-            else
-                printf '%s\n' $directoryname
-            end
-        end
-        __fish_complete_user_at_hosts | string replace --regex '$' ':'
+    # Check if we're at the right token position
+    if not test (count $tokens) "-eq" "$token_count"
+        return 1
     end
+
+    # Additional check to ensure we're not in the middle of typing an option
+    if string match --quiet --regex -- "^-" (commandline --current-token)
+        return 1
+    end
+
+    return 0
 end
 
-complete -c borg -f -n "__fish_borg_is_argument_n 2" -a '(__fish_borg_list_repos_or_archives)'
+# The following completions use the -F flag to force disable filename completion
+# for various borg commands, ensuring only archive names are suggested.
+# We also use the -e flag to explicitly erase all default completions before adding our custom ones.
 
+# Global rules to disable filename completions for specific borg commands
+# This ensures that no filename completions are shown for these commands
+complete -c borg -e -n '__fish_seen_subcommand_from diff delete list info extract mount export-tar rename tag undelete recreate transfer check analyze'
 
-# Additional archive listings
+# First, explicitly erase all default completions for each command
+# This is the most specific rule and should take precedence
+complete -c borg -e -n '__fish_borg_archive_arg "diff" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "diff" 3'
+complete -c borg -e -n '__fish_borg_archive_arg "delete" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "list" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "info" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "extract" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "mount" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "export-tar" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "rename" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "tag" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "undelete" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "recreate" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "transfer" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "check" 2'
+complete -c borg -e -n '__fish_borg_archive_arg "analyze" 2'
 
-function __fish_borg_is_diff_second_archive
-    return (string match --quiet --regex ' diff .*::[^ ]+ '(commandline --current-token)'$' (commandline))
-end
+# Also add specific rules to disable filename completions at the exact position
+# This ensures that no filename completions are shown at the position where we expect archive names
+complete -c borg --no-files -n '__fish_borg_archive_arg "diff" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "diff" 3'
+complete -c borg --no-files -n '__fish_borg_archive_arg "delete" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "list" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "info" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "extract" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "mount" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "export-tar" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "rename" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "tag" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "undelete" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "recreate" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "transfer" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "check" 2'
+complete -c borg --no-files -n '__fish_borg_archive_arg "analyze" 2'
 
-function __fish_borg_is_delete_additional_archive
-    return (string match --quiet --regex ' delete .*::[^ ]+ ' (commandline))
-end
-
-function __fish_borg_list_only_archives
-    set -l repo_matches (string match --regex '([^ ]*)::' (commandline))
-    borg list --format="{archive}{TAB}{comment}{NEWLINE}" "$repo_matches[2]" 2>/dev/null
-end
-
-complete -c borg -f -n __fish_borg_is_diff_second_archive -a '(__fish_borg_list_only_archives)'
-complete -c borg -f -n __fish_borg_is_delete_additional_archive -a '(__fish_borg_list_only_archives)'
+# Then add our custom completions with high priority and no-files
+# This ensures no filename completions are shown and our custom completions take precedence
+complete -c borg -p 100 -n '__fish_borg_archive_arg "diff" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "diff" 3' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "delete" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "list" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "info" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "extract" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "mount" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "export-tar" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "rename" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "tag" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "undelete" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "recreate" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "transfer" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "check" 2' -a '(__fish_borg_archives)' --no-files
+complete -c borg -p 100 -n '__fish_borg_archive_arg "analyze" 2' -a '(__fish_borg_archives)' --no-files

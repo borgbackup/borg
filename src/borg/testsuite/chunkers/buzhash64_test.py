@@ -38,7 +38,7 @@ def test_chunkpoints64_unchanged():
                 for maskbits in (4, 7, 10, 12):
                     for key in (key0, key1):
                         fh = BytesIO(data)
-                        chunker = ChunkerBuzHash64(key, minexp, maxexp, maskbits, winsize)
+                        chunker = ChunkerBuzHash64(key, minexp, maxexp, maskbits, winsize, do_encrypt=False)
                         chunks = [H(c) for c in cf(chunker.chunkify(fh, -1))]
                         runs.append(H(b"".join(chunks)))
 

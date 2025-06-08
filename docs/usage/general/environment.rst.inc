@@ -62,6 +62,8 @@ General:
     BORG_REMOTE_PATH
         When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
         Using ``--remote-path PATH`` commandline option overrides the environment variable.
+    BORG_REPO_PERMISSIONS
+        Set repository permissions, see also: :ref:`borg_serve`
     BORG_FILES_CACHE_SUFFIX
         When set to a value at least one character long, instructs borg to use a specifically named
         (based on the suffix) alternative files cache. This can be used to avoid loading and saving

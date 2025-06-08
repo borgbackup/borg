@@ -38,6 +38,18 @@ class ServeMixIn:
         Please note that `borg serve` does not support giving a specific repository via the
         `--repo` option or `BORG_REPO` environment variable. It is always the borg client which
         specifies the repo to use when talking to `borg serve`.
+
+        The --permissions option allows enforcing repository permissions:
+
+        - `all`: All permissions are granted (default, permissions system is not used)
+        - `no-delete`: Allow reading and writing, disallow deleting and overwriting data.
+          New archives can be created, existing archives can not be deleted. New chunks can
+          be added, existing chunks can not be deleted or overwritten.
+        - `write-only`: Allow writing, disallow reading data.
+          New archives can be created, existing archives can not be read.
+          New chunks can be added, existing chunks can not be read, deleted or overwritten.
+        - `read-only`: Allow reading, disallow writing or deleting data.
+          Existing archives can be read, but no archives can be created or deleted.
         """
         )
         subparser = subparsers.add_parser(
@@ -76,5 +88,5 @@ class ServeMixIn:
             "--permissions",
             dest="permissions",
             choices=["all", "no-delete", "write-only", "read-only"],
-            help="Set repository permission mode. Equivalent to setting BORG_REPO_PERMISSIONS environment variable.",
+            help="Set repository permission mode. Overrides BORG_REPO_PERMISSIONS environment variable.",
         )

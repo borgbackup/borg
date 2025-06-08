@@ -19,6 +19,8 @@ borg serve
     +-------------------------------------------------------+-----------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--restrict-to-repository PATH`` | restrict repository access. Only the repository located at PATH (no sub-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike ``--restrict-to-path`` sub-directories are not accessible; PATH needs to point directly at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there. |
     +-------------------------------------------------------+-----------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--permissions``                 | Set repository permission mode. Overrides BORG_REPO_PERMISSIONS environment variable.                                                                                                                                                                                                                                                                                                                                                                                 |
+    +-------------------------------------------------------+-----------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
     |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
     | :ref:`common_options`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -39,6 +41,7 @@ borg serve
     options
         --restrict-to-path PATH           restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all sub-directories is granted implicitly; PATH doesn't need to point directly to a repository.
         --restrict-to-repository PATH     restrict repository access. Only the repository located at PATH (no sub-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike ``--restrict-to-path`` sub-directories are not accessible; PATH needs to point directly at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
+        --permissions                     Set repository permission mode. Overrides BORG_REPO_PERMISSIONS environment variable.
 
 
     :ref:`common_options`
@@ -62,3 +65,15 @@ borg serve can currently support:
 Please note that `borg serve` does not support giving a specific repository via the
 `--repo` option or `BORG_REPO` environment variable. It is always the borg client which
 specifies the repo to use when talking to `borg serve`.
+
+The --permissions option allows enforcing repository permissions:
+
+- `all`: All permissions are granted (default, permissions system is not used)
+- `no-delete`: Allow reading and writing, disallow deleting and overwriting data.
+  New archives can be created, existing archives can not be deleted. New chunks can
+  be added, existing chunks can not be deleted or overwritten.
+- `write-only`: Allow writing, disallow reading data.
+  New archives can be created, existing archives can not be read.
+  New chunks can be added, existing chunks can not be read, deleted or overwritten.
+- `read-only`: Allow reading, disallow writing or deleting data.
+  Existing archives can be read, but no archives can be created or deleted.

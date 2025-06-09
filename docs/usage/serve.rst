@@ -32,7 +32,7 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
     command="BORG_XXX=value borg serve [...]",restrict ssh-rsa [...]
 
 .. note::
-    The examples above use the ``restrict`` directive and assumes a POSIX
+    The examples above use the ``restrict`` directive and assume a POSIX
     compliant shell set as the user's login shell.
     This does automatically
     block potential dangerous ssh features, even when they are added in a future

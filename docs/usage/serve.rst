@@ -38,9 +38,8 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
 .. note::
     The examples above use the ``restrict`` directive and assume a POSIX
     compliant shell set as the user's login shell.
-    This does automatically
-    block potential dangerous ssh features, even when they are added in a future
-    update. Thus, this option should be preferred.
+    This does automatically block potential dangerous ssh features, even when
+    they are added in a future update. Thus, this option should be preferred.
 
     If you're using openssh-server < 7.2, however, you have to specify explicitly
     the ssh features to restrict and cannot simply use the restrict option as it

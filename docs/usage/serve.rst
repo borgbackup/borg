@@ -33,10 +33,12 @@ locations like ``/etc/environment`` or in the forced command itself (example bel
 
     # Set a BORG_XXX environment variable on the "borg serve" side
     $ cat ~/.ssh/authorized_keys
-    command="export BORG_XXX=value; borg serve [...]",restrict ssh-rsa [...]
+    command="BORG_XXX=value borg serve [...]",restrict ssh-rsa [...]
 
 .. note::
-    The examples above use the ``restrict`` directive. This does automatically
+    The examples above use the ``restrict`` directive and assumes a POSIX
+    compliant shell set as the user's login shell.
+    This does automatically
     block potential dangerous ssh features, even when they are added in a future
     update. Thus, this option should be preferred.
 

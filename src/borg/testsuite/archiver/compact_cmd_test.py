@@ -1,4 +1,5 @@
-import os
+from pathlib import Path
+
 import pytest
 
 from ...constants import *  # NOQA
@@ -104,8 +105,8 @@ def test_compact_files_cache_cleanup(archivers, request):
         pytest.fail("Could not find repository ID in info output")
 
     # Check cache directory for files cache files
-    cache_dir = os.path.join(get_cache_dir(), repo_id)
-    if not os.path.exists(cache_dir):
+    cache_dir = Path(get_cache_dir()) / repo_id
+    if not cache_dir.exists():
         pytest.skip("Cache directory does not exist, skipping test")
 
     # Get initial files cache files

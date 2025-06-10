@@ -64,7 +64,7 @@ def discover_files_cache_names(path, files_cache_name="files"):
     :param files_cache_name: base name of the files cache files
     :return: list of files cache file names
     """
-    return [p.name for p in Path(path).iterdir() if p.name.startswith(files_cache_name + ".")]
+    return [p.name for p in path.iterdir() if p.name.startswith(files_cache_name + ".")]
 
 
 # chunks is a list of ChunkListEntry

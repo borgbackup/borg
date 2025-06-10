@@ -166,6 +166,10 @@ New features:
 
 Other changes:
 
+- msgpack: allow 1.1.1
+- msgpack version check: ignore "rc" or other version elements
+- add derive_key to derive new keys from existing key material
+- fish: fix archive name completion
 - refactor the chunkers, #8882 #8883:
 
   - transform buzhash chunker C code to Cython
@@ -176,6 +180,10 @@ Other changes:
     - FileReader uses FileFMAPReader to fill its buffer and offers clients a
       `.read(size)` method so they can read pieces of the data.
     - both chunkers now use the FileReader/FileFMAPReader code
+  - split code and test module into packages
+- ChunkerFixed: add fixed chunker tests to selftest
+- ChunkerFixed: do not assert on short header read
+- Chunker: use safe_fadvise
 - ChunkerParams: reject even window size for buzhash, #8868
 - tests / CI:
 
@@ -185,6 +193,8 @@ Other changes:
   - more chunker-related tests
 - docs:
 
+  - add docs for serve --permissions / BORG_REPO_PERMISSIONS
+  - borg-serve: simplify example of env in authorized_keys, #8318
   - fix mistyped CVE number
 
 

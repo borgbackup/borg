@@ -1,14 +1,15 @@
-import os
 import subprocess
+from pathlib import Path
+
 import pytest
 
-SHELL_COMPLETIONS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "scripts", "shell_completions")
+SHELL_COMPLETIONS_DIR = Path(__file__).parent / ".." / ".." / ".." / "scripts" / "shell_completions"
 
 
 def test_bash_completion_is_valid():
     """Test that the bash completion file is valid bash syntax."""
-    bash_completion_file = os.path.join(SHELL_COMPLETIONS_DIR, "bash", "borg")
-    assert os.path.isfile(bash_completion_file)
+    bash_completion_file = SHELL_COMPLETIONS_DIR / "bash" / "borg"
+    assert bash_completion_file.is_file()
 
     # Check if bash is available
     try:
@@ -17,14 +18,14 @@ def test_bash_completion_is_valid():
         pytest.skip("bash not available")
 
     # Test if the bash completion file can be sourced without errors
-    result = subprocess.run(["bash", "-n", bash_completion_file], capture_output=True)
+    result = subprocess.run(["bash", "-n", str(bash_completion_file)], capture_output=True)
     assert result.returncode == 0, f"Bash completion file has syntax errors: {result.stderr.decode()}"
 
 
 def test_fish_completion_is_valid():
     """Test that the fish completion file is valid fish syntax."""
-    fish_completion_file = os.path.join(SHELL_COMPLETIONS_DIR, "fish", "borg.fish")
-    assert os.path.isfile(fish_completion_file)
+    fish_completion_file = SHELL_COMPLETIONS_DIR / "fish" / "borg.fish"
+    assert fish_completion_file.is_file()
 
     # Check if fish is available
     try:
@@ -33,14 +34,14 @@ def test_fish_completion_is_valid():
         pytest.skip("fish not available")
 
     # Test if the fish completion file can be sourced without errors
-    result = subprocess.run(["fish", "-c", f"source {fish_completion_file}"], capture_output=True)
+    result = subprocess.run(["fish", "-c", f"source {str(fish_completion_file)}"], capture_output=True)
     assert result.returncode == 0, f"Fish completion file has syntax errors: {result.stderr.decode()}"
 
 
 def test_zsh_completion_is_valid():
     """Test that the zsh completion file is valid zsh syntax."""
-    zsh_completion_file = os.path.join(SHELL_COMPLETIONS_DIR, "zsh", "_borg")
-    assert os.path.isfile(zsh_completion_file)
+    zsh_completion_file = SHELL_COMPLETIONS_DIR / "zsh" / "_borg"
+    assert zsh_completion_file.is_file()
 
     # Check if zsh is available
     try:
@@ -49,5 +50,5 @@ def test_zsh_completion_is_valid():
         pytest.skip("zsh not available")
 
     # Test if the zsh completion file can be sourced without errors
-    result = subprocess.run(["zsh", "-n", zsh_completion_file], capture_output=True)
+    result = subprocess.run(["zsh", "-n", str(zsh_completion_file)], capture_output=True)
     assert result.returncode == 0, f"Zsh completion file has syntax errors: {result.stderr.decode()}"

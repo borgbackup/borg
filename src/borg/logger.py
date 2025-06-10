@@ -58,8 +58,9 @@ import queue
 import sys
 import time
 import warnings
+from pathlib import Path
 
-logging_debugging_path: str | None = None  # if set, write borg.logger debugging log to path/borg-*.log
+logging_debugging_path: Path | None = None  # if set, write borg.logger debugging log to thatpath/borg-*.log
 
 configured = False
 borg_serve_log_queue: queue.SimpleQueue = queue.SimpleQueue()
@@ -167,12 +168,12 @@ def setup_logging(
         conf_fname = os.environ.get(env_var, conf_fname)
     if conf_fname:
         try:
-            conf_fname = os.path.abspath(conf_fname)
+            conf_path = Path(conf_fname).absolute()
             # we open the conf file here to be able to give a reasonable
             # error message in case of failure (if we give the filename to
             # fileConfig(), it silently ignores unreadable files and gives
             # unhelpful error msgs like "No section: 'formatters'"):
-            with open(conf_fname) as f:
+            with conf_path.open() as f:
                 logging.config.fileConfig(f)
             configured = True
             logger = logging.getLogger(__name__)
@@ -195,8 +196,8 @@ def setup_logging(
 
     if logging_debugging_path is not None:
         # add an addtl. root handler for debugging purposes
-        log_fname = os.path.join(logging_debugging_path, f"borg-{'serve' if is_serve else 'client'}-root.log")
-        handler2 = logging.StreamHandler(open(log_fname, "a"))
+        log_path = logging_debugging_path / (f"borg-{'serve' if is_serve else 'client'}-root.log")
+        handler2 = logging.StreamHandler(log_path.open("a"))
         handler2.setFormatter(formatter)
         logger.addHandler(handler2)
         logger.warning(f"--- {func} ---")  # only handler2 shall get this
@@ -213,8 +214,8 @@ def setup_logging(
 
     if logging_debugging_path is not None:
         # add an addtl. progress handler for debugging purposes
-        log_fname = os.path.join(logging_debugging_path, f"borg-{'serve' if is_serve else 'client'}-progress.log")
-        bop_handler2 = logging.StreamHandler(open(log_fname, "a"))
+        log_path = logging_debugging_path / (f"borg-{'serve' if is_serve else 'client'}-progress.log")
+        bop_handler2 = logging.StreamHandler(log_path.open("a"))
         bop_handler2.setFormatter(bop_formatter)
         bop_logger.addHandler(bop_handler2)
         json_dict = dict(

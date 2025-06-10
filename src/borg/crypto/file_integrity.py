@@ -1,9 +1,9 @@
 import hashlib
 import io
 import json
-import os
 from hmac import compare_digest
 from collections.abc import Callable
+from pathlib import Path
 
 from ..helpers import IntegrityError
 from ..logger import create_logger
@@ -162,7 +162,7 @@ class IntegrityCheckedFile(FileLikeWrapper):
         # Changing the name however imbues a change of context that is not permissible.
         # While Borg does not use anything except ASCII in these file names, it's important to use
         # the same encoding everywhere for portability. Using os.fsencode() would be wrong.
-        filename = os.path.basename(filename or self.path)
+        filename = Path(filename or self.path).name
         self.hasher.update(("%10d" % len(filename)).encode())
         self.hasher.update(filename.encode())
 
@@ -219,9 +219,9 @@ class IntegrityCheckedFile(FileLikeWrapper):
 class DetachedIntegrityCheckedFile(IntegrityCheckedFile):
     def __init__(self, path, write, filename=None, override_fd=None):
         super().__init__(path, write, filename, override_fd)
-        filename = filename or os.path.basename(path)
-        output_dir = os.path.dirname(path)
-        self.output_integrity_file = self.integrity_file_path(os.path.join(output_dir, filename))
+        path_obj = Path(path)
+        filename = filename or path_obj.name
+        self.output_integrity_file = self.integrity_file_path(path_obj.parent / filename)
 
     def load_integrity_data(self, path, integrity_data):
         assert not integrity_data, "Cannot pass explicit integrity_data to DetachedIntegrityCheckedFile"
@@ -229,7 +229,7 @@ class DetachedIntegrityCheckedFile(IntegrityCheckedFile):
 
     @staticmethod
     def integrity_file_path(path):
-        return path + ".integrity"
+        return Path(str(path) + ".integrity")
 
     @classmethod
     def read_integrity_file(cls, path):
@@ -243,5 +243,5 @@ class DetachedIntegrityCheckedFile(IntegrityCheckedFile):
             raise FileIntegrityError(path)
 
     def store_integrity_data(self, data: str):
-        with open(self.output_integrity_file, "w") as fd:
+        with self.output_integrity_file.open("w") as fd:
             fd.write(data)

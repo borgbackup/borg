@@ -3,6 +3,7 @@ import hmac
 import os
 import textwrap
 from hashlib import sha256, pbkdf2_hmac
+from pathlib import Path
 from typing import Literal, ClassVar
 from collections.abc import Callable
 
@@ -642,11 +643,11 @@ class FlexiKey:
 
     def _find_key_in_keys_dir(self):
         id = self.repository.id
-        keys_dir = get_keys_dir()
-        for name in os.listdir(keys_dir):
-            filename = os.path.join(keys_dir, name)
+        keys_path = Path(get_keys_dir())
+        for entry in keys_path.iterdir():
+            filename = keys_path / entry.name
             try:
-                return self.sanity_check(filename, id)
+                return self.sanity_check(str(filename), id)
             except (KeyfileInvalidError, KeyfileMismatchError):
                 pass
 
@@ -668,12 +669,12 @@ class FlexiKey:
 
     def _get_new_target_in_keys_dir(self, args):
         filename = args.location.to_key_filename()
-        path = filename
+        path = Path(filename)
         i = 1
-        while os.path.exists(path):
+        while path.exists():
             i += 1
-            path = filename + ".%d" % i
-        return path
+            path = Path(filename + ".%d" % i)
+        return str(path)
 
     def load(self, target, passphrase):
         if self.STORAGE == KeyBlobStorage.KEYFILE:

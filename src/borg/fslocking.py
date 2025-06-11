@@ -88,7 +88,7 @@ class LockFailed(LockErrorT):
 
 
 class LockTimeout(LockError):
-    """Failed to create/acquire the lock {} (timeout)."""
+    """Failed to acquire the lock {} (timeout). You may need to run 'borg break-lock <REPO>' if the lock is stale."""
 
     exit_mcode = 73
 

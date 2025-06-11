@@ -361,12 +361,18 @@ The chunks stored in the repo are the (compressed, encrypted and authenticated)
 output of the chunker. The sizes of these stored chunks are influenced by the
 compression, encryption and authentication.
 
-buzhash chunker
-~~~~~~~~~~~~~~~
+buzhash and buzhash64 chunker
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The buzhash chunker chunks according to the input data, the chunker's
-parameters and the secret chunker seed (which all influence the chunk boundary
+The buzhash chunkers chunk according to the input data, the chunker's
+parameters and secret key material (which all influence the chunk boundary
 positions).
+
+Secret key material:
+
+- "buzhash": chunker seed (32bits), used for XORing the hardcoded buzhash table
+- "buzhash64": bh64_key (256bits) is derived from ID key, used to cryptographically
+  generate the table.
 
 Small files below some specific threshold (default: 512 KiB) result in only one
 chunk (identical content / size as the original file), bigger files result in

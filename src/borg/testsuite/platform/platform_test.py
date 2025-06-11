@@ -4,11 +4,11 @@ import os
 
 import pytest
 
-from ..platformflags import is_darwin, is_freebsd, is_linux, is_win32
-from ..platform import acl_get, acl_set
-from ..platform import get_process_id, process_alive
-from . import unopened_tempfile
-from .fslocking_test import free_pid  # NOQA
+from ...platformflags import is_darwin, is_freebsd, is_linux, is_win32
+from ...platform import acl_get, acl_set
+from ...platform import get_process_id, process_alive
+from .. import unopened_tempfile
+from ..fslocking_test import free_pid  # NOQA
 
 
 def fakeroot_detected():
@@ -77,7 +77,7 @@ skipif_acls_not_working = pytest.mark.skipif(not are_acls_working(), reason="ACL
 skipif_no_ubel_user = pytest.mark.skipif(not user_exists("übel"), reason="requires übel user")
 
 
-def test_process_alive(free_pid):
+def test_process_alive(free_pid):  # NOQA
     id = get_process_id()
     assert process_alive(*id)
     host, pid, tid = id

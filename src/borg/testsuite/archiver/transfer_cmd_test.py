@@ -13,7 +13,7 @@ from ...constants import *  # NOQA
 from ...helpers import open_item
 from ...helpers.time import parse_timestamp
 from ...helpers.parseformat import parse_file_size, ChunkerParams
-from ..platform_test import is_win32
+from ..platform.platform_test import is_win32
 from . import cmd, create_regular_file, create_test_files, RK_ENCRYPTION, open_archive, generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote")  # NOQA

@@ -4,14 +4,14 @@
 from unittest.mock import MagicMock
 import unittest
 
-from ..crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, IntegrityError
-from ..crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
-from ..crypto.low_level import AES, hmac_sha256
+from ...crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, IntegrityError
+from ...crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
+from ...crypto.low_level import AES, hmac_sha256
 from hashlib import sha256
-from ..crypto.key import CHPOKeyfileKey, AESOCBRepoKey, FlexiKey, KeyBase, PlaintextKey
-from ..helpers import msgpack, bin_to_hex
+from ...crypto.key import CHPOKeyfileKey, AESOCBRepoKey, FlexiKey, KeyBase, PlaintextKey
+from ...helpers import msgpack, bin_to_hex
 
-from . import BaseTestCase
+from .. import BaseTestCase
 
 
 class CryptoTestCase(BaseTestCase):

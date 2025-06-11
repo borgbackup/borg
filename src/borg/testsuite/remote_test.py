@@ -14,7 +14,7 @@ from ..helpers import IntegrityError
 from ..repoobj import RepoObj
 from .hashindex_test import H
 from .repository_test import fchunk, pdchunk
-from .key_test import TestKey
+from .crypto.key_test import TestKey
 
 
 class TestSleepingBandwidthLimiter:

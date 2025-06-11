@@ -2,6 +2,7 @@ import errno
 import os
 import sys
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 
@@ -257,10 +258,10 @@ def test_safe_unlink_is_safe_ENOSPC(tmpdir, monkeypatch):
     hard_link = tmpdir / "hardlink"
     os.link(str(victim), str(hard_link))  # hard_link.mklinkto is not implemented on win32
 
-    def os_unlink(_):
+    def Path_unlink(_):
         raise OSError(errno.ENOSPC, "Pretend that we ran out of space")
 
-    monkeypatch.setattr(os, "unlink", os_unlink)
+    monkeypatch.setattr(Path, "unlink", Path_unlink)
 
     with pytest.raises(OSError):
         safe_unlink(hard_link)

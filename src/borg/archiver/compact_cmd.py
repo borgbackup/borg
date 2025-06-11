@@ -1,5 +1,5 @@
 import argparse
-import os
+from pathlib import Path
 
 from ._common import with_repository
 from ..archive import Archive
@@ -83,8 +83,8 @@ class ArchiveGarbageCollector:
         """
         logger.info("Cleaning up files cache...")
 
-        cache_dir = os.path.join(get_cache_dir(), self.repository.id_str)
-        if not os.path.exists(cache_dir):
+        cache_dir = Path(get_cache_dir()) / self.repository.id_str
+        if not cache_dir.exists():
             logger.debug("Cache directory does not exist, skipping files cache cleanup")
             return
 
@@ -104,9 +104,9 @@ class ArchiveGarbageCollector:
         unused_files_cache_names = files_cache_names - used_files_cache_names
 
         for cache_filename in unused_files_cache_names:
-            cache_path = os.path.join(cache_dir, cache_filename)
+            cache_path = cache_dir / cache_filename
             try:
-                os.unlink(cache_path)
+                cache_path.unlink()
             except (FileNotFoundError, PermissionError) as e:
                 logger.warning(f"Could not access cache file: {e}")
         logger.info(f"Removed {len(unused_files_cache_names)} unused files cache files.")

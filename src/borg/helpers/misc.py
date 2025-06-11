@@ -1,7 +1,6 @@
 import logging
 import io
 import os
-import os.path
 import platform  # python stdlib import - if this fails, check that cwd != src/borg/
 import sys
 from collections import deque

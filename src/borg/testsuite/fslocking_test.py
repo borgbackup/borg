@@ -1,5 +1,6 @@
 import random
 import time
+from pathlib import Path
 from threading import Thread, Lock as ThreadingLock
 from traceback import format_exc
 
@@ -306,7 +307,7 @@ class TestLock:
 
 @pytest.fixture()
 def rosterpath(tmpdir):
-    return str(tmpdir.join("roster"))
+    return Path(tmpdir) / "roster"
 
 
 class TestLockRoster:

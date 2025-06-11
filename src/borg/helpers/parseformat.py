@@ -10,6 +10,7 @@ import re
 import shlex
 import stat
 import uuid
+from pathlib import Path
 from typing import ClassVar, Any, TYPE_CHECKING, Literal
 from collections import OrderedDict
 from datetime import datetime, timezone
@@ -1163,6 +1164,8 @@ class BorgJsonEncoder(json.JSONEncoder):
             return o.info()
         if isinstance(o, (AdHocWithFilesCache,)):
             return {"path": o.path}
+        if isinstance(o, Path):
+            return str(o)
         if callable(getattr(o, "to_json", None)):
             return o.to_json()
         return super().default(o)

@@ -1,6 +1,5 @@
 import contextlib
 import os
-import os.path
 import shlex
 import signal
 import subprocess

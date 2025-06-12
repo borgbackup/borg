@@ -305,8 +305,8 @@ class DebugMixIn:
         """convert Borg profile to Python profile"""
         import marshal
 
-        with args.output, args.input:
-            marshal.dump(msgpack.unpack(args.input, use_list=False, raw=False), args.output)
+        with open(args.output, "wb") as wfd, open(args.input, "rb") as rfd:
+            marshal.dump(msgpack.unpack(rfd, use_list=False, raw=False), wfd)
 
     def build_parser_debug(self, subparsers, common_parser, mid_common_parser):
         debug_epilog = process_epilog(
@@ -596,5 +596,5 @@ class DebugMixIn:
             help="convert Borg profile to Python profile (debug)",
         )
         subparser.set_defaults(func=self.do_debug_convert_profile)
-        subparser.add_argument("input", metavar="INPUT", type=argparse.FileType("rb"), help="Borg profile")
-        subparser.add_argument("output", metavar="OUTPUT", type=argparse.FileType("wb"), help="Output file")
+        subparser.add_argument("input", metavar="INPUT", type=str, help="Borg profile")
+        subparser.add_argument("output", metavar="OUTPUT", type=str, help="Output file")

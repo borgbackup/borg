@@ -23,6 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Security :: Cryptography",
     "Topic :: System :: Archiving :: Backup",
 ]
@@ -159,7 +160,7 @@ ignore_missing_imports = true
 
 [tool.tox]
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
-env_list = ["py{310,311,312,313}-{none,fuse2,fuse3}", "docs", "ruff", "mypy", "bandit"]
+env_list = ["py{310,311,312,313,314}-{none,fuse2,fuse3}", "docs", "ruff", "mypy", "bandit"]
 
 [tool.tox.env_run_base]
 package = "editable-legacy"  # without this it does not find setup_docs when running under fakeroot
@@ -171,15 +172,15 @@ pass_env = ["*"]  # fakeroot -u needs some env vars
 pass_env = ["*"]  # needed by tox4, so env vars are visible for building borg
 
 # Environment-specific configurations
-[tool.tox.env."py{310,311,312,313}-fuse2"]
+[tool.tox.env."py{310,311,312,313,314}-fuse2"]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
 deps = ["-rrequirements.d/development.txt", "llfuse"]
 
-[tool.tox.env."py{310,311,312,313}-fuse3"]
+[tool.tox.env."py{310,311,312,313,314}-fuse3"]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 deps = ["-rrequirements.d/development.txt", "pyfuse3"]
 
-[tool.tox.env."py{310,311,312,313}-none"]
+[tool.tox.env."py{310,311,312,313,314}-none"]
 deps = ["-rrequirements.d/development.txt"]
 
 [tool.tox.env.ruff]

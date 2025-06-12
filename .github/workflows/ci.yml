@@ -84,6 +84,9 @@ jobs:
             - os: ubuntu-24.04
               python-version: '3.13'
               toxenv: py313-fuse3
+            - os: ubuntu-24.04
+              python-version: '3.14-dev'
+              toxenv: py314-fuse3
 
     env:
       TOXENV: ${{ matrix.toxenv }}

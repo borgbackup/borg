@@ -21,7 +21,7 @@ import sys
 import time
 from unittest import TestResult, TestSuite, defaultTestLoader
 
-from .testsuite.crypto_test import CryptoTestCase
+from .testsuite.crypto.crypto_test import CryptoTestCase
 from .testsuite.chunkers.buzhash_self_test import ChunkerTestCase
 from .testsuite.chunkers.fixed_self_test import ChunkerFixedTestCase
 

@@ -10,7 +10,7 @@ from ...helpers import CommandError
 from ...helpers import bin_to_hex, hex_to_bin
 from ...helpers import msgpack
 from ...repository import Repository
-from ..key_test import TestKey
+from ..crypto.key_test import TestKey
 from . import RK_ENCRYPTION, KF_ENCRYPTION, cmd, _extract_repository_id, _set_repository_id, generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA

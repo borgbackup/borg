@@ -1,7 +1,7 @@
 import os
 import tempfile
 
-from ..platform import acl_get, acl_set
+from ...platform import acl_get, acl_set
 from .platform_test import skipif_not_freebsd, skipif_acls_not_working
 
 # set module-level skips

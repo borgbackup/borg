@@ -4,20 +4,20 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ..crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey
-from ..crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey
-from ..crypto.key import AEADKeyBase
-from ..crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey
-from ..crypto.key import Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey
-from ..crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
-from ..crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
-from ..crypto.key import identify_key
-from ..crypto.low_level import IntegrityError as IntegrityErrorBase
-from ..helpers import IntegrityError
-from ..helpers import Location
-from ..helpers import msgpack
-from ..constants import KEY_ALGORITHMS
-from ..helpers import hex_to_bin, bin_to_hex
+from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey
+from ...crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey
+from ...crypto.key import AEADKeyBase
+from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey
+from ...crypto.key import Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey
+from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
+from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
+from ...crypto.key import identify_key
+from ...crypto.low_level import IntegrityError as IntegrityErrorBase
+from ...helpers import IntegrityError
+from ...helpers import Location
+from ...helpers import msgpack
+from ...constants import KEY_ALGORITHMS
+from ...helpers import hex_to_bin, bin_to_hex
 
 
 class TestKey:

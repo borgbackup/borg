@@ -1,6 +1,6 @@
 import pytest
 
-from ..helpers.datastruct import EfficientCollectionQueue
+from ...helpers.datastruct import EfficientCollectionQueue
 
 
 class TestEfficientQueue:

@@ -1,6 +1,9 @@
 import json
 import os
 import pstats
+import sys
+
+import pytest
 
 from ...constants import *  # NOQA
 from .. import changedir
@@ -10,6 +13,7 @@ from . import cmd, create_test_files, create_regular_file, generate_archiver_tes
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
+@pytest.mark.skipif(sys.version_info[:3] >= (3, 14, 0), reason="cProfile.Profile broken in Python 3.14.0b2")
 def test_debug_profile(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)

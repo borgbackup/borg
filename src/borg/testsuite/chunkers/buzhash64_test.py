@@ -140,3 +140,43 @@ def test_fuzz_bh64(worker):
                 parts = cf_expand(chunker.chunkify(bio))
             reconstructed = b"".join(parts)
             assert reconstructed == data
+
+
+@pytest.mark.parametrize("do_encrypt", (False, True))
+def test_buzhash64_dedup_shifted(do_encrypt):
+    min_exp, max_exp, mask = 10, 16, 14  # chunk size target 16kiB, clip at 1kiB and 64kiB
+    key = b"0123456789ABCDEF" * 2
+    chunker = ChunkerBuzHash64(key, min_exp, max_exp, mask, 4095, do_encrypt=do_encrypt)
+    rdata = os.urandom(4000000)
+
+    def chunkit(data):
+        size = 0
+        chunks = []
+        with BytesIO(data) as f:
+            for chunk in chunker.chunkify(f):
+                chunks.append(sha256(chunk.data).digest())
+                size += len(chunk.data)
+        return chunks, size
+
+    # 2 identical files
+    data1, data2 = rdata, rdata
+    chunks1, size1 = chunkit(data1)
+    chunks2, size2 = chunkit(data2)
+    # exact same chunking
+    assert size1 == len(data1)
+    assert size2 == len(data2)
+    assert chunks1 == chunks2
+
+    # 2 almost identical files
+    data1, data2 = rdata, b"inserted" + rdata
+    chunks1, size1 = chunkit(data1)
+    chunks2, size2 = chunkit(data2)
+    assert size1 == len(data1)
+    assert size2 == len(data2)
+    # almost same chunking
+    # many chunks overall
+    assert len(chunks1) > 100
+    assert len(chunks2) > 100
+    # only a few unique chunks per file, most chunks are duplicates
+    assert len(set(chunks1) - set(chunks2)) <= 2
+    assert len(set(chunks2) - set(chunks1)) <= 2

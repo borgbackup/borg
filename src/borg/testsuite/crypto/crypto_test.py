@@ -332,3 +332,23 @@ class TestDeriveKey(BaseTestCase):
         derived_key_from_id = key.derive_key(salt=salt, domain=domain, size=size, from_id_key=True)
         derived_key_from_crypt = key.derive_key(salt=salt, domain=domain, size=size, from_id_key=False)
         assert derived_key_from_id != derived_key_from_crypt
+
+
+def test_chunker_buzhash64_encryption():
+    """Test the encryption functionality."""
+    from ...chunkers.buzhash64 import Crypter
+
+    key = b"0123456789ABCDEF"
+    assert len(key) == 16
+    c = Crypter(key)
+
+    plaintext = b"abcdef0123456789"
+    assert len(plaintext) == 16
+
+    ciphertext = c.encrypt_bytes(plaintext)
+    assert len(ciphertext) == 16
+
+    decrypted = c.decrypt_bytes(ciphertext)
+    assert len(decrypted) == 16
+
+    assert decrypted == plaintext

@@ -3,7 +3,6 @@
 
 from io import BytesIO
 
-from ...chunkers import get_chunker
 from ...chunkers.buzhash64 import buzhash64, buzhash64_update, ChunkerBuzHash64
 from ...constants import *  # NOQA
 from .. import BaseTestCase
@@ -12,46 +11,49 @@ from . import cf
 
 class ChunkerBuzHash64TestCase(BaseTestCase):
     def test_chunkify64(self):
+        key0, key1, key2 = b"0" * 16, b"1" * 16, b"2" * 16
         data = b"0" * int(1.5 * (1 << CHUNK_MAX_EXP)) + b"Y"
-        parts = cf(ChunkerBuzHash64(b"0", 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(data)))
+        parts = cf(ChunkerBuzHash64(key0, 1, CHUNK_MAX_EXP, 2, 2, do_encrypt=False).chunkify(BytesIO(data)))
         self.assert_equal(len(parts), 2)
         self.assert_equal(b"".join(parts), data)
-        self.assert_equal(cf(ChunkerBuzHash64(b"0", 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b""))), [])
         self.assert_equal(
-            cf(ChunkerBuzHash64(b"0", 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"fo", b"obarbo", b"ob", b"azfo", b"obarbo", b"ob", b"azfo", b"obarbo", b"obaz"],
+            cf(ChunkerBuzHash64(b"0" * 16, 1, CHUNK_MAX_EXP, 2, 2, do_encrypt=False).chunkify(BytesIO(b""))), []
         )
         self.assert_equal(
-            cf(ChunkerBuzHash64(b"1", 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"fooba", b"rboobaz", b"fooba", b"rboobaz", b"fooba", b"rboobaz"],
+            cf(ChunkerBuzHash64(key0, 1, CHUNK_MAX_EXP, 2, 2, do_encrypt=False).chunkify(BytesIO(b"foobarboobaz" * 3))),
+            [b"fo", b"oba", b"rbo", b"ob", b"azfo", b"oba", b"rbo", b"ob", b"azfo", b"oba", b"rbo", b"obaz"],
         )
         self.assert_equal(
-            cf(ChunkerBuzHash64(b"2", 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foob", b"arboobazfoob", b"arboobazfoob", b"arboobaz"],
+            cf(ChunkerBuzHash64(key1, 1, CHUNK_MAX_EXP, 2, 2, do_encrypt=False).chunkify(BytesIO(b"foobarboobaz" * 3))),
+            [b"fooba", b"rboobazfooba", b"rboobazfooba", b"rboobaz"],
         )
         self.assert_equal(
-            cf(ChunkerBuzHash64(b"0", 2, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarb", b"oobaz", b"foobarb", b"oobaz", b"foobarb", b"oobaz"],
+            cf(ChunkerBuzHash64(key2, 1, CHUNK_MAX_EXP, 2, 2, do_encrypt=False).chunkify(BytesIO(b"foobarboobaz" * 3))),
+            [b"foo", b"barboo", b"bazfoo", b"barboo", b"bazfoo", b"barboo", b"baz"],
         )
         self.assert_equal(
-            cf(ChunkerBuzHash64(b"1", 2, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarbo", b"obazfo", b"obarbo", b"obazfo", b"obarbo", b"obaz"],
+            cf(ChunkerBuzHash64(key0, 2, CHUNK_MAX_EXP, 2, 3, do_encrypt=False).chunkify(BytesIO(b"foobarboobaz" * 3))),
+            [b"foobar", b"boobazfoo", b"barboobazfoo", b"barboobaz"],
         )
         self.assert_equal(
-            cf(ChunkerBuzHash64(b"2", 2, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarboobaz", b"foobarboobaz", b"foobarboobaz"],
+            cf(ChunkerBuzHash64(key1, 2, CHUNK_MAX_EXP, 2, 3, do_encrypt=False).chunkify(BytesIO(b"foobarboobaz" * 3))),
+            [b"foobarboo", b"bazfoobarboo", b"bazfoobarboobaz"],
         )
         self.assert_equal(
-            cf(ChunkerBuzHash64(b"0", 3, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarbo", b"obazfoobarb", b"oobazfoo", b"barboobaz"],
+            cf(ChunkerBuzHash64(key2, 2, CHUNK_MAX_EXP, 2, 3, do_encrypt=False).chunkify(BytesIO(b"foobarboobaz" * 3))),
+            [b"fooba", b"rboob", b"azfooba", b"rboob", b"azfooba", b"rboobaz"],
         )
         self.assert_equal(
-            cf(ChunkerBuzHash64(b"1", 3, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarbo", b"obazfoobarbo", b"obazfoobarbo", b"obaz"],
+            cf(ChunkerBuzHash64(key0, 3, CHUNK_MAX_EXP, 2, 3, do_encrypt=False).chunkify(BytesIO(b"foobarboobaz" * 3))),
+            [b"foobarboobazfoo", b"barboobazfoo", b"barboobaz"],
         )
         self.assert_equal(
-            cf(ChunkerBuzHash64(b"2", 3, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarboobaz", b"foobarboobaz", b"foobarboobaz"],
+            cf(ChunkerBuzHash64(key1, 3, CHUNK_MAX_EXP, 2, 3, do_encrypt=False).chunkify(BytesIO(b"foobarboobaz" * 3))),
+            [b"foobarboo", b"bazfoobarboo", b"bazfoobarboobaz"],
+        )
+        self.assert_equal(
+            cf(ChunkerBuzHash64(key2, 3, CHUNK_MAX_EXP, 2, 3, do_encrypt=False).chunkify(BytesIO(b"foobarboobaz" * 3))),
+            [b"foobarboob", b"azfoobarboob", b"azfoobarboobaz"],
         )
 
     def test_buzhash64(self):
@@ -72,6 +74,10 @@ class ChunkerBuzHash64TestCase(BaseTestCase):
                 self.input = self.input[:-1]
                 return self.input[:1]
 
-        chunker = get_chunker(*CHUNKER64_PARAMS, sparse=False)
+        # Explicitly create the chunker with the same parameters as CHUNKER64_PARAMS
+        # but also specify do_encrypt=True.
+        chunker = ChunkerBuzHash64(
+            b"0" * 16, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE, sparse=False, do_encrypt=True
+        )
         reconstructed = b"".join(cf(chunker.chunkify(SmallReadFile())))
         assert reconstructed == b"a" * 20

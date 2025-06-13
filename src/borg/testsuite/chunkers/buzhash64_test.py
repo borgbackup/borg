@@ -2,6 +2,8 @@ from hashlib import sha256
 from io import BytesIO
 import os
 
+import pytest
+
 from . import cf
 from ...chunkers import ChunkerBuzHash64
 from ...constants import *  # NOQA
@@ -30,22 +32,22 @@ def test_chunkpoints64_unchanged():
                 if minexp >= maxexp:
                     continue
                 for maskbits in (4, 7, 10, 12):
-                    for key in (b"first_key", b"second_key"):
+                    for key in (b"0123456789ABCDEF", b"456789ABCDEF0123"):
                         fh = BytesIO(data)
-                        chunker = ChunkerBuzHash64(key, minexp, maxexp, maskbits, winsize)
+                        chunker = ChunkerBuzHash64(key, minexp, maxexp, maskbits, winsize, do_encrypt=False)
                         chunks = [H(c) for c in cf(chunker.chunkify(fh, -1))]
                         runs.append(H(b"".join(chunks)))
 
     # The "correct" hash below matches the existing chunker behavior.
     # Future chunker optimisations must not change this, or existing repos will bloat.
     overall_hash = H(b"".join(runs))
-    assert overall_hash == hex_to_bin("ab98713d28c5a544eeb8b6a2b5ba6405847bd6924d45fb7e267d173892ad0cdc")
+    assert overall_hash == hex_to_bin("3c42fc19307cfb9bbc28cf7f9604ef9ddbf90d86c06f3f4228abf56bf39ab4f3")
 
 
 def test_buzhash64_chunksize_distribution():
     data = os.urandom(1048576)
     min_exp, max_exp, mask = 10, 16, 14  # chunk size target 16kiB, clip at 1kiB and 64kiB
-    chunker = ChunkerBuzHash64(b"", min_exp, max_exp, mask, 4095)
+    chunker = ChunkerBuzHash64(b"0123456789ABCDEF", min_exp, max_exp, mask, 4095)
     f = BytesIO(data)
     chunks = cf(chunker.chunkify(f))
     del chunks[-1]  # get rid of the last chunk, it can be smaller than 2**min_exp
@@ -67,3 +69,42 @@ def test_buzhash64_chunksize_distribution():
     # most chunks should be cut due to buzhash triggering, not due to clipping at min/max size:
     assert min_count < 10
     assert max_count < 10
+
+
+@pytest.mark.parametrize("do_encrypt", (False, True))
+def test_buzhash64_dedup_shifted(do_encrypt):
+    min_exp, max_exp, mask = 10, 16, 14  # chunk size target 16kiB, clip at 1kiB and 64kiB
+    chunker = ChunkerBuzHash64(b"0123456789ABCDEF", min_exp, max_exp, mask, 4095, do_encrypt=do_encrypt)
+    rdata = os.urandom(4000000)
+
+    def chunkit(data):
+        size = 0
+        chunks = []
+        with BytesIO(data) as f:
+            for chunk in chunker.chunkify(f):
+                chunks.append(sha256(chunk.data).digest())
+                size += len(chunk.data)
+        return chunks, size
+
+    # 2 identical files
+    data1, data2 = rdata, rdata
+    chunks1, size1 = chunkit(data1)
+    chunks2, size2 = chunkit(data2)
+    # exact same chunking
+    assert size1 == len(data1)
+    assert size2 == len(data2)
+    assert chunks1 == chunks2
+
+    # 2 almost identical files
+    data1, data2 = rdata, b"inserted" + rdata
+    chunks1, size1 = chunkit(data1)
+    chunks2, size2 = chunkit(data2)
+    assert size1 == len(data1)
+    assert size2 == len(data2)
+    # almost same chunking
+    # many chunks overall
+    assert len(chunks1) > 100
+    assert len(chunks2) > 100
+    # only a few unique chunks per file, most chunks are duplicates
+    assert len(set(chunks1) - set(chunks2)) <= 2
+    assert len(set(chunks2) - set(chunks1)) <= 2

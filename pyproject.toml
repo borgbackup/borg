@@ -208,3 +208,30 @@ skips = [
 skip_install = true
 deps = ["bandit[toml]"]
 commands = [["bandit", "-r", "src/borg", "-c", "pyproject.toml"]]
+
+[tool.coverage.run]
+branch = true
+disable_warnings = ["module-not-measured", "no-ctracer"]
+source = "src/borg"
+omit = [
+    "*/borg/__init__.py",
+    "*/borg/__main__.py",
+    "*/borg/_version.py",
+    "*/borg/fuse.py",
+    "*/borg/support/*",
+    "*/borg/testsuite/*",
+    "*/borg/hash_sizes.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "pragma: freebsd only",
+    "pragma: unknown platform only",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+]
+ignore_errors = true

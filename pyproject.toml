@@ -212,7 +212,7 @@ commands = [["bandit", "-r", "src/borg", "-c", "pyproject.toml"]]
 [tool.coverage.run]
 branch = true
 disable_warnings = ["module-not-measured", "no-ctracer"]
-source = "src/borg"
+source = ["src/borg"]
 omit = [
     "*/borg/__init__.py",
     "*/borg/__main__.py",

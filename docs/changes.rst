@@ -156,6 +156,7 @@ above.
 
 New features:
 
+- new "buzhash64" chunker, init bh table using a 256bit key derived from ID key
 - serve: add --permissions option as an alternative to BORG_REPO_PERMISSIONS env var
 - create: auto-exclude items based on xattrs or NODUMP, see #4972
 
@@ -166,10 +167,13 @@ New features:
 
 Other changes:
 
+- support Python 3.14
 - msgpack: allow 1.1.1
 - msgpack version check: ignore "rc" or other version elements
 - add derive_key to derive new keys from existing key material
 - fish: fix archive name completion
+- refactor: modularize tests
+- refactor: use pathlib.Path
 - refactor the chunkers, #8882 #8883:
 
   - transform buzhash chunker C code to Cython

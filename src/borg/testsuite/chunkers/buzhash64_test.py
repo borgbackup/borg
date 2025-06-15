@@ -4,8 +4,14 @@ import os
 
 from . import cf
 from ...chunkers import ChunkerBuzHash64
+from ...chunkers.buzhash64 import buzhash64_get_table
 from ...constants import *  # NOQA
 from ...helpers import hex_to_bin
+
+
+# from os.urandom(32)
+key0 = hex_to_bin("ad9f89095817f0566337dc9ee292fcd59b70f054a8200151f1df5f21704824da")
+key1 = hex_to_bin("f1088c7e9e6ae83557ad1558ff36c44a369ea719d1081c29684f52ffccb72cb8")
 
 
 def H(data):
@@ -39,7 +45,8 @@ def test_chunkpoints64_unchanged():
     # The "correct" hash below matches the existing chunker behavior.
     # Future chunker optimisations must not change this, or existing repos will bloat.
     overall_hash = H(b"".join(runs))
-    assert overall_hash == hex_to_bin("ab98713d28c5a544eeb8b6a2b5ba6405847bd6924d45fb7e267d173892ad0cdc")
+    print(overall_hash.hex())
+    assert overall_hash == hex_to_bin("db4b37fbe0cb841d79cfbb52bff8ac2f11040bf83a7d389640c7afb314fc4bfb")
 
 
 def test_buzhash64_chunksize_distribution():
@@ -67,3 +74,27 @@ def test_buzhash64_chunksize_distribution():
     # most chunks should be cut due to buzhash triggering, not due to clipping at min/max size:
     assert min_count < 10
     assert max_count < 10
+
+
+def test_buzhash64_table():
+    # Test that the function returns a list of 256 integers
+    table0 = buzhash64_get_table(key0)
+    assert len(table0) == 256
+
+    # Test that all elements are integers
+    for value in table0:
+        assert isinstance(value, int)
+
+    # Test that the function is deterministic (same key produces same table)
+    table0_again = buzhash64_get_table(key0)
+    assert table0 == table0_again
+
+    # Test that different keys produce different tables
+    table1 = buzhash64_get_table(key1)
+    assert table0 != table1
+
+    # Test that the table has balanced bit distribution
+    # For each bit position 0..63, exactly 50% of the table values should have the bit set to 1
+    for bit_pos in range(64):
+        bit_count = sum(1 for value in table0 if value & (1 << bit_pos))
+        assert bit_count == 128  # 50% of 256 = 128

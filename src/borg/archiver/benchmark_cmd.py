@@ -134,23 +134,33 @@ class BenchmarkMixIn:
         key_96 = os.urandom(12)
 
         import io
-        from ..chunkers import get_chunker
+        from ..chunkers import get_chunker  # noqa
 
         print("Chunkers =======================================================")
         size = "1GB"
 
-        def chunkit(chunker_name, *args, **kwargs):
+        def chunkit(ch):
             with io.BytesIO(random_10M) as data_file:
-                ch = get_chunker(chunker_name, *args, **kwargs)
                 for _ in ch.chunkify(fd=data_file):
                     pass
 
-        for spec, func in [
-            ("buzhash,19,23,21,4095", lambda: chunkit("buzhash", 19, 23, 21, 4095, sparse=False)),
-            ("buzhash64,19,23,21,4095", lambda: chunkit("buzhash64", 19, 23, 21, 4095, sparse=False)),
-            ("fixed,1048576", lambda: chunkit("fixed", 1048576, sparse=False)),
+        for spec, setup, func, vars in [
+            (
+                "buzhash,19,23,21,4095",
+                "ch = get_chunker('buzhash', 19, 23, 21, 4095, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
+            # note: the buzhash64 chunker creation is rather slow, so we must keep it in setup
+            (
+                "buzhash64,19,23,21,4095",
+                "ch = get_chunker('buzhash64', 19, 23, 21, 4095, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
+            ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
         ]:
-            print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
+            print(f"{spec:<24} {size:<10} {timeit(func, setup, number=100, globals=vars):.3f}s")
 
         from ..checksums import crc32, xxh64
 

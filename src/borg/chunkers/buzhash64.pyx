@@ -4,12 +4,13 @@ API_VERSION = '1.2_01'
 
 import cython
 import time
-from hashlib import sha256
 
 from cpython.bytes cimport PyBytes_AsString
 from libc.stdint cimport uint8_t, uint64_t
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, memmove
+
+from ..crypto.low_level import CSPRNG
 
 from ..constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
 from .reader import FileReader, Chunk
@@ -40,14 +41,31 @@ cdef extern from *:
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)  # Deactivate negative indexing.
 cdef uint64_t* buzhash64_init_table(bytes key):
-    """Initialize the buzhash table using the given key."""
-    cdef int i
+    """
+    Generate a balanced pseudo-random table deterministically from a 256-bit key.
+    Balanced means that for each bit position 0..63, exactly 50% of the table values have the bit set to 1.
+    """
+    # Create deterministic random number generator
+    rng = CSPRNG(key)
+
+    cdef int i, j, bit_pos
     cdef uint64_t* table = <uint64_t*>malloc(2048)  # 256 * sizeof(uint64_t)
+
+    # Initialize all values to 0
     for i in range(256):
-        # deterministically generate a pseudo-random 64-bit unsigned integer for table entry i involving the key:
-        v = f"{i:02x}".encode() + key
-        d64 = sha256(v).digest()[:8]
-        table[i] = <uint64_t> int.from_bytes(d64, byteorder='little')
+        table[i] = 0
+
+    # For each bit position, deterministically assign exactly 128 positions to have that bit set
+    for bit_pos in range(64):
+        # Create a list of indices and shuffle deterministically
+        indices = list(range(256))
+        rng.shuffle(indices)
+
+        # Set the bit at bit_pos for the first 128 shuffled indices
+        for i in range(128):
+            j = indices[i]
+            table[j] |= (1ULL << bit_pos)
+
     return table
 
 
@@ -289,3 +307,14 @@ def buzhash64_update(uint64_t sum, unsigned char remove, unsigned char add, size
     sum = _buzhash64_update(sum, remove, add, len, table)
     free(table)
     return sum
+
+
+def buzhash64_get_table(bytes key):
+    """Get the buzhash table generated from <key>."""
+    cdef uint64_t *table
+    cdef int i
+    table = buzhash64_init_table(key)
+    try:
+        return [table[i] for i in range(256)]
+    finally:
+        free(table)

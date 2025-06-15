@@ -25,50 +25,50 @@ class ChunkerBuzHash64TestCase(BaseTestCase):
         self.assert_equal(cf(ChunkerBuzHash64(key0, 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b""))), [])
         self.assert_equal(
             cf(ChunkerBuzHash64(key0, 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarboobaz", b"foobarboobaz", b"foobarboobaz"],
+            [b"foobarboobazfoobarboobazfoobarboobaz"],
         )
         self.assert_equal(
             cf(ChunkerBuzHash64(key1, 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobar", b"boob", b"az", b"foobar", b"boob", b"az", b"foobar", b"boobaz"],
+            [b"fo", b"ob", b"arbo", b"obazfo", b"ob", b"arbo", b"obazfo", b"ob", b"arbo", b"obaz"],
         )
         self.assert_equal(
             cf(ChunkerBuzHash64(key2, 1, CHUNK_MAX_EXP, 2, 2).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarb", b"oob", b"az", b"foobarb", b"oob", b"az", b"foobarb", b"oobaz"],
+            [b"foo", b"barboo", b"bazfoo", b"barboo", b"bazfoo", b"barboo", b"baz"],
         )
         self.assert_equal(
             cf(ChunkerBuzHash64(key0, 2, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarb", b"oobazf", b"oobarb", b"oobazf", b"oobarb", b"oobaz"],
+            [b"foob", b"arboobazfoob", b"arboobazfoob", b"arboobaz"],
         )
         self.assert_equal(
             cf(ChunkerBuzHash64(key1, 2, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarb", b"oobaz", b"foobarb", b"oobaz", b"foobarb", b"oobaz"],
+            [b"foobarb", b"ooba", b"zfoo", b"barb", b"ooba", b"zfoo", b"barb", b"oobaz"],
         )
         self.assert_equal(
             cf(ChunkerBuzHash64(key2, 2, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarbooba", b"zfoobarbooba", b"zfoobarboobaz"],
+            [b"foob", b"arboobazf", b"oobarb", b"oobazf", b"oobarb", b"oobaz"],
         )
         self.assert_equal(
             cf(ChunkerBuzHash64(key0, 3, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarboobazf", b"oobarboobazf", b"oobarboobaz"],
+            [b"foobarboobazfoob", b"arboobazfoob", b"arboobaz"],
         )
         self.assert_equal(
             cf(ChunkerBuzHash64(key1, 3, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarbo", b"obazfoobarb", b"oobazfoobarb", b"oobaz"],
+            [b"foobarboob", b"azfoobarb", b"oobazfoo", b"barboobaz"],
         )
         self.assert_equal(
             cf(ChunkerBuzHash64(key2, 3, CHUNK_MAX_EXP, 2, 3).chunkify(BytesIO(b"foobarboobaz" * 3))),
-            [b"foobarbooba", b"zfoobarbooba", b"zfoobarboobaz"],
+            [b"foobarboobazf", b"oobarboobazf", b"oobarboobaz"],
         )
 
     def test_buzhash64(self):
-        self.assert_equal(buzhash64(b"abcdefghijklmnop", key0), 15080163834872228739)
-        self.assert_equal(buzhash64(b"abcdefghijklmnop", key1), 9505908538285923444)
+        self.assert_equal(buzhash64(b"abcdefghijklmnop", key0), 17431277362176251403)
+        self.assert_equal(buzhash64(b"abcdefghijklmnop", key1), 13352287297226390838)
         expected = buzhash64(b"abcdefghijklmnop", key0)
         previous = buzhash64(b"Xabcdefghijklmno", key0)
         this = buzhash64_update(previous, ord("X"), ord("p"), 16, key0)
         self.assert_equal(this, expected)
         # Test with more than 63 bytes to make sure our barrel_shift macro works correctly
-        self.assert_equal(buzhash64(b"abcdefghijklmnopqrstuvwxyz" * 4, key0), 1936382207158378368)
+        self.assert_equal(buzhash64(b"abcdefghijklmnopqrstuvwxyz" * 4, key0), 73413671054664199)
 
     def test_small_reads64(self):
         class SmallReadFile:

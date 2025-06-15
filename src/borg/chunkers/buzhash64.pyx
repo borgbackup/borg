@@ -3,13 +3,14 @@
 API_VERSION = '1.2_01'
 
 import cython
-import random
 import time
 
 from cpython.bytes cimport PyBytes_AsString
 from libc.stdint cimport uint8_t, uint64_t
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, memmove
+
+from ..crypto.low_level import CSPRNG
 
 from ..constants import CH_DATA, CH_ALLOC, CH_HOLE, zeros
 from .reader import FileReader, Chunk
@@ -45,7 +46,7 @@ cdef uint64_t* buzhash64_init_table(bytes key):
     Balanced means that for each bit position 0..63, exactly 50% of the table values have the bit set to 1.
     """
     # Create deterministic random number generator
-    rng = random.Random(int.from_bytes(key, 'big'))
+    rng = CSPRNG(key)
 
     cdef int i, j, bit_pos
     cdef uint64_t* table = <uint64_t*>malloc(2048)  # 256 * sizeof(uint64_t)

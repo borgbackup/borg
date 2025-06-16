@@ -40,6 +40,10 @@ from math import ceil
 
 from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
+from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_AsString
+from libc.stdlib cimport malloc, free
+from libc.stdint cimport uint8_t, uint32_t, uint64_t
+from libc.string cimport memset, memcpy
 
 API_VERSION = '1.3_01'
 
@@ -714,3 +718,161 @@ def blake2b_256(key, data):
 
 def blake2b_128(data):
     return hashlib.blake2b(data, digest_size=16).digest()
+
+
+cdef class CSPRNG:
+    """
+    Cryptographically Secure Pseudo-Random Number Generator based on AES-CTR mode.
+
+    This class provides methods for generating random bytes and shuffling lists
+    using a deterministic algorithm seeded with a 256-bit key.
+
+    The implementation uses AES-256 in CTR mode, which is a well-established
+    method for creating a CSPRNG.
+    """
+    cdef EVP_CIPHER_CTX *ctx
+    cdef uint8_t key[32]
+    cdef uint8_t iv[16]
+    cdef uint8_t zeros[4096]  # Static buffer for zeros
+    cdef uint8_t buffer[4096]  # Static buffer for random bytes
+    cdef size_t buffer_size
+    cdef size_t buffer_pos
+
+    def __cinit__(self, bytes seed_key):
+        """
+        Initialize the CSPRNG with a 256-bit key.
+
+        :param seed_key: A 32-byte key used as the seed for the CSPRNG
+        """
+        if len(seed_key) != 32:
+            raise ValueError("Seed key must be 32 bytes (256 bits)")
+
+        # Initialize context
+        self.ctx = EVP_CIPHER_CTX_new()
+        if self.ctx == NULL:
+            raise MemoryError("Failed to allocate cipher context")
+
+        self.key = seed_key[:32]
+
+        # Initialize to zeros
+        memset(self.iv, 0, 16)
+        memset(self.zeros, 0, 4096)
+
+        self.buffer_size = 4096
+        self.buffer_pos = self.buffer_size  # Force refill on first use
+
+        # Initialize the cipher
+        if not EVP_EncryptInit_ex(self.ctx, EVP_aes_256_ctr(), NULL, self.key, self.iv):
+            EVP_CIPHER_CTX_free(self.ctx)
+            raise CryptoError("Failed to initialize AES-CTR cipher")
+
+    def __dealloc__(self):
+        """Free resources when the object is deallocated."""
+        if self.ctx != NULL:
+            EVP_CIPHER_CTX_free(self.ctx)
+            self.ctx = NULL
+
+    cdef _refill_buffer(self):
+        """Refill the internal buffer with random bytes."""
+        cdef int outlen = 0
+
+        # Encrypt zeros to get random bytes
+        if not EVP_EncryptUpdate(self.ctx, self.buffer, &outlen, self.zeros, self.buffer_size):
+            raise CryptoError("Failed to generate random bytes")
+        if outlen != self.buffer_size:
+            raise CryptoError("Unexpected length of random bytes")
+
+        self.buffer_pos = 0
+
+    def random_bytes(self, size_t n):
+        """
+        Generate n random bytes.
+
+        :param n: Number of bytes to generate
+        :return: a bytes object containing the random bytes
+        """
+        # Directly create a Python bytes object of the required size
+        cdef object py_bytes = PyBytes_FromStringAndSize(NULL, n)
+        cdef uint8_t *result = <uint8_t *>PyBytes_AsString(py_bytes)
+        cdef size_t remaining
+        cdef size_t pos
+        cdef size_t to_copy
+        cdef size_t available
+
+        remaining = n
+        pos = 0
+
+        while remaining > 0:
+            if self.buffer_pos >= self.buffer_size:
+                self._refill_buffer()
+
+            # Calculate how many bytes we can copy
+            available = self.buffer_size - self.buffer_pos
+            to_copy = remaining if remaining < available else available
+
+            # Copy bytes from buffer to result
+            memcpy(result + pos, &self.buffer[self.buffer_pos], to_copy)
+
+            self.buffer_pos += to_copy
+            pos += to_copy
+            remaining -= to_copy
+
+        return py_bytes
+
+    def random_int(self, n):
+        """
+        Generate a random integer in the range [0, n).
+
+        :param n: Upper bound (exclusive)
+        :return: Random integer
+        """
+        if n <= 0:
+            raise ValueError("Upper bound must be positive")
+        if n == 1:
+            return 0
+
+        # Calculate the number of bits and bytes needed
+        bits_needed = 0
+        temp = n - 1
+        while temp > 0:
+            bits_needed += 1
+            temp >>= 1
+        bytes_needed = (bits_needed + 7) // 8
+
+        # Generate random bytes
+        mask = (1 << bits_needed) - 1
+        max_attempts = 1000  # Prevent infinite loop
+
+        # Rejection sampling to avoid bias
+        attempts = 0
+        while attempts < max_attempts:
+            attempts += 1
+            random_data = self.random_bytes(bytes_needed)
+            result = int.from_bytes(random_data, byteorder='big')
+
+            # Apply mask to get the right number of bits
+            result &= mask
+            if result < n:
+                return result
+
+        # If we reach here, we've made too many attempts
+        # Fall back to a slightly biased but guaranteed-to-terminate method
+        random_data = self.random_bytes(bytes_needed)
+        result = int.from_bytes(random_data, byteorder='big')
+        return result % n
+
+    def shuffle(self, list items):
+        """
+        Shuffle a list in-place using the Fisher-Yates algorithm.
+
+        :param items: List to shuffle
+        """
+        cdef size_t n = len(items)
+        cdef size_t i, j
+
+        for i in range(n - 1, 0, -1):
+            # Generate random index j such that 0 <= j <= i
+            j = self.random_int(i + 1)
+
+            # Swap items[i] and items[j]
+            items[i], items[j] = items[j], items[i]

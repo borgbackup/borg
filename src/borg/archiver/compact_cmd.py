@@ -166,8 +166,8 @@ class ArchiveGarbageCollector:
             name, id, hex_id = archive_info.name, archive_info.id, bin_to_hex(archive_info.id)
             try:
                 self.manifest.archives.nuke_by_id(id)
-            except KeyError:
-                self.print_warning(f"Archive {name} {hex_id} not found.")
+            except self.repository.ObjectNotFound:
+                logger.warning(f"Soft-deleted archive {name} {hex_id} not found.")
 
         repo_size_before = self.repository_size
         logger.info("Determining unused objects...")

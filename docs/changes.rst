@@ -144,8 +144,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b18 (not released yet)
------------------------------------
+Version 2.0.0b18 (2025-06-19)
+-----------------------------
 
 Please note:
 
@@ -156,7 +156,29 @@ above.
 
 New features:
 
-- new "buzhash64" chunker, init bh table using a 256bit key derived from ID key
+- experimental new "buzhash64" chunker (later, after testing, this shall become
+  the default chunker in borg2):
+
+  - add own cryptographically secure pseudo-random number generator (CSPRNG)
+    based on AES256-CTR to create deterministic random, based on a 256bit seed.
+  - use that to deterministically create a perfectly balanced buzhash64 table.
+  - "buzhash64" chunker computes 64bit hash values for the chunking decision.
+  - performance is similar to "buzhash" (measured on Apple M3P cpu).
+
+  That should also resolve these points of criticism about the old "buzhash"
+  32bit code:
+
+  - table_base: that the bits are not randomly distributed enough
+  - that an XORed seed cancels out for specific window sizes
+  - that XORing the table with a seed is equivalent to XORing the computed hash
+    value with another constant
+
+  Please test the chunkers extensively (e.g. with borg create, borg transfer),
+  we can hardly change them "in production", because chunking differently also
+  means not deduplicating with old chunks. So, in case there are changes
+  needed, we need to find and fix them now while borg is in beta.
+
+  See also some other chunker changes listed below "Other changes".
 - serve: add --permissions option as an alternative to BORG_REPO_PERMISSIONS env var
 - create: auto-exclude items based on xattrs or NODUMP, see #4972
 
@@ -165,15 +187,16 @@ New features:
 
   also: create: read stat attrs, xattrs, ACLs early, before file contents.
 
+Fixes:
+
+- compact: fix cleaning archives directory (catch correct exception, use
+  logger.warning, improve error msg)
+
 Other changes:
 
 - support Python 3.14
-- msgpack: allow 1.1.1
-- msgpack version check: ignore "rc" or other version elements
+- msgpack: allow 1.1.1, version check: ignore "rc" or other version elements
 - add derive_key to derive new keys from existing key material
-- fish: fix archive name completion
-- refactor: modularize tests
-- refactor: use pathlib.Path
 - refactor the chunkers, #8882 #8883:
 
   - transform buzhash chunker C code to Cython
@@ -183,12 +206,15 @@ Other changes:
       files and fmaps.
     - FileReader uses FileFMAPReader to fill its buffer and offers clients a
       `.read(size)` method so they can read pieces of the data.
-    - both chunkers now use the FileReader/FileFMAPReader code
+    - all chunkers now use the FileReader/FileFMAPReader code
   - split code and test module into packages
-- ChunkerFixed: add fixed chunker tests to selftest
-- ChunkerFixed: do not assert on short header read
-- Chunker: use safe_fadvise
-- ChunkerParams: reject even window size for buzhash, #8868
+- "fixed" chunker: add fixed chunker tests to selftest
+- "fixed" chunker: do not assert on short header read
+- "buzhash*" chunker: use safe_fadvise
+- "buzhash" chunker: reject even window size, #8868
+- fish: fix archive name completion
+- refactor: modularize tests
+- refactor: use pathlib.Path
 - tests / CI:
 
   - CI: add bandit, a security-oriented static analysis tool

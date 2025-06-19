@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-SERVE" "1" "2025-05-22" "" "borg backup tool"
+.TH "BORG-SERVE" "1" "2025-06-18" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -52,6 +52,23 @@ option if you do not want to use the default path for the socket and pid file).
 Please note that \fIborg serve\fP does not support giving a specific repository via the
 \fI\-\-repo\fP option or \fIBORG_REPO\fP environment variable. It is always the borg client which
 specifies the repo to use when talking to \fIborg serve\fP\&.
+.sp
+The \-\-permissions option allows enforcing repository permissions:
+.INDENT 0.0
+.IP \(bu 2
+\fIall\fP: All permissions are granted (default, permissions system is not used)
+.IP \(bu 2
+\fIno\-delete\fP: Allow reading and writing, disallow deleting and overwriting data.
+New archives can be created, existing archives can not be deleted. New chunks can
+be added, existing chunks can not be deleted or overwritten.
+.IP \(bu 2
+\fIwrite\-only\fP: Allow writing, disallow reading data.
+New archives can be created, existing archives can not be read.
+New chunks can be added, existing chunks can not be read, deleted or overwritten.
+.IP \(bu 2
+\fIread\-only\fP: Allow reading, disallow writing or deleting data.
+Existing archives can be read, but no archives can be created or deleted.
+.UNINDENT
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -63,6 +80,9 @@ restrict repository access to PATH. Can be specified multiple times to allow the
 .TP
 .BI \-\-restrict\-to\-repository \ PATH
 restrict repository access. Only the repository located at PATH (no sub\-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike \fB\-\-restrict\-to\-path\fP sub\-directories are not accessible; PATH needs to point directly at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
+.TP
+.B  \-\-permissions
+Set repository permission mode. Overrides BORG_REPO_PERMISSIONS environment variable.
 .UNINDENT
 .SH EXAMPLES
 .sp
@@ -94,9 +114,13 @@ locations like \fB/etc/environment\fP or in the forced command itself (example b
 $ cat ~/.ssh/authorized_keys
 command=\(dqborg serve \-\-restrict\-to\-path /path/to/repo\(dq,restrict ssh\-rsa AAAAB3[...]
 
+# Specify repository permissions for an SSH keypair.
+$ cat ~/.ssh/authorized_keys
+command=\(dqborg serve \-\-permissions=read\-only\(dq,restrict ssh\-rsa AAAAB3[...]
+
 # Set a BORG_XXX environment variable on the \(dqborg serve\(dq side
 $ cat ~/.ssh/authorized_keys
-command=\(dqexport BORG_XXX=value; borg serve [...]\(dq,restrict ssh\-rsa [...]
+command=\(dqBORG_XXX=value borg serve [...]\(dq,restrict ssh\-rsa [...]
 .EE
 .UNINDENT
 .UNINDENT
@@ -104,9 +128,10 @@ command=\(dqexport BORG_XXX=value; borg serve [...]\(dq,restrict ssh\-rsa [...]
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
-The examples above use the \fBrestrict\fP directive. This does automatically
-block potential dangerous ssh features, even when they are added in a future
-update. Thus, this option should be preferred.
+The examples above use the \fBrestrict\fP directive and assume a POSIX
+compliant shell set as the user\(aqs login shell.
+This does automatically block potential dangerous ssh features, even when
+they are added in a future update. Thus, this option should be preferred.
 .sp
 If you\(aqre using openssh\-server < 7.2, however, you have to specify explicitly
 the ssh features to restrict and cannot simply use the restrict option as it

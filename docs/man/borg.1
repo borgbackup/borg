@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" "1" "2025-05-22" "" "borg backup tool"
+.TH "BORG" "1" "2025-06-18" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -447,6 +447,9 @@ the \fB\-\-rsh CMD\fP commandline option overrides the environment variable.
 .B BORG_REMOTE_PATH
 When set, use the given path as borg executable on the remote (defaults to \(dqborg\(dq if unset).
 Using \fB\-\-remote\-path PATH\fP commandline option overrides the environment variable.
+.TP
+.B BORG_REPO_PERMISSIONS
+Set repository permissions, see also: \fIborg_serve\fP
 .TP
 .B BORG_FILES_CACHE_SUFFIX
 When set to a value at least one character long, instructs borg to use a specifically named

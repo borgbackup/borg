@@ -247,7 +247,7 @@ cdef class Chunker:
         self.remaining -= min_size
         sum = _buzhash(self.data + self.position, window_size, self.table)
 
-        while self.remaining > self.window_size and (sum & chunk_mask) and not (self.eof and self.remaining <= window_size):
+        while self.remaining > window_size and (sum & chunk_mask) and not (self.eof and self.remaining <= window_size):
             p = self.data + self.position
             stop_at = p + self.remaining - window_size
 

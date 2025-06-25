@@ -464,8 +464,6 @@ are calculated *before* compression. New compression settings
 will only be applied to new chunks, not existing chunks. So it's safe
 to change them.
 
-Use ``borg repo-compress`` to efficiently recompress a complete repository.
-
 Why is backing up an unmodified FAT filesystem slow on Linux?
 -------------------------------------------------------------
 

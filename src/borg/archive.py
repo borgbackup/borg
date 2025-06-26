@@ -146,7 +146,7 @@ Bytes sent to remote: {stats.tx_bytes}
     def usize_fmt(self):
         return format_file_size(self.usize, iec=self.iec)
 
-    def show_progress(self, item=None, final=False, stream=None, dt=None):
+    def show_progress(self, item=None, final=False, stream=sys.stderr, dt=None):
         now = time.monotonic()
         if dt is None or now - self.last_progress > dt:
             self.last_progress = now
@@ -159,6 +159,13 @@ Bytes sent to remote: {stats.tx_bytes}
                     data = {}
                 data.update({"time": time.time(), "type": "archive_progress", "finished": final})
                 msg = json.dumps(data)
+                end = "\n"
+            elif not stream.isatty():
+                if not final:
+                    msg = "{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N ".format(self)
+                    msg += remove_surrogates(item.path) if item else ""
+                else:
+                    msg = ""
                 end = "\n"
             else:
                 columns, lines = get_terminal_size()
@@ -174,7 +181,7 @@ Bytes sent to remote: {stats.tx_bytes}
                 else:
                     msg = " " * columns
                 end = "\r"
-            print(msg, end=end, file=stream or sys.stderr, flush=True)
+            print(msg, end=end, file=stream, flush=True)
 
 
 def is_special(mode):

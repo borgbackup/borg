@@ -1514,7 +1514,10 @@ class TarfileObjectProcessors:
 
     @contextmanager
     def create_helper(self, tarinfo, status=None, type=None):
-        item = Item(path=make_path_safe(tarinfo.name), mode=tarinfo.mode | type,
+        # if the tar has names starting with "./", normalize them like borg create also does.
+        # ./dir/file must become dir/file in the borg archive.
+        normalized_path = os.path.normpath(tarinfo.name)
+        item = Item(path=make_path_safe(normalized_path), mode=tarinfo.mode | type,
                     uid=tarinfo.uid, gid=tarinfo.gid, user=tarinfo.uname or None, group=tarinfo.gname or None,
                     mtime=safe_ns(int(tarinfo.mtime * 1000**3)))
         yield item, status

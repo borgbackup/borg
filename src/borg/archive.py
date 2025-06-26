@@ -1518,8 +1518,11 @@ class TarfileObjectProcessors:
             def s_to_ns(s):
                 return safe_ns(int(float(s) * 1e9))
 
+            # if the tar has names starting with "./", normalize them like borg create also does.
+            # ./dir/file must become dir/file in the borg archive.
+            normalized_path = os.path.normpath(tarinfo.name)
             item = Item(
-                path=make_path_safe(tarinfo.name),
+                path=make_path_safe(normalized_path),
                 mode=tarinfo.mode | type,
                 uid=tarinfo.uid,
                 gid=tarinfo.gid,

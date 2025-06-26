@@ -211,6 +211,34 @@ def test_import_concatenated_tar_without_ignore_zeros(archivers, request):
     assert os.listdir("output") == ["file1"]
 
 
+@requires_gnutar
+def test_import_tar_with_dotslash_paths(archivers, request):
+    """Test that paths starting with './' are normalized during import-tar."""
+    archiver = request.getfixturevalue(archivers)
+    # Create a simple directory structure
+    create_regular_file(archiver.input_path, "dir/file")
+
+    # Create a tar file with paths starting with './'
+    with changedir("input"):
+        # Directly use a path that starts with './'
+        subprocess.check_call(["tar", "cf", "dotslash.tar", "./dir"])
+
+        # Verify the tar file contains paths with './' prefix
+        tar_content = subprocess.check_output(["tar", "tf", "dotslash.tar"]).decode()
+        assert "./dir" in tar_content
+        assert "./dir/file" in tar_content
+
+    # Import the tar file into a Borg repository
+    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "import-tar", "dotslash", "input/dotslash.tar")
+
+    # List the archive contents and verify no paths start with './'
+    output = cmd(archiver, "list", "--format={path}{NL}", "dotslash")
+    assert "./dir" not in output
+    assert "dir" in output
+    assert "dir/file" in output
+
+
 def test_roundtrip_pax_borg(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)

@@ -1523,7 +1523,7 @@ class TarfileObjectProcessors:
 
     def process_file(self, *, tarinfo, status, type, tar):
         with self.create_helper(tarinfo, status, type) as (item, status):
-            self.print_file_status(status, tarinfo.name)
+            self.print_file_status(status, item.path)
             status = None  # we already printed the status
             fd = tar.extractfile(tarinfo)
             self.process_file_chunks(item, self.cache, self.stats, self.show_progress,

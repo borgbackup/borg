@@ -3663,6 +3663,33 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         # due to zero-filled block marker.
         self.assert_equal(os.listdir('output'), ['file1'])
 
+    @requires_gnutar
+    def test_import_tar_with_dotslash_paths(self):
+        """Test that paths starting with './' are normalized during import-tar."""
+        # Create a simple directory structure
+        os.makedirs('input/dir', exist_ok=True)
+        self.create_regular_file('dir/file')
+
+        # Create a tar file with paths starting with './'
+        with changedir('input'):
+            # Directly use a path that starts with './'
+            subprocess.check_call(['tar', 'cf', 'dotslash.tar', './dir'])
+
+            # Verify the tar file contains paths with './' prefix
+            tar_content = subprocess.check_output(['tar', 'tf', 'dotslash.tar']).decode()
+            assert './dir' in tar_content
+            assert './dir/file' in tar_content
+
+        # Import the tar file into a Borg repository
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('import-tar', self.repository_location + '::dotslash', 'input/dotslash.tar')
+
+        # List the archive contents and verify no paths start with './'
+        output = self.cmd('list', '--format={path}{NL}', self.repository_location + '::dotslash')
+        assert './dir' not in output
+        assert 'dir' in output
+        assert 'dir/file' in output
+
     def test_detect_attic_repo(self):
         path = make_attic_repo(self.repository_path)
         cmds = [

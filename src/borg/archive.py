@@ -1503,7 +1503,7 @@ class TarfileObjectProcessors:
 
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
         self.chunker = get_chunker(*chunker_params, key=key, sparse=False)
-        self.hlm = HardLinkManager(id_type=str, info_type=list)  # path -> chunks
+        self.hlm = HardLinkManager(id_type=str, info_type=list)  # normalized/safe path -> chunks
 
     @contextmanager
     def create_helper(self, tarinfo, status=None, type=None):
@@ -1575,7 +1575,9 @@ class TarfileObjectProcessors:
     def process_hardlink(self, *, tarinfo, status, type):
         with self.create_helper(tarinfo, status, type) as (item, status):
             # create a not hardlinked borg item, reusing the chunks, see HardLinkManager.__doc__
-            chunks = self.hlm.retrieve(tarinfo.linkname)
+            normalized_path = os.path.normpath(tarinfo.linkname)
+            safe_path = make_path_safe(normalized_path)
+            chunks = self.hlm.retrieve(safe_path)
             if chunks is not None:
                 item.chunks = chunks
             item.get_size(memorize=True, from_chunks=True)
@@ -1584,7 +1586,7 @@ class TarfileObjectProcessors:
 
     def process_file(self, *, tarinfo, status, type, tar):
         with self.create_helper(tarinfo, status, type) as (item, status):
-            self.print_file_status(status, tarinfo.name)
+            self.print_file_status(status, item.path)
             status = None  # we already printed the status
             fd = tar.extractfile(tarinfo)
             self.process_file_chunks(
@@ -1593,7 +1595,7 @@ class TarfileObjectProcessors:
             item.get_size(memorize=True, from_chunks=True)
             self.stats.nfiles += 1
             # we need to remember ALL files, see HardLinkManager.__doc__
-            self.hlm.remember(id=tarinfo.name, info=item.chunks)
+            self.hlm.remember(id=item.path, info=item.chunks)
             return status
 
 

@@ -216,6 +216,13 @@ class TarMixIn:
                     key = SCHILY_XATTR + bkey.decode("utf-8", errors="surrogateescape")
                     value = bvalue.decode("utf-8", errors="surrogateescape")
                     ph[key] = value
+            # Add POSIX access and default ACL if present
+            acl_access = item.get("acl_access")
+            if acl_access is not None:
+                ph[SCHILY_ACL_ACCESS] = acl_access.decode("utf-8", errors="surrogateescape")
+            acl_default = item.get("acl_default")
+            if acl_default is not None:
+                ph[SCHILY_ACL_DEFAULT] = acl_default.decode("utf-8", errors="surrogateescape")
             if format == "BORG":  # BORG format additions
                 ph["BORG.item.version"] = "1"
                 # BORG.item.meta - just serialize all metadata we have:

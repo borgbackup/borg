@@ -125,6 +125,8 @@ TIME_DIFFERS2_NS = 3000000000
 
 # tar related
 SCHILY_XATTR = "SCHILY.xattr."  # xattr key prefix in tar PAX headers
+SCHILY_ACL_ACCESS = "SCHILY.acl.access"  # POSIX access ACL in tar PAX headers
+SCHILY_ACL_DEFAULT = "SCHILY.acl.default"  # POSIX default ACL in tar PAX headers
 
 # special tags
 # @PROT protects archives against accidential deletion or modification by delete, prune or recreate.

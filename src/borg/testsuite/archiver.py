@@ -2531,12 +2531,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_list_chunk_counts(self):
         self.create_regular_file('empty_file', size=0)
         self.create_regular_file('two_chunks')
-        with open(os.path.join(self.input_path, 'two_chunks'), 'wb') as fd:
+        filename = os.path.join(self.input_path, 'two_chunks')
+        with open(filename, 'wb') as fd:
             fd.write(b'abba' * 2000000)
             fd.write(b'baab' * 2000000)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         test_archive = self.repository_location + '::test'
         self.cmd('create', test_archive, 'input')
+        os.unlink(filename)  # save space on TMPDIR
         output = self.cmd('list', '--format', '{num_chunks} {unique_chunks} {path}{NL}', test_archive)
         assert "0 0 input/empty_file" in output
         assert "2 2 input/two_chunks" in output

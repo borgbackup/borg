@@ -178,7 +178,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.assert_equal(self.repository.get(H(0)), max_data)
         self.assert_raises(IntegrityError,
                            lambda: self.repository.put(H(1), max_data + b'x'))
-
+        self.repository.delete(H(0))
 
 class LocalRepositoryTestCase(RepositoryTestCaseBase):
     # test case that doesn't work with remote repositories

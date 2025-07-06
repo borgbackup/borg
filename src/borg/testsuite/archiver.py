@@ -680,11 +680,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                         sparse = False
             return sparse
 
-        filename = os.path.join(self.input_path, 'sparse')
+        filename_in = os.path.join(self.input_path, 'sparse')
         content = b'foobar'
         hole_size = 5 * (1 << CHUNK_MAX_EXP)  # 5 full chunker buffers
         total_size = hole_size + len(content) + hole_size
-        with open(filename, 'wb') as fd:
+        with open(filename_in, 'wb') as fd:
             # create a file that has a hole at the beginning and end (if the
             # OS and filesystem supports sparse files)
             fd.seek(hole_size, 1)
@@ -693,7 +693,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             pos = fd.tell()
             fd.truncate(pos)
         # we first check if we could create a sparse input file:
-        sparse_support = is_sparse(filename, total_size, hole_size)
+        sparse_support = is_sparse(filename_in, total_size, hole_size)
         if sparse_support:
             # we could create a sparse input file, so creating a backup of it and
             # extracting it again (as sparse) should also work:
@@ -702,13 +702,15 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             with changedir(self.output_path):
                 self.cmd('extract', '--sparse', self.repository_location + '::test')
             self.assert_dirs_equal('input', 'output/input')
-            filename = os.path.join(self.output_path, 'input', 'sparse')
-            with open(filename, 'rb') as fd:
+            filename_out = os.path.join(self.output_path, 'input', 'sparse')
+            with open(filename_out, 'rb') as fd:
                 # check if file contents are as expected
                 self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
                 self.assert_equal(fd.read(len(content)), content)
                 self.assert_equal(fd.read(hole_size), b'\0' * hole_size)
-            assert is_sparse(filename, total_size, hole_size)
+            assert is_sparse(filename_out, total_size, hole_size)
+            os.unlink(filename_out)  # save space on TMPDIR
+        os.unlink(filename_in)  # save space on TMPDIR
 
     def test_unusual_filenames(self):
         filenames = ['normal', 'with some blanks', '(with_parens)', ]
@@ -2529,12 +2531,14 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_list_chunk_counts(self):
         self.create_regular_file('empty_file', size=0)
         self.create_regular_file('two_chunks')
-        with open(os.path.join(self.input_path, 'two_chunks'), 'wb') as fd:
+        filename = os.path.join(self.input_path, 'two_chunks')
+        with open(filename, 'wb') as fd:
             fd.write(b'abba' * 2000000)
             fd.write(b'baab' * 2000000)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         test_archive = self.repository_location + '::test'
         self.cmd('create', test_archive, 'input')
+        os.unlink(filename)  # save space on TMPDIR
         output = self.cmd('list', '--format', '{num_chunks} {unique_chunks} {path}{NL}', test_archive)
         assert "0 0 input/empty_file" in output
         assert "2 2 input/two_chunks" in output

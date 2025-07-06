@@ -180,7 +180,7 @@ description = "Run tests with pytest"
 package = "editable-legacy"  # without this it does not find setup_docs when running under fakeroot
 deps = ["-rrequirements.d/development.txt"]
 commands = [
-    ["pytest", "-v", "-n", "{env:XDISTN:1}", "-rs", "--cov=borg", "--cov-config=.coveragerc", "--benchmark-skip", "--pyargs", "{posargs:borg.testsuite}"]
+    ["pytest", "-v", "-n", "{env:XDISTN:1}", "-rs", "--cov=borg", "--cov-config=pyproject.toml", "--benchmark-skip", "--pyargs", "{posargs:borg.testsuite}"]
 ]
 pass_env = ["*"]  # fakeroot -u needs some env vars
 labels = ["test"]
@@ -215,3 +215,30 @@ commands = [
     ["ruff", "check", "."]
 ]
 labels = ["lint"]
+
+[tool.coverage.run]
+branch = true
+disable_warnings = ["module-not-measured"]
+source = ["src/borg"]
+omit = [
+    "*/borg/__init__.py",
+    "*/borg/__main__.py",
+    "*/borg/_version.py",
+    "*/borg/fuse.py",
+    "*/borg/support/*",
+    "*/borg/testsuite/*",
+    "*/borg/hash_sizes.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "pragma: freebsd only",
+    "pragma: unknown platform only",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+]
+ignore_errors = true

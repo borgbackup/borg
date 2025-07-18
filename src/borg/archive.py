@@ -1302,7 +1302,8 @@ class FilesystemObjectProcessors:
     def __init__(self, *, metadata_collector, cache, key,
                  add_item, process_file_chunks,
                  chunker_params, show_progress, sparse,
-                 log_json, iec, file_status_printer=None):
+                 log_json, iec, file_status_printer=None,
+                 files_changed='ctime'):
         self.metadata_collector = metadata_collector
         self.cache = cache
         self.key = key
@@ -1310,6 +1311,7 @@ class FilesystemObjectProcessors:
         self.process_file_chunks = process_file_chunks
         self.show_progress = show_progress
         self.print_file_status = file_status_printer or (lambda *args: None)
+        self.files_changed = files_changed
 
         self.hard_links = {}
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
@@ -1482,7 +1484,14 @@ class FilesystemObjectProcessors:
                             # special files:
                             # - fifos change naturally, because they are fed from the other side. no problem.
                             # - blk/chr devices don't change ctime anyway.
-                            changed_while_backup = not is_special_file and st.st_ctime_ns != st2.st_ctime_ns
+                            if self.files_changed == 'disabled' or is_special_file:
+                                changed_while_backup = False
+                            elif self.files_changed == 'ctime':
+                                changed_while_backup = st.st_ctime_ns != st2.st_ctime_ns
+                            elif self.files_changed == 'mtime':
+                                changed_while_backup = st.st_mtime_ns != st2.st_mtime_ns
+                            else:
+                                raise ValueError('invalid files_changed value: %r' % self.files_changed)
                         if changed_while_backup:
                             status = 'C'  # regular file changed while we backed it up, might be inconsistent/corrupt!
                         if not is_special_file and not changed_while_backup:

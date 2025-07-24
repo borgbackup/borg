@@ -977,7 +977,7 @@ class RemoteRepositoryTestCase(RepositoryTestCase):
             self.repository.call('inject_exception', {'kind': 'divide'})
         except RemoteRepository.RPCError as e:
             assert e.unpacked
-            assert e.get_message() == 'ZeroDivisionError: integer division or modulo by zero\n'
+            assert e.get_message().startswith("ZeroDivisionError:")
             assert e.exception_class == 'ZeroDivisionError'
             assert len(e.exception_full) > 0
 

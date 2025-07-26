@@ -25,6 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Security :: Cryptography",
     "Topic :: System :: Archiving :: Backup",
 ]
@@ -172,7 +173,7 @@ markers = [
 [tool.tox]
 min_version = "4.19"
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
-env_list = ["py{39,310,311,312,313}-{none,fuse2,fuse3}", "ruff"]
+env_list = ["py{39,310,311,312,313,314}-{none,fuse2,fuse3}", "ruff"]
 
 # Base configuration for test environments
 [tool.tox.env_run_base]
@@ -190,19 +191,19 @@ labels = ["test"]
 pass_env = ["*"]  # needed by tox4, so env vars are visible for building borg
 
 # Test environments with different FUSE implementations
-[tool.tox.env."py{39,310,311,312,313}-fuse2"]
+[tool.tox.env."py{39,310,311,312,313,314}-fuse2"]
 description = "Run tests with llfuse (FUSE2) implementation"
 set_env = {BORG_FUSE_IMPL = "llfuse"}
 deps = ["-rrequirements.d/development.txt", "llfuse"]
 labels = ["test", "fuse"]
 
-[tool.tox.env."py{39,310,311,312,313}-fuse3"]
+[tool.tox.env."py{39,310,311,312,313,314}-fuse3"]
 description = "Run tests with pyfuse3 (FUSE3) implementation"
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 deps = ["-rrequirements.d/development.txt", "pyfuse3"]
 labels = ["test", "fuse"]
 
-[tool.tox.env."py{39,310,311,312,313}-none"]
+[tool.tox.env."py{39,310,311,312,313,314}-none"]
 description = "Run tests without FUSE support"
 deps = ["-rrequirements.d/development.txt"]
 labels = ["test", "nofuse"]

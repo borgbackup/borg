@@ -303,10 +303,11 @@ class FileReader:
                 # For data chunks, add the actual data
                 result.extend(data[self.offset:self.offset + to_read])
             else:
-                # For non-data chunks, add zeros if we've seen a data chunk
-                if has_data:
-                    result.extend(b'\0' * to_read)
-                # Otherwise, we'll just track the size without adding data
+                # For non-data chunks, always add zeros to the result.
+                # We will only yield a CH_DATA chunk with the result bytes,
+                # if there was at least one CH_DATA chunk contributing to the result,
+                # otherwise we will yield a CH_HOLE or CH_ALLOC chunk.
+                result.extend(b'\0' * to_read)
 
             bytes_read += to_read
 

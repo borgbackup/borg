@@ -144,7 +144,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b18 (2025-06-19)
+Version 2.0.0b19 (unreleased)
 -----------------------------
 
 Please note:
@@ -153,6 +153,22 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Fixes:
+
+- reader: fix corruption issue "forgetting" all-zero bytestrings, #8963
+- import-tar: normalize the tarinfo name/linkname when used as hlm key.
+  also: when printing the path, use the already normalized item.path.
+- import-tar: fix the dotslash issue, add test
+
+Other changes:
+
+- to_key_filename: raise length limit to 120, #8966.
+  This works around a test failure on systems with deep build directories.
+
+
+Version 2.0.0b18 (2025-06-19)
+-----------------------------
 
 New features:
 

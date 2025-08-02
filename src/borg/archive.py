@@ -1215,6 +1215,7 @@ class FilesystemObjectProcessors:
         log_json,
         iec,
         file_status_printer=None,
+        files_changed="ctime",
     ):
         self.metadata_collector = metadata_collector
         self.cache = cache
@@ -1223,6 +1224,7 @@ class FilesystemObjectProcessors:
         self.process_file_chunks = process_file_chunks
         self.show_progress = show_progress
         self.print_file_status = file_status_printer or (lambda *args: None)
+        self.files_changed = files_changed
 
         self.hlm = HardLinkManager(id_type=tuple, info_type=(list, type(None)))  # (dev, ino) -> chunks or None
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
@@ -1445,21 +1447,37 @@ class FilesystemObjectProcessors:
                         if not is_win32:  # TODO for win32
                             with backup_io("fstat2"):
                                 st2 = os.fstat(fd)
-                            if is_special_file:
+                            if self.files_changed == "disabled" or is_special_file:
                                 # special files:
                                 # - fifos change naturally, because they are fed from the other side. no problem.
                                 # - blk/chr devices don't change ctime anyway.
                                 pass
-                            elif st.st_ctime_ns != st2.st_ctime_ns:
-                                # ctime was changed, this is either a metadata or a data change.
-                                changed_while_backup = True
-                            elif start_reading - TIME_DIFFERS1_NS < st2.st_ctime_ns < end_reading + TIME_DIFFERS1_NS:
-                                # this is to treat a very special race condition, see #3536.
-                                # - file was changed right before st.ctime was determined.
-                                # - then, shortly afterwards, but already while we read the file, the
-                                #   file was changed again, but st2.ctime is the same due to ctime granularity.
-                                # when comparing file ctime to local clock, widen interval by TIME_DIFFERS1_NS.
-                                changed_while_backup = True
+                            elif self.files_changed == "ctime":
+                                if st.st_ctime_ns != st2.st_ctime_ns:
+                                    # ctime was changed, this is either a metadata or a data change.
+                                    changed_while_backup = True
+                                elif (
+                                    start_reading - TIME_DIFFERS1_NS < st2.st_ctime_ns < end_reading + TIME_DIFFERS1_NS
+                                ):
+                                    # this is to treat a very special race condition, see #3536.
+                                    # - file was changed right before st.ctime was determined.
+                                    # - then, shortly afterwards, but already while we read the file, the
+                                    #   file was changed again, but st2.ctime is the same due to ctime granularity.
+                                    # when comparing file ctime to local clock, widen interval by TIME_DIFFERS1_NS.
+                                    changed_while_backup = True
+                            elif self.files_changed == "mtime":
+                                if st.st_mtime_ns != st2.st_mtime_ns:
+                                    # mtime was changed, this is either a data change.
+                                    changed_while_backup = True
+                                elif (
+                                    start_reading - TIME_DIFFERS1_NS < st2.st_mtime_ns < end_reading + TIME_DIFFERS1_NS
+                                ):
+                                    # this is to treat a very special race condition, see #3536.
+                                    # - file was changed right before st.mtime was determined.
+                                    # - then, shortly afterwards, but already while we read the file, the
+                                    #   file was changed again, but st2.mtime is the same due to mtime granularity.
+                                    # when comparing file mtime to local clock, widen interval by TIME_DIFFERS1_NS.
+                                    changed_while_backup = True
                         if changed_while_backup:
                             # regular file changed while we backed it up, might be inconsistent/corrupt!
                             if last_try:

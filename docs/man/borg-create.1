@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" "1" "2025-06-18" "" "borg backup tool"
+.TH "BORG-CREATE" "1" "2025-08-02" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -105,6 +105,20 @@ mtime usually works and only updates if file contents were changed. But mtime
 can be arbitrarily set from userspace, e.g. to set mtime back to the same value
 it had before a content change happened. This can be used maliciously as well as
 well\-meant, but in both cases mtime based cache modes can be problematic.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B The \fB\-\-files\-changed\fP option controls how Borg detects if a file has changed during backup:
+.INDENT 7.0
+.IP \(bu 2
+ctime (default): Use ctime to detect changes. This is the safest option.
+.IP \(bu 2
+mtime: Use mtime to detect changes.
+.IP \(bu 2
+disabled: Disable the \(dqfile has changed while we backed it up\(dq detection completely.
+This is not recommended unless you know what you\(aqre doing, as it could lead to
+inconsistent backups if files change during the backup process.
+.UNINDENT
 .UNINDENT
 .sp
 The mount points of filesystems or filesystem snapshots should be the same for every
@@ -235,6 +249,9 @@ detect sparse holes in input (supported only by fixed chunker)
 .TP
 .BI \-\-files\-cache \ MODE
 operate files cache in MODE. default: ctime,size,inode
+.TP
+.BI \-\-files\-changed \ MODE
+specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime
 .TP
 .B  \-\-read\-special
 open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.

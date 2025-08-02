@@ -144,7 +144,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b19 (unreleased)
+Version 2.0.0b19 (2025-07-02)
 -----------------------------
 
 Please note:
@@ -160,6 +160,12 @@ Fixes:
 - import-tar: normalize the tarinfo name/linkname when used as hlm key.
   also: when printing the path, use the already normalized item.path.
 - import-tar: fix the dotslash issue, add test
+
+New features:
+
+- create --files-changed=MODE option, #8958.
+  control how borg detects whether a file has changed while it was backed up,
+  valid modes are ctime (default), mtime (2nd best) or disabled (not recommended).
 
 Other changes:
 

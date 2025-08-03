@@ -692,7 +692,8 @@ class Archiver:
                 fso = FilesystemObjectProcessors(metadata_collector=metadata_collector, cache=cache, key=key,
                     process_file_chunks=cp.process_file_chunks, add_item=archive.add_item,
                     chunker_params=args.chunker_params, show_progress=args.progress, sparse=args.sparse,
-                    log_json=args.log_json, iec=args.iec, file_status_printer=self.print_file_status)
+                    log_json=args.log_json, iec=args.iec, file_status_printer=self.print_file_status,
+                    files_changed=args.files_changed)
                 create_inner(archive, cache, fso)
         else:
             create_inner(None, None, None)
@@ -3563,6 +3564,14 @@ class Archiver:
           it had before a content change happened. This can be used maliciously as well as
           well-meant, but in both cases mtime based cache modes can be problematic.
 
+        The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
+
+        - ctime (default): Use ctime to detect changes. This is the safest option.
+        - mtime: Use mtime to detect changes.
+        - disabled: Disable the "file has changed while we backed it up" detection completely.
+          This is not recommended unless you know what you're doing, as it could lead to
+          inconsistent backups if files change during the backup process.
+
         The mount points of filesystems or filesystem snapshots should be the same for every
         creation of a new archive to ensure fast operation. This is because the file cache that
         is used to determine changed files quickly uses absolute filenames.
@@ -3776,6 +3785,9 @@ class Archiver:
         fs_group.add_argument('--files-cache', metavar='MODE', dest='files_cache_mode', action=Highlander,
                               type=FilesCacheMode, default=FILES_CACHE_MODE_UI_DEFAULT,
                               help='operate files cache in MODE. default: %s' % FILES_CACHE_MODE_UI_DEFAULT)
+        fs_group.add_argument('--files-changed', metavar='MODE', dest='files_changed', action=Highlander,
+                              choices=['ctime', 'mtime', 'disabled'], default='ctime',
+                              help='specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime')
         fs_group.add_argument('--read-special', dest='read_special', action='store_true',
                               help='open and read block and char device files as well as FIFOs as if they were '
                                    'regular files. Also follows symlinks pointing to these kinds of files.')

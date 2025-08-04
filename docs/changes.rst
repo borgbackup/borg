@@ -392,8 +392,8 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.2.9 (2025-04-19)
---------------------------
+Version 1.2.9 (not yet released)
+--------------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
@@ -415,11 +415,15 @@ Fixes:
 - setup.py: fix import error reporting for cythonize import, #8208
 - setup.py: detect noexec build fs issue, #8208
 - Fix paper key import error message
+- import-tar: fix the dotslash issue, add test
+- import-tar: when printing the path, use the already normalized item.path.
 
 Other changes:
 
-- use Python 3.9.22 for the binary build
-- allow msgpack 1.1.0
+- use Python 3.9.23 for the binary build
+- msgpack: allow 1.1.0 and 1.1.1
+- msgpack version check: ignore "rc" or other version elements
+- ChunkerParams: warn about even window size for buzhash, #8868
 - changed insufficiently reserved length for log message, #8152
 - docs:
 

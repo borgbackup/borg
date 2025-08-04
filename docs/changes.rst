@@ -392,8 +392,8 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.2.9 (not yet released)
---------------------------------
+Version 1.2.9 (2025-08-04)
+--------------------------
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.

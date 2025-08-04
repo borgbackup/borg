@@ -3229,7 +3229,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b'a' * 280)
             fd.write(b'b' * 280)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', '--chunker-params', '7,9,8,128', self.repository_location + '::test1', 'input')
+        self.cmd('create', '--chunker-params', '7,9,8,127', self.repository_location + '::test1', 'input')
         self.cmd('create', self.repository_location + '::test2', 'input', '--files-cache=disabled')
         list = self.cmd('list', self.repository_location + '::test1', 'input/large_file',
                         '--format', '{num_chunks} {unique_chunks}')
@@ -3247,7 +3247,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         with open(os.path.join(self.input_path, 'file'), 'wb') as fd:
             fd.write(b'a' * 8192)
         self.cmd('init', '--encryption=repokey', self.repository_location)
-        self.cmd('create', '--chunker-params', '7,9,8,128', self.repository_location + '::test', 'input')
+        self.cmd('create', '--chunker-params', '7,9,8,127', self.repository_location + '::test', 'input')
         output = self.cmd('list', self.repository_location + '::test', 'input/file',
                           '--format', '{num_chunks}')
         num_chunks = int(output)
@@ -3263,7 +3263,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             fd.write(b'a' * 8192)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         # first create an archive with non-default chunker params:
-        self.cmd('create', '--chunker-params', '7,9,8,128', self.repository_location + '::test', 'input')
+        self.cmd('create', '--chunker-params', '7,9,8,127', self.repository_location + '::test', 'input')
         output = self.cmd('list', self.repository_location + '::test', 'input/file',
                           '--format', '{num_chunks}')
         num_chunks = int(output)

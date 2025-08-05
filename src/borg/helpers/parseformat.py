@@ -106,16 +106,10 @@ def interval(s):
 
 
 def ChunkerParams(s):
-    def reject_or_warn(msg, reject):
-        if reject:
-            raise argparse.ArgumentTypeError(msg)
-        else:
-            logger.warning(msg)
-
     params = s.strip().split(',')
     count = len(params)
     if count == 0:
-        reject_or_warn('no chunker params given', True)
+        raise argparse.ArgumentTypeError('no chunker params given')
     algo = params[0].lower()
     if algo == CH_FIXED and 2 <= count <= 3:  # fixed, block_size[, header_size]
         block_size = int(params[1])
@@ -126,9 +120,9 @@ def ChunkerParams(s):
             # or in-memory chunk management.
             # choose the block (chunk) size wisely: if you have a lot of data and you cut
             # it into very small chunks, you are asking for trouble!
-            reject_or_warn('block_size must not be less than 64 Bytes', False)
+            raise argparse.ArgumentTypeError('block_size must not be less than 64 Bytes')
         if block_size > MAX_DATA_SIZE or header_size > MAX_DATA_SIZE:
-            reject_or_warn('block_size and header_size must not exceed MAX_DATA_SIZE [%d]' % MAX_DATA_SIZE, True)
+            raise argparse.ArgumentTypeError('block_size and header_size must not exceed MAX_DATA_SIZE [%d]' % MAX_DATA_SIZE)
         return algo, block_size, header_size
     if algo == 'default' and count == 1:  # default
         return CHUNKER_PARAMS
@@ -136,14 +130,14 @@ def ChunkerParams(s):
     if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[count - 4:])
         if not (chunk_min <= chunk_mask <= chunk_max):
-            reject_or_warn('required: chunk_min <= chunk_mask <= chunk_max', False)
+            raise argparse.ArgumentTypeError('required: chunk_min <= chunk_mask <= chunk_max')
         if chunk_min < 6:
             # see comment in 'fixed' algo check
-            reject_or_warn('min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)', False)
+            raise argparse.ArgumentTypeError('min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)')
         if chunk_max > 23:
-            reject_or_warn('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)', True)
+            raise argparse.ArgumentTypeError('max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)')
         if window_size % 2 == 0:
-            reject_or_warn("window_size must be an uneven (odd) number", False)
+            raise argparse.ArgumentTypeError("window_size must be an uneven (odd) number")
         return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
     raise argparse.ArgumentTypeError('invalid chunker params')
 

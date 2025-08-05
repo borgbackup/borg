@@ -10,6 +10,8 @@ from .. import changedir
 from . import assert_dirs_equal, _extract_hardlinks_setup, cmd, requires_hardlinks, RK_ENCRYPTION
 from . import create_test_files, create_regular_file
 from . import generate_archiver_tests
+from ...platform import acl_get, acl_set
+from ..platform.platform_test import skipif_not_linux, skipif_acls_not_working
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -269,3 +271,89 @@ def test_roundtrip_pax_xattrs(archivers, request):
         extracted_path = os.path.abspath("input/file")
         xa_value_extracted = xattr.getxattr(extracted_path.encode(), xa_key)
     assert xa_value_extracted == xa_value
+
+
+@skipif_not_linux
+@skipif_acls_not_working
+def test_acl_roundtrip(archivers, request):
+    """Test the complete workflow for POSIX ACLs with export-tar and import-tar.
+
+    This test follows the workflow:
+    1. set filesystem ACLs
+    2. create a Borg archive
+    3. export-tar this archive
+    4. import-tar the resulting tar file
+    5. extract the imported archive
+    6. check the expected ACLs in the filesystem
+    """
+    archiver = request.getfixturevalue(archivers)
+
+    # Define helper functions for working with ACLs
+    def get_acl(path):
+        item = {}
+        acl_get(path, item, os.stat(path))
+        return item
+
+    def set_acl(path, access=None, default=None):
+        item = {"acl_access": access, "acl_default": default}
+        acl_set(path, item)
+
+    # Define example ACLs
+    ACCESS_ACL = b"user::rw-\nuser:root:rw-:0\ngroup::r--\ngroup:root:r--:0\nmask::rw-\nother::r--"
+    DEFAULT_ACL = b"user::rw-\nuser:root:r--:0\ngroup::r--\ngroup:root:r--:0\nmask::rw-\nother::r--"
+
+    # 1. Set filesystem ACLs
+    # Create test files with ACLs
+    create_regular_file(archiver.input_path, "file")
+    os.mkdir(os.path.join(archiver.input_path, "dir"))
+
+    file_path = os.path.join(archiver.input_path, "file")
+    dir_path = os.path.join(archiver.input_path, "dir")
+
+    # Set ACLs on the test files
+    try:
+        set_acl(file_path, access=ACCESS_ACL)
+        set_acl(dir_path, access=ACCESS_ACL, default=DEFAULT_ACL)
+    except OSError as e:
+        pytest.skip(f"Failed to set ACLs: {e}")
+
+    file_acl = get_acl(file_path)
+    dir_acl = get_acl(dir_path)
+
+    if not file_acl.get("acl_access") or not dir_acl.get("acl_access") or not dir_acl.get("acl_default"):
+        pytest.skip("ACLs not supported or not working correctly")
+
+    # 2. Create a Borg archive
+    cmd(archiver, "repo-create", "--encryption=none")
+    cmd(archiver, "create", "original", "input")
+
+    # 3. export-tar this archive to a tar file
+    cmd(archiver, "export-tar", "original", "acls.tar", "--tar-format=PAX")
+
+    # 4. import-tar the resulting tar file
+    cmd(archiver, "import-tar", "imported", "acls.tar")
+
+    # 5. Extract the imported archive
+    with changedir(archiver.output_path):
+        cmd(archiver, "extract", "imported")
+
+        # 6. Check the expected ACLs in the filesystem
+        extracted_file_path = os.path.abspath("input/file")
+        extracted_dir_path = os.path.abspath("input/dir")
+
+        extracted_file_acl = get_acl(extracted_file_path)
+        extracted_dir_acl = get_acl(extracted_dir_path)
+
+        # Check that access ACLs were preserved
+        assert "acl_access" in extracted_file_acl
+        assert extracted_file_acl["acl_access"] == file_acl["acl_access"]
+        assert b"user:root:rw-" in file_acl["acl_access"]
+
+        assert "acl_access" in extracted_dir_acl
+        assert extracted_dir_acl["acl_access"] == dir_acl["acl_access"]
+        assert b"user:root:rw-" in dir_acl["acl_access"]
+
+        # Check that default ACLs were preserved for directories
+        assert "acl_default" in extracted_dir_acl
+        assert extracted_dir_acl["acl_default"] == dir_acl["acl_default"]
+        assert b"user:root:r--" in dir_acl["acl_default"]

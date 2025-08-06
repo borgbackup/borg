@@ -959,6 +959,10 @@ def test_create_big_zeros_files(archivers, request):
             # Also verify the directory structure matches
             assert_dirs_equal(archiver.input_path, os.path.join(extract_path, "input"))
 
+    # Remove input files
+    for i in range(count):
+        os.unlink(os.path.join(archiver.input_path, f"zeros_{i}"))
+
 
 def test_create_big_random_files(archivers, request):
     """Test creating an archive from 10 files with 10MB random data each."""
@@ -990,6 +994,10 @@ def test_create_big_random_files(archivers, request):
 
             # Also verify the directory structure matches
             assert_dirs_equal(archiver.input_path, os.path.join(extract_path, "input"))
+
+    # Remove input files
+    for i in range(count):
+        os.unlink(os.path.join(archiver.input_path, f"random_{i}"))
 
 
 def test_create_with_compression_algorithms(archivers, request):
@@ -1052,3 +1060,8 @@ def test_create_with_compression_algorithms(archivers, request):
 
                 # Also verify the directory structure matches
                 assert_dirs_equal(archiver.input_path, os.path.join(extract_path, "input"))
+
+    # Remove input files
+    for i in range(count):
+        os.unlink(os.path.join(archiver.input_path, f"zeros_{i}"))
+        os.unlink(os.path.join(archiver.input_path, f"random_{i}"))

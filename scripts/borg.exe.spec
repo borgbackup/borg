@@ -12,7 +12,7 @@ basepath = os.path.abspath(os.path.join(here, '..'))
 if is_win32:
     hiddenimports = []
 else:
-    hiddenimports = ['borg.platform.posix', 'pkg_resources.py2_warn', ]
+    hiddenimports = ['borg.platform.posix', ]
 
 block_cipher = None
 
@@ -27,6 +27,7 @@ a = Analysis([os.path.join(basepath, 'src', 'borg', '__main__.py'), ],
              runtime_hooks=[],
              excludes=[
                 '_ssl', 'ssl',
+                'pkg_resources',  # avoid pkg_resources related warnings
              ],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,

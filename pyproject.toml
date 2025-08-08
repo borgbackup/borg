@@ -12,7 +12,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: BSD License",
     "Operating System :: POSIX :: BSD :: FreeBSD",
     "Operating System :: POSIX :: BSD :: OpenBSD",
     "Operating System :: POSIX :: BSD :: NetBSD",
@@ -29,7 +28,8 @@ classifiers = [
     "Topic :: Security :: Cryptography",
     "Topic :: System :: Archiving :: Backup",
 ]
-license = {text="BSD"}
+license = "BSD-3-Clause"
+license-files = ["LICENSE", "AUTHORS"]
 dependencies = [
     # we are rather picky about msgpack versions, because a good working msgpack is
     # very important for borg, see: https://github.com/borgbackup/borg/issues/3753
@@ -73,7 +73,7 @@ where = ["src"]
 "*" = ["*.c", "*.h", "*.pyx"]
 
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm>=8", "wheel", "pkgconfig", "Cython>=3.0.3"]
+requires = ["setuptools>=77.0.0", "setuptools_scm>=8", "wheel", "pkgconfig", "Cython>=3.0.3"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]

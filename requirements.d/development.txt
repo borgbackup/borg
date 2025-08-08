@@ -1,4 +1,4 @@
-setuptools>=64
+setuptools>=77.0.0
 setuptools_scm>=8
 pip
 virtualenv

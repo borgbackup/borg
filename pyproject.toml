@@ -160,6 +160,8 @@ ignore_missing_imports = true
 
 [tool.tox]
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
+# Important: when adding/removing Python versions here,
+#            also update the section "Test environments with different FUSE implementations" accordingly.
 env_list = ["py{310,311,312,313,314}-{none,fuse2,fuse3}", "docs", "ruff", "mypy", "bandit"]
 
 [tool.tox.env_run_base]
@@ -171,17 +173,56 @@ pass_env = ["*"]  # fakeroot -u needs some env vars
 [tool.tox.env_pkg_base]
 pass_env = ["*"]  # needed by tox4, so env vars are visible for building borg
 
-# Environment-specific configurations
-[tool.tox.env."py{310,311,312,313,314}-fuse2"]
+# Test environments with different FUSE implementations
+[tool.tox.env.py310-none]
+
+[tool.tox.env.py310-fuse2]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
-deps = ["-rrequirements.d/development.txt", "llfuse"]
+extras = ["llfuse"]
 
-[tool.tox.env."py{310,311,312,313,314}-fuse3"]
+[tool.tox.env.py310-fuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
-deps = ["-rrequirements.d/development.txt", "pyfuse3"]
+extras = ["pyfuse3"]
 
-[tool.tox.env."py{310,311,312,313,314}-none"]
-deps = ["-rrequirements.d/development.txt"]
+[tool.tox.env.py311-none]
+
+[tool.tox.env.py311-fuse2]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse"]
+
+[tool.tox.env.py311-fuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3"]
+
+[tool.tox.env.py312-none]
+
+[tool.tox.env.py312-fuse2]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse"]
+
+[tool.tox.env.py312-fuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3"]
+
+[tool.tox.env.py313-none]
+
+[tool.tox.env.py313-fuse2]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse"]
+
+[tool.tox.env.py313-fuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3"]
+
+[tool.tox.env.py314-none]
+
+[tool.tox.env.py314-fuse2]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse"]
+
+[tool.tox.env.py314-fuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3"]
 
 [tool.tox.env.ruff]
 skip_install = true

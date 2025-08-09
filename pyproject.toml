@@ -173,6 +173,8 @@ markers = [
 [tool.tox]
 min_version = "4.19"
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
+# Important: when adding/removing Python versions here,
+#            also update the section "Test environments with different FUSE implementations" accordingly.
 env_list = ["py{39,310,311,312,313,314}-{none,fuse2,fuse3}", "ruff"]
 
 # Base configuration for test environments
@@ -191,22 +193,65 @@ labels = ["test"]
 pass_env = ["*"]  # needed by tox4, so env vars are visible for building borg
 
 # Test environments with different FUSE implementations
-[tool.tox.env."py{39,310,311,312,313,314}-fuse2"]
-description = "Run tests with llfuse (FUSE2) implementation"
+[tool.tox.env.py39-none]
+
+[tool.tox.env.py39-fuse2]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
-deps = ["-rrequirements.d/development.txt", "llfuse"]
-labels = ["test", "fuse"]
+extras = ["llfuse"]
 
-[tool.tox.env."py{39,310,311,312,313,314}-fuse3"]
-description = "Run tests with pyfuse3 (FUSE3) implementation"
+[tool.tox.env.py39-fuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
-deps = ["-rrequirements.d/development.txt", "pyfuse3"]
-labels = ["test", "fuse"]
+extras = ["pyfuse3"]
 
-[tool.tox.env."py{39,310,311,312,313,314}-none"]
-description = "Run tests without FUSE support"
-deps = ["-rrequirements.d/development.txt"]
-labels = ["test", "nofuse"]
+[tool.tox.env.py310-none]
+
+[tool.tox.env.py310-fuse2]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse"]
+
+[tool.tox.env.py310-fuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3"]
+
+[tool.tox.env.py311-none]
+
+[tool.tox.env.py311-fuse2]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse"]
+
+[tool.tox.env.py311-fuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3"]
+
+[tool.tox.env.py312-none]
+
+[tool.tox.env.py312-fuse2]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse"]
+
+[tool.tox.env.py312-fuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3"]
+
+[tool.tox.env.py313-none]
+
+[tool.tox.env.py313-fuse2]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse"]
+
+[tool.tox.env.py313-fuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3"]
+
+[tool.tox.env.py314-none]
+
+[tool.tox.env.py314-fuse2]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse"]
+
+[tool.tox.env.py314-fuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3"]
 
 [tool.tox.env.ruff]
 description = "Run ruff linter and formatter"

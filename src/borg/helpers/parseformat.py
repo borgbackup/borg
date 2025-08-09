@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 from typing import ClassVar, Any, TYPE_CHECKING, Literal
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import partial
 from string import Formatter
 
@@ -155,10 +155,22 @@ def interval(s):
     except ValueError:
         seconds = -1
 
-    if seconds <= 0:
-        raise argparse.ArgumentTypeError(f'Invalid number "{number}": expected positive integer')
+    if seconds < 0:
+        raise argparse.ArgumentTypeError(f'Invalid number "{number}": expected nonnegative integer')
 
     return seconds
+
+
+def int_or_interval(s):
+    try:
+        return int(s)
+    except ValueError:
+        pass
+
+    try:
+        return timedelta(seconds=interval(s))
+    except argparse.ArgumentTypeError as e:
+        raise argparse.ArgumentTypeError(f"Value is neither an integer nor an interval: {e}")
 
 
 def ChunkerParams(s):

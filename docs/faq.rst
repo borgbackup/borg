@@ -150,7 +150,11 @@ My machine goes to sleep causing `Broken pipe`
 ----------------------------------------------
 
 While backing up your data over the network, your machine should not go to sleep.
-On macOS you can use `caffeinate` to avoid that.
+On Linux you can use `systemd-inhibit` to avoid that. On macOS you can use `caffeinate`.
+
+``systemd-inhibit borg create repo::archive path``
+
+``caffeinate -i borg create repo::archive path``
 
 How can I compare contents of an archive to my local filesystem?
 -----------------------------------------------------------------

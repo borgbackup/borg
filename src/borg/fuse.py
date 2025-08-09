@@ -57,6 +57,7 @@ def fuse_main():
         except KeyboardInterrupt:
             return SIGINT
         except:  # noqa
+            logger.exception("Exception in fuse_main:")
             return -1  # avoid colliding with signal numbers
         else:
             return None

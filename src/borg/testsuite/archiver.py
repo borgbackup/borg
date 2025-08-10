@@ -103,7 +103,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b'', binary_outpu
             try:
                 args = archiver.parse_args(list(args))
                 # argparse parsing may raise SystemExit when the command line is bad or
-                # actions that abort early (eg. --help) where given. Catch this and return
+                # Actions that abort early (e.g., --help) were given. Catch this and return
                 # the error code as-if we invoked a Borg binary.
             except SystemExit as e:
                 output_text.flush()
@@ -846,7 +846,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         shutil.rmtree(self.cache_path)
         self.cmd('info', self.repository_location)
 
-        # Needs confirmation: cache and security dir both gone (eg. another host or rm -rf ~)
+        # Needs confirmation: cache and security dir both gone (e.g., another host or rm -rf ~)
         shutil.rmtree(self.cache_path)
         shutil.rmtree(self.get_security_dir())
         if self.FORK_DEFAULT:

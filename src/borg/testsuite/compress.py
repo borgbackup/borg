@@ -48,7 +48,7 @@ def test_lz4_buffer_allocation(monkeypatch):
     # disable fallback to no compression on incompressible data
     monkeypatch.setattr(LZ4, 'decide', lambda always_compress: LZ4)
     # test with a rather huge data object to see if buffer allocation / resizing works
-    data = os.urandom(5 * 2**20) * 10  # 50MiB badly compressible data
+    data = os.urandom(5 * 2**20) * 10  # 50 MiB badly compressible data
     assert len(data) == 50 * 2**20
     c = Compressor('lz4')
     cdata = c.compress(data)
@@ -90,8 +90,8 @@ def test_autodetect_invalid():
 
 
 def test_zlib_compat():
-    # for compatibility reasons, we do not add an extra header for zlib,
-    # nor do we expect one when decompressing / autodetecting
+    # For compatibility reasons, we do not add an extra header for zlib,
+    # nor do we expect one when decompressing or autodetecting
     for level in range(10):
         c = get_compressor(name='zlib', level=level)
         cdata1 = c.compress(data)
@@ -109,7 +109,7 @@ def test_compressor():
         dict(name='lz4'),
         dict(name='zstd', level=1),
         dict(name='zstd', level=3),
-        # avoiding high zstd levels, memory needs unclear
+        # Avoiding high zstd levels; memory needs unclear
         dict(name='zlib', level=0),
         dict(name='zlib', level=6),
         dict(name='zlib', level=9),
@@ -118,7 +118,7 @@ def test_compressor():
         params_list += [
             dict(name='lzma', level=0),
             dict(name='lzma', level=6),
-            # we do not test lzma on level 9 because of the huge memory needs
+            # We do not test lzma on level 9 because of the huge memory needs
         ]
     for params in params_list:
         c = Compressor(**params)
@@ -216,12 +216,12 @@ def test_obfuscate():
 )
 def test_padme_obfuscation(data_length, expected_padding):
     compressor = Compressor(name="obfuscate", level=250, compressor=Compressor("none"))
-    # the innner compressor will add an inner header of 2 bytes, so we reduce the data length by 2 bytes
-    # to be able to use (almost) the same test cases as in master branch.
+    # The inner compressor will add an inner header of 2 bytes, so we reduce the data length by 2 bytes
+    # to be able to use (almost) the same test cases as in the master branch.
     data = b"x" * (data_length - 2)
     compressed = compressor.compress(data)
 
-    # the outer "obfuscate" pseudo-compressor adds an outer header of 6 bytes.
+    # The outer "obfuscate" pseudo-compressor adds an outer header of 6 bytes.
     expected_padded_size = 6 + data_length + expected_padding
 
     assert (

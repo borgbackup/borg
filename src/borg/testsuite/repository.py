@@ -57,7 +57,7 @@ class RepositoryTestCaseBase(BaseTestCase):
     def repo_dump(self, label=None):
         label = label + ': ' if label is not None else ''
         H_trans = {H(i): i for i in range(10)}
-        H_trans[None] = -1  # key == None appears in commits
+        H_trans[None] = -1  # key is None appears in commits
         tag_trans = {TAG_PUT: 'put', TAG_DELETE: 'del', TAG_COMMIT: 'comm'}
         for segment, fn in self.repository.io.segment_iterator():
             for tag, key, offset, size in self.repository.io.iter_objects(segment):
@@ -84,8 +84,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
                 self.assert_equal(repository2.get(H(x)), b'SOMEDATA')
 
     def test2(self):
-        """Test multiple sequential transactions
-        """
+        """Test multiple sequential transactions."""
         self.repository.put(H(0), b'foo')
         self.repository.put(H(1), b'foo')
         self.repository.commit(compact=False)
@@ -95,8 +94,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.assert_equal(self.repository.get(H(1)), b'bar')
 
     def test_consistency(self):
-        """Test cache consistency
-        """
+        """Test cache consistency."""
         self.repository.put(H(0), b'foo')
         self.assert_equal(self.repository.get(H(0)), b'foo')
         self.repository.put(H(0), b'foo2')
@@ -107,8 +105,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.assert_raises(Repository.ObjectNotFound, lambda: self.repository.get(H(0)))
 
     def test_consistency2(self):
-        """Test cache consistency2
-        """
+        """Test cache consistency 2."""
         self.repository.put(H(0), b'foo')
         self.assert_equal(self.repository.get(H(0)), b'foo')
         self.repository.commit(compact=False)
@@ -118,8 +115,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.assert_equal(self.repository.get(H(0)), b'foo')
 
     def test_overwrite_in_same_transaction(self):
-        """Test cache consistency2
-        """
+        """Test cache consistency 2."""
         self.repository.put(H(0), b'foo')
         self.repository.put(H(0), b'foo2')
         self.repository.commit(compact=False)
@@ -181,7 +177,7 @@ class RepositoryTestCase(RepositoryTestCaseBase):
         self.repository.delete(H(0))
 
 class LocalRepositoryTestCase(RepositoryTestCaseBase):
-    # test case that doesn't work with remote repositories
+    # Test case that doesn't work with remote repositories.
 
     def _assert_sparse(self):
         # The superseded 123456... PUT

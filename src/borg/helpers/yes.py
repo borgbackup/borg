@@ -17,34 +17,34 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
         falsish=FALSISH, truish=TRUISH, defaultish=DEFAULTISH,
         default=False, retry=True, env_var_override=None, ofile=None, input=input, prompt=True,
         msgid=None):
-    """Output <msg> (usually a question) and let user input an answer.
-    Qualifies the answer according to falsish, truish and defaultish as True, False or <default>.
-    If it didn't qualify and retry is False (no retries wanted), return the default [which
-    defaults to False]. If retry is True let user retry answering until answer is qualified.
+    """Output <msg> (usually a question) and let the user input an answer.
+    Qualifies the answer according to falsish, truish, and defaultish as True, False, or <default>.
+    If it does not qualify and retry is False (no retries wanted), return the default [which
+    defaults to False]. If retry is True, let the user retry answering until the answer is qualified.
 
-    If env_var_override is given and this var is present in the environment, do not ask
-    the user, but just use the env var contents as answer as if it was typed in.
-    Otherwise read input from stdin and proceed as normal.
-    If EOF is received instead an input or an invalid input without retry possibility,
+    If env_var_override is given and this variable is present in the environment, do not ask
+    the user, but use the environment variable's contents as the answer as if it were typed in.
+    Otherwise, read input from stdin and proceed as normal.
+    If EOF is received instead of input, or an invalid input occurs without the possibility to retry,
     return default.
 
-    :param msg: introducing message to output on ofile, no \n is added [None]
-    :param retry_msg: retry message to output on ofile, no \n is added [None]
-    :param false_msg: message to output before returning False [None]
-    :param true_msg: message to output before returning True [None]
-    :param default_msg: message to output before returning a <default> [None]
-    :param invalid_msg: message to output after a invalid answer was given [None]
-    :param env_msg: message to output when using input from env_var_override ['{} (from {})'],
-           needs to have 2 placeholders for answer and env var name
-    :param falsish: sequence of answers qualifying as False
-    :param truish: sequence of answers qualifying as True
-    :param defaultish: sequence of answers qualifying as <default>
-    :param default: default return value (defaultish answer was given or no-answer condition) [False]
-    :param retry: if True and input is incorrect, retry. Otherwise return default. [True]
-    :param env_var_override: environment variable name [None]
-    :param ofile: output stream [sys.stderr]
-    :param input: input function [input from builtins]
-    :return: boolean answer value, True or False
+    :param msg: introductory message to output on ofile; no \n is added. [None]
+    :param retry_msg: retry message to output on ofile; no \n is added. [None]
+    :param false_msg: message to output before returning False. [None]
+    :param true_msg: message to output before returning True. [None]
+    :param default_msg: message to output before returning the default value. [None]
+    :param invalid_msg: message to output after an invalid answer was given. [None]
+    :param env_msg: message to output when using input from env_var_override ['{} (from {})'];
+           needs to have two placeholders for the answer and the environment variable name.
+    :param falsish: sequence of answers qualifying as False.
+    :param truish: sequence of answers qualifying as True.
+    :param defaultish: sequence of answers qualifying as <default>.
+    :param default: default return value (defaultish answer was given or no-answer condition). [False]
+    :param retry: If True and input is incorrect, retry; otherwise return default. [True]
+    :param env_var_override: environment variable name. [None]
+    :param ofile: output stream. [sys.stderr]
+    :param input: input function. [builtins.input]
+    :return: boolean answer value, True or False.
     """
     def output(msg, msg_type, is_prompt=False, **kwargs):
         json_output = getattr(logging.getLogger('borg'), 'json', False)
@@ -62,8 +62,8 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
                 print(msg, file=ofile)
 
     msgid = msgid or env_var_override
-    # note: we do not assign sys.stderr as default above, so it is
-    # really evaluated NOW,  not at function definition time.
+    # Note: We do not assign sys.stderr as the default above, so it is
+    # evaluated now, not at function definition time.
     if ofile is None:
         ofile = sys.stderr
     if default not in (True, False):
@@ -84,7 +84,7 @@ def yes(msg=None, false_msg=None, true_msg=None, default_msg=None,
                 if answer == ERROR:  # for testing purposes
                     raise UnicodeDecodeError("?", b"?", 0, 1, "?")  # args don't matter
             except EOFError:
-                # avoid defaultish[0], defaultish could be empty
+                # Avoid defaultish[0]; defaultish could be empty.
                 answer = truish[0] if default else falsish[0]
             except UnicodeDecodeError:
                 answer = ERROR

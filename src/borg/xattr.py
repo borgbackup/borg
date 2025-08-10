@@ -39,8 +39,7 @@ if sys.platform.startswith('linux'):
 
 
 def is_enabled(path=None):
-    """Determine if xattr is enabled on the filesystem
-    """
+    """Determine if xattr is enabled on the filesystem."""
     with tempfile.NamedTemporaryFile(dir=path, prefix='borg-tmp') as f:
         fd = f.fileno()
         name, value = b'user.name', b'value'
@@ -66,7 +65,7 @@ def get_all(path, follow_symlinks=False):
     and only applies when *path* is not an open file descriptor.
 
     The returned mapping maps xattr names (bytes) to values (bytes or None).
-    None indicates, as a xattr value, an empty value, i.e. a value of length zero.
+    None indicates, as an xattr value, an empty value, i.e. a value of length zero.
     """
     if isinstance(path, str):
         path = os.fsencode(path)
@@ -75,18 +74,18 @@ def get_all(path, follow_symlinks=False):
         names = listxattr(path, follow_symlinks=follow_symlinks)
         for name in names:
             try:
-                # xattr name is a bytes object, we directly use it.
-                # if we get an empty xattr value (b''), we store None into the result dict -
-                # borg always did it like that...
+                # xattr name is a bytes object; we directly use it.
+                # If we get an empty xattr value (b''), we store None into the result dict—
+                # Borg has always done it like that.
                 result[name] = getxattr(path, name, follow_symlinks=follow_symlinks) or None
             except OSError as e:
-                # note: platform.xattr._check has already made a nice exception e with errno, msg, path/fd
-                if e.errno in (ENOATTR, ):  # errors we just ignore silently
-                    # ENOATTR: a race has happened: xattr names were deleted after list.
+                # Note: platform.xattr._check has already made a nice exception e with errno, msg, path/fd
+                if e.errno in (ENOATTR, ):  # errors we ignore silently
+                    # ENOATTR: a race has happened: xattr names were deleted after listing.
                     pass
                 else:  # all others: warn, skip this single xattr name, continue processing other xattrs
                     # EPERM: we were not permitted to read this attribute
-                    # EINVAL: maybe xattr name is invalid or other issue, #6988
+                    # EINVAL: maybe the xattr name is invalid or other issue, #6988
                     logger.warning('when getting extended attribute %s: %s', name.decode(errors='replace'), str(e))
     except OSError as e:
         if e.errno in (errno.ENOTSUP, errno.EPERM):
@@ -105,8 +104,8 @@ def set_all(path, xattrs, follow_symlinks=False):
     *path* can either be a path (str or bytes) or an open file descriptor (int).
     *follow_symlinks* indicates whether symlinks should be followed
     and only applies when *path* is not an open file descriptor.
-    *xattrs* is mapping maps xattr names (bytes) to values (bytes or None).
-    None indicates, as a xattr value, an empty value, i.e. a value of length zero.
+    *xattrs* is a mapping that maps xattr names (bytes) to values (bytes or None).
+    None indicates, as an xattr value, an empty value, i.e. a value of length zero.
 
     Return warning status (True means a non-fatal exception has happened and was dealt with).
     """
@@ -124,8 +123,8 @@ def set_all(path, xattrs, follow_symlinks=False):
             if e.errno == errno.E2BIG:
                 err_str = 'too big for this filesystem (%s)' % str(e)
             elif e.errno == errno.ENOSPC:
-                # ext4 reports ENOSPC when trying to set an xattr with >4kiB while ext4 can only support 4kiB xattrs
-                # (in this case, this is NOT a "disk full" error, just a ext4 limitation).
+                # ext4 reports ENOSPC when trying to set an xattr with >4 KiB while ext4 can only support 4 KiB xattrs
+                # (in this case, this is NOT a "disk full" error, just an ext4 limitation).
                 err_str = 'fs full or xattr too big? [xattr len = %d] (%s)' % (len(v), str(e))
             else:
                 # generic handler

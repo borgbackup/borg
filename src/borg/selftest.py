@@ -2,16 +2,16 @@
 #       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
 
 """
-Self testing module
+Self-testing module
 ===================
 
 The selftest() function runs a small test suite of relatively fast tests that are meant to discover issues
 with the way Borg was compiled or packaged and also bugs in Borg itself.
 
-These tests are a subset of the borg/testsuite and are run with Pythons built-in unittest, hence none of
+These tests are a subset of the borg/testsuite and are run with Python's built-in unittest, hence none of
 the tests used for this can or should be ported to py.test currently.
 
-To assert that self test discovery works correctly the number of tests is kept in the SELFTEST_COUNT
+To assert that self-test discovery works correctly the number of tests is kept in the SELFTEST_COUNT
 variable. SELFTEST_COUNT must be updated if new tests are added or removed to or from any of the tests
 used here.
 """
@@ -68,7 +68,7 @@ def selftest(logger):
     for test_case in SELFTEST_CASES:
         module = sys.modules[test_case.__module__]
         # a normal borg user does not have pytest installed, we must not require it in the test modules used here.
-        # note: this only detects the usual toplevel import
+        # Note: this only detects the usual top-level import
         assert 'pytest' not in dir(module), "pytest must not be imported in %s" % module.__name__
         test_suite.addTest(defaultTestLoader.loadTestsFromTestCase(test_case))
     test_suite.run(result)

@@ -1,6 +1,6 @@
 from packaging.version import parse as parse_version
 
-# IMPORTANT keep imports from borg here to a minimum because our testsuite depends on
+# IMPORTANT keep imports from borg here to a minimum because our test suite depends on
 # being able to import borg.constants and then monkey patching borg.constants.PBKDF2_ITERATIONS
 from ._version import version as __version__
 

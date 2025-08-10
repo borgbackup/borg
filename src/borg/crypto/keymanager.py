@@ -10,7 +10,7 @@ from .key import KeyfileKey, KeyfileNotFoundError, RepoKeyNotFoundError, KeyBlob
 
 
 class NotABorgKeyFile(Error):
-    """This file is not a borg key backup, aborting."""
+    """This file is not a Borg key backup, aborting."""
     exit_mcode = 43
 
 

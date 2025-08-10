@@ -7,14 +7,14 @@ from borg.helpers import safe_unlink
 from borg.platformflags import is_win32
 
 """
-platform base module
+Platform base module
 ====================
 
 Contains platform API implementations based on what Python itself provides. More specific
 APIs are stubs in this module.
 
-When functions in this module use platform APIs themselves they access the public
-platform API: that way platform APIs provided by the platform-specific support module
+When functions in this module use platform APIs themselves, they access the public
+platform API; that way, platform APIs provided by the platform-specific support module
 are correctly composed into the base functionality.
 """
 
@@ -45,7 +45,7 @@ def getxattr(path, name, *, follow_symlinks=False):
     *follow_symlinks* indicates whether symlinks should be followed
     and only applies when *path* is not an open file descriptor.
     """
-    # as this base dummy implementation returns [] from listxattr,
+    # As this base dummy implementation returns [] from listxattr,
     # it must raise here for any given name:
     raise OSError(ENOATTR, os.strerror(ENOATTR), path)
 
@@ -55,7 +55,7 @@ def setxattr(path, name, value, *, follow_symlinks=False):
     Write xattr on *path*.
 
     *path* can either be a path (bytes) or an open file descriptor (int).
-    *name* is the name of the xattr to read (bytes).
+    *name* is the name of the xattr to write (bytes).
     *value* is the value to write (bytes).
     *follow_symlinks* indicates whether symlinks should be followed
     and only applies when *path* is not an open file descriptor.
@@ -64,18 +64,18 @@ def setxattr(path, name, value, *, follow_symlinks=False):
 
 def acl_get(path, item, st, numeric_ids=False, fd=None):
     """
-    Saves ACL Entries
+    Save ACL entries.
 
-    If `numeric_ids` is True the user/group field is not preserved only uid/gid
+    If `numeric_ids` is True, the user/group field is not preserved; only uid/gid.
     """
 
 
 def acl_set(path, item, numeric_ids=False, fd=None):
     """
-    Restore ACL Entries
+    Restore ACL entries.
 
-    If `numeric_ids` is True the stored uid/gid is used instead
-    of the user/group names
+    If `numeric_ids` is True, the stored uid/gid is used instead
+    of the user/group names.
     """
 
 
@@ -96,7 +96,7 @@ def get_flags(path, st, fd=None):
 
 def sync_dir(path):
     if is_win32:
-        # Opening directories is not supported on windows.
+        # Opening directories is not supported on Windows.
         # TODO: do we need to handle this in some other way?
         return
     fd = os.open(path, os.O_RDONLY)
@@ -143,7 +143,7 @@ class SyncFile:
 
     Calling SyncFile(path) for an existing path will raise FileExistsError, see comment in __init__.
 
-    TODO: Use F_FULLSYNC on OSX.
+    TODO: Use F_FULLSYNC on macOS.
     TODO: A Windows implementation should use CreateFile with FILE_FLAG_WRITE_THROUGH.
     """
 
@@ -208,7 +208,7 @@ class SaveFile:
     atomically and won't become corrupted, even on power failures or
     crashes (for caveats see SyncFile).
 
-    SaveFile can safely by used in parallel (e.g. by multiple processes) to write
+    SaveFile can safely be used in parallel (e.g. by multiple processes) to write
     to the same target path. Whatever writer finishes last (executes the os.replace
     last) "wins" and has successfully written its content to the target path.
     Internally used temporary files are created in the target directory and are
@@ -249,9 +249,9 @@ class SaveFile:
 
 
 def swidth(s):
-    """terminal output width of string <s>
+    """Terminal output width of string <s>.
 
-    For western scripts, this is just len(s), but for cjk glyphs, 2 cells are used.
+    For Western scripts, this is just len(s), but for CJK glyphs, 2 cells are used.
     """
     return len(s)
 
@@ -277,17 +277,17 @@ def getfqdn(name=''):
     return name
 
 
-# for performance reasons, only determine hostname / fqdn / hostid once.
-# XXX this sometimes requires live internet access for issuing a DNS query in the background.
+# For performance reasons, only determine hostname / FQDN / host ID once.
+# XXX This sometimes requires live internet access for issuing a DNS query in the background.
 hostname = socket.gethostname()
 fqdn = getfqdn(hostname)
-# some people put the fqdn into /etc/hostname (which is wrong, should be the short hostname)
-# fix this (do the same as "hostname --short" cli command does internally):
+# Some people put the FQDN into /etc/hostname (which is wrong; it should be the short hostname).
+# Fix this (do the same as "hostname --short" CLI command does internally):
 hostname = hostname.split('.')[0]
 
-# uuid.getnode() is problematic in some environments (e.g. OpenVZ, see #3968) where the virtual MAC address
+# uuid.getnode() is problematic in some environments (e.g., OpenVZ, see #3968) where the virtual MAC address
 # is all-zero. uuid.getnode falls back to returning a random value in that case, which is not what we want.
-# thus, we offer BORG_HOST_ID where a user can set an own, unique id for each of his hosts.
+# Thus, we offer BORG_HOST_ID where a user can set an own, unique ID for each of his hosts.
 hostid = os.environ.get('BORG_HOST_ID')
 if not hostid:
     hostid = f'{fqdn}@{uuid.getnode()}'

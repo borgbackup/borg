@@ -1,9 +1,9 @@
-# borg cli interface / toplevel archiver code
+# Borg CLI interface / top-level archiver code
 
 import sys
 import traceback
 
-# quickfix to disallow running borg with assertions switched off
+# Quick fix to disallow running Borg with assertions switched off
 try:
     assert False
 except AssertionError:
@@ -98,9 +98,9 @@ try:
     from .selftest import selftest
     from .upgrader import AtticRepositoryUpgrader, BorgRepositoryUpgrader
 except BaseException:
-    # an unhandled exception in the try-block would cause the borg cli command to exit with rc 1 due to python's
-    # default behavior, see issue #4424.
-    # as borg defines rc 1 as WARNING, this would be a mismatch, because a crash should be an ERROR (rc 2).
+    # An unhandled exception in the try-block would cause the Borg CLI command to exit with rc 1 due to Python's
+    # default behavior; see issue #4424.
+    # As Borg defines rc 1 as WARNING, this would be a mismatch, because a crash should be an ERROR (rc 2).
     traceback.print_exc()
     sys.exit(2)  # == EXIT_ERROR
 
@@ -160,7 +160,7 @@ def with_repository(fake=False, invert_fake=False, create=False, lock=True,
     # `nonlocal` statement to access `lock` as modifications would also
     # affect the scope outside of `wrapper`. Subsequent calls would
     # only see the overwritten value of `lock`, not the original one.
-    # The solution is to define a place holder variable `_lock` to
+    # The solution is to define a placeholder variable `_lock` to
     # propagate the value into `wrapper`.
     _lock = lock
 
@@ -5316,7 +5316,7 @@ class Archiver:
         selftest(logger)
 
     def _setup_implied_logging(self, args):
-        """ turn on INFO level logging for args that imply that they will produce output """
+        """Turn on INFO level logging for args that imply that they will produce output."""
         # map of option name to name of logger for that option
         option_logger = {
             'output_list': 'borg.output.list',

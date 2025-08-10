@@ -1,33 +1,33 @@
-"""logging facilities
+"""Logging facilities.
 
-The way to use this is as follows:
+How to use:
 
-* each module declares its own logger, using:
+- Each module declares its own logger, using:
 
     from .logger import create_logger
     logger = create_logger()
 
-* then each module uses logger.info/warning/debug/etc according to the
+- Then each module uses logger.info/warning/debug/etc. according to the
   level it believes is appropriate:
 
     logger.debug('debugging info for developers or power users')
     logger.info('normal, informational output')
-    logger.warning('warn about a non-fatal error or sth else')
+    logger.warning('warn about a non-fatal error or something else')
     logger.error('a fatal error')
 
-  ... and so on. see the `logging documentation
+  See the `logging documentation
   <https://docs.python.org/3/howto/logging.html#when-to-use-logging>`_
-  for more information
+  for more information.
 
-* console interaction happens on stderr, that includes interactive
-  reporting functions like `help`, `info` and `list`
+- Console interaction happens on stderr; that includes interactive
+  reporting functions like `help`, `info`, and `list`.
 
-* ...except ``input()`` is special, because we can't control the
-  stream it is using, unfortunately. we assume that it won't clutter
-  stdout, because interaction would be broken then anyways
+- ...except ``input()`` is special, because we cannot control the
+  stream it uses. We assume that it will not clutter stdout, because
+  interaction would be broken otherwise.
 
-* what is output on INFO level is additionally controlled by commandline
-  flags
+- What is output at the INFO level is additionally controlled by command-line
+  flags.
 """
 
 import inspect
@@ -60,16 +60,16 @@ def _log_warning(message, category, filename, lineno, file=None, line=None):
 
 
 def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', level='info', is_serve=False, json=False):
-    """setup logging module according to the arguments provided
+    """Set up the logging module according to the provided arguments.
 
-    if conf_fname is given (or the config file name can be determined via
-    the env_var, if given): load this logging configuration.
+    If conf_fname is given (or the config file name can be determined via
+    env_var, if given), load that logging configuration.
 
-    otherwise, set up a stream handler logger on stderr (by default, if no
+    Otherwise, set up a stream handler logger on stderr (by default, if no
     stream is provided).
 
-    if is_serve == True, we configure a special log format as expected by
-    the borg client log message interceptor.
+    If is_serve is True, configure a special log format as expected by
+    the Borg client log message interceptor.
     """
     global configured
     err_msg = None
@@ -123,9 +123,9 @@ def setup_logging(stream=None, conf_fname=None, env_var='BORG_LOGGING_CONF', lev
 
 
 def find_parent_module():
-    """find the name of the first module calling this module
+    """Find the name of the first module calling this module.
 
-    if we cannot find it, we return the current module's name
+    If it cannot be found, return the current module's name
     (__name__) instead.
     """
     try:
@@ -142,18 +142,18 @@ def find_parent_module():
 
 
 def create_logger(name=None):
-    """lazily create a Logger object with the proper path, which is returned by
-    find_parent_module() by default, or is provided via the commandline
+    """Lazily create a Logger object with the proper path, which is returned by
+    find_parent_module() by default, or is provided via the command-line.
 
-    this is really a shortcut for:
+    This is really a shortcut for:
 
         logger = logging.getLogger(__name__)
 
-    we use it to avoid errors and provide a more standard API.
+    We use it to avoid errors and provide a more standard API.
 
-    We must create the logger lazily, because this is usually called from
-    module level (and thus executed at import time - BEFORE setup_logging()
-    was called). By doing it lazily we can do the setup first, we just have to
+    We must create the logger lazily because this is usually called from
+    module level (and thus executed at import time—before setup_logging()
+    is called). By doing it lazily we can do the setup first; we just have to
     be careful not to call any logger methods before the setup_logging() call.
     If you try, you'll get an exception.
     """

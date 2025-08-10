@@ -219,20 +219,20 @@ def backup_io_iter(iterator):
 
 def stat_update_check(st_old, st_curr):
     """
-    this checks for some race conditions between the first filename-based stat()
-    we did before dispatching to the (hopefully correct) file type backup handler
-    and the (hopefully) fd-based fstat() we did in the handler.
+    This checks for race conditions between the first filename-based stat()
+    performed before dispatching to the (hopefully correct) file type backup handler
+    and the (hopefully) fd-based fstat() performed in the handler.
 
-    if there is a problematic difference (e.g. file type changed), we rather
-    skip the file than being tricked into a security problem.
+    If there is a problematic difference (e.g., the file type changed), we would rather
+    skip the file than risk a security problem.
 
-    such races should only happen if:
-    - we are backing up a live filesystem (no snapshot, not inactive)
-    - if files change due to normal fs activity at an unfortunate time
-    - if somebody is doing an attack against us
+    Such races should only happen if:
+    - We are backing up a live filesystem (no snapshot, not inactive).
+    - Files change due to normal fs activity at an unfortunate time.
+    - Somebody is performing an attack against us.
     """
-    # assuming that a file type change implicates a different inode change AND that inode numbers
-    # are not duplicate in a short timeframe, this check is redundant and solved by the ino check:
+    # assuming that a file type change implies a different inode change AND that inode numbers
+    # are not duplicated in a short timeframe, this check is redundant and solved by the ino check:
     if stat.S_IFMT(st_old.st_mode) != stat.S_IFMT(st_curr.st_mode):
         # in this case, we dispatched to wrong handler - abort
         raise BackupRaceConditionError('file type changed (race condition), skipping file')

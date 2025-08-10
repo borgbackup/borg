@@ -37,22 +37,22 @@ AUTHENTICATED_NO_KEY = 'authenticated_no_key' in helpers.workarounds
 
 
 class NoPassphraseFailure(Error):
-    """can not acquire a passphrase: {}"""
+    """Cannot acquire a passphrase: {}"""
     exit_mcode = 50
 
 
 class PasscommandFailure(Error):
-    """passcommand supplied in BORG_PASSCOMMAND failed: {}"""
+    """Passcommand supplied in BORG_PASSCOMMAND failed: {}"""
     exit_mcode = 51
 
 
 class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."""
+    """Passphrase supplied via BORG_PASSPHRASE, by BORG_PASSCOMMAND, or via BORG_PASSPHRASE_FD is incorrect."""
     exit_mcode = 52
 
 
 class PasswordRetriesExceeded(Error):
-    """exceeded the maximum password retries"""
+    """Exceeded the maximum password retries."""
     exit_mcode = 53
 
 
@@ -193,7 +193,7 @@ class KeyBase:
     chunk_seed = None
 
     # Whether this *particular instance* is encrypted from a practical point of view,
-    # i.e. when it's using encryption with a empty passphrase, then
+    # i.e. when it's using encryption with an empty passphrase, then
     # that may be *technically* called encryption, but for all intents and purposes
     # that's as good as not encrypting in the first place, and this member should be False.
     #
@@ -212,8 +212,7 @@ class KeyBase:
         self.tam_required = True
 
     def id_hash(self, data):
-        """Return HMAC hash using the "id" HMAC key
-        """
+        """Return HMAC using the "id" HMAC key."""
 
     def encrypt(self, chunk):
         pass
@@ -297,7 +296,7 @@ class KeyBase:
         """Unpack msgpacked *data* and return (object, did_verify, salt)."""
         tam_required = self.tam_required
         if force_tam_not_required and tam_required:
-            # for a long time, borg only checked manifest for "tam_required" and
+            # For a long time, Borg only checked the manifest for "tam_required" and
             # people might have archives without TAM, so don't be too annoyingly loud here:
             logger.debug('Archive authentication DISABLED.')
             tam_required = False
@@ -394,7 +393,7 @@ def random_blake2b_256_key():
     # and len(block) >= len(state), hence wide.)
     # In other words, a key longer than 64 bytes would have simply no advantage, since the function
     # has no way of propagating more than 64 bytes of entropy internally.
-    # It's padded to a full block so that the key is never buffered internally by blake2b_update, ie.
+    # It's padded to a full block so that the key is never buffered internally by blake2b_update, i.e.
     # it remains in a single memory location that can be tracked and could be erased securely, if we
     # wanted to.
     return os.urandom(64) + bytes(64)
@@ -430,14 +429,14 @@ class ID_HMAC_SHA_256:
 
 class AESKeyBase(KeyBase):
     """
-    Common base class shared by KeyfileKey and PassphraseKey
+    Common base class shared by KeyfileKey and PassphraseKey.
 
-    Chunks are encrypted using 256bit AES in Counter Mode (CTR)
+    Chunks are encrypted using 256-bit AES in Counter Mode (CTR).
 
     Payload layout: TYPE(1) + HMAC(32) + NONCE(8) + CIPHERTEXT
 
-    To reduce payload size only 8 bytes of the 16 bytes nonce is saved
-    in the payload, the first 8 bytes are always zeros. This does not
+    To reduce payload size, only 8 bytes of the 16-byte nonce are saved
+    in the payload; the first 8 bytes are always zeros. This does not
     affect security but limits the maximum repository capacity to
     only 295 exabytes!
     """
@@ -520,7 +519,7 @@ class Passphrase(str):
     def env_passcommand(cls, default=None):
         passcommand = os.environ.get('BORG_PASSCOMMAND', None)
         if passcommand is not None:
-            # passcommand is a system command (not inside pyinstaller env)
+            # The passcommand is a system command (not inside the PyInstaller environment)
             env = prepare_subprocess_env(system=True)
             try:
                 passphrase = subprocess.check_output(shlex.split(passcommand), text=True, env=env)

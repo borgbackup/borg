@@ -10,7 +10,7 @@ from ..remote import InvalidRPCMethod
 from .low_level import bytes_to_long, long_to_bytes
 
 MAX_REPRESENTABLE_NONCE = 2**64 - 1
-NONCE_SPACE_RESERVATION = 2**28  # This in units of AES blocksize (16 bytes)
+NONCE_SPACE_RESERVATION = 2**28  # This is in units of AES block size (16 bytes)
 
 
 class NonceManager:
@@ -54,12 +54,12 @@ class NonceManager:
 
     def ensure_reservation(self, nonce, nonce_space_needed):
         """
-        Call this before doing encryption, give current, yet unused, integer IV as <nonce>
+        Call this before doing encryption; give the current, yet unused, integer IV as <nonce>
         and the amount of subsequent (counter-like) IVs needed as <nonce_space_needed>.
-        Return value is the IV (counter) integer you shall use for encryption.
+        The return value is the IV (counter) integer you should use for encryption.
 
-        Note: this method may return the <nonce> you gave, if a reservation for it exists or
-              can be established, so make sure you give a unused nonce.
+        Note: This method may return the <nonce> you gave if a reservation for it exists or
+              can be established, so make sure you give an unused nonce.
         """
         # Nonces may never repeat, even if a transaction aborts or the system crashes.
         # Therefore a part of the nonce space is reserved before any nonce is used for encryption.
@@ -67,16 +67,16 @@ class NonceManager:
         # against nonce reuse in crashes and transaction aborts. In that case the reservation still
         # persists and the whole reserved space is never reused.
         #
-        # Local storage on the client is used to protect against an attacker that is able to rollback the
+        # Local storage on the client is used to protect against an attacker that is able to roll back the
         # state of the server or can do arbitrary modifications to the repository.
-        # Storage on the server is used for the multi client use case where a transaction on client A is
+        # Storage on the server is used for the multi-client use case where a transaction on client A is
         # aborted and later client B writes to the repository.
         #
-        # This scheme does not protect against attacker who is able to rollback the state of the server
-        # or can do arbitrary modifications to the repository in the multi client usecase.
+        # This scheme does not protect against an attacker who is able to roll back the state of the server
+        # or can do arbitrary modifications to the repository in the multi-client use case.
 
         if self.end_of_nonce_reservation:
-            # we already got a reservation, if nonce_space_needed still fits everything is ok
+            # We already have a reservation; if nonce_space_needed still fits, everything is okay.
             next_nonce = nonce
             assert next_nonce <= self.end_of_nonce_reservation
             if next_nonce + nonce_space_needed <= self.end_of_nonce_reservation:

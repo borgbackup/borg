@@ -20,7 +20,7 @@ def parse_patternfile_line(line, roots, ie_commands, fallback):
     elif ie_command.cmd is IECommand.PatternStyle:
         fallback = ie_command.val
     else:
-        # it is some kind of include/exclude command
+        # It is some kind of include/exclude command.
         ie_commands.append(ie_command)
     return fallback
 
@@ -51,7 +51,7 @@ class ArgparsePatternFileAction(argparse.Action):
 
     def __call__(self, parser, args, values, option_string=None):
         """Load and parse patterns from a file.
-        Lines empty or starting with '#' after stripping whitespace on both line ends are ignored.
+        Empty lines or lines starting with '#' (after stripping whitespace at both ends) are ignored.
         """
         filename = values[0]
         try:
@@ -81,7 +81,7 @@ class PatternMatcher:
         # Value to return from match function when none of the patterns match.
         self.fallback = fallback
 
-        # optimizations
+        # Optimizations
         self._path_full_patterns = {}  # full path -> return value
 
         # indicates whether the last match() call ended on a pattern for which
@@ -89,13 +89,13 @@ class PatternMatcher:
         # False when calling match().
         self.recurse_dir = None
 
-        # whether to recurse into directories when no match is found
+        # Whether to recurse into directories when no match is found
         # TODO: allow modification as a config option?
         self.recurse_dir_default = True
 
         self.include_patterns = []
 
-        # TODO: move this info to parse_inclexcl_command and store in PatternBase subclass?
+        # TODO: Move this info to parse_inclexcl_command and store it in a PatternBase subclass?
         self.is_include_cmd = {
             IECommand.Exclude: False,
             IECommand.ExcludeNoRecurse: False,
@@ -151,28 +151,28 @@ class PatternMatcher:
 
         """
         path = normalize_path(path).lstrip(os.path.sep)
-        # do a fast lookup for full path matches (note: we do not count such matches):
+        # Do a fast lookup for full path matches (note: we do not count such matches):
         non_existent = object()
         value = self._path_full_patterns.get(path, non_existent)
 
         if value is not non_existent:
-            # we have a full path match!
+            # We have a full path match!
             self.recurse_dir = command_recurses_dir(value)
             return self.is_include_cmd[value]
 
-        # this is the slow way, if we have many patterns in self._items:
+        # This is the slow path if we have many patterns in self._items:
         for (pattern, cmd) in self._items:
             if pattern.match(path, normalize=False):
                 self.recurse_dir = pattern.recurse_dir
                 return self.is_include_cmd[cmd]
 
-        # by default we will recurse if there is no match
+        # By default we will recurse if there is no match
         self.recurse_dir = self.recurse_dir_default
         return self.fallback
 
 
 def normalize_path(path):
-    """normalize paths for MacOS (but do nothing on other platforms)"""
+    """Normalize paths for macOS (no-op on other platforms)."""
     # HFS+ converts paths to a canonical form, so users shouldn't be required to enter an exact match.
     # Windows and Unix filesystems allow different forms, so users always have to enter an exact match.
     return unicodedata.normalize('NFD', path) if sys.platform == 'darwin' else path

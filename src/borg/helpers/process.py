@@ -53,9 +53,9 @@ def _daemonize():
 
 
 def daemonize():
-    """Detach process from controlling terminal and run in background
+    """Detach process from controlling terminal and run in background.
 
-    Returns: old and new get_process_id tuples
+    Returns: old and new get_process_id tuples.
     """
     with _daemonize() as (old_id, new_id):
         return old_id, new_id

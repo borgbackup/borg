@@ -1,7 +1,7 @@
-# Completions for borg
+# Completions for Borg
 # https://www.borgbackup.org/
 # Note:
-# Listing archives works on password protected repositories only if $BORG_PASSPHRASE is set.
+# Listing archives works on password-protected repositories only if $BORG_PASSPHRASE is set.
 # Install:
 # Copy this file to /usr/share/fish/vendor_completions.d/
 
@@ -19,7 +19,7 @@ complete -c borg -f -n __fish_is_first_token -a 'prune' -d 'Prune repository arc
 complete -c borg -f -n __fish_is_first_token -a 'compact' -d 'Free repository space'
 complete -c borg -f -n __fish_is_first_token -a 'info' -d 'Show archive details'
 complete -c borg -f -n __fish_is_first_token -a 'mount' -d 'Mount archive or a repository'
-complete -c borg -f -n __fish_is_first_token -a 'umount' -d 'Un-mount the mounted archive'
+complete -c borg -f -n __fish_is_first_token -a 'umount' -d 'Unmount the mounted archive'
 
 function __fish_borg_seen_key
     if __fish_seen_subcommand_from key
@@ -48,8 +48,8 @@ function __fish_borg_seen_benchmark
     end
     return 1
 end
-complete -c borg -f -n __fish_is_first_token -a 'benchmark' -d 'Benchmark borg operations'
-complete -c borg -f -n __fish_borg_seen_benchmark -a 'crud' -d 'Benchmark borg CRUD operations'
+complete -c borg -f -n __fish_is_first_token -a 'benchmark' -d 'Benchmark Borg operations'
+complete -c borg -f -n __fish_borg_seen_benchmark -a 'crud' -d 'Benchmark Borg CRUD operations'
 
 function __fish_borg_seen_help
     if __fish_seen_subcommand_from help

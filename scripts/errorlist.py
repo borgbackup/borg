@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# this script automatically generates the error list for the docs by
+# This script automatically generates the error list for the docs by
 # looking at the "Error" class and its subclasses.
 
 from textwrap import indent
@@ -14,14 +14,14 @@ def subclasses(cls):
     return set(direct_subclasses) | set(s for c in direct_subclasses for s in subclasses(c))
 
 
-# 0, 1, 2 are used for success, generic warning, generic error
-# 3..99 are available for specific errors
-# 100..127 are available for specific warnings
-# 128+ are reserved for signals
+# 0, 1, 2 are used for success, generic warning, generic error.
+# 3..99 are available for specific errors.
+# 100..127 are available for specific warnings.
+# 128+ are reserved for signals.
 free_error_rcs = set(range(EXIT_ERROR_BASE, EXIT_WARNING_BASE))  # 3 .. 99
 free_warning_rcs = set(range(EXIT_WARNING_BASE, EXIT_SIGNAL_BASE))  # 100 .. 127
 
-# these classes map to rc 2
+# These classes map to rc 2
 generic_error_rc_classes = set()
 generic_warning_rc_classes = set()
 
@@ -37,7 +37,7 @@ for cls in sorted(error_classes, key=lambda cls: (cls.__module__, cls.__qualname
     elif rc == 2:
         generic_error_rc_classes.add(cls.__qualname__)
     else:  # rc != 2
-        # if we did not intentionally map this to the generic error rc, this might be an issue:
+        # If we did not intentionally map this to the generic error rc, this might be an issue:
         print(f'ERROR: {rc} is not a free/available RC, but either duplicate or invalid')
 
 print()
@@ -55,7 +55,7 @@ for cls in sorted(warning_classes, key=lambda cls: (cls.__module__, cls.__qualna
     elif rc == 1:
         generic_warning_rc_classes.add(cls.__qualname__)
     else:  # rc != 1
-        # if we did not intentionally map this to the generic warning rc, this might be an issue:
+        # If we did not intentionally map this to the generic warning rc, this might be an issue:
         print(f'ERROR: {rc} is not a free/available RC, but either duplicate or invalid')
 
 print("\n")

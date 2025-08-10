@@ -10,16 +10,16 @@ $wmem = $xdistn * 256  # give the VM additional memory for workers [MB]
 def packages_debianoid(user)
   return <<-EOF
     export DEBIAN_FRONTEND=noninteractive
-    # this is to avoid grub asking about which device it should install to:
+    # This is to avoid GRUB asking which device it should install to:
     echo "set grub-pc/install_devices /dev/sda" | debconf-communicate
     apt-get -y -qq update
     apt-get -y -qq dist-upgrade
-    # for building borgbackup and dependencies:
+    # For building BorgBackup and dependencies:
     apt install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev libxxhash-dev pkg-config
     apt install -y libfuse-dev fuse || true
     apt install -y libfuse3-dev fuse3 || true
     apt install -y locales || true
-    # we need to give the prefix to support debian buster (no libxxhash.pc for pkg-config there):
+    # We need to give the prefix to support Debian Buster (no libxxhash.pc for pkg-config there):
     echo 'export BORG_LIBXXHASH_PREFIX=/usr' >> ~vagrant/.bash_profile
     sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
     usermod -a -G fuse #{user}
@@ -38,7 +38,7 @@ def packages_freebsd
     hostname freebsd
     # install all the (security and other) updates, base system
     freebsd-update --not-running-from-cron fetch install
-    # for building borgbackup and dependencies:
+    # For building BorgBackup and dependencies:
     pkg install -y liblz4 zstd pkgconf
     pkg install -y fusefs-libs || true
     pkg install -y fusefs-libs3 || true

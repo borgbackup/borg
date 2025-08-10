@@ -31,19 +31,19 @@ classifiers = [
 license = "BSD-3-Clause"
 license-files = ["LICENSE", "AUTHORS"]
 dependencies = [
-    # we are rather picky about msgpack versions, because a good working msgpack is
-    # very important for borg, see: https://github.com/borgbackup/borg/issues/3753
+    # We are rather picky about msgpack versions, because a good working msgpack is
+    # very important for Borg, see: https://github.com/borgbackup/borg/issues/3753
     # Please note:
-    # using any other msgpack version is not supported by borg development and
+    # Using any other msgpack version is not supported by Borg development and
     # any feedback related to issues caused by this will be ignored.
     "msgpack >=1.0.3, <=1.1.1",
     "packaging",
 ]
 
-# note for package maintainers: if you package borgbackup for distribution,
-# please (if available) add pyfuse3 (preferably) or llfuse as a *requirement*.
+# Note for package maintainers: If you package BorgBackup for distribution,
+# please (if available) add pyfuse3 (preferably) or llfuse as a requirement.
 # "borg mount" needs one of them to work.
-# if neither is available, do not require it, most of borgbackup will work.
+# If neither is available, do not require it; most of BorgBackup will work.
 [project.optional-dependencies]
 llfuse = ["llfuse >= 1.3.8"]
 pyfuse3 = ["pyfuse3 >= 3.1.1"]
@@ -97,7 +97,7 @@ select = ["E", "F"]
 #   F405 undefined or defined from star imports
 #   F811 redef of unused var
 
-# borg code style guidelines:
+# Borg code style guidelines:
 # Ignoring E203 due to https://github.com/PyCQA/pycodestyle/issues/373
 ignore = ["E203", "F405", "E402"]
 

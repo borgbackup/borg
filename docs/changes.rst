@@ -1232,7 +1232,7 @@ Fixes:
   fix potential memory leak with ssh: remote repository with partial extraction.
 - remove empty shadowed_segments lists, #5275
 - fix bad default: manifest.archives.list(consider_checkpoints=False),
-  fixes tracebacks / KeyErros for missing objects in ChunkIndex, #5668
+  fixes tracebacks / KeyErrors for missing objects in ChunkIndex, #5668
 
 New features:
 
@@ -1243,7 +1243,7 @@ New features:
   - detect all-zero chunks in read data in "buzhash" and "fixed" chunkers
   - cached_hash: use a small LRU cache to accelerate all-zero chunks hashing
   - use cached_hash also to generate all-zero replacement chunks
-- create --remote-buffer, add a upload buffer for remote repos, #5574
+- create --remote-buffer, add an upload buffer for remote repos, #5574
 - prune: keep oldest archive when retention target not met
 
 Other changes:
@@ -1255,7 +1255,7 @@ Other changes:
 - create: add repository location to --stats output, #5491
 - check: debug log the segment filename
 - delete: add a --list switch to borg delete, #5116
-- borg debug dump-hints - implemented to e.g. to look at shadow_index
+- borg debug dump-hints - implemented e.g. to look at shadow_index
 - Tab completion support for additional archives for 'borg delete'
 - refactor: have one borg.constants.zero all-zero bytes object
 - refactor shadow_index updating repo.put/delete, #5661, #5636.
@@ -1291,12 +1291,12 @@ Fixes:
 New features:
 
 - create: implement --paths-from-stdin and --paths-from-command, see #5492.
-  These switches read paths to archive from stdin. Delimiter can specified
-  by --paths-delimiter=DELIM. Paths read will be added honoring every
-  option but exclusion options and --one-file-system. borg won't recurse
+  These switches read paths to archive from stdin. Delimiter can be specified
+  by --paths-delimiter=DELIM. Paths read will be added honoring all
+  options except exclusion options and --one-file-system. borg won't recurse
   into directories.
 - 'obfuscate' pseudo compressor obfuscates compressed chunk size in repo
-- add pyfuse3 (successor of llfuse) as an alternative lowlevel fuse
+- add pyfuse3 (successor of llfuse) as an alternative low-level FUSE
   implementation to llfuse (deprecated), #5407.
   FUSE implementation can be switched via env var BORG_FUSE_IMPL.
 - allow appending to the files cache filename with BORG_FILES_CACHE_SUFFIX

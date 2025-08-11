@@ -3125,19 +3125,19 @@ class Archiver:
         This can be useful for browsing or restoring individual files.
 
         When restoring, take into account that the current FUSE implementation does
-        not support special fs flags and ACLs.
+        not support special filesystem flags and ACLs.
 
         When mounting a repository, the top directories will be named like the
         archives and the directory structure below these will be loaded on-demand from
         the repository when entering these directories, so expect some delay.
 
         Unless the ``--foreground`` option is given the command will run in the
-        background until the filesystem is ``umounted``.
+        background until the filesystem is ``unmounted``.
 
         Performance tips:
 
         - when doing a "whole repository" mount:
-          do not enter archive dirs if not needed, this avoids on-demand loading.
+          do not enter archive directories if not needed; this avoids on-demand loading.
         - only mount a specific archive, not the whole repository.
         - only mount specific paths in a specific archive, not the complete archive.
 
@@ -3160,7 +3160,7 @@ class Archiver:
         uid=1000,gid=1000``).
 
         The man page references ``user_id`` and ``group_id`` mount options
-        (implemented by fuse) which specify the user and group id of the mount owner
+        (implemented by FUSE) which specify the user and group id of the mount owner
         (aka, the user who does the mounting). It is set automatically by libfuse (or
         the filesystem if libfuse is not used). However, you should not specify these
         manually. Unlike the ``uid`` and ``gid`` mount options which affect all files,
@@ -3170,7 +3170,7 @@ class Archiver:
         Additional mount options supported by borg:
 
         - ``versions``: when used with a repository mount, this gives a merged, versioned
-          view of the files in the archives. EXPERIMENTAL, layout may change in future.
+          view of the files in the archives. EXPERIMENTAL; the layout may change in the future.
         - ``allow_damaged_files``: by default damaged files (where missing chunks were
           replaced with runs of zeros by ``borg check --repair``) are not readable and
           return EIO (I/O error). Set this option to read such files.
@@ -3202,7 +3202,7 @@ class Archiver:
         subparsers = parser.add_subparsers(title='required arguments', metavar='<command>')
 
         # borg benchmark
-        benchmark_epilog = process_epilog("These commands do various benchmarks.")
+        benchmark_epilog = process_epilog("These commands perform various benchmarks.")
 
         subparser = subparsers.add_parser('benchmark', parents=[mid_common_parser], add_help=False,
                                           description='benchmark command',
@@ -3216,7 +3216,7 @@ class Archiver:
         bench_crud_epilog = process_epilog("""
         This command benchmarks borg CRUD (create, read, update, delete) operations.
 
-        It creates input data below the given PATH and backups this data into the given REPO.
+        It creates input data below the given PATH and backs up this data into the given REPO.
         The REPO must already exist (it could be a fresh empty repo or an existing repo, the
         command will create / read / update / delete some archives named borg-benchmark-crud\\* there.
 
@@ -3232,17 +3232,17 @@ class Archiver:
         Also, due to the kind of content used, no compression is used in these benchmarks.
 
         C- == borg create (1st archive creation, no compression, do not use files cache)
-              C-Z- == all-zero files. full dedup, this is primarily measuring reader/chunker/hasher.
-              C-R- == random files. no dedup, measuring throughput through all processing stages.
+              C-Z- == all-zero files. full deduplication; this primarily measures reader/chunker/hasher.
+              C-R- == random files. no deduplication, measuring throughput through all processing stages.
 
         R- == borg extract (extract archive, dry-run, do everything, but do not write files to disk)
-              R-Z- == all zero files. Measuring heavily duplicated files.
+              R-Z- == all-zero files. Measuring heavily duplicated files.
               R-R- == random files. No duplication here, measuring throughput through all processing
               stages, except writing to disk.
 
         U- == borg create (2nd archive creation of unchanged input files, measure files cache speed)
               The throughput value is kind of virtual here, it does not actually read the file.
-              U-Z- == needs to check the 2 all-zero chunks' existence in the repo.
+              U-Z- == needs to check the two all-zero chunks' existence in the repo.
               U-R- == needs to check existence of a lot of different chunks in the repo.
 
         D- == borg delete archive (delete last remaining archive, measure deletion + compaction)
@@ -3250,7 +3250,7 @@ class Archiver:
               D-R- == many chunks to delete / many segments to compact/remove.
 
         Please note that there might be quite some variance in these measurements.
-        Try multiple measurements and having a otherwise idle machine (and network, if you use it).
+        Try multiple measurements and have an otherwise idle machine (and network, if you use it).
         """)
         subparser = benchmark_parsers.add_parser('crud', parents=[common_parser], add_help=False,
                                                  description=self.do_benchmark_crud.__doc__,
@@ -3263,13 +3263,13 @@ class Archiver:
                                type=location_validator(archive=False),
                                help='repository to use for benchmark (must exist)')
 
-        subparser.add_argument('path', metavar='PATH', help='path were to create benchmark input data')
+        subparser.add_argument('path', metavar='PATH', help='path where to create benchmark input data')
 
         # borg break-lock
         break_lock_epilog = process_epilog("""
         This command breaks the repository and cache locks.
-        Please use carefully and only while no borg process (on any machine) is
-        trying to access the Cache or the Repository.
+        Please use with care and only when no borg process (on any machine) is
+        trying to access the cache or the repository.
         """)
         subparser = subparsers.add_parser('break-lock', parents=[common_parser], add_help=False,
                                           description=self.do_break_lock.__doc__,
@@ -3324,7 +3324,7 @@ class Archiver:
         **Warning:** Please note that partial repository checks (i.e. running it with
         ``--max-duration``) can only perform non-cryptographic checksum checks on the
         segment files. A full repository check (i.e. without ``--max-duration``) can
-        also do a repository index check. Enabling partial repository checks excepts
+        also do a repository index check. Enabling partial repository checks excludes
         archive checks for the same reason. Therefore partial checks may be useful with
         very large repositories only where a full check would take too long.
 
@@ -3333,13 +3333,13 @@ class Archiver:
         data from the repository, decrypting and decompressing it. It is a complete
         cryptographic verification and hence very time consuming, but will detect any
         accidental and malicious corruption. Tamper-resistance is only guaranteed for
-        encrypted repositories against attackers without access to the keys. You can
-        not use ``--verify-data`` with ``--repository-only``.
+        encrypted repositories against attackers without access to the keys. You cannot
+        use ``--verify-data`` with ``--repository-only``.
 
         About repair mode
         +++++++++++++++++
 
-        The check command is a readonly task by default. If any corruption is found,
+        The check command is a read-only task by default. If any corruption is found,
         Borg will report the issue and proceed with checking. To actually repair the
         issues found, pass ``--repair``.
 
@@ -3440,7 +3440,7 @@ class Archiver:
         When using ``--verbose``, borg will output an estimate of the freed space.
 
         After upgrading borg (server) to 1.2+, you can use ``borg compact --cleanup-commits``
-        to clean up the numerous 17byte commit-only segments that borg 1.1 did not clean up
+        to clean up the numerous 17-byte commit-only segments that borg 1.1 did not clean up
         due to a bug. It is enough to do that once per repository. After cleaning up the
         commits, borg will also do a normal compaction.
 
@@ -3468,7 +3468,7 @@ class Archiver:
         For security reasons, this command only works on local repositories.
 
         To delete a config value entirely, use ``--delete``. To list the values
-        of the configuration file or the default values, use ``--list``.  To get an existing
+        of the configuration file or the default values, use ``--list``. To get an existing
         key, pass only the key name. To set a key, pass both the key name and
         the new value. Keys can be specified in the format "section.name" or
         simply "name"; the section will default to "repository" and "cache" for
@@ -3505,18 +3505,18 @@ class Archiver:
         create_epilog = process_epilog("""
         This command creates a backup archive containing all files found while recursively
         traversing all paths specified. Paths are added to the archive as they are given,
-        that means if relative paths are desired, the command has to be run from the correct
+        which means that if relative paths are desired, the command has to be run from the correct
         directory.
 
         The slashdot hack in paths (recursion roots) is triggered by using ``/./``:
-        ``/this/gets/stripped/./this/gets/archived`` means to process that fs object, but
+        ``/this/gets/stripped/./this/gets/archived`` means to process that filesystem object, but
         strip the prefix on the left side of ``./`` from the archived items (in this case,
         ``this/gets/archived`` will be the path in the archived item).
 
-        When giving '-' as path, borg will read data from standard input and create a
-        file 'stdin' in the created archive from that data. In some cases it's more
-        appropriate to use --content-from-command, however. See section *Reading from
-        stdin* below for details.
+        When giving '-' as a path, Borg will read data from standard input and create a
+        file 'stdin' in the created archive from that data. In some cases, it is more
+        appropriate to use ``--content-from-command``. See section "Reading from stdin"
+        below for details.
 
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
@@ -3536,33 +3536,33 @@ class Archiver:
         This comparison can operate in different modes as given by ``--files-cache``:
 
         - ctime,size,inode (default)
-        - mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+        - mtime,size,inode (default behavior of borg versions older than 1.1.0rc4)
         - ctime,size (ignore the inode number)
         - mtime,size (ignore the inode number)
         - rechunk,ctime (all files are considered modified - rechunk, cache ctime)
         - rechunk,mtime (all files are considered modified - rechunk, cache mtime)
         - disabled (disable the files cache, all files considered modified - rechunk)
 
-        inode number: better safety, but often unstable on network filesystems
+        inode number: better safety, but often unstable on network file systems
 
         Normally, detecting file modifications will take inode information into
         consideration to improve the reliability of file change detection.
-        This is problematic for files located on sshfs and similar network file
-        systems which do not provide stable inode numbers, such files will always
+        This is problematic for files located on SSHFS and similar network file
+        systems which do not provide stable inode numbers; such files will always
         be considered modified. You can use modes without `inode` in this case to
-        improve performance, but reliability of change detection might be reduced.
+        improve performance, but the reliability of change detection might be reduced.
 
         ctime vs. mtime: safety vs. speed
 
         - ctime is a rather safe way to detect changes to a file (metadata and contents)
-          as it can not be set from userspace. But, a metadata-only change will already
+          as it cannot be set from user space. However, a metadata-only change will already
           update the ctime, so there might be some unnecessary chunking/hashing even
-          without content changes. Some filesystems do not support ctime (change time).
-          E.g. doing a chown or chmod to a file will change its ctime.
+          without content changes. Some file systems do not support ctime (change time).
+          For example, doing a chown or chmod to a file will change its ctime.
         - mtime usually works and only updates if file contents were changed. But mtime
-          can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+          can be arbitrarily set from user space, e.g., to set mtime back to the same value
           it had before a content change happened. This can be used maliciously as well as
-          well-meant, but in both cases mtime based cache modes can be problematic.
+          well-meant, but in both cases mtime-based cache modes can be problematic.
 
         The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
 
@@ -3572,13 +3572,13 @@ class Archiver:
           This is not recommended unless you know what you're doing, as it could lead to
           inconsistent backups if files change during the backup process.
 
-        The mount points of filesystems or filesystem snapshots should be the same for every
+        The mount points of file systems or file system snapshots should be the same for every
         creation of a new archive to ensure fast operation. This is because the file cache that
-        is used to determine changed files quickly uses absolute filenames.
+        is used to determine changed files quickly uses absolute file names.
         If this is not possible, consider creating a bind mount to a stable location.
 
         The ``--progress`` option shows (from left to right) Original, Compressed and Deduplicated
-        (O, C and D, respectively), then the Number of files (N) processed so far, followed by
+        (O, C and D, respectively), then the number of files (N) processed so far, followed by
         the currently processed path.
 
         When using ``--stats``, you will get some statistics about how much data was
@@ -3606,15 +3606,15 @@ class Archiver:
         and not include any other contents of the containing folder, this can be enabled
         through using the ``--keep-exclude-tags`` option.
 
-        The ``-x`` or ``--one-file-system`` option excludes directories, that are mountpoints (and everything in them).
-        It detects mountpoints by comparing the device number from the output of ``stat()`` of the directory and its
+        The ``-x`` or ``--one-file-system`` option excludes directories that are mount points (and everything in them).
+        It detects mount points by comparing the device number from the output of ``stat()`` of the directory and its
         parent directory. Specifically, it excludes directories for which ``stat()`` reports a device number different
         from the device number of their parent.
-        In general: be aware that there are directories with device number different from their parent, which the kernel
-        does not consider a mountpoint and also the other way around.
-        Linux examples for this are bind mounts (possibly same device number, but always a mountpoint) and ALL
-        subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint).
-        macOS examples are the apfs mounts of a typical macOS installation.
+        In general: be aware that there are directories with device numbers different from their parent, which the kernel
+        does not consider mount points, and vice versa.
+        Linux examples for this are bind mounts (possibly same device number, but always a mount point) and all
+        subvolumes of a Btrfs file system (different device numbers from the parent but not necessarily mount points).
+        macOS examples are the APFS mounts of a typical macOS installation.
         Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
 
 
@@ -3819,10 +3819,10 @@ class Archiver:
 
         # borg debug
         debug_epilog = process_epilog("""
-        These commands are not intended for normal use and potentially very
+        These commands are not intended for normal use and are potentially very
         dangerous if used incorrectly.
 
-        They exist to improve debugging capabilities without direct system access, e.g.
+        They exist to improve debugging capabilities without direct system access, e.g.,
         in case you ever run into some severe malfunction. Use them only if you know
         what you are doing or if a trusted developer tells you what to do.""")
 
@@ -3891,7 +3891,7 @@ class Archiver:
                                help='file to dump data into')
 
         debug_dump_repo_objs_epilog = process_epilog("""
-        This command dumps raw (but decrypted and decompressed) repo objects to files.
+        This command dumps raw (but decrypted and decompressed) repository objects to files.
         """)
         subparser = debug_parsers.add_parser('dump-repo-objs', parents=[common_parser], add_help=False,
                                           description=self.do_debug_dump_repo_objs.__doc__,
@@ -3910,7 +3910,7 @@ class Archiver:
                                help='used together with --ghost: limit processing to given offset.')
 
         debug_search_repo_objs_epilog = process_epilog("""
-        This command searches raw (but decrypted and decompressed) repo objects for a specific bytes sequence.
+        This command searches raw (but decrypted and decompressed) repository objects for a specific byte sequence.
         """)
         subparser = debug_parsers.add_parser('search-repo-objs', parents=[common_parser], add_help=False,
                                           description=self.do_debug_search_repo_objs.__doc__,
@@ -3925,7 +3925,7 @@ class Archiver:
                                help='term to search the repo for, either 0x1234abcd hex term or a string')
 
         debug_id_hash_epilog = process_epilog("""
-        This command computes the id-hash for some file content.
+        This command computes the ID hash for some file content.
         """)
         subparser = debug_parsers.add_parser('id-hash', parents=[common_parser], add_help=False,
                                              description=self.do_debug_id_hash.__doc__,
@@ -3987,7 +3987,7 @@ class Archiver:
                                help='hex object ID(s) to delete from the repo')
 
         debug_refcount_obj_epilog = process_epilog("""
-        This command displays the reference count for objects from the repository.
+        This command displays the reference count for objects in the repository.
         """)
         subparser = debug_parsers.add_parser('refcount-obj', parents=[common_parser], add_help=False,
                                           description=self.do_debug_refcount_obj.__doc__,
@@ -4017,7 +4017,7 @@ class Archiver:
                                help='file to dump data into')
 
         debug_convert_profile_epilog = process_epilog("""
-        Convert a Borg profile to a Python cProfile compatible profile.
+        Convert a Borg profile to a Python cProfile-compatible profile.
         """)
         subparser = debug_parsers.add_parser('convert-profile', parents=[common_parser], add_help=False,
                                           description=self.do_debug_convert_profile.__doc__,
@@ -4093,17 +4093,17 @@ class Archiver:
             This command finds differences (file contents, user/group/mode) between archives.
 
             A repository location and an archive name must be specified for REPO::ARCHIVE1.
-            ARCHIVE2 is just another archive name in same repository (no repository location
+            ARCHIVE2 is just another archive name in the same repository (no repository location
             allowed).
 
-            For archives created with Borg 1.1 or newer diff automatically detects whether
-            the archives are created with the same chunker params. If so, only chunk IDs
+            For archives created with Borg 1.1 or newer, diff automatically detects whether
+            the archives were created with the same chunker parameters. If so, only chunk IDs
             are compared, which is very fast.
 
-            For archives prior to Borg 1.1 chunk contents are compared by default.
-            If you did not create the archives with different chunker params,
+            For archives prior to Borg 1.1, chunk contents are compared by default.
+            If you did not create the archives with different chunker parameters,
             pass ``--same-chunker-params``.
-            Note that the chunker params changed from Borg 0.xx to 1.0.
+            Note that the chunker parameters changed from Borg 0.xx to 1.0.
 
             For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
             """)
@@ -4165,7 +4165,7 @@ class Archiver:
         Timestamp resolution is limited to whole seconds, not the nanosecond resolution
         otherwise supported by Borg.
 
-        A ``--sparse`` option (as found in borg extract) is not supported.
+        A ``--sparse`` option (as found in ``borg extract``) is not supported.
 
         By default the entire archive is extracted but a subset of files and directories
         can be selected by passing a list of ``PATHs`` as arguments.
@@ -4205,8 +4205,8 @@ class Archiver:
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
         By using ``--dry-run``, you can do all extraction steps except actually writing the
-        output data: reading metadata and data chunks from the repo, checking the hash/hmac,
-        decrypting, decompressing.
+        output data: reading metadata and data chunks from the repository, checking the hash/HMAC,
+        decrypting, and decompressing.
 
         ``--progress`` can be slower than no progress display, since it makes one additional
         pass over the archive metadata.
@@ -4217,8 +4217,8 @@ class Archiver:
             so make sure you ``cd`` to the right place before calling ``borg extract``.
 
             When parent directories are not extracted (because of using file/directory selection
-            or any other reason), borg can not restore parent directories' metadata, e.g. owner,
-            group, permission, etc.
+            or any other reason), Borg cannot restore parent directories' metadata, e.g., owner,
+            group, permissions, etc.
         """)
         subparser = subparsers.add_parser('extract', parents=[common_parser], add_help=False,
                                           description=self.do_extract.__doc__,
@@ -4268,11 +4268,11 @@ class Archiver:
 
         Please note that the deduplicated sizes of the individual archives do not add
         up to the deduplicated size of the repository ("all archives"), because the two
-        are meaning different things:
+        mean different things:
 
         This archive / deduplicated size = amount of data stored ONLY for this archive
         = unique chunks of this archive.
-        All archives / deduplicated size = amount of data stored in the repo
+        All archives / deduplicated size = amount of data stored in the repository
         = all chunks in the repository.
 
         Borg archives can only contain a limited amount of file metadata.
@@ -4295,12 +4295,12 @@ class Archiver:
 
         # borg version
         version_epilog = process_epilog("""
-        This command displays the borg client version / borg server version.
+        This command displays the Borg client version / Borg server version.
 
-        If a local repo is given, the client code directly accesses the repository,
+        If a local repository is given, the client code directly accesses the repository,
         thus we show the client version also as the server version.
 
-        If a remote repo is given (e.g. ssh:), the remote borg is queried and
+        If a remote repository is given (e.g., ssh:), the remote Borg is queried and
         its version is displayed as the server version.
 
         Examples::
@@ -4313,10 +4313,10 @@ class Archiver:
             $ borg version ssh://borg@borgbackup:repo
             1.4.0a / 1.2.7
 
-        Due to the version tuple format used in borg client/server negotiation, only
-        a simplified version is displayed (as provided by borg.version.format_version).
+        Due to the version tuple format used in Borg client/server negotiation, only
+        a simplified version is displayed (as provided by ``borg.version.format_version``).
 
-        There is also borg --version to display a potentially more precise client version.
+        There is also ``borg --version`` to display a potentially more precise client version.
         """)
         subparser = subparsers.add_parser('version', parents=[common_parser], add_help=False,
                                           description=self.do_version.__doc__, epilog=version_epilog,
@@ -4350,9 +4350,9 @@ class Archiver:
         Borg will:
 
         1. Ask you to come up with a passphrase.
-        2. Create a borg key (which contains 3 random secrets. See :ref:`key_files`).
+        2. Create a Borg key (which contains three random secrets. See :ref:`key_files`).
         3. Encrypt the key with your passphrase.
-        4. Store the encrypted borg key inside the repository directory (in the repo config).
+        4. Store the encrypted Borg key inside the repository directory (in the repo config).
            This is why it is essential to use a secure passphrase.
         5. Encrypt and sign your backups to prevent anyone from reading or forging them unless they
            have the key and know the passphrase. Make sure to keep a backup of
@@ -4360,7 +4360,7 @@ class Archiver:
            "leaving your keys inside your car" (see :ref:`borg_key_export`).
            For remote backups the encryption is done locally - the remote machine
            never sees your passphrase, your unencrypted key or your unencrypted files.
-           Chunking and id generation are also based on your key to improve
+           Chunking and ID generation are also based on your key to improve
            your privacy.
         6. Use the key when extracting files to decrypt them and to verify that the contents of
            the backups have not been accidentally or maliciously altered.
@@ -4370,20 +4370,20 @@ class Archiver:
 
         Make sure you use a good passphrase. Not too short, not too simple. The real
         encryption / decryption key is encrypted with / locked by your passphrase.
-        If an attacker gets your key, he can't unlock and use it without knowing the
+        If an attacker gets your key, they can't unlock and use it without knowing the
         passphrase.
 
-        Be careful with special or non-ascii characters in your passphrase:
+        Be careful with special or non-ASCII characters in your passphrase:
 
-        - Borg processes the passphrase as unicode (and encodes it as utf-8),
+        - Borg processes the passphrase as Unicode (and encodes it as UTF-8),
           so it does not have problems dealing with even the strangest characters.
         - BUT: that does not necessarily apply to your OS / VM / keyboard configuration.
 
-        So better use a long passphrase made from simple ascii chars than one that
-        includes non-ascii stuff or characters that are hard/impossible to enter on
+        So it is better to use a long passphrase made from simple ASCII characters than one that
+        includes non-ASCII characters or characters that are hard or impossible to enter on
         a different keyboard layout.
 
-        You can change your passphrase for existing repos at any time, it won't affect
+        You can change your passphrase for existing repositories at any time; it won't affect
         the encryption/decryption key or other secrets.
 
         More encryption modes
@@ -4496,25 +4496,25 @@ class Archiver:
 
         key_export_epilog = process_epilog("""
         If repository encryption is used, the repository is inaccessible
-        without the key. This command allows one to backup this essential key.
+        without the key. This command allows one to back up this essential key.
         Note that the backup produced does not include the passphrase itself
-        (i.e. the exported key stays encrypted). In order to regain access to a
+        (i.e., the exported key stays encrypted). In order to regain access to a
         repository, one needs both the exported key and the original passphrase.
 
         There are three backup formats. The normal backup format is suitable for
         digital storage as a file. The ``--paper`` backup format is optimized
-        for printing and typing in while importing, with per line checks to
-        reduce problems with manual input. The ``--qr-html`` creates a printable
+        for printing and typing in while importing, with per-line checks to
+        reduce problems with manual input. The ``--qr-html`` option creates a printable
         HTML template with a QR code and a copy of the ``--paper``-formatted key.
 
-        For repositories using keyfile encryption the key is saved locally
+        For repositories using key file encryption the key is saved locally
         on the system that is capable of doing backups. To guard against loss
         of this key, the key needs to be backed up independently of the main
         data backup.
 
-        For repositories using the repokey encryption the key is saved in the
-        repository in the config file. A backup is thus not strictly needed,
-        but guards against the repository becoming inaccessible if the file
+        For repositories using repokey encryption, the key is saved in the
+        repository's config file. A backup is thus not strictly needed,
+        but it guards against the repository becoming inaccessible if the file
         is damaged for some reason.
 
         Examples::
@@ -4549,12 +4549,12 @@ class Archiver:
 
         If the ``--paper`` option is given, the import will be an interactive
         process in which each line is checked for plausibility before
-        proceeding to the next line. For this format PATH must not be given.
+        proceeding to the next line. For this format, PATH must not be provided.
 
-        For repositories using keyfile encryption, the key file which ``borg key
+        For repositories using key file encryption, the key file which ``borg key
         import`` writes to depends on several factors. If the ``BORG_KEY_FILE``
         environment variable is set and non-empty, ``borg key import`` creates
-        or overwrites that file named by ``$BORG_KEY_FILE``. Otherwise, ``borg
+        or overwrites the file named by ``$BORG_KEY_FILE``. Otherwise, ``borg
         key import`` searches in the ``$BORG_KEYS_DIR`` directory for a key file
         associated with the repository. If a key file is found in
         ``$BORG_KEYS_DIR``, ``borg key import`` overwrites it; otherwise, ``borg
@@ -4574,12 +4574,12 @@ class Archiver:
                                help='interactively import from a backup done with ``--paper``')
 
         change_passphrase_epilog = process_epilog("""
-        The key files used for repository encryption are optionally passphrase
+        The key files used for repository encryption are optionally passphrase-
         protected. This command can be used to change this passphrase.
 
         Please note that this command only changes the passphrase, but not any
-        secret protected by it (like e.g. encryption/MAC keys or chunker seed).
-        Thus, changing the passphrase after passphrase and borg key got compromised
+        secret protected by it (e.g., encryption/MAC keys or the chunker seed).
+        Thus, changing the passphrase after the passphrase and Borg key were compromised
         does not protect future (nor past) backups to the same repository.
         """)
         subparser = key_parsers.add_parser('change-passphrase', parents=[common_parser], add_help=False,
@@ -4595,10 +4595,10 @@ class Archiver:
         This command migrates a repository from passphrase mode (removed in Borg 1.0)
         to repokey mode.
 
-        You will be first asked for the repository passphrase (to open it in passphrase
-        mode). This is the same passphrase as you used to use for this repo before 1.0.
+        You will first be asked for the repository passphrase (to open it in passphrase
+        mode). This is the same passphrase you used for this repository before 1.0.
 
-        It will then derive the different secrets from this passphrase.
+        The different secrets will then be derived from this passphrase.
 
         Then you will be asked for a new passphrase (twice, for safety). This
         passphrase will be used to protect the repokey (which contains these same
@@ -4606,7 +4606,7 @@ class Archiver:
         use, but you may also use a different one.
 
         After migrating to repokey mode, you can change the passphrase at any time.
-        But please note: the secrets will always stay the same and they could always
+        Please note: the secrets will always stay the same, and they could always
         be derived from your (old) passphrase-mode passphrase.
         """)
         subparser = key_parsers.add_parser('migrate-to-repokey', parents=[common_parser], add_help=False,
@@ -4629,7 +4629,7 @@ class Archiver:
         The FORMAT specifier syntax
         +++++++++++++++++++++++++++
 
-        The ``--format`` option uses python's `format string syntax
+        The ``--format`` option uses Python's `format string syntax
         <https://docs.python.org/3.9/library/string.html#formatstrings>`_.
 
         Examples:
@@ -4748,9 +4748,9 @@ class Archiver:
         The rules are applied from secondly to yearly, and backups selected by previous
         rules do not count towards those of later rules. The time that each backup
         starts is used for pruning purposes. Dates and times are interpreted in
-        the local timezone, and weeks go from Monday to Sunday. Specifying a
-        negative number of archives to keep means that there is no limit. As of borg
-        1.2.0, borg will retain the oldest archive if any of the secondly, minutely,
+        the local time zone, and weeks go from Monday to Sunday. Specifying a
+        negative number of archives to keep means that there is no limit. As of Borg
+        1.2.0, Borg will retain the oldest archive if any of the secondly, minutely,
         hourly, daily, weekly, monthly, quarterly, or yearly rules was not otherwise
         able to meet its retention target. This enables the first chronological archive
         to continue aging until it is replaced by a newer archive that meets the
@@ -4818,7 +4818,7 @@ class Archiver:
         recreate_epilog = process_epilog("""
         Recreate the contents of existing archives.
 
-        recreate is a potentially dangerous function and might lead to data loss
+        Recreate is a potentially dangerous operation and might lead to data loss
         (if used wrongly). BE VERY CAREFUL!
 
         Important: Repository disk space is **not** freed until you run ``borg compact``.
@@ -4836,34 +4836,34 @@ class Archiver:
         incorrect information for archives that were not recreated at the same time.
         There is no risk of data loss by this.
 
-        ``--chunker-params`` will re-chunk all files in the archive, this can be
+        ``--chunker-params`` will re-chunk all files in the archive; this can be
         used to have upgraded Borg 0.xx or Attic archives deduplicate with
         Borg 1.x archives.
 
         **USE WITH CAUTION.**
         Depending on the PATHs and patterns given, recreate can be used to permanently
         delete files from archives.
-        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
+        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHs are
         interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
 
         The archive being recreated is only removed after the operation completes. The
         archive that is built during the operation exists at the same time at
         "<ARCHIVE>.recreate". The new archive will have a different archive ID.
 
-        With ``--target`` the original archive is not replaced, instead a new archive is created.
+        With ``--target`` the original archive is not replaced; instead, a new archive is created.
 
         When rechunking (or recompressing), space usage can be substantial - expect
         at least the entire deduplicated size of the archives using the previous
-        chunker (or compression) params.
+        chunker (or compression) parameters.
 
-        If you recently ran borg check --repair and it had to fix lost chunks with all-zero
+        If you recently ran ``borg check --repair`` and it had to fix lost chunks with all-zero
         replacement chunks, please first run another backup for the same data and re-run
-        borg check --repair afterwards to heal any archives that had lost chunks which are
+        ``borg check --repair`` afterwards to heal any archives that had lost chunks which are
         still generated from the input data.
 
-        Important: running borg recreate to re-chunk will remove the chunks_healthy
+        Important: running ``borg recreate`` to re-chunk will remove the ``chunks_healthy``
         metadata of all items with replacement chunks, so healing will not be possible
-        any more after re-chunking (it is also unlikely it would ever work: due to the
+        anymore after re-chunking (it is also unlikely it would ever work: due to the
         change of chunking parameters, the missing chunk likely will never be seen again
         even if you still have the data that produced it).
         """)
@@ -4979,7 +4979,7 @@ class Archiver:
 
         # borg umount
         umount_epilog = process_epilog("""
-        This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
+        This command unmounts a FUSE filesystem that was mounted with ``borg mount``.
 
         This is a convenience wrapper that just calls the platform-specific shell
         command - usually this is either umount or fusermount -u.
@@ -5020,8 +5020,8 @@ class Archiver:
         This is a convenient method to just trust all archives present - if
         an archive does not have TAM authentication yet, a TAM will be added.
         Archives created by old borg versions < 1.0.9 do not have TAMs.
-        Archives created by newer borg version should have TAMs already.
-        If you have a high risk environment, you should not just run this,
+        Archives created by newer borg versions should have TAMs already.
+        If you have a high-risk environment, you should not just run this,
         but first verify that the archives are authentic and not malicious
         (== have good content, have a good timestamp).
         Borg 1.2.5+ needs all archives to be TAM authenticated for safety reasons.
@@ -5063,7 +5063,7 @@ class Archiver:
         See ``--chunker-params`` option of ``borg create`` and ``borg recreate``.
 
         ``borg upgrade`` will change the magic strings in the repository's
-        segments to match the new Borg magic strings. The keyfiles found in
+        segments to match the new Borg magic strings. The key files found in
         $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
         copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
 
@@ -5071,11 +5071,11 @@ class Archiver:
         ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the
         cache layout between Borg and Attic changed, so it is possible
         the first backup after the conversion takes longer than expected
-        due to the cache resync.
+        due to the cache re-sync.
 
-        Upgrade should be able to resume if interrupted, although it
+        The upgrade should be able to resume if interrupted, although it
         will still iterate over all segments. If you want to start
-        from scratch, use `borg delete` over the copied repository to
+        from scratch, use ``borg delete`` over the copied repository to
         make sure the cache files are also removed::
 
             borg delete borg
@@ -5129,14 +5129,14 @@ class Archiver:
             $ borg with-lock /mnt/borgrepo rsync -av /mnt/borgrepo /somewhere/else/borgrepo
 
         It will first try to acquire the lock (make sure that no other operation is
-        running in the repo), then execute the given command as a subprocess and wait
-        for its termination, release the lock and return the user command's return
-        code as borg's return code.
+        running in the repository), then execute the given command as a subprocess and wait
+        for its termination, release the lock, and return the user command's return
+        code as Borg's return code.
 
         .. note::
 
             If you copy a repository with the lock held, the lock will be present in
-            the copy. Thus, before using borg on the copy from a different host,
+            the copy. Thus, before using Borg on the copy from a different host,
             you need to use "borg break-lock" on the copied repository, because
             Borg is cautious and does not automatically remove stale locks made by a different host.
         """)
@@ -5158,9 +5158,9 @@ class Archiver:
         import_tar_epilog = process_epilog("""
         This command creates a backup archive from a tarball.
 
-        When giving '-' as path, Borg will read a tar stream from standard input.
+        When giving '-' as a path, Borg will read a tar stream from standard input.
 
-        By default (--tar-filter=auto) Borg will detect whether the file is compressed
+        By default (``--tar-filter=auto``) Borg will detect whether the file is compressed
         based on its file extension and pipe the file through an appropriate filter:
 
         - .tar.gz or .tgz: gzip -d
@@ -5169,11 +5169,11 @@ class Archiver:
         - .tar.zstd or .tar.zst: zstd -d
         - .tar.lz4: lz4 -d
 
-        Alternatively, a --tar-filter program may be explicitly specified. It should
+        Alternatively, a ``--tar-filter`` program may be explicitly specified. It should
         read compressed data from stdin and output an uncompressed tar stream on
         stdout.
 
-        Most documentation of borg create applies. Note that this command does not
+        Most documentation of ``borg create`` applies. Note that this command does not
         support excluding files.
 
         import-tar is a lossy conversion:

@@ -44,10 +44,14 @@ def process_alive(host, pid, thread):
     from . import local_pid_alive
     from . import hostid
 
-    assert isinstance(host, str)
-    assert isinstance(hostid, str)
-    assert isinstance(pid, int)
-    assert isinstance(thread, int)
+    if not isinstance(host, str):
+        raise TypeError("host must be a string")
+    if not isinstance(hostid, str):
+        raise TypeError("hostid must be a string")
+    if not isinstance(pid, int):
+        raise TypeError("pid must be an integer")
+    if not isinstance(thread, int):
+        raise TypeError("thread must be an integer")
 
     if host != hostid:
         return True
@@ -116,7 +120,8 @@ def group2gid(group, default=None):
 def posix_acl_use_stored_uid_gid(acl):
     """Replace the user/group field with the stored uid/gid
     """
-    assert isinstance(acl, bytes)
+    if not isinstance(acl, bytes):
+        raise TypeError("acl must be of type bytes")
     from ..helpers import safe_decode, safe_encode
     entries = []
     for entry in safe_decode(acl).split('\n'):

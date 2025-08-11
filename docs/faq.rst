@@ -228,8 +228,12 @@ maybe has less potential of things going wrong somehow.
 My machine goes to sleep causing `Broken pipe`
 ----------------------------------------------
 
-When backing up your data over the network, your machine should not go to sleep.
-On macOS you can use `caffeinate` to avoid that.
+While backing up your data over the network, your machine should not go to sleep.
+On Linux you can use `systemd-inhibit` to avoid that. On macOS you can use `caffeinate`.
+
+``systemd-inhibit borg create ...``
+
+``caffeinate -i borg create ...``
 
 How can I restore huge file(s) over an unstable connection?
 -----------------------------------------------------------

@@ -230,7 +230,7 @@ class Item(PropDict):
                     try:
                         master = getattr(self, 'source')
                     except AttributeError:
-                        # not a hardlink slave, likely a directory or special file w/o chunks
+                        # not a hardlink slave, likely a directory or special file without chunks
                         chunks = None
                     else:
                         # hardlink slave, try to fetch hardlink master's chunks list
@@ -296,12 +296,12 @@ class EncryptedKey(PropDict):
     """
     EncryptedKey abstraction that deals with validation and the low-level details internally:
 
-    A EncryptedKey is created either from msgpack unpacker output, from another dict, from kwargs or
+    An EncryptedKey is created either from msgpack unpacker output, from another dict, from kwargs or
     built step-by-step by setting attributes.
 
     msgpack gives us a dict with bytes-typed keys, just give it to EncryptedKey(d) and use enc_key.xxx later.
 
-    If a EncryptedKey shall be serialized, give as_dict() method output to msgpack packer.
+    If an EncryptedKey shall be serialized, give as_dict() method output to msgpack packer.
     """
 
     VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data'}  # str-typed keys
@@ -362,7 +362,7 @@ class ArchiveItem(PropDict):
 
     msgpack gives us a dict with bytes-typed keys, just give it to ArchiveItem(d) and use arch.xxx later.
 
-    If a ArchiveItem shall be serialized, give as_dict() method output to msgpack packer.
+    If an ArchiveItem shall be serialized, give as_dict() method output to msgpack packer.
     """
 
     VALID_KEYS = ARCHIVE_KEYS  # str-typed keys

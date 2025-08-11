@@ -60,17 +60,17 @@ cdef extern from "cache_sync/cache_sync.c":
 cdef _NoDefault = object()
 
 """
-The HashIndex is *not* a general purpose data structure. The value size must be at least 4 bytes, and these
-first bytes are used for in-band signalling in the data structure itself.
+The HashIndex is *not* a general-purpose data structure. The value size must be at least 4 bytes, and these
+first bytes are used for in-band signaling in the data structure itself.
 
-The constant MAX_VALUE defines the valid range for these 4 bytes when interpreted as an uint32_t from 0
+The constant MAX_VALUE defines the valid range for these 4 bytes when interpreted as a uint32_t from 0
 to MAX_VALUE (inclusive). The following reserved values beyond MAX_VALUE are currently in use
 (byte order is LE)::
 
-    0xffffffff marks empty entries in the hashtable
-    0xfffffffe marks deleted entries in the hashtable
+    0xffffffff marks empty entries in the hash table
+    0xfffffffe marks deleted entries in the hash table
 
-None of the publicly available classes in this module will accept nor return a reserved value;
+None of the publicly available classes in this module will neither accept nor return a reserved value;
 AssertionError is raised instead.
 """
 
@@ -169,7 +169,7 @@ cdef class IndexBase:
 
 
 cdef class FuseVersionsIndex(IndexBase):
-    # 4 byte version + 16 byte file contents hash
+    # 4-byte version + 16-byte file contents hash
     value_size = 20
     _key_size = 16
 
@@ -276,7 +276,7 @@ ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'refcount size csize')
 
 cdef class ChunkIndex(IndexBase):
     """
-    Mapping of 32 byte keys to (refcount, size, csize), which are all 32-bit unsigned.
+    Mapping of 32-byte keys to (refcount, size, csize), which are all 32-bit unsigned.
 
     The reference count cannot overflow. If an overflow would occur, the refcount
     is fixed to MAX_VALUE and will neither increase nor decrease by incref(), decref()
@@ -321,7 +321,7 @@ cdef class ChunkIndex(IndexBase):
         return data != NULL
 
     def incref(self, key):
-        """Increase refcount for 'key', return (refcount, size, csize)"""
+        """Increase refcount for 'key', return (refcount, size, csize)."""
         assert len(key) == self.key_size
         data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
         if not data:
@@ -334,7 +334,7 @@ cdef class ChunkIndex(IndexBase):
         return refcount, _le32toh(data[1]), _le32toh(data[2])
 
     def decref(self, key):
-        """Decrease refcount for 'key', return (refcount, size, csize)"""
+        """Decrease refcount for 'key', return (refcount, size, csize)."""
         assert len(key) == self.key_size
         data = <uint32_t *>hashindex_get(self.index, <unsigned char *>key)
         if not data:

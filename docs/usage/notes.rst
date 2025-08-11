@@ -1,7 +1,7 @@
 Additional Notes
 ----------------
 
-Here are misc. notes about topics that are maybe not covered in enough detail in the usage section.
+Here are miscellaneous notes about topics that might not be covered in enough detail in the usage section.
 
 .. _chunker-params:
 
@@ -24,14 +24,14 @@ deduplication and creates a much smaller amount of chunks and thus uses less
 resources. This is good for relatively big data volumes and if the machine has
 a relatively low amount of free RAM and disk space.
 
-``--chunker-params=fixed,4194304`` results in fixed 4MiB sized block
+``--chunker-params=fixed,4194304`` results in fixed 4 MiB sized block
 deduplication and is more efficient than the previous example when used for
-for block devices (like disks, partitions, LVM LVs) or raw disk image files.
+block devices (like disks, partitions, LVM LVs) or raw disk image files.
 
-``--chunker-params=fixed,4096,512`` results in fixed 4kiB sized blocks,
-but the first header block will only be 512B long. This might be useful to
-dedup files with 1 header + N fixed size data blocks. Be careful to not
-produce a too big amount of chunks (like using small block size for huge
+``--chunker-params=fixed,4096,512`` results in fixed 4 KiB sized blocks,
+but the first header block will only be 512 B long. This might be useful to
+deduplicate files with 1 header + N fixed-size data blocks. Be careful not to
+produce too many chunks (such as using a small block size for huge
 files).
 
 If you already have made some archives in a repository and you then change
@@ -46,7 +46,7 @@ Usually, it is not that bad though:
 - usually most files are not touched, so it will just re-use the old chunks
   it already has in the repo
 - files smaller than the (both old and new) minimum chunksize result in only
-  one chunk anyway, so the resulting chunks are same and deduplication will apply
+  one chunk anyway, so the resulting chunks are the same and deduplication will apply
 
 If you switch chunker params to save resources for an existing repo that
 already has some backup archives, you will see an increasing effect over time,
@@ -85,17 +85,17 @@ use this option also for speeding up operations.
 ~~~~~~~~~~~
 
 borg uses a safe default umask of 077 (that means the files borg creates have
-only permissions for owner, but no permissions for group and others) - so there
+only permissions for the owner, but no permissions for group and others) - so there
 should rarely be a need to change the default behaviour.
 
 This option only affects the process to which it is given. Thus, when you run
 borg in client/server mode and you want to change the behaviour on the server
-side, you need to use ``borg serve --umask=XXX ...`` as a ssh forced command
+side, you need to use ``borg serve --umask=XXX ...`` as an SSH forced command
 in ``authorized_keys``. The ``--umask`` value given on the client side is
 **not** transferred to the server side.
 
 Also, if you choose to use the ``--umask`` option, always be consistent and use
-the same umask value so you do not create a mixup of permissions in a borg
+the same umask value so you do not create a mix-up of permissions in a borg
 repository or with other files borg creates.
 
 ``--read-special``
@@ -120,13 +120,13 @@ You need to be careful about what you include when using ``--read-special``,
 e.g. if you include ``/dev/zero``, your backup will never terminate.
 
 Restoring such files' content is currently only supported one at a time via
-``--stdout`` option (and you have to redirect stdout to where ever it shall go,
+``--stdout`` option (and you have to redirect stdout to wherever it shall go,
 maybe directly into an existing device file of your choice or indirectly via
 ``dd``).
 
 To some extent, mounting a backup archive with the backups of special files
 via ``borg mount`` and then loop-mounting the image files from inside the mount
-point will work. If you plan to access a lot of data in there, it likely will
+point will work. If you plan to access a lot of data in there, it will likely
 scale and perform better if you do not work via the FUSE mount.
 
 Example
@@ -211,7 +211,7 @@ but borg will also reject to delete the repository completely).
 If ``borg compact`` command is used on a repo in append-only mode, there
 will be no warning or error, but no compaction will happen.
 
-append-only is useful for scenarios where a backup client machine backups
+Append-only is useful for scenarios where a backup client machine backs up
 remotely to a backup server using ``borg serve``, since a hacked client machine
 cannot delete backups on the server permanently.
 
@@ -233,7 +233,7 @@ in ``.ssh/authorized_keys``:
 
 ::
 
-    command="borg serve --append-only ..." ssh-rsa <key used for not-always-trustable backup clients>
+    command="borg serve --append-only ..." ssh-rsa <key used for not-always-trustworthy backup clients>
     command="borg serve ..." ssh-rsa <key used for backup management>
 
 Running ``borg init`` via a ``borg serve --append-only`` server will *not* create
@@ -255,7 +255,7 @@ mode. A transaction log in this situation might look like this:
     transaction 13, UTC time 2016-03-31T15:55:55.472564
 
 From your security logs you conclude the attacker gained access at 15:54:00 and all
-the backups where deleted or replaced by compromised backups. From the log you know
+the backups were deleted or replaced by compromised backups. From the log you know
 that transactions 11 and later are compromised. Note that the transaction ID is the
 name of the *last* file in the transaction. For example, transaction 11 spans files 6
 to 11.
@@ -320,7 +320,7 @@ repository. Make sure that backup client machines only get to access the reposit
 ``borg serve``.
 
 Ensure that no remote access is possible if the repository is temporarily set to normal mode
-for e.g. regular pruning.
+for example, regular pruning.
 
 Further protections can be implemented, but are outside of Borg's scope. For example,
 file system snapshots or wrapping ``borg serve`` to set special permissions or ACLs on

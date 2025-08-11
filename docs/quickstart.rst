@@ -8,7 +8,7 @@ Quick Start
 This chapter will get you started with Borg and covers
 various use cases.
 
-A step by step example
+A step-by-step example
 ----------------------
 
 .. include:: quickstart_example.rst.inc
@@ -20,8 +20,8 @@ A *Borg archive* is the result of a single backup (``borg create``). An archive
 stores a snapshot of the data of the files "inside" it. One can later extract or
 mount an archive to restore from a backup.
 
-*Repositories* are filesystem directories acting as self-contained stores of archives.
-Repositories can be accessed locally via path or remotely via ssh. Under the hood,
+*Repositories* are file system directories acting as self-contained stores of archives.
+Repositories can be accessed locally via path or remotely via SSH. Under the hood,
 repositories contain data blocks and a manifest tracking which blocks are in each
 archive. If some data hasn't changed from one backup to another, Borg can simply
 reference an already uploaded data chunk (deduplication).
@@ -37,7 +37,7 @@ a good amount of free space on the filesystem that has your backup repository
 repositories. See also :ref:`cache-memory-usage`.
 
 Borg doesn't use space reserved for root on repository disks (even when run as root),
-on file systems which do not support this mechanism (e.g. XFS) we recommend to reserve
+on file systems which do not support this mechanism (e.g., XFS) we recommend reserving
 some space in Borg itself just to be safe by adjusting the ``additional_free_space``
 setting (a good starting point is ``2G``)::
 
@@ -49,7 +49,7 @@ by deleting/pruning archives. This mechanism is not bullet-proof in some
 circumstances [1]_.
 
 If you *really* run out of disk space, it can be hard or impossible to free space,
-because Borg needs free space to operate - even to delete backup
+because Borg needs free space to operate—even to delete backup
 archives.
 
 You can use some monitoring process or just include the free space information
@@ -58,38 +58,38 @@ in your backup log files (you check them regularly anyway, right?).
 Also helpful:
 
 - create a big file as a "space reserve", that you can delete to free space
-- if you use LVM: use a LV + a filesystem that you can resize later and have
+- if you use LVM: use an LV + a file system that you can resize later and have
   some unallocated PEs you can add to the LV.
 - consider using quotas
 - use `prune` and `compact` regularly
 
-.. [1] This failsafe can fail in these circumstances:
+.. [1] This fail-safe can fail in these circumstances:
 
-    - The underlying file system doesn't support statvfs(2), or returns incorrect
-      data, or the repository doesn't reside on a single file system
+    - The underlying file system does not support statvfs(2), or returns incorrect
+      data, or the repository does not reside on a single file system
     - Other tasks fill the disk simultaneously
     - Hard quotas (which may not be reflected in statvfs(2))
 
 Important note about permissions
 --------------------------------
 
-To avoid permissions issues (in your borg repository or borg cache), **always
+To avoid permissions issues (in your Borg repository or Borg cache), **always
 access the repository using the same user account**.
 
-If you want to backup files of other users or the operating system, running
-borg as root likely will be required (otherwise you'ld get `Permission denied`
+If you want to back up files of other users or the operating system, running
+Borg as root likely will be required (otherwise you'd get `Permission denied`
 errors).
-If you only back up your own files, you neither need nor want to run borg as
+If you only back up your own files, you neither need nor want to run Borg as
 root, just run it as your normal user.
 
-For a local repository just always use the same user to invoke borg.
+For a local repository just always use the same user to invoke Borg.
 
 For a remote repository: always use e.g. borg@remote_host. You can use this
-from different local users, the remote user running borg and accessing the
+from different local users; the remote user running Borg and accessing the
 repo will always be `borg`.
 
 If you need to access a local repository from different users, you can use the
-same method by using ssh to borg@localhost.
+same method by using SSH to borg@localhost.
 
 Important note about files changing during the backup process
 -------------------------------------------------------------

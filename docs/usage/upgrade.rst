@@ -16,14 +16,14 @@ Examples
 
 .. _borg_key_migrate-to-repokey:
 
-Upgrading a passphrase encrypted attic repo
+Upgrading a passphrase-encrypted Attic repo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-attic offered a "passphrase" encryption mode, but this was removed in borg 1.0
+Attic offered a "passphrase" encryption mode, but this was removed in Borg 1.0
 and replaced by the "repokey" mode (which stores the passphrase-protected
-encryption key into the repository config).
+encryption key in the repository config).
 
-Thus, to upgrade a "passphrase" attic repo to a "repokey" borg repo, 2 steps
+Thus, to upgrade a "passphrase" Attic repo to a "repokey" Borg repo, two steps
 are needed, in this order:
 
 - borg upgrade repo

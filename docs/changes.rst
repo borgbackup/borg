@@ -87,11 +87,11 @@ no matter what encryption mode they use, including "none"):
 
 5. Done. Manifest and archives are TAM authenticated now.
 
-Vulnerability time line:
+Vulnerability timeline:
 
 * 2023-06-13: Vulnerability discovered during code review by Thomas Waldmann
 * 2023-06-13...: Work on fixing the issue, upgrade procedure, docs.
-* 2023-06-30: CVE was assigned via Github CNA
+* 2023-06-30: CVE was assigned via GitHub CNA
 * 2023-06-30 .. 2023-08-29: Fixed issue, code review, docs, testing.
 * 2023-08-30: Released fixed version 1.2.5 (broken upgrade procedure for some repos)
 * 2023-08-31: Released fixed version 1.2.6 (fixes upgrade procedure)
@@ -230,7 +230,7 @@ This attack is mitigated by:
 
 We are not aware of others having discovered, disclosed or exploited this vulnerability.
 
-Vulnerability time line:
+Vulnerability timeline:
 
 * 2016-11-14: Vulnerability and fix discovered during review of cryptography by Marian Beermann (@enkore)
 * 2016-11-20: First patch

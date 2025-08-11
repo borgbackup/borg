@@ -105,7 +105,7 @@ Standalone Binary
 .. note:: Releases are signed with an OpenPGP key, see
           :ref:`security-contact` for more instructions.
 
-Borg x86-64 amd/intel compatible binaries (generated with `pyinstaller`_)
+Borg x86-64 AMD/Intel-compatible binaries (generated with `pyinstaller`_)
 are available on the releases_ page for the following platforms (for more
 details see the ``00_README.txt`` file there):
 

@@ -3,7 +3,7 @@ This is borg2!
 
 Please note that this is the README for borg2 / master branch.
 
-For the stable version's docs, please see there:
+For the stable version's docs, please see here:
 
 https://borgbackup.readthedocs.io/en/stable/
 
@@ -14,7 +14,7 @@ next-beta upgrade code, so you will have to delete and re-create repos).
 Thus, **DO NOT USE BORG2 FOR YOUR PRODUCTION BACKUPS!** Please help with
 testing it, but set it up *additionally* to your production backups.
 
-TODO: the screencasts need a remake using borg2, see there:
+TODO: the screencasts need a remake using borg2, see here:
 
 https://github.com/borgbackup/borg/issues/6303
 
@@ -35,7 +35,7 @@ See the `installation manual`_ or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 There is also an `offline documentation`_ available, in multiple formats.
 
-.. _installation manual: https://borgbackup.readthedocs.org/en/stable/installation.html
+.. _installation manual: https://borgbackup.readthedocs.io/en/master/installation.html
 .. _offline documentation: https://readthedocs.org/projects/borgbackup/downloads
 
 Main features
@@ -78,7 +78,7 @@ Main features
     authenticity.
 
 **Obfuscation**
-    Optionally, borg can actively obfuscate e.g. the size of files / chunks to
+    Optionally, Borg can actively obfuscate, e.g., the size of files/chunks to
     make fingerprinting attacks more difficult.
 
 **Compression**
@@ -91,13 +91,13 @@ Main features
     * lzma (low speed, high compression)
 
 **Off-site backups**
-    Borg can store data on any remote host accessible over SSH.  If Borg is
-    installed on the remote host, big performance gains can be achieved
-    compared to using a network filesystem (sshfs, nfs, ...).
+    Borg can store data on any remote host accessible over SSH. If Borg is
+    installed on the remote host, significant performance gains can be achieved
+    compared to using a network file system (sshfs, NFS, ...).
 
-**Backups mountable as filesystems**
-    Backup archives are mountable as userspace filesystems for easy interactive
-    backup examination and restores (e.g. by using a regular file manager).
+**Backups mountable as file systems**
+    Backup archives are mountable as user-space file systems for easy interactive
+    backup examination and restores (e.g., by using a regular file manager).
 
 **Easy installation on multiple platforms**
     We offer single-file binaries that do not require installing anything -
@@ -108,7 +108,7 @@ Main features
     * FreeBSD
     * OpenBSD and NetBSD (no xattrs/ACLs support or binaries yet)
     * Cygwin (experimental, no binaries yet)
-    * Linux Subsystem of Windows 10 (experimental)
+    * Windows Subsystem for Linux (WSL) on Windows 10/11 (experimental)
 
 **Free and Open Source Software**
   * security and functionality can be audited independently
@@ -130,7 +130,7 @@ Create a new backup archive::
 
     $ borg create Monday1 ~/Documents
 
-Now doing another backup, just to show off the great deduplication::
+Now do another backup, just to show off the great deduplication::
 
     $ borg create -v --stats Monday2 ~/Documents
     Repository: /path/to/repo
@@ -144,31 +144,31 @@ Now doing another backup, just to show off the great deduplication::
     Deduplicated size: 520 B
 
 
-Helping, Donations and Bounties, becoming a Patron
+Helping, donations and bounties, becoming a Patron
 --------------------------------------------------
 
 Your help is always welcome!
 
 Spread the word, give feedback, help with documentation, testing or development.
 
-You can also give monetary support to the project, see there for details:
+You can also give monetary support to the project, see here for details:
 
 https://www.borgbackup.org/support/fund.html
 
 Links
 -----
 
-* `Main Web Site <https://borgbackup.readthedocs.org/>`_
+* `Main website <https://borgbackup.readthedocs.io/>`_
 * `Releases <https://github.com/borgbackup/borg/releases>`_,
   `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_ and
-  `ChangeLog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
-* `Offline Documentation <https://readthedocs.org/projects/borgbackup/downloads>`_
+  `Changelog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
+* `Offline documentation <https://readthedocs.org/projects/borgbackup/downloads>`_
 * `GitHub <https://github.com/borgbackup/borg>`_ and
-  `Issue Tracker <https://github.com/borgbackup/borg/issues>`_.
-* `Web-Chat (IRC) <https://web.libera.chat/#borgbackup>`_ and
-  `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
-* `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
-* `Security contact <https://borgbackup.readthedocs.io/en/latest/support.html#security-contact>`_
+  `Issue tracker <https://github.com/borgbackup/borg/issues>`_.
+* `Web chat (IRC) <https://web.libera.chat/#borgbackup>`_ and
+  `Mailing list <https://mail.python.org/mailman/listinfo/borgbackup>`_
+* `License <https://borgbackup.readthedocs.io/en/master/authors.html#license>`_
+* `Security contact <https://borgbackup.readthedocs.io/en/master/support.html#security-contact>`_
 
 Compatibility notes
 -------------------
@@ -178,7 +178,7 @@ CHANGES (like when going from 0.x.y to 1.0.0 or from 1.x.y to 2.0.0).
 
 NOT RELEASED DEVELOPMENT VERSIONS HAVE UNKNOWN COMPATIBILITY PROPERTIES.
 
-THIS IS SOFTWARE IN DEVELOPMENT, DECIDE YOURSELF WHETHER IT FITS YOUR NEEDS.
+THIS IS SOFTWARE IN DEVELOPMENT, DECIDE FOR YOURSELF WHETHER IT FITS YOUR NEEDS.
 
 Security issues should be reported to the `Security contact`_ (or
 see ``docs/support.rst`` in the source distribution).
@@ -187,9 +187,9 @@ see ``docs/support.rst`` in the source distribution).
 
 |doc| |build| |coverage| |bestpractices|
 
-.. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable
+.. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=master
         :alt: Documentation
-        :target: https://borgbackup.readthedocs.org/en/stable/
+        :target: https://borgbackup.readthedocs.io/en/master/
 
 .. |build| image:: https://github.com/borgbackup/borg/workflows/CI/badge.svg?branch=master
         :alt: Build Status (master)

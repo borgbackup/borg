@@ -20,14 +20,15 @@ logger = create_logger()
 
 def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_deadly=True):
     """
-    Ensures that the dir exists with the right permissions.
-    1) Make sure the directory exists in a race-free operation
+    Ensure that the directory exists with the right permissions.
+    1) Make sure the directory exists in a race-free operation.
     2) If mode is not None and the directory has been created, give the right
-    permissions to the leaf directory. The current umask value is masked out first.
-    3) If pretty_deadly is True, catch exceptions, reraise them with a pretty
-    message.
-    Returns if the directory has been created and has the right permissions,
-    An exception otherwise. If a deadly exception happened it is reraised.
+       permissions to the leaf directory. The current umask value is masked out first.
+    3) If pretty_deadly is True, catch exceptions and re-raise them with a clearer
+       message.
+
+    Returns normally if the directory exists (or was created) and has the right permissions;
+    raises an exception otherwise. If a fatal exception happened, it is re-raised.
     """
     try:
         os.makedirs(path, mode=mode, exist_ok=True)
@@ -57,7 +58,7 @@ def get_base_dir():
 
 
 def get_keys_dir():
-    """Determine where to repository keys and cache"""
+    """Determine where to store repository keys."""
     keys_dir = os.environ.get('BORG_KEYS_DIR')
     if keys_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
@@ -79,7 +80,7 @@ def get_security_dir(repository_id=None):
 
 
 def get_cache_dir():
-    """Determine where to repository keys and cache"""
+    """Determine where to store the cache."""
     # Get cache home path
     cache_home = os.path.join(get_base_dir(), '.cache')
     # Try to use XDG_CACHE_HOME instead if BORG_BASE_DIR isn't explicitly set
@@ -103,7 +104,7 @@ def get_cache_dir():
 
 
 def get_config_dir():
-    """Determine where to store whole config"""
+    """Determine where to store the whole configuration."""
     # Get config home path
     config_home = os.path.join(get_base_dir(), '.config')
     # Try to use XDG_CONFIG_HOME instead if BORG_BASE_DIR isn't explicitly set
@@ -157,7 +158,7 @@ _safe_re = re.compile(r'^((\.\.)?/+)+')
 
 
 def make_path_safe(path):
-    """Make path safe by making it relative and local
+    """Make path safe by making it relative and local.
     """
     return _safe_re.sub('', path) or '.'
 
@@ -178,7 +179,7 @@ def get_strip_prefix(path):
 
 
 def hardlinkable(mode):
-    """return True if we support hardlinked items of this type"""
+    """Return True if we support hardlinked items of this type."""
     return stat.S_ISREG(mode) or stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
 
 
@@ -282,7 +283,7 @@ flags_dir = O_('DIRECTORY', 'RDONLY', 'NOFOLLOW')
 
 def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):
     """
-    Use os.open to open a fs item.
+    Use os.open to open a filesystem item.
 
     If parent_fd and name are given, they are preferred and openat will be used,
     path is not used in this case.
@@ -328,7 +329,7 @@ def os_open(*, flags, path=None, parent_fd=None, name=None, noatime=False):
 
 def os_stat(*, path=None, parent_fd=None, name=None, follow_symlinks=False):
     """
-    Use os.stat to open a fs item.
+    Use os.stat to stat a filesystem item.
 
     If parent_fd and name are given, they are preferred and statat will be used,
     path is not used in this case.

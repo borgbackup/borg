@@ -19,15 +19,15 @@ Some properties of buzhash / of this implementation:
     the hash function, e.g. in "X <any 31 bytes> X", the last X would cancel out the influence
     of the first X on the hash value.
 
-(2) the hash table is supposed to have (according to the BUZ) exactly a 50% distribution of
-    0/1 bit values per position, but the hard coded table below doesn't fit that property.
+(2) The hash table is supposed to have (according to the BUZ) exactly a 50% distribution of
+    0/1 bit values per position, but the hard-coded table below doesn't fit that property.
 
-(3) if you would use a window size divisible by 64, the seed would cancel itself out completely.
-    this is why we use a window size of 4095 bytes.
+(3) If you would use a window size divisible by 64, the seed would cancel itself out completely.
+    This is why we use a window size of 4095 bytes.
 
 Another quirk is that, even with the 4095 byte window, XORing the entire table by a constant
-is equivalent to XORing the hash output with a different constant. but since the seed is stored
-encrypted, i think it still serves its purpose.
+is equivalent to XORing the hash output with a different constant. But since the seed is stored
+encrypted, I think it still serves its purpose.
 */
 
 static uint32_t table_base[] =
@@ -174,7 +174,7 @@ chunker_fill(Chunker *c)
         off_t offset = c->bytes_read;
         #endif
 
-        // if we have a os-level file descriptor, use os-level API
+        // If we have an OS-level file descriptor, use an OS-level API
         n = read(c->fh, c->data + c->position + c->remaining, n);
         if(n > 0) {
             c->remaining += n;
@@ -197,23 +197,23 @@ chunker_fill(Chunker *c)
         if (pagemask == 0)
             pagemask = getpagesize() - 1;
 
-        // We tell the OS that we do not need the data that we just have read any
+        // We tell the OS that we no longer need the data we have just read any
         // more (that it maybe has in the cache). This avoids that we spoil the
         // complete cache with data that we only read once and (due to cache
-        // size limit) kick out data from the cache that might be still useful
+        // size limit) kick out data from the cache that might still be useful
         // for the OS or other processes.
-        // We rollback the initial offset back to the start of the page,
-        // to avoid it not being truncated as a partial page request.
+        // We roll back the initial offset to the start of the page,
+        // to avoid it being truncated as a partial page request.
         int overshoot;
         if (length > 0) {
             // All Linux kernels (at least up to and including 4.6(.0)) have a bug where
-            // they truncate last partial page of POSIX_FADV_DONTNEED request, so we need
+            // they truncate the last partial page of a POSIX_FADV_DONTNEED request, so we need
             // to page-align it ourselves. We'll need the rest of this page on the next
             // read (assuming this was not EOF).
             overshoot = (offset + length) & pagemask;
         } else {
             // For length == 0 we set overshoot 0, so the below
-            // length - overshoot is 0, which means till end of file for
+            // length - overshoot is 0, which means to the end of the file for
             // fadvise. This will cancel the final page and is not part
             // of the above workaround.
             overshoot = 0;
@@ -225,7 +225,7 @@ chunker_fill(Chunker *c)
         PyEval_RestoreThread(thread_state);
     }
     else {
-        // no os-level file descriptor, use Python file object API
+        // No OS-level file descriptor, use Python file object API
         data = PyObject_CallMethod(c->fd, "read", "i", n);
         if(!data) {
             return 0;
@@ -266,7 +266,7 @@ chunker_process(Chunker *c)
             return NULL;
         }
     }
-    /* here we either are at eof ... */
+    /* Here we are either at EOF ... */
     if(c->eof) {
         c->done = 1;
         if(c->remaining) {

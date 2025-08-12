@@ -55,10 +55,10 @@ cdef class CompressorBase:
     """
     base class for all (de)compression classes,
     also handles compression format auto detection and
-    adding/stripping the ID header (which enable auto detection).
+    adding/stripping the ID header (which enables auto detection).
     """
     ID = b'\xFF\xFF'  # reserved and not used
-                      # overwrite with a unique 2-bytes bytestring in child classes
+                      # overwrite with a unique 2-byte byte string in child classes
     name = 'baseclass'
 
     @classmethod
@@ -147,7 +147,7 @@ cdef class DecidingCompressor(CompressorBase):
 
 class CNONE(CompressorBase):
     """
-    none - no compression, just pass through data
+    None - no compression; just pass through data.
     """
     ID = b'\x00\x00'
     name = 'none'
@@ -167,9 +167,9 @@ class LZ4(DecidingCompressor):
     raw LZ4 compression / decompression (liblz4).
 
     Features:
-        - lz4 is super fast
-        - wrapper releases CPython's GIL to support multithreaded code
-        - uses safe lz4 methods that never go beyond the end of the output buffer
+        - LZ4 is super fast
+        - The wrapper releases CPython's GIL to support multithreaded code
+        - Uses safe LZ4 methods that never go beyond the end of the output buffer
     """
     ID = b'\x01\x00'
     name = 'lz4'
@@ -196,7 +196,7 @@ class LZ4(DecidingCompressor):
             osize = LZ4_compress_default(source, dest, isize, osize)
         if not osize:
             raise Exception('lz4 compress failed')
-        # only compress if the result actually is smaller
+        # only compress if the result is actually smaller
         if osize < isize:
             return self, dest[:osize]
         else:
@@ -234,7 +234,7 @@ class LZ4(DecidingCompressor):
 
 class LZMA(DecidingCompressor):
     """
-    lzma compression / decompression
+    LZMA compression/decompression.
     """
     ID = b'\x02\x00'
     name = 'lzma'
@@ -251,7 +251,7 @@ class LZMA(DecidingCompressor):
 
         *lzma_data* is the LZMA result if *compressor* is LZMA as well, otherwise it is None.
         """
-        # we do not need integrity checks in lzma, we do that already
+        # We do not need integrity checks in LZMA; we do that already.
         lzma_data = lzma.compress(data, preset=self.level, check=lzma.CHECK_NONE)
         if len(lzma_data) < len(data):
             return self, lzma_data
@@ -267,10 +267,10 @@ class LZMA(DecidingCompressor):
 
 
 class ZSTD(DecidingCompressor):
-    """zstd compression / decompression (pypi: zstandard, gh: python-zstandard)"""
-    # This is a NOT THREAD SAFE implementation.
-    # Only ONE python context must be created at a time.
-    # It should work flawlessly as long as borg will call ONLY ONE compression job at time.
+    """Zstd compression/decompression (PyPI: zstandard, GH: python-zstandard)."""
+    # This is NOT THREAD-SAFE.
+    # Only ONE Python context must be created at a time.
+    # It should work flawlessly as long as borg calls ONLY ONE compression job at a time.
     ID = b'\x03\x00'
     name = 'zstd'
 
@@ -298,7 +298,7 @@ class ZSTD(DecidingCompressor):
             osize = ZSTD_compress(dest, osize, source, isize, level)
         if ZSTD_isError(osize):
             raise Exception('zstd compress failed: %s' % ZSTD_getErrorName(osize))
-        # only compress if the result actually is smaller
+        # only compress if the result is actually smaller
         if osize < isize:
             return self, dest[:osize]
         else:
@@ -334,7 +334,7 @@ class ZSTD(DecidingCompressor):
 
 class ZLIB(CompressorBase):
     """
-    zlib compression / decompression (python stdlib)
+    Zlib compression/decompression (Python stdlib).
     """
     ID = b'\x08\x00'  # not used here, see detect()
                       # avoid all 0x.8.. IDs elsewhere!
@@ -353,11 +353,11 @@ class ZLIB(CompressorBase):
         self.level = level
 
     def compress(self, data):
-        # note: for compatibility no super call, do not add ID bytes
+        # Note: for compatibility, no super call; do not add ID bytes.
         return zlib.compress(data, self.level)
 
     def decompress(self, data):
-        # note: for compatibility no super call, do not strip ID bytes
+        # Note: for compatibility, no super call; do not strip ID bytes.
         try:
             return zlib.decompress(data)
         except zlib.error as e:
@@ -417,17 +417,17 @@ class Auto(CompressorBase):
         compressor, cheap_compressed_data = self._decide(data)
         if compressor in (LZ4_COMPRESSOR, NONE_COMPRESSOR):
             # we know that trying to compress with expensive compressor is likely pointless,
-            # so we fallback to return the cheap compressed data.
+            # so we fall back to return the cheap compressed data.
             return cheap_compressed_data
         # if we get here, the decider decided to try the expensive compressor.
-        # we also know that the compressed data returned by the decider is lz4 compressed.
+        # we also know that the compressed data returned by the decider is LZ4-compressed.
         expensive_compressed_data = compressor.compress(data)
         ratio = len(expensive_compressed_data) / len(cheap_compressed_data)
         if ratio < 0.99:
-            # the expensive compressor managed to squeeze the data significantly better than lz4.
+            # the expensive compressor managed to squeeze the data significantly better than LZ4.
             return expensive_compressed_data
         else:
-            # otherwise let's just store the lz4 data, which decompresses extremely fast.
+            # otherwise let's just store the LZ4 data, which decompresses extremely fast.
             return cheap_compressed_data
 
     def decompress(self, data):
@@ -463,8 +463,7 @@ class ObfuscateSize(CompressorBase):
             self._obfuscate = self._padme_obfuscate
 
     def _obfuscate(self, compr_size):
-        # implementations need to return the size of obfuscation data,
-        # that the caller shall add.
+        # Implementations need to return the size of the obfuscation data that the caller shall add.
         raise NotImplementedError
 
     def _relative_random_reciprocal_obfuscate(self, compr_size):
@@ -538,8 +537,8 @@ LZ4_COMPRESSOR = get_compressor('lz4')
 
 class Compressor:
     """
-    compresses using a compressor with given name and parameters
-    decompresses everything we can handle (autodetect)
+    Compresses using a compressor with a given name and parameters.
+    Decompresses everything we can handle (autodetect).
     """
     def __init__(self, name='null', **kwargs):
         self.params = kwargs

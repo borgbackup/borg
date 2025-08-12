@@ -33,11 +33,11 @@ version = mp_version
 
 
 class PackException(Exception):
-    """Exception while msgpack packing"""
+    """Exception while msgpack packing."""
 
 
 class UnpackException(Exception):
-    """Exception while msgpack unpacking"""
+    """Exception while msgpack unpacking."""
 
 
 class Packer(mp_Packer):

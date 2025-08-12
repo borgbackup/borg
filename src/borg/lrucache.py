@@ -40,8 +40,8 @@ class LRUCache:
         return value
 
     def upd(self, key, value):
-        # special use only: update the value for an existing key without having to dispose it first
-        # this method complements __setitem__ which should be used for the normal use case.
+        # Special use only: update the value for an existing key without having to dispose it first.
+        # This method complements __setitem__, which should be used for the normal use case.
         assert key in self._cache, "Unexpected attempt to update a non-existing item."
         self._cache[key] = value
 

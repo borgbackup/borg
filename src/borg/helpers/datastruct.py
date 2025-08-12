@@ -2,7 +2,7 @@ from .errors import Error
 
 
 class StableDict(dict):
-    """A dict subclass with stable items() ordering"""
+    """A dict subclass with stable items() ordering."""
     def items(self):
         return sorted(super().items())
 
@@ -17,8 +17,8 @@ class Buffer:
 
     def __init__(self, allocator, size=4096, limit=None):
         """
-        Initialize the buffer: use allocator(size) call to allocate a buffer.
-        Optionally, set the upper <limit> for the buffer size.
+        Initialize the buffer: use allocator(size) to allocate a buffer.
+        Optionally set the upper limit for the buffer size via limit.
         """
         assert callable(allocator), 'must give alloc(size) function as first param'
         assert limit is None or size <= limit, 'initial size must be <= limit'
@@ -31,9 +31,9 @@ class Buffer:
 
     def resize(self, size, init=False):
         """
-        resize the buffer - to avoid frequent reallocation, we usually always grow (if needed).
-        giving init=True it is possible to first-time initialize or shrink the buffer.
-        if a buffer size beyond the limit is requested, raise Buffer.MemoryLimitExceeded (OSError).
+        Resize the buffer. To avoid frequent reallocation, we usually grow (if needed).
+        By giving init=True it is possible to first-time initialize or shrink the buffer.
+        If a buffer size beyond the limit is requested, raise Buffer.MemoryLimitExceeded (OSError).
         """
         size = int(size)
         if self.limit is not None and size > self.limit:
@@ -43,7 +43,7 @@ class Buffer:
 
     def get(self, size=None, init=False):
         """
-        return a buffer of at least the requested size (None: any current size).
+        Return a buffer of at least the requested size (None: any current size).
         init=True can be given to trigger shrinking of the buffer to the given size.
         """
         if size is not None:
@@ -57,13 +57,13 @@ class EfficientCollectionQueue:
     """
 
     class SizeUnderflow(Error):
-        """Could not pop_front first {} elements, collection only has {} elements.."""
+        """Could not pop_front the first {} elements; collection only has {} elements."""
 
     def __init__(self, split_size, member_type):
         """
-        Initializes empty queue.
-        Requires split_size to define maximum chunk size.
-        Requires member_type to be type defining what base collection looks like.
+        Initialize an empty queue.
+        Requires split_size to define the maximum chunk size.
+        Requires member_type to be the type defining what the base collection looks like.
         """
         self.buffers = []
         self.size = 0
@@ -72,9 +72,9 @@ class EfficientCollectionQueue:
 
     def peek_front(self):
         """
-        Returns first chunk from queue without removing it.
-        Returned collection will have between 1 and split_size length.
-        Returns empty collection when nothing is queued.
+        Return the first chunk from the queue without removing it.
+        The returned collection will have between 1 and split_size elements.
+        Returns an empty collection when nothing is queued.
         """
         if not self.buffers:
             return self.member_type()
@@ -83,8 +83,8 @@ class EfficientCollectionQueue:
 
     def pop_front(self, size):
         """
-        Removes first size elements from queue.
-        Throws if requested removal size is larger than whole queue.
+        Remove the first size elements from the queue.
+        Raises if the requested removal size is larger than the whole queue.
         """
         if size > self.size:
             raise EfficientCollectionQueue.SizeUnderflow(size, self.size)
@@ -101,8 +101,8 @@ class EfficientCollectionQueue:
 
     def push_back(self, data):
         """
-        Adds data at end of queue.
-        Takes care to chunk data into split_size sized elements.
+        Add data at the end of the queue.
+        Takes care to chunk data into split_size-sized elements.
         """
         if not self.buffers:
             self.buffers = [self.member_type()]
@@ -126,6 +126,6 @@ class EfficientCollectionQueue:
 
     def __bool__(self):
         """
-        Returns true if queue isn't empty.
+        Return True if the queue is not empty.
         """
         return self.size != 0

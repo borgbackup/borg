@@ -10,14 +10,14 @@ def translate(pat, match_end=r"\Z"):
     any path separator. Wrap meta-characters in brackets for a literal match (i.e. "[?]" to match the literal character
     "?").
 
-    Using match_end=regex one can give a regular expression that is used to match after the regex that is generated from
+    Using match_end=regex, one can provide a regular expression that is used to match after the regex that is generated from
     the pattern. The default is to match the end of the string.
 
     This function is derived from the "fnmatch" module distributed with the Python standard library.
 
     Copyright (C) 2001-2016 Python Software Foundation. All rights reserved.
 
-    TODO: support {alt1,alt2} shell-style alternatives
+    TODO: support {alt1,alt2} shell-style alternatives.
 
     """
     sep = os.path.sep

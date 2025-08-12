@@ -1,7 +1,7 @@
-# Completions for borg
+# Completions for Borg
 # https://www.borgbackup.org/
 # Note:
-# Listing archives works on password protected repositories only if $BORG_PASSPHRASE is set.
+# Listing archives works on password-protected repositories only if $BORG_PASSPHRASE is set.
 # Install:
 # Copy this file to /usr/share/bash-completion/completions/ or /etc/bash_completion.d/
 
@@ -57,7 +57,7 @@ _borg()
             return 0
             ;;
         '-o')
-            # FIXME This list is probably not full, but I tried to pick only those that are relevant to borg mount -o:
+            # FIXME: This list is probably not complete, but it includes options relevant to 'borg mount -o':
             local fuse_options="ac_attr_timeout= allow_damaged_files allow_other allow_root attr_timeout= auto auto_cache auto_unmount default_permissions entry_timeout= gid= group_id= kernel_cache max_read= negative_timeout= noauto noforget remember= remount rootmode= uid= umask= user user_id= versions"
             COMPREPLY=( $(compgen -W "${fuse_options}" -- ${cur}) )
             return 0
@@ -162,11 +162,11 @@ _borg()
     if [[ ${prev} == "::" ]] ; then
         list_archives=1
     fi
-    # Second archive listing for borg diff
+    # Second archive listing for 'borg diff'
     if [[ ${COMP_LINE} =~ ^.*\ diff\ .*::[^\ ]+\ ${cur}$ ]] ; then
         list_archives=1
     fi
-    # Additional archive listing for borg delete
+    # Additional archive listing for 'borg delete'
     if [[ ${COMP_LINE} =~ ^.*\ delete\ .*::[^\ ]+.*${cur}$ ]] ; then
         list_archives=1
     fi

@@ -182,7 +182,7 @@ class TestNonceManager:
         assert self.cache_nonce() == "0000000000002033"
         assert self.repository.next_free == 0x2033
 
-        # somehow the clients unlocks, another client reserves and this client relocks
+        # somehow the client unlocks, another client reserves, and this client relocks
         self.repository.next_free = 0x4000
 
         # enough space in reservation

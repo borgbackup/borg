@@ -39,7 +39,7 @@ def process_alive(host, pid, thread):
     Check if the (host, pid, thread_id) combination corresponds to a potentially alive process.
 
     If the process is local, then this will be accurate. If the process is not local, then this
-    returns always True, since there is no real way to check.
+    always returns True, since there is no real way to check.
     """
     from . import local_pid_alive
     from . import hostid
@@ -110,8 +110,7 @@ def group2gid(group, default=None):
 
 
 def posix_acl_use_stored_uid_gid(acl):
-    """Replace the user/group field with the stored uid/gid
-    """
+    """Replace the user/group field with the stored uid/gid."""
     from ..helpers import safe_decode, safe_encode
     entries = []
     for entry in safe_decode(acl).split('\n'):

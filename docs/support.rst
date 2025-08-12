@@ -15,7 +15,7 @@ Security
 --------
 
 In case you discover a security issue, please use this contact for reporting it
-privately and please, if possible, use encrypted E-Mail:
+privately and please, if possible, use encrypted email:
 
 Thomas Waldmann <tw@waldmann-edv.de>
 
@@ -28,7 +28,7 @@ Verifying signed releases
 -------------------------
 
 `Releases <https://github.com/borgbackup/borg/releases>`_ are signed with the
-same GPG key and a .asc file is provided for each binary.
+same GPG key and an .asc file is provided for each binary.
 
 To verify a signature, the public key needs to be known to GPG. It can be
 imported into the local keystore from a keyserver with the fingerprint::
@@ -41,7 +41,7 @@ If GPG successfully imported the key, the output should include (among other thi
       gpg: Total number processed: 1
       ...
 
-To verify for example the signature of the borg-linux64 binary::
+To verify, for example, the signature of the borg-linux64 binary::
 
       gpg --verify borg-linux64.asc
 

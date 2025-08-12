@@ -40,7 +40,7 @@ NOTES
 SEE ALSO
 --------
 
-`borg-common(1)` for common command line options
+`borg-common(1)` for common command-line options
 
 `borg-init(1)`,
 `borg-create(1)`, `borg-mount(1)`, `borg-extract(1)`,

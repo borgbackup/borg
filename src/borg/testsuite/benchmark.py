@@ -1,5 +1,5 @@
 """
-Do benchmarks using pytest-benchmark.
+Run benchmarks using pytest-benchmark.
 
 Usage:
 

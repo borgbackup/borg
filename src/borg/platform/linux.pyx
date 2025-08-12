@@ -134,7 +134,7 @@ def set_flags(path, bsd_flags, fd=None):
     if fd is None:
         st = os.stat(path, follow_symlinks=False)
         if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISLNK(st.st_mode):
-            # see comment in get_flags()
+            # See comment in get_flags().
             return
     cdef int flags = 0
     for bsd_flag, linux_flag in BSD_TO_LINUX_FLAGS.items():
@@ -155,8 +155,8 @@ def set_flags(path, bsd_flags, fd=None):
 
 def get_flags(path, st, fd=None):
     if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISLNK(st.st_mode):
-        # avoid opening devices files - trying to open non-present devices can be rather slow.
-        # avoid opening symlinks, O_NOFOLLOW would make the open() fail anyway.
+        # Avoid opening device files - trying to open non-present devices can be rather slow.
+        # Avoid opening symlinks; O_NOFOLLOW would make the open() fail anyway.
         return 0
     cdef int linux_flags
     open_fd = fd is None
@@ -179,8 +179,7 @@ def get_flags(path, st, fd=None):
 
 
 def acl_use_local_uid_gid(acl):
-    """Replace the user/group field with the local uid/gid if possible
-    """
+    """Replace the user/group field with the local uid/gid if possible."""
     entries = []
     for entry in safe_decode(acl).split('\n'):
         if entry:
@@ -194,8 +193,7 @@ def acl_use_local_uid_gid(acl):
 
 
 cdef acl_append_numeric_ids(acl):
-    """Extend the "POSIX 1003.1e draft standard 17" format with an additional uid/gid field
-    """
+    """Extend the "POSIX 1003.1e draft standard 17" format with an additional uid/gid field."""
     entries = []
     for entry in _comment_re.sub('', safe_decode(acl)).split('\n'):
         if entry:
@@ -210,8 +208,7 @@ cdef acl_append_numeric_ids(acl):
 
 
 cdef acl_numeric_ids(acl):
-    """Replace the "POSIX 1003.1e draft standard 17" user/group field with uid/gid
-    """
+    """Replace the "POSIX 1003.1e draft standard 17" user/group field with uid/gid."""
     entries = []
     for entry in _comment_re.sub('', safe_decode(acl)).split('\n'):
         if entry:
@@ -243,8 +240,8 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     if ret < 0:
         raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
     if ret == 0:
-        # there is no ACL defining permissions other than those defined by the traditional file permission bits.
-        # note: this should also be the case for symlink fs objects, as they can not have ACLs.
+        # There is no ACL defining permissions other than those defined by the traditional file permission bits.
+        # Note: this should also be the case for symlink file system objects, as they cannot have ACLs.
         return
     if numeric_ids:
         converter = acl_numeric_ids
@@ -265,7 +262,7 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
         acl_free(access_text)
         acl_free(access_acl)
     if stat.S_ISDIR(st.st_mode):
-        # only directories can have a default ACL. there is no fd-based api to get it.
+        # Only directories can have a default ACL. There is no fd-based API to get it.
         try:
             default_acl = acl_get_file(path, ACL_TYPE_DEFAULT)
             if default_acl == NULL:
@@ -284,7 +281,7 @@ def acl_set(path, item, numeric_ids=False, fd=None):
     cdef acl_t default_acl = NULL
 
     if stat.S_ISLNK(item.get('mode', 0)):
-        # Linux does not support setting ACLs on symlinks
+        # Linux does not support setting ACLs on symlinks.
         return
 
     if isinstance(path, str):
@@ -313,7 +310,7 @@ def acl_set(path, item, numeric_ids=False, fd=None):
             default_acl = acl_from_text(<bytes>converter(default_text))
             if default_acl == NULL:
                 raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-            # only directories can get a default ACL. there is no fd-based api to set it.
+            # Only directories can get a default ACL. There is no fd-based API to set it.
             if acl_set_file(path, ACL_TYPE_DEFAULT, default_acl) == -1:
                 raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         finally:
@@ -333,9 +330,9 @@ cdef unsigned PAGE_MASK = sysconf(_SC_PAGESIZE) - 1
 
 if 'basesyncfile' in workarounds or not SYNC_FILE_RANGE_LOADED:
     class SyncFile(BaseSyncFile):
-        # if we are on platforms with a broken or not implemented sync_file_range,
+        # If we are on platforms with a broken or not implemented sync_file_range,
         # use the more generic BaseSyncFile to avoid issues.
-        # see basesyncfile description in our docs for details.
+        # See BaseSyncFile description in our docs for details.
         pass
 else:
     # a real Linux, so we can do better. :)
@@ -343,7 +340,7 @@ else:
         """
         Implemented using sync_file_range for asynchronous write-out and fdatasync for actual durability.
 
-        "write-out" means that dirty pages (= data that was written) are submitted to an I/O queue and will be send to
+        "write-out" means that dirty pages (= data that was written) are submitted to an I/O queue and will be sent to
         disk in the immediate future.
         """
 
@@ -369,6 +366,6 @@ else:
         def sync(self):
             self.f.flush()
             os.fdatasync(self.fd)
-            # tell the OS that it does not need to cache what we just wrote,
-            # avoids spoiling the cache for the OS and other processes.
+            # Tell the OS that it does not need to cache what we just wrote,
+            # This avoids spoiling the cache for the OS and other processes.
             safe_fadvise(self.fd, 0, 0, 'DONTNEED')

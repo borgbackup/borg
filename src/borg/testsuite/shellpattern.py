@@ -82,10 +82,10 @@ def test_match(path, patterns):
     ("foo", ["?foo"]),
     ("foo", ["f?oo"]),
 
-    # do not match path separator
+    # Do not match path separator
     ("foo/ar", ["foo?ar"]),
 
-    # do not match/cross over os.path.sep
+    # Do not match/cross over os.path.sep
     ("foo/bar", ["*"]),
     ("foo/bar", ["foo*bar"]),
     ("foo/bar", ["foo*ar"]),

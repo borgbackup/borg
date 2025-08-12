@@ -36,15 +36,15 @@ _Chunk.__doc__ = """\
     meta is always a dictionary, data depends on allocation.
 
     data chunk read from a DATA range of a file (not from a sparse hole):
-        meta = {'allocation' = CH_DATA, 'size' = size_of_chunk }
+        meta = {'allocation': CH_DATA, 'size': size_of_chunk}
         data = read_data [bytes or memoryview]
 
     all-zero chunk read from a DATA range of a file (not from a sparse hole, but detected to be all-zero):
-        meta = {'allocation' = CH_ALLOC, 'size' = size_of_chunk }
+        meta = {'allocation': CH_ALLOC, 'size': size_of_chunk}
         data = None
 
     all-zero chunk from a HOLE range of a file (from a sparse hole):
-        meta = {'allocation' = CH_HOLE, 'size' = size_of_chunk }
+        meta = {'allocation': CH_HOLE, 'size': size_of_chunk}
         data = None
 """
 
@@ -57,8 +57,8 @@ def dread(offset, size, fd=None, fh=-1):
     if use_fh:
         data = os.read(fh, size)
         if hasattr(os, 'posix_fadvise'):
-            # UNIX only and, in case of block sizes that are not a multiple of the
-            # system's page size, better be used with a bug fixed linux kernel > 4.6.0,
+            # UNIX-only and, in case of block sizes that are not a multiple of the
+            # system's page size, it is better used with a bug-fixed Linux kernel >= 4.6.0,
             # see comment/workaround in _chunker.c and borgbackup issue #907.
             os.posix_fadvise(fh, offset, len(data), os.POSIX_FADV_DONTNEED)
         return data
@@ -86,14 +86,14 @@ def dpos_curr_end(fd=None, fh=-1):
 
 def sparsemap(fd=None, fh=-1):
     """
-    generator yielding a (start, length, is_data) tuple for each range.
-    is_data is indicating data ranges (True) or hole ranges (False).
+    Generator yielding a (start, length, is_data) tuple for each range.
+    is_data indicates data ranges (True) or hole ranges (False).
 
-    note:
-    the map is generated starting from the current seek position (it
+    Note:
+    The map is generated starting from the current seek position (it
     is not required to be 0 / to be at the start of the file) and
-    work from there up to the end of the file.
-    when the generator is finished, the file pointer position will be
+    works from there up to the end of the file.
+    When the generator is finished, the file pointer position will be
     reset to where it was before calling this function.
     """
     curr, file_len = dpos_curr_end(fd, fh)
@@ -107,7 +107,7 @@ def sparsemap(fd=None, fh=-1):
             except OSError as e:
                 if e.errno == errno.ENXIO:
                     if not is_data and start < file_len:
-                        # if there is a hole at the end of a file, we can not find the file end by SEEK_DATA
+                        # If there is a hole at the end of a file, we cannot find the file end by SEEK_DATA
                         # (because we run into ENXIO), thus we must manually deal with this case:
                         end = file_len
                         yield (start, end - start, is_data)
@@ -120,7 +120,7 @@ def sparsemap(fd=None, fh=-1):
             start = end
             whence = os.SEEK_DATA if is_data else os.SEEK_HOLE
     finally:
-        # seek to same position as before calling this function
+        # Seek to the same position as before calling this function
         dseek(curr, os.SEEK_SET, fd, fh)
 
 
@@ -271,7 +271,7 @@ cdef class Chunker:
         got = len(data)
         # we do not have SEEK_DATA/SEEK_HOLE support in chunker_process C code,
         # but we can just check if data was all-zero (and either came from a hole
-        # or from stored zeros - we can not detect that here).
+        # or from stored zeros - we cannot detect that here).
         if zeros.startswith(data):
             data = None
             allocation = CH_ALLOC

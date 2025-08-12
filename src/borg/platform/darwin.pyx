@@ -101,8 +101,7 @@ def setxattr(path, name, value, *, follow_symlinks=False):
 
 
 def _remove_numeric_id_if_possible(acl):
-    """Replace the user/group field with the local uid/gid if possible
-    """
+    """Replace the user/group field with the local uid/gid if possible."""
     entries = []
     for entry in safe_decode(acl).split('\n'):
         if entry:
@@ -118,8 +117,7 @@ def _remove_numeric_id_if_possible(acl):
 
 
 def _remove_non_numeric_identifier(acl):
-    """Remove user and group names from the acl
-    """
+    """Remove user and group names from the ACL."""
     entries = []
     for entry in safe_decode(acl).split('\n'):
         if entry:

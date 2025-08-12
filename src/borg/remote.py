@@ -47,11 +47,11 @@ RATELIMIT_PERIOD = 0.1
 
 
 def os_write(fd, data):
-    """os.write wrapper so we do not lose data for partial writes."""
-    # TODO: this issue is fixed in cygwin since at least 2.8.0, remove this
-    #       wrapper / workaround when this version is considered ancient.
-    # This is happening frequently on cygwin due to its small pipe buffer size of only 64kiB
-    # and also due to its different blocking pipe behaviour compared to Linux/*BSD.
+    """Wrapper around os.write to avoid data loss on partial writes."""
+    # TODO: This issue is fixed in Cygwin since at least 2.8.0; remove this
+    #       wrapper/workaround when this version is considered ancient.
+    # This happens frequently on Cygwin due to its small pipe buffer size of only 64 KiB
+    # and also due to its different blocking pipe behavior compared to Linux/*BSD.
     # Neither Linux nor *BSD ever do partial writes on blocking pipes, unless interrupted by a
     # signal, in which case serve() would terminate.
     amount = remaining = len(data)
@@ -66,7 +66,7 @@ def os_write(fd, data):
 
 
 class ConnectionClosed(Error):
-    """Connection closed by remote host"""
+    """Connection closed by remote host."""
     exit_mcode = 80
 
 
@@ -81,7 +81,7 @@ class PathNotAllowed(Error):
 
 
 class InvalidRPCMethod(Error):
-    """RPC method {} is not valid"""
+    """RPC method {} is not valid."""
     exit_mcode = 82
 
 

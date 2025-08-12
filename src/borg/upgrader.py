@@ -23,15 +23,15 @@ class AtticRepositoryUpgrader(Repository):
         super().__init__(*args, **kw)
 
     def upgrade(self, dryrun=True, inplace=False, progress=False):
-        """convert an attic repository to a borg repository
+        """Convert an Attic repository to a Borg repository.
 
-        those are the files that need to be upgraded here, from most
+        These are the files that need to be upgraded here, from most
         important to least important: segments, key files, and various
-        caches, the latter being optional, as they will be rebuilt if
+        caches—the latter being optional, as they will be rebuilt if
         missing.
 
-        we nevertheless do the order in reverse, as we prefer to do
-        the fast stuff first, to improve interactivity.
+        We nevertheless do the order in reverse, as we prefer to do
+        the fast stuff first to improve interactivity.
         """
         with self:
             backup = None
@@ -70,13 +70,14 @@ class AtticRepositoryUpgrader(Repository):
 
     @staticmethod
     def convert_segments(segments, dryrun=True, inplace=False, progress=False):
-        """convert repository segments from attic to borg
+        """Convert repository segments from Attic to Borg.
 
-        replacement pattern is `s/ATTICSEG/BORG_SEG/` in files in
+        Replacement pattern is `s/ATTICSEG/BORG_SEG/` in files in
         `$ATTIC_REPO/data/**`.
 
-        luckily the magic string length didn't change so we can just
-        replace the 8 first bytes of all regular files in there."""
+        Luckily the magic string length did not change, so we can just
+        replace the first 8 bytes of all regular files in there.
+        """
         logger.info("converting %d segments..." % len(segments))
         segment_count = len(segments)
         pi = ProgressIndicatorPercent(total=segment_count, msg="Converting segments %3.0f%%", msgid='upgrade.convert_segments')
@@ -94,55 +95,57 @@ class AtticRepositoryUpgrader(Repository):
     def header_replace(filename, old_magic, new_magic, inplace=True):
         with open(filename, 'r+b') as segment:
             segment.seek(0)
-            # only write if necessary
+            # Only write if necessary.
             if segment.read(len(old_magic)) == old_magic:
                 if inplace:
                     segment.seek(0)
                     segment.write(new_magic)
                 else:
-                    # rename the hardlink and rewrite the file. this works
-                    # because the file is still open. so even though the file
+                    # Rename the hardlink and rewrite the file. This works
+                    # because the file is still open. Even though the file
                     # is renamed, we can still read it until it is closed.
                     os.rename(filename, filename + '.tmp')
                     with open(filename, 'wb') as new_segment:
                         new_segment.write(new_magic)
                         new_segment.write(segment.read())
-                    # the little dance with the .tmp file is necessary
-                    # because Windows won't allow overwriting an open file.
+                    # The little dance with the .tmp file is necessary
+                    # because Windows will not allow overwriting an open file.
                     os.unlink(filename + '.tmp')
 
     def find_attic_keyfile(self):
-        """find the attic keyfiles
+        """Find the Attic key files.
 
-        the keyfiles are loaded by `KeyfileKey.find_key_file()`. that
+        The key files are loaded by `KeyfileKey.find_key_file()`. That
         finds the keys with the right identifier for the repo.
 
-        this is expected to look into $HOME/.attic/keys or
+        This is expected to look into $HOME/.attic/keys or
         $ATTIC_KEYS_DIR for key files matching the given Borg
         repository.
 
-        it is expected to raise an exception (KeyfileNotFoundError) if
-        no key is found. whether that exception is from Borg or Attic
+        It is expected to raise an exception (KeyfileNotFoundError) if
+        no key is found. Whether that exception is from Borg or Attic
         is unclear.
 
-        this is split in a separate function in case we want to use
-        the attic code here directly, instead of our local
-        implementation."""
+        This is split into a separate function in case we want to use
+        the Attic code here directly, instead of our local
+        implementation.
+        """
         return AtticKeyfileKey.find_key_file(self)
 
     @staticmethod
     def convert_keyfiles(keyfile, dryrun):
-        """convert key files from attic to borg
+        """Convert key files from Attic to Borg.
 
-        replacement pattern is `s/ATTIC KEY/BORG_KEY/` in
+        Replacement pattern is `s/ATTIC KEY/BORG_KEY/` in
         `get_keys_dir()`, that is `$ATTIC_KEYS_DIR` or
         `$HOME/.attic/keys`, and moved to `$BORG_KEYS_DIR` or
         `$HOME/.config/borg/keys`.
 
-        no need to decrypt to convert. we need to rewrite the whole
-        key file because magic string length changed, but that's not a
-        problem because the keyfiles are small (compared to, say,
-        all the segments)."""
+        No need to decrypt to convert. We need to rewrite the whole
+        key file because the magic string length changed, but that is not a
+        problem because the key files are small (compared to, say,
+        all the segments).
+        """
         logger.info("converting keyfile %s" % keyfile)
         with open(keyfile) as f:
             data = f.read()
@@ -154,16 +157,16 @@ class AtticRepositoryUpgrader(Repository):
                 f.write(data)
 
     def convert_repo_index(self, dryrun, inplace):
-        """convert some repo files
+        """Convert some repo files.
 
-        those are all hash indexes, so we need to
+        These are all hash indexes, so we need to
         `s/ATTICIDX/BORG_IDX/` in a few locations:
 
         * the repository index (in `$ATTIC_REPO/index.%d`, where `%d`
           is the `Repository.get_index_transaction_id()`), which we
-          should probably update, with a lock, see
-          `Repository.open()`, which i'm not sure we should use
-          because it may write data on `Repository.close()`...
+          should probably update with a lock (see
+          `Repository.open()`), although we might avoid it because it may
+          write data on `Repository.close()`.
         """
         transaction_id = self.get_index_transaction_id()
         if transaction_id is None:
@@ -175,16 +178,16 @@ class AtticRepositoryUpgrader(Repository):
                 AtticRepositoryUpgrader.header_replace(index, b'ATTICIDX', b'BORG_IDX', inplace=inplace)
 
     def convert_cache(self, dryrun):
-        """convert caches from attic to borg
+        """Convert caches from Attic to Borg.
 
-        those are all hash indexes, so we need to
+        These are all hash indexes, so we need to
         `s/ATTICIDX/BORG_IDX/` in a few locations:
 
         * the `files` and `chunks` cache (in `$ATTIC_CACHE_DIR` or
           `$HOME/.cache/attic/<repoid>/`), which we could just drop,
-          but if we'd want to convert, we could open it with the
-          `Cache.open()`, edit in place and then `Cache.close()` to
-          make sure we have locking right
+          but if we wanted to convert it, we could open it with
+          `Cache.open()`, edit in place, and then `Cache.close()` to
+          make sure we have locking right.
         """
         # copy of attic's get_cache_dir()
         attic_cache_dir = os.environ.get('ATTIC_CACHE_DIR',
@@ -194,19 +197,17 @@ class AtticRepositoryUpgrader(Repository):
         borg_cache_dir = os.path.join(get_cache_dir(), self.id_str)
 
         def copy_cache_file(path):
-            """copy the given attic cache path into the borg directory
+            """Copy the given Attic cache path into the Borg directory.
 
-            does nothing if dryrun is True. also expects
+            Does nothing if dryrun is True. Also expects
             attic_cache_dir and borg_cache_dir to be set in the parent
-            scope, to the directories path including the repository
+            scope, to the directories' paths including the repository
             identifier.
 
-            :params path: the basename of the cache file to copy
-            (example: "files" or "chunks") as a string
-
-            :returns: the borg file that was created or None if no
-            Attic cache file was found.
-
+            :param path: the basename of the cache file to copy
+                (example: "files" or "chunks") as a string
+            :returns: the Borg file that was created, or None if no
+                Attic cache file was found.
             """
             attic_file = os.path.join(attic_cache_dir, path)
             if os.path.exists(attic_file):

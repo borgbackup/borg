@@ -15,12 +15,12 @@ from . import BaseTestCase, unopened_tempfile
 
 
 def H(x):
-    # make some 32byte long thing that depends on x
+    # Make some 32-byte long thing that depends on x
     return bytes('%-0.32d' % x, 'ascii')
 
 
 def H2(x):
-    # like H(x), but with pseudo-random distribution of the output value
+    # Like H(x), but with pseudo-random distribution of the output value
     return hashlib.sha256(H(x)).digest()
 
 
@@ -160,12 +160,12 @@ class HashIndexExtraTestCase(BaseTestCase):
     """These tests are separate because they should not become part of the selftest.
     """
     def test_chunk_indexer(self):
-        # see _hashindex.c hash_sizes, we want to be close to the max. load
+        # See _hashindex.c hash_sizes; we want to be close to the maximum load
         # because interesting errors happen there.
         key_count = int(65537 * ChunkIndex.MAX_LOAD_FACTOR) - 10
         index = ChunkIndex(key_count)
         all_keys = [hashlib.sha256(H(k)).digest() for k in range(key_count)]
-        # we're gonna delete 1/3 of all_keys, so let's split them 2/3 and 1/3:
+        # We are going to delete 1/3 of all_keys, so let's split them 2/3 and 1/3:
         keys, to_delete_keys = all_keys[0:(2*key_count//3)], all_keys[(2*key_count//3):]
 
         for i, key in enumerate(keys):
@@ -180,10 +180,10 @@ class HashIndexExtraTestCase(BaseTestCase):
         for key in to_delete_keys:
             assert index.get(key) is None
 
-        # now delete every key still in the index
+        # Now delete every key still in the index
         for key in keys:
             del index[key]
-        # the index should now be empty
+        # The index should now be empty
         assert list(index.iteritems()) == []
 
 
@@ -533,33 +533,33 @@ class IndexCorruptionTestCase(BaseTestCase):
         from struct import pack
 
         def HH(x, y):
-            # make some 32byte long thing that depends on x and y.
-            # same x will mean a collision in the hashtable as bucket index is computed from
-            # first 4 bytes. giving a specific x targets bucket index x.
-            # y is to create different keys and does not go into the bucket index calculation.
-            # so, same x + different y --> collision
+            # Make some 32-byte long thing that depends on x and y.
+            # The same x will mean a collision in the hash table as the bucket index is computed from
+            # the first 4 bytes. Giving a specific x targets bucket index x.
+            # y is used to create different keys and does not go into the bucket index calculation.
+            # Therefore, same x + different y -> collision
             return pack('<IIQQQ', x, y, 0, 0, 0)  # 2 * 4 + 3 * 8 == 32
 
         idx = NSIndex()
 
-        # create lots of colliding entries
+        # Create lots of colliding entries
         for y in range(700):  # stay below max load to not trigger resize
             idx[HH(0, y)] = (0, y)
 
         assert idx.size() == 1031 * 40 + 18  # 1031 buckets + header
 
-        # delete lots of the collisions, creating lots of tombstones
+        # Delete many of the collisions, creating many tombstones
         for y in range(400):  # stay above min load to not trigger resize
             del idx[HH(0, y)]
 
-        # create lots of colliding entries, within the not yet used part of the hashtable
+        # Create many colliding entries within the not-yet-used part of the hash table
         for y in range(330):  # stay below max load to not trigger resize
-            # at y == 259 a resize will happen due to going beyond max EFFECTIVE load
-            # if the bug is present, that element will be inserted at the wrong place.
-            # and because it will be at the wrong place, it can not be found again.
+            # At y == 259 a resize will happen due to going beyond the maximum EFFECTIVE load.
+            # If the bug is present, that element will be inserted at the wrong place.
+            # And because it will be at the wrong place, it cannot be found again.
             idx[HH(600, y)] = 600, y
 
-        # now check if hashtable contents is as expected:
+        # Now check if the hash table contents are as expected:
 
         assert [idx.get(HH(0, y)) for y in range(400, 700)] == [(0, y) for y in range(400, 700)]
 

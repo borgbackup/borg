@@ -10,18 +10,18 @@ Borg does not have a public API on the Python level. That does not keep you from
 but does mean that there are no release-to-release guarantees on what you might find in that package, not
 even for point releases (1.1.x), and there is no documentation beyond the code and the internals documents.
 
-Borg does on the other hand provide an API on a command-line level. In other words, a frontend should
-(for example) create a backup archive just invoke :ref:`borg_create`, give commandline parameters/options
-as needed and parse JSON output from borg.
+Borg does, on the other hand, provide an API on a command-line level. In other words, a frontend should
+(for example) create a backup archive by invoking :ref:`borg_create`, pass command-line parameters/options
+as needed, and parse JSON output from Borg.
 
-Important: JSON output is expected to be UTF-8, but currently borg depends on the locale being configured
-for that (must be a UTF-8 locale and *not* "C" or "ascii"), so that Python will choose to encode to UTF-8.
-The same applies to any inputs read by borg, they are expected to be UTF-8 encoded also.
+Important: JSON output is expected to be UTF-8, but currently Borg depends on the locale being configured
+for that (must be a UTF-8 locale and not "C" or "ASCII"), so that Python will choose to encode to UTF-8.
+The same applies to any inputs read by Borg; they are expected to be UTF-8 encoded also.
 
 We consider this a bug (see :issue:`2273`) and might fix it later, so borg will use UTF-8 independent of
 the locale.
 
-On POSIX systems, you can usually set environment vars to choose a UTF-8 locale:
+On POSIX systems, you can usually set environment variables to choose a UTF-8 locale:
 
 ::
 

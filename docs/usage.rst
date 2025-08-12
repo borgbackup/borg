@@ -22,7 +22,7 @@ Usage
            window.location.pathname = replaced;
        }
    }
-   // Fixup anchored links from when usage.html contained all the commands
+   // Fix up anchored links from when usage.html contained all the commands
    else if(hash.startsWith("borg-key") || hash == "borg-change-passphrase") {
       window.location.hash = "";
       window.location.pathname = window.location.pathname.replace("usage.html", "usage/key.html");

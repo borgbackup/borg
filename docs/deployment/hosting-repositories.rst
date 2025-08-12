@@ -5,11 +5,11 @@
 Hosting repositories
 ====================
 
-This sections shows how to securely provide repository storage for users.
+This section shows how to securely provide repository storage for users.
 Optionally, each user can have a storage quota.
 
 Repositories are accessed through SSH. Each user of the service should
-have her own login which is only able to access the user's files.
+have their own login which is only able to access the user's files.
 Technically it would be possible to have multiple users share one login,
 however, separating them is better. Separate logins increase isolation
 and are thus an additional layer of security and safety for both the

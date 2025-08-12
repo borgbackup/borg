@@ -1,6 +1,6 @@
-# stuff we need to include into the sdist is handled automatically by
-# setuptools_scm - it includes all git-committed files.
-# but we want to exclude some committed files/dirs not needed in the sdist:
+# Files to include into the sdist are handled automatically by
+# setuptools_scm — it includes all Git-committed files.
+# But we want to exclude some committed files/dirs not needed in the sdist:
 exclude .editorconfig .gitattributes .gitignore .mailmap Vagrantfile
 prune .github
 include src/borg/platform/darwin.c src/borg/platform/freebsd.c src/borg/platform/linux.c src/borg/platform/posix.c

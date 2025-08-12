@@ -52,7 +52,7 @@ Borg development happens on the ``master`` branch and uses GitHub pull
 requests (if you don't have GitHub or don't want to use it you can
 send smaller patches via the borgbackup mailing list to the maintainers).
 
-Stable releases are maintained on maintenance branches named ``x.y-maint``, eg.
+Stable releases are maintained on maintenance branches named ``x.y-maint``, e.g.
 the maintenance branch of the 1.4.x series is ``1.4-maint``.
 
 Most PRs should be filed against the ``master`` branch. Only if an
@@ -372,6 +372,7 @@ Checklist:
   ::
 
     scripts/sign-binaries 201912312359
+
 - Close the release milestone on GitHub.
 - `Update borgbackup.org
   <https://github.com/borgbackup/borgbackup.github.io/pull/53/files>`_ with the

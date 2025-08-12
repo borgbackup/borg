@@ -9,7 +9,7 @@ from . import BaseTestCase
 
 
 def cf(chunks):
-    """chunk filter"""
+    """Chunk filter."""
     # this is to simplify testing: either return the data piece (bytes) or the hole length (int).
     def _cf(chunk):
         if chunk.meta['allocation'] == CH_DATA:

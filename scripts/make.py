@@ -23,7 +23,7 @@ def format_metavar(option):
 
 
 class BuildUsage:
-    """generate usage docs for each command"""
+    """Generate usage docs for each command."""
 
     def run(self):
         print('generating usage docs')
@@ -31,11 +31,11 @@ class BuildUsage:
         borg.doc_mode = 'build_man'
         if not os.path.exists('docs/usage'):
             os.mkdir('docs/usage')
-        # allows us to build docs without the C modules fully loaded during help generation
+        # Allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
         parser = Archiver(prog='borg').build_parser()
-        # borgfs has a separate man page to satisfy debian's "every program from a package
-        # must have a man page" requirement, but it doesn't need a separate HTML docs page
+        # borgfs has a separate man page to satisfy Debian's "every program from a package
+        # must have a man page" requirement, but it does not need a separate HTML docs page.
         #borgfs_parser = Archiver(prog='borgfs').build_parser()
 
         self.generate_level("", parser, Archiver)
@@ -290,7 +290,7 @@ class BuildMan:
         import borg
         borg.doc_mode = 'build_man'
         os.makedirs('docs/man', exist_ok=True)
-        # allows us to build docs without the C modules fully loaded during help generation
+        # Allows us to build docs without the C modules fully loaded during help generation
         from borg.archiver import Archiver
         parser = Archiver(prog='borg').build_parser()
         borgfs_parser = Archiver(prog='borgfs').build_parser()

@@ -38,6 +38,6 @@ class ChunkerRegressionTestCase(BaseTestCase):
                             runs.append(H(b''.join(chunks)))
 
         # The "correct" hash below matches the existing chunker behavior.
-        # Future chunker optimisations must not change this, or existing repos will bloat.
+        # Future chunker optimizations must not change this, or existing repos will bloat.
         overall_hash = H(b''.join(runs))
         self.assert_equal(overall_hash, hex_to_bin("a43d0ecb3ae24f38852fcc433a83dacd28fe0748d09cc73fc11b69cf3f1a7299"))

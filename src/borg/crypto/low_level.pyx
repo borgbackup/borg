@@ -1,4 +1,4 @@
-"""An AEAD style OpenSSL wrapper
+"""An AEAD-style OpenSSL wrapper.
 
 API:
 
@@ -15,10 +15,10 @@ Envelope layout:
 |------------- #header_len ------>|
 
 S means a cryptographic signature function (like HMAC or GMAC).
-E means a encryption function (like AES).
+E means an encryption function (like AES).
 iv is the initialization vector / nonce, if needed.
 
-The split of header into not authenticated data and aad (additional authenticated
+The split of header into unauthenticated data and AAD (additional authenticated
 data) is done to support the legacy envelope layout as used in attic and early borg
 (where the TYPE byte was not authenticated) and avoid unneeded memcpy and string
 garbage.
@@ -136,7 +136,7 @@ class UNENCRYPTED:
 
     def encrypt(self, data, header=b'', iv=None):
         """
-        IMPORTANT: it is called encrypt to satisfy the crypto api naming convention,
+        IMPORTANT: It is called encrypt to satisfy the crypto API naming convention,
         but this does NOT encrypt and it does NOT compute and store a MAC either.
         """
         if iv is not None:
@@ -146,7 +146,7 @@ class UNENCRYPTED:
 
     def decrypt(self, envelope):
         """
-        IMPORTANT: it is called decrypt to satisfy the crypto api naming convention,
+        IMPORTANT: It is called decrypt to satisfy the crypto API naming convention,
         but this does NOT decrypt and it does NOT verify a MAC either, because data
         is not encrypted and there is no MAC.
         """
@@ -220,8 +220,8 @@ cdef class AES256_CTR_BASE:
 
     def encrypt(self, data, header=b'', iv=None):
         """
-        encrypt data, compute mac over aad + iv + cdata, prepend header.
-        aad_offset is the offset into the header where aad starts.
+        Encrypt data, compute MAC over AAD + IV + cdata, prepend header.
+        aad_offset is the offset into the header where AAD starts.
         """
         if iv is not None:
             self.set_iv(iv)
@@ -270,7 +270,7 @@ cdef class AES256_CTR_BASE:
 
     def decrypt(self, envelope):
         """
-        authenticate aad + iv + cdata, decrypt cdata, ignore header bytes up to aad_offset.
+        Authenticate AAD + IV + cdata, decrypt cdata, ignore header bytes up to aad_offset.
         """
         cdef int ilen = len(envelope)
         cdef int hlen = self.header_len
@@ -314,7 +314,7 @@ cdef class AES256_CTR_BASE:
         return num_cipher_blocks(length, self.cipher_blk_len)
 
     def set_iv(self, iv):
-        # set_iv needs to be called before each encrypt() call
+        # Call set_iv before each encrypt() call.
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
@@ -322,16 +322,16 @@ cdef class AES256_CTR_BASE:
         self.blocks = 0  # how many AES blocks got encrypted with this IV?
 
     def next_iv(self):
-        # call this after encrypt() to get the next iv (int) for the next encrypt() call
+        # Call this after encrypt() to get the next IV (int) for the next encrypt() call
         iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
         return iv + self.blocks
 
     cdef fetch_iv(self, unsigned char * iv_in):
-        # fetch lower self.iv_len_short bytes of iv and add upper zero bytes
+        # Fetch lower self.iv_len_short bytes of IV and add upper zero bytes.
         return b'\0' * (self.iv_len - self.iv_len_short) + iv_in[0:self.iv_len_short]
 
     cdef store_iv(self, unsigned char * iv_out, unsigned char * iv):
-        # store only lower self.iv_len_short bytes, upper bytes are assumed to be 0
+        # Store only lower self.iv_len_short bytes, upper bytes are assumed to be 0.
         cdef int i
         for i in range(self.iv_len_short):
             iv_out[i] = iv[(self.iv_len-self.iv_len_short)+i]
@@ -405,7 +405,7 @@ ctypedef const EVP_CIPHER * (* CIPHER)()
 
 
 cdef class AES:
-    """A thin wrapper around the OpenSSL EVP cipher API - for legacy code, like key file encryption"""
+    """A thin wrapper around the OpenSSL EVP cipher API - for legacy code, like key file encryption."""
     cdef CIPHER cipher
     cdef EVP_CIPHER_CTX *ctx
     cdef unsigned char enc_key[32]
@@ -476,8 +476,8 @@ cdef class AES:
                 raise Exception('EVP_DecryptUpdate failed')
             offset += olen
             if EVP_DecryptFinal_ex(self.ctx, odata+offset, &olen) <= 0:
-                # this error check is very important for modes with padding or
-                # authentication. for them, a failure here means corrupted data.
+                # This error check is very important for modes with padding or
+                # authentication. For them, a failure here means corrupted data.
                 # CTR mode does not use padding nor authentication.
                 raise Exception('EVP_DecryptFinal failed')
             offset += olen
@@ -491,8 +491,8 @@ cdef class AES:
         return num_cipher_blocks(length, self.cipher_blk_len)
 
     def set_iv(self, iv):
-        # set_iv needs to be called before each encrypt() call,
-        # because encrypt does a full initialisation of the cipher context.
+        # Call set_iv before each encrypt() call,
+        # because encrypt() does a full initialization of the cipher context.
         if isinstance(iv, int):
             iv = iv.to_bytes(self.iv_len, byteorder='big')
         assert isinstance(iv, bytes) and len(iv) == self.iv_len
@@ -500,7 +500,7 @@ cdef class AES:
         self.blocks = 0  # number of cipher blocks encrypted with this IV
 
     def next_iv(self):
-        # call this after encrypt() to get the next iv (int) for the next encrypt() call
+        # Call this after encrypt() to get the next IV (int) for the next encrypt() call
         iv = int.from_bytes(self.iv[:self.iv_len], byteorder='big')
         return iv + self.blocks
 

@@ -19,7 +19,7 @@ from ..constants import *  # NOQA
 
 
 class MandatoryFeatureUnsupported(Error):
-    """Unsupported repository feature(s) {}. A newer version of borg is required to access this repository."""
+    """Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository."""
     exit_mcode = 25
 
 
@@ -79,16 +79,16 @@ class Archives(abc.MutableMapping):
 
     def list(self, *, glob=None, match_end=r'\Z', sort_by=(), consider_checkpoints=True, first=None, last=None, reverse=False):
         """
-        Return list of ArchiveInfo instances according to the parameters.
+        Return a list of ArchiveInfo instances according to the parameters.
 
         First match *glob* (considering *match_end*), then *sort_by*.
         Apply *first* and *last* filters, and then possibly *reverse* the list.
 
         *sort_by* is a list of sort keys applied in reverse order.
 
-        Note: for better robustness, all filtering / limiting parameters must default to
-              "not limit / not filter", so a FULL archive list is produced by a simple .list().
-              some callers EXPECT to iterate over all archives in a repo for correct operation.
+        Note: For better robustness, all filtering/limiting parameters must default to
+              "not limit / not filter", so a full archive list is produced by a simple .list().
+              Some callers expect to iterate over all archives in a repo for correct operation.
         """
         if isinstance(sort_by, (str, bytes)):
             raise TypeError('sort_by must be a sequence of str')
@@ -108,7 +108,7 @@ class Archives(abc.MutableMapping):
 
     def list_considering(self, args):
         """
-        get a list of archives, considering --first/last/prefix/glob-archives/sort/consider-checkpoints cmdline args
+        Get a list of archives, considering --first/last/prefix/glob-archives/sort/consider-checkpoints command-line arguments.
         """
         if args.location.archive:
             raise Error('The options --first, --last, --prefix, and --glob-archives, and --consider-checkpoints can only be used on repository targets.')
@@ -117,14 +117,14 @@ class Archives(abc.MutableMapping):
         return self.list(sort_by=args.sort_by.split(','), consider_checkpoints=args.consider_checkpoints, glob=args.glob_archives, first=args.first, last=args.last)
 
     def set_raw_dict(self, d):
-        """set the dict we get from the msgpack unpacker"""
+        """Set the dict we get from the msgpack unpacker."""
         for k, v in d.items():
             assert isinstance(k, bytes)
             assert isinstance(v, dict) and b'id' in v and b'time' in v
             self._archives[k] = v
 
     def get_raw_dict(self):
-        """get the dict we can give to the msgpack packer"""
+        """Get the dict we can give to the msgpack packer."""
         return self._archives
 
 

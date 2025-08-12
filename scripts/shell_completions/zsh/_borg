@@ -51,7 +51,7 @@ _borg_commands() {
     'recreate:re-create archives'
     'rename:rename an existing archive'
     'serve:start in server mode'
-    'umount:un-mount the FUSE filesystem'
+    'umount:unmount the FUSE filesystem'
     'upgrade:upgrade a repository from a previous version'
     'with-lock:run a user specified command with the repository lock held'
   )

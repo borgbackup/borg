@@ -1,4 +1,4 @@
-# borgbackup - main setup code (extension building here, rest see pyproject.toml)
+# BorgBackup - main setup code (extensions built here; the rest is in pyproject.toml).
 
 import os
 import re
@@ -28,7 +28,7 @@ sys.path += [os.path.dirname(__file__)]
 
 is_win32 = sys.platform.startswith("win32")
 
-# Number of threads to use for cythonize, not used on windows
+# Number of threads to use for cythonize; not used on Windows
 cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != "spawn" else None
 
 # How the build process finds the system libs:
@@ -106,7 +106,7 @@ if not on_rtd:
     try:
         import pkgconfig as pc
     except ImportError:
-        print("Warning: can not import pkgconfig python package.")
+        print("Warning: cannot import pkgconfig Python package.")
         pc = None
 
     def lib_ext_kwargs(pc, prefix_env_var, lib_name, lib_pkg_name, pc_version, lib_subdir="lib"):

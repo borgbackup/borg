@@ -13,7 +13,7 @@ def parse_version(version):
     For final versions the last element is a -1.
     For prerelease versions the last two elements are a smaller negative number and the number of e.g. the beta.
 
-    This version format is part of the remote protocol, don‘t change in breaking ways.
+    This version format is part of the remote protocol; don't change it in breaking ways.
     """
     version_re = r"""
         (?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)   # version, e.g. 1.2.33
@@ -34,7 +34,7 @@ def parse_version(version):
 
 
 def format_version(version):
-    """a reverse for parse_version (obviously without the dropped information)"""
+    """A reverse for parse_version (obviously without the dropped information)."""
     f = []
     it = iter(version)
     while True:

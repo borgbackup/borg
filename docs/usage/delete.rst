@@ -15,7 +15,7 @@ Examples
     # delete all archives whose names contain "-2012-"
     $ borg delete --glob-archives '*-2012-*' /path/to/repo
 
-    # see what would be deleted if delete was run without --dry-run
+    # see what would be deleted if delete were run without --dry-run
     $ borg delete --list --dry-run -a '*-May-*' /path/to/repo
 
     # delete the whole repository and the related local cache:

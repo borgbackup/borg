@@ -35,7 +35,7 @@ from .platform import SaveFile
 from .remote import cache_if_remote
 from .repository import LIST_SCAN_LIMIT
 
-# note: cmtime might me either a ctime or a mtime timestamp
+# note: cmtime might be either a ctime or an mtime timestamp
 FileCacheEntry = namedtuple('FileCacheEntry', 'age inode size cmtime chunk_ids')
 
 
@@ -69,7 +69,7 @@ class SecurityManager:
 
     @staticmethod
     def destroy(repository, path=None):
-        """destroy the security dir for ``repository`` or at ``path``"""
+        """Destroy the security dir for ``repository`` or at ``path``."""
         path = path or get_security_dir(repository.id_str)
         if os.path.exists(path):
             shutil.rmtree(path)
@@ -338,7 +338,7 @@ class CacheConfig:
 
 
 class Cache:
-    """Client Side cache
+    """Client-side cache.
     """
     class CacheInitAbortedError(Error):
         """Cache initialization aborted"""
@@ -367,7 +367,7 @@ class Cache:
 
     @staticmethod
     def destroy(repository, path=None):
-        """destroy the cache for ``repository`` or at ``path``"""
+        """Destroy the cache for ``repository`` or at ``path``."""
         path = path or os.path.join(get_cache_dir(), repository.id_str)
         config = os.path.join(path, 'config')
         if os.path.exists(config):
@@ -416,7 +416,7 @@ Chunk index:    {0.total_unique_chunks:20d} {0.total_chunks:20d}"""
 
     def __init__(self, iec=False):
         self.iec = iec
-        self.pre12_meta = {}  # here we cache archive metadata for borg < 1.2
+        self.pre12_meta = {}  # Here we cache archive metadata for Borg < 1.2.
 
     def __str__(self):
         return self.str_format.format(self.format_tuple())
@@ -892,7 +892,7 @@ class LocalCache(CacheStatsMixin):
             return chunk_idx
 
         def legacy_cleanup():
-            """bring old cache dirs into the desired state (cleanup and adapt)"""
+            """Bring old cache dirs into the desired state (cleanup and adapt)."""
             try:
                 os.unlink(os.path.join(self.path, 'chunks.archive'))
             except:

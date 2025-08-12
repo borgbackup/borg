@@ -24,10 +24,10 @@ class TimeoutTimer:
         """
         Initialize a timer.
 
-        :param timeout: time out interval [s] or None (never timeout, wait forever) [default]
-        :param sleep: sleep interval [s] (>= 0: do sleep call, <0: don't call sleep)
-                      or None (autocompute: use 10% of timeout [but not more than 60s],
-                      or 1s for "never timeout" mode)
+        :param timeout: timeout interval [s] or None (never time out, wait forever). [default]
+        :param sleep: sleep interval [s] (>= 0: do sleep; < 0: do not call sleep),
+                      or None (auto-compute: use 10% of timeout, but not more than 60 s;
+                      or 1 s for "never timeout" mode).
         """
         if timeout is not None and timeout < 0:
             raise ValueError("timeout must be >= 0")
@@ -98,9 +98,9 @@ class NotMyLock(LockErrorT):
 
 
 class ExclusiveLock:
-    """An exclusive Lock based on mkdir fs operation being atomic.
+    """An exclusive lock based on the mkdir filesystem operation being atomic.
 
-    If possible, try to use the contextmanager here like::
+    If possible, try to use the context manager here like::
 
         with ExclusiveLock(...) as lock:
             ...
@@ -212,7 +212,7 @@ class ExclusiveLock:
 
                 if not self.kill_stale_locks:
                     if not self.stale_warning_printed:
-                        # Log this at warning level to hint the user at the ability
+                        # Log this at warning level to hint to the user about the ability
                         logger.warning("Found stale lock %s, but not deleting because self.kill_stale_locks = False.", name)
                         self.stale_warning_printed = True
                     return False
@@ -246,7 +246,7 @@ class ExclusiveLock:
             os.rmdir(self.path)
 
     def migrate_lock(self, old_id, new_id):
-        """migrate the lock ownership from old_id to new_id"""
+        """Migrate the lock ownership from old_id to new_id."""
         assert self.id == old_id
         new_unique_name = os.path.join(self.path, "%s.%d-%x" % new_id)
         if self.is_locked() and self.by_me():
@@ -319,8 +319,8 @@ class LockRoster:
         if op == ADD:
             elements.add(self.id)
         elif op == REMOVE:
-            # note: we ignore it if the element is already not present anymore.
-            # this has been frequently seen in teardowns involving Repository.__del__ and Repository.__exit__.
+            # Note: We ignore it if the element is already not present anymore.
+            # This has been frequently seen in teardowns involving Repository.__del__ and Repository.__exit__.
             elements.discard(self.id)
         elif op == REMOVE2:
             # needed for callers that do not want to ignore.
@@ -331,7 +331,7 @@ class LockRoster:
         self.save(roster)
 
     def migrate_lock(self, key, old_id, new_id):
-        """migrate the lock ownership from old_id to new_id"""
+        """Migrate the lock ownership from old_id to new_id."""
         assert self.id == old_id
         # need to temporarily switch off stale lock killing as we want to
         # rather migrate than kill them (at least the one made by old_id).
@@ -352,12 +352,12 @@ class LockRoster:
 
 class Lock:
     """
-    A Lock for a resource that can be accessed in a shared or exclusive way.
+    A lock for a resource that can be accessed in a shared or exclusive way.
     Typically, write access to a resource needs an exclusive lock (1 writer,
     no one is allowed reading) and read access to a resource needs a shared
     lock (multiple readers are allowed).
 
-    If possible, try to use the contextmanager here like::
+    If possible, try to use the context manager here like::
 
         with Lock(...) as lock:
             ...
@@ -371,10 +371,10 @@ class Lock:
         self.sleep = sleep
         self.timeout = timeout
         self.id = id or platform.get_process_id()
-        # globally keeping track of shared and exclusive lockers:
+        # Globally keep track of shared and exclusive lockers:
         self._roster = LockRoster(path + '.roster', id=id)
-        # an exclusive lock, used for:
-        # - holding while doing roster queries / updates
+        # An exclusive lock, used for:
+        # - holding while doing roster queries/updates
         # - holding while the Lock itself is exclusive
         self._lock = ExclusiveLock(path + '.exclusive', id=id, timeout=timeout)
 
@@ -415,7 +415,7 @@ class Lock:
                 if remove is not None:
                     self._roster.modify(remove, ADD)
             except:
-                # avoid orphan lock when an exception happens here, e.g. Ctrl-C!
+                # Avoid an orphan lock when an exception happens here (e.g., Ctrl-C)!
                 self._lock.release()
                 raise
             else:

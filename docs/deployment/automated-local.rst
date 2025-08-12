@@ -14,8 +14,8 @@ systemd and udev.
 Overview
 --------
 
-An udev rule is created to trigger on the addition of block devices. The rule contains a tag
-that triggers systemd to start a oneshot service. The oneshot service executes a script in
+A udev rule is created to trigger on the addition of block devices. The rule contains a tag
+that causes systemd to start a oneshot service. The oneshot service executes a script in
 the standard systemd service environment, which automatically captures stdout/stderr and
 logs it to the journal.
 
@@ -36,9 +36,9 @@ Then, create ``/etc/backups/80-backup.rules`` with the following content (all on
 
     ACTION=="add", SUBSYSTEM=="block", ENV{ID_PART_TABLE_UUID}=="<the PTUUID you just noted>", TAG+="systemd", ENV{SYSTEMD_WANTS}+="automatic-backup.service"
 
-The "systemd" tag in conjunction with the SYSTEMD_WANTS environment variable has systemd
-launch the "automatic-backup" service, which we will create next, as the
-``/etc/backups/automatic-backup.service`` file:
+The "systemd" tag in conjunction with the SYSTEMD_WANTS environment variable causes systemd to
+launch the "automatic-backup" service, which we will create next, as the file
+``/etc/backups/automatic-backup.service``:
 
 .. code-block:: ini
 
@@ -65,13 +65,13 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     # Script configuration
     #
 
-    # The backup partition is mounted there
+    # The backup partition is mounted here
     MOUNTPOINT=/mnt/backup
 
     # This is the location of the Borg repository
     TARGET=$MOUNTPOINT/borg-backups/backup.borg
 
-    # Archive name schema
+    # Archive name scheme
     DATE=$(date --iso-8601)-$(hostname)
 
     # This is the file that will later contain UUIDs of registered backup drives
@@ -93,7 +93,7 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
 
     echo "Disk $uuid is a backup disk"
     partition_path=/dev/disk/by-uuid/$uuid
-    # Mount file system if not already done. This assumes that if something is already
+    # Mount the file system if not already done. This assumes that if something is already
     # mounted at $MOUNTPOINT, it is the backup drive. It won't find the drive if
     # it was mounted somewhere else.
     findmnt $MOUNTPOINT >/dev/null || mount $partition_path $MOUNTPOINT
@@ -104,7 +104,7 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     # Create backups
     #
 
-    # Options for borg create
+    # Options for Borg create
     BORG_OPTS="--stats --one-file-system --compression lz4 --checkpoint-interval 86400"
 
     # Set BORG_PASSPHRASE or BORG_PASSCOMMAND somewhere around here, using export,

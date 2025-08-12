@@ -59,11 +59,11 @@ borgfs
     $ mount /tmp/myrepo
     $ mount /tmp/myarchive
     $ ls /tmp/myrepo
-    root-2016-02-01 root-2016-02-2015
+    root-2016-02-01 root-2016-02-15
     $ ls /tmp/myarchive
     bin  boot  etc	home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
 
-.. Note::
+.. note::
 
     ``borgfs`` will be automatically provided if you used a distribution
     package or ``pip`` to install Borg. Users of the standalone binary will have

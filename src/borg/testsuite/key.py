@@ -57,7 +57,7 @@ class TestKey:
 
     keyfile_blake2_cdata = bytes.fromhex('04fdf9475cf2323c0ba7a99ddc011064f2e7d039f539f2e448'
                                          '0e6f5fc6ff9993d604040404040404098c8cee1c6db8c28947')
-    # Verified against b2sum. Entire string passed to BLAKE2, including the padded 64 byte key contained in
+    # Verified against b2sum. Entire string passed to BLAKE2, including the padded 64-byte key contained in
     # keyfile_blake2_key_file above is
     # 19280471de95185ec27ecb6fc9edbb4f4db26974c315ede1cd505fab4250ce7cd0d081ea66946c
     # 95f0db934d5f616921efbd869257e8ded2bd9bd93d7f07b1a30000000000000000000000000000

@@ -3,7 +3,7 @@
 Examples
 ~~~~~~~~
 
-``borg serve`` has special support for ssh forced commands (see ``authorized_keys``
+``borg serve`` has special support for SSH forced commands (see ``authorized_keys``
 example below): if the environment variable SSH_ORIGINAL_COMMAND is set it will
 ignore some options given on the command line and use the values from the
 variable instead. This only applies to a carefully controlled allowlist of safe
@@ -15,31 +15,31 @@ options. This list currently contains:
   giving up and aborting the operation when another process is holding a lock.
 
 Environment variables (such as BORG_XXX) contained in the original
-command sent by the client are *not* interpreted, but ignored. If BORG_XXX environment
-variables should be set on the ``borg serve`` side, then these must be set in system-specific
+command sent by the client are *not* interpreted; they are ignored. If BORG_XXX environment
+variables need to be set on the ``borg serve`` side, then these must be set in system-specific
 locations like ``/etc/environment`` or in the forced command itself (example below).
 
 ::
 
-    # Allow an SSH keypair to only run borg, and only have access to /path/to/repo.
+    # Allow an SSH key pair to only run borg, and only have access to /path/to/repo.
     # Use key options to disable unneeded and potentially dangerous SSH functionality.
-    # This will help to secure an automated remote backup system.
+    # This helps secure an automated remote backup system.
     $ cat ~/.ssh/authorized_keys
     command="borg serve --restrict-to-path /path/to/repo",restrict ssh-rsa AAAAB3[...]
 
-    # Set a BORG_XXX environment variable on the "borg serve" side
+    # Set a BORG_XXX environment variable on the ``borg serve`` side.
     $ cat ~/.ssh/authorized_keys
     command="BORG_XXX=value borg serve [...]",restrict ssh-rsa [...]
 
 .. note::
-    The examples above use the ``restrict`` directive and assume a POSIX
-    compliant shell set as the user's login shell.
-    This does automatically block potential dangerous ssh features, even when
+    The examples above use the ``restrict`` directive and assume a POSIX-compliant
+    shell set as the user's login shell.
+    This automatically blocks potentially dangerous SSH features, even when
     they are added in a future update. Thus, this option should be preferred.
 
-    If you're using openssh-server < 7.2, however, you have to explicitly specify
-    the ssh features to restrict and cannot simply use the restrict option as it
-    has been introduced in v7.2. We recommend to use
+    If you're using OpenSSH server < 7.2, however, you have to explicitly specify
+    the SSH features to restrict and cannot simply use the ``restrict`` option as it
+    was introduced in v7.2. We recommend using
     ``no-port-forwarding,no-X11-forwarding,no-pty,no-agent-forwarding,no-user-rc``
     in this case.
 
@@ -60,9 +60,9 @@ Either in the client side's ``~/.ssh/config`` file, or in the client's ``/etc/ss
             ServerAliveInterval 10
             ServerAliveCountMax 30
 
-Replacing ``backupserver`` with the hostname, FQDN or IP address of the borg server.
+Replace ``backupserver`` with the hostname, FQDN, or IP address of the Borg server.
 
-This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the ssh client process will be terminated, causing the borg process to terminate gracefully.
+This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the SSH client process will be terminated, causing the Borg process to terminate gracefully.
 
 On the server side's ``sshd`` configuration file (typically ``/etc/ssh/sshd_config``):
 ::
@@ -70,8 +70,8 @@ On the server side's ``sshd`` configuration file (typically ``/etc/ssh/sshd_conf
     ClientAliveInterval 10
     ClientAliveCountMax 30
 
-This will cause the server to send a keep alive to the client every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the server's sshd process will be terminated, causing the ``borg serve`` process to terminate gracefully and release the lock on the repository.
+This will cause the server to send a keepalive to the client every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the server's sshd process will be terminated, causing the ``borg serve`` process to terminate gracefully and release the lock on the repository.
 
-If you then run borg commands with ``--lock-wait 600``, this gives sufficient time for the borg serve processes to terminate after the SSH connection is torn down after the 300 second wait for the keepalives to fail.
+If you then run Borg commands with ``--lock-wait 600``, this gives sufficient time for the ``borg serve`` processes to terminate after the SSH connection is torn down following the 300-second wait for the keepalives to fail.
 
 You may, of course, modify the timeout values demonstrated above to values that suit your environment and use case.

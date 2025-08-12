@@ -4,7 +4,7 @@
 Internals
 =========
 
-The internals chapter describes and analyses most of the inner workings
+The internals chapter describes and analyzes most of the inner workings
 of Borg.
 
 Borg uses a low-level, key-value store, the :ref:`repository`, and
@@ -19,12 +19,12 @@ specified when the backup was performed.
 Deduplication is performed globally across all data in the repository
 (multiple backups and even multiple hosts), both on data and file
 metadata, using :ref:`chunks` created by the chunker using the
-Buzhash_ algorithm ("buzhash" chunker) or a simpler fixed blocksize
+Buzhash_ algorithm ("buzhash" chunker) or a simpler fixed block size
 algorithm ("fixed" chunker).
 
 To actually perform the repository-wide deduplication, a hash of each
 chunk is checked against the :ref:`chunks cache <cache>`, which is a
-hash-table of all chunks that already exist.
+hash table of all chunks that already exist.
 
 .. figure:: internals/structure.png
     :figwidth: 100%

@@ -30,7 +30,7 @@ Under these circumstances Borg guarantees that the attacker cannot
 
 1. modify the data of any archive without the client detecting the change
 2. rename, remove or add an archive without the client detecting the change
-3. recover plain-text data
+3. recover plaintext data
 4. recover definite (heuristics based on access patterns are possible)
    structural information such as the object graph (which archives
    refer to what chunks)
@@ -144,10 +144,10 @@ Depending on the chosen mode (see :ref:`borg_init`) different primitives are use
 - The authentication primitive is either HMAC-SHA-256 or BLAKE2b-256
   in a keyed mode.
 
-  Both HMAC-SHA-256 and BLAKE2b have undergone extensive cryptanalysis  
+  Both HMAC-SHA-256 and BLAKE2b have undergone extensive cryptanalysis
   and have proven secure against known attacks. The known vulnerability
   of SHA-256 against length extension attacks does not apply to HMAC-SHA-256.
-  
+
   The authentication primitive should be chosen based upon SHA hardware support:
   all AMD Ryzen, Intel 10th+ generation mobile and Intel 11th+ generation
   desktop processors, Apple M1+ and most current ARM64 architectures support

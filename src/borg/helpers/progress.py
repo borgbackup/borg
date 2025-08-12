@@ -12,7 +12,7 @@ from .parseformat import ellipsis_truncate
 
 def justify_to_terminal_size(message):
     terminal_space = get_terminal_size(fallback=(-1, -1))[0]
-    # justify only if we are outputting to a terminal
+    # Justify only if we are outputting to a terminal.
     if terminal_space != -1:
         return message.ljust(terminal_space)
     return message
@@ -110,12 +110,12 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
 
     def __init__(self, total=0, step=5, start=0, msg="%3.0f%%", msgid=None):
         """
-        Percentage-based progress indicator
+        Percentage-based progress indicator.
 
-        :param total: total amount of items
-        :param step: step size in percent
-        :param start: at which percent value to start
-        :param msg: output message, must contain one %f placeholder for the percentage
+        :param total: Total number of items.
+        :param step: Step size in percent.
+        :param start: At which percentage value to start.
+        :param msg: Output message; must contain one %f placeholder for the percentage.
         """
         self.counter = 0  # 0 .. (total-1)
         self.total = total

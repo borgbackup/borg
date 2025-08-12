@@ -1,5 +1,5 @@
 # https://black.readthedocs.io/en/stable/integrations/github_actions.html#usage
-# see also what we use locally, requirements.d/codestyle.txt - should be the same version here.
+# See also what we use locally in requirements.d/codestyle.txt — this should be the same version here.
 
 name: Lint
 

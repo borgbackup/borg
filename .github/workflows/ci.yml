@@ -1,4 +1,4 @@
-# badge: https://github.com/borgbackup/borg/workflows/CI/badge.svg?branch=master
+# badge: https://github.com/borgbackup/borg/workflows/CI/badge.svg?branch=1.4-maint
 
 name: CI
 
@@ -97,7 +97,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        # just fetching 1 commit is not enough for setuptools-scm, so we fetch all
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -206,7 +206,7 @@ jobs:
         include:
             - os: macos-14
               python-version: '3.11'
-              toxenv: py311-none  # note: no fuse testing, due to #6099, see also #6196.
+              toxenv: py311-none  # Note: no FUSE testing due to #6099; see also #6196.
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
@@ -219,7 +219,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        # just fetching 1 commit is not enough for setuptools-scm, so we fetch all
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all
         fetch-depth: 0
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -243,21 +243,21 @@ jobs:
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.d/development.txt
-    - name: Install borgbackup
+    - name: Install BorgBackup
       env:
-        # we already have that in the global env, but something is broken and overwrites that.
-        # so, set it here, again.
+        # We already have this in the global environment, but something overrides it.
+        # So set it here again.
         PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
       run: |
         pip install -ve .
-    - name: run tox env
+    - name: Run pytest via tox
       env:
-        # we already have that in the global env, but something is broken and overwrites that.
-        # so, set it here, again.
+        # We already have this in the global environment, but something overrides it.
+        # So set it here again.
         PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
         XDISTN: "6"
       run: |
-        # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
+        # Do not use fakeroot; run as root. Avoids the dreaded sporadic EISDIR failures; see #2482.
         #sudo -E bash -c "tox -e py"
         tox --skip-missing-interpreters
     - name: Upload coverage to Codecov
@@ -271,7 +271,7 @@ jobs:
 
   windows:
 
-    if: false  # can be used to temporary disable build
+    if: false  # can be used to temporarily disable the build
     runs-on: windows-latest
     timeout-minutes: 120
     needs: linux

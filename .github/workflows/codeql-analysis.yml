@@ -31,7 +31,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        # just fetching 1 commit is not enough for setuptools-scm, so we fetch all
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
     - name: Set up Python
       uses: actions/setup-python@v5

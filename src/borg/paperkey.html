@@ -2,21 +2,21 @@
 <html moznomarginboxes mozdisallowselectionprint>
 <!--
     Notes:
-        This may never cause external network connections. Everything needs to included in this file.
-        No minified libraries. Everything needs to be auditable and in preferred form of modification.
+        This may never cause external network connections. Everything needs to be included in this file.
+        No minified libraries. Everything needs to be auditable and in the preferred form for modification.
 
         This file includes two libraries inline:
             Kazuhiko Arase's qrcode-generator library (unpatched)
             Chris Veness's sha256 implementation (locally modified to utf8Encode)
         Both are MIT licensed.
-        As this script doesn’t interact with any untrusted parties / components it should be safe to
-        use local embedded copies of these libraries.
+        As this script doesn’t interact with any untrusted parties or components, it should be safe to
+        use locally embedded copies of these libraries.
 -->
 
 
 <head>
 <title>BorgBackup Printable Key Template</title>
-<meta http-equiv="Content-Type" content="text/html; charset=Utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <script>
 // https://github.com/kazuhikoarase/qrcode-generator/blob/master/js/qrcode.js
 //---------------------------------------------------------------------
@@ -30,7 +30,7 @@
 // Licensed under the MIT license:
 //  http://www.opensource.org/licenses/mit-license.php
 //
-// The word 'QR Code' is registered trademark of
+// The word 'QR Code' is a registered trademark of
 // DENSO WAVE INCORPORATED
 //  https://www.denso-wave.com/qrcode/faqpatent-e.html
 //
@@ -2181,17 +2181,18 @@ if (typeof define == 'function' && define.amd) define([], function() { return Sh
 <body>
     <div id="settings">
         <div class="instructions">
-           <p>To create a printable key, either paste the contents of your keyfile or a key export in the text field
+           <p>To create a printable key, either paste the contents of your keyfile or a key export into the text field
            below, or select a key export file.</p>
-           <p>To create a key export use <pre>borg key export /path/to/repository exportfile.txt</pre></p>
-           <p>If you are using keyfile mode, keyfiles are usually stored in $HOME/.config/borg/keys/</p>
-           <p>You can edit the parts with light blue border in the print preview below by click into them.</p>
-           <p>Key security: This print template will never send anything to remote servers. But keep in mind, that printing
-              might involve computers that can store the printed image, for example with cloud printing services, or
-              networked printers.<p>
+           <p>To create a key export, use:</p>
+           <pre>borg key export /path/to/repository exportfile.txt</pre>
+           <p>If you are using keyfile mode, keyfiles are usually stored in $HOME/.config/borg/keys/.</p>
+           <p>You can edit the parts with a light blue border in the print preview below by clicking into them.</p>
+           <p>Key security: This print template will never send anything to remote servers. Keep in mind that printing
+              might involve computers that can store the printed image, such as cloud printing services or
+              networked printers.</p>
         </div>
         <div class="block">
-            <div id="keyfile_expander" style="display:none;"><a href="#" onclick="document.getElementById('keyfile').style.display='inline';document.getElementById('keyfile_expander').style.display='none';">show keyfile</a></div>
+            <div id="keyfile_expander" style="display:none;"><a href="#" onclick="document.getElementById('keyfile').style.display='inline';document.getElementById('keyfile_expander').style.display='none';">Show keyfile</a></div>
             <textarea id="keyfile" rows="10" cols="73"></textarea>
         </div>
         <div class="block">
@@ -2213,17 +2214,17 @@ if (typeof define == 'function' && define.amd) define([], function() { return Sh
         </div>
         <div>
             <input type="file" id="fileinput"/>
-            <input type="button" value="update" onclick="update()"/>
+            <input type="button" value="Update" onclick="update()"/>
         </div>
     </div>
 
     <div id="printout">
         <div id="title" contenteditable>BorgBackup Printable Key Backup</div>
-        <div contenteditable>To restore either scan the QR code below, decode it and import it using
+        <div contenteditable>To restore, either scan the QR code below, decode it, and import it using
 <pre>borg key import /path/to/repo scannedfile</pre>
 
-Or run
-<pre>borg key import --paper /path/to/repo</pre> and type in the text below.<br><br></div>
+Alternatively, run
+<pre>borg key import --paper /path/to/repo</pre> and type the text below.<br><br></div>
         <div id="typein"></div>
         <div id="spacer"></div>
         <div id="qr"></div>

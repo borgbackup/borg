@@ -21,7 +21,7 @@ class KeysMixIn:
         key = manifest.key
         if not hasattr(key, "change_passphrase"):
             raise CommandError("This repository is not encrypted, cannot change the passphrase.")
-        key.change_passphrase()
+        key.change_passphrase(args)
         logger.info("Key updated")
         if hasattr(key, "find_key"):
             # print key location to make backing it up easier
@@ -270,6 +270,13 @@ class KeysMixIn:
             parents=[common_parser], description=self.do_key_change_passphrase.__doc__, epilog=change_passphrase_epilog
         )
         key_parsers.add_subcommand("change-passphrase", subparser, help="change the repository passphrase")
+        subparser.add_argument(
+            "--fido2-device",
+            metavar="DEVICE",
+            dest="fido2_device",
+            default=None,
+            help="select fido2 device to protect the repository key, use ``fido2-token -L`` to list available devices.",
+        )
 
         add_epilog = process_epilog(
             """
@@ -288,6 +295,7 @@ class KeysMixIn:
         keys require a unique, user-defined ``--label``.
         """
         )
+
         subparser = ArgumentParser(parents=[common_parser], description=self.do_key_add.__doc__, epilog=add_epilog)
         key_parsers.add_subcommand("add", subparser, help="add a borg key (independent passphrase)")
         subparser.add_argument(

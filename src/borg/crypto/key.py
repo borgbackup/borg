@@ -29,6 +29,7 @@ from ..platform import SaveFile
 from ..repoobj import RepoObj, RepoObj1
 
 
+from .fido2 import Fido2Operations
 from .low_level import bytes_to_int, num_cipher_blocks, hmac_sha256
 from .low_level import AES256_OCB, CHACHA20_POLY1305
 from . import low_level
@@ -508,6 +509,7 @@ class FlexiKey:
     def detect(cls, repository, manifest_data, *, other=False):
         key = cls(repository)
         target = key.find_key()
+        # TODO: ask for "PIN" when applicable
         prompt = "Enter passphrase for key %s: " % target
         passphrase = Passphrase.env_passphrase(other=other)
         # a repository may have multiple borg keys, one per passphrase; try the
@@ -563,6 +565,8 @@ class FlexiKey:
             self._encrypted_key_label = encrypted_key.get("label")
             if encrypted_key.algorithm == "argon2 chacha20-poly1305":
                 return self.decrypt_key_file_argon2(encrypted_key, passphrase)
+            elif encrypted_key.algorithm == "fido2 hmac-secret chacha20-poly1305":
+                return self.decrypt_key_file_fido2(encrypted_key, passphrase)
             else:
                 raise UnsupportedKeyFormatError()
 
@@ -601,9 +605,21 @@ class FlexiKey:
         except low_level.IntegrityError:
             return None
 
+    def decrypt_key_file_fido2(self, encrypted_key, pin):
+        device = Fido2Operations.find_device(encrypted_key.fido2_credential_id)
+        operations = Fido2Operations(device, pin)
+        secret = operations.use_hmac_hash(encrypted_key.salt, encrypted_key.fido2_credential_id)
+        ae_cipher = CHACHA20_POLY1305(key=secret, iv=0, header_len=0, aad_offset=0)
+        try:
+            return ae_cipher.decrypt(encrypted_key.data)
+        except low_level.IntegrityError:
+            return None
+
     def encrypt_key_file(self, data, passphrase, algorithm, label=None):
         if algorithm == "argon2 chacha20-poly1305":
             return self.encrypt_key_file_argon2(data, passphrase, label=label)
+        elif algorithm == "fido2 hmac-secret chacha20-poly1305":
+            return self.encrypt_key_file_fido2(data, passphrase, args)
         else:
             raise ValueError(f"Unexpected algorithm: {algorithm}")
 
@@ -623,7 +639,20 @@ class FlexiKey:
         encrypted_key = EncryptedKey(**kw)
         return msgpack.packb(encrypted_key.as_dict())
 
-    def _save(self, passphrase, algorithm, label=None):
+    def encrypt_key_file_fido2(self, data, pin, args):
+        operations = Fido2Operations(args.fido2_device, pin)
+        credential_id, salt, secret = operations.generate_hmac_hash(user=self.repository_id)
+        ae_cipher = CHACHA20_POLY1305(key=secret, iv=0, header_len=0, aad_offset=0)
+        encrypted_key = EncryptedKey(
+            version=1,
+            algorithm="fido2 hmac-secret chacha20-poly1305",
+            salt=salt,
+            data=ae_cipher.encrypt(data),
+            fido2_credential_id=credential_id,
+        )
+        return msgpack.packb(encrypted_key.as_dict())
+
+    def _save(self, passphrase, algorithm, args, label=None):
         key = Key(
             version=2,
             repository_id=self.repository_id,
@@ -631,17 +660,31 @@ class FlexiKey:
             id_key=self.id_key,
             chunk_seed=self.chunk_seed,
         )
-        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase, algorithm, label=label)
+        data = self.encrypt_key_file(msgpack.packb(key.as_dict()), passphrase, algorithm, args, label=label)
         key_data = "\n".join(textwrap.wrap(binascii.b2a_base64(data).decode("ascii")))
         return key_data
 
-    def change_passphrase(self, passphrase=None):
-        if passphrase is None:
-            passphrase = Passphrase.new(allow_empty=True, only_new=True)
-        # replace the borg key we unlocked with: keep its label, write the new borg key, then
-        # (for repokey) delete the previously-loaded borg key (keyfile mode auto-erases it in save()).
-        old_id = self._loaded_key_id
-        self.save(self.target, passphrase, algorithm=self._encrypted_key_algorithm, label=self._loaded_label)
+    def change_passphrase(self, args, passphrase=None):
+        if args.fido2_device:
+            operations = Fido2Operations(args.fido2_device)
+            if operations.has_client_pin:
+                # TODO: try to be more descriptive about the device
+                passphrase = Passphrase.new(only_new=True, pin_prompt=f"Enter PIN for {args.fido2_device}: ")
+            else:
+                passphrase = Passphrase("")
+            key_algorithm = KEY_ALGORITHMS["fido2"]
+        else:
+            if passphrase is None:
+                passphrase = Passphrase.new(allow_empty=True, only_new=True)
+            # replace the borg key we unlocked with: keep its label, write the new borg key, then
+            # (for repokey) delete the previously-loaded borg key (keyfile mode auto-erases it in save()).
+            old_id = self._loaded_key_id
+
+            key_algorithm = self._encrypted_key_algorithm
+            # If fido2 was used before change it to argon2
+            if key_algorithm == KEY_ALGORITHMS["fido2"]:
+                key_algorithm = KEY_ALGORITHMS["argon2"]
+        self.save(self.target, passphrase, algorithm=key_algorithm, args=args, label=self._loaded_label)
         if self.storage == KeyBlobStorage.REPO and old_id and hasattr(self.repository, "delete_key"):
             if self._loaded_key_id != old_id:
                 self.repository.delete_key(old_id)
@@ -675,11 +718,16 @@ class FlexiKey:
             key.init_from_given_data(crypt_key=crypt_key, id_key=id_key, chunk_seed=chunk_seed)
         else:
             key.init_from_random_data()
-        passphrase = Passphrase.new(allow_empty=True)
+        if args.fido2_device:
+            key_algorithm = KEY_ALGORITHMS["fido2"]
+            passphrase = Passphrase.new(pin_prompt="Enter PIN for {args.fido2_device}: ")
+        else:
+            key_algorithm = KEY_ALGORITHMS["argon2"]
+            passphrase = Passphrase.new(allow_empty=True)
         key.init_ciphers()
         target = key.get_new_target(args)
         # the first borg key of a repository is the protected "admin" key.
-        key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS["argon2"], label=ADMIN_LABEL)
+        key.save(target, passphrase, key_algorithm, args, create=True, label=ADMIN_LABEL)
         logger.info('Key in "%s" created.' % key.target)
         logger.info("Keep this key safe. Your data will be inaccessible without it.")
         return key
@@ -873,10 +921,10 @@ class FlexiKey:
         else:
             return self.load_any(passphrase)
 
-    def save(self, target, passphrase, algorithm, create=False, label=None, replace=True):
+    def save(self, target, passphrase, algorithm, args, create=False, label=None, replace=True):
         # replace=True replaces the previously-loaded borg key (change-passphrase semantics);
         # replace=False adds an additional borg key, keeping the existing ones (key add).
-        key_data = self._save(passphrase, algorithm, label=label)
+        key_data = self._save(passphrase, algorithm, args, label=label)
         if self.storage == KeyBlobStorage.KEYFILE:
             old_target = getattr(self, "target", None)
             keys_dir = get_keys_dir()
@@ -1222,8 +1270,8 @@ class AuthenticatedKeyBase(MACKeyBase, FlexiKey):
         self.logically_encrypted = False
         return success
 
-    def save(self, target, passphrase, algorithm, create=False, label=None, replace=True):
-        super().save(target, passphrase, algorithm, create=create, label=label, replace=replace)
+    def save(self, target, passphrase, algorithm, args, create=False, label=None, replace=True):
+        super().save(target, passphrase, algorithm, args, create=create, label=label, replace=replace)
         self.logically_encrypted = False
 
     def init_from_given_data(self, *, crypt_key, id_key, chunk_seed):

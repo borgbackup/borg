@@ -159,7 +159,7 @@ class Passphrase(str):
             print(passphrase_info, file=sys.stderr)
 
     @classmethod
-    def new(cls, allow_empty=False, only_new=False):
+    def new(cls, allow_empty=False, only_new=False, pin_prompt=None):
         passphrase = cls.env_passphrase(new=True)
         if passphrase is not None:
             return passphrase
@@ -167,6 +167,13 @@ class Passphrase(str):
             passphrase = cls.env_passphrase()
             if passphrase is not None:
                 return passphrase
+        if pin_prompt:
+            passphrase = cls.getpass(pin_prompt)
+            if passphrase is not None:
+                return passphrase
+            else:
+                print("PIN must not be blank.", file=sys.stderr)
+                raise PasswordRetriesExceeded
         for retry in range(1, 11):
             passphrase = cls.getpass("Enter new passphrase: ")
             if allow_empty or passphrase:

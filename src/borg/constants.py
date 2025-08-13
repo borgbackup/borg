@@ -157,6 +157,8 @@ KEY_ALGORITHMS = {
     "pbkdf2": "sha256",
     # encrypt-then-MAC, kdf: argon2, encryption: chacha20, authentication: poly1305
     "argon2": "argon2 chacha20-poly1305",
+    # Fido2 hmac-secret
+    "fido2": "fido2 hmac-secret chacha20-poly1305",
 }
 
 

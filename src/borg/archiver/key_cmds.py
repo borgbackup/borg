@@ -23,7 +23,7 @@ class KeysMixIn:
         key = manifest.key
         if not hasattr(key, "change_passphrase"):
             raise CommandError("This repository is not encrypted, cannot change the passphrase.")
-        key.change_passphrase()
+        key.change_passphrase(args)
         logger.info("Key updated")
         if hasattr(key, "find_key"):
             # print key location to make backing it up easier
@@ -241,6 +241,14 @@ class KeysMixIn:
             help="change repository passphrase",
         )
         subparser.set_defaults(func=self.do_change_passphrase)
+        subparser.add_argument(
+            "--fido2-device",
+            metavar="DEVICE",
+            dest="fido2_device",
+            default=None,
+            help="select fido2 device to protect the repository key, use ``fido2-token -L`` "
+            "to list available devices.",
+        )
 
         change_location_epilog = process_epilog(
             """

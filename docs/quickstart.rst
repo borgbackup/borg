@@ -49,7 +49,7 @@ by deleting/pruning archives. This mechanism is not bullet-proof in some
 circumstances [1]_.
 
 If you *really* run out of disk space, it can be hard or impossible to free space,
-because Borg needs free space to operate—even to delete backup
+because Borg needs free space to operate — even to delete backup
 archives.
 
 You can use some monitoring process or just include the free space information

@@ -58,7 +58,7 @@ def dread(offset, size, fd=None, fh=-1):
         data = os.read(fh, size)
         if hasattr(os, 'posix_fadvise'):
             # UNIX-only and, in case of block sizes that are not a multiple of the
-            # system's page size, it is better used with a bug-fixed Linux kernel >= 4.6.0,
+            # system's page size, it is better used with a bug-fixed Linux kernel > 4.6.0,
             # see comment/workaround in _chunker.c and borgbackup issue #907.
             os.posix_fadvise(fh, offset, len(data), os.POSIX_FADV_DONTNEED)
         return data

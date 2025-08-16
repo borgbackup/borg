@@ -90,7 +90,7 @@ Main features
     * FreeBSD
     * OpenBSD and NetBSD (no xattrs/ACLs support or binaries yet)
     * Cygwin (experimental, no binaries yet)
-    * Windows Subsystem for Linux (WSL) on Windows 10 (experimental)
+    * Windows Subsystem for Linux (WSL) on Windows 10/11 (experimental)
 
 **Free and Open Source Software**
   * security and functionality can be audited independently

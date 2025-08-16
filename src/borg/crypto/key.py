@@ -47,7 +47,7 @@ class PasscommandFailure(Error):
 
 
 class PassphraseWrong(Error):
-    """Passphrase supplied via BORG_PASSPHRASE, by BORG_PASSCOMMAND, or via BORG_PASSPHRASE_FD is incorrect."""
+    """Passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND, or via BORG_PASSPHRASE_FD is incorrect."""
     exit_mcode = 52
 
 

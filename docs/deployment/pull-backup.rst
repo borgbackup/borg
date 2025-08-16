@@ -54,7 +54,7 @@ completely in every aspect from such a backup.
 
 .. warning::
 
-    The chroot method was chosen to get the right user and group name-ID
+    The chroot method was chosen to get the right user and group name-id
     mappings, assuming they only come from files (/etc/passwd and group).
     This assumption might be wrong, e.g. if users/groups also come from
     ldap or other providers.

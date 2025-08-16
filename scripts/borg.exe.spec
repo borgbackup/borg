@@ -51,7 +51,7 @@ exe = EXE(pyz,
           console=True)
 
 # Build a directory-based binary in addition to a packed
-# single-file. This allows one to easily look at all included
+# single file. This allows one to easily look at all included
 # files (e.g., without having to strace or halt the built binary
 # and introspect /tmp). Also avoids unpacking all libraries when
 # running the app, which is better for app signing on various operating systems.

@@ -27,7 +27,7 @@ class AtticRepositoryUpgrader(Repository):
 
         These are the files that need to be upgraded here, from most
         important to least important: segments, key files, and various
-        caches—the latter being optional, as they will be rebuilt if
+        caches — the latter being optional, as they will be rebuilt if
         missing.
 
         We nevertheless do the order in reverse, as we prefer to do

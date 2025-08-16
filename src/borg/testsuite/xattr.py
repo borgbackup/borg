@@ -56,7 +56,7 @@ class XattrTestCase(BaseTestCase):
         tmp_fn = os.fsencode(self.tmpfile.name)
         # Make it work even with ext4, which imposes rather low limits.
         buffer.resize(size=64, init=True)
-        # xattr raw key list will be greater than 64
+        # xattr raw key list will be longer than 64
         keys = [b'user.attr%d' % i for i in range(20)]
         for key in keys:
             setxattr(tmp_fn, key, b'x')

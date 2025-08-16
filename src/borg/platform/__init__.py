@@ -26,17 +26,17 @@ else:
     from .windows import process_alive, local_pid_alive
     from .windows import uid2user, user2uid, gid2group, group2gid, getosusername
 
-if is_linux:  # pragma: Linux only
+if is_linux:  # pragma: linux only
     from .linux import API_VERSION as OS_API_VERSION
     from .linux import listxattr, getxattr, setxattr
     from .linux import acl_get, acl_set
     from .linux import set_flags, get_flags
     from .linux import SyncFile
-elif is_freebsd:  # pragma: FreeBSD only
+elif is_freebsd:  # pragma: freebsd only
     from .freebsd import API_VERSION as OS_API_VERSION
     from .freebsd import listxattr, getxattr, setxattr
     from .freebsd import acl_get, acl_set
-elif is_darwin:  # pragma: Darwin only
+elif is_darwin:  # pragma: darwin only
     from .darwin import API_VERSION as OS_API_VERSION
     from .darwin import listxattr, getxattr, setxattr
     from .darwin import acl_get, acl_set

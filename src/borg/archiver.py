@@ -4507,13 +4507,13 @@ class Archiver:
         reduce problems with manual input. The ``--qr-html`` option creates a printable
         HTML template with a QR code and a copy of the ``--paper``-formatted key.
 
-        For repositories using key file encryption the key is saved locally
+        For repositories using keyfile encryption the key is saved locally
         on the system that is capable of doing backups. To guard against loss
         of this key, the key needs to be backed up independently of the main
         data backup.
 
         For repositories using repokey encryption, the key is saved in the
-        repository's config file. A backup is thus not strictly needed,
+        repository in the config file. A backup is thus not strictly needed,
         but it guards against the repository becoming inaccessible if the file
         is damaged for some reason.
 
@@ -4551,7 +4551,7 @@ class Archiver:
         process in which each line is checked for plausibility before
         proceeding to the next line. For this format, PATH must not be provided.
 
-        For repositories using key file encryption, the key file which ``borg key
+        For repositories using keyfile encryption, the key file which ``borg key
         import`` writes to depends on several factors. If the ``BORG_KEY_FILE``
         environment variable is set and non-empty, ``borg key import`` creates
         or overwrites the file named by ``$BORG_KEY_FILE``. Otherwise, ``borg
@@ -5073,7 +5073,7 @@ class Archiver:
         the first backup after the conversion takes longer than expected
         due to the cache re-sync.
 
-        The upgrade should be able to resume if interrupted, although it
+        Upgrade should be able to resume if interrupted, although it
         will still iterate over all segments. If you want to start
         from scratch, use ``borg delete`` over the copied repository to
         make sure the cache files are also removed::

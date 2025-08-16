@@ -152,7 +152,7 @@ def create_logger(name=None):
     We use it to avoid errors and provide a more standard API.
 
     We must create the logger lazily because this is usually called from
-    module level (and thus executed at import time—before setup_logging()
+    module level (and thus executed at import time — before setup_logging()
     is called). By doing it lazily we can do the setup first; we just have to
     be careful not to call any logger methods before the setup_logging() call.
     If you try, you'll get an exception.

@@ -320,7 +320,7 @@ repository. Make sure that backup client machines only get to access the reposit
 ``borg serve``.
 
 Ensure that no remote access is possible if the repository is temporarily set to normal mode
-for example, regular pruning.
+(for example, for regular pruning).
 
 Further protections can be implemented, but are outside of Borg's scope. For example,
 file system snapshots or wrapping ``borg serve`` to set special permissions or ACLs on

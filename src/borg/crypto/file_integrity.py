@@ -153,7 +153,7 @@ class IntegrityCheckedFile(FileLikeWrapper):
         # Hash the name of the file, but only the basename, i.e. not the path.
         # In Borg the name itself encodes the context (e.g., index.N, cache, files),
         # while the path doesn't matter, and moving e.g. a repository or cache directory is supported.
-        # Changing the name, however, implies a change of context that is not permissible.
+        # Changing the name, however, imbues a change of context that is not permissible.
         # While Borg does not use anything except ASCII in these file names, it's important to use
         # the same encoding everywhere for portability. Using os.fsencode() would be wrong.
         filename = os.path.basename(filename or self.path)

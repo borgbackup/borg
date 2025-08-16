@@ -17,7 +17,7 @@ ATTIC_TAR = os.path.join(os.path.dirname(__file__), 'attic.tar.gz')
 
 def untar(tarfname, path, what):
     """
-    Extract the <tarfname> tar archive to <path>, including all entries starting with <what>.
+    Extract the <tarfname> tar archive to <path>, only the entries starting with <what>.
 
     Return the path to <what>.
     """

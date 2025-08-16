@@ -70,7 +70,7 @@ to MAX_VALUE (inclusive). The following reserved values beyond MAX_VALUE are cur
     0xffffffff marks empty entries in the hash table
     0xfffffffe marks deleted entries in the hash table
 
-None of the publicly available classes in this module will neither accept nor return a reserved value;
+The publicly available classes in this module will neither accept nor return a reserved value;
 AssertionError is raised instead.
 """
 

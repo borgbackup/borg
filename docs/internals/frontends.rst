@@ -10,18 +10,18 @@ Borg does not have a public API on the Python level. That does not keep you from
 but does mean that there are no release-to-release guarantees on what you might find in that package, not
 even for point releases (1.1.x), and there is no documentation beyond the code and the internals documents.
 
-Borg does on the other hand provide an API on a command-line level. In other words, a frontend should
-(for example) create a backup archive just invoke :ref:`borg_create`, give commandline parameters/options
-as needed and parse JSON output from borg.
+Borg does, on the other hand, provide an API on a command-line level. In other words, a frontend should
+(for example) create a backup archive by invoking :ref:`borg_create`, pass command-line parameters/options
+as needed, and parse JSON output from Borg.
 
-Important: JSON output is expected to be UTF-8, but currently borg depends on the locale being configured
-for that (must be a UTF-8 locale and *not* "C" or "ascii"), so that Python will choose to encode to UTF-8.
-The same applies to any inputs read by borg, they are expected to be UTF-8 encoded also.
+Important: JSON output is expected to be UTF-8, but currently Borg depends on the locale being configured
+for that (must be a UTF-8 locale and not "C" or "ASCII"), so that Python will choose to encode to UTF-8.
+The same applies to any inputs read by Borg; they are expected to be UTF-8 encoded also.
 
 We consider this a bug (see :issue:`2273`) and might fix it later, so borg will use UTF-8 independent of
 the locale.
 
-On POSIX systems, you can usually set environment vars to choose a UTF-8 locale:
+On POSIX systems, you can usually set environment variables to choose a UTF-8 locale:
 
 ::
 
@@ -551,7 +551,7 @@ Errors
     Buffer.MemoryLimitExceeded rc: 2 traceback: no
         Requested buffer size {} is above the limit of {}.
     EfficientCollectionQueue.SizeUnderflow rc: 2 traceback: no
-        Could not pop_front first {} elements, collection only has {} elements..
+        Could not pop_front the first {} elements; collection only has {} elements.
     RTError rc: 2 traceback: no
         Runtime Error: {}
 
@@ -591,7 +591,7 @@ Errors
         Permission denied to {}.
 
     MandatoryFeatureUnsupported rc: 25 traceback: no
-        Unsupported repository feature(s) {}. A newer version of borg is required to access this repository.
+        Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository.
     NoManifestError rc: 26 traceback: no
         Repository has no manifest.
     UnsupportedManifestError rc: 27 traceback: no
@@ -611,7 +611,7 @@ Errors
     KeyfileNotFoundError rc: 42 traceback: no
         No key file for repository {} found in {}.
     NotABorgKeyFile rc: 43 traceback: no
-        This file is not a borg key backup, aborting.
+        This file is not a Borg key backup, aborting.
     RepoKeyNotFoundError rc: 44 traceback: no
         No key entry found in the config of repository {}.
     RepoIdMismatch rc: 45 traceback: no
@@ -624,13 +624,13 @@ Errors
         Unsupported payload type {}. A newer version is required to access this repository.
 
     NoPassphraseFailure rc: 50 traceback: no
-        can not acquire a passphrase: {}
+        Cannot acquire a passphrase: {}
     PasscommandFailure rc: 51 traceback: no
-        passcommand supplied in BORG_PASSCOMMAND failed: {}
+        Passcommand supplied in BORG_PASSCOMMAND failed: {}
     PassphraseWrong rc: 52 traceback: no
-        passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect.
+        Passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND, or via BORG_PASSPHRASE_FD is incorrect.
     PasswordRetriesExceeded rc: 53 traceback: no
-        exceeded the maximum password retries
+        Exceeded the maximum password retries.
 
     Cache.CacheInitAbortedError rc: 60 traceback: no
         Cache initialization aborted
@@ -657,11 +657,11 @@ Errors
         Failed to release the lock {} (was/is locked, but not by me).
 
     ConnectionClosed rc: 80 traceback: no
-        Connection closed by remote host
+        Connection closed by remote host.
     ConnectionClosedWithHint rc: 81 traceback: no
         Connection closed by remote host. {}
     InvalidRPCMethod rc: 82 traceback: no
-        RPC method {} is not valid
+        RPC method {} is not valid.
     PathNotAllowed rc: 83 traceback: no
         Repository path not allowed: {}
     RemoteRepository.RPCServerOutdated rc: 84 traceback: no

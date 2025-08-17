@@ -17,9 +17,9 @@ ATTIC_TAR = os.path.join(os.path.dirname(__file__), 'attic.tar.gz')
 
 def untar(tarfname, path, what):
     """
-    extract <tarfname> tar archive to <path>, all stuff starting with <what>.
+    Extract the <tarfname> tar archive to <path>, only the entries starting with <what>.
 
-    return path to <what>.
+    Return the path to <what>.
     """
 
     def files(members):
@@ -35,10 +35,10 @@ def untar(tarfname, path, what):
 
 def repo_valid(path):
     """
-    utility function to check if borg can open a repository
+    Utility function to check if Borg can open a repository.
 
     :param path: the path to the repository
-    :returns: if borg can check the repository
+    :returns: whether Borg can check the repository
     """
     with Repository(str(path), exclusive=True, create=False) as repository:
         # can't check raises() because check() handles the error
@@ -47,10 +47,10 @@ def repo_valid(path):
 
 def key_valid(path):
     """
-    check that the new keyfile is alright
+    Check that the new key file is valid.
 
     :param path: the path to the key file
-    :returns: if the file starts with the borg magic string
+    :returns: whether the file starts with the Borg magic string
     """
     keyfile = os.path.join(get_keys_dir(),
                            os.path.basename(path))
@@ -60,10 +60,10 @@ def key_valid(path):
 
 def make_attic_repo(dir):
     """
-    create an attic repo with some stuff in it
+    Create an Attic repo with some content in it.
 
     :param dir: path to the repository to be created
-    :returns: path to attic repository
+    :returns: path to the Attic repository
     """
     # there is some stuff in that repo, copied from `RepositoryTestCase.test1`
     return untar(ATTIC_TAR, str(dir), 'repo')
@@ -80,13 +80,13 @@ def inplace(request):
 
 
 def test_convert_segments(attic_repo, inplace):
-    """test segment conversion
+    """Test segment conversion.
 
-    this will load the given attic repository, list all the segments
-    then convert them one at a time. we need to close the repo before
-    conversion otherwise we have errors from borg
+    This will load the given Attic repository, list all the segments,
+    then convert them one at a time. We need to close the repo before
+    conversion; otherwise we have errors from Borg.
 
-    :param attic_repo: a populated attic repository (fixture)
+    :param attic_repo: a populated Attic repository (fixture)
     """
     repo_path = attic_repo
     with pytest.raises(Repository.AtticRepository):
@@ -102,21 +102,21 @@ def test_convert_segments(attic_repo, inplace):
 @pytest.fixture()
 def attic_key_file(tmpdir, monkeypatch):
     """
-    create an attic key file from the given repo, in the keys
-    subdirectory of the given tmpdir
+    Create an Attic key file from the given repo, in the keys
+    subdirectory of the given tmpdir.
 
-    :param tmpdir: a temporary directory (a builtin fixture)
-    :returns: path to key file
+    :param tmpdir: a temporary directory (a built-in fixture)
+    :returns: path to the key file
     """
     keys_dir = untar(ATTIC_TAR, str(tmpdir), 'keys')
 
-    # we use the repo dir for the created keyfile, because we do
-    # not want to clutter existing keyfiles
+    # We use the repo dir for the created key file, because we do
+    # not want to clutter existing key files.
     monkeypatch.setenv('ATTIC_KEYS_DIR', keys_dir)
 
-    # we use the same directory for the converted files, which
-    # will clutter the previously created one, which we don't care
-    # about anyways. in real runs, the original key will be retained.
+    # We use the same directory for the converted files, which
+    # will clutter the previously created one—which we don't care
+    # about anyway. In real runs, the original key will be retained.
     monkeypatch.setenv('BORG_KEYS_DIR', keys_dir)
     monkeypatch.setenv('ATTIC_PASSPHRASE', 'test')
 

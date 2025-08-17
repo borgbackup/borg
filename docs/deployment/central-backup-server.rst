@@ -4,20 +4,20 @@
 Central repository server with Ansible or Salt
 ==============================================
 
-This section will give an example how to setup a borg repository server for multiple
+This section gives an example of how to set up a Borg repository server for multiple
 clients.
 
 Machines
 --------
 
 There are multiple machines used in this section and will further be named by their
-respective fully qualified domain name (fqdn).
+respective fully qualified domain name (FQDN).
 
 * The backup server: `backup01.srv.local`
 * The clients:
 
   - John Doe's desktop: `johndoe.clnt.local`
-  - Webserver 01: `web01.srv.local`
+  - Web server 01: `web01.srv.local`
   - Application server 01: `app01.srv.local`
 
 User and group
@@ -28,7 +28,7 @@ Recommended user and group with additional settings:
 
 * User: `backup`
 * Group: `backup`
-* Shell: `/bin/bash` (or other capable to run the `borg serve` command)
+* Shell: `/bin/bash` (or another capable of running the `borg serve` command)
 * Home: `/home/backup`
 
 Most clients shall initiate a backup from the root user to catch all
@@ -79,11 +79,11 @@ The options which are added to the key will perform the following:
 3. Restrict ssh and do not allow stuff which imposes a security risk
 
 Due to the ``cd`` command we use, the server automatically changes the current
-working directory. Then client doesn't need to have knowledge of the absolute
+working directory. The client doesn't need to have knowledge of the absolute
 or relative remote repository path and can directly access the repositories at
 ``ssh://<user>@<host>/./<repo>``.
 
-.. note:: The setup above ignores all client given commandline parameters
+.. note:: The setup above ignores all client-given command-line parameters
           which are normally appended to the `borg serve` command.
 
 Client
@@ -95,14 +95,14 @@ The client needs to initialize the `pictures` repository like this:
 
  borg init ssh://backup@backup01.srv.local/./pictures
 
-Or with the full path (should actually never be used, as only for demonstrational purposes).
-The server should automatically change the current working directory to the `<client fqdn>` folder.
+Or with the full path (should actually never be used, as only for demonstration purposes).
+The server should automatically change the current working directory to the `<client FQDN>` folder.
 
 ::
 
   borg init ssh://backup@backup01.srv.local/home/backup/repos/johndoe.clnt.local/pictures
 
-When `johndoe.clnt.local` tries to access a not restricted path the following error is raised.
+When `johndoe.clnt.local` tries to access an unrestricted path, the following error is raised.
 John Doe tries to backup into the Web 01 path:
 
 ::

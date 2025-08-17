@@ -22,7 +22,7 @@ from ..helpers import umount
 from ..helpers import EXIT_SUCCESS, EXIT_WARNING, EXIT_ERROR
 from .. import platform
 
-# Note: this is used by borg.selftest, do not use or import py.test functionality here.
+# Note: this is used by borg.selftest; do not use or import pytest functionality here.
 
 from ..fuse_impl import llfuse, has_pyfuse3, has_llfuse
 
@@ -54,7 +54,7 @@ if sys.platform.startswith('netbsd'):
 
 
 def same_ts_ns(ts_ns1, ts_ns2):
-    """compare 2 timestamps (both in nanoseconds) whether they are (roughly) equal"""
+    """Compare two timestamps (both in nanoseconds) to determine whether they are (roughly) equal."""
     diff_ts = int(abs(ts_ns1 - ts_ns2))
     diff_max = 10 ** (-st_mtime_ns_round)
     return diff_ts <= diff_max
@@ -81,7 +81,7 @@ def are_symlinks_supported():
 @functools.lru_cache
 def are_hardlinks_supported():
     if not hasattr(os, 'link'):
-        # some pythons do not have os.link
+        # Some Python builds do not have os.link
         return False
 
     with unopened_tempfile() as file1path, unopened_tempfile() as file2path:
@@ -157,7 +157,7 @@ def is_birthtime_fully_supported():
 
 
 def no_selinux(x):
-    # selinux fails our FUSE tests, thus ignore selinux xattrs
+    # SELinux fails our FUSE tests; thus, ignore SELinux xattrs
     SELINUX_KEY = b'security.selinux'
     if isinstance(x, dict):
         return {k: v for k, v in x.items() if k != SELINUX_KEY}
@@ -222,7 +222,7 @@ class BaseTestCase(unittest.TestCase):
                 d1[4] = None
             if not stat.S_ISCHR(s2.st_mode) and not stat.S_ISBLK(s2.st_mode):
                 d2[4] = None
-            # If utime isn't fully supported, borg can't set mtime.
+            # If utime isn't fully supported, Borg can't set mtime.
             # Therefore, we shouldn't test it in that case.
             if is_utime_fully_supported():
                 # Older versions of llfuse do not support ns precision properly
@@ -301,7 +301,7 @@ class BaseTestCase(unittest.TestCase):
         time.sleep(0.2)
 
     def wait_for_mountstate(self, mountpoint, *, mounted, timeout=5):
-        """Wait until a path meets specified mount point status"""
+        """Wait until a path meets the specified mount point status."""
         timeout += time.time()
         while timeout > time.time():
             if os.path.ismount(mountpoint) == mounted:
@@ -312,7 +312,7 @@ class BaseTestCase(unittest.TestCase):
 
     @contextmanager
     def read_only(self, path):
-        """Some paths need to be made read-only for testing
+        """Some paths need to be made read-only for testing.
 
         If the tests are executed inside a fakeroot environment, the
         changes from chmod won't affect the real permissions of that
@@ -379,7 +379,7 @@ class environment_variable:
 
 
 class FakeInputs:
-    """Simulate multiple user inputs, can be used as input() replacement"""
+    """Simulate multiple user inputs; can be used as an input() replacement."""
     def __init__(self, inputs):
         self.inputs = inputs
 

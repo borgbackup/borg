@@ -6,17 +6,17 @@ from ..constants import ISO_FORMAT, ISO_FORMAT_NO_USECS
 
 
 def to_localtime(ts):
-    """Convert datetime object from UTC to local time zone"""
+    """Convert a datetime object from UTC to the local time zone."""
     return datetime(*time.localtime((ts - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds())[:6])
 
 
 def utcnow():
-    """Returns a naive datetime instance representing the time in the UTC timezone"""
+    """Return a naive datetime instance representing the time in the UTC time zone."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
-    """Parse a ISO 8601 timestamp string"""
+    """Parse an ISO 8601 timestamp string."""
     fmt = ISO_FORMAT if '.' in timestamp else ISO_FORMAT_NO_USECS
     dt = datetime.strptime(timestamp, fmt)
     if tzinfo is not None:
@@ -25,13 +25,13 @@ def parse_timestamp(timestamp, tzinfo=timezone.utc):
 
 
 def timestamp(s):
-    """Convert a --timestamp=s argument to a datetime object"""
+    """Convert a --timestamp=s argument to a datetime object."""
     try:
-        # is it pointing to a file / directory?
+        # Is it pointing to a file/directory?
         ts = safe_s(os.stat(s).st_mtime)
         return datetime.fromtimestamp(ts, tz=timezone.utc)
     except OSError:
-        # didn't work, try parsing as timestamp. UTC, no TZ, no microsecs support.
+        # Didn't work; try parsing as a timestamp. UTC, no time zone, no microseconds support.
         for format in ('%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%M:%S+00:00',
                        '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S',
                        '%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M',
@@ -48,24 +48,24 @@ def timestamp(s):
 # As they are crap anyway (valid filesystem timestamps always refer to the past up to
 # the present, but never to the future), nothing is lost if we just clamp them to the
 # maximum value we can support.
-# As long as people are using borg on 32bit platforms to access borg archives, we must
-# keep this value True. But we can expect that we can stop supporting 32bit platforms
+# As long as people are using Borg on 32-bit platforms to access Borg archives, we must
+# keep this value True. But we can expect that we can stop supporting 32-bit platforms
 # well before coming close to the year 2038, so this will never be a practical problem.
 SUPPORT_32BIT_PLATFORMS = True  # set this to False before y2038.
 
 if SUPPORT_32BIT_PLATFORMS:
     # second timestamps will fit into a signed int32 (platform time_t limit).
     # nanosecond timestamps thus will naturally fit into a signed int64.
-    # subtract last 48h to avoid any issues that could be caused by tz calculations.
-    # this is in the year 2038, so it is also less than y9999 (which is a datetime internal limit).
+    # Subtract the last 48 h to avoid any issues that could be caused by time zone calculations.
+    # This is in the year 2038, so it is also less than y9999 (which is a datetime internal limit).
     # msgpack can pack up to uint64.
     MAX_S = 2**31-1 - 48*3600
     MAX_NS = MAX_S * 1000000000
 else:
     # nanosecond timestamps will fit into a signed int64.
-    # subtract last 48h to avoid any issues that could be caused by tz calculations.
-    # this is in the year 2262, so it is also less than y9999 (which is a datetime internal limit).
-    # round down to 1e9 multiple, so MAX_NS corresponds precisely to a integer MAX_S.
+    # Subtract the last 48 h to avoid any issues that could be caused by time zone calculations.
+    # This is in the year 2262, so it is also less than y9999 (which is a datetime internal limit).
+    # Round down to a 1e9 multiple so MAX_NS corresponds precisely to an integer MAX_S.
     # msgpack can pack up to uint64.
     MAX_NS = (2**63-1 - 48*3600*1000000000) // 1000000000 * 1000000000
     MAX_S = MAX_NS // 1000000000
@@ -95,9 +95,7 @@ def safe_timestamp(item_timestamp_ns):
 
 
 def format_time(ts: datetime, format_spec=''):
-    """
-    Convert *ts* to a human-friendly format with textual weekday.
-    """
+    """Convert *ts* to a human-friendly format with textual weekday."""
     return ts.strftime('%a, %Y-%m-%d %H:%M:%S' if format_spec == '' else format_spec)
 
 

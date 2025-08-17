@@ -8,9 +8,9 @@ Backing up disk images can still be efficient with Borg because its `deduplicati
 technique makes sure only the modified parts of the file are stored. Borg also has
 optional simple sparse file support for extract.
 
-It is of utmost importancy to pin down the disk you want to backup.
-You need to use the SERIAL for that. 
-Use: 
+It is of utmost importance to pin down the disk you want to back up.
+You need to use the SERIAL for that.
+Use:
 
 .. code-block:: bash
 
@@ -65,7 +65,7 @@ deduplicating. For backup, save the disk header and the contents of each partiti
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
         ntfsclone -so - $x | borg create repo::hostname-part$PARTNUM -
     done
-    # to backup non-NTFS partitions as well:
+    # to back up non-NTFS partitions as well:
     echo "$PARTITIONS" | grep -v NTFS | cut -d' ' -f1 | while read x; do
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
         borg create --read-special repo::hostname-part$PARTNUM $x

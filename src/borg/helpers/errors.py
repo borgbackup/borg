@@ -12,8 +12,8 @@ class ErrorBase(Exception):
     """ErrorBase: {}"""
     # Error base class
 
-    # if we raise such an Error and it is only caught by the uppermost
-    # exception handler (that exits short after with the given exit_code),
+    # If we raise such an Error and it is only caught by the uppermost
+    # exception handler (that exits shortly after with the given exit_code),
     # it is always a (fatal and abrupt) error, never just a warning.
     exit_mcode = EXIT_ERROR  # modern, more specific exit code (defaults to EXIT_ERROR)
 
@@ -31,7 +31,7 @@ class ErrorBase(Exception):
 
     @property
     def exit_code(self):
-        # legacy: borg used to always use rc 2 (EXIT_ERROR) for all errors.
+        # legacy: Borg used to always use rc 2 (EXIT_ERROR) for all errors.
         # modern: users can opt in to more specific return codes, using BORG_EXIT_CODES:
         return self.exit_mcode if modern_ec else EXIT_ERROR
 
@@ -88,7 +88,7 @@ class BorgWarning:
 
     @property
     def exit_code(self):
-        # legacy: borg used to always use rc 1 (EXIT_WARNING) for all warnings.
+        # legacy: Borg used to always use rc 1 (EXIT_WARNING) for all warnings.
         # modern: users can opt in to more specific return codes, using BORG_EXIT_CODES:
         return self.exit_mcode if modern_ec else EXIT_WARNING
 
@@ -105,7 +105,7 @@ class IncludePatternNeverMatchedWarning(BorgWarning):
 
 class BackupWarning(BorgWarning):
     """{}: {}"""
-    # this is to wrap a caught BackupError exception, so it can be given to print_warning_instance
+    # This is to wrap a caught BackupError exception so it can be given to print_warning_instance.
 
     @property
     def exit_code(self):

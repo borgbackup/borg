@@ -1,13 +1,13 @@
 """
-Compute hashtable sizes with nices properties
+Compute hash table sizes with nice properties:
 - prime sizes (for small to medium sizes)
-- 2 prime-factor sizes (for big sizes)
+- two prime-factor sizes (for big sizes)
 - fast growth for small sizes
 - slow growth for big sizes
 
 Note:
-     this is just a tool for developers.
-     within borgbackup, it is just used to generate hash_sizes definition for _hashindex.c.
+    This is just a tool for developers.
+    Within BorgBackup, it is only used to generate the hash_sizes definition for _hashindex.c.
 """
 
 from collections import namedtuple
@@ -20,7 +20,7 @@ start, end_p1, end_p2 = 1 * K, 127 * M, 2 * G - 10 * M  # stay well below 2^31 -
 Policy = namedtuple("Policy", "upto grow")
 
 policies = [
-    # which growth factor to use when growing a hashtable of size < upto
+    # which growth factor to use when growing a hash table of size < upto
     # grow fast (*2.0) at the start so we do not have to resize too often (expensive).
     # grow slow (*1.1) for huge hash tables (do not jump too much in memory usage)
     Policy(256*K, 2.0),
@@ -85,7 +85,7 @@ def main():
         sizes.append(p)
         i = int(i * grow_factor)
 
-    gen = two_prime_factors()  # for lower ram consumption
+    gen = two_prime_factors()  # for lower RAM consumption
     while i < end_p2:
         grow_factor = get_grow_factor(i)
         p = find_bigger_prime(gen, i)

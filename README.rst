@@ -18,7 +18,7 @@ See the `installation manual`_ or, if you have already
 downloaded Borg, ``docs/installation.rst`` to get started with Borg.
 There is also an `offline documentation`_ available, in multiple formats.
 
-.. _installation manual: https://borgbackup.readthedocs.org/en/stable/installation.html
+.. _installation manual: https://borgbackup.readthedocs.io/en/stable/installation.html
 .. _offline documentation: https://readthedocs.org/projects/borgbackup/downloads
 
 Main features
@@ -57,10 +57,10 @@ Main features
 
 **Data encryption**
     All data can be protected using 256-bit AES encryption, data integrity and
-    authenticity is verified using HMAC-SHA256. Data is encrypted clientside.
+    authenticity is verified using HMAC-SHA256. Data is encrypted client-side.
 
 **Obfuscation**
-    Optionally, borg can actively obfuscate e.g. the size of files / chunks to
+    Optionally, Borg can actively obfuscate, e.g., the size of files/chunks to
     make fingerprinting attacks more difficult.
 
 **Compression**
@@ -73,24 +73,24 @@ Main features
     * lzma (low speed, high compression)
 
 **Off-site backups**
-    Borg can store data on any remote host accessible over SSH.  If Borg is
-    installed on the remote host, big performance gains can be achieved
-    compared to using a network filesystem (sshfs, nfs, ...).
+    Borg can store data on any remote host accessible over SSH. If Borg is
+    installed on the remote host, significant performance gains can be achieved
+    compared to using a network file system (sshfs, NFS, ...).
 
-**Backups mountable as filesystems**
-    Backup archives are mountable as userspace filesystems for easy interactive
-    backup examination and restores (e.g. by using a regular file manager).
+**Backups mountable as file systems**
+    Backup archives are mountable as user-space file systems for easy interactive
+    backup examination and restores (e.g., by using a regular file manager).
 
 **Easy installation on multiple platforms**
     We offer single-file binaries that do not require installing anything -
     you can just run them on these platforms:
 
     * Linux
-    * Mac OS X
+    * macOS
     * FreeBSD
     * OpenBSD and NetBSD (no xattrs/ACLs support or binaries yet)
     * Cygwin (experimental, no binaries yet)
-    * Linux Subsystem of Windows 10 (experimental)
+    * Windows Subsystem for Linux (WSL) on Windows 10/11 (experimental)
 
 **Free and Open Source Software**
   * security and functionality can be audited independently
@@ -128,9 +128,9 @@ Now doing another backup, just to show off the great deduplication::
     -----------------------------------------------------------------------------
 
 
-For a graphical frontend refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
+For a graphical frontend, refer to our complementary project `BorgWeb <https://borgweb.readthedocs.io/>`_.
 
-Helping, Donations and Bounties, becoming a Patron
+Helping, donations and bounties, becoming a Patron
 --------------------------------------------------
 
 Your help is always welcome!
@@ -144,17 +144,17 @@ https://www.borgbackup.org/support/fund.html
 Links
 -----
 
-* `Main Web Site <https://borgbackup.readthedocs.org/>`_
+* `Main website <https://borgbackup.readthedocs.io/>`_
 * `Releases <https://github.com/borgbackup/borg/releases>`_,
   `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_ and
-  `ChangeLog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
-* `Offline Documentation <https://readthedocs.org/projects/borgbackup/downloads>`_
+  `Changelog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
+* `Offline documentation <https://readthedocs.org/projects/borgbackup/downloads>`_
 * `GitHub <https://github.com/borgbackup/borg>`_ and
-  `Issue Tracker <https://github.com/borgbackup/borg/issues>`_.
-* `Web-Chat (IRC) <https://web.libera.chat/#borgbackup>`_ and
-  `Mailing List <https://mail.python.org/mailman/listinfo/borgbackup>`_
-* `License <https://borgbackup.readthedocs.org/en/stable/authors.html#license>`_
-* `Security contact <https://borgbackup.readthedocs.io/en/latest/support.html#security-contact>`_
+  `Issue tracker <https://github.com/borgbackup/borg/issues>`_.
+* `Web chat (IRC) <https://web.libera.chat/#borgbackup>`_ and
+  `Mailing list <https://mail.python.org/mailman/listinfo/borgbackup>`_
+* `License <https://borgbackup.readthedocs.io/en/stable/authors.html#license>`_
+* `Security contact <https://borgbackup.readthedocs.io/en/stable/support.html#security-contact>`_
 
 Compatibility notes
 -------------------
@@ -175,15 +175,15 @@ see ``docs/support.rst`` in the source distribution).
 
 .. |doc| image:: https://readthedocs.org/projects/borgbackup/badge/?version=stable
         :alt: Documentation
-        :target: https://borgbackup.readthedocs.org/en/stable/
+        :target: https://borgbackup.readthedocs.io/en/stable/
 
-.. |build| image:: https://github.com/borgbackup/borg/workflows/CI/badge.svg?branch=master
-        :alt: Build Status (master)
+.. |build| image:: https://github.com/borgbackup/borg/workflows/CI/badge.svg?branch=1.4-maint
+        :alt: Build Status (1.4-maint)
         :target: https://github.com/borgbackup/borg/actions
 
-.. |coverage| image:: https://codecov.io/github/borgbackup/borg/coverage.svg?branch=master
+.. |coverage| image:: https://codecov.io/github/borgbackup/borg/coverage.svg?branch=1.4-maint
         :alt: Test Coverage
-        :target: https://codecov.io/github/borgbackup/borg?branch=master
+        :target: https://codecov.io/github/borgbackup/borg?branch=1.4-maint
 
 .. |screencast_basic| image:: https://asciinema.org/a/133292.png
         :alt: BorgBackup Basic Usage

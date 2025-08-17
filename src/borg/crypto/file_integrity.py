@@ -43,14 +43,14 @@ class FileHashingWrapper(FileLikeWrapper):
     Wrapper for file-like objects that computes a hash on-the-fly while reading/writing.
 
     WARNING: Seeks should only be used to query the size of the file, not
-    to skip data, because skipped data isn't read and not hashed into the digest.
+    to skip data, because skipped data is not read and therefore not hashed into the digest.
 
-    Similarly skipping while writing to create sparse files is also not supported.
+    Similarly, skipping while writing to create sparse files is also not supported.
 
-    Data has to be read/written in a symmetric fashion, otherwise different
+    Data has to be read/written in a symmetric fashion; otherwise different
     digests will be generated.
 
-    Note: When used as a context manager read/write operations outside the enclosed scope
+    Note: When used as a context manager, read/write operations outside the enclosed scope
     are illegal.
     """
 
@@ -85,9 +85,9 @@ class FileHashingWrapper(FileLikeWrapper):
 
     def hexdigest(self):
         """
-        Return current digest bytes as hex-string.
+        Return the current digest as a hex string.
 
-        Note: this can be called multiple times.
+        Note: This can be called multiple times.
         """
         return self.hash.hexdigest()
 
@@ -96,7 +96,7 @@ class FileHashingWrapper(FileLikeWrapper):
 
     def hash_length(self, seek_to_end=False):
         if seek_to_end:
-            # Add length of file to the hash to avoid problems if only a prefix is read.
+            # Add the length of the file to the hash to avoid problems if only a prefix is read.
             self.seek(0, io.SEEK_END)
         self.hash.update(str(self.tell()).encode())
 
@@ -150,10 +150,10 @@ class IntegrityCheckedFile(FileLikeWrapper):
             return self.parse_integrity_data(path, integrity_data)
 
     def hash_filename(self, filename=None):
-        # Hash the name of the file, but only the basename, ie. not the path.
-        # In Borg the name itself encodes the context (eg. index.N, cache, files),
+        # Hash the name of the file, but only the basename, i.e. not the path.
+        # In Borg the name itself encodes the context (e.g., index.N, cache, files),
         # while the path doesn't matter, and moving e.g. a repository or cache directory is supported.
-        # Changing the name however imbues a change of context that is not permissible.
+        # Changing the name, however, imbues a change of context that is not permissible.
         # While Borg does not use anything except ASCII in these file names, it's important to use
         # the same encoding everywhere for portability. Using os.fsencode() would be wrong.
         filename = os.path.basename(filename or self.path)

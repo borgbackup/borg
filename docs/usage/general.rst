@@ -32,16 +32,16 @@ All Borg commands share these options:
 .. include:: common-options.rst.inc
 
 Option ``--bypass-lock`` allows you to access the repository while bypassing
-borg's locking mechanism. This is necessary if your repository is on a read-only
+Borg's locking mechanism. This is necessary if your repository is on a read-only
 storage where you don't have write permissions or capabilities and therefore
-cannot create a lock. Examples are repositories stored on a Bluray disc or a
-read-only network storage. Avoid this option if you are able to use locks as
+cannot create a lock. Examples are repositories stored on a Blu-ray disc or a
+read-only network storage. Avoid this option if you are able to use locks, as
 that is the safer way; see the warning below.
 
 .. warning::
 
-    If you do use ``--bypass-lock``, you are responsible to ensure that no other
-    borg instances have write access to the repository. Otherwise, you might
+    If you do use ``--bypass-lock``, you are responsible for ensuring that no other
+    Borg instances have write access to the repository. Otherwise, you might
     experience errors and read broken data if changes to that repository are
     being made at the same time.
 

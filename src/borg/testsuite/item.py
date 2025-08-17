@@ -35,7 +35,7 @@ def test_item_empty():
 
 
 def test_item_from_dict():
-    # does not matter whether we get str or bytes keys
+    # It does not matter whether we get str or bytes keys
     item = Item({b'path': '/a/b/c', b'mode': 0o666})
     assert item.path == '/a/b/c'
     assert item.mode == 0o666

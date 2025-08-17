@@ -51,7 +51,7 @@ FreeSpace = partial(defaultdict, int)
 
 class Repository:
     """
-    Filesystem based transactional key value store
+    Filesystem-based transactional key-value store.
 
     Transactionality is achieved by using a log (aka journal) to record changes. The log is a series of numbered files
     called segments. Each segment is a series of log entries. The segment number together with the offset of each
@@ -84,9 +84,9 @@ class Repository:
     such obsolete entries is called sparse, while a segment containing no such entries is called compact.
 
     Sparse segments can be compacted and thereby disk space freed. This destroys the transaction for which the
-    superseded entries where current.
+    superseded entries were current.
 
-    On disk layout:
+    On-disk layout:
 
     dir/README
     dir/config
@@ -97,16 +97,16 @@ class Repository:
     File system interaction
     -----------------------
 
-    LoggedIO generally tries to rely on common behaviours across transactional file systems.
+    LoggedIO generally tries to rely on common behaviors across transactional file systems.
 
     Segments that are deleted are truncated first, which avoids problems if the FS needs to
     allocate space to delete the dirent of the segment. This mostly affects CoW file systems,
     traditional journaling file systems have a fairly good grip on this problem.
 
     Note that deletion, i.e. unlink(2), is atomic on every file system that uses inode reference
-    counts, which includes pretty much all of them. To remove a dirent the inodes refcount has
-    to be decreased, but you can't decrease the refcount before removing the dirent nor can you
-    decrease the refcount after removing the dirent. File systems solve this with a lock,
+    counts, which includes pretty much all of them. To remove a dirent the inode's reference count has
+    to be decreased, but you cannot decrease the reference count before removing the dirent nor can you
+    decrease the reference count after removing the dirent. File systems solve this with a lock,
     and by ensuring it all stays within the same FS transaction.
 
     Truncation is generally not atomic in itself, and combining truncate(2) and unlink(2) is of
@@ -115,7 +115,7 @@ class Repository:
     this is of course way more complex).
 
     LoggedIO gracefully handles truncate/unlink splits as long as the truncate resulted in
-    a zero length file. Zero length segments are considered to not exist, while LoggedIO.cleanup()
+    a zero-length file. Zero-length segments are considered to not exist, while LoggedIO.cleanup()
     will still get rid of them.
     """
 

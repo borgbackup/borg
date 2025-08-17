@@ -22,7 +22,7 @@ class XattrTestCase(BaseTestCase):
         os.unlink(self.symlink)
 
     def assert_equal_se(self, is_x, want_x):
-        # check 2 xattr lists for equality, but ignore security.selinux attr
+        # Check two xattr lists for equality, but ignore the security.selinux attribute.
         is_x = set(is_x) - {b'security.selinux', b'com.apple.provenance'}
         want_x = set(want_x)
         self.assert_equal(is_x, want_x)
@@ -38,7 +38,7 @@ class XattrTestCase(BaseTestCase):
         setxattr(tmp_fd, b'user.bar', b'foo')
         setxattr(tmp_fn, b'user.empty', b'')
         if not is_linux:
-            # linux does not allow setting user.* xattrs on symlinks
+            # Linux does not allow setting user.* xattrs on symlinks.
             setxattr(tmp_lfn, b'user.linkxattr', b'baz')
         self.assert_equal_se(listxattr(tmp_fn), [b'user.foo', b'user.bar', b'user.empty'])
         self.assert_equal_se(listxattr(tmp_fd), [b'user.foo', b'user.bar', b'user.empty'])
@@ -54,9 +54,9 @@ class XattrTestCase(BaseTestCase):
 
     def test_listxattr_buffer_growth(self):
         tmp_fn = os.fsencode(self.tmpfile.name)
-        # make it work even with ext4, which imposes rather low limits
+        # Make it work even with ext4, which imposes rather low limits.
         buffer.resize(size=64, init=True)
-        # xattr raw key list will be > 64
+        # xattr raw key list will be longer than 64
         keys = [b'user.attr%d' % i for i in range(20)]
         for key in keys:
             setxattr(tmp_fn, key, b'x')

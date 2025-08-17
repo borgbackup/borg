@@ -17,7 +17,7 @@ OS_API_VERSION = API_VERSION
 
 if not is_win32:
     from .posix import process_alive, local_pid_alive
-    # posix swidth implementation works for: linux, freebsd, darwin, openindiana, cygwin
+    # POSIX swidth implementation works for: Linux, FreeBSD, Darwin, OpenIndiana, Cygwin
     from .posix import swidth
     from .posix import get_errno
     from .posix import uid2user, user2uid, gid2group, group2gid, getosusername
@@ -45,7 +45,7 @@ elif is_darwin:  # pragma: darwin only
 
 def get_birthtime_ns(st, path, fd=None):
     if hasattr(st, "st_birthtime_ns"):
-        # added in Python 3.12 but not always available.
+        # Added in Python 3.12 but not always available.
         return st.st_birthtime_ns
     elif is_darwin and is_darwin_feature_64_bit_inode:
         return _get_birthtime_ns(fd or path, follow_symlinks=False)

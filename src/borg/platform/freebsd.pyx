@@ -57,18 +57,18 @@ NS_ID_MAP = {b"user": EXTATTR_NAMESPACE_USER, }
 
 
 def split_ns(ns_name, default_ns):
-    # split ns_name (which is in the form of b"namespace.name") into namespace and name.
-    # if there is no namespace given in ns_name, default to default_ns.
-    # note:
+    # Split ns_name (which is in the form of b"namespace.name") into namespace and name.
+    # If there is no namespace given in ns_name, default to default_ns.
+    # Note:
     # borg < 1.1.10 on FreeBSD did not prefix the namespace to the names, see #3952.
-    # we also need to deal with "unexpected" namespaces here, they could come
+    # We also need to deal with "unexpected" namespaces here; they could come
     # from borg archives made on other operating systems.
     ns_name_tuple = ns_name.split(b".", 1)
     if len(ns_name_tuple) == 2:
-        # we have a namespace prefix in the given name
+        # We have a namespace prefix in the given name.
         ns, name = ns_name_tuple
     else:
-        # no namespace given in ns_name (== no dot found), maybe data coming from an old borg archive.
+        # No namespace given in ns_name (no dot found), maybe data coming from an old borg archive.
         ns, name = default_ns, ns_name
     return ns, name
 
@@ -100,7 +100,7 @@ def getxattr(path, name, *, follow_symlinks=False):
                 return c_extattr_get_link(path, ns_id, name, <char *> buf, size)
 
     ns, name = split_ns(name, b"user")
-    ns_id = NS_ID_MAP[ns]  # this will raise a KeyError it the namespace is unsupported
+    ns_id = NS_ID_MAP[ns]  # this will raise a KeyError if the namespace is unsupported
     n, buf = _getxattr_inner(func, path, name)
     return bytes(buf[:n])
 
@@ -117,7 +117,7 @@ def setxattr(path, name, value, *, follow_symlinks=False):
 
     ns, name = split_ns(name, b"user")
     try:
-        ns_id = NS_ID_MAP[ns]  # this will raise a KeyError it the namespace is unsupported
+        ns_id = NS_ID_MAP[ns]  # this will raise a KeyError if the namespace is unsupported
     except KeyError:
         pass
     else:
@@ -142,9 +142,9 @@ cdef _get_acl(p, type, item, attribute, flags, fd=None):
     acl_free(acl)
 
 def acl_get(path, item, st, numeric_ids=False, fd=None):
-    """Saves ACL Entries
+    """Save ACL entries.
 
-    If `numeric_ids` is True the user/group field is not preserved only uid/gid
+    If numeric_ids is True, the user/group field is not preserved; only uid/gid.
     """
     cdef int flags = ACL_TEXT_APPEND_ID
     flags |= ACL_TEXT_NUMERIC_IDS if numeric_ids else 0
@@ -154,7 +154,7 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     if ret < 0:
         raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
     if ret == 0:
-        # there is no ACL defining permissions other than those defined by the traditional file permission bits.
+        # There is no ACL defining permissions other than those defined by the traditional file permission bits.
         return
     ret = lpathconf(path, _PC_ACL_NFS4)
     if ret < 0:
@@ -192,8 +192,7 @@ cdef _set_acl(p, type, item, attribute, numeric_ids=False, fd=None):
 
 
 cdef _nfs4_use_stored_uid_gid(acl):
-    """Replace the user/group field with the stored uid/gid
-    """
+    """Replace the user/group field with the stored uid/gid."""
     entries = []
     for entry in safe_decode(acl).split('\n'):
         if entry:
@@ -206,10 +205,9 @@ cdef _nfs4_use_stored_uid_gid(acl):
 
 
 def acl_set(path, item, numeric_ids=False, fd=None):
-    """Restore ACL Entries
+    """Restore ACL entries.
 
-    If `numeric_ids` is True the stored uid/gid is used instead
-    of the user/group names
+    If numeric_ids is True, the stored uid/gid is used instead of the user/group names.
     """
     if isinstance(path, str):
         path = os.fsencode(path)

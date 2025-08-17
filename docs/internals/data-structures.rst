@@ -21,29 +21,29 @@ Repository
 
 .. Some parts of this description were taken from the Repository docstring
 
-Borg stores its data in a `Repository`, which is a file system based
+Borg stores its data in a `Repository`, which is a filesystem-based
 transactional key-value store. Thus the repository does not know about
 the concept of archives or items.
 
 Each repository has the following file structure:
 
 README
-  simple text file telling that this is a Borg repository
+  Simple text file telling that this is a Borg repository
 
 config
-  repository configuration
+  Repository configuration
 
 data/
-  directory where the actual data is stored
+  Directory where the actual data is stored
 
 hints.%d
-  hints for repository compaction
+  Hints for repository compaction
 
 index.%d
-  repository index
+  Repository index
 
 lock.roster and lock.exclusive/*
-  used by the locking system to manage shared and exclusive locks
+  Used by the locking system to manage shared and exclusive locks
 
 Transactionality is achieved by using a log (aka journal) to record changes. The log is a series of numbered files
 called segments_. Each segment is a series of log entries. The segment number together with the offset of each

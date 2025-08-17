@@ -8,28 +8,28 @@ any dependencies.
 Download the correct files
 --------------------------
 
-amd64 / x86_64 architecture
+AMD64/x86_64 architecture
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 borg-linux-glibc241 Linux (built on Debian 13 "Trixie" with glibc 2.41)
 borg-linux-glibc236 Linux (built on Debian 12 "Bookworm" with glibc 2.36)
 borg-linux-glibc231 Linux (built on Debian 11 "Bullseye" with glibc 2.31)
 borg-linux-glibc228 Linux (built on Debian 10 "Buster" with glibc 2.28)
-                    Note: you can also try them on other Linuxes with other glibc
-                    versions - as long as the glibc is compatible, they will work.
-                    If it doesn't work, try a borg 1.2.x binary.
+                    Note: You can also try them on other Linux distributions with different glibc
+                    versions - as long as glibc is compatible, they will work.
+                    If it doesn't work, try a Borg 1.2.x binary.
 
-borg-macos1012      macOS (built on macOS Sierra 10.12 with latest macFUSE from brew)
-                    To avoid signing issues download the file via command line OR
+borg-macos1012      macOS (built on macOS Sierra 10.12 with the latest macFUSE from Homebrew)
+                    To avoid signing issues, download the file via the command line OR
                     remove the "quarantine" attribute after downloading:
-                    $ xattr -dr com.apple.quarantine borg-macos.tgz
+                    $ xattr -dr com.apple.quarantine borg-macos1012.tgz
 
 borg-freebsd13      FreeBSD (built on FreeBSD 13)
 borg-freebsd14      FreeBSD (built on FreeBSD 14)
 
-*.tgz               similar to above, but built as a directory with files,
-                    not as a single self-extracting binary. using the directory
-                    build is faster and doesn't need as much space in the temp
+*.tgz               Similar to the above, but built as a directory with files,
+                    not as a single self-extracting binary. Using the directory
+                    build is faster and does not require as much space in the temporary
                     directory as the one-file build.
 *.asc               GnuPG signatures for *
 
@@ -41,7 +41,7 @@ Please check the GPG signature to make sure you received the binary as I have
 built it.
 
 To check the GPG signature, download both the binary and the corresponding
-*.asc file and then (on the shell) type, e.g.:
+*.asc file and then (on the shell) type, for example:
 
     gpg --recv-keys 9F88FB52FAF7B393
     gpg --verify borg-freebsd.asc borg-freebsd
@@ -51,7 +51,7 @@ The files are signed by:
 Thomas Waldmann <tw@waldmann-edv.de>
 GPG key fingerprint: 6D5B EF9A DD20 7580 5747 B70F 9F88 FB52 FAF7 B393
 
-My fingerprint is also in the footer of all my borgbackup mailing list posts.
+My fingerprint is also in the footer of all my BorgBackup mailing list posts.
 
 
 Installing
@@ -62,7 +62,7 @@ If you need "borgfs", just also symlink it to the same binary, it will
 detect internally under which name it was invoked.
 
 On UNIX-like platforms, /usr/local/bin/ or ~/bin/ is a nice place for it,
-but you can invoke it from every place by giving a full path to it.
+but you can invoke it from anywhere by providing the full path to it.
 
 Make sure the file is readable and executable (chmod +rx borg on UNIX-like
 platforms).
@@ -71,7 +71,7 @@ platforms).
 Reporting issues
 ----------------
 
-Please first check the FAQ and whether a github issue already exists.
+Please first check the FAQ and whether a GitHub issue already exists.
 
 If you find a NEW issue, please open a ticket on our issue tracker:
 
@@ -83,6 +83,6 @@ There, please give:
 - a good description of what the issue is
 - a good description of how to reproduce your issue
 - a traceback with system info (if you have one)
-- your precise platform (CPU, 32/64bit?), OS, distribution, release
-- your python and (g)libc version
+- your precise platform (CPU, 32/64-bit?), OS, distribution, release
+- your Python and (g)libc versions
 

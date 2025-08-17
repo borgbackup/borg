@@ -524,7 +524,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         if mount_options:
             options.extend(mount_options.split(','))
         if is_darwin:
-            # macFUSE supports a volname mount option to give what finder displays on desktop / in directory list.
+            # macFUSE supports a volname mount option to give what Finder displays on the desktop / in directory list.
             volname = pop_option(options, 'volname', '', '', str)
             # if the user did not specify it, we make something up,
             # because otherwise it would be "macFUSE Volume 0 (Python)", #7690.

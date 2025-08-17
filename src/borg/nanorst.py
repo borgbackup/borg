@@ -50,10 +50,10 @@ def process_directive(directive, arguments, out, state_hook):
 
 def rst_to_text(text, state_hook=None, references=None):
     """
-    Convert rST to a more human text form.
+    Convert reStructuredText (rST) to a more human-readable text form.
 
     This is a very loose conversion. No advanced rST features are supported.
-    The generated output directly depends on the input (e.g. indentation of
+    The generated output directly depends on the input (e.g., indentation of
     admonitions).
     """
     state_hook = state_hook or (lambda old_state, new_state, out: None)
@@ -90,7 +90,7 @@ def rst_to_text(text, state_hook=None, references=None):
                     text.read(1)
                     continue
                 if text.peek(-1).isspace() and char == ':' and text.peek(5) == 'ref:`':
-                    # translate reference
+                    # Translate reference
                     text.read(5)
                     ref = ''
                     while True:
@@ -108,7 +108,7 @@ def rst_to_text(text, state_hook=None, references=None):
                         raise ValueError("Undefined reference in Archiver help: %r — please add reference "
                                          "substitution to 'rst_plain_text_references'" % ref)
                     continue
-                if char == ':' and text.peek(2) == ':\n':  # End of line code block
+                if char == ':' and text.peek(2) == ':\n':  # End-of-line code block
                     text.read(2)
                     state_hook(state, 'code-block', out)
                     state = 'code-block'
@@ -204,7 +204,7 @@ def rst_to_terminal(rst, references=None, destination=sys.stdout):
     Convert *rst* to a lazy string.
 
     If *destination* is a file-like object connected to a terminal,
-    enrich text with suitable ANSI escapes. Otherwise return plain text.
+    enrich the text with suitable ANSI escapes. Otherwise, return plain text.
     """
     if is_terminal(destination):
         rst_state_hook = ansi_escapes

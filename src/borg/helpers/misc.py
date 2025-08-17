@@ -41,21 +41,21 @@ def default_period_func(pattern):
 def quarterly_13weekly_period_func(a):
     (year, week, _) = to_localtime(a.ts).isocalendar()
     if week <= 13:
-        # Weeks containing Jan 4th to Mar 28th (leap year) or 29th- 91 (13*7)
+        # Weeks containing Jan 4th to Mar 28th (leap year) or 29th — 91 (13*7)
         # days later.
         return (year, 1)
     elif 14 <= week <= 26:
-        # Weeks containing Apr 4th (leap year) or 5th to Jun 27th or 28th- 91
+        # Weeks containing Apr 4th (leap year) or 5th to Jun 27th or 28th — 91
         # days later.
         return (year, 2)
     elif 27 <= week <= 39:
-        # Weeks containing Jul 4th (leap year) or 5th to Sep 26th or 27th-
+        # Weeks containing Jul 4th (leap year) or 5th to Sep 26th or 27th —
         # at least 91 days later.
         return (year, 3)
     else:
-        # Everything else, Oct 3rd (leap year) or 4th onward, will always
-        # include week of Dec 26th (leap year) or Dec 27th, may also include
-        # up to possibly Jan 3rd of next year.
+        # Everything else: Oct 3rd (leap year) or 4th onward; will always
+        # include the week of Dec 26th (leap year) or Dec 27th and may also include
+        # up to Jan 3rd of next year.
         return (year, 4)
 
 
@@ -155,9 +155,9 @@ def sysinfo():
 
 def log_multi(*msgs, level=logging.INFO, logger=logger):
     """
-    log multiple lines of text, each line by a separate logging call for cosmetic reasons
+    Log multiple lines of text, each line via a separate logging call for cosmetic reasons.
 
-    each positional argument may be a single or multiple lines (separated by newlines) of text.
+    Each positional argument may be a single or multiple lines (separated by newlines) of text.
     """
     lines = []
     for msg in msgs:
@@ -171,14 +171,14 @@ def normalize_chunker_params(cp):
     if isinstance(cp, list):
         cp = tuple(cp)
     if len(cp) == 4 and isinstance(cp[0], int):
-        # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
+        # This is a Borg < 1.2 chunker_params tuple: no chunker algorithm specified, but we only had buzhash.
         cp = (CH_BUZHASH, ) + cp
     assert cp[0] in (CH_BUZHASH, CH_FIXED)
     return cp
 
 
 class ChunkIteratorFileWrapper:
-    """File-like wrapper for chunk iterators"""
+    """File-like wrapper for chunk iterators."""
 
     def __init__(self, chunk_iterator, read_callback=None):
         """
@@ -245,13 +245,13 @@ def chunkit(it, size):
 
 
 def consume(iterator, n=None):
-    """Advance the iterator n-steps ahead. If n is none, consume entirely."""
+    """Advance the iterator n steps ahead. If n is None, consume entirely."""
     # Use functions that consume iterators at C speed.
     if n is None:
-        # feed the entire iterator into a zero-length deque
+        # Feed the entire iterator into a zero-length deque.
         deque(iterator, maxlen=0)
     else:
-        # advance to the empty slice starting at position n
+        # Advance to the empty slice starting at position n.
         next(islice(iterator, n, n), None)
 
 
@@ -280,7 +280,7 @@ class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
 
 
 def iter_separated(fd, sep=None, read_size=4096):
-    """Iter over chunks of open file ``fd`` delimited by ``sep``. Doesn't trim."""
+    """Iterate over chunks of the open file ``fd`` delimited by ``sep``. Does not trim."""
     buf = fd.read(read_size)
     is_str = isinstance(buf, str)
     part = '' if is_str else b''

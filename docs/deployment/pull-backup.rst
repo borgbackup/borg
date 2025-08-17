@@ -6,20 +6,20 @@
 Backing up in pull mode
 =======================
 
-Typically the borg client connects to a backup server using SSH as a transport
+Typically the Borg client connects to a backup server using SSH as a transport
 when initiating a backup. This is referred to as push mode.
 
-If you however require the backup server to initiate the connection or prefer
+If, however, you require the backup server to initiate the connection or prefer
 it to initiate the backup run, one of the following workarounds is required to
 allow such a pull mode setup.
 
-A common use case for pull mode is to backup a remote server to a local personal
+A common use case for pull mode is to back up a remote server to a local personal
 computer.
 
 SSHFS
 =====
 
-Assuming you have a pull backup system set up with borg, where a backup server
+Assuming you have a pull backup system set up with Borg, where a backup server
 pulls the data from the target via SSHFS. In this mode, the backup client's file
 system is mounted remotely on the backup server. Pull mode is even possible if
 the SSH connection must be established by the client via a remote tunnel. Other
@@ -64,7 +64,7 @@ completely in every aspect from such a backup.
 Creating a backup
 -----------------
 
-Generally, in a pull backup situation there is no direct way for borg to know
+Generally, in a pull backup situation there is no direct way for Borg to know
 the client's original UID:GID name mapping of files, because Borg would use
 ``/etc/passwd`` and ``/etc/group`` of the backup server to map the names. To
 derive the right names, Borg needs to have access to the client's passwd and
@@ -72,7 +72,7 @@ group files and use them in the backup process.
 
 The solution to this problem is chrooting into an sshfs mounted directory. In
 this example the whole client root file system is mounted. We use the
-stand-alone BorgBackup executable and copy it into the mounted file system to
+standalone BorgBackup executable and copy it into the mounted file system to
 make Borg available after entering chroot; this can be skipped if Borg is
 already installed on the client.
 

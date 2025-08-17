@@ -1,5 +1,5 @@
 """
-load library for lowlevel FUSE implementation
+Load library for low-level FUSE implementation.
 """
 
 import os

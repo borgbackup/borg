@@ -347,6 +347,22 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jammy", ".*none.*")
   end
 
+  config.vm.define "trixie" do |b|
+    b.vm.box = "debian/testing64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("trixie")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("trixie")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("trixie")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("trixie")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trixie", ".*none.*")
+  end
+
   config.vm.define "bookworm32" do |b|
     b.vm.box = "generic-x32/debian12"
     b.vm.provider :virtualbox do |v|

@@ -424,7 +424,8 @@ cdef class EncryptedKey(PropDict):
     """
 
     VALID_KEYS = {'version', 'algorithm', 'iterations', 'salt', 'hash', 'data',
-                  'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism', 'argon2_type'}
+                  'argon2_time_cost', 'argon2_memory_cost', 'argon2_parallelism',
+                  'argon2_type', 'fido2_credential_id'}
 
     version = PropDictProperty(int)
     algorithm = PropDictProperty(str)
@@ -436,6 +437,7 @@ cdef class EncryptedKey(PropDict):
     argon2_memory_cost = PropDictProperty(int)
     argon2_parallelism = PropDictProperty(int)
     argon2_type = PropDictProperty(str)
+    fido2_credential_id = PropDictProperty(bytes)
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)

@@ -47,21 +47,27 @@ class Passphrase(str):
             return cls(passphrase)
 
     @classmethod
-    def env_passphrase(cls, default=None, other=False):
+    def env_passphrase(cls, default=None, other=False, new=False):
+        if other and new:
+            raise ValueError("Only one of 'other' and 'new' may be true")
         env_var = "BORG_OTHER_PASSPHRASE" if other else "BORG_PASSPHRASE"
+        env_var = "BORG_NEW_PASSPHRASE" if new else env_var
         passphrase = cls._env_passphrase(env_var, default)
         if passphrase is not None:
             return passphrase
-        passphrase = cls.env_passcommand(other=other)
+        passphrase = cls.env_passcommand(other=other, new=new)
         if passphrase is not None:
             return passphrase
-        passphrase = cls.fd_passphrase(other=other)
+        passphrase = cls.fd_passphrase(other=other, new=new)
         if passphrase is not None:
             return passphrase
 
     @classmethod
-    def env_passcommand(cls, default=None, other=False):
+    def env_passcommand(cls, default=None, other=False, new=False):
+        if other and new:
+            raise ValueError("Only one of 'other' and 'new' may be true")
         env_var = "BORG_OTHER_PASSCOMMAND" if other else "BORG_PASSCOMMAND"
+        env_var = "BORG_NEW_PASSCOMMAND" if other else env_var
         passcommand = os.environ.get(env_var, None)
         if passcommand is not None:
             # passcommand is a system command (not inside pyinstaller env)
@@ -73,8 +79,11 @@ class Passphrase(str):
             return cls(passphrase.rstrip("\n"))
 
     @classmethod
-    def fd_passphrase(cls, other=False):
+    def fd_passphrase(cls, other=False, new=False):
+        if other and new:
+            raise ValueError("Only one of 'other' and 'new' may be true")
         env_var = "BORG_OTHER_PASSPHRASE_FD" if other else "BORG_PASSPHRASE_FD"
+        env_var = "BORG_NEW_PASSPHRASE_FD" if new else env_var
         try:
             fd = int(os.environ.get(env_var))
         except (ValueError, TypeError):
@@ -82,10 +91,6 @@ class Passphrase(str):
         with os.fdopen(fd, mode="r") as f:
             passphrase = f.read()
         return cls(passphrase.rstrip("\n"))
-
-    @classmethod
-    def env_new_passphrase(cls, default=None):
-        return cls._env_passphrase("BORG_NEW_PASSPHRASE", default)
 
     @classmethod
     def getpass(cls, prompt):
@@ -143,6 +148,9 @@ class Passphrase(str):
                 {fmt_var("BORG_PASSPHRASE")}
                 {fmt_var("BORG_PASSCOMMAND")}
                 {fmt_var("BORG_PASSPHRASE_FD")}
+                {fmt_var("BORG_NEW_PASSPHRASE")}
+                {fmt_var("BORG_NEW_PASSCOMMAND")}
+                {fmt_var("BORG_NEW_PASSPHRASE_FD")}
                 {fmt_var("BORG_OTHER_PASSPHRASE")}
                 {fmt_var("BORG_OTHER_PASSCOMMAND")}
                 {fmt_var("BORG_OTHER_PASSPHRASE_FD")}
@@ -151,13 +159,21 @@ class Passphrase(str):
             print(passphrase_info, file=sys.stderr)
 
     @classmethod
-    def new(cls, allow_empty=False):
-        passphrase = cls.env_new_passphrase()
+    def new(cls, allow_empty=False, only_new=False, pin_prompt=None):
+        passphrase = cls.env_passphrase(new=True)
         if passphrase is not None:
             return passphrase
-        passphrase = cls.env_passphrase()
-        if passphrase is not None:
-            return passphrase
+        if not only_new:
+            passphrase = cls.env_passphrase()
+            if passphrase is not None:
+                return passphrase
+        if pin_prompt:
+            passphrase = cls.getpass(pin_prompt)
+            if passphrase is not None:
+                return passphrase
+            else:
+                print("PIN must not be blank.", file=sys.stderr)
+                raise PasswordRetriesExceeded
         for retry in range(1, 11):
             passphrase = cls.getpass("Enter new passphrase: ")
             if allow_empty or passphrase:

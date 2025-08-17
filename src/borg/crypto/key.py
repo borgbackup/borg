@@ -637,7 +637,7 @@ class FlexiKey:
 
     def change_passphrase(self, passphrase=None):
         if passphrase is None:
-            passphrase = Passphrase.new(allow_empty=True)
+            passphrase = Passphrase.new(allow_empty=True, only_new=True)
         # replace the borg key we unlocked with: keep its label, write the new borg key, then
         # (for repokey) delete the previously-loaded borg key (keyfile mode auto-erases it in save()).
         old_id = self._loaded_key_id

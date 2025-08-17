@@ -551,7 +551,7 @@ Errors
     Buffer.MemoryLimitExceeded rc: 2 traceback: no
         Requested buffer size {} is above the limit of {}.
     EfficientCollectionQueue.SizeUnderflow rc: 2 traceback: no
-        Could not pop_front first {} elements, collection only has {} elements..
+        Could not pop_front the first {} elements; collection only has {} elements.
     RTError rc: 2 traceback: no
         Runtime Error: {}
 
@@ -591,7 +591,7 @@ Errors
         Permission denied to {}.
 
     MandatoryFeatureUnsupported rc: 25 traceback: no
-        Unsupported repository feature(s) {}. A newer version of borg is required to access this repository.
+        Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository.
     NoManifestError rc: 26 traceback: no
         Repository has no manifest.
     UnsupportedManifestError rc: 27 traceback: no
@@ -611,7 +611,7 @@ Errors
     KeyfileNotFoundError rc: 42 traceback: no
         No key file for repository {} found in {}.
     NotABorgKeyFile rc: 43 traceback: no
-        This file is not a borg key backup, aborting.
+        This file is not a Borg key backup, aborting.
     RepoKeyNotFoundError rc: 44 traceback: no
         No key entry found in the config of repository {}.
     RepoIdMismatch rc: 45 traceback: no
@@ -624,13 +624,13 @@ Errors
         Unsupported payload type {}. A newer version is required to access this repository.
 
     NoPassphraseFailure rc: 50 traceback: no
-        can not acquire a passphrase: {}
+        Cannot acquire a passphrase: {}
     PasscommandFailure rc: 51 traceback: no
-        passcommand supplied in BORG_PASSCOMMAND failed: {}
+        Passcommand supplied in BORG_PASSCOMMAND failed: {}
     PassphraseWrong rc: 52 traceback: no
-        passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect.
+        Passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND, or via BORG_PASSPHRASE_FD is incorrect.
     PasswordRetriesExceeded rc: 53 traceback: no
-        exceeded the maximum password retries
+        Exceeded the maximum password retries.
 
     Cache.CacheInitAbortedError rc: 60 traceback: no
         Cache initialization aborted
@@ -657,11 +657,11 @@ Errors
         Failed to release the lock {} (was/is locked, but not by me).
 
     ConnectionClosed rc: 80 traceback: no
-        Connection closed by remote host
+        Connection closed by remote host.
     ConnectionClosedWithHint rc: 81 traceback: no
         Connection closed by remote host. {}
     InvalidRPCMethod rc: 82 traceback: no
-        RPC method {} is not valid
+        RPC method {} is not valid.
     PathNotAllowed rc: 83 traceback: no
         Repository path not allowed: {}
     RemoteRepository.RPCServerOutdated rc: 84 traceback: no

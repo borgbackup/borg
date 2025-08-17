@@ -545,7 +545,7 @@ class FlexiKey:
 
     def change_passphrase(self, passphrase=None):
         if passphrase is None:
-            passphrase = Passphrase.new(allow_empty=True)
+            passphrase = Passphrase.new(allow_empty=True, only_new=True)
         self.save(self.target, passphrase, algorithm=self._encrypted_key_algorithm)
 
     @classmethod

@@ -82,9 +82,9 @@ def test_default_acl():
 @skipif_acls_not_working
 @skipif_no_ubel_user
 def test_non_ascii_acl():
-    # Testing non-ascii ACL processing to see whether our code is robust.
-    # I have no idea whether non-ascii ACLs are allowed by the standard,
-    # but in practice they seem to be out there and must not make our code explode.
+    # Testing non-ASCII ACL processing to see whether our code is robust.
+    # I have no idea whether non-ASCII ACLs are allowed by the standard,
+    # but in practice they seem to be out there and must not cause failures.
     file = tempfile.NamedTemporaryFile()
     assert get_acl(file.name) == {}
     nothing_special = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\n"

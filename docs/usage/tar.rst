@@ -6,25 +6,25 @@ Examples
 ~~~~~~~~
 ::
 
-    # export as uncompressed tar
+    # Export as an uncompressed tar archive
     $ borg export-tar Monday Monday.tar
 
-    # import an uncompressed tar
+    # Import an uncompressed tar archive
     $ borg import-tar Monday Monday.tar
 
-    # exclude some file types, compress using gzip
+    # Exclude some file types and compress using gzip
     $ borg export-tar Monday Monday.tar.gz --exclude '*.so'
 
-    # use higher compression level with gzip
+    # Use a higher compression level with gzip
     $ borg export-tar --tar-filter="gzip -9" Monday Monday.tar.gz
 
-    # copy an archive from repoA to repoB
+    # Copy an archive from repoA to repoB
     $ borg -r repoA export-tar --tar-format=BORG archive - | borg -r repoB import-tar archive -
 
-    # export a tar, but instead of storing it on disk, upload it to remote site using curl
+    # Export a tar, but instead of storing it on disk, upload it to a remote site using curl
     $ borg export-tar Monday - | curl --data-binary @- https://somewhere/to/POST
 
-    # remote extraction via "tarpipe"
+    # Remote extraction via 'tarpipe'
     $ borg export-tar Monday - | ssh somewhere "cd extracted; tar x"
 
 Archives transfer script
@@ -46,7 +46,7 @@ Kept:
 
 Lost:
 
-- some archive metadata (like the original commandline, execution time, etc.)
+- some archive metadata (like the original command line, execution time, etc.)
 
 Please note:
 

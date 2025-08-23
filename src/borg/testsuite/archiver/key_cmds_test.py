@@ -20,7 +20,7 @@ def test_change_passphrase(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     os.environ["BORG_NEW_PASSPHRASE"] = "newpassphrase"
-    # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
+    # Here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
     cmd(archiver, "key", "change-passphrase")
     os.environ["BORG_PASSPHRASE"] = "newpassphrase"
     cmd(archiver, "repo-list")

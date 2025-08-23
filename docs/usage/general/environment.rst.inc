@@ -33,7 +33,7 @@ General:
         When set, use the value to answer the passphrase question when a **new** passphrase is asked for.
         This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
         be checked.
-        Main usecase for this is to automate fully ``borg change-passphrase``.
+        Main use case for this is to fully automate ``borg change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
     BORG_DEBUG_PASSPHRASE
@@ -46,22 +46,22 @@ General:
         Borg usually computes a host id from the FQDN plus the results of ``uuid.getnode()`` (which usually returns
         a unique id based on the MAC address of the network interface. Except if that MAC happens to be all-zero - in
         that case it returns a random value, which is not what we want (because it kills automatic stale lock removal).
-        So, if you have a all-zero MAC address or other reasons to control better externally the host id, just set this
+        So, if you have an all-zero MAC address or other reasons to better control the host id externally, just set this
         environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
-        use fqdn@uniqueid.
+        use FQDN@uniqueid.
     BORG_LOCK_WAIT
         You can set the default value for the ``--lock-wait`` option with this, so
-        you do not need to give it as a commandline option.
+        you do not need to give it as a command line option.
     BORG_LOGGING_CONF
         When set, use the given filename as INI_-style logging configuration.
         A basic example conf can be found at ``docs/misc/logging.conf``.
     BORG_RSH
         When set, use this command instead of ``ssh``. This can be used to specify ssh options, such as
         a custom identity file ``ssh -i /path/to/private/key``. See ``man ssh`` for other options. Using
-        the ``--rsh CMD`` commandline option overrides the environment variable.
+        the ``--rsh CMD`` command line option overrides the environment variable.
     BORG_REMOTE_PATH
         When set, use the given path as borg executable on the remote (defaults to "borg" if unset).
-        Using ``--remote-path PATH`` commandline option overrides the environment variable.
+        Using the ``--remote-path PATH`` command line option overrides the environment variable.
     BORG_REPO_PERMISSIONS
         Set repository permissions, see also: :ref:`borg_serve`
     BORG_FILES_CACHE_SUFFIX
@@ -79,7 +79,7 @@ General:
         exceptions is not shown.
         Please only use for good reasons as it makes issues harder to analyze.
     BORG_FUSE_IMPL
-        Choose the lowlevel FUSE implementation borg shall use for ``borg mount``.
+        Choose the low-level FUSE implementation borg shall use for ``borg mount``.
         This is a comma-separated list of implementation names, they are tried in the
         given order, e.g.:
 
@@ -89,15 +89,15 @@ General:
         - ``llfuse``: only try to load llfuse
         - ``none``: do not try to load an implementation
     BORG_SELFTEST
-        This can be used to influence borg's builtin self-tests. The default is to execute the tests
+        This can be used to influence borg's built-in self-tests. The default is to execute the tests
         at the beginning of each borg command invocation.
 
         BORG_SELFTEST=disabled can be used to switch off the tests and rather save some time.
         Disabling is not recommended for normal borg users, but large scale borg storage providers can
         use this to optimize production servers after at least doing a one-time test borg (with
-        selftests not disabled) when installing or upgrading machines / OS / borg.
+        self-tests not disabled) when installing or upgrading machines/OS/Borg.
     BORG_WORKAROUNDS
-        A list of comma separated strings that trigger workarounds in borg,
+        A list of comma-separated strings that trigger workarounds in borg,
         e.g. to work around bugs in other software.
 
         Currently known strings are:
@@ -107,7 +107,7 @@ General:
             You might need this to run borg on WSL (Windows Subsystem for Linux) or
             in systemd.nspawn containers on some architectures (e.g. ARM).
             Using this does not affect data safety, but might result in a more bursty
-            write to disk behaviour (not continuously streaming to disk).
+            write-to-disk behavior (not continuously streaming to disk).
 
         retry_erofs
             Retry opening a file without O_NOATIME if opening a file with O_NOATIME

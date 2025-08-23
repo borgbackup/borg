@@ -1,6 +1,6 @@
 {%- extends "basic/layout.html" %}
 
-{# Do this so that bootstrap is included before the main css file #}
+{# Do this so that Bootstrap is included before the main CSS file. #}
 {%- block htmltitle %}
   {% set script_files = script_files + ["_static/myscript.js"] %}
   <!-- Licensed under the Apache 2.0 License -->
@@ -20,7 +20,7 @@
   {{ super() }}
 {% endblock %}
 
-{# Displays the URL for the homepage if it's set or the master_doc if it is not #}
+{# Displays the URL for the homepage if it's set, or the master_doc if it is not. #}
 {% macro homepage() -%}
   {%- if theme_homepage %}
     {%- if hasdoc(theme_homepage) %}
@@ -33,7 +33,7 @@
   {%- endif %}
 {%- endmacro %}
 
-{# Displays the URL for the tospage if it's set or falls back to homepage macro #}
+{# Displays the URL for the tospage if it's set, or falls back to the homepage macro. #}
 {% macro tospage() -%}
   {%- if theme_tospage %}
     {%- if hasdoc(theme_tospage) %}
@@ -46,7 +46,7 @@
   {%- endif %}
 {%- endmacro %}
 
-{# Displays the URL for the projectpage if it's set or falls back to homepage macro #}
+{# Displays the URL for the projectpage if it's set, or falls back to the homepage macro. #}
 {% macro projectlink() -%}
   {%- if theme_projectlink %}
     {%- if hasdoc(theme_projectlink) %}
@@ -59,7 +59,7 @@
   {%- endif %}
 {%- endmacro %}
 
-{# Displays the next and previous links both before and after content #}
+{# Displays the next and previous links both before and after the content. #}
 {% macro render_relations() -%}
   {% if prev or next %}
   <div class="footer-relations">
@@ -82,7 +82,7 @@
   <div id="left-column">
     <div class="sphinxsidebar">
       {%- if sidebars != None %}
-        {#- new style sidebar: explicitly include/exclude templates #}
+        {#- New-style sidebar: explicitly include/exclude templates. #}
         {%- for sidebartemplate in sidebars %}
         {%- include sidebartemplate %}
         {%- endfor %}

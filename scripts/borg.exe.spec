@@ -1,5 +1,5 @@
 # -*- mode: python -*-
-# this pyinstaller spec file is used to build borg binaries on posix platforms and Windows
+# This PyInstaller spec file is used to build Borg binaries on POSIX platforms and Windows.
 
 import os, sys
 
@@ -53,10 +53,10 @@ exe = EXE(pyz,
           icon='NONE')
 
 # Build a directory-based binary in addition to a packed
-# single file. This allows one to look at all included
-# files easily (e.g. without having to strace or halt the built binary
-# and introspect /tmp). Also avoids unpacking all libs when
-# running the app, which is better for app signing on various OS.
+# single-file binary. This allows you to look at all included
+# files easily (e.g., without having to strace or halt the built binary
+# and introspect /tmp). It also avoids unpacking all libraries when
+# running the app, which is better for application signing on various OSes.
 slim_exe = EXE(pyz,
             a.scripts,
             exclude_binaries=True,

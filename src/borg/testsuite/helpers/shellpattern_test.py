@@ -45,7 +45,7 @@ def check(path, pattern):
         ("foo/bar", ["fo*/bar"]),
         ("foo/bar", ["f*/bar"]),
         ("foo/bar", ["*/bar"]),
-        # Double asterisk (matches 0..n directory layers)
+        # Double asterisk (matches 0 to n directory layers)
         ("foo/bar", ["foo/**/bar"]),
         ("foo/1/bar", ["foo/**/bar"]),
         ("foo/1/22/333/bar", ["foo/**/bar"]),
@@ -90,9 +90,9 @@ def test_match(path, patterns):
         ("foo", ["foo?"]),
         ("foo", ["?foo"]),
         ("foo", ["f?oo"]),
-        # do not match path separator
+        # Do not match the path separator.
         ("foo/ar", ["foo?ar"]),
-        # do not match/cross over os.path.sep
+        # Do not match or cross the path separator (os.path.sep).
         ("foo/bar", ["*"]),
         ("foo/bar", ["foo*bar"]),
         ("foo/bar", ["foo*ar"]),
@@ -100,9 +100,9 @@ def test_match(path, patterns):
         ("foo/bar", ["fo*ar"]),
         # Double asterisk
         ("foobar", ["foo/**/bar"]),
-        # Two asterisks without slash do not match directory separator
+        # Two asterisks without a slash do not match the directory separator.
         ("foo/bar", ["**"]),
-        # Double asterisk not matching filename
+        # Double asterisk does not match a filename.
         ("foo/bar", ["**/"]),
         # Set
         ("foo3", ["foo[12]"]),
@@ -122,11 +122,11 @@ def test_mismatch(path, patterns):
 
 
 def test_match_end():
-    regex = shellpattern.translate("*-home")  # default is match_end == string end
+    regex = shellpattern.translate("*-home")  # The default is match_end == end of string.
     assert re.match(regex, "2017-07-03-home")
     assert not re.match(regex, "2017-07-03-home.xxx")
 
-    match_end = r"(\.xxx)?\Z"  # with/without .xxx ending
+    match_end = r"(\.xxx)?\Z"  # With or without a .xxx suffix.
     regex = shellpattern.translate("*-home", match_end=match_end)
     assert re.match(regex, "2017-07-03-home")
     assert re.match(regex, "2017-07-03-home.xxx")

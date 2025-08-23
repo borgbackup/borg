@@ -15,7 +15,7 @@ def test_highlander(archiver):
     cmd(archiver, "create", "--comment", "comment 1", "test-1", __file__)
     error_msg = "There can be only one"
     # Default umask value is 0077
-    # Test that it works with a one time specified default or custom value
+    # Test that it works with a one-time specified default or custom value
     output_default = cmd(archiver, "--umask", "0077", "repo-list")
     assert error_msg not in output_default
     output_custom = cmd(archiver, "--umask", "0007", "repo-list")

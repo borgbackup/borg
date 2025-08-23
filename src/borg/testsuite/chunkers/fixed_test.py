@@ -6,7 +6,7 @@ from ...chunkers import ChunkerFixed
 from ...constants import *  # NOQA
 
 
-@pytest.mark.skipif(not fs_supports_sparse(), reason="fs does not support sparse files")
+@pytest.mark.skipif(not fs_supports_sparse(), reason="filesystem does not support sparse files")
 @pytest.mark.parametrize(
     "fname, sparse_map, header_size, sparse",
     [

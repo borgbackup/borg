@@ -10,7 +10,7 @@ def check_python():
     else:
         required_funcs = {os.stat, os.utime, os.chown}
     if not os.supports_follow_symlinks.issuperset(required_funcs):
-        raise RTError("""FATAL: this Python was compiled for a too old (g)libc and misses required functionality.""")
+        raise RTError("""FATAL: This Python was compiled for a too old (g)libc and lacks required functionality.""")
 
 
 def check_extension_modules():

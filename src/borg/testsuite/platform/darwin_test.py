@@ -4,7 +4,7 @@ import tempfile
 from ...platform import acl_get, acl_set
 from .platform_test import skipif_not_darwin, skipif_fakeroot_detected, skipif_acls_not_working
 
-# set module-level skips
+# Set module-level skips
 pytestmark = [skipif_not_darwin, skipif_fakeroot_detected]
 
 

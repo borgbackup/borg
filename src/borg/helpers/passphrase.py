@@ -16,25 +16,25 @@ logger = create_logger()
 
 
 class NoPassphraseFailure(Error):
-    """can not acquire a passphrase: {}"""
+    """Cannot acquire a passphrase: {}."""
 
     exit_mcode = 50
 
 
 class PasscommandFailure(Error):
-    """passcommand supplied in BORG_PASSCOMMAND failed: {}"""
+    """Passcommand supplied in BORG_PASSCOMMAND failed: {}."""
 
     exit_mcode = 51
 
 
 class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."""
+    """Passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND, or via BORG_PASSPHRASE_FD is incorrect."""
 
     exit_mcode = 52
 
 
 class PasswordRetriesExceeded(Error):
-    """exceeded the maximum password retries"""
+    """Exceeded the maximum password retries."""
 
     exit_mcode = 53
 
@@ -118,8 +118,8 @@ class Passphrase(str):
             Your passphrase (between double-quotes): "{passphrase}"
             Make sure the passphrase displayed above is exactly what you wanted.
             Your passphrase (UTF-8 encoding in hex): {bin_to_hex(passphrase.encode("utf-8"))}
-            It is recommended to keep the UTF-8 encoding in hex together with the passphrase at a safe place.
-            In case you should ever run into passphrase issues, it could sometimes help debugging them.
+            It is recommended to keep the UTF-8 encoding in hex together with the passphrase in a safe place.
+            In case you should ever run into passphrase issues, it could sometimes help debug them.
             """
             )
             print(pw_msg, file=sys.stderr)

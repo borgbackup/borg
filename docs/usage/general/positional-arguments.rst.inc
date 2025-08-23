@@ -2,7 +2,7 @@ Positional Arguments and Options: Order matters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Borg only supports taking options (``-s`` and ``--progress`` in the example)
-to the left or right of all positional arguments (``repo::archive`` and ``path``
+either to the left or to the right of all positional arguments (``repo::archive`` and ``path``
 in the example), but not in between them:
 
 ::

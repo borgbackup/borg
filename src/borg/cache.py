@@ -74,21 +74,21 @@ FileCacheEntry = namedtuple("FileCacheEntry", "age inode size ctime mtime chunks
 class SecurityManager:
     """
     Tracks repositories. Ensures that nothing bad happens (repository swaps,
-    replay attacks, unknown repositories etc.).
+    replay attacks, unknown repositories, etc.).
 
-    This is complicated by the Cache being initially used for this, while
-    only some commands actually use the Cache, which meant that other commands
+    This is complicated by the cache being initially used for this, while
+    only some commands actually use the cache, which meant that other commands
     did not perform these checks.
 
-    Further complications were created by the Cache being a cache, so it
-    could be legitimately deleted, which is annoying because Borg didn't
+    Further complications were created by the cache being a cache, so it
+    could be legitimately deleted, which is annoying because Borg did not
     recognize repositories after that.
 
-    Therefore a second location, the security database (see get_security_dir),
-    was introduced which stores this information. However, this means that
-    the code has to deal with a cache existing but no security DB entry,
-    or inconsistencies between the security DB and the cache which have to
-    be reconciled, and also with no cache existing but a security DB entry.
+    Therefore, a second location, the security database (see get_security_dir),
+    was introduced, which stores this information. However, this means that
+    the code has to deal with a cache existing but no security database entry,
+    or inconsistencies between the security database and the cache which have to
+    be reconciled, and also with no cache existing but a security database entry.
     """
 
     def __init__(self, repository):
@@ -100,7 +100,7 @@ class SecurityManager:
 
     @staticmethod
     def destroy(repository, path=None):
-        """destroy the security dir for ``repository`` or at ``path``"""
+        """Destroys the security directory for ``repository`` or at ``path``."""
         path = path or get_security_dir(repository.id_str, legacy=(repository.version == 1))
         if Path(path).exists():
             shutil.rmtree(path)

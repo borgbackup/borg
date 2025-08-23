@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Check if all given binaries work with the given glibc version.
+Check whether all given binaries work with the specified glibc version.
 
-glibc_check.py 2.11 bin [bin ...]
+Usage: glibc_check.py 2.11 BIN [BIN ...]
 
-rc = 0 means "yes", rc = 1 means "no".
+Exit code 0 means "yes"; exit code 1 means "no".
 """
 
 import re
@@ -40,7 +40,7 @@ def main():
                 print(f"{filename} {format_version(requires_glibc)}")
         except subprocess.CalledProcessError:
             if verbose:
-                print("%s errored." % filename)
+                print("%s failed." % filename)
 
     wanted = max(overall_versions)
     ok = given >= wanted
@@ -51,7 +51,7 @@ def main():
         else:
             print(
                 "The binaries do not work with the given glibc %s. "
-                "Minimum is: %s" % (format_version(given), format_version(wanted))
+                "Minimum required is %s." % (format_version(given), format_version(wanted))
             )
     return ok
 

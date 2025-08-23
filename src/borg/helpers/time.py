@@ -4,9 +4,9 @@ from datetime import datetime, timezone, timedelta
 
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
-    """Parse a ISO 8601 timestamp string.
+    """Parse an ISO 8601 timestamp string.
 
-    For naive/unaware dt, assume it is in tzinfo timezone (default: UTC).
+    For naive/unaware datetime objects, assume they are in the tzinfo timezone (default: UTC).
     """
     dt = datetime.fromisoformat(timestamp)
     if dt.tzinfo is None:
@@ -15,10 +15,10 @@ def parse_timestamp(timestamp, tzinfo=timezone.utc):
 
 
 def parse_local_timestamp(timestamp, tzinfo=None):
-    """Parse a ISO 8601 timestamp string.
+    """Parse an ISO 8601 timestamp string.
 
-    For naive/unaware dt, assume it is in local timezone.
-    Convert to tzinfo timezone (the default None means: local timezone).
+    For naive/unaware datetime objects, assume the local timezone.
+    Convert to the tzinfo timezone (the default None means: local timezone).
     """
     dt = datetime.fromisoformat(timestamp)
     if dt.tzinfo is None:
@@ -27,13 +27,13 @@ def parse_local_timestamp(timestamp, tzinfo=None):
 
 
 def timestamp(s):
-    """Convert a --timestamp=s argument to a datetime object"""
+    """Convert a --timestamp=s argument to a datetime object."""
     try:
         # is it pointing to a file / directory?
         ts = safe_s(os.stat(s).st_mtime)
         return datetime.fromtimestamp(ts, tz=timezone.utc)
     except OSError:
-        # didn't work, try parsing as a ISO timestamp. if no TZ is given, we assume local timezone.
+        # didn't work, try parsing as an ISO timestamp. if no TZ is given, we assume local timezone.
         return parse_local_timestamp(s)
 
 
@@ -95,7 +95,7 @@ def format_time(ts: datetime, format_spec=""):
 
 
 def format_timedelta(td):
-    """Format timedelta in a human friendly format"""
+    """Format a timedelta in a human-friendly format."""
     ts = td.total_seconds()
     s = ts % 60
     m = int(ts / 60) % 60
@@ -112,8 +112,9 @@ def format_timedelta(td):
 
 def calculate_relative_offset(format_string, from_ts, earlier=False):
     """
-    Calculates offset based on a relative marker. 7d (7 days), 8m (8 months)
-    earlier: whether offset should be calculated to an earlier time.
+    Calculate an offset based on a relative marker (e.g., 7d for 7 days, 8m for 8 months).
+
+    earlier indicates whether the offset should be applied towards an earlier time.
     """
     if from_ts is None:
         from_ts = archive_ts_now()
@@ -173,7 +174,7 @@ class OutputTimestamp:
         return format_time(self.ts.astimezone(), format_spec=format_spec)
 
     def __str__(self):
-        return f"{self}"
+        return self.isoformat()
 
     def isoformat(self):
         # we want to output a timestamp in the user's local timezone

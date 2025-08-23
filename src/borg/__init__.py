@@ -11,10 +11,10 @@ __version_tuple__ = _v._version.release  # type: ignore
 # and setuptools_scm determines a 0.1.dev... version
 assert all(isinstance(v, int) for v in __version_tuple__), (
     """\
-broken borgbackup version metadata: %r
+Broken BorgBackup version metadata: %r
 
-version metadata is obtained dynamically on installation via setuptools_scm,
-please ensure your git repo has the correct tags or you provide the version
+Version metadata is obtained dynamically during installation via setuptools_scm;
+please ensure your Git repository has the correct tags, or provide the version
 using SETUPTOOLS_SCM_PRETEND_VERSION in your build script.
 """
     % __version__

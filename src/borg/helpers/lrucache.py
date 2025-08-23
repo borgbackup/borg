@@ -25,9 +25,9 @@ class LRUCache(MutableMapping[K, V]):
         self._dispose = dispose
 
     def __setitem__(self, key: K, value: V) -> None:
-        assert key not in self._cache, (
-            "Unexpected attempt to replace a cached item," " without first deleting the old item."
-        )
+        assert (
+            key not in self._cache
+        ), "Unexpected attempt to replace a cached item without first deleting the old item."
         while len(self._cache) >= self._capacity:
             self._dispose(self._cache.popitem(last=False)[1])
         self._cache[key] = value
@@ -47,7 +47,7 @@ class LRUCache(MutableMapping[K, V]):
         return len(self._cache)
 
     def replace(self, key: K, value: V) -> None:
-        """Replace an item which is already present, not disposing it in the process"""
+        """Replace an item that is already present, not disposing it in the process."""
         # this method complements __setitem__ which should be used for the normal use case.
         assert key in self._cache, "Unexpected attempt to update a non-existing item."
         self._cache[key] = value

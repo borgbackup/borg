@@ -73,7 +73,7 @@ class RepoKeyNotFoundError(Error):
 
 
 class UnsupportedKeyFormatError(Error):
-    """Your borg key is stored in an unsupported format. Try using a newer version of borg."""
+    """Your Borg key is stored in an unsupported format. Try using a newer version of Borg."""
 
     exit_mcode = 49
 

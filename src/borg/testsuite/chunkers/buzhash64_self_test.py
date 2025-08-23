@@ -1,5 +1,5 @@
-# Note: these tests are part of the self test, do not use or import pytest functionality here.
-#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
+# Note: these tests are part of the self-test; do not use or import pytest functionality here.
+#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT.
 
 from io import BytesIO
 

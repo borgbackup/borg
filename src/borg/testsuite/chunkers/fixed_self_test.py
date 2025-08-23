@@ -1,5 +1,5 @@
-# Note: these tests are part of the self test, do not use or import pytest functionality here.
-#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT
+# Note: these tests are part of the self-test; do not use or import pytest functionality here.
+#       See borg.selftest for details. If you add/remove test methods, update SELFTEST_COUNT.
 
 from io import BytesIO
 
@@ -45,7 +45,7 @@ class ChunkerFixedTestCase(BaseTestCase):
         chunker = ChunkerFixed(4096, 123)
         fmap = [(0, 123, True), (123, 4096, False), (123 + 4096, 4096, True), (123 + 8192, 4096, False)]
         parts = cf(chunker.chunkify(BytesIO(data), fmap=fmap))
-        # because we marked the '_' ranges as holes, we will get hole ranges instead!
+        # Because we marked the '_' ranges as holes, we will get hole ranges instead!
         self.assert_equal(parts, [data[0:123], 4096, data[123 + 4096 : 123 + 8192], 4096])
 
     def test_chunkify_header_and_blocks_fmap_partial(self):
@@ -58,5 +58,5 @@ class ChunkerFixedTestCase(BaseTestCase):
             # (123+8192, 4096, False),
         ]
         parts = cf(chunker.chunkify(BytesIO(data), fmap=fmap))
-        # because we left out the '_' ranges from the fmap, we will not get them at all!
+        # Because we left out the '_' ranges from the fmap, we will not get them at all!
         self.assert_equal(parts, [data[0:123], data[123 + 4096 : 123 + 8192]])

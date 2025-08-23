@@ -5,8 +5,8 @@ Examples
 
 ::
 
-    # recompress repo contents
+    # Recompress repository contents
     $ borg repo-compress --progress --compression=zstd,3
 
-    # recompress and obfuscate repo contents
+    # Recompress and obfuscate repository contents
     $ borg repo-compress --progress --compression=obfuscate,1,zstd,3

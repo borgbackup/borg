@@ -25,14 +25,16 @@ logger = create_logger()
 
 def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_deadly=True):
     """
-    Ensures that the dir exists with the right permissions.
-    1) Make sure the directory exists in a race-free operation
-    2) If mode is not None and the directory has been created, give the right
-    permissions to the leaf directory. The current umask value is masked out first.
-    3) If pretty_deadly is True, catch exceptions, reraise them with a pretty
-    message.
-    Returns if the directory has been created and has the right permissions,
-    An exception otherwise. If a deadly exception happened it is reraised.
+    Ensure that the directory exists with the correct permissions.
+
+    1) Create the directory in a race-free manner.
+    2) If mode is not None and the directory was created, set the correct
+       permissions on the leaf directory (masking out the current umask first).
+    3) If pretty_deadly is True, catch exceptions and re-raise them with a clearer
+       message.
+
+    Returns normally if the directory exists (with correct permissions) or was created.
+    Raises an exception otherwise. If a fatal exception occurs, it is re-raised.
     """
     try:
         Path(path).mkdir(mode=mode, parents=True, exist_ok=True)
@@ -44,7 +46,7 @@ def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_dea
 
 
 def get_base_dir(*, legacy=False):
-    """Get home directory / base directory for borg:
+    """Get home directory / base directory for Borg:
 
     - BORG_BASE_DIR, if set
     - HOME, if set
@@ -73,7 +75,7 @@ def join_base_dir(*paths, **kw):
 
 
 def get_keys_dir(*, legacy=False, create=True):
-    """Determine where to repository keys and cache"""
+    """Determine where to store repository keys."""
     keys_dir = os.environ.get("BORG_KEYS_DIR")
     if keys_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
@@ -124,7 +126,7 @@ def get_socket_filename():
 
 
 def get_cache_dir(*, legacy=False, create=True):
-    """Determine where to repository keys and cache"""
+    """Determine where to store Borg cache data"""
 
     if legacy:
         # Get cache home path
@@ -160,7 +162,7 @@ def get_cache_dir(*, legacy=False, create=True):
 
 
 def get_config_dir(*, legacy=False, create=True):
-    """Determine where to store whole config"""
+    """Determine where to store the configuration"""
 
     # Get config home path
     if legacy:

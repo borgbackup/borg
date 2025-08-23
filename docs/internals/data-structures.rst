@@ -63,7 +63,7 @@ Keys
 ~~~~
 
 Repository object IDs (which are used as key into the key-value store) are
-byte-strings of fixed length (256bit, 32 bytes), computed like this::
+byte strings of fixed length (256-bit, 32 bytes), computed like this::
 
   key = id = id_hash(plaintext_data)  # plain = not encrypted, not compressed, not obfuscated
 
@@ -79,10 +79,10 @@ Each repository object is stored separately, under its ID into data/xx/yy/xxyy..
 
 A repo object has a structure like this:
 
-* 32bit meta size
-* 32bit data size
-* 64bit xxh64(meta)
-* 64bit xxh64(data)
+* 32-bit meta size
+* 32-bit data size
+* 64-bit xxh64(meta)
+* 64-bit xxh64(data)
 * meta
 * data
 
@@ -90,8 +90,8 @@ The size and xxh64 hashes can be used for server-side corruption checks without
 needing to decrypt anything (which would require the borg key).
 
 The overall size of repository objects varies from very small (a small source
-file will be stored as a single repo object) to medium (big source files will
-be cut into medium sized chunks of some MB).
+file will be stored as a single repository object) to medium (big source files will
+be cut into medium-sized chunks of some MB).
 
 Metadata and data are separately encrypted and authenticated (depending on
 the user's choices).
@@ -102,7 +102,7 @@ encryption.
 Repo object metadata
 ~~~~~~~~~~~~~~~~~~~~
 
-Metadata is a msgpacked (and encrypted/authenticated) dict with:
+Metadata is a MessagePack-encoded (and encrypted/authenticated) dict with:
 
 - ctype (compression type 0..255)
 - clevel (compression level 0..255)

@@ -24,13 +24,13 @@ from ._common import process_epilog
 
 class DebugMixIn:
     def do_debug_info(self, args):
-        """display system information for debugging / bug reports"""
+        """Displays system information for debugging and bug reports."""
         print(sysinfo())
         print("Process ID:", get_process_id())
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_archive_items(self, args, repository, manifest):
-        """dump (decrypted, decompressed) archive items metadata (not: data)"""
+        """Dumps (decrypted, decompressed) archive item metadata (not data)."""
         repo_objs = manifest.repo_objs
         archive_info = manifest.archives.get_one([args.name])
         archive = Archive(manifest, archive_info.id)
@@ -44,7 +44,7 @@ class DebugMixIn:
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_archive(self, args, repository, manifest):
-        """dump decoded archive metadata (not: data)"""
+        """Dumps decoded archive metadata (not data)."""
         archive_info = manifest.archives.get_one([args.name])
         repo_objs = manifest.repo_objs
         try:
@@ -99,7 +99,7 @@ class DebugMixIn:
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_dump_manifest(self, args, repository, manifest):
-        """dump decoded repository manifest"""
+        """Dumps decoded repository manifest."""
         repo_objs = manifest.repo_objs
         cdata = repository.get_manifest()
         _, data = repo_objs.parse(manifest.MANIFEST_ID, cdata, ro_type=ROBJ_MANIFEST)
@@ -111,7 +111,7 @@ class DebugMixIn:
 
     @with_repository(manifest=False)
     def do_debug_dump_repo_objs(self, args, repository):
-        """dump (decrypted, decompressed) repo objects"""
+        """Dumps (decrypted, decompressed) repository objects."""
         from ..crypto.key import key_factory
 
         def decrypt_dump(id, cdata):
@@ -137,7 +137,7 @@ class DebugMixIn:
 
     @with_repository(manifest=False)
     def do_debug_search_repo_objs(self, args, repository):
-        """search for byte sequences in repo objects, repo index MUST be current/correct"""
+        """Searches for byte sequences in repository objects; the repository index MUST be current/correct."""
         context = 32
 
         def print_finding(info, wanted, data, offset):
@@ -201,7 +201,7 @@ class DebugMixIn:
 
     @with_repository(manifest=False)
     def do_debug_get_obj(self, args, repository):
-        """get object contents from the repository and write it into file"""
+        """Gets object contents from the repository and writes them to a file."""
         hex_id = args.id
         try:
             id = hex_to_bin(hex_id, length=32)
@@ -217,7 +217,7 @@ class DebugMixIn:
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_id_hash(self, args, repository, manifest):
-        """compute id-hash for file contents"""
+        """Computes id-hash for file contents."""
         with open(args.path, "rb") as f:
             data = f.read()
         key = manifest.key
@@ -226,7 +226,7 @@ class DebugMixIn:
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_parse_obj(self, args, repository, manifest):
-        """parse borg object file into meta dict and data (decrypting, decompressing)"""
+        """Parses a Borg object file into a metadata dict and data (decrypting, decompressing)."""
 
         # get the object from id
         hex_id = args.id
@@ -249,7 +249,7 @@ class DebugMixIn:
 
     @with_repository(compatibility=Manifest.NO_OPERATION_CHECK)
     def do_debug_format_obj(self, args, repository, manifest):
-        """format file and metadata into borg object file"""
+        """Formats file and metadata into a Borg object file."""
 
         # get the object from id
         hex_id = args.id
@@ -273,7 +273,7 @@ class DebugMixIn:
 
     @with_repository(manifest=False)
     def do_debug_put_obj(self, args, repository):
-        """put file contents into the repository"""
+        """Puts file contents into the repository."""
         with open(args.path, "rb") as f:
             data = f.read()
         hex_id = args.id
@@ -287,7 +287,7 @@ class DebugMixIn:
 
     @with_repository(manifest=False, exclusive=True)
     def do_debug_delete_obj(self, args, repository):
-        """delete the objects with the given IDs from the repo"""
+        """Deletes the objects with the given IDs from the repository."""
         for hex_id in args.ids:
             try:
                 id = hex_to_bin(hex_id, length=32)
@@ -302,7 +302,7 @@ class DebugMixIn:
         print("Done.")
 
     def do_debug_convert_profile(self, args):
-        """convert Borg profile to Python profile"""
+        """Converts a Borg profile to a Python profile."""
         import marshal
 
         with open(args.output, "wb") as wfd, open(args.input, "rb") as rfd:
@@ -489,7 +489,7 @@ class DebugMixIn:
         # format_obj
         debug_format_obj_epilog = process_epilog(
             """
-                This command formats the file and metadata into objectfile.
+                This command formats the file and metadata into a Borg object file.
                 """
         )
         subparser = debug_parsers.add_parser(
@@ -499,12 +499,12 @@ class DebugMixIn:
             description=self.do_debug_format_obj.__doc__,
             epilog=debug_format_obj_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="format file and metadata into borg objectfile",
+            help="format file and metadata into a Borg object file",
         )
         subparser.set_defaults(func=self.do_debug_format_obj)
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
         subparser.add_argument(
-            "binary_path", metavar="BINARY_PATH", type=str, help="path of the file to convert into objectfile"
+            "binary_path", metavar="BINARY_PATH", type=str, help="path of the file to convert into an object file"
         )
         subparser.add_argument(
             "json_path", metavar="JSON_PATH", type=str, help="path of the json file to read metadata from"
@@ -523,7 +523,7 @@ class DebugMixIn:
             "object_path",
             metavar="OBJECT_PATH",
             type=str,
-            help="path of the objectfile to write compressed encrypted data into",
+            help="path of the object file to write compressed encrypted data into",
         )
 
         debug_get_obj_epilog = process_epilog(

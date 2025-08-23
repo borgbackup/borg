@@ -19,7 +19,7 @@ logger = create_logger(__name__)
 class KeysMixIn:
     @with_repository(compatibility=(Manifest.Operation.CHECK,))
     def do_change_passphrase(self, args, repository, manifest):
-        """Change repository key file passphrase"""
+        """Changes the repository key file passphrase."""
         key = manifest.key
         if not hasattr(key, "change_passphrase"):
             raise CommandError("This repository is not encrypted, cannot change the passphrase.")
@@ -31,7 +31,7 @@ class KeysMixIn:
 
     @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
     def do_change_location(self, args, repository, manifest, cache):
-        """Change repository key location"""
+        """Changes the repository key location."""
         key = manifest.key
         if not hasattr(key, "change_passphrase"):
             raise CommandError("This repository is not encrypted, cannot change the key location.")
@@ -85,7 +85,7 @@ class KeysMixIn:
 
     @with_repository(lock=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
-        """Export the repository key for backup"""
+        """Exports the repository key for backup."""
         manager = KeyManager(repository)
         manager.load_keyblob()
         try:
@@ -104,15 +104,15 @@ class KeysMixIn:
 
     @with_repository(lock=False, manifest=False, cache=False)
     def do_key_import(self, args, repository):
-        """Import the repository key from backup"""
+        """Imports the repository key from backup."""
         manager = KeyManager(repository)
         if args.paper:
             if args.path:
-                raise CommandError("with --paper import from file is not supported")
+                raise CommandError("with --paper, import from file is not supported")
             manager.import_paperkey(args)
         else:
             if not args.path:
-                raise CommandError("expected input file to import key from")
+                raise CommandError("expected input file to import the key from")
             if args.path != "-" and not os.path.exists(args.path):
                 raise CommandError(f"input file does not exist: {args.path}")
             manager.import_keyfile(args)
@@ -124,10 +124,10 @@ class KeysMixIn:
             "key",
             parents=[mid_common_parser],
             add_help=False,
-            description="Manage a keyfile or repokey of a repository",
+            description="Manage the keyfile or repokey of a repository",
             epilog="",
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="manage repository key",
+            help="manage the repository key",
         )
 
         key_parsers = subparser.add_subparsers(title="required arguments", metavar="<command>")
@@ -165,7 +165,7 @@ class KeysMixIn:
             description=self.do_key_export.__doc__,
             epilog=key_export_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="export repository key for backup",
+            help="export the repository key for backup",
         )
         subparser.set_defaults(func=self.do_key_export)
         subparser.add_argument("path", metavar="PATH", nargs="?", type=PathSpec, help="where to store the backup")
@@ -179,7 +179,7 @@ class KeysMixIn:
             "--qr-html",
             dest="qr",
             action="store_true",
-            help="Create an html file suitable for printing and later type-in or qr scan",
+            help="Create an HTML file suitable for printing and later type-in or QR scan",
         )
 
         key_import_epilog = process_epilog(
@@ -207,7 +207,7 @@ class KeysMixIn:
             description=self.do_key_import.__doc__,
             epilog=key_import_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="import repository key from backup",
+            help="import the repository key from backup",
         )
         subparser.set_defaults(func=self.do_key_import)
         subparser.add_argument(
@@ -238,16 +238,16 @@ class KeysMixIn:
             description=self.do_change_passphrase.__doc__,
             epilog=change_passphrase_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="change repository passphrase",
+            help="change the repository passphrase",
         )
         subparser.set_defaults(func=self.do_change_passphrase)
 
         change_location_epilog = process_epilog(
             """
-        Change the location of a borg key. The key can be stored at different locations:
+        Change the location of a Borg key. The key can be stored at different locations:
 
         - keyfile: locally, usually in the home directory
-        - repokey: inside the repo (in the repo config)
+        - repokey: inside the repository (in the repository config)
 
         Please note:
 
@@ -262,7 +262,7 @@ class KeysMixIn:
             description=self.do_change_location.__doc__,
             epilog=change_location_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="change key location",
+            help="change the key location",
         )
         subparser.set_defaults(func=self.do_change_location)
         subparser.add_argument(

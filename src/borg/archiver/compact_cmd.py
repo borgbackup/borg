@@ -208,7 +208,7 @@ class ArchiveGarbageCollector:
 class CompactMixIn:
     @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
     def do_compact(self, args, repository, manifest):
-        """Collect garbage in repository"""
+        """Collects garbage in the repository."""
         if not args.dry_run:  # support --dry-run to simplify scripting
             ArchiveGarbageCollector(repository, manifest, stats=args.stats, iec=args.iec).garbage_collect()
 
@@ -219,44 +219,42 @@ class CompactMixIn:
             """
             Free repository space by deleting unused chunks.
 
-            borg compact analyzes all existing archives to find out which repository
+            ``borg compact`` analyzes all existing archives to determine which repository
             objects are actually used (referenced). It then deletes all unused objects
             from the repository to free space.
 
             Unused objects may result from:
 
-            - borg delete or prune usage
-            - interrupted backups (maybe retry the backup first before running compact)
-            - backup of source files that had an I/O error in the middle of their contents
-              and that were skipped due to this
-            - corruption of the repository (e.g. the archives directory having lost
-              entries, see notes below)
+            - use of ``borg delete`` or ``borg prune``
+            - interrupted backups (consider retrying the backup before running compact)
+            - backups of source files that encountered an I/O error mid-transfer and were skipped
+            - corruption of the repository (e.g., the archives directory lost entries; see notes below)
 
-            You usually don't want to run ``borg compact`` after every write operation, but
-            either regularly (e.g. once a month, possibly together with ``borg check``) or
+            You usually do not want to run ``borg compact`` after every write operation, but
+            either regularly (e.g., once a month, possibly together with ``borg check``) or
             when disk space needs to be freed.
 
             **Important:**
 
-            After compacting it is no longer possible to use ``borg undelete`` to recover
+            After compacting, it is no longer possible to use ``borg undelete`` to recover
             previously soft-deleted archives.
 
             ``borg compact`` might also delete data from archives that were "lost" due to
             archives directory corruption. Such archives could potentially be restored with
             ``borg check --find-lost-archives [--repair]``, which is slow. You therefore
-            might not want to do that unless there are signs of lost archives (e.g. when
+            might not want to do that unless there are signs of lost archives (e.g., when
             seeing fatal errors when creating backups or when archives are missing in
             ``borg repo-list``).
 
-            When giving the ``--stats`` option, borg will internally list all repository
-            objects to determine their existence AND stored size. It will build a fresh
+            When using the ``--stats`` option, borg will internally list all repository
+            objects to determine their existence and stored size. It will build a fresh
             chunks index from that information and cache it in the repository. For some
             types of repositories, this might be very slow. It will tell you the sum of
             stored object sizes, before and after compaction.
 
             Without ``--stats``, borg will rely on the cached chunks index to determine
             existing object IDs (but there is no stored size information in the index,
-            thus it can't compute before/after compaction size statistics).
+            thus it cannot compute before/after compaction size statistics).
             """
         )
         subparser = subparsers.add_parser(
@@ -266,10 +264,12 @@ class CompactMixIn:
             description=self.do_compact.__doc__,
             epilog=compact_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="compact repository",
+            help="compact the repository",
         )
         subparser.set_defaults(func=self.do_compact)
-        subparser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true", help="do nothing")
+        subparser.add_argument(
+            "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
+        )
         subparser.add_argument(
             "-s", "--stats", dest="stats", action="store_true", help="print statistics (might be much slower)"
         )

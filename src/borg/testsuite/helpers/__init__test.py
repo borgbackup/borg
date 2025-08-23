@@ -7,7 +7,7 @@ from ...helpers import classify_ec, max_ec
 @pytest.mark.parametrize(
     "ec_range,ec_class",
     (
-        # inclusive range start, exclusive range end
+        # Inclusive range start; exclusive range end.
         ((0, 1), "success"),
         ((1, 2), "warning"),
         ((2, 3), "error"),
@@ -33,7 +33,7 @@ def test_ec_invalid():
 @pytest.mark.parametrize(
     "ec1,ec2,ec_max",
     (
-        # same for modern / legacy
+        # Same for modern/legacy.
         (EXIT_SUCCESS, EXIT_SUCCESS, EXIT_SUCCESS),
         (EXIT_SUCCESS, EXIT_SIGNAL_BASE, EXIT_SIGNAL_BASE),
         # legacy exit codes

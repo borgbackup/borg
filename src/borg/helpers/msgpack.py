@@ -1,47 +1,48 @@
 """
-wrapping msgpack
+Wrapping MessagePack
 ================
 
-We wrap msgpack here the way we need it - to avoid having lots of clutter in the calling code.
+We wrap MessagePack here as needed to avoid clutter in the calling code.
 
 Packing
 -------
-- use_bin_type = True (used by borg since borg 2.0)
+- use_bin_type = True (used by Borg since Borg 2.0)
   This is used to generate output according to new msgpack 2.0 spec.
   This cleanly keeps bytes and str types apart.
 
-- use_bin_type = False (used by borg < 1.3)
+- use_bin_type = False (used by Borg < 1.3)
   This creates output according to the older msgpack spec.
   BAD: str and bytes were packed into same "raw" representation.
 
 - unicode_errors = 'surrogateescape'
-  Guess backup applications are one of the rare cases when this needs to be used.
-  It is needed because borg also needs to deal with data that does not cleanly encode/decode using utf-8.
-  There's a lot of crap out there, e.g. in filenames and as a backup tool, we must keep them as good as possible.
+  Backup applications are one of the rare cases where this is necessary.
+  It is needed because Borg also needs to deal with data that does not cleanly encode or decode using UTF-8.
+  There is a lot of problematic data out there (e.g., in filenames), and as a backup tool,
+  we must preserve them as faithfully as possible.
 
 Unpacking
 ---------
-- raw = False (used by borg since borg 2.0)
+- raw = False (used by Borg since Borg 2.0)
   We already can use this with borg 2.0 due to the type conversion to the desired type in item.py update_internal
   methods. This type conversion code can be removed in future, when we do not have to deal with data any more
   that was packed the old way.
   It will then unpack according to the msgpack 2.0 spec format and directly output bytes or str.
 
-- raw = True (the old way, used by borg < 1.3)
+- raw = True (the old way, used by Borg < 1.3)
 
 - unicode_errors = 'surrogateescape' -> see description above (will be used when raw is False).
 
-As of borg 2.0, we have fixed most of the msgpack str/bytes mess, #968.
-Borg now still needs to **read** old repos, archives, keys, ... so we can not yet fix it completely.
-But from now on, borg only **writes** new data according to the new msgpack 2.0 spec,
-thus we can remove some legacy support in a later borg release (some places are marked with "legacy").
+As of Borg 2.0, we have fixed most of the MessagePack str/bytes issues (#968).
+Borg still needs to read old repositories, archives, keys, etc., so we cannot yet fix it completely.
+From now on, Borg only writes new data according to the MessagePack 2.0 spec,
+thus we can remove some legacy support in a later Borg release (some places are marked with "legacy").
 
-current way in msgpack terms
+Current behavior in MessagePack terms
 ----------------------------
 
-- pack with use_bin_type=True (according to msgpack 2.0 spec)
+- pack with use_bin_type=True (according to the MessagePack 2.0 spec)
 - packs str -> raw and bytes -> bin
-- unpack with raw=False (according to msgpack 2.0 spec, using unicode_errors='surrogateescape')
+- unpack with raw=False (according to the MessagePack 2.0 spec, using unicode_errors='surrogateescape')
 - unpacks bin to bytes and raw to str (thus we need to convert to desired type if we want bytes from "raw")
 """
 
@@ -68,11 +69,11 @@ UNICODE_ERRORS = "surrogateescape"
 
 
 class PackException(Exception):
-    """Exception while msgpack packing"""
+    """Exception during MessagePack packing."""
 
 
 class UnpackException(Exception):
-    """Exception while msgpack unpacking"""
+    """Exception during MessagePack unpacking."""
 
 
 class Packer(mp_Packer):

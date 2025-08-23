@@ -133,7 +133,7 @@ def test_date_matching(archivers, request):
     assert "archive-2022-12-18" in output
     assert "archive-now" not in output
 
-    # check for output when timespan older than the earliest archive is given. Issue #1711
+    # Check for output when a time span older than the earliest archive is given. Issue #1711
     output = cmd(archiver, "check", "-v", "--archives-only", "--older=9999m", exit_code=0)
     for archive in ("archive1", "archive2", "archive3"):
         assert archive not in output

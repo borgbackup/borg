@@ -7,13 +7,13 @@ from ...chunkers import has_seek_hole
 
 
 def cf(chunks):
-    """chunk filter"""
+    """Chunk filter."""
 
-    # this is to simplify testing: either return the data piece (bytes) or the hole length (int).
+    # This is to simplify testing: either return the data piece (bytes) or the hole length (int).
     def _cf(chunk):
         if chunk.meta["allocation"] == CH_DATA:
             assert len(chunk.data) == chunk.meta["size"]
-            return bytes(chunk.data)  # make sure we have bytes, not memoryview
+            return bytes(chunk.data)  # Make sure we have bytes, not a memoryview
         if chunk.meta["allocation"] in (CH_HOLE, CH_ALLOC):
             assert chunk.data is None
             return chunk.meta["size"]
@@ -64,14 +64,14 @@ def fs_supports_sparse():
                 offset_hole = f.seek(0, os.SEEK_HOLE)
                 offset_data = f.seek(0, os.SEEK_DATA)
             except OSError:
-                # no sparse support if these seeks do not work
+                # No sparse support if these seeks do not work
                 return False
         return offset_hole == 0 and offset_data == BS
 
 
-BS = 4096  # fs block size
+BS = 4096  # filesystem block size
 
-# some sparse files. X = content blocks, _ = sparse blocks.
+# Some sparse files. X = content blocks, _ = sparse blocks.
 # X__XXX____
 map_sparse1 = [(0 * BS, 1 * BS, True), (1 * BS, 2 * BS, False), (3 * BS, 3 * BS, True), (6 * BS, 4 * BS, False)]
 

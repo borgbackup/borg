@@ -1,9 +1,9 @@
-# Completions for borg
+# Bash completions for Borg
 # https://www.borgbackup.org/
 # Note:
-# Listing archives works on password protected repositories only if $BORG_PASSPHRASE is set.
+# Listing archives works on password-protected repositories only if $BORG_PASSPHRASE is set.
 # Install:
-# Copy this file to /usr/share/bash-completion/completions/ or /etc/bash_completion.d/
+# Copy this file to /usr/share/bash-completion/completions/ or /etc/bash_completion.d/.
 
 _borg()
 {

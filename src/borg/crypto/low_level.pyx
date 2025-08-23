@@ -1,4 +1,4 @@
-"""An AEAD style OpenSSL wrapper
+"""An AEAD-style OpenSSL wrapper
 
 API:
 
@@ -15,11 +15,11 @@ Envelope layout:
 |------------- #header_len ------>|
 
 S means a cryptographic signature function (like HMAC or GMAC).
-E means a encryption function (like AES).
+E means an encryption function (like AES).
 iv is the initialization vector / nonce, if needed.
 
-The split of header into not authenticated data and aad (additional authenticated
-data) is done to support the legacy envelope layout as used in attic and early borg
+The split of header into not-authenticated data and AAD (additional authenticated
+data) is done to support the legacy envelope layout as used in Attic and early Borg
 (where the TYPE byte was not authenticated) and avoid unneeded memcpy and string
 garbage.
 

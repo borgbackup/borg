@@ -3,53 +3,53 @@ About borg create --chunker-params
 
 --chunker-params CHUNK_MIN_EXP,CHUNK_MAX_EXP,HASH_MASK_BITS,HASH_WINDOW_SIZE
 
-CHUNK_MIN_EXP and CHUNK_MAX_EXP give the exponent N of the 2^N minimum and
-maximum chunk size. Required: CHUNK_MIN_EXP < CHUNK_MAX_EXP.
+CHUNK_MIN_EXP and CHUNK_MAX_EXP provide the exponent N for the 2^N minimum and
+maximum chunk sizes. Required: CHUNK_MIN_EXP < CHUNK_MAX_EXP.
 
 Defaults: 19 (2^19 == 512KiB) minimum, 23 (2^23 == 8MiB) maximum.
-Currently it is not supported to give more than 23 as maximum.
+Currently, specifying a maximum greater than 23 is not supported.
 
 HASH_MASK_BITS is the number of least-significant bits of the rolling hash
 that need to be zero to trigger a chunk cut.
 Recommended: CHUNK_MIN_EXP + X <= HASH_MASK_BITS <= CHUNK_MAX_EXP - X, X >= 2
 (this allows the rolling hash some freedom to make its cut at a place
-determined by the windows contents rather than the min/max. chunk size).
+determined by the window's contents rather than the minimum/maximum chunk size).
 
-Default: 21 (statistically, chunks will be about 2^21 == 2MiB in size)
+Default: 21 (statistically, chunks will be about 2^21 == 2MiB in size).
 
 HASH_WINDOW_SIZE: the size of the window used for the rolling hash computation.
-Must be an odd number. Default: 4095B
+Must be an odd number. Default: 4095B.
 
 
 Trying it out
 =============
 
 I backed up a VM directory to demonstrate how different chunker parameters
-influence repo size, index size / chunk count, compression, deduplication.
+affect repository size, index size/chunk count, compression, and deduplication.
 
-repo-sm: ~64kiB chunks (16 bits chunk mask), min chunk size 1kiB (2^10B)
-         (these are attic / borg 0.23 internal defaults)
+repo-sm: ~64 KiB chunks (16 bits chunk mask), min chunk size 1 KiB (2^10B)
+         (these are Attic/Borg 0.23 internal defaults)
 
-repo-lg: ~1MiB chunks (20 bits chunk mask), min chunk size 64kiB (2^16B)
+repo-lg: ~1MiB chunks (20 bits chunk mask), min chunk size 64 KiB (2^16B)
 
-repo-xl: 8MiB chunks (2^23B max chunk size), min chunk size 64kiB (2^16B).
-         The chunk mask bits was set to 31, so it (almost) never triggers.
+repo-xl: 8MiB chunks (2^23B max chunk size), min chunk size 64 KiB (2^16B).
+         The chunk mask bits were set to 31, so it (almost) never triggers.
          This degrades the rolling hash based dedup to a fixed-offset dedup
          as the cutting point is now (almost) always the end of the buffer
          (at 2^23B == 8MiB).
 
 The repo index size is an indicator for the RAM needs of Borg.
 In this special case, the total RAM needs are about 2.1x the repo index size.
-You see index size of repo-sm is 16x larger than of repo-lg, which corresponds
+You see the index size of repo-sm is 16x larger than that of repo-lg, which corresponds
 to the ratio of the different target chunk sizes.
 
 Note: RAM needs were not a problem in this specific case (37GB data size).
-      But just imagine, you have 37TB of such data and much less than 42GB RAM,
-      then you should use the "lg" chunker params so you only need
-      2.6GB RAM. Or even bigger chunks than shown for "lg" (see "xl").
+      But imagine you have 37TB of such data and much less than 42GB RAM,
+      then you should use the "lg" chunker parameters so you need only
+      2.6GB RAM. Or even larger chunks than shown for "lg" (see "xl").
 
 You also see compression works better for larger chunks, as expected.
-Duplication works worse for larger chunks, also as expected.
+Deduplication works worse for larger chunks, also as expected.
 
 small chunks
 ============

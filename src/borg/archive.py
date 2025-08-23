@@ -767,11 +767,11 @@ Duration: {0.duration}
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
         :param hlm: maps hlid to link_target for extracting subtrees with hardlinks correctly
         :param pi: ProgressIndicatorPercent (or similar) for file extraction progress (in bytes)
-        :param continue_extraction: continue a previously interrupted extraction of same archive
+        :param continue_extraction: continue a previously interrupted extraction of the same archive
         """
 
         def same_item(item, st):
-            """is the archived item the same as the fs item at same path with stat st?"""
+            """Is the archived item the same as the filesystem item at the same path with stat st?"""
             if not stat.S_ISREG(st.st_mode):
                 # we only "optimize" for regular files.
                 # other file types are less frequent and have no content extraction we could "optimize away".

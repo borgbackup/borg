@@ -16,7 +16,7 @@ logger = create_logger()
 class RepoSpaceMixIn:
     @with_repository(lock=False, manifest=False)
     def do_repo_space(self, args, repository):
-        """Manage reserved space in repository"""
+        """Manages reserved space in the repository."""
         # we work without locking here because locks don't work with full disk.
         if args.reserve_space > 0:
             storage_space_reserve_object_size = 64 * 2**20  # 64 MiB per object
@@ -35,7 +35,7 @@ class RepoSpaceMixIn:
                 if info.name.startswith("space-reserve."):
                     size += info.size
                     repository.store_delete(f"config/{info.name}")
-            print(f"Freed {format_file_size(size, iec=False)} in repository.")
+            print(f"Freed {format_file_size(size, iec=False)} in the repository.")
             print("Now run borg prune or borg delete plus borg compact to free more space.")
             print("After that, do not forget to reserve space again for next time!")
         else:  # print amount currently reserved
@@ -56,24 +56,23 @@ class RepoSpaceMixIn:
             """
         This command manages reserved space in a repository.
 
-        Borg can not work in disk-full conditions (can not lock a repo and thus can
-        not run prune/delete or compact operations to free disk space).
+        Borg cannot work in disk-full conditions (it cannot lock a repository and thus cannot
+        run prune/delete or compact operations to free disk space).
 
-        To avoid running into dead-end situations like that, you can put some objects
-        into a repository that take up some disk space. If you ever run into a
-        disk-full situation, you can free that space and then borg will be able to
-        run normally, so you can free more disk space by using prune/delete/compact.
-        After that, don't forget to reserve space again, in case you run into that
-        situation again at a later time.
+        To avoid running into such dead-end situations, you can put some objects into a
+        repository that take up disk space. If you ever run into a disk-full situation, you
+        can free that space, and then Borg will be able to run normally so you can free more
+        disk space by using ``borg prune``/``borg delete``/``borg compact``. After that, do
+        not forget to reserve space again, in case you run into that situation again later.
 
         Examples::
 
             # Create a new repository:
             $ borg repo-create ...
-            # Reserve approx. 1GB of space for emergencies:
+            # Reserve approx. 1 GiB of space for emergencies:
             $ borg repo-space --reserve 1G
 
-            # Check amount of reserved space in the repository:
+            # Check the amount of reserved space in the repository:
             $ borg repo-space
 
             # EMERGENCY! Free all reserved space to get things back to normal:
@@ -84,7 +83,7 @@ class RepoSpaceMixIn:
             $ borg repo-space --reserve 1G  # reserve space again for next time
 
 
-        Reserved space is always rounded up to use full reservation blocks of 64MiB.
+        Reserved space is always rounded up to full reservation blocks of 64 MiB.
         """
         )
         subparser = subparsers.add_parser(
@@ -110,5 +109,5 @@ class RepoSpaceMixIn:
             "--free",
             dest="free_space",
             action="store_true",
-            help="Free all reserved space. Don't forget to reserve space later again.",
+            help="Free all reserved space. Do not forget to reserve space again later.",
         )

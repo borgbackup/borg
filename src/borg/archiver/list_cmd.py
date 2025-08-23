@@ -18,7 +18,7 @@ logger = create_logger()
 class ListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest):
-        """List archive contents"""
+        """List archive contents."""
         matcher = build_matcher(args.patterns, args.paths)
         if args.format is not None:
             format = args.format
@@ -64,14 +64,14 @@ class ListMixIn:
                 """
         This command lists the contents of an archive.
 
-        For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
+        For more help on include/exclude patterns, see the output of :ref:`borg_patterns`.
 
         .. man NOTES
 
         The FORMAT specifier syntax
         +++++++++++++++++++++++++++
 
-        The ``--format`` option uses python's `format string syntax
+        The ``--format`` option uses Python's `format string syntax
         <https://docs.python.org/3.9/library/string.html#formatstrings>`_.
 
         Examples:
@@ -132,11 +132,7 @@ class ListMixIn:
             "Some keys are always present. Note: JSON can only represent text.",
         )
         subparser.add_argument(
-            "--depth",
-            metavar="N",
-            dest="depth",
-            type=int,
-            help="only list files up to the specified directory level depth",
+            "--depth", metavar="N", dest="depth", type=int, help="only list files up to the specified directory depth"
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(

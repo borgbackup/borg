@@ -103,7 +103,7 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
             # borg 2 parseformat uses .get("bsdflags"), so the json has either an int
             # (if the archived item has bsdflags) or None (if the item has no bsdflags).
             if e["flags"] == 0 and g["flags"] is None:
-                # this is expected behaviour, fix the expectation
+                # this is expected behavior, fix the expectation
                 e["flags"] = None
 
             # borg2 parseformat falls back to str(item.uid) if it does not have item.user,

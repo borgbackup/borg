@@ -51,18 +51,19 @@ class NotMyLock(LockErrorT):
 
 class Lock:
     """
-    A Lock for a resource that can be accessed in a shared or exclusive way.
-    Typically, write access to a resource needs an exclusive lock (1 writer,
-    no one is allowed reading) and read access to a resource needs a shared
-    lock (multiple readers are allowed).
+    A lock for a resource that can be accessed in a shared or exclusive way.
 
-    If possible, try to use the contextmanager here like::
+    Typically, write access to a resource needs an exclusive lock (one writer,
+    no readers allowed), and read access to a resource needs a shared lock
+    (multiple readers are allowed).
+
+    If possible, use the context manager form::
 
         with Lock(...) as lock:
             ...
 
-    This makes sure the lock is released again if the block is left, no
-    matter how (e.g. if an exception occurred).
+    This ensures the lock is released when the block is exited, no matter how
+    (e.g., if an exception occurs).
     """
 
     def __init__(self, store, exclusive=False, sleep=None, timeout=1.0, stale=30 * 60, id=None):
@@ -79,7 +80,7 @@ class Lock:
         self.last_refresh_dt = None
         self.id = id or platform.get_process_id()
         assert len(self.id) == 3
-        logger.debug(f"LOCK-INIT: initialising. store: {store}, stale: {stale}s, refresh: {stale // 2}s.")
+        logger.debug(f"LOCK-INIT: initializing. store: {store}, stale: {stale}s, refresh: {stale // 2}s.")
 
     def __enter__(self):
         return self.acquire()
@@ -103,7 +104,7 @@ class Lock:
         logger.debug(f"LOCK-CREATE: creating lock in store. key: {key}, lock: {lock}.")
         self.store.store(f"locks/{key}", value)
         if update_last_refresh:
-            # we parse the timestamp str to get *precisely* the datetime in the lock:
+            # we parse the timestamp string to get *precisely* the datetime in the lock:
             self.last_refresh_dt = datetime.datetime.fromisoformat(timestamp)
         return key
 
@@ -127,7 +128,7 @@ class Lock:
             logger.debug(f"LOCK-STALE: lock is too old, it was not refreshed. lock: {lock}.")
             return True
         if not platform.process_alive(lock["hostid"], lock["processid"], lock["threadid"]):
-            logger.debug(f"LOCK-STALE: we KNOW that the lock owning process is dead. lock: {lock}.")
+            logger.debug(f"LOCK-STALE: we KNOW that the lock-owning process is dead. lock: {lock}.")
             return True
         return False
 
@@ -212,7 +213,7 @@ class Lock:
         locks = self._find_locks(only_mine=True)
         if not locks:
             if ignore_not_found:
-                logger.debug("LOCK-RELEASE: trying to release lock, but none was found.")
+                logger.debug("LOCK-RELEASE: trying to release a lock, but none was found.")
                 return
             else:
                 raise NotLocked(str(self.store))
@@ -226,7 +227,7 @@ class Lock:
         return len(locks) == 1
 
     def break_lock(self):
-        """break ALL locks (not just ours)"""
+        """Breaks all locks (not just ours)."""
         logger.debug("LOCK-BREAK: break_lock() was called - deleting ALL locks!")
         locks = self._get_locks()
         for key in locks:
@@ -234,7 +235,7 @@ class Lock:
         self.last_refresh_dt = None
 
     def migrate_lock(self, old_id, new_id):
-        """migrate the lock ownership from old_id to new_id"""
+        """Migrates the lock ownership from old_id to new_id."""
         logger.debug(f"LOCK-MIGRATE: {old_id} -> {new_id}.")
         assert self.id == old_id
         assert len(new_id) == 3
@@ -245,7 +246,7 @@ class Lock:
         self._delete_lock(old_locks[0]["key"], update_last_refresh=False)
 
     def refresh(self):
-        """refresh the lock - call this frequently, but not later than every <stale> seconds"""
+        """Refreshes the lock—call this frequently, but not later than every <stale> seconds."""
         now = datetime.datetime.now(datetime.timezone.utc)
         if self.last_refresh_dt is not None and now > self.last_refresh_dt + self.refresh_td:
             old_locks = self._find_locks(only_mine=True)

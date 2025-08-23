@@ -14,13 +14,13 @@ systemd and udev.
 Overview
 --------
 
-An udev rule is created to trigger on the addition of block devices. The rule contains a tag
-that triggers systemd to start a oneshot service. The oneshot service executes a script in
+A udev rule is created to trigger on the addition of block devices. The rule contains a tag
+that triggers systemd to start a one-shot service. The one-shot service executes a script in
 the standard systemd service environment, which automatically captures stdout/stderr and
 logs it to the journal.
 
-The script mounts the added block device, if it is a registered backup drive, and creates
-backups on it. When done, it optionally unmounts the file system and spins the drive down,
+The script mounts the added block device if it is a registered backup drive and creates
+backups on it. When done, it optionally unmounts the filesystem and spins the drive down,
 so that it may be physically disconnected.
 
 Configuring the system
@@ -29,7 +29,8 @@ Configuring the system
 First, create the ``/etc/backups`` directory (as root).
 All configuration goes into this directory.
 
-Find out the ID of the partition table of your backup disk (here assumed to be /dev/sdz):
+Find out the ID of the partition table of your backup disk (here assumed to be /dev/sdz)::
+
     lsblk --fs -o +PTUUID /dev/sdz
 
 Then, create ``/etc/backups/80-backup.rules`` with the following content (all on one line)::
@@ -46,8 +47,8 @@ launch the "automatic-backup" service, which we will create next, as the
     Type=oneshot
     ExecStart=/etc/backups/run.sh
 
-Now, create the main backup script, ``/etc/backups/run.sh``. Below is a template,
-modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
+Now, create the main backup script, ``/etc/backups/run.sh``. Below is a template;
+modify it to suit your needs (e.g., more backup sets, dumping databases, etc.).
 
 .. code-block:: bash
 
@@ -93,8 +94,8 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
 
     echo "Disk $uuid is a backup disk"
     partition_path=/dev/disk/by-uuid/$uuid
-    # Mount file system if not already done. This assumes that if something is already
-    # mounted at $MOUNTPOINT, it is the backup drive. It won't find the drive if
+    # Mount filesystem if not already done. This assumes that if something is already
+    # mounted at $MOUNTPOINT, it is the backup drive. It will not find the drive if
     # it was mounted somewhere else.
     findmnt $MOUNTPOINT >/dev/null || mount $partition_path $MOUNTPOINT
     drive=$(lsblk --inverse --noheadings --list --paths --output name $partition_path | head --lines 1)
@@ -110,8 +111,8 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     # Set BORG_PASSPHRASE or BORG_PASSCOMMAND somewhere around here, using export,
     # if encryption is used.
 
-    # No one can answer if Borg asks these questions, it is better to just fail quickly
-    # instead of hanging.
+    # Because no one can answer these questions non-interactively, it is better to
+    # fail quickly instead of hanging.
     export BORG_RELOCATED_REPO_ACCESS_IS_OK=no
     export BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK=no
 
@@ -127,8 +128,8 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
       $TARGET::$DATE-$$-system \
       / /boot
 
-    # /home is often a separate partition / file system.
-    # Even if it isn't (add --exclude /home above), it probably makes sense
+    # /home is often a separate partition/filesystem.
+    # Even if it is not (add --exclude /home above), it probably makes sense
     # to have /home in a separate archive.
     borg create $BORG_OPTS \
       --exclude 'sh:home/*/.cache' \
@@ -150,17 +151,16 @@ modify it to suit your needs (e.g. more backup sets, dumping databases etc.).
     fi
 
 Create the ``/etc/backups/autoeject`` file to have the script automatically eject the drive
-after creating the backup. Rename the file to something else (e.g. ``/etc/backups/autoeject-no``)
-when you want to do something with the drive after creating backups (e.g running check).
+after creating the backup. Rename the file to something else (e.g., ``/etc/backups/autoeject-no``)
+when you want to do something with the drive after creating backups (e.g., running checks).
 
 Create the ``/etc/backups/backup-suspend`` file if the machine should suspend after completing
 the backup. Don't forget to disconnect the device physically before resuming,
 otherwise you'll enter a cycle. You can also add an option to power down instead.
 
-Create an empty ``/etc/backups/backup.disks`` file, you'll register your backup drives
-there.
+Create an empty ``/etc/backups/backup.disks`` file, in which you will register your backup drives.
 
-The last part is actually to enable the udev rules and services:
+Finally, enable the udev rules and services:
 
 .. code-block:: bash
 
@@ -173,13 +173,13 @@ Adding backup hard drives
 -------------------------
 
 Connect your backup hard drive. Format it, if not done already.
-Find the UUID of the file system that backups should be stored on::
+Find the UUID of the filesystem on which backups should be stored::
 
     lsblk -o+uuid,label
 
-Note the UUID into the ``/etc/backups/backup.disks`` file.
+Record the UUID in the ``/etc/backups/backup.disks`` file.
 
-Mount the drive to /mnt/backup.
+Mount the drive at /mnt/backup.
 
 Initialize a Borg repository at the location indicated by ``TARGET``::
 
@@ -197,14 +197,14 @@ See backup logs using journalctl::
 Security considerations
 -----------------------
 
-The script as shown above will mount any file system with an UUID listed in
-``/etc/backups/backup.disks``. The UUID check is a safety / annoyance-reduction
+The script as shown above will mount any filesystem with a UUID listed in
+``/etc/backups/backup.disks``. The UUID check is a safety/annoyance-reduction
 mechanism to keep the script from blowing up whenever a random USB thumb drive is connected.
-It is not meant as a security mechanism. Mounting file systems and reading repository
-data exposes additional attack surfaces (kernel file system drivers,
-possibly user space services and Borg itself). On the other hand, someone
+It is not meant as a security mechanism. Mounting filesystems and reading repository
+data exposes additional attack surfaces (kernel filesystem drivers,
+possibly userspace services, and Borg itself). On the other hand, someone
 standing right next to your computer can attempt a lot of attacks, most of which
-are easier to do than e.g. exploiting file systems (installing a physical key logger,
+are easier to do than, e.g., exploiting filesystems (installing a physical keylogger,
 DMA attacks, stealing the machine, ...).
 
 Borg ensures that backups are not created on random drives that "just happen"

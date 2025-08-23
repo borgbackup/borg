@@ -24,7 +24,7 @@ The attack model of Borg is that the environment of the client process
 attacker has any and all access to the repository, including interactive
 manipulation (man-in-the-middle) for remote repositories.
 
-Furthermore the client environment is assumed to be persistent across
+Furthermore, the client environment is assumed to be persistent across
 attacks (practically this means that the security database cannot be
 deleted between attacks).
 
@@ -37,8 +37,8 @@ Under these circumstances Borg guarantees that the attacker cannot
    structural information such as the object graph (which archives
    refer to what chunks)
 
-The attacker can always impose a denial of service per definition (he could
-forbid connections to the repository, or delete it partly or entirely).
+The attacker can always impose a denial of service by definition (they could
+block connections to the repository, or delete it partly or entirely).
 
 
 .. _security_structural_auth:

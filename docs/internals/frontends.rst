@@ -11,8 +11,8 @@ but does mean that there are no release-to-release guarantees on what you might 
 even for point releases (1.1.x), and there is no documentation beyond the code and the internals documents.
 
 Borg does on the other hand provide an API on a command-line level. In other words, a frontend should
-(for example) create a backup archive just invoke :ref:`borg_create`, give commandline parameters/options
-as needed and parse JSON output from borg.
+(for example) create a backup archive by invoking :ref:`borg_create`, provide command-line parameters/options
+as needed, and parse JSON output from Borg.
 
 Important: JSON output is expected to be UTF-8, but currently borg depends on the locale being configured
 for that (must be a UTF-8 locale and *not* "C" or "ascii"), so that Python will choose to encode to UTF-8.

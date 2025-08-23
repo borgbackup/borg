@@ -1,5 +1,5 @@
 """
-load library for lowlevel FUSE implementation
+Loads the library for the low-level FUSE implementation.
 """
 
 import os
@@ -29,7 +29,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
     elif FUSE_IMPL == "none":
         pass
     else:
-        raise RuntimeError("unknown fuse implementation in BORG_FUSE_IMPL: '%s'" % BORG_FUSE_IMPL)
+        raise RuntimeError("Unknown FUSE implementation in BORG_FUSE_IMPL: '%s'." % BORG_FUSE_IMPL)
 else:
     llfuse = None  # noqa
     has_llfuse = False

@@ -6,10 +6,10 @@ Backing up entire disk images
 
 Backing up disk images can still be efficient with Borg because its `deduplication`_
 technique makes sure only the modified parts of the file are stored. Borg also has
-optional simple sparse file support for extract.
+optional simple sparse file support for extraction.
 
-It is of utmost importancy to pin down the disk you want to backup.
-You need to use the SERIAL for that.
+It is of utmost importance to pin down the disk you want to back up.
+Use the disk's SERIAL for that.
 Use:
 
 .. code-block:: bash
@@ -25,10 +25,10 @@ Use:
     echo "${PARTITIONS[@]}"
     echo "Disk Identifier: $DISK_ID"
 
-    # Use the following line to perform a borg backup for the full disk:
+    # Use the following line to perform a Borg backup for the full disk:
     # borg create --read-special disk-backup "$DISK_ID"
 
-    # Use the following to perform a borg backup for all partitions of the disk
+    # Use the following to perform a Borg backup for all partitions of the disk
     # borg create --read-special partitions-backup "${PARTITIONS[@]}"
 
     # Example output:
@@ -47,7 +47,7 @@ Decreasing the size of image backups
 ------------------------------------
 
 Disk images are as large as the full disk when uncompressed and might not get much
-smaller post-deduplication after heavy use because virtually all file systems don't
+smaller post-deduplication after heavy use because virtually all filesystems do not
 actually delete file data on disk but instead delete the filesystem entries referencing
 the data. Therefore, if a disk nears capacity and files are deleted again, the change
 will barely decrease the space it takes up when compressed and deduplicated. Depending
@@ -115,8 +115,8 @@ Because the partitions were zeroed in place, restoration is only one command::
           mounted, is simply to ``dd`` from ``/dev/zero`` to a temporary file and delete
           it. This is ill-advised for the reasons mentioned in the ``zerofree`` man page:
 
-          - it is slow
-          - it makes the disk image (temporarily) grow to its maximal extent
+          - it is slow.
+          - it makes the disk image (temporarily) grow to its maximal extent.
           - it (temporarily) uses all free space on the disk, so other concurrent write actions may fail.
 
 Virtual machines
@@ -129,7 +129,7 @@ regular file to Borg with the same issues as regular files when it comes to conc
 reading and writing from the same file.
 
 For backing up live VMs use filesystem snapshots on the VM host, which establishes
-crash-consistency for the VM images. This means that with most file systems (that
+crash-consistency for the VM images. This means that with most filesystems (that
 are journaling) the FS will always be fine in the backup (but may need a journal
 replay to become accessible).
 
@@ -145,10 +145,10 @@ to reach application-consistency; it's a broad and complex issue that cannot be 
 in entirety here.
 
 Hypervisor snapshots capturing most of the VM's state can also be used for backups and
-can be a better alternative to pure file system based snapshots of the VM's disk, since
+can be a better alternative to pure filesystem-based snapshots of the VM's disk, since
 no state is lost. Depending on the application this can be the easiest and most reliable
 way to create application-consistent backups.
 
-Borg doesn't intend to address these issues due to their huge complexity and
+Borg does not intend to address these issues due to their huge complexity and
 platform/software dependency. Combining Borg with the mechanisms provided by the platform
 (snapshots, hypervisor features) will be the best approach to start tackling them.

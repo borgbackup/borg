@@ -48,38 +48,38 @@ ROBJ_DONTCARE = "*"  # used to parse without type assertion (= accept any type)
 MAX_DATA_SIZE = 20971479
 
 # MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT2 header)
-# note: for borg >= 1.3, this makes the MAX_OBJECT_SIZE grow slightly over the precise 20MiB used by
+# note: for borg >= 1.3, this makes the MAX_OBJECT_SIZE grow slightly over the precise 20 MiB used by
 # borg < 1.3, but this is not expected to cause any issues.
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41 + 8  # see assertion at end of repository module
 
-# How many segment files borg puts into a single directory by default.
+# How many segment files Borg puts into a single directory by default.
 DEFAULT_SEGMENTS_PER_DIR = 1000
 
-# A large, but not unreasonably large segment size. Always less than 2 GiB (for legacy file systems). We choose
-# 500 MiB which means that no indirection from the inode is needed for typical Linux file systems.
-# Note that this is a soft-limit and can be exceeded (worst case) by a full maximum chunk size and some metadata
+# A large, but not unreasonably large segment size. Always less than 2 GiB (for legacy filesystems). We choose
+# 500 MiB, which means that no indirection from the inode is needed for typical Linux filesystems.
+# Note that this is a soft limit and can be exceeded (worst case) by a full maximum chunk size and some metadata
 # bytes. That's why it's 500 MiB instead of 512 MiB.
 DEFAULT_MAX_SEGMENT_SIZE = 500 * 1024 * 1024
 
 # repo config max_segment_size value must be below this limit to stay within uint32 offsets:
 MAX_SEGMENT_SIZE_LIMIT = 2**32 - MAX_OBJECT_SIZE
 
-# how many metadata stream chunk ids do we store into a "pointer chunk" of the ArchiveItem.item_ptrs list?
+# How many metadata stream chunk IDs do we store in a "pointer chunk" of the ArchiveItem.item_ptrs list?
 IDS_PER_CHUNK = MAX_DATA_SIZE // 40
 
 # have one all-zero bytes object
-# we use it at all places where we need to detect or create all-zero buffers
+# we use it in all places where we need to detect or create all-zero buffers
 zeros = bytes(MAX_DATA_SIZE)
 
 # borg.remote read() buffer size
 BUFSIZE = 10 * 1024 * 1024
 
-# to use a safe, limited unpacker, we need to set a upper limit to the archive count in the manifest.
+# To use a safe, limited unpacker, we need to set an upper limit to the archive count in the manifest.
 # this does not mean that you can always really reach that number, because it also needs to be less than
 # MAX_DATA_SIZE or it will trigger the check for that.
 MAX_ARCHIVES = 400000
 
-# repo.list() result count limit the borg client uses
+# repo.list() result count limit used by the Borg client
 LIST_SCAN_LIMIT = 100000
 
 FD_MAX_AGE = 4 * 60  # 4 minutes
@@ -97,10 +97,10 @@ CH_FIXED = "fixed"
 CH_FAIL = "fail"
 
 # buzhash chunker params
-CHUNK_MIN_EXP = 19  # 2**19 == 512kiB
-CHUNK_MAX_EXP = 23  # 2**23 == 8MiB
-HASH_WINDOW_SIZE = 0xFFF  # 4095B
-HASH_MASK_BITS = 21  # results in ~2MiB chunks statistically
+CHUNK_MIN_EXP = 19  # 2**19 == 512 KiB
+CHUNK_MAX_EXP = 23  # 2**23 == 8 MiB
+HASH_WINDOW_SIZE = 0xFFF  # 4095 B
+HASH_MASK_BITS = 21  # results in ~2 MiB chunks statistically
 
 # defaults, use --chunker-params to override
 CHUNKER_PARAMS = (CH_BUZHASH, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE)
@@ -129,10 +129,10 @@ SCHILY_ACL_ACCESS = "SCHILY.acl.access"  # POSIX access ACL in tar PAX headers
 SCHILY_ACL_DEFAULT = "SCHILY.acl.default"  # POSIX default ACL in tar PAX headers
 
 # special tags
-# @PROT protects archives against accidential deletion or modification by delete, prune or recreate.
+# @PROT protects archives against accidental deletion or modification by delete, prune, or recreate.
 SPECIAL_TAGS = frozenset(["@PROT"])
 
-# return codes returned by borg command
+# return codes returned by Borg command
 EXIT_SUCCESS = 0  # everything done, no problems
 EXIT_WARNING = 1  # reached normal end of operation, but there were issues (generic warning)
 EXIT_ERROR = 2  # terminated abruptly, did not reach end of operation (generic error)

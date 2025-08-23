@@ -35,11 +35,11 @@ class TestLock:
         assert not lock.got_exclusive_lock()
 
     def test_exclusive_lock(self, lockstore):
-        # there must not be 2 exclusive locks
+        # There must not be two exclusive locks.
         with Lock(lockstore, exclusive=True, id=ID1):
             with pytest.raises(LockTimeout):
                 Lock(lockstore, exclusive=True, id=ID2).acquire()
-        # acquiring an exclusive lock will time out if the non-exclusive does not go away
+        # Acquiring an exclusive lock will time out if the non-exclusive lock does not go away.
         with Lock(lockstore, exclusive=False, id=ID1):
             with pytest.raises(LockTimeout):
                 Lock(lockstore, exclusive=True, id=ID2).acquire()
@@ -71,10 +71,10 @@ class TestLock:
         lock.acquire()
         lock_keys_a00 = set(lock._get_locks())
         time.sleep(0.5)
-        lock.refresh()  # shouldn't change locks, existing lock too young
+        lock.refresh()  # Should not change locks; existing lock is too young.
         lock_keys_a05 = set(lock._get_locks())
         time.sleep(0.6)
-        lock.refresh()  # that should refresh the lock!
+        lock.refresh()  # This should refresh the lock.
         lock_keys_b00 = set(lock._get_locks())
         time.sleep(2.1)
         lock_keys_b21 = set(lock._get_locks())  # now the lock should be stale & gone.

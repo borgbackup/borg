@@ -76,13 +76,13 @@ def test_directory_timestamps1(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    # default file archiving order (internal recursion)
+    # Default file archiving order (internal recursion)
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         cmd(archiver, "extract", "test")
-    # extracting a file inside a directory touches the directory mtime
+    # Extracting a file inside a directory touches the directory mtime
     assert os.path.exists("output/input/dir2/file2")
-    # make sure borg fixes the directory mtime after touching it
+    # Make sure Borg fixes the directory mtime after touching it
     sti = os.stat("input/dir2")
     sto = os.stat("output/input/dir2")
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
@@ -93,14 +93,14 @@ def test_directory_timestamps2(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    # given order, dir first, file second
+    # Given order, directory first, file second
     flist_dir_first = b"input/dir2\ninput/dir2/file2\n"
     cmd(archiver, "create", "--paths-from-stdin", "test", input=flist_dir_first)
     with changedir("output"):
         cmd(archiver, "extract", "test")
-    # extracting a file inside a directory touches the directory mtime
+    # Extracting a file inside a directory touches the directory mtime
     assert os.path.exists("output/input/dir2/file2")
-    # make sure borg fixes the directory mtime after touching it
+    # Make sure Borg fixes the directory mtime after touching it
     sti = os.stat("input/dir2")
     sto = os.stat("output/input/dir2")
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
@@ -111,14 +111,14 @@ def test_directory_timestamps3(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    # given order, file first, dir second
+    # Given order, file first, directory second
     flist_file_first = b"input/dir2/file2\ninput/dir2\n"
     cmd(archiver, "create", "--paths-from-stdin", "test", input=flist_file_first)
     with changedir("output"):
         cmd(archiver, "extract", "test")
-    # extracting a file inside a directory touches the directory mtime
+    # Extracting a file inside a directory touches the directory mtime
     assert os.path.exists("output/input/dir2/file2")
-    # make sure borg fixes the directory mtime after touching it
+    # Make sure Borg fixes the directory mtime after touching it
     sti = os.stat("input/dir2")
     sto = os.stat("output/input/dir2")
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)

@@ -55,7 +55,7 @@ cdef class CompressorBase:
     """
     base class for all (de)compression classes,
     also handles compression format auto detection and
-    adding/stripping the ID header (which enable auto detection).
+    adding/stripping the ID header (which enables auto-detection).
     """
     ID = 0xFF  # reserved and not used
                # overwrite with a unique 1-byte bytestring in child classes

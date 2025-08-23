@@ -51,24 +51,24 @@ cdef extern from "unistd.h":
     int _PC_ACL_EXTENDED
 
 
-# On FreeBSD, borg currently only deals with the USER namespace as it is unclear
-# whether (and if so, how exactly) it should deal with the SYSTEM namespace.
+# On FreeBSD, Borg currently only deals with the USER namespace, as it is unclear
+# whether (and, if so, how exactly) it should deal with the SYSTEM namespace.
 NS_ID_MAP = {b"user": EXTATTR_NAMESPACE_USER, }
 
 
 def split_ns(ns_name, default_ns):
-    # split ns_name (which is in the form of b"namespace.name") into namespace and name.
-    # if there is no namespace given in ns_name, default to default_ns.
-    # note:
-    # borg < 1.1.10 on FreeBSD did not prefix the namespace to the names, see #3952.
-    # we also need to deal with "unexpected" namespaces here, they could come
-    # from borg archives made on other operating systems.
+    # Split ns_name (which is in the form b"namespace.name") into namespace and name.
+    # If there is no namespace given in ns_name, default to default_ns.
+    # Note:
+    # Borg < 1.1.10 on FreeBSD did not prefix the namespace to the names; see #3952.
+    # We also need to deal with "unexpected" namespaces here — they could come
+    # from Borg archives made on other operating systems.
     ns_name_tuple = ns_name.split(b".", 1)
     if len(ns_name_tuple) == 2:
-        # we have a namespace prefix in the given name
+        # We have a namespace prefix in the given name.
         ns, name = ns_name_tuple
     else:
-        # no namespace given in ns_name (== no dot found), maybe data coming from an old borg archive.
+        # No namespace given in ns_name (no dot found); maybe data from an old Borg archive.
         ns, name = default_ns, ns_name
     return ns, name
 

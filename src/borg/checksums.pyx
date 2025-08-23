@@ -39,8 +39,8 @@ cdef Py_buffer ro_buffer(object data) except *:
     return view
 
 
-# borg 2.0's new repos do not compute crc32 over big amounts of data,
-# so speed does not matter much any more and we can just use zlib.crc32.
+# Borg 2.0 repositories do not compute CRC32 over large amounts of data,
+# so speed does not matter much anymore, and we can just use zlib.crc32.
 crc32 = zlib.crc32
 
 

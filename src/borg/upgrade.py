@@ -56,7 +56,7 @@ class UpgraderFrom12To20:
         self.hlm = HardLinkManager(id_type=bytes, info_type=list)  # hlid -> chunks_correct
 
     def upgrade_item(self, *, item):
-        """upgrade item as needed, get rid of legacy crap"""
+        """Upgrades the item as needed and removes legacy data."""
         ITEM_KEY_WHITELIST = {
             "path",
             "rdev",

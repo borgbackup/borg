@@ -65,14 +65,14 @@ def header_size(tag):
 
 class LegacyRepository:
     """
-    Filesystem based transactional key value store
+    Filesystem-based transactional key-value store.
 
     Transactionality is achieved by using a log (aka journal) to record changes. The log is a series of numbered files
     called segments. Each segment is a series of log entries. The segment number together with the offset of each
     entry relative to its segment start establishes an ordering of the log entries. This is the "definition" of
     time for the purposes of the log.
 
-    Log entries are either PUT, DELETE or COMMIT.
+    Log entries are either PUT, DELETE, or COMMIT.
 
     A COMMIT is always the final log entry in a segment and marks all data from the beginning of the log until the
     segment ending with the COMMIT as committed and consistent. The segment number of a segment ending with a COMMIT
@@ -82,11 +82,11 @@ class LegacyRepository:
     all segments after the last committed segment are deleted; they contain log entries whose consistency is not
     established by a COMMIT.
 
-    Note that the COMMIT can't establish consistency by itself, but only manages to do so with proper support from
+    Note that the COMMIT cannot establish consistency by itself, but only manages to do so with proper support from
     the platform (including the hardware). See platform.base.SyncFile for details.
 
     A PUT inserts a key-value pair. The value is stored in the log entry, hence the repository implements
-    full data logging, meaning that all data is consistent, not just metadata (which is common in file systems).
+    full data logging, meaning that all data is consistent, not just metadata (which is common in filesystems).
 
     A DELETE marks a key as deleted.
 
@@ -98,9 +98,9 @@ class LegacyRepository:
     such obsolete entries is called sparse, while a segment containing no such entries is called compact.
 
     Sparse segments can be compacted and thereby disk space freed. This destroys the transaction for which the
-    superseded entries where current.
+    superseded entries were current.
 
-    On disk layout:
+    On-disk layout:
 
     dir/README
     dir/config
@@ -108,7 +108,7 @@ class LegacyRepository:
     dir/index.X
     dir/hints.X
 
-    File system interaction
+    Filesystem interaction
     -----------------------
 
     LoggedIO generally tries to rely on common behaviours across transactional file systems.

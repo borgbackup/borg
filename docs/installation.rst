@@ -82,9 +82,9 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _Ubuntu packages: https://launchpad.net/ubuntu/+source/borgbackup
 .. _Ubuntu PPA: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 
-Please ask package maintainers to build a package or, if you can package /
+Please ask package maintainers to build a package or, if you can package/
 submit it yourself, please help us with that! See :issue:`105` on
-github to followup on packaging efforts.
+GitHub to follow up on packaging efforts.
 
 **Current status of package in the repositories**
 
@@ -106,12 +106,12 @@ Standalone Binary
 .. note:: Releases are signed with an OpenPGP key, see
           :ref:`security-contact` for more instructions.
 
-Borg x86/x64 amd/intel compatible binaries (generated with `pyinstaller`_)
+Borg x86/x64 AMD/Intel compatible binaries (generated with `pyinstaller`_)
 are available on the releases_ page for the following platforms:
 
 * **Linux**: glibc >= 2.28 (ok for most supported Linux releases).
   Older glibc releases are untested and may not work.
-* **MacOS**: 10.12 or newer (To avoid signing issues download the file via
+* **macOS**: 10.12 or newer (To avoid signing issues, download the file via
   command line **or** remove the ``quarantine`` attribute after downloading:
   ``$ xattr -dr com.apple.quarantine borg-macosx64.tgz``)
 * **FreeBSD**: 12.1 (unknown whether it works for older releases)

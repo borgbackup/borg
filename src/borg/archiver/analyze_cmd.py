@@ -99,7 +99,7 @@ class ArchiveAnalyzer:
 class AnalyzeMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_analyze(self, args, repository, manifest):
-        """Analyze archives"""
+        """Analyzes archives."""
         ArchiveAnalyzer(args, repository, manifest).analyze()
 
     def build_parser_analyze(self, subparsers, common_parser, mid_common_parser):
@@ -109,21 +109,21 @@ class AnalyzeMixIn:
             """
             Analyze archives to find "hot spots".
 
-            Borg analyze relies on the usual archive matching options to select the
+            ``borg analyze`` relies on the usual archive matching options to select the
             archives that should be considered for analysis (e.g. ``-a series_name``).
-            Then it iterates over all matching archives, over all contained files and
-            collects information about chunks stored in all directories it encountered.
+            Then it iterates over all matching archives, over all contained files, and
+            collects information about chunks stored in all directories it encounters.
 
-            It considers chunk IDs and their plaintext sizes (we don't have the compressed
-            size in the repository easily available) and adds up added/removed chunks'
-            sizes per direct parent directory and outputs a list of "directory: size".
+            It considers chunk IDs and their plaintext sizes (we do not have the compressed
+            size in the repository easily available) and adds up the sizes of added and removed
+            chunks per direct parent directory, and outputs a list of "directory: size".
 
-            You can use that list to find directories with a lot of "activity" - maybe
-            some of these are temporary or cache directories you did forget to exclude.
+            You can use that list to find directories with a lot of "activity" — maybe
+            some of these are temporary or cache directories you forgot to exclude.
 
-            To not have these unwanted directories in your backups, you could carefully
-            exclude these in ``borg create`` (for future backups) or use ``borg recreate``
-            to re-create existing archives without these.
+            To avoid including these unwanted directories in your backups, you can carefully
+            exclude them in ``borg create`` (for future backups) or use ``borg recreate``
+            to recreate existing archives without them.
             """
         )
         subparser = subparsers.add_parser(

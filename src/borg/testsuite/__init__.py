@@ -46,7 +46,7 @@ if sys.platform.startswith("netbsd"):
 
 
 def same_ts_ns(ts_ns1, ts_ns2):
-    """compare 2 timestamps (both in nanoseconds) whether they are (roughly) equal"""
+    """Compare two timestamps (both in nanoseconds) to determine whether they are (roughly) equal."""
     diff_ts = int(abs(ts_ns1 - ts_ns2))
     diff_max = 10 ** (-st_mtime_ns_round)
     return diff_ts <= diff_max
@@ -85,7 +85,7 @@ def changedir(dir):
 
 
 def is_root():
-    """return True if running with high privileges, like as root"""
+    """Return True if running with high privileges (e.g., as root)."""
     if is_win32:
         return False  # TODO
     else:

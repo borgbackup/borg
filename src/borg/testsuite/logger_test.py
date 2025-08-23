@@ -43,7 +43,7 @@ def test_parent_module():
 
 
 def test_lazy_logger():
-    # just calling all the methods of the proxy
+    # Just calling all the methods of the proxy.
     logger.setLevel(logging.DEBUG)
     logger.debug("debug")
     logger.info("info")

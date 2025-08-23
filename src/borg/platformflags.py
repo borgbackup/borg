@@ -1,7 +1,7 @@
 """
-Flags for Platform-specific APIs.
+Flags for platform-specific APIs.
 
-Use these Flags instead of sys.platform.startswith('<OS>') or try/except.
+Use these flags instead of sys.platform.startswith('<os>') or try/except.
 """
 
 import sys

@@ -5,7 +5,7 @@ There is a ``borg debug`` command that has some subcommands which are all
 **not intended for normal use** and **potentially very dangerous** if used incorrectly.
 
 For example, ``borg debug put-obj`` and ``borg debug delete-obj`` will only do
-what their name suggests: put objects into repo / delete objects from repo.
+what their name suggests: put objects into the repository / delete objects from the repository.
 
 Please note:
 
@@ -30,5 +30,5 @@ or unauthenticated source.").
 The ``borg debug profile-convert`` command can be used to take a Borg profile and convert
 it to a profile file that is compatible with the Python tools.
 
-Additionally, if the filename specified for ``--debug-profile`` ends with ".pyprof" a
-Python compatible profile is generated. This is only intended for local use by developers.
+Additionally, if the filename specified for ``--debug-profile`` ends with ".pyprof", a
+Python-compatible profile is generated. This is only intended for local use by developers.

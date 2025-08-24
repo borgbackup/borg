@@ -68,10 +68,10 @@ def are_acls_working():
 
 
 # define skips available to platform tests
-skipif_not_linux = pytest.mark.skipif(not is_linux, reason="linux only test")
-skipif_not_darwin = pytest.mark.skipif(not is_darwin, reason="darwin only test")
-skipif_not_freebsd = pytest.mark.skipif(not is_freebsd, reason="freebsd only test")
-skipif_not_posix = pytest.mark.skipif(not (is_linux or is_freebsd or is_darwin), reason="POSIX only tests")
+skipif_not_linux = pytest.mark.skipif(not is_linux, reason="Linux-only test")
+skipif_not_darwin = pytest.mark.skipif(not is_darwin, reason="Darwin-only test")
+skipif_not_freebsd = pytest.mark.skipif(not is_freebsd, reason="FreeBSD-only test")
+skipif_not_posix = pytest.mark.skipif(not (is_linux or is_freebsd or is_darwin), reason="POSIX-only tests")
 skipif_fakeroot_detected = pytest.mark.skipif(fakeroot_detected(), reason="not compatible with fakeroot")
 skipif_acls_not_working = pytest.mark.skipif(not are_acls_working(), reason="ACLs do not work")
 skipif_no_ubel_user = pytest.mark.skipif(not user_exists("übel"), reason="requires übel user")

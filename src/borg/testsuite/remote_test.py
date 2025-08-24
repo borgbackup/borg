@@ -41,31 +41,31 @@ class TestSleepingBandwidthLimiter:
 
         now = 100
 
-        it = SleepingBandwidthLimiter(100)  # bandwidth quota
+        it = SleepingBandwidthLimiter(100)  # Bandwidth quota.
 
-        # all fits
+        # All fits
         self.expect_write(5, b"test")
         it.write(5, b"test")
 
-        # only partial write
+        # Only partial write
         self.expect_write(5, b"123456")
         it.write(5, b"1234567890")
 
-        # sleeps
+        # Sleeps
         self.expect_write(5, b"123456")
         it.write(5, b"123456")
 
-        # long time interval between writes
+        # Long time interval between writes
         now += 10
         self.expect_write(5, b"1")
         it.write(5, b"1")
 
-        # long time interval between writes, filling up quota
+        # Long time interval between writes, filling up the quota
         now += 10
         self.expect_write(5, b"1")
         it.write(5, b"1")
 
-        # long time interval between writes, filling up quota to clip to maximum
+        # Long time interval between writes, filling up the quota to clip to the maximum
         now += 10
         self.expect_write(5, b"1")
         it.write(5, b"1")
@@ -104,7 +104,7 @@ class TestRepositoryCache:
         assert cache.hits == 2
 
     def test_meta(self, cache: RepositoryCache):
-        # same as test_simple, but not reading the chunk data (metadata only).
+        # Same as test_simple, but not reading the chunk data (metadata only).
         # Single get()s are not cached, since they are used for unique objects like archives.
         assert pdchunk(cache.get(H(1), read_data=False)) == b""
         assert cache.misses == 1
@@ -188,7 +188,7 @@ class TestRepositoryCache:
         with patch("builtins.open", enospc_open):
             assert pdchunk(next(iterator)) == b"5678"
             assert cache.enospc == 1
-            # We didn't patch query_size_limit which would set size_limit to some low
+            # We didn't patch query_size_limit, which would set size_limit to a low
             # value, so nothing was actually evicted.
             assert cache.evictions == 0
 

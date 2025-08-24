@@ -60,9 +60,9 @@ def sysinfo():
 
 def log_multi(*msgs, level=logging.INFO, logger=logger):
     """
-    log multiple lines of text, each line by a separate logging call for cosmetic reasons
+    Log multiple lines of text, emitting each line via a separate logging call for cosmetic reasons.
 
-    each positional argument may be a single or multiple lines (separated by newlines) of text.
+    Each positional argument may be a single or multiple lines (separated by newlines) of text.
     """
     lines = []
     for msg in msgs:
@@ -72,16 +72,16 @@ def log_multi(*msgs, level=logging.INFO, logger=logger):
 
 
 class ChunkIteratorFileWrapper:
-    """File-like wrapper for chunk iterators"""
+    """File-like wrapper for chunk iterators."""
 
     def __init__(self, chunk_iterator, read_callback=None):
         """
         *chunk_iterator* should be an iterator yielding bytes. These will be buffered
         internally as necessary to satisfy .read() calls.
 
-        *read_callback* will be called with one argument, some byte string that has
-        just been read and will be subsequently returned to a caller of .read().
-        It can be used to update a progress display.
+        *read_callback* will be called with one argument, a byte string that has
+        just been read and will subsequently be returned to a caller of .read().
+        The callback can be used to update a progress display.
         """
         self.chunk_iterator = chunk_iterator
         self.chunk_offset = 0
@@ -129,9 +129,9 @@ def open_item(archive, item):
 
 def chunkit(it, size):
     """
-    Chunk an iterator <it> into pieces of <size>.
+    Chunk an iterator into pieces of the given size.
 
-    >>> list(chunker('ABCDEFG', 3))
+    >>> list(chunkit('ABCDEFG', 3))
     [['A', 'B', 'C'], ['D', 'E', 'F'], ['G']]
     """
     iterable = iter(it)
@@ -139,7 +139,7 @@ def chunkit(it, size):
 
 
 def consume(iterator, n=None):
-    """Advance the iterator n-steps ahead. If n is none, consume entirely."""
+    """Advance the iterator n steps. If n is None, consume it entirely."""
     # Use functions that consume iterators at C speed.
     if n is None:
         # feed the entire iterator into a zero-length deque
@@ -174,7 +174,7 @@ class ErrorIgnoringTextIOWrapper(io.TextIOWrapper):
 
 
 def iter_separated(fd, sep=None, read_size=4096):
-    """Iter over chunks of open file ``fd`` delimited by ``sep``. Doesn't trim."""
+    """Iterate over chunks of the open file ``fd`` delimited by ``sep``. Does not trim."""
     buf = fd.read(read_size)
     is_str = isinstance(buf, str)
     part = "" if is_str else b""

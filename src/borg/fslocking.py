@@ -17,7 +17,7 @@ logger = create_logger(__name__)
 
 class TimeoutTimer:
     """
-    A timer for timeout checks (can also deal with "never timeout").
+    A timer for timeout checks (can also deal with "never time out").
     It can also compute and optionally execute a reasonable sleep time (e.g. to avoid
     polling too often or to support thread/process rescheduling).
     """
@@ -26,7 +26,7 @@ class TimeoutTimer:
         """
         Initialize a timer.
 
-        :param timeout: time out interval [s] or None (never timeout, wait forever) [default]
+        :param timeout: timeout interval [s] or None (never time out, wait forever) [default]
         :param sleep: sleep interval [s] (>= 0: do sleep call, <0: don't call sleep)
                       or None (autocompute: use 10% of timeout [but not more than 60s],
                       or 1s for "never timeout" mode)
@@ -106,9 +106,9 @@ class NotMyLock(LockErrorT):
 
 
 class ExclusiveLock:
-    """An exclusive Lock based on mkdir fs operation being atomic.
+    """An exclusive lock based on mkdir filesystem operation being atomic.
 
-    If possible, try to use the contextmanager here like::
+    If possible, try to use the context manager here like::
 
         with ExclusiveLock(...) as lock:
             ...

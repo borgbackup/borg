@@ -37,7 +37,7 @@ def test_export_tar(archivers, request):
     cmd(archiver, "create", "test", "input")
     cmd(archiver, "export-tar", "test", "simple.tar", "--progress", "--tar-format=GNU")
     with changedir("output"):
-        # This probably assumes GNU tar. Note -p switch to extract permissions regardless of umask.
+        # This probably assumes GNU tar. Note: use the -p switch to extract permissions regardless of umask.
         subprocess.check_call(["tar", "xpf", "../simple.tar", "--warning=no-timestamp"])
     assert_dirs_equal("input", "output/input", ignore_flags=True, ignore_xattrs=True, ignore_ns=True)
 
@@ -67,7 +67,7 @@ def test_export_tar_strip_components(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     test_list = cmd(archiver, "export-tar", "test", "simple.tar", "--strip-components=1", "--list", "--tar-format=GNU")
-    # --list's path are those before processing with --strip-components
+    # --list's paths are those before processing with --strip-components
     assert "input/file1\n" in test_list
     assert "input/dir2\n" in test_list
     with changedir("output"):

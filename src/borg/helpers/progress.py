@@ -48,12 +48,12 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
 
     def __init__(self, total=0, step=5, start=0, msg="%3.0f%%", msgid=None):
         """
-        Percentage-based progress indicator
+        Percentage-based progress indicator.
 
-        :param total: total amount of items
-        :param step: step size in percent
-        :param start: at which percent value to start
-        :param msg: output message, must contain one %f placeholder for the percentage
+        :param total: total amount of items.
+        :param step: step size in percent.
+        :param start: at which percent value to start.
+        :param msg: output message; must contain one %f placeholder for the percentage.
         """
         self.counter = 0  # 0 .. (total-1)
         self.total = total
@@ -74,11 +74,11 @@ class ProgressIndicatorPercent(ProgressIndicatorBase):
 
     def show(self, current=None, increase=1, info=None):
         """
-        Show and output the progress message
+        Show and output the progress message.
 
-        :param current: set the current percentage [None]
-        :param increase: increase the current percentage [None]
-        :param info: array of strings to be formatted with msg [None]
+        :param current: Set the current percentage. [None]
+        :param increase: Increase the current percentage. [None]
+        :param info: Array of strings to be formatted with msg. [None]
         """
         pct = self.progress(current, increase)
         if pct is not None:

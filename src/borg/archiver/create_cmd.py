@@ -42,7 +42,7 @@ logger = create_logger()
 class CreateMixIn:
     @with_repository(compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest):
-        """Create new archive"""
+        """Creates a new archive."""
         key = manifest.key
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
@@ -552,8 +552,8 @@ class CreateMixIn:
         create_epilog = process_epilog(
             """
         This command creates a backup archive containing all files found while recursively
-        traversing all paths specified. Paths are added to the archive as they are given,
-        that means if relative paths are desired, the command has to be run from the correct
+        traversing all specified paths. Paths are added to the archive as they are given,
+        which means that if relative paths are desired, the command must be run from the correct
         directory.
 
         The slashdot hack in paths (recursion roots) is triggered by using ``/./``:
@@ -561,23 +561,23 @@ class CreateMixIn:
         strip the prefix on the left side of ``./`` from the archived items (in this case,
         ``this/gets/archived`` will be the path in the archived item).
 
-        When giving '-' as path, borg will read data from standard input and create a
-        file 'stdin' in the created archive from that data. In some cases it's more
-        appropriate to use --content-from-command, however. See section *Reading from
-        stdin* below for details.
+        When specifying '-' as a path, borg will read data from standard input and create a
+        file named 'stdin' in the created archive from that data. In some cases, it is more
+        appropriate to use --content-from-command. See the section *Reading from stdin*
+        below for details.
 
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
 
-        The archive name does NOT need to be unique, you can and should use the same
-        name for a series of archives. The unique archive identifier is its ID (hash)
+        The archive name does not need to be unique; you can and should use the same
+        name for a series of archives. The unique archive identifier is its ID (hash),
         and you can abbreviate the ID as long as it is unique.
 
         In the archive name, you may use the following placeholders:
         {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
         Backup speed is increased by not reprocessing files that are already part of
-        existing archives and weren't modified. The detection of unmodified files is
+        existing archives and were not modified. The detection of unmodified files is
         done by comparing multiple file metadata values with previous values kept in
         the files cache.
 
@@ -603,14 +603,14 @@ class CreateMixIn:
         ctime vs. mtime: safety vs. speed
 
         - ctime is a rather safe way to detect changes to a file (metadata and contents)
-          as it can not be set from userspace. But, a metadata-only change will already
+          as it cannot be set from userspace. But a metadata-only change will already
           update the ctime, so there might be some unnecessary chunking/hashing even
           without content changes. Some filesystems do not support ctime (change time).
           E.g. doing a chown or chmod to a file will change its ctime.
         - mtime usually works and only updates if file contents were changed. But mtime
-          can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+          can be arbitrarily set from userspace, e.g., to set mtime back to the same value
           it had before a content change happened. This can be used maliciously as well as
-          well-meant, but in both cases mtime based cache modes can be problematic.
+          well-meant, but in both cases mtime-based cache modes can be problematic.
 
         The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
          - ctime (default): Use ctime to detect changes. This is the safest option.
@@ -764,7 +764,7 @@ class CreateMixIn:
             description=self.do_create.__doc__,
             epilog=create_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="create backup",
+            help="create a backup",
         )
         subparser.set_defaults(func=self.do_create)
 
@@ -778,7 +778,7 @@ class CreateMixIn:
         )
 
         subparser.add_argument(
-            "--list", dest="output_list", action="store_true", help="output verbose list of items (files, dirs, ...)"
+            "--list", dest="output_list", action="store_true", help="output a verbose list of items (files, dirs, ...)"
         )
         subparser.add_argument(
             "--filter",
@@ -824,7 +824,7 @@ class CreateMixIn:
         subparser.add_argument(
             "--content-from-command",
             action="store_true",
-            help="interpret PATH as command and store its stdout. See also section Reading from" " stdin below.",
+            help="interpret PATH as a command and store its stdout. See also the section 'Reading from stdin' below.",
         )
         subparser.add_argument(
             "--paths-from-stdin",

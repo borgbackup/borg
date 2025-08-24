@@ -8,10 +8,10 @@ def translate(pat, match_end=r"\Z"):
 
     The pattern may include ``**<sep>`` (<sep> stands for the platform-specific path separator; "/" on POSIX systems)
     for matching zero or more directory levels and "*" for matching zero or more arbitrary characters except any path
-    separator. Wrap meta-characters in brackets for a literal match (i.e. "[?]" to match the literal character "?").
+    separator. Wrap meta-characters in brackets for a literal match (i.e., "[?]" to match the literal character "?").
 
-    Using match_end=regex one can give a regular expression that is used to match after the regex that is generated from
-    the pattern. The default is to match the end of the string.
+    Using ``match_end=REGEX`` you can provide a regular expression that is appended after the pattern-derived
+    expression. The default is to match the end of the string.
 
     This function is derived from the "fnmatch" module distributed with the Python standard library.
 
@@ -69,18 +69,18 @@ def translate(pat, match_end=r"\Z"):
 
 
 def _parse_braces(pat):
-    """Returns the index values of paired braces in `pat` as a list of tuples.
+    """Return the index pairs of matched braces in `pat` as a list of tuples.
 
-    The dict's keys are the indexes corresponding to opening braces. Initially,
+    The dictionary's keys are the indices corresponding to opening braces. Initially,
     they are set to a value of `None`. Once a corresponding closing brace is found,
-    the value is updated. All dict keys with a positive int value are valid pairs.
+    the value is updated. All dictionary keys with a positive integer value are valid pairs.
 
-    Cannot rely on re.match("[^\\(\\\\)*]?{.*[^\\(\\\\)*]}") because, while it
-    does handle unpaired braces and nested pairs of braces, it misses sequences
-    of paired braces. E.g.: "{foo,bar}{bar,baz}" would translate, incorrectly, to
-    "(foo|bar\\}\\{bar|baz)" instead of, correctly, to "(foo|bar)(bar|baz)"
+    We cannot rely on re.match("[^\\(\\\\)*]?{.*[^\\(\\\\)*]}") because, while it
+    handles unpaired braces and nested pairs of braces, it misses sequences
+    of paired braces. For example: "{foo,bar}{bar,baz}" would translate, incorrectly, to
+    "(foo|bar\\}\\{bar|baz)" instead of, correctly, to "(foo|bar)(bar|baz)".
 
-    So this function parses in a left-to-right fashion, tracking pairs with a LIFO
+    Therefore, this function parses left-to-right, tracking pairs with a LIFO
     queue: pushing opening braces on and popping them off when finding a closing
     brace.
     """

@@ -1,7 +1,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Automated creation of testing environments / binaries on misc. platforms
+# Automated creation of testing environments/binaries on miscellaneous platforms
 
 $cpus = Integer(ENV.fetch('VMCPUS', '8'))  # create VMs with that many cpus
 $xdistn = Integer(ENV.fetch('XDISTN', '8'))  # dispatch tests to that many pytest workers

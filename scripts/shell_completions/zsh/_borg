@@ -55,10 +55,10 @@ _borg_commands() {
     'serve:start in server mode'
     'tag:tag archives'
     'transfer:transfer of archives from another repository'
-    'umount:un-mount the FUSE filesystem'
+    'umount:unmount the FUSE filesystem'
     'undelete:undelete archive'
     'version:display borg client version / borg server version'
-    'with-lock:run a user specified command with the repository lock held'
+    'with-lock:run a user-specified command with the repository lock held'
   )
   _describe -t commands 'borg commands' commands_
 }

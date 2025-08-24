@@ -17,7 +17,7 @@ logger = create_logger()
 class DiffMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_diff(self, args, repository, manifest):
-        """Diff contents of two archives"""
+        """Finds differences between two archives."""
 
         def actual_change(j):
             j = j.to_dict()
@@ -119,7 +119,7 @@ class DiffMixIn:
         The FORMAT specifier syntax
         +++++++++++++++++++++++++++
 
-        The ``--format`` option uses python's `format string syntax
+        The ``--format`` option uses Python's `format string syntax
         <https://docs.python.org/3.9/library/string.html#formatstrings>`_.
 
         Examples:
@@ -170,7 +170,7 @@ class DiffMixIn:
             "--same-chunker-params",
             dest="same_chunker_params",
             action="store_true",
-            help="Override check of chunker parameters.",
+            help="override the check of chunker parameters",
         )
         subparser.add_argument("--sort", dest="sort", action="store_true", help="Sort the output lines by file path.")
         subparser.add_argument(
@@ -180,7 +180,7 @@ class DiffMixIn:
             action=Highlander,
             help='specify format for differences between archives (default: "{change} {path}{NL}")',
         )
-        subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines. ")
+        subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines.")
         subparser.add_argument(
             "--content-only",
             action="store_true",
@@ -193,6 +193,6 @@ class DiffMixIn:
             metavar="PATH",
             nargs="*",
             type=PathSpec,
-            help="paths of items inside the archives to compare; patterns are supported",
+            help="paths of items inside the archives to compare; patterns are supported.",
         )
         define_exclusion_group(subparser)

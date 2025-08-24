@@ -1,5 +1,5 @@
 """
-Do benchmarks using pytest-benchmark.
+Run benchmarks using pytest-benchmark.
 
 Usage:
 
@@ -40,7 +40,7 @@ def testdata(request, tmpdir_factory):
     p = tmpdir_factory.mktemp("data")
     data_type = request.param
     if data_type == "zeros":
-        # do not use a binary zero (\0) to avoid sparse detection
+        # Do not use a binary zero (\\0) to avoid sparse detection.
         def data(size):
             return memoryview(zeros)[:size]
 

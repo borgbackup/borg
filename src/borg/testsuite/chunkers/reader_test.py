@@ -9,7 +9,7 @@ from ...chunkers import sparsemap, FileReader, FileFMAPReader, Chunk
 from ...constants import *  # NOQA
 
 
-@pytest.mark.skipif(not fs_supports_sparse(), reason="fs does not support sparse files")
+@pytest.mark.skipif(not fs_supports_sparse(), reason="filesystem does not support sparse files")
 @pytest.mark.parametrize(
     "fname, sparse_map",
     [("sparse1", map_sparse1), ("sparse2", map_sparse2), ("onlysparse", map_onlysparse), ("notsparse", map_notsparse)],

@@ -62,7 +62,7 @@ class TarMixIn:
 
         # A quick note about the general design of tar_filter and tarfile;
         # The tarfile module of Python can provide some compression mechanisms
-        # by itself, using the builtin gzip, bz2 and lzma modules (and "tarmodes"
+        # by itself, using the built-in gzip, bz2, and lzma modules (and "tar modes"
         # such as "w:xz").
         #
         # Doing so would have three major drawbacks:
@@ -250,9 +250,6 @@ class TarMixIn:
         # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
         tar.close()
 
-        for pattern in matcher.get_unmatched_include_patterns():
-            self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
-
     @with_repository(cache=True, compatibility=(Manifest.Operation.WRITE,))
     def do_import_tar(self, args, repository, manifest, cache):
         """Create a backup archive from a tarball"""
@@ -360,7 +357,7 @@ class TarMixIn:
         read the uncompressed tar stream from stdin and write a compressed/filtered
         tar stream to stdout.
 
-        Depending on the ``-tar-format`` option, these formats are created:
+        Depending on the ``--tar-format`` option, these formats are created:
 
         +--------------+---------------------------+----------------------------+
         | --tar-format | Specification             | Metadata                   |

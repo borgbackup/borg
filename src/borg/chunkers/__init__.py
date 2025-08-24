@@ -10,7 +10,7 @@ API_VERSION = "1.2_01"
 def get_chunker(algo, *params, **kw):
     key = kw.get("key", None)
     sparse = kw.get("sparse", False)
-    # key.chunk_seed only has 32bits
+    # key.chunk_seed only has 32 bits
     seed = key.chunk_seed if key is not None else 0
     # for buzhash64, we want a much longer key, so we derive it from the id key
     bh64_key = (

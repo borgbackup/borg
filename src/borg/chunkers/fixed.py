@@ -9,8 +9,8 @@ from .reader import FileReader
 
 class ChunkerFixed:
     """
-    This is a simple chunker for input data with data usually staying at same
-    offset and / or with known block/record sizes:
+    This is a simple chunker for input data with data usually staying at the same
+    offset and/or with known block/record sizes:
 
     - raw disk images
     - block devices

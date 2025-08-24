@@ -3,15 +3,15 @@ Support for file metadata
 
 Besides regular file and directory structures, Borg can preserve
 
-* symlinks (stored as symlink, the symlink is not followed)
+* symlinks (stored as a symlink; the symlink is not followed)
 * special files:
 
-  * character and block device files (restored via mknod)
+  * character and block device files (restored via mknod(2))
   * FIFOs ("named pipes")
   * special file *contents* can be backed up in ``--read-special`` mode.
-    By default the metadata to create them with mknod(2), mkfifo(2) etc. is stored.
-* hardlinked regular files, devices, symlinks, FIFOs (considering all items in the same archive)
-* timestamps in nanosecond precision: mtime, atime, ctime
+    By default, the metadata to create them with mknod(2), mkfifo(2), etc. is stored.
+* hard-linked regular files, devices, symlinks, FIFOs (considering all items in the same archive)
+* timestamps with nanosecond precision: mtime, atime, ctime
 * other timestamps: birthtime (on platforms supporting it)
 * permissions:
 
@@ -42,10 +42,10 @@ On some platforms additional features are supported:
 | Windows (cygwin)        | No [4]_  | No        | No         |
 +-------------------------+----------+-----------+------------+
 
-Other Unix-like operating systems may work as well, but have not been tested at all.
+Other Unix-like operating systems may work as well, but have not been tested yet.
 
-Note that most of the platform-dependent features also depend on the file system.
-For example, ntfs-3g on Linux isn't able to convey NTFS ACLs.
+Note that most platform-dependent features also depend on the filesystem.
+For example, ntfs-3g on Linux is not able to convey NTFS ACLs.
 
 .. [1] Only "nodump", "immutable", "compressed" and "append" are supported.
     Feature request :issue:`618` for more flags.
@@ -54,8 +54,8 @@ For example, ntfs-3g on Linux isn't able to convey NTFS ACLs.
 .. [4] Cygwin tries to map NTFS ACLs to permissions with varying degrees of success.
 
 .. [#acls] The native access control list mechanism of the OS. This normally limits access to
-    non-native ACLs. For example, NTFS ACLs aren't completely accessible on Linux with ntfs-3g.
-.. [#xattr] extended attributes; key-value pairs attached to a file, mainly used by the OS.
-    This includes resource forks on Mac OS X.
-.. [#flags] aka *BSD flags*. The Linux set of flags [1]_ is portable across platforms.
+    non-native ACLs. For example, NTFS ACLs are not completely accessible on Linux with ntfs-3g.
+.. [#xattr] Extended attributes; key-value pairs attached to a file, mainly used by the OS.
+    This includes resource forks on macOS.
+.. [#flags] Also known as *BSD flags*. The Linux set of flags [1]_ is portable across platforms.
     The BSDs define additional flags.

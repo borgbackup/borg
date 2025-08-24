@@ -4,7 +4,7 @@
 Internals
 =========
 
-The internals chapter describes and analyses most of the inner workings
+The internals chapter describes and analyzes most of the inner workings
 of Borg.
 
 Borg uses a low-level, key-value store, the :ref:`repository`, and
@@ -20,17 +20,17 @@ Deduplication is performed globally across all data in the repository
 (multiple backups and even multiple hosts), both on data and file
 metadata, using :ref:`chunks` created by the chunker using the
 Buzhash_ algorithm ("buzhash" and "buzhash64" chunker) or a simpler
-fixed blocksize algorithm ("fixed" chunker).
+fixed block size algorithm ("fixed" chunker).
 
 To perform the repository-wide deduplication, a hash of each
 chunk is checked against the :ref:`chunks cache <cache>`, which is a
-hash-table of all chunks that already exist.
+hash table of all chunks that already exist.
 
 .. figure:: internals/structure.png
     :figwidth: 100%
     :width: 100%
 
-    Layers in Borg. On the very top commands are implemented, using
+    Layers in Borg. At the very top, commands are implemented, using
     a data access layer provided by the Archive and Item classes.
     The "key" object provides both compression and authenticated
     encryption used by the data access layer. The "key" object represents

@@ -68,14 +68,13 @@ def dpos_curr_end(fd=None, fh=-1):
 
 def sparsemap(fd=None, fh=-1):
     """
-    generator yielding a (start, length, is_data) tuple for each range.
-    is_data is indicating data ranges (True) or hole ranges (False).
+    Generator yielding (start, length, is_data) tuples for each range.
+    is_data indicates data ranges (True) or hole ranges (False).
 
-    note:
-    the map is generated starting from the current seek position (it
-    is not required to be 0 / to be at the start of the file) and
-    work from there up to the end of the file.
-    when the generator is finished, the file pointer position will be
+    Note:
+    The map is generated starting from the current seek position (it
+    is not required to be 0, i.e., the start of the file) and works from there up to the end of the file.
+    When the generator is finished, the file pointer position will be
     reset to where it was before calling this function.
     """
     curr, file_len = dpos_curr_end(fd, fh)
@@ -188,7 +187,7 @@ class FileFMAPReader:
                     range_size -= got
                     yield Chunk(data, size=got, allocation=allocation)
                 if got < wanted:
-                    # we did not get enough data, looks like EOF.
+                    # We did not get enough data; looks like EOF.
                     return
 
 

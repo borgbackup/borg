@@ -1,7 +1,7 @@
 # Completions for borg
 # https://www.borgbackup.org/
 # Note:
-# Listing archives works on password protected repositories only if $BORG_PASSPHRASE is set.
+# Listing archives works on password-protected repositories only if $BORG_PASSPHRASE is set.
 # Install:
 # Copy this file to /usr/share/fish/vendor_completions.d/
 
@@ -19,7 +19,7 @@ complete -c borg -f -n __fish_is_first_token -a 'prune' -d 'Prune repository arc
 complete -c borg -f -n __fish_is_first_token -a 'compact' -d 'Free repository space'
 complete -c borg -f -n __fish_is_first_token -a 'info' -d 'Show archive details'
 complete -c borg -f -n __fish_is_first_token -a 'mount' -d 'Mount archive or a repository'
-complete -c borg -f -n __fish_is_first_token -a 'umount' -d 'Un-mount the mounted archive'
+complete -c borg -f -n __fish_is_first_token -a 'umount' -d 'Unmount the mounted archive'
 complete -c borg -f -n __fish_is_first_token -a 'repo-compress' -d 'Repository (re-)compression'
 complete -c borg -f -n __fish_is_first_token -a 'repo-create' -d 'Create a new, empty repository'
 complete -c borg -f -n __fish_is_first_token -a 'repo-delete' -d 'Delete a repository'
@@ -29,7 +29,7 @@ complete -c borg -f -n __fish_is_first_token -a 'repo-space' -d 'Manage reserved
 complete -c borg -f -n __fish_is_first_token -a 'tag' -d 'Tag archives'
 complete -c borg -f -n __fish_is_first_token -a 'transfer' -d 'Transfer of archives from another repository'
 complete -c borg -f -n __fish_is_first_token -a 'undelete' -d 'Undelete archives'
-complete -c borg -f -n __fish_is_first_token -a 'version' -d 'Display borg client version / borg server version'
+complete -c borg -f -n __fish_is_first_token -a 'version' -d 'Display Borg client version / Borg server version'
 
 function __fish_borg_seen_key
     if __fish_seen_subcommand_from key
@@ -46,7 +46,7 @@ complete -c borg -f -n __fish_borg_seen_key  -a 'change-passphrase' -d 'Change k
 complete -c borg -f -n __fish_is_first_token -a 'serve' -d 'Start in server mode'
 complete -c borg -f -n __fish_is_first_token -a 'recreate' -d 'Recreate contents of existing archives'
 complete -c borg -f -n __fish_is_first_token -a 'export-tar' -d 'Create tarball from an archive'
-complete -c borg -f -n __fish_is_first_token -a 'with-lock' -d 'Run a command while repository lock held'
+complete -c borg -f -n __fish_is_first_token -a 'with-lock' -d 'Run a command while the repository lock is held'
 complete -c borg -f -n __fish_is_first_token -a 'break-lock' -d 'Break the repository lock'
 
 function __fish_borg_seen_benchmark
@@ -89,11 +89,11 @@ complete -c borg -f      -l 'show-version'          -d 'Log version information'
 complete -c borg -f      -l 'show-rc'               -d 'Log the return code'
 complete -c borg -f      -l 'umask'                 -d 'Set umask to M [0077]'
 complete -c borg         -l 'remote-path'           -d 'Use PATH as remote borg executable'
-complete -c borg -f      -l 'upload-ratelimit'      -d 'Set network upload rate limit in kiByte/s'
+complete -c borg -f      -l 'upload-ratelimit'      -d 'Set network upload rate limit in KiB/s'
 complete -c borg -f      -l 'upload-buffer'         -d 'Set network upload buffer size in MiB'
 complete -c borg         -l 'debug-profile'         -d 'Write execution profile into FILE'
 complete -c borg         -l 'rsh'                   -d 'Use COMMAND instead of ssh'
-complete -c borg         -l 'socket'                -d 'Use UNIX DOMAIN socket at PATH'
+complete -c borg         -l 'socket'                -d 'Use UNIX domain socket at PATH'
 
 # borg analyze options
 complete -c borg -f -s a -l 'match-archives'        -d 'Only archive names matching PATTERN'        -n "__fish_seen_subcommand_from analyze"

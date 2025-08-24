@@ -11,7 +11,7 @@ from . import create_regular_file, cmd, RK_ENCRYPTION
 
 def test_repo_compress(archiver):
     def check_compression(ctype, clevel, olevel):
-        """check if all the chunks in the repo are compressed/obfuscated like expected"""
+        """Check that all chunks in the repo are compressed/obfuscated as expected."""
         repository = Repository(archiver.repository_path, exclusive=True)
         with repository:
             manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
@@ -26,7 +26,7 @@ def test_repo_compress(archiver):
                 # this is not as easy as one thinks due to the DecidingCompressor choosing the smallest of
                 # (desired compressed, lz4 compressed, not compressed).
                 assert meta["ctype"] in (ctype, LZ4.ID, CNONE.ID)
-                assert meta["clevel"] in (clevel, 255)  # LZ4 and CNONE has level 255
+                assert meta["clevel"] in (clevel, 255)  # LZ4 and CNONE have level 255
                 if olevel != -1:  # we expect obfuscation
                     assert "psize" in meta
                     assert m_olevel == olevel

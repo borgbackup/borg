@@ -1,9 +1,9 @@
 borg prune visualized
 =====================
 
-Assume it is 2016-01-01, today's backup has not yet been made, you have
+Assume it is 2016-01-01. Today's backup has not yet been made. You have
 created at least one backup on each day in 2015 except on 2015-12-19 (no
-backup made on that day), and you started backing up with borg on
+backup was made on that day), and you started backing up with Borg on
 2015-01-01.
 
 This is what borg prune --keep-daily 14 --keep-monthly 6 --keep-yearly 1
@@ -91,17 +91,17 @@ The --keep-monthly 6 rule keeps Nov, Oct, Sep, Aug, Jul and Jun. December is
 not considered for this rule, because that backup was already kept because of
 the daily rule.
 
-2015-12-17 is kept to satisfy the --keep-daily 14 rule - because no backup was
+2015-12-17 is kept to satisfy the --keep-daily 14 rule, because no backup was
 made on 2015-12-19. If a backup had been made on that day, it would not keep
 the one from 2015-12-17.
 
-We did not include weekly, hourly, minutely or secondly rules to keep this
+We did not include weekly, hourly, minutely, or secondly rules to keep this
 example simple. They all work in basically the same way.
 
 The weekly rule is easy to understand roughly, but hard to understand in all
-details. If interested, read "ISO 8601:2000 standard week-based year".
+details. If you are interested, read "ISO 8601:2000 standard week-based year".
 
-The 13weekly and 3monthly rules are two different strategies for keeping one
+The 13weekly and 3monthly rules are two different strategies for keeping one backup
 every quarter of a year. There are `multiple ways` to define a quarter-year;
 borg prune recognizes two:
 
@@ -113,12 +113,12 @@ borg prune recognizes two:
   March 31, April 1st to June 30th, July 1st to September 30th, and October 1st
   to December 31st form the quarters.
 
-If the subtleties of the definition of a quarter year don't matter to you, a
+If the subtleties of the definition of a quarter-year don't matter to you, a
 short summary of behavior is:
 
-* --keep-13weekly favors keeping backups at the beginning of Jan, Apr, July,
+* --keep-13weekly favors keeping backups at the beginning of Jan, Apr, Jul,
   and Oct.
-* --keep-3monthly favors keeping backups at the end of Dec, Mar, Jun, and Sept.
+* --keep-3monthly favors keeping backups at the end of Dec, Mar, Jun, and Sep.
 * Both strategies will have some overlap in which backups are kept.
 * The differences are negligible unless backups considered for deletion were
   created weekly or more frequently.

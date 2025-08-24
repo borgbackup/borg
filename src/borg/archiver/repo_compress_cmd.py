@@ -16,7 +16,7 @@ logger = create_logger()
 
 
 def find_chunks(repository, repo_objs, cache, stats, ctype, clevel, olevel):
-    """find and flag chunks that need processing (usually: recompression)."""
+    """Find and flag chunks that need processing (usually: recompression)."""
     compr_keys = stats["compr_keys"] = set()
     compr_wanted = ctype, clevel, olevel
     recompress_count = 0
@@ -35,7 +35,7 @@ def find_chunks(repository, repo_objs, cache, stats, ctype, clevel, olevel):
 
 
 def process_chunks(repository, repo_objs, stats, recompress_ids, olevel):
-    """process some chunks (usually: recompress)"""
+    """Process some chunks (usually: recompress)."""
     compr_keys = stats["compr_keys"]
     if compr_keys == 0:  # work around defaultdict(int)
         compr_keys = stats["compr_keys"] = set()
@@ -87,7 +87,7 @@ def format_compression_spec(ctype, clevel, olevel):
 class RepoCompressMixIn:
     @with_repository(cache=True, manifest=True, compatibility=(Manifest.Operation.CHECK,))
     def do_repo_compress(self, args, repository, manifest, cache):
-        """Repository (re-)compression"""
+        """Repository (re-)compression."""
 
         def get_csettings(c):
             if isinstance(c, Auto):

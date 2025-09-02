@@ -5,7 +5,7 @@ import tempfile
 import pytest
 
 from .chunker import cf
-from ..chunker import Chunker, ChunkerFixed, sparsemap, has_seek_hole
+from ..chunker import Chunker, ChunkerFixed, sparsemap, has_seek_hole, get_chunker
 from ..constants import *  # NOQA
 
 BS = 4096  # fs block size
@@ -161,3 +161,44 @@ def test_buzhash_chunksize_distribution():
     # most chunks should be cut due to buzhash triggering, not due to clipping at min/max size:
     assert min_count < 10
     assert max_count < 10
+
+
+@pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+@pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
+def test_fuzz_chunkify(worker):
+    # Fuzz the chunker with random and all-zero data of misc. sizes and seeds 0 or random int32 values.
+    import random
+
+    def rnd_int32():
+        uint = random.getrandbits(32)
+        return uint if uint < 2**31 else uint - 2**32
+
+    seeds = [0] + [rnd_int32() for _ in range(50)]
+    sizes = [random.randint(1, 4 * 1024 * 1024) for _ in range(50)]
+
+    for seed in seeds:
+        chunker = get_chunker(*CHUNKER_PARAMS, seed=seed)
+        for size in sizes:
+            # Random data
+            data = os.urandom(size)
+            with BytesIO(data) as bio:
+                parts = cf(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            print(seed, size)
+            assert reconstructed == data
+
+            # All-same data
+            data = b"\x42" * size
+            with BytesIO(data) as bio:
+                parts = cf(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            print(seed, size)
+            assert reconstructed == data
+
+            # All-zero data
+            data = b"\x00" * size
+            with BytesIO(data) as bio:
+                parts = cf(chunker.chunkify(bio))
+            # parts has just the integer sizes of each all-zero chunk (since fmap is not used, they are data)
+            print(seed, size)
+            assert sum(parts) == size

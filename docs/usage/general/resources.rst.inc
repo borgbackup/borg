@@ -35,7 +35,7 @@ CPU server:
 CPU (only for client/server operation):
     When using Borg in a client/server way with an ssh-type repository, the SSH
     processes used for the transport layer will need some CPU on the client and
-    on the server due to the crypto they are doing—especially if you are pumping
+    on the server due to the crypto they are doing — especially if you are pumping
     large amounts of data.
 
 Memory (RAM) client:

@@ -119,7 +119,7 @@ def prune_split(archives, rule, n, kept_because=None):
 class PruneMixIn:
     @with_repository(compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest):
-        """Prune repository archives according to specified rules."""
+        """Prune archives according to specified rules."""
         if not any(
             (
                 args.secondly,
@@ -280,7 +280,7 @@ class PruneMixIn:
             description=self.do_prune.__doc__,
             epilog=prune_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="prune repository archives",
+            help="prune archives",
         )
         subparser.set_defaults(func=self.do_prune)
         subparser.add_argument(

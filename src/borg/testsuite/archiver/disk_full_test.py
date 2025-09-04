@@ -1,5 +1,5 @@
 """
-Test "disk full" is very slow and not recommended for daily test runs.
+test_disk_full is very slow and not recommended for daily test runs.
 For this test, an empty, writable 700 MB filesystem mounted on DF_MOUNT is required.
 For speed and other reasons, it is recommended that the underlying block device is
 in RAM, not a magnetic or flash disk.

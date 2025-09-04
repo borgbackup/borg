@@ -247,7 +247,7 @@ def test_invalid_msgpacked_item(packed, item_keys_serialized):
     assert not valid_msgpacked_dict(packed, item_keys_serialized)
 
 
-# pytest-xdist requires the same order for the keys and dicts:
+# pytest-xdist always requires the same order for the keys and dicts:
 IK = sorted(list(ITEM_KEYS))
 
 

@@ -126,7 +126,7 @@ def get_socket_filename():
 
 
 def get_cache_dir(*, legacy=False, create=True):
-    """Determine where to store Borg cache data"""
+    """Determine where to store Borg cache data."""
 
     if legacy:
         # Get cache home path
@@ -162,7 +162,7 @@ def get_cache_dir(*, legacy=False, create=True):
 
 
 def get_config_dir(*, legacy=False, create=True):
-    """Determine where to store the configuration"""
+    """Determine where to store the configuration."""
 
     # Get config home path
     if legacy:

@@ -85,7 +85,7 @@ def test_basic_functionality(archivers, request):
     if are_hardlinks_supported():
         expected.append("input/hardlink")
     if not have_root:
-        # We could not create these device files without (fake) root.
+        # We could not create these device files without (fake)root.
         expected.remove("input/bdev")
         expected.remove("input/cdev")
     if has_lchflags:

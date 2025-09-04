@@ -1,8 +1,8 @@
 """
-Wrapping MessagePack
+Wrapping msgpack
 ================
 
-We wrap MessagePack here as needed to avoid clutter in the calling code.
+We wrap ``msgpack`` here as needed to avoid clutter in the calling code.
 
 Packing
 -------
@@ -32,17 +32,17 @@ Unpacking
 
 - unicode_errors = 'surrogateescape' -> see description above (will be used when raw is False).
 
-As of Borg 2.0, we have fixed most of the MessagePack str/bytes issues (#968).
+As of Borg 2.0, we have fixed most of the `msgpack`` str/bytes issues (#968).
 Borg still needs to read old repositories, archives, keys, etc., so we cannot yet fix it completely.
-From now on, Borg only writes new data according to the MessagePack 2.0 spec,
+From now on, Borg only writes new data according to the msgpack 2.0 spec,
 thus we can remove some legacy support in a later Borg release (some places are marked with "legacy").
 
-Current behavior in MessagePack terms
-----------------------------
+Current behavior in msgpack terms
+---------------------------------
 
-- pack with use_bin_type=True (according to the MessagePack 2.0 spec)
+- pack with use_bin_type=True (according to the msgpack 2.0 spec)
 - packs str -> raw and bytes -> bin
-- unpack with raw=False (according to the MessagePack 2.0 spec, using unicode_errors='surrogateescape')
+- unpack with raw=False (according to the msgpack 2.0 spec, using unicode_errors='surrogateescape')
 - unpacks bin to bytes and raw to str (thus we need to convert to desired type if we want bytes from "raw")
 """
 
@@ -69,11 +69,11 @@ UNICODE_ERRORS = "surrogateescape"
 
 
 class PackException(Exception):
-    """Exception during MessagePack packing."""
+    """Exception during msgpack packing."""
 
 
 class UnpackException(Exception):
-    """Exception during MessagePack unpacking."""
+    """Exception during msgpack unpacking."""
 
 
 class Packer(mp_Packer):

@@ -49,7 +49,7 @@ locations), the recommended way to do that is like this:
 
 This will create distinct (different repository ID) but related repositories.
 Related means using the same chunker secret and the same id_key, thus producing
-the same chunks/the same chunk IDs if the input data is the same.
+the same chunks / the same chunk IDs if the input data is the same.
 
 The two independent borg create invocations mean there is no error propagation
 from repo1 to repo2 when done like that.
@@ -76,7 +76,7 @@ run into this by yourself by restoring an older copy of your repository.
 "attack": An attacker may have replaced your repo with an older copy, trying to
 trigger AES counter reuse and break your repo encryption.
 
-Borg users have also reported that file system (fs) issues (e.g., hardware issues or I/O errors causing
+Borg users have also reported that file system issues (e.g., hardware issues or I/O errors causing
 the file system to become read-only) can cause this warning, see :issue:`7853`.
 
 If you decide to ignore this and accept unsafe operation for this repository,

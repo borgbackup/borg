@@ -6,11 +6,11 @@ from ..version import parse_version, format_version
 @pytest.mark.parametrize(
     "version_str, version_tuple",
     [
-        # Setuptools < 8.0 uses "-"
+        # setuptools < 8.0 uses "-"
         ("1.0.0a1.dev204-g8866961.d20170606", (1, 0, 0, -4, 1)),
         ("1.0.0a1.dev204-g8866961", (1, 0, 0, -4, 1)),
         ("1.0.0-d20170606", (1, 0, 0, -1)),
-        # Setuptools >= 8.0 uses "+"
+        # setuptools >= 8.0 uses "+"
         ("1.0.0a1.dev204+g8866961.d20170606", (1, 0, 0, -4, 1)),
         ("1.0.0a1.dev204+g8866961", (1, 0, 0, -4, 1)),
         ("1.0.0+d20170606", (1, 0, 0, -1)),

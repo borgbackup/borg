@@ -119,7 +119,7 @@ def decode_dict(d, keys, encoding="utf-8", errors="surrogateescape"):
 
 
 def positive_int_validator(value):
-    """Argparse type for positive integers."""
+    """argparse type for positive integers."""
     int_value = int(value)
     if int_value <= 0:
         raise argparse.ArgumentTypeError("A positive integer is required: %s" % value)

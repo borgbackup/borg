@@ -237,7 +237,7 @@ def test_dash_open():
     assert dash_open("-", "wb") is sys.stdout.buffer
 
 
-@pytest.mark.skipif(not are_hardlinks_supported(), reason="hard links not supported")
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
 def test_safe_unlink_is_safe(tmpdir):
     contents = b"Hello, world\n"
     victim = tmpdir / "victim"
@@ -250,7 +250,7 @@ def test_safe_unlink_is_safe(tmpdir):
     assert victim.read_binary() == contents
 
 
-@pytest.mark.skipif(not are_hardlinks_supported(), reason="hard links not supported")
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
 def test_safe_unlink_is_safe_ENOSPC(tmpdir, monkeypatch):
     contents = b"Hello, world\n"
     victim = tmpdir / "victim"

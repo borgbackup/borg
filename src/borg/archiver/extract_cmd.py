@@ -171,13 +171,10 @@ class ExtractMixIn:
             "--numeric-ids", dest="numeric_ids", action="store_true", help="only use numeric user and group identifiers"
         )
         subparser.add_argument(
-            "--noflags",
-            dest="noflags",
-            action="store_true",
-            help="do not extract or set flags (e.g. NODUMP, IMMUTABLE)",
+            "--noflags", dest="noflags", action="store_true", help="do not extract/set flags (e.g. NODUMP, IMMUTABLE)"
         )
-        subparser.add_argument("--noacls", dest="noacls", action="store_true", help="do not extract or set ACLs")
-        subparser.add_argument("--noxattrs", dest="noxattrs", action="store_true", help="do not extract or set xattrs")
+        subparser.add_argument("--noacls", dest="noacls", action="store_true", help="do not extract/set ACLs")
+        subparser.add_argument("--noxattrs", dest="noxattrs", action="store_true", help="do not extract/set xattrs")
         subparser.add_argument(
             "--stdout", dest="stdout", action="store_true", help="write all extracted data to stdout"
         )

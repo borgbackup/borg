@@ -109,7 +109,7 @@ class LegacyRepository:
     dir/hints.X
 
     Filesystem interaction
-    -----------------------
+    ----------------------
 
     LoggedIO generally tries to rely on common behaviours across transactional file systems.
 

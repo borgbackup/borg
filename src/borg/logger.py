@@ -60,7 +60,7 @@ import time
 import warnings
 from pathlib import Path
 
-logging_debugging_path: Path | None = None  # if set, write borg.logger debugging log to that path/borg-*.log
+logging_debugging_path: Path | None = None  # if set, write borg.logger debugging log to that_path/borg-*.log
 
 configured = False
 borg_serve_log_queue: queue.SimpleQueue = queue.SimpleQueue()

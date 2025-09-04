@@ -11,26 +11,26 @@ def utcfromtimestamp(timestamp):
 
 def test_safe_timestamps():
     if SUPPORT_32BIT_PLATFORMS:
-        # Nanoseconds fit into int64.
+        # Nanoseconds fitting into int64.
         assert safe_ns(2**64) <= 2**63 - 1
         assert safe_ns(-1) == 0
-        # Seconds fit into int32.
+        # Seconds fitting into int32.
         assert safe_s(2**64) <= 2**31 - 1
         assert safe_s(-1) == 0
-        # datetime will not stumble over the Y10K problem.
+        # datetime will not stumble over its Y10K problem.
         beyond_y10k = 2**100
         with pytest.raises(OverflowError):
             utcfromtimestamp(beyond_y10k)
         assert utcfromtimestamp(safe_s(beyond_y10k)) > datetime(2038, 1, 1)
         assert utcfromtimestamp(safe_ns(beyond_y10k) / 1000000000) > datetime(2038, 1, 1)
     else:
-        # Nanoseconds fit into int64.
+        # Nanoseconds fitting into int64.
         assert safe_ns(2**64) <= 2**63 - 1
         assert safe_ns(-1) == 0
         # Seconds are limited so that their ns conversion fits into int64.
         assert safe_s(2**64) * 1000000000 <= 2**63 - 1
         assert safe_s(-1) == 0
-        # datetime will not stumble over the Y10K problem.
+        # datetime will not stumble over its Y10K problem.
         beyond_y10k = 2**100
         with pytest.raises(OverflowError):
             utcfromtimestamp(beyond_y10k)

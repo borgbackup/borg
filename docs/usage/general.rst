@@ -5,8 +5,8 @@ Borg consists of a number of commands. Each command accepts
 a number of arguments and options and interprets various environment variables.
 The following sections will describe each command in detail.
 
-Commands, options, parameters, paths, and similar elements are shown in fixed-width.
-Option values are underlined. Borg has a few options that accept a fixed set
+Commands, options, parameters, paths, and similar elements are shown in ``fixed-width``.
+Option values are `underlined. Borg has a few options that accept a fixed set
 of values (e.g., ``--encryption`` of :ref:`borg_repo-create`).
 
 .. container:: experimental

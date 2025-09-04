@@ -108,7 +108,7 @@ def add_keys(repository):
 def repo_dump(repository, label=None):
     label = label + ": " if label is not None else ""
     H_trans = {H(i): i for i in range(10)}
-    H_trans[None] = -1  # key is None appears in commits
+    H_trans[None] = -1  # key == None appears in commits
     tag_trans = {TAG_PUT2: "put2", TAG_PUT: "put", TAG_DELETE: "del", TAG_COMMIT: "comm"}
     for segment, fn in repository.io.segment_iterator():
         for tag, key, offset, size, _ in repository.io.iter_objects(segment):

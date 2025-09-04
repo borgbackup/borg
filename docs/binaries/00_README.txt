@@ -9,7 +9,7 @@ Download the correct files
 --------------------------
 
 AMD64/x86_64 architecture
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 borg-linux-glibc241 Linux (built on Debian 13 "Trixie" with glibc 2.41)
 borg-linux-glibc236 Linux (built on Debian 12 "Bookworm" with glibc 2.36)

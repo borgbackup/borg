@@ -17,7 +17,7 @@ logger = create_logger()
 class RepoDeleteMixIn:
     @with_repository(exclusive=True, manifest=False)
     def do_repo_delete(self, args, repository):
-        """Deletes the repository."""
+        """Deletes a repository."""
         self.output_list = args.output_list
         dry_run = args.dry_run
         keep_security_info = args.keep_security_info
@@ -92,7 +92,7 @@ class RepoDeleteMixIn:
 
         repo_delete_epilog = process_epilog(
             """
-        This command deletes the complete repository.
+        This command deletes a complete repository.
 
         When you delete a complete repository, the security info and local cache for it
         (if any) are also deleted. Alternatively, you can delete just the local cache
@@ -109,7 +109,7 @@ class RepoDeleteMixIn:
             description=self.do_repo_delete.__doc__,
             epilog=repo_delete_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="delete the repository",
+            help="delete a repository",
         )
         subparser.set_defaults(func=self.do_repo_delete)
         subparser.add_argument(

@@ -35,7 +35,7 @@ from ...xattr import get_all
 RK_ENCRYPTION = "--encryption=repokey-aes-ocb"
 KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"
 
-# This points to src/borg/archiver (small, with only a few files).
+# This points to the ``src/borg/archiver`` directory (small, with only a few files).
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "archiver"))
 src_file = "archiver/__init__.py"  # relative path of one file in src_dir
 
@@ -108,7 +108,7 @@ def cmd_fixture(request):
     elif request.param == "binary":
         exe = "borg.exe"
     else:
-        raise ValueError("Parameter must be 'python' or 'binary'.")
+        raise ValueError("param must be 'python' or 'binary'.")
 
     def exec_fn(*args, **kw):
         return exec_cmd(*args, exe=exe, fork=True, **kw)

@@ -9,7 +9,7 @@ import time
 from ..archive import Archive, TarfileObjectProcessors, ChunksProcessor
 from ..compress import CompressionSpec
 from ..constants import *  # NOQA
-from ..helpers import HardLinkManager
+from ..helpers import HardLinkManager, IncludePatternNeverMatchedWarning
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import dash_open
 from ..helpers import msgpack
@@ -249,6 +249,9 @@ class TarMixIn:
 
         # This does not close the fileobj (tarstream) we passed to it -- a side effect of the | mode.
         tar.close()
+
+        for pattern in matcher.get_unmatched_include_patterns():
+            self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
 
     @with_repository(cache=True, compatibility=(Manifest.Operation.WRITE,))
     def do_import_tar(self, args, repository, manifest, cache):

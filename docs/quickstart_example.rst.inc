@@ -44,7 +44,7 @@
 
     $ borg -r /path/to/repo extract aid:b80e24d2
 
-7. Delete the first archive (please note that this does **not** immediately free repository disk space)::
+7. Delete the first archive (please note that this does **not** free repository disk space)::
 
     $ borg -r /path/to/repo delete aid:b80e24d2
 

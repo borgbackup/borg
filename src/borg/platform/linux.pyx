@@ -153,7 +153,7 @@ def set_flags(path, bsd_flags, fd=None):
 
 def get_flags(path, st, fd=None):
     if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISLNK(st.st_mode):
-        # Avoid opening device files—trying to open non-present devices can be rather slow.
+        # Avoid opening device files — trying to open non-present devices can be rather slow.
         # Avoid opening symlinks; O_NOFOLLOW would make the open() fail anyway.
         return 0
     cdef int linux_flags

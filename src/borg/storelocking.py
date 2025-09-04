@@ -213,7 +213,7 @@ class Lock:
         locks = self._find_locks(only_mine=True)
         if not locks:
             if ignore_not_found:
-                logger.debug("LOCK-RELEASE: trying to release a lock, but none was found.")
+                logger.debug("LOCK-RELEASE: trying to release the lock, but none was found.")
                 return
             else:
                 raise NotLocked(str(self.store))
@@ -246,7 +246,7 @@ class Lock:
         self._delete_lock(old_locks[0]["key"], update_last_refresh=False)
 
     def refresh(self):
-        """Refreshes the lock—call this frequently, but not later than every <stale> seconds."""
+        """Refreshes the lock; call this frequently, but not later than every <stale> seconds."""
         now = datetime.datetime.now(datetime.timezone.utc)
         if self.last_refresh_dt is not None and now > self.last_refresh_dt + self.refresh_td:
             old_locks = self._find_locks(only_mine=True)

@@ -33,7 +33,7 @@ def repo_lister(repository, *, limit=None):
 
 
 class Repository:
-    """BorgStore-based key-value store."""
+    """borgstore-based key/value store."""
 
     class AlreadyExists(Error):
         """A repository already exists at {}."""
@@ -56,12 +56,12 @@ class Repository:
         exit_mcode = 14
 
     class InvalidRepository(Error):
-        """{} is not a valid repository. Check the repository configuration."""
+        """{} is not a valid repository. Check the repository config."""
 
         exit_mcode = 15
 
     class InvalidRepositoryConfig(Error):
-        """{} does not have a valid configuration. Check the repository configuration [{}]."""
+        """{} does not have a valid config. Check the repository config [{}]."""
 
         exit_mcode = 16
 

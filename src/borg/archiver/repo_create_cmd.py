@@ -69,7 +69,7 @@ class RepoCreateMixIn:
         store faster.
 
         Encryption mode TL;DR
-        ++++++++++++++++++++
+        +++++++++++++++++++++
 
         The encryption mode can only be configured when creating a new repository - you can
         neither configure it on a per-archive basis nor change the mode of an existing repository.

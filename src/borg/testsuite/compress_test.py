@@ -56,7 +56,7 @@ def test_autodetect_invalid(invalid_cdata):
 
 def test_zlib_legacy_compat():
     # For compatibility reasons, we do not add an extra header for zlib,
-    # nor do we expect one when decompressing or auto-detecting
+    # nor do we expect one when decompressing / auto-detecting.
     for level in range(10):
         c = get_compressor(name="zlib_legacy", level=level, legacy_mode=True)
         meta1, cdata1 = c.compress({}, DATA)

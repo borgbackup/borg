@@ -10,5 +10,5 @@ Commands that work with an arbitrary number of archives usually accept ``-a ARCH
 
 Archive names must not contain the ``/`` (slash) character. For simplicity,
 also avoid spaces or other characters that have special meaning to the
-shell or in a filesystem (Borg mount uses the archive name as a directory
+shell or in a filesystem (``borg mount`` uses the archive name as a directory
 name).

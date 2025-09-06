@@ -469,7 +469,10 @@ class Archive:
         self.pipeline = DownloadPipeline(self.repository, self.key)
         self.create = create
         if self.create:
-            self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
+            # Use a separate statistics counter for metadata (items, archive metadata),
+            # so that archive.stats reflects only file content statistics.
+            self.meta_stats = Statistics(output_json=False, iec=iec)
+            self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.meta_stats)
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
             i = 0
@@ -605,7 +608,8 @@ Utilization of max. archive size: {csize_max:.0%}
     def write_checkpoint(self):
         self.save(self.checkpoint_name)
         del self.manifest.archives[self.checkpoint_name]
-        self.cache.chunk_decref(self.id, self.stats)
+        # Use meta_stats so metadata chunks do not affect archive.stats
+        self.cache.chunk_decref(self.id, self.meta_stats)
 
     def save(self, name=None, comment=None, timestamp=None, stats=None, additional_metadata=None):
         name = name or self.name
@@ -649,7 +653,8 @@ Utilization of max. archive size: {csize_max:.0%}
         data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
         self.id = self.key.id_hash(data)
         try:
-            self.cache.add_chunk(self.id, data, self.stats)
+            # Use meta_stats so metadata chunk addition does not skew archive.stats
+            self.cache.add_chunk(self.id, data, self.meta_stats)
         except IntegrityError as err:
             err_msg = str(err)
             # hack to avoid changing the RPC protocol by introducing new (more specific) exception class
@@ -687,13 +692,14 @@ Utilization of max. archive size: {csize_max:.0%}
         if have_borg12_meta and not want_unique:
             unique_csize = 0
         else:
-            def add(id):
-                entry = cache.chunks[id]
-                archive_index.add(id, 1, entry.size, entry.csize)
 
             archive_index = ChunkIndex()
             sync = CacheSynchronizer(archive_index)
-            add(self.id)
+            # do NOT add the archive metadata chunk (self.id) here.
+            # The metadata chunk is accounted via meta_stats during creation and must not
+            # contribute to the "This archive" deduplicated size computed by borg info.
+            # See issue #9003: make info's deduplicated size match create-time stats.
+
             # we must escape any % char in the archive name, because we use it in a format string, see #6500
             arch_name_escd = self.name.replace('%', '%%')
             pi = ProgressIndicatorPercent(total=len(self.metadata.items),
@@ -701,7 +707,8 @@ Utilization of max. archive size: {csize_max:.0%}
                                           msgid='archive.calc_stats')
             for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
                 pi.show(increase=1)
-                add(id)
+                # do NOT add(id) here, this is a metadata stream chunk and should not
+                # be accounted for in stats, see comment above.
                 data = self.key.decrypt(id, chunk)
                 sync.feed(data)
             unique_csize = archive_index.stats_against(cache.chunks)[3]
@@ -965,9 +972,11 @@ Utilization of max. archive size: {csize_max:.0%}
         setattr(metadata, key, value)
         data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
         new_id = self.key.id_hash(data)
-        self.cache.add_chunk(new_id, data, self.stats)
+        # Use a local Statistics(), metadata updates shall not affect stats.
+        stats = Statistics(output_json=False, iec=self.iec)
+        self.cache.add_chunk(new_id, data, stats)
         self.manifest.archives[self.name] = (new_id, metadata.time)
-        self.cache.chunk_decref(self.id, self.stats)
+        self.cache.chunk_decref(self.id, stats)
         self.id = new_id
 
     def rename(self, name):

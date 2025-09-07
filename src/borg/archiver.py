@@ -1173,14 +1173,92 @@ class Archiver:
         matcher = self.build_matcher(args.patterns, args.paths)
 
         diffs = Archive.compare_archives_iter(self.print_warning, archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids, content_only=args.content_only)
-        # Conversion to string and filtering for diff.equal to save memory if sorting
-        diffs = ((path, diff.changes()) for path, diff in diffs if not diff.equal)
+        diffs = ((path, diff) for path, diff in diffs if not diff.equal)
 
-        if args.sort:
-            diffs = sorted(diffs)
+        # Sorting support
+
+        def current_item(diff_obj):
+            # Prefer the state in archive2 if available, otherwise fall back to archive1 (e.g. removed items)
+            it2 = getattr(diff_obj, '_item2', None)
+            it1 = getattr(diff_obj, '_item1', None)
+            return it2 or it1
+
+        def key_for(field, path, diff_obj):
+            # field without direction markers
+            if field in ('path', None):
+                return remove_surrogates(path)
+            # compute size_added/removed from changes summary
+            if field in ('size_diff', 'size_added', 'size_removed'):
+                added = removed = 0
+                for j, s in diff_obj.changes():
+                    t = j.get('type')
+                    if t == 'modified':
+                        added += j.get('added', 0)
+                        removed += j.get('removed', 0)
+                    elif t and t.startswith('added'):
+                        added += j.get('size', 0)
+                    elif t and t.startswith('removed'):
+                        removed += j.get('size', 0)
+                if field == 'size_diff':
+                    return added - removed
+                if field == 'size_added':
+                    return added
+                if field == 'size_removed':
+                    return removed
+            if field in ('ctime_diff', 'mtime_diff'):
+                it2 = getattr(diff_obj, '_item2', None)
+                it1 = getattr(diff_obj, '_item1', None)
+                # default to 0 if missing
+                t2 = getattr(it2, field.split('_')[0], 0) if it2 is not None else 0
+                t1 = getattr(it1, field.split('_')[0], 0) if it1 is not None else 0
+                return t2 - t1
+            if field == 'size':
+                it2 = getattr(diff_obj, '_item2', None)
+                if it2 is None or it2.get('deleted'):
+                    return 0
+                # size of the item as stored in archive2
+                return it2.get_size()
+            it = current_item(diff_obj)
+            attr_defaults = {
+                # note: mode sorting removed per issue request
+                # keep defaults for potential other fields
+                'user': '',
+                'group': '',
+                'uid': -1,
+                'gid': -1,
+                'ctime': 0,
+                'mtime': 0,
+            }
+            if field in attr_defaults:
+                default = attr_defaults[field]
+                return getattr(it, field, default)
+            raise ValueError('Invalid field name: %s' % field)
+
+        # Determine sort specifications: use --sort-by if given; legacy --sort means sorting by path.
+        sort_specs = []
+        if getattr(args, 'sort_by', None):
+            # args.sort_by is a single comma-separated string
+            for spec in str(args.sort_by).split(','):
+                spec = spec.strip()
+                if spec:
+                    sort_specs.append(spec)
+        elif getattr(args, 'sort', False):
+            sort_specs = ['path']
+
+        if sort_specs:
+            diffs = list(diffs)  # create the full list from the iterator
+            # Apply stable sorts from last to first spec
+            for spec in reversed(sort_specs):
+                # parse direction
+                desc = False
+                field = spec
+                if field and (field[0] == '>' or field[0] == '<'):
+                    desc = field[0] == '>'
+                    field = field[1:]
+                diffs.sort(key=lambda pd: key_for(field, pd[0], pd[1]), reverse=desc)
 
         for path, diff in diffs:
-            print_output(diff, remove_surrogates(path))
+            print_output(diff.changes(), remove_surrogates(path))
 
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
@@ -2802,6 +2880,7 @@ class Archiver:
             ('--remote-ratelimit', None, 'Warning: "--remote-ratelimit" has been deprecated. Use --upload-ratelimit instead.'),
             ('--remote-buffer', None, 'Warning: "--remote-buffer" has been deprecated. Use --upload-buffer instead.'),
             ('--prefix', None, 'Warning: "--prefix" has been deprecated. Use "--glob-archives \'yourprefix*\'" (-a) instead.'),
+            ('--sort', None, 'Warning: "--sort" is deprecated. Use "--sort-by=path" instead.'),
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
@@ -4090,6 +4169,29 @@ class Archiver:
         define_archive_filters_group(subparser)
 
         # borg diff
+        def diff_sort_spec_validator(s):
+            if not isinstance(s, str):
+                raise argparse.ArgumentTypeError('unsupported sort field (not a string)')
+            allowed = {
+                'path',
+                'size_added', 'size_removed', 'size_diff', 'size',
+                'user', 'group', 'uid', 'gid',
+                'ctime', 'mtime',
+                'ctime_diff', 'mtime_diff',
+            }
+            # Allow comma-separated list; validate each spec
+            parts = [p.strip() for p in s.split(',') if p.strip()]
+            if not parts:
+                raise argparse.ArgumentTypeError('unsupported sort field: empty spec')
+            for spec in parts:
+                if spec and spec[0] in ('>', '<'):
+                    field = spec[1:]
+                else:
+                    field = spec
+                if field not in allowed:
+                    raise argparse.ArgumentTypeError(f"unsupported sort field: {field}")
+            # Return normalized string (comma-joined, no spaces)
+            return ','.join(parts)
         diff_epilog = process_epilog("""
             This command finds differences (file contents, user/group/mode) between archives.
 
@@ -4097,6 +4199,53 @@ class Archiver:
             ARCHIVE2 is just another archive name in the same repository (no repository location
             allowed).
 
+            What is compared
+            +++++++++++++++++
+            For each matching item in both archives, Borg reports:
+
+            - Content changes: total added/removed bytes within files. If chunker parameters are comparable,
+              Borg compares chunk IDs quickly; otherwise, it compares the content.
+            - Metadata changes: user, group, mode, and other metadata shown inline like
+              "[old_mode -> new_mode]" for mode changes. Use ``--content-only`` to suppress metadata changes.
+            - Added/removed items: printed as "added SIZE path" or "removed SIZE path".
+
+            Output formats
+            ++++++++++++++
+            The default (text) output shows one line per changed path, e.g.::
+
+                +135 B    -252 B [ -rw-r--r-- -> -rwxr-xr-x ] path/to/file
+
+            JSON Lines output (``--json-lines``) prints one JSON object per changed path, e.g.::
+
+                {"path": "PATH", "changes": [
+                    {"type": "modified", "added": BYTES, "removed": BYTES},
+                    {"type": "mode", "old_mode": "-rw-r--r--", "new_mode": "-rwxr-xr-x"},
+                    {"type": "added", "size": SIZE},
+                    {"type": "removed", "size": SIZE}
+                ]}
+
+            Only actual changes are included in the "changes" list. For example, a modified entry with
+            added=0 and removed=0 is omitted.
+
+            Sorting
+            ++++++++
+            Use ``--sort-by FIELDS`` where FIELDS is a comma-separated list of fields.
+            Sorts are applied stably from last to first in the given list. Prepend ">" for
+            descending, "<" (or no prefix) for ascending, for example ``--sort-by=">size_added,path"``.
+            Supported fields include:
+
+            - path: the item path
+            - size_added: total bytes added for the item content
+            - size_removed: total bytes removed for the item content
+            - size_diff: size_added - size_removed (net content change)
+            - size: size of the item as stored in ARCHIVE2 (0 for removed items)
+            - user, group, uid, gid, ctime, mtime: taken from the item state in ARCHIVE2 when present
+            - ctime_diff, mtime_diff: timestamp difference (archive2 - archive1)
+
+            The ``--sort`` option is deprecated and only sorts by path.
+
+            Performance considerations
+            ++++++++++++++++++++++++++
             For archives created with Borg 1.1 or newer, diff automatically detects whether
             the archives were created with the same chunker parameters. If so, only chunk IDs
             are compared, which is very fast.
@@ -4121,7 +4270,10 @@ class Archiver:
         subparser.add_argument('--same-chunker-params', dest='same_chunker_params', action='store_true',
                                help='Override check of chunker parameters.')
         subparser.add_argument('--sort', dest='sort', action='store_true',
-                               help='Sort the output lines by file path.')
+                               help='Sort the output by path (deprecated, use --sort-by=path).')
+        subparser.add_argument('--sort-by', dest='sort_by', metavar='FIELD[,FIELD...]', type=diff_sort_spec_validator,
+                               action=Highlander,
+                               help='Advanced sorting: specify field(s) to sort by. Accepts a comma-separated list. Prefix with > for descending or < for ascending (default).')
         subparser.add_argument(
             "--content-only",
             action="store_true",

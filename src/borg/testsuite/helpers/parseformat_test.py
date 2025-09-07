@@ -86,30 +86,30 @@ class TestLocationWithoutEnv:
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
             repr(Location("ssh://user@host:1234//absolute/path"))
-            == "Location(proto='ssh', user='user', host='host', port=1234, path='/absolute/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='host', port=1234, path='/absolute/path')"
         )
         assert Location("ssh://user@host:1234//absolute/path").to_key_filename() == keys_dir + "host___absolute_path"
         assert (
             repr(Location("ssh://user@host:1234/relative/path"))
-            == "Location(proto='ssh', user='user', host='host', port=1234, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='host', port=1234, path='relative/path')"
         )
         assert Location("ssh://user@host:1234/relative/path").to_key_filename() == keys_dir + "host__relative_path"
         assert (
             repr(Location("ssh://user@host/relative/path"))
-            == "Location(proto='ssh', user='user', host='host', port=None, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='host', port=None, path='relative/path')"
         )
         assert (
             repr(Location("ssh://user@[::]:1234/relative/path"))
-            == "Location(proto='ssh', user='user', host='::', port=1234, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='::', port=1234, path='relative/path')"
         )
         assert Location("ssh://user@[::]:1234/relative/path").to_key_filename() == keys_dir + "____relative_path"
         assert (
             repr(Location("ssh://user@[::]/relative/path"))
-            == "Location(proto='ssh', user='user', host='::', port=None, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='::', port=None, path='relative/path')"
         )
         assert (
             repr(Location("ssh://user@[2001:db8::]:1234/relative/path"))
-            == "Location(proto='ssh', user='user', host='2001:db8::', port=1234, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='2001:db8::', port=1234, path='relative/path')"
         )
         assert (
             Location("ssh://user@[2001:db8::]:1234/relative/path").to_key_filename()
@@ -117,23 +117,23 @@ class TestLocationWithoutEnv:
         )
         assert (
             repr(Location("ssh://user@[2001:db8::]/relative/path"))
-            == "Location(proto='ssh', user='user', host='2001:db8::', port=None, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='2001:db8::', port=None, path='relative/path')"
         )
         assert (
             repr(Location("ssh://user@[2001:db8::c0:ffee]:1234/relative/path"))
-            == "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=1234, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='2001:db8::c0:ffee', port=1234, path='relative/path')"  # noqa: E501
         )
         assert (
             repr(Location("ssh://user@[2001:db8::c0:ffee]/relative/path"))
-            == "Location(proto='ssh', user='user', host='2001:db8::c0:ffee', port=None, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='2001:db8::c0:ffee', port=None, path='relative/path')"  # noqa: E501
         )
         assert (
             repr(Location("ssh://user@[2001:db8::192.0.2.1]:1234/relative/path"))
-            == "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=1234, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='2001:db8::192.0.2.1', port=1234, path='relative/path')"  # noqa: E501
         )
         assert (
             repr(Location("ssh://user@[2001:db8::192.0.2.1]/relative/path"))
-            == "Location(proto='ssh', user='user', host='2001:db8::192.0.2.1', port=None, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='2001:db8::192.0.2.1', port=None, path='relative/path')"  # noqa: E501
         )
         assert (
             Location("ssh://user@[2001:db8::192.0.2.1]/relative/path").to_key_filename()
@@ -141,20 +141,39 @@ class TestLocationWithoutEnv:
         )
         assert (
             repr(Location("ssh://user@[2a02:0001:0002:0003:0004:0005:0006:0007]/relative/path"))
-            == "Location(proto='ssh', user='user', "
+            == "Location(proto='ssh', user='user', pass=None, "
             "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=None, path='relative/path')"
         )
         assert (
             repr(Location("ssh://user@[2a02:0001:0002:0003:0004:0005:0006:0007]:1234/relative/path"))
-            == "Location(proto='ssh', user='user', "
+            == "Location(proto='ssh', user='user', pass=None, "
             "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='relative/path')"
+        )
+
+    def test_s3(self, monkeypatch, keys_dir):
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        assert (
+            repr(Location("s3:/test/path"))
+            == "Location(proto='s3', user=None, pass=None, host=None, port=None, path='test/path')"
+        )
+        assert (
+            repr(Location("s3:profile@http://172.28.52.116:9000/test/path"))
+            == "Location(proto='s3', user='profile', pass=None, host='172.28.52.116', port=9000, path='test/path')"  # noqa: E501
+        )
+        assert (
+            repr(Location("s3:user:pass@http://172.28.52.116:9000/test/path"))
+            == "Location(proto='s3', user='user', pass='REDACTED', host='172.28.52.116', port=9000, path='test/path')"  # noqa: E501
+        )
+        assert (
+            repr(Location("b2:user:pass@https://s3.us-east-005.backblazeb2.com/test/path"))
+            == "Location(proto='b2', user='user', pass='REDACTED', host='s3.us-east-005.backblazeb2.com', port=None, path='test/path')"  # noqa: E501
         )
 
     def test_rclone(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
             repr(Location("rclone:remote:path"))
-            == "Location(proto='rclone', user=None, host=None, port=None, path='remote:path')"
+            == "Location(proto='rclone', user=None, pass=None, host=None, port=None, path='remote:path')"
         )
         assert Location("rclone:remote:path").to_key_filename() == keys_dir + "remote_path"
 
@@ -163,13 +182,13 @@ class TestLocationWithoutEnv:
         # relative path
         assert (
             repr(Location("sftp://user@host:1234/rel/path"))
-            == "Location(proto='sftp', user='user', host='host', port=1234, path='rel/path')"
+            == "Location(proto='sftp', user='user', pass=None, host='host', port=1234, path='rel/path')"
         )
         assert Location("sftp://user@host:1234/rel/path").to_key_filename() == keys_dir + "host__rel_path"
         # absolute path
         assert (
             repr(Location("sftp://user@host:1234//abs/path"))
-            == "Location(proto='sftp', user='user', host='host', port=1234, path='/abs/path')"
+            == "Location(proto='sftp', user='user', pass=None, host='host', port=1234, path='/abs/path')"
         )
         assert Location("sftp://user@host:1234//abs/path").to_key_filename() == keys_dir + "host___abs_path"
 
@@ -177,7 +196,7 @@ class TestLocationWithoutEnv:
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
             repr(Location("socket:///repo/path"))
-            == "Location(proto='socket', user=None, host=None, port=None, path='/repo/path')"
+            == "Location(proto='socket', user=None, pass=None, host=None, port=None, path='/repo/path')"
         )
         assert Location("socket:///some/path").to_key_filename() == keys_dir + "_some_path"
 
@@ -185,11 +204,11 @@ class TestLocationWithoutEnv:
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
             repr(Location("file:///some/path"))
-            == "Location(proto='file', user=None, host=None, port=None, path='/some/path')"
+            == "Location(proto='file', user=None, pass=None, host=None, port=None, path='/some/path')"
         )
         assert (
             repr(Location("file:///some/path"))
-            == "Location(proto='file', user=None, host=None, port=None, path='/some/path')"
+            == "Location(proto='file', user=None, pass=None, host=None, port=None, path='/some/path')"
         )
         assert Location("file:///some/path").to_key_filename() == keys_dir + "_some_path"
 
@@ -197,7 +216,7 @@ class TestLocationWithoutEnv:
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
             repr(Location("file:////server/share/path"))
-            == "Location(proto='file', user=None, host=None, port=None, path='//server/share/path')"
+            == "Location(proto='file', user=None, pass=None, host=None, port=None, path='//server/share/path')"
         )
         assert Location("file:////server/share/path").to_key_filename() == keys_dir + "__server_share_path"
 
@@ -205,19 +224,22 @@ class TestLocationWithoutEnv:
         monkeypatch.delenv("BORG_REPO", raising=False)
         rel_path = "path"
         abs_path = os.path.abspath(rel_path)
-        assert repr(Location(rel_path)) == f"Location(proto='file', user=None, host=None, port=None, path='{abs_path}')"
+        assert (
+            repr(Location(rel_path))
+            == f"Location(proto='file', user=None, pass=None, host=None, port=None, path='{abs_path}')"
+        )
         assert Location("path").to_key_filename().endswith(rel_path)
 
     def test_abspath(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
             repr(Location("/some/absolute/path"))
-            == "Location(proto='file', user=None, host=None, port=None, path='/some/absolute/path')"
+            == "Location(proto='file', user=None, pass=None, host=None, port=None, path='/some/absolute/path')"
         )
         assert Location("/some/absolute/path").to_key_filename() == keys_dir + "_some_absolute_path"
         assert (
             repr(Location("/some/../absolute/path"))
-            == "Location(proto='file', user=None, host=None, port=None, path='/absolute/path')"
+            == "Location(proto='file', user=None, pass=None, host=None, port=None, path='/absolute/path')"
         )
         assert Location("/some/../absolute/path").to_key_filename() == keys_dir + "_absolute_path"
 
@@ -226,11 +248,14 @@ class TestLocationWithoutEnv:
         # for a local path, borg creates a Location instance with an absolute path
         rel_path = "relative/path"
         abs_path = os.path.abspath(rel_path)
-        assert repr(Location(rel_path)) == f"Location(proto='file', user=None, host=None, port=None, path='{abs_path}')"
+        assert (
+            repr(Location(rel_path))
+            == f"Location(proto='file', user=None, pass=None, host=None, port=None, path='{abs_path}')"
+        )
         assert Location(rel_path).to_key_filename().endswith("relative_path")
         assert (
             repr(Location("ssh://user@host/relative/path"))
-            == "Location(proto='ssh', user='user', host='host', port=None, path='relative/path')"
+            == "Location(proto='ssh', user='user', pass=None, host='host', port=None, path='relative/path')"
         )
         assert Location("ssh://user@host/relative/path").to_key_filename() == keys_dir + "host__relative_path"
 
@@ -238,17 +263,17 @@ class TestLocationWithoutEnv:
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
             repr(Location("/abs/path:w:cols"))
-            == "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols')"
+            == "Location(proto='file', user=None, pass=None, host=None, port=None, path='/abs/path:w:cols')"
         )
         assert Location("/abs/path:w:cols").to_key_filename() == keys_dir + "_abs_path_w_cols"
         assert (
             repr(Location("file:///abs/path:w:cols"))
-            == "Location(proto='file', user=None, host=None, port=None, path='/abs/path:w:cols')"
+            == "Location(proto='file', user=None, pass=None, host=None, port=None, path='/abs/path:w:cols')"
         )
         assert Location("file:///abs/path:w:cols").to_key_filename() == keys_dir + "_abs_path_w_cols"
         assert (
             repr(Location("ssh://user@host/abs/path:w:cols"))
-            == "Location(proto='ssh', user='user', host='host', port=None, path='abs/path:w:cols')"
+            == "Location(proto='ssh', user='user', pass=None, host='host', port=None, path='abs/path:w:cols')"
         )
         assert Location("ssh://user@host/abs/path:w:cols").to_key_filename() == keys_dir + "host__abs_path_w_cols"
 

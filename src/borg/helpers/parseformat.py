@@ -472,6 +472,27 @@ class Location:
         re.VERBOSE,
     )
 
+    # (s3|b2):[profile|(access_key_id:access_key_secret)@][schema://hostname[:port]]/bucket/path
+    s3_re = re.compile(
+        r"""
+        (?P<s3type>(s3|b2)):
+        ((
+            (?P<profile>[^@:]+)  # profile (no colons allowed)
+            |
+            (?P<access_key_id>[^:@]+):(?P<access_key_secret>[^@]+)  # access key and secret
+        )@)?  # optional authentication
+        (
+            [^:/]+://  # scheme
+            (?P<hostname>[^:/]+)
+            (:(?P<port>\d+))?
+        )?  # optional endpoint
+        /
+        (?P<bucket>[^/]+)/  # bucket name
+        (?P<path>.+)  # path
+    """,
+        re.VERBOSE,
+    )
+
     rclone_re = re.compile(r"(?P<proto>rclone):(?P<path>(.*))", re.VERBOSE)
 
     file_or_socket_re = re.compile(r"(?P<proto>(file|socket))://" + abs_path_re, re.VERBOSE)
@@ -483,6 +504,7 @@ class Location:
         self.valid = False
         self.proto = None
         self.user = None
+        self._pass = None
         self._host = None
         self.port = None
         self.path = None
@@ -524,6 +546,15 @@ class Location:
             self.proto = m.group("proto")
             self.path = os.path.normpath(m.group("path"))
             return True
+        m = self.s3_re.match(text)
+        if m:
+            self.proto = m.group("s3type")
+            self.user = m.group("profile") if m.group("profile") else m.group("access_key_id")
+            self._pass = True if m.group("access_key_secret") else False
+            self._host = m.group("hostname")
+            self.port = m.group("port") and int(m.group("port")) or None
+            self.path = m.group("bucket") + "/" + m.group("path")
+            return True
         m = self.local_re.match(text)
         if m:
             self.proto = "file"
@@ -535,6 +566,7 @@ class Location:
         items = [
             "proto=%r" % self.proto,
             "user=%r" % self.user,
+            "pass=%r" % ("REDACTED" if self._pass else None),
             "host=%r" % self.host,
             "port=%r" % self.port,
             "path=%r" % self.path,
@@ -566,7 +598,7 @@ class Location:
             return self.path
         if self.proto == "rclone":
             return f"{self.proto}:{self.path}"
-        if self.proto in ("sftp", "ssh"):
+        if self.proto in ("sftp", "ssh", "s3", "b2"):
             return (
                 f"{self.proto}://"
                 f"{(self.user + '@') if self.user else ''}"

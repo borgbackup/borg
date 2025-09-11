@@ -120,7 +120,60 @@ jobs:
         sudo apt-get install -y libfuse-dev fuse || true  # Required for Python llfuse module
         sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
         sudo apt-get install -y bash zsh fish  # for shell completion tests
-
+        sudo apt-get install -y rclone openssh-server curl
+    - name: Configure OpenSSH SFTP server (test only)
+      run: |
+        sudo mkdir -p /run/sshd
+        sudo useradd -m -s /bin/bash sftpuser || true
+        # Create SSH key for the CI user and authorize it for sftpuser
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
+        sudo mkdir -p /home/sftpuser/.ssh
+        sudo chmod 700 /home/sftpuser/.ssh
+        sudo cp ~/.ssh/id_ed25519.pub /home/sftpuser/.ssh/authorized_keys
+        sudo chown -R sftpuser:sftpuser /home/sftpuser/.ssh
+        sudo chmod 600 /home/sftpuser/.ssh/authorized_keys
+        # Allow publickey auth and enable Subsystem sftp
+        sudo sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+        sudo sed -i 's/^#\?PubkeyAuthentication .*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+        if ! grep -q '^Subsystem sftp' /etc/ssh/sshd_config; then echo 'Subsystem sftp /usr/lib/openssh/sftp-server' | sudo tee -a /etc/ssh/sshd_config; fi
+        # Ensure host keys exist to avoid slow generation on first sshd start
+        sudo ssh-keygen -A
+        # Start sshd (listen on default 22 inside runner)
+        sudo /usr/sbin/sshd -D &
+        # Add host key to known_hosts so paramiko trusts it
+        ssh-keyscan -H localhost 127.0.0.1 | tee -a ~/.ssh/known_hosts
+        # Start ssh-agent and add our key so paramiko can use the agent
+        eval "$(ssh-agent -s)"
+        ssh-add ~/.ssh/id_ed25519
+        # Export SFTP test URL for tox via GITHUB_ENV
+        echo "BORG_TEST_SFTP_REPO=sftp://sftpuser@localhost:22/borg/sftp-repo" >> $GITHUB_ENV
+    - name: Install and configure MinIO S3 server (test only)
+      run: |
+        set -e
+        arch=$(uname -m)
+        case "$arch" in
+          x86_64|amd64) srv_url=https://dl.min.io/server/minio/release/linux-amd64/minio; cli_url=https://dl.min.io/client/mc/release/linux-amd64/mc ;;
+          aarch64|arm64) srv_url=https://dl.min.io/server/minio/release/linux-arm64/minio; cli_url=https://dl.min.io/client/mc/release/linux-arm64/mc ;;
+          *) echo "Unsupported arch: $arch"; exit 1 ;;
+        esac
+        curl -fsSL -o /usr/local/bin/minio "$srv_url"
+        curl -fsSL -o /usr/local/bin/mc "$cli_url"
+        sudo chmod +x /usr/local/bin/minio /usr/local/bin/mc
+        export PATH=/usr/local/bin:$PATH
+        # Start MinIO on :9000 with default credentials (minioadmin/minioadmin)
+        MINIO_DIR="$GITHUB_WORKSPACE/.minio-data"
+        MINIO_LOG="$GITHUB_WORKSPACE/.minio.log"
+        mkdir -p "$MINIO_DIR"
+        nohup minio server "$MINIO_DIR" --address ":9000" >"$MINIO_LOG" 2>&1 &
+        # Wait for MinIO port to be ready
+        for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/9000) >/dev/null 2>&1 && break; sleep 1; done
+        # Configure client and create bucket
+        mc alias set local http://127.0.0.1:9000 minioadmin minioadmin
+        mc mb --ignore-existing local/borg
+        # Export S3 test URL for tox via GITHUB_ENV
+        echo "BORG_TEST_S3_REPO=s3:minioadmin:minioadmin@http://127.0.0.1:9000/borg/s3-repo" >> $GITHUB_ENV
     - name: Install Python requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel

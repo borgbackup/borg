@@ -184,7 +184,7 @@ extras = ["llfuse", "sftp"]
 
 [tool.tox.env.py310-fuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
-extras = ["pyfuse3", "sftp"]
+extras = ["pyfuse3", "sftp", "s3"]
 
 [tool.tox.env.py311-none]
 

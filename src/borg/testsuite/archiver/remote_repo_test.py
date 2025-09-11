@@ -78,3 +78,30 @@ def test_rclone_repo_basics(archiver, tmp_path):
     list_output = cmd(archiver, "repo-list")
     assert archive_name not in list_output
     cmd(archiver, "repo-delete")
+
+
+S3_URL = os.environ.get("BORG_TEST_S3_REPO")
+
+
+@pytest.mark.skipif(not S3_URL, reason="BORG_TEST_S3_REPO not set.")
+def test_s3_repo_basics(archiver):
+    create_regular_file(archiver.input_path, "file1", size=100 * 1024)
+    create_regular_file(archiver.input_path, "file2", size=10 * 1024)
+    archiver.repository_location = S3_URL
+    archive_name = "test-archive"
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", archive_name, "input")
+    list_output = cmd(archiver, "repo-list")
+    assert archive_name in list_output
+    archive_list_output = cmd(archiver, "list", archive_name)
+    assert "input/file1" in archive_list_output
+    assert "input/file2" in archive_list_output
+    with changedir("output"):
+        cmd(archiver, "extract", archive_name)
+    assert_dirs_equal(
+        archiver.input_path, os.path.join(archiver.output_path, "input"), ignore_flags=True, ignore_xattrs=True
+    )
+    cmd(archiver, "delete", "-a", archive_name)
+    list_output = cmd(archiver, "repo-list")
+    assert archive_name not in list_output
+    cmd(archiver, "repo-delete")

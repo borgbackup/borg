@@ -180,7 +180,7 @@ jobs:
         pip install -r requirements.d/development.txt
     - name: Install borgbackup
       run: |
-        pip install -e .
+        pip install -e .[sftp]
     - name: run tox env
       env:
         XDISTN: "4"

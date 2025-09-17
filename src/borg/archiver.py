@@ -2805,7 +2805,8 @@ class Archiver:
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
-                if arg.startswith(old_name):
+                # either --old_name or --old_name=...
+                if arg == old_name or arg.startswith(old_name) and arg[len(old_name)] == '=':
                     if new_name is not None:
                         args[i] = arg.replace(old_name, new_name)
                     print(warning, file=sys.stderr)

@@ -78,7 +78,8 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
             flags = self.F_USED
         else:
             flags = v.flags | self.F_USED
-            assert v.size == 0 or v.size == size
+            if v.size != 0 and v.size != size:
+                raise ValueError(f"Invalid size: expected 0 or {size}, got {v.size}")
         self[key] = ChunkIndexEntry(flags=flags, size=size)
 
     def __getitem__(self, key):
@@ -217,8 +218,10 @@ class NSIndex1(HTProxyMixin, MutableMapping):
         magic, entries, buckets, ksize, vsize = struct.unpack(self.HEADER_FMT, header_bytes)
         if magic != self.MAGIC:
             raise ValueError(f"Invalid file, magic {self.MAGIC.decode()} not found.")
-        assert ksize == self.KEY_SIZE, "invalid key size"
-        assert vsize == self.VALUE_SIZE, "invalid value size"
+        if ksize != self.KEY_SIZE:
+            raise ValueError("Invalid key size")
+        if vsize != self.VALUE_SIZE:
+            raise ValueError("Invalid value size")
         buckets_size = buckets * (ksize + vsize)
         current_pos = fd.tell()
         end_of_file = fd.seek(0, os.SEEK_END)
@@ -230,4 +233,5 @@ class NSIndex1(HTProxyMixin, MutableMapping):
             value = fd.read(vsize)
             self.ht._set_raw(key, value)
         pos = fd.tell()
-        assert pos == end_of_file
+        if pos != end_of_file:
+            raise ValueError(f"Expected pos ({pos}) to be at end_of_file ({end_of_file})")

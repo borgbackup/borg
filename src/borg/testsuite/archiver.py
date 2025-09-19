@@ -4842,8 +4842,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('d_file_added', size=256)
         self.cmd('create', self.repository_location + '::test1', 'input')
 
-        output = self.cmd('diff', '--sort', self.repository_location + '::test0', 'test1', '--content-only')
+        # default sorting: legacy --sort sorts by path ascending
+        output = self.cmd('diff', self.repository_location + '::test0', 'test1', '--content-only', '--sort')
         expected = [
+            'Warning: "--sort" is deprecated',  # workaround to make test succeed
             'a_file_removed',
             'b_file_added',
             'c_file_changed',
@@ -4851,8 +4853,64 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             'e_file_changed',
             'f_file_removed',
         ]
-
         assert all(x in line for x, line in zip(expected, output.splitlines()))
+
+        # single field sort by size_added descending (new --sort-by)
+        output = self.cmd('diff', self.repository_location + '::test0', 'test1', '--content-only', '--sort-by=>size_added')
+        # size_added for entries: e_file_changed (1024), c_file_changed (512), d_file_added (256), b_file_added (128), a_file_removed (0), f_file_removed (0)
+        expected = [
+            'e_file_changed',
+            'c_file_changed',
+            'd_file_added',
+            'b_file_added',
+        ]
+        names_in_output = [line.split()[-1].split('/')[-1] for line in output.splitlines()]
+        subset = [n for n in names_in_output if n in expected]
+        assert subset == expected
+
+        # multi-key sort: primary by size_added descending, secondary by path ascending for ties (removed files have 0)
+        output = self.cmd('diff', self.repository_location + '::test0', 'test1', '--content-only', '--sort-by=>size_added,path')
+        expected = [
+            'e_file_changed',
+            'c_file_changed',
+            'd_file_added',
+            'b_file_added',
+            'a_file_removed',
+            'f_file_removed',
+        ]
+        assert all(x in line for x, line in zip(expected, output.splitlines()))
+
+        # sort by size_diff descending (net content change)
+        output = self.cmd('diff', self.repository_location + '::test0', 'test1', '--content-only', '--sort-by=>size_diff')
+        expected = [
+            'e_file_changed',
+            'c_file_changed',
+            'd_file_added',
+            'b_file_added',
+        ]
+        names_in_output = [line.split()[-1].split('/')[-1] for line in output.splitlines()]
+        subset = [n for n in names_in_output if n in expected]
+        assert subset == expected
+
+        # sort by size (file size in archive2) descending; removed files have 0 and come last
+        output = self.cmd('diff', self.repository_location + '::test0', 'test1', '--content-only', '--sort-by=>size')
+        expected = [
+            'e_file_changed',  # 1024 in archive2
+            'c_file_changed',  # 512
+            'd_file_added',    # 256
+            'b_file_added',    # 128
+        ]
+        names_in_output = [line.split()[-1].split('/')[-1] for line in output.splitlines()]
+        subset = [n for n in names_in_output if n in expected]
+        assert subset == expected
+
+    def test_sort_validation(self):
+        # invalid sort field should be rejected by argparse
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_regular_file('x', size=1)
+        self.cmd('create', self.repository_location + '::a', 'input')
+        out = self.cmd('diff', self.repository_location + '::a', 'a', '--sort-by=invalid_field', fork=True, exit_code=2)
+        assert 'unsupported sort field' in out or 'invalid choice' in out or 'unsupported' in out
 
     def test_time_diffs(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

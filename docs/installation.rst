@@ -191,6 +191,19 @@ instructions, try to use your package manager to install the dependencies.
 After you have installed the dependencies, you can proceed with steps outlined
 under :ref:`pip-installation`.
 
+Arch Linux
+++++++++++
+
+Install the runtime and build dependencies::
+
+    pacman -S python python-pip python-virtualenv openssl acl xxhash lz4 zstd base-devel
+    pacman -S fuse2     # needed for llfuse
+    pacman -S fuse3     # needed for pyfuse3
+
+Note that Arch Linux specifically doesn't support
+`partial upgrades <https://wiki.archlinux.org/title/Partial_upgrade>`__,
+so in case some packages cannot be retrieved from the repo, run with ``pacman -Syu``.
+
 Debian / Ubuntu
 +++++++++++++++
 

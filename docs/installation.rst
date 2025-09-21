@@ -428,6 +428,10 @@ While we try not to break master, there are no guarantees on anything.
 
 Ensure to install the dependencies as described within :ref:`source-install`.
 
+Version metadata is obtained dynamically at install time using ``setuptools-scm``.
+Please ensure that your git repo either has correct tags, or provide the version
+manually using the ``SETUPTOOLS_SCM_PRETEND_VERSION`` environment variable.
+
 ::
 
     # get borg from github
@@ -437,11 +441,15 @@ Ensure to install the dependencies as described within :ref:`source-install`.
     virtualenv --python=$(which python3) borg-env
     source borg-env/bin/activate   # always before using!
 
-    # install borg + dependencies into virtualenv
+    # install borg dependencies into virtualenv
     cd borg
     pip install -r requirements.d/development.txt
     pip install -r requirements.d/docs.txt  # optional, to build the docs
 
+    # set a borg version if setuptools-scm fails to do so automatically
+    export SETUPTOOLS_SCM_PRETEND_VERSION=
+
+    # install borg into virtualenv
     pip install -e .           # in-place editable mode
     or
     pip install -e .[pyfuse3]  # in-place editable mode, use pyfuse3

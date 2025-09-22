@@ -337,7 +337,12 @@ class BaseTestCase(unittest.TestCase):
             self.skipTest(message)
         try:
             os.system('LD_PRELOAD= chmod -R ugo-w "%s"' % path)
-            os.system(cmd_immutable)
+            rc = os.system(cmd_immutable)
+            if rc != 0:
+                # If we cannot make the path immutable (e.g., missing CAP_LINUX_IMMUTABLE
+                # in containers or restricted environments), the read-only tests would
+                # not be meaningful. Skip them instead of failing.
+                self.skipTest('Unable to make path immutable with: %s (rc=%d)' % (cmd_immutable, rc))
             yield
         finally:
             # Restore permissions to ensure clean-up doesn't fail

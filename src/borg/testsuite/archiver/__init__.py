@@ -440,7 +440,12 @@ def read_only(path):
         pytest.skip(message)
     try:
         os.system('LD_PRELOAD= chmod -R ugo-w "%s"' % path)
-        os.system(cmd_immutable)
+        rc = os.system(cmd_immutable)
+        if rc != 0:
+            # If we cannot make the path immutable (e.g., missing CAP_LINUX_IMMUTABLE
+            # in containers or restricted environments), the read-only tests would
+            # not be meaningful. Skip them instead of failing.
+            pytest.skip(f"Unable to make path immutable with: {cmd_immutable} (rc={rc})")
         yield
     finally:
         # Restore permissions to ensure clean-up doesn't fail

@@ -3977,6 +3977,25 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
             self.cmd('create', self.repository_location + '::archive', 'input', fork=True,
                      exit_code=Repository.InvalidRepository.exit_mcode)
 
+    def test_original_size_stable_across_recreate(self):
+        # Test that changes in archive metadata (like number of chunks) do not influence the original size.
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        def original_size(archive_name):
+            info = json.loads(self.cmd('info', '--json', f"{self.repository_location}::{archive_name}"))
+            return info['archives'][0]['stats']['original_size']
+
+        sizes = [12345, 67890]
+        self.create_regular_file('file1', size=sizes[0])
+        self.create_regular_file('file2', size=sizes[1])
+
+        self.cmd('create', '--compression=none', self.repository_location + '::archive', 'input')
+        assert original_size('archive') == sum(sizes)
+
+        # Recreate with different chunker params to try to reproduce #8898.
+        self.cmd('recreate', '--chunker-params=10,12,11,63', self.repository_location + '::archive')
+        assert original_size('archive') == sum(sizes)
+
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):

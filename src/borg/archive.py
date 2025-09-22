@@ -458,7 +458,10 @@ class Archive:
         self.pipeline = DownloadPipeline(self.repository, self.key)
         self.create = create
         if self.create:
-            self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.stats)
+            # Use a separate statistics counter for metadata (items, archive metadata),
+            # so that archive.stats reflects only file content statistics.
+            self.meta_stats = Statistics(output_json=False, iec=iec)
+            self.items_buffer = CacheChunkBuffer(self.cache, self.key, self.meta_stats)
             if name in manifest.archives:
                 raise self.AlreadyExists(name)
             i = 0
@@ -594,7 +597,8 @@ Utilization of max. archive size: {csize_max:.0%}
     def write_checkpoint(self):
         self.save(self.checkpoint_name)
         del self.manifest.archives[self.checkpoint_name]
-        self.cache.chunk_decref(self.id, self.stats)
+        # Use meta_stats so metadata chunks do not affect archive.stats
+        self.cache.chunk_decref(self.id, self.meta_stats if hasattr(self, 'meta_stats') else self.stats)
 
     def save(self, name=None, comment=None, timestamp=None, stats=None, additional_metadata=None):
         name = name or self.name
@@ -638,7 +642,8 @@ Utilization of max. archive size: {csize_max:.0%}
         data = self.key.pack_and_authenticate_metadata(metadata.as_dict(), context=b'archive')
         self.id = self.key.id_hash(data)
         try:
-            self.cache.add_chunk(self.id, data, self.stats)
+            # Use meta_stats so metadata chunk addition does not skew archive.stats
+            self.cache.add_chunk(self.id, data, self.meta_stats if hasattr(self, 'meta_stats') else self.stats)
         except IntegrityError as err:
             err_msg = str(err)
             # hack to avoid changing the RPC protocol by introducing new (more specific) exception class

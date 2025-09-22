@@ -515,23 +515,13 @@ class LegacyRepository:
             return
         return integrity[key]
 
-    def open_index(self, transaction_id, auto_recover=True):
+    def open_index(self, transaction_id):
         if transaction_id is None:
             return NSIndex1()
         index_path = os.path.join(self.path, "index.%d" % transaction_id)
         integrity_data = self._read_integrity(transaction_id, "index")
-        try:
-            with IntegrityCheckedFile(index_path, write=False, integrity_data=integrity_data) as fd:
-                return NSIndex1.read(fd)
-        except (ValueError, OSError, FileIntegrityError) as exc:
-            logger.warning("Repository index missing or corrupted, trying to recover from: %s", exc)
-            os.unlink(index_path)
-            if not auto_recover:
-                raise
-            self.prepare_txn(self.get_transaction_id())
-            # don't leave an open transaction around
-            self.commit(compact=False)
-            return self.open_index(self.get_transaction_id())
+        with IntegrityCheckedFile(index_path, write=False, integrity_data=integrity_data) as fd:
+            return NSIndex1.read(fd)
 
     def _unpack_hints(self, transaction_id):
         hints_path = os.path.join(self.path, "hints.%d" % transaction_id)
@@ -560,11 +550,11 @@ class LegacyRepository:
                 raise
         if not self.index or transaction_id is None:
             try:
-                self.index = self.open_index(transaction_id, auto_recover=False)
+                self.index = self.open_index(transaction_id)
             except (ValueError, OSError, FileIntegrityError) as exc:
                 logger.warning("Checking repository transaction due to previous error: %s", exc)
                 self.check_transaction()
-                self.index = self.open_index(transaction_id, auto_recover=False)
+                self.index = self.open_index(transaction_id)
         if transaction_id is None:
             self.segments = {}  # XXX bad name: usage_count_of_segment_x = self.segments[x]
             self.compact = FreeSpace()  # XXX bad name: freeable_space_of_segment_x = self.compact[x]

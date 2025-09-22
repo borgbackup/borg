@@ -1,3 +1,4 @@
+import glob
 import hashlib
 import json
 import os
@@ -469,3 +470,58 @@ def test_transfer_rechunk(archivers, request, monkeypatch):
                 # Verify that the file hash is identical to the source
                 assert item.path in source_file_hashes, f"File {item.path} not found in source archive"
                 assert dest_hash == source_file_hashes[item.path], f"Content hash mismatch for {item.path}"
+
+
+def test_issue_9022(archivers, request, monkeypatch):
+    """
+    Regression test for borgbackup/borg#9022: After "borg transfer --from-borg1",
+    the source Borg 1.x repository index must not be changed.
+    """
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() in ["remote", "binary"]:
+        pytest.skip("only works locally")
+
+    # Prepare source (borg 1.2) repo from tarball next to this test file
+    repo12_tar = os.path.join(os.path.dirname(__file__), "repo12.tar.gz")
+
+    original_location = archiver.repository_location
+    extract_dir = f"{original_location}1"
+    os.makedirs(extract_dir)
+    with tarfile.open(repo12_tar) as tf:
+        tf.extractall(extract_dir)
+
+    def index_meta(repo_path):
+        index_files = sorted(glob.glob(os.path.join(repo_path, "index.*")))
+        assert len(index_files) == 1, f"Expected exactly 1 index file before transfer, found {len(index_files)}"
+        st = os.stat(index_files[0])
+        # Return (mtime_ns, size, inode). Use fallbacks where attributes may not exist on some platforms.
+        mtime_ns = getattr(st, "st_mtime_ns", int(st.st_mtime * 1e9))
+        inode = getattr(st, "st_ino", None)
+        return (mtime_ns, st.st_size, inode)
+
+    # Record pre-transfer index file metadata
+    pre_meta = index_meta(extract_dir)
+
+    other_repo1 = f"--other-repo={original_location}1"
+
+    # Destination repo where we transfer to (borg 2 repo)
+    archiver.repository_location = f"{original_location}2"
+
+    # Set passphrases: repo12 testdata uses "waytooeasyonlyfortests"
+    monkeypatch.setenv("BORG_PASSPHRASE", "pw2")
+    monkeypatch.setenv("BORG_OTHER_PASSPHRASE", "waytooeasyonlyfortests")
+    # For this test, we must not weaken KDF, otherwise borg2 couldn't decrypt the borg1 key
+    os.environ["BORG_TESTONLY_WEAKEN_KDF"] = "0"
+
+    # Create destination repo and run transfer from borg1 source
+    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1, "--from-borg1")
+    cmd(archiver, "transfer", other_repo1, "--from-borg1")
+
+    # After transfer, ensure the source borg1 index file looks valid and unchanged.
+    post_meta = index_meta(extract_dir)
+
+    assert post_meta == pre_meta, (
+        f"Index file metadata changed after transfer!\n"
+        f"Before: mtime_ns={pre_meta[0]}, size={pre_meta[1]}, inode={pre_meta[2]}\n"
+        f"After:  mtime_ns={post_meta[0]}, size={post_meta[1]}, inode={post_meta[2]}"
+    )

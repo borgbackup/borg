@@ -201,6 +201,10 @@ class NSIndex1(HTProxyMixin, MutableMapping):
         used = len(self.ht)
         header_bytes = struct.pack(self.HEADER_FMT, self.MAGIC, used, used, self.KEY_SIZE, self.VALUE_SIZE)
         fd.write(header_bytes)
+        # record the header as a separate integrity-hash part if supported
+        hash_part = getattr(fd, "hash_part", None)
+        if hash_part:
+            hash_part("HashHeader")
         count = 0
         for key, _ in self.ht.items():
             value = self.ht._get_raw(key)
@@ -214,6 +218,10 @@ class NSIndex1(HTProxyMixin, MutableMapping):
         header_bytes = fd.read(header_size)
         if len(header_bytes) < header_size:
             raise ValueError(f"Invalid file, file is too short (header).")
+        # verify the header as a separate integrity-hash part if supported
+        hash_part = getattr(fd, "hash_part", None)
+        if hash_part:
+            hash_part("HashHeader")
         magic, entries, buckets, ksize, vsize = struct.unpack(self.HEADER_FMT, header_bytes)
         if magic != self.MAGIC:
             raise ValueError(f"Invalid file, magic {self.MAGIC.decode()} not found.")
@@ -228,6 +236,10 @@ class NSIndex1(HTProxyMixin, MutableMapping):
         for i in range(buckets):
             key = fd.read(ksize)
             value = fd.read(vsize)
+            if value.startswith(b'\xFF\xFF\xFF\xFF'):  # LE for 0xffffffff (empty/unused bucket)
+                continue
+            if value.startswith(b'\xFE\xFF\xFF\xFF'):  # LE for 0xfffffffe (deleted/tombstone bucket)
+                continue
             self.ht._set_raw(key, value)
         pos = fd.tell()
         assert pos == end_of_file

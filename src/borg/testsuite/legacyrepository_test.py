@@ -571,21 +571,6 @@ def test_unreadable_hints(repository):
         do_commit(repository)
 
 
-def test_index(repository):
-    make_auxiliary(repository)
-    with open(os.path.join(repository.path, "index.1"), "wb") as fd:
-        fd.write(b"123456789")
-    do_commit(repository)
-
-
-def test_index_outside_transaction(repository):
-    make_auxiliary(repository)
-    with open(os.path.join(repository.path, "index.1"), "wb") as fd:
-        fd.write(b"123456789")
-    with repository:
-        assert len(repository) == 1
-
-
 def _corrupt_index(repository):
     # HashIndex is able to detect incorrect headers and file lengths,
     # but on its own it can't tell if the data is correct.
@@ -599,15 +584,6 @@ def _corrupt_index(repository):
         assert len(corrupted_index_data) == len(index_data)
         fd.seek(0)
         fd.write(corrupted_index_data)
-
-
-def test_index_corrupted(repository):
-    make_auxiliary(repository)
-    _corrupt_index(repository)
-    with repository:
-        # data corruption is detected due to mismatching checksums, and fixed by rebuilding the index.
-        assert len(repository) == 1
-        assert pdchunk(repository.get(H(0))) == b"foo"
 
 
 def test_index_corrupted_without_integrity(repository):

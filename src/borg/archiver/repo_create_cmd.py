@@ -229,10 +229,3 @@ class RepoCreateMixIn:
             help="copy the crypt_key (used for authenticated encryption) from the key of the other repo "
             "(default: new random key).",
         )
-        subparser.add_argument(
-            "--fido2-device",
-            metavar="DEVICE",
-            dest="fido2_device",
-            help="select fido2 device to protect the repository key, use ``fido2-token -L`` "
-            "to list available devices.",
-        )

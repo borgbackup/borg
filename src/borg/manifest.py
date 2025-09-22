@@ -491,13 +491,13 @@ class Manifest:
         return parse_timestamp(self.timestamp)
 
     @classmethod
-    def load(cls, repository, operations, key=None, *, other=False, ro_cls=RepoObj):
+    def load(cls, repository, operations, args, key=None, *, other=False, ro_cls=RepoObj):
         from .item import ManifestItem
         from .crypto.key import key_factory
 
         cdata = repository.get_manifest()
         if not key:
-            key = key_factory(repository, cdata, other=other, ro_cls=ro_cls)
+            key = key_factory(repository, cdata, args, other=other, ro_cls=ro_cls)
         manifest = cls(key, repository, ro_cls=ro_cls)
         _, data = manifest.repo_objs.parse(cls.MANIFEST_ID, cdata, ro_type=ROBJ_MANIFEST)
         manifest_dict = key.unpack_manifest(data)

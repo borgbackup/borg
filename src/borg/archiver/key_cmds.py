@@ -241,14 +241,6 @@ class KeysMixIn:
             help="change repository passphrase",
         )
         subparser.set_defaults(func=self.do_change_passphrase)
-        subparser.add_argument(
-            "--fido2-device",
-            metavar="DEVICE",
-            dest="fido2_device",
-            default=None,
-            help="select fido2 device to protect the repository key, use ``fido2-token -L`` "
-            "to list available devices.",
-        )
 
         change_location_epilog = process_epilog(
             """

@@ -18,6 +18,7 @@ from functools import partial
 from string import Formatter
 
 from ..logger import create_logger
+from ..platformflags import is_windows
 
 logger = create_logger()
 
@@ -455,8 +456,9 @@ class Location:
         (?P<path>.+)
     """
 
-    # abs_path must start with a slash.
-    abs_path_re = r"(?P<path>/.+)"
+    abs_path_re_posix = r"(?P<path>/.+)"  # abs path must start with a slash.
+    abs_path_re_win = r"(?P<path>[a-zA-Z]:/.+)"  # abs path must start with drive : slash.
+    abs_path_re = abs_path_re_win if is_windows else abs_path_re_posix
 
     # path may or may not start with a slash.
     abs_or_rel_path_re = r"(?P<path>.+)"
@@ -495,7 +497,8 @@ class Location:
 
     rclone_re = re.compile(r"(?P<proto>rclone):(?P<path>(.*))", re.VERBOSE)
 
-    file_or_socket_re = re.compile(r"(?P<proto>(file|socket))://" + abs_path_re, re.VERBOSE)
+    sep = r"/" if is_windows else r""  # on windows, an addtl. slash is needed
+    file_or_socket_re = re.compile(r"(?P<proto>(file|socket))://" + sep + abs_path_re, re.VERBOSE)
 
     local_re = re.compile(local_path_re, re.VERBOSE)
 

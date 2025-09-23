@@ -21,7 +21,7 @@ from .logger import create_logger
 logger = create_logger()
 
 from . import xattr
-from .chunker import get_chunker, Chunk
+from .chunkers import get_chunker, Chunk
 from .cache import ChunkListEntry, build_chunkindex_from_repo, delete_chunkindex_cache
 from .crypto.key import key_factory, UnsupportedPayloadError
 from .compress import CompressionSpec
@@ -240,7 +240,7 @@ def stat_update_check(st_old, st_curr):
         # in this case, we dispatched to wrong handler - abort
         raise BackupRaceConditionError("file type changed (race condition), skipping file")
     if st_old.st_ino != st_curr.st_ino:
-        # in this case, the hardlinks-related code in create_helper has the wrong inode - abort!
+        # in this case, the hard-links-related code in create_helper has the wrong inode - abort!
         raise BackupRaceConditionError("file inode changed (race condition), skipping file")
     # looks ok, we are still dealing with the same thing - return current stat:
     return st_curr
@@ -290,7 +290,7 @@ class DownloadPipeline:
         """
         Preloads the content data chunks of an item (if any).
         optimize_hardlinks can be set to True if item chunks only need to be preloaded for
-        1st hardlink, but not for any further hardlink to same inode / with same hlid.
+        1st hard link, but not for any further hard link to same inode / with same hlid.
         Returns True if chunks were preloaded.
 
         Warning: if data chunks are preloaded then all data chunks have to be retrieved,
@@ -305,7 +305,7 @@ class DownloadPipeline:
                 elif hlid in self.hlids_preloaded:
                     preload_chunks = False
                 else:
-                    # not having the hardlink's chunks already preloaded for other hardlink to same inode
+                    # not having the hard link's chunks already preloaded for other hard link to same inode
                     preload_chunks = True
                     self.hlids_preloaded.add(hlid)
             else:
@@ -351,7 +351,7 @@ class ChunkBuffer:
         self.packer = msgpack.Packer()
         self.chunks = []
         self.key = key
-        self.chunker = get_chunker(*chunker_params, seed=self.key.chunk_seed, sparse=False)
+        self.chunker = get_chunker(*chunker_params, key=self.key, sparse=False)
         self.saved_chunks_len = None
 
     def add(self, item):
@@ -730,15 +730,15 @@ Duration: {0.duration}
             link_target = hlm.retrieve(id=item.hlid)
             if link_target is not None and has_link:
                 if not dry_run:
-                    # another hardlink to same inode (same hlid) was extracted previously, just link to it
+                    # another hard link to same inode (same hlid) was extracted previously, just link to it
                     with backup_io("link"):
                         os.link(link_target, path, follow_symlinks=False)
                 hardlink_set = True
         yield hardlink_set
         if not hardlink_set:
             if "hlid" in item and has_link:
-                # Update entry with extracted item path, so that following hardlinks don't extract twice.
-                # We have hardlinking support, so we will hardlink not extract.
+                # Update entry with extracted item path, so that following hard links don't extract twice.
+                # We have hardlinking support, so we will hard link not extract.
                 hlm.remember(id=item.hlid, info=path)
             else:
                 # Broken platform with no hardlinking support.
@@ -765,13 +765,13 @@ Duration: {0.duration}
         :param dry_run: do not write any data
         :param stdout: write extracted data to stdout
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
-        :param hlm: maps hlid to link_target for extracting subtrees with hardlinks correctly
+        :param hlm: maps hlid to link_target for extracting subtrees with hard links correctly
         :param pi: ProgressIndicatorPercent (or similar) for file extraction progress (in bytes)
-        :param continue_extraction: continue a previously interrupted extraction of same archive
+        :param continue_extraction: continue a previously interrupted extraction of the same archive
         """
 
         def same_item(item, st):
-            """is the archived item the same as the fs item at same path with stat st?"""
+            """Is the archived item the same as the filesystem item at the same path with stat st?"""
             if not stat.S_ISREG(st.st_mode):
                 # we only "optimize" for regular files.
                 # other file types are less frequent and have no content extraction we could "optimize away".
@@ -791,7 +791,7 @@ Duration: {0.duration}
         if dry_run or stdout:
             with self.extract_helper(item, "", hlm, dry_run=dry_run or stdout) as hardlink_set:
                 if not hardlink_set:
-                    # it does not really set hardlinks due to dry_run, but we need to behave same
+                    # it does not really set hard links due to dry_run, but we need to behave same
                     # as non-dry_run concerning fetching preloaded chunks from the pipeline or
                     # it would get stuck.
                     if "chunks" in item:
@@ -1215,6 +1215,7 @@ class FilesystemObjectProcessors:
         log_json,
         iec,
         file_status_printer=None,
+        files_changed="ctime",
     ):
         self.metadata_collector = metadata_collector
         self.cache = cache
@@ -1223,11 +1224,12 @@ class FilesystemObjectProcessors:
         self.process_file_chunks = process_file_chunks
         self.show_progress = show_progress
         self.print_file_status = file_status_printer or (lambda *args: None)
+        self.files_changed = files_changed
 
         self.hlm = HardLinkManager(id_type=tuple, info_type=(list, type(None)))  # (dev, ino) -> chunks or None
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
         self.cwd = os.getcwd()
-        self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=sparse)
+        self.chunker = get_chunker(*chunker_params, key=key, sparse=sparse)
 
     @contextmanager
     def create_helper(self, path, st, status=None, hardlinkable=True, strip_prefix=None):
@@ -1246,7 +1248,7 @@ class FilesystemObjectProcessors:
         hl_chunks = None
         update_map = False
         if hardlinked:
-            status = "h"  # hardlink
+            status = "h"  # hard link
             nothing = object()
             chunks = self.hlm.retrieve(id=(st.st_ino, st.st_dev), default=nothing)
             if chunks is nothing:
@@ -1259,7 +1261,7 @@ class FilesystemObjectProcessors:
         self.add_item(item, stats=self.stats)
         if update_map:
             # remember the hlid of this fs object and if the item has chunks,
-            # also remember them, so we do not have to re-chunk a hardlink.
+            # also remember them, so we do not have to re-chunk a hard link.
             chunks = item.chunks if "chunks" in item else None
             self.hlm.remember(id=(st.st_ino, st.st_dev), info=chunks)
 
@@ -1392,13 +1394,13 @@ class FilesystemObjectProcessors:
                     # this needs to be done early, so that part files also get the patched mode.
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
                 # we begin processing chunks now.
-                if hl_chunks is not None:  # create_helper gave us chunks from a previous hardlink
+                if hl_chunks is not None:  # create_helper gave us chunks from a previous hard link
                     item.chunks = []
                     for chunk_id, chunk_size in hl_chunks:
                         # process one-by-one, so we will know in item.chunks how far we got
                         chunk_entry = cache.reuse_chunk(chunk_id, chunk_size, self.stats)
                         item.chunks.append(chunk_entry)
-                else:  # normal case, no "2nd+" hardlink
+                else:  # normal case, no "2nd+" hard link
                     if not is_special_file:
                         hashed_path = safe_encode(item.path)  # path as in archive item!
                         started_hashing = time.monotonic()
@@ -1445,21 +1447,37 @@ class FilesystemObjectProcessors:
                         if not is_win32:  # TODO for win32
                             with backup_io("fstat2"):
                                 st2 = os.fstat(fd)
-                            if is_special_file:
+                            if self.files_changed == "disabled" or is_special_file:
                                 # special files:
                                 # - fifos change naturally, because they are fed from the other side. no problem.
                                 # - blk/chr devices don't change ctime anyway.
                                 pass
-                            elif st.st_ctime_ns != st2.st_ctime_ns:
-                                # ctime was changed, this is either a metadata or a data change.
-                                changed_while_backup = True
-                            elif start_reading - TIME_DIFFERS1_NS < st2.st_ctime_ns < end_reading + TIME_DIFFERS1_NS:
-                                # this is to treat a very special race condition, see #3536.
-                                # - file was changed right before st.ctime was determined.
-                                # - then, shortly afterwards, but already while we read the file, the
-                                #   file was changed again, but st2.ctime is the same due to ctime granularity.
-                                # when comparing file ctime to local clock, widen interval by TIME_DIFFERS1_NS.
-                                changed_while_backup = True
+                            elif self.files_changed == "ctime":
+                                if st.st_ctime_ns != st2.st_ctime_ns:
+                                    # ctime was changed, this is either a metadata or a data change.
+                                    changed_while_backup = True
+                                elif (
+                                    start_reading - TIME_DIFFERS1_NS < st2.st_ctime_ns < end_reading + TIME_DIFFERS1_NS
+                                ):
+                                    # this is to treat a very special race condition, see #3536.
+                                    # - file was changed right before st.ctime was determined.
+                                    # - then, shortly afterwards, but already while we read the file, the
+                                    #   file was changed again, but st2.ctime is the same due to ctime granularity.
+                                    # when comparing file ctime to local clock, widen interval by TIME_DIFFERS1_NS.
+                                    changed_while_backup = True
+                            elif self.files_changed == "mtime":
+                                if st.st_mtime_ns != st2.st_mtime_ns:
+                                    # mtime was changed, this is either a data change.
+                                    changed_while_backup = True
+                                elif (
+                                    start_reading - TIME_DIFFERS1_NS < st2.st_mtime_ns < end_reading + TIME_DIFFERS1_NS
+                                ):
+                                    # this is to treat a very special race condition, see #3536.
+                                    # - file was changed right before st.mtime was determined.
+                                    # - then, shortly afterwards, but already while we read the file, the
+                                    #   file was changed again, but st2.mtime is the same due to mtime granularity.
+                                    # when comparing file mtime to local clock, widen interval by TIME_DIFFERS1_NS.
+                                    changed_while_backup = True
                         if changed_while_backup:
                             # regular file changed while we backed it up, might be inconsistent/corrupt!
                             if last_try:
@@ -1502,8 +1520,8 @@ class TarfileObjectProcessors:
         self.print_file_status = file_status_printer or (lambda *args: None)
 
         self.stats = Statistics(output_json=log_json, iec=iec)  # threading: done by cache (including progress)
-        self.chunker = get_chunker(*chunker_params, seed=key.chunk_seed, sparse=False)
-        self.hlm = HardLinkManager(id_type=str, info_type=list)  # path -> chunks
+        self.chunker = get_chunker(*chunker_params, key=key, sparse=False)
+        self.hlm = HardLinkManager(id_type=str, info_type=list)  # normalized/safe path -> chunks
 
     @contextmanager
     def create_helper(self, tarinfo, status=None, type=None):
@@ -1518,8 +1536,11 @@ class TarfileObjectProcessors:
             def s_to_ns(s):
                 return safe_ns(int(float(s) * 1e9))
 
+            # if the tar has names starting with "./", normalize them like borg create also does.
+            # ./dir/file must become dir/file in the borg archive.
+            normalized_path = os.path.normpath(tarinfo.name)
             item = Item(
-                path=make_path_safe(tarinfo.name),
+                path=make_path_safe(normalized_path),
                 mode=tarinfo.mode | type,
                 uid=tarinfo.uid,
                 gid=tarinfo.gid,
@@ -1545,6 +1566,12 @@ class TarfileObjectProcessors:
                         bkey = key.encode("utf-8", errors="surrogateescape")
                         bvalue = value.encode("utf-8", errors="surrogateescape")
                         xattrs[bkey] = bvalue
+                    elif key == SCHILY_ACL_ACCESS:
+                        # Process POSIX access ACL
+                        item.acl_access = value.encode("utf-8", errors="surrogateescape")
+                    elif key == SCHILY_ACL_DEFAULT:
+                        # Process POSIX default ACL
+                        item.acl_default = value.encode("utf-8", errors="surrogateescape")
                 if xattrs:
                     item.xattrs = xattrs
         yield item, status
@@ -1572,7 +1599,9 @@ class TarfileObjectProcessors:
     def process_hardlink(self, *, tarinfo, status, type):
         with self.create_helper(tarinfo, status, type) as (item, status):
             # create a not hardlinked borg item, reusing the chunks, see HardLinkManager.__doc__
-            chunks = self.hlm.retrieve(tarinfo.linkname)
+            normalized_path = os.path.normpath(tarinfo.linkname)
+            safe_path = make_path_safe(normalized_path)
+            chunks = self.hlm.retrieve(safe_path)
             if chunks is not None:
                 item.chunks = chunks
             item.get_size(memorize=True, from_chunks=True)
@@ -1581,7 +1610,7 @@ class TarfileObjectProcessors:
 
     def process_file(self, *, tarinfo, status, type, tar):
         with self.create_helper(tarinfo, status, type) as (item, status):
-            self.print_file_status(status, tarinfo.name)
+            self.print_file_status(status, item.path)
             status = None  # we already printed the status
             fd = tar.extractfile(tarinfo)
             self.process_file_chunks(
@@ -1590,7 +1619,7 @@ class TarfileObjectProcessors:
             item.get_size(memorize=True, from_chunks=True)
             self.stats.nfiles += 1
             # we need to remember ALL files, see HardLinkManager.__doc__
-            self.hlm.remember(id=tarinfo.name, info=item.chunks)
+            self.hlm.remember(id=item.path, info=item.chunks)
             return status
 
 
@@ -2325,7 +2354,7 @@ class ArchiveRecreater:
         target.process_file_chunks = ChunksProcessor(
             cache=self.cache, key=self.key, add_item=target.add_item, rechunkify=target.recreate_rechunkify
         ).process_file_chunks
-        target.chunker = get_chunker(*target.chunker_params, seed=self.key.chunk_seed, sparse=False)
+        target.chunker = get_chunker(*target.chunker_params, key=self.key, sparse=False)
         return target
 
     def create_target_archive(self, name):

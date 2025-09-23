@@ -8,7 +8,7 @@ Development
 This chapter will get you started with Borg development.
 
 Borg is written in Python (with a little bit of Cython and C for
-the performance critical parts).
+the performance-critical parts).
 
 Contributions
 -------------
@@ -52,14 +52,14 @@ Borg development happens on the ``master`` branch and uses GitHub pull
 requests (if you don't have GitHub or don't want to use it you can
 send smaller patches via the borgbackup mailing list to the maintainers).
 
-Stable releases are maintained on maintenance branches named ``x.y-maint``, eg.
+Stable releases are maintained on maintenance branches named ``x.y-maint``, e.g.,
 the maintenance branch of the 1.4.x series is ``1.4-maint``.
 
 Most PRs should be filed against the ``master`` branch. Only if an
 issue affects **only** a particular maintenance branch a PR should be
 filed against it directly.
 
-While discussing / reviewing a PR it will be decided whether the
+While discussing/reviewing a PR it will be decided whether the
 change should be applied to maintenance branches. Each maintenance
 branch has a corresponding *backport/x.y-maint* label, which will then
 be applied.
@@ -105,8 +105,8 @@ were collected:
 
 Previously (until release 1.0.10) Borg used a `"merge upwards"
 <https://git-scm.com/docs/gitworkflows#_merging_upwards>`_ model where
-most minor changes and fixes where committed to a maintenance branch
-(eg. 1.0-maint), and the maintenance branch(es) were regularly merged
+most minor changes and fixes were committed to a maintenance branch
+(e.g. 1.0-maint), and the maintenance branch(es) were regularly merged
 back into the main development branch. This became more and more
 troublesome due to merges growing more conflict-heavy and error-prone.
 

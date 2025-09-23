@@ -17,7 +17,7 @@ borg 1.2.x/1.4.x to borg 2.0
 
 Compatibility notes:
 
-- this is a major "breaking" release that is not compatible with existing repos.
+- This is a major "breaking" release that is not compatible with existing repositories.
 
   We tried to put all the necessary "breaking" changes into this release, so we
   hopefully do not need another breaking release in the near future. The changes
@@ -33,24 +33,24 @@ Compatibility notes:
   you must have followed the upgrade instructions at top of the change log
   relating to manifest and archive TAMs (borg2 just requires these TAMs now).
 
-- command line syntax was changed, scripts and wrappers will need changes:
+- Command-line syntax was changed; scripts and wrappers will need changes:
 
-  - you will usually either export BORG_REPO=<MYREPO> into your environment or
+  - You will usually either export BORG_REPO=<MYREPO> into your environment or
     call borg like: "borg -r <MYREPO> <COMMAND>".
-    in the docs, we usually omit "-r ..." for brevity.
-  - the scp-style REPO syntax was removed, please use ssh://..., #6697
-  - ssh:// URLs: removed support for /~otheruser/, /~/ and /./, #6855.
+    In the docs, we usually omit "-r ..." for brevity.
+  - The scp-style REPO syntax was removed; please use ssh://..., #6697
+  - ssh:// URLs: Removed support for /~otheruser/, /~/ and /./, #6855.
     New format:
 
     - ssh://user@host:port/relative/path
     - ssh://user@host:port//absolute/path
-  - -P / --prefix option was removed, please use the similar -a / --match-archives.
-  - archive names don't need to be unique anymore. to the contrary:
-    it is now strongly recommended to use the identical name for borg create
+  - -P / --prefix option was removed; please use the similar -a / --match-archives.
+  - Archive names don't need to be unique anymore. To the contrary:
+    It is now strongly recommended to use the identical name for borg create
     within the same series of archives to make borg work more efficiently.
-    the name now identifies a series of archive, to identify a single archive
-    please use aid:<archive-hash-prefix>, e.g.: borg delete aid:d34db33f
-  - in case you do NOT want to adopt the "series name" way of naming archives
+    The name now identifies a series of archives; to identify a single archive,
+    please use aid:<archive-hash-prefix>, e.g., borg delete aid:d34db33f
+  - In case you do NOT want to adopt the "series name" way of naming archives
     (like "myarchive") as we recommend, but keep using always-changing names
     (like "myserver-myarchive-20241231"), you can do that, but then you must
     make use of BORG_FILES_CACHE_SUFFIX and either set it to a constant suffix
@@ -60,9 +60,9 @@ Compatibility notes:
     greater than the count of different archives series you write to that repo.
     Usually borg uses a different files cache suffix per archive (series) name
     and defaults to BORG_FILES_CACHE_TTL=2 because that is sufficient for that.
-  - the archive id is always given separately from the repository
-    (differently than with borg 1.x you must not give repo::archive).
-  - the series name or archive id is either given as a positional parameter,
+  - The archive ID is always given separately from the repository.
+    Unlike in borg 1.x, you must not give repo::archive.
+  - The series name or archive ID is either given as a positional parameter,
     like:
 
     - borg create documents ~/Documents
@@ -144,7 +144,7 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b17 (2025-05-23)
+Version 2.0.0b19 (2025-07-02)
 -----------------------------
 
 Please note:
@@ -153,6 +153,105 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Fixes:
+
+- reader: fix corruption issue "forgetting" all-zero bytestrings, #8963
+- import-tar: normalize the tarinfo name/linkname when used as hlm key.
+  also: when printing the path, use the already normalized item.path.
+- import-tar: fix the dotslash issue, add test
+
+New features:
+
+- create --files-changed=MODE option, #8958.
+  control how borg detects whether a file has changed while it was backed up,
+  valid modes are ctime (default), mtime (2nd best) or disabled (not recommended).
+
+Other changes:
+
+- to_key_filename: raise length limit to 120, #8966.
+  This works around a test failure on systems with deep build directories.
+
+
+Version 2.0.0b18 (2025-06-19)
+-----------------------------
+
+New features:
+
+- experimental new "buzhash64" chunker (later, after testing, this shall become
+  the default chunker in borg2):
+
+  - add own cryptographically secure pseudo-random number generator (CSPRNG)
+    based on AES256-CTR to create deterministic random, based on a 256bit seed.
+  - use that to deterministically create a perfectly balanced buzhash64 table.
+  - "buzhash64" chunker computes 64bit hash values for the chunking decision.
+  - performance is similar to "buzhash" (measured on Apple M3P cpu).
+
+  That should also resolve these points of criticism about the old "buzhash"
+  32bit code:
+
+  - table_base: that the bits are not randomly distributed enough
+  - that an XORed seed cancels out for specific window sizes
+  - that XORing the table with a seed is equivalent to XORing the computed hash
+    value with another constant
+
+  Please test the chunkers extensively (e.g. with borg create, borg transfer),
+  we can hardly change them "in production", because chunking differently also
+  means not deduplicating with old chunks. So, in case there are changes
+  needed, we need to find and fix them now while borg is in beta.
+
+  See also some other chunker changes listed below "Other changes".
+- serve: add --permissions option as an alternative to BORG_REPO_PERMISSIONS env var
+- create: auto-exclude items based on xattrs or NODUMP, see #4972
+
+  no options yet, just hardcoded macOS and Linux xattrs.
+  removed the --exclude-nodump option, it is also done automagically now.
+
+  also: create: read stat attrs, xattrs, ACLs early, before file contents.
+
+Fixes:
+
+- compact: fix cleaning archives directory (catch correct exception, use
+  logger.warning, improve error msg)
+
+Other changes:
+
+- support Python 3.14
+- msgpack: allow 1.1.1, version check: ignore "rc" or other version elements
+- add derive_key to derive new keys from existing key material
+- refactor the chunkers, #8882 #8883:
+
+  - transform buzhash chunker C code to Cython
+  - split concerns into FileFMAPReader, FileReader, Chunker*:
+
+    - FileFMAPReader reads blocks from the input file, supporting sparse
+      files and fmaps.
+    - FileReader uses FileFMAPReader to fill its buffer and offers clients a
+      `.read(size)` method so they can read pieces of the data.
+    - all chunkers now use the FileReader/FileFMAPReader code
+  - split code and test module into packages
+- "fixed" chunker: add fixed chunker tests to selftest
+- "fixed" chunker: do not assert on short header read
+- "buzhash*" chunker: use safe_fadvise
+- "buzhash" chunker: reject even window size, #8868
+- fish: fix archive name completion
+- refactor: modularize tests
+- refactor: use pathlib.Path
+- tests / CI:
+
+  - CI: add bandit, a security-oriented static analysis tool
+  - CI: disable windows as the file:// repo URLs are still broken on windows.
+  - tests: tox: use native pyproject.toml configuration
+  - more chunker-related tests
+- docs:
+
+  - add docs for serve --permissions / BORG_REPO_PERMISSIONS
+  - borg-serve: simplify example of env in authorized_keys, #8318
+  - fix mistyped CVE number
+
+
+Version 2.0.0b17 (2025-05-23)
+-----------------------------
 
 New features:
 

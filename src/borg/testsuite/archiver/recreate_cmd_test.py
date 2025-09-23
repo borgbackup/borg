@@ -59,7 +59,7 @@ def test_recreate_exclude_keep_tagged(archivers, request):
     _assert_test_keep_tagged(archiver)
 
 
-@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hard links not supported")
 def test_recreate_hardlinked_tags(archivers, request):  # test for issue #4911
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", "--encryption=none")
@@ -69,11 +69,11 @@ def test_recreate_hardlinked_tags(archivers, request):  # test for issue #4911
     os.mkdir(os.path.join(archiver.input_path, "subdir"))  # to make sure the tag is encountered *after* file1
     os.link(
         os.path.join(archiver.input_path, "file1"), os.path.join(archiver.input_path, "subdir", CACHE_TAG_NAME)
-    )  # correct tag name, hardlink to file1
+    )  # correct tag name, hard link to file1
     cmd(archiver, "create", "test", "input")
     # in the "test" archive, we now have, in this order:
     # - a regular file item for "file1"
-    # - a hardlink item for "CACHEDIR.TAG" referring back to file1 for its contents
+    # - a hard link item for "CACHEDIR.TAG" referring back to file1 for its contents
     cmd(archiver, "recreate", "test", "--exclude-caches", "--keep-exclude-tags")
     # if issue #4911 is present, the recreate will crash with a KeyError for "input/file1"
 
@@ -113,7 +113,7 @@ def test_recreate_basic(archivers, request):
     assert "dir2/file3" not in listing
 
 
-@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hard links not supported")
 def test_recreate_subtree_hardlinks(archivers, request):
     archiver = request.getfixturevalue(archivers)
     # This is essentially the same problem set as in test_extract_hardlinks

@@ -17,7 +17,7 @@ logger = create_logger()
 class RepoDeleteMixIn:
     @with_repository(exclusive=True, manifest=False)
     def do_repo_delete(self, args, repository):
-        """Delete a repository"""
+        """Deletes a repository."""
         self.output_list = args.output_list
         dry_run = args.dry_run
         keep_security_info = args.keep_security_info
@@ -54,10 +54,10 @@ class RepoDeleteMixIn:
                             for archive_info in manifest.archives.list(sort_by=["ts"]):
                                 msg.append(format_archive(archive_info))
                         else:
-                            msg.append("This repository seems not to have any archives.")
+                            msg.append("This repository does not appear to have any archives.")
                     else:
                         msg.append(
-                            "This repository seems to have no manifest, so we can't "
+                            "This repository seems to have no manifest, so we cannot "
                             "tell anything about its contents."
                         )
 
@@ -92,7 +92,7 @@ class RepoDeleteMixIn:
 
         repo_delete_epilog = process_epilog(
             """
-        This command deletes the complete repository.
+        This command deletes a complete repository.
 
         When you delete a complete repository, the security info and local cache for it
         (if any) are also deleted. Alternatively, you can delete just the local cache
@@ -109,19 +109,21 @@ class RepoDeleteMixIn:
             description=self.do_repo_delete.__doc__,
             epilog=repo_delete_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="delete repository",
+            help="delete a repository",
         )
         subparser.set_defaults(func=self.do_repo_delete)
-        subparser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository")
         subparser.add_argument(
-            "--list", dest="output_list", action="store_true", help="output verbose list of archives"
+            "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
+        )
+        subparser.add_argument(
+            "--list", dest="output_list", action="store_true", help="output a verbose list of archives"
         )
         subparser.add_argument(
             "--force",
             dest="forced",
             action="count",
             default=0,
-            help="force deletion of corrupted archives, " "use ``--force --force`` in case ``--force`` does not work.",
+            help="force deletion of corrupted archives; use ``--force --force`` if a single ``--force`` does not work.",
         )
         subparser.add_argument(
             "--cache-only",

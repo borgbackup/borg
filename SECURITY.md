@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-These borg releases are currently supported with security updates.
+These Borg releases are currently supported with security updates.
 
 | Version | Supported          |
 |---------|--------------------|
@@ -14,6 +14,6 @@ These borg releases are currently supported with security updates.
 
 ## Reporting a Vulnerability
 
-See there:
+See here:
 
 https://borgbackup.readthedocs.io/en/latest/support.html#security-contact

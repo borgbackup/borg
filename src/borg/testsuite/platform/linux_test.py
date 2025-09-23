@@ -1,7 +1,7 @@
 import os
 import tempfile
 
-from ..platform import acl_get, acl_set
+from ...platform import acl_get, acl_set
 from .platform_test import skipif_not_linux, skipif_fakeroot_detected, skipif_acls_not_working, skipif_no_ubel_user
 
 # set module-level skips
@@ -82,9 +82,9 @@ def test_default_acl():
 @skipif_acls_not_working
 @skipif_no_ubel_user
 def test_non_ascii_acl():
-    # Testing non-ascii ACL processing to see whether our code is robust.
-    # I have no idea whether non-ascii ACLs are allowed by the standard,
-    # but in practice they seem to be out there and must not make our code explode.
+    # Testing non-ASCII ACL processing to see whether our code is robust.
+    # I have no idea whether non-ASCII ACLs are allowed by the standard,
+    # but in practice they seem to be out there and must not cause failures.
     file = tempfile.NamedTemporaryFile()
     assert get_acl(file.name) == {}
     nothing_special = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\n"
@@ -116,7 +116,7 @@ def test_non_ascii_acl():
 
 
 def test_utils():
-    from ..platform.linux import acl_use_local_uid_gid
+    from ...platform.linux import acl_use_local_uid_gid
 
     assert acl_use_local_uid_gid(b"user:nonexistent1234:rw-:1234") == b"user:1234:rw-"
     assert acl_use_local_uid_gid(b"group:nonexistent1234:rw-:1234") == b"group:1234:rw-"

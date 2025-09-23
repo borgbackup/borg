@@ -14,10 +14,10 @@ logger = create_logger()
 class TagMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.WRITE,))
     def do_tag(self, args, repository, manifest, cache):
-        """Manage tags"""
+        """Manage tags."""
 
         def tags_set(tags):
-            """return a set of tags, removing empty tags"""
+            """Return a set of tags, removing empty tags."""
             return {tag for tag in tags if tag}
 
         if args.name:
@@ -29,7 +29,7 @@ class TagMixIn:
             if tags:
                 special = {tag for tag in tags_set(tags) if tag.startswith("@")}
                 if not special.issubset(SPECIAL_TAGS):
-                    raise Error("unknown special tags given.")
+                    raise Error("Unknown special tags given.")
 
         check_special(args.set_tags)
         check_special(args.add_tags)
@@ -70,13 +70,13 @@ class TagMixIn:
             You can set the tags to a specific set of tags or you can add or remove
             tags from the current set of tags.
 
-            User defined tags must not start with `@` because such tags are considered
+            User-defined tags must not start with `@` because such tags are considered
             special and users are only allowed to use known special tags:
 
             ``@PROT``: protects archives against archive deletion or pruning.
 
-            Pre-existing special tags can not be removed via ``--set``. You can still use
-            ``--set``, but you must give pre-existing special tags also (so they won't be
+            Pre-existing special tags cannot be removed via ``--set``. You can still use
+            ``--set``, but you must also give pre-existing special tags (so they won't be
             removed).
             """
         )

@@ -5,44 +5,44 @@
 Central repository server with Ansible or Salt
 ==============================================
 
-This section will give an example how to set up a borg repository server for multiple
+This section gives an example of how to set up a Borg repository server for multiple
 clients.
 
 Machines
 --------
 
-There are multiple machines used in this section and will further be named by their
-respective fully qualified domain name (fqdn).
+This section uses multiple machines, referred to by their
+respective fully qualified domain names (FQDNs).
 
 * The backup server: `backup01.srv.local`
 * The clients:
 
   - John Doe's desktop: `johndoe.clnt.local`
-  - Webserver 01: `web01.srv.local`
+  - Web server 01: `web01.srv.local`
   - Application server 01: `app01.srv.local`
 
 User and group
 --------------
 
-The repository server needs to have only one UNIX user for all the clients.
+The repository server should have a single UNIX user for all the clients.
 Recommended user and group with additional settings:
 
 * User: `backup`
 * Group: `backup`
-* Shell: `/bin/bash` (or other capable to run the `borg serve` command)
+* Shell: `/bin/bash` (or another shell capable of running the `borg serve` command)
 * Home: `/home/backup`
 
-Most clients shall initiate a backup from the root user to catch all
-users, groups and permissions (e.g. when backing up `/home`).
+Most clients should initiate a backup as the root user to capture all
+users, groups, and permissions (e.g., when backing up `/home`).
 
 Folders
 -------
 
-The following folder tree layout is suggested on the repository server:
+The following directory layout is suggested on the repository server:
 
 * User home directory, /home/backup
 * Repositories path (storage pool): /home/backup/repos
-* Clients restricted paths (`/home/backup/repos/<client fqdn>`):
+* Clients’ restricted paths (`/home/backup/repos/<client fqdn>`):
 
   - johndoe.clnt.local: `/home/backup/repos/johndoe.clnt.local`
   - web01.srv.local: `/home/backup/repos/web01.srv.local`
@@ -60,10 +60,10 @@ but no other directories. You can allow a client to access several separate dire
 which could make sense if multiple machines belong to one person which should then have access to all the
 backups of their machines.
 
-There is only one ssh key per client allowed. Keys are added for ``johndoe.clnt.local``, ``web01.srv.local`` and
-``app01.srv.local``. But they will access the backup under only one UNIX user account as:
+Only one SSH key per client is allowed. Keys are added for ``johndoe.clnt.local``, ``web01.srv.local`` and
+``app01.srv.local``. They will access the backup under a single UNIX user account as
 ``backup@backup01.srv.local``. Every key in ``$HOME/.ssh/authorized_keys`` has a
-forced command and restrictions applied as shown below:
+forced command and restrictions applied, as shown below:
 
 ::
 
@@ -73,19 +73,19 @@ forced command and restrictions applied as shown below:
 
 .. note:: The text shown above needs to be written on a single line!
 
-The options which are added to the key will perform the following:
+The options added to the key perform the following:
 
 1. Change working directory
 2. Run ``borg serve`` restricted to the client base path
 3. Restrict ssh and do not allow stuff which imposes a security risk
 
-Due to the ``cd`` command we use, the server automatically changes the current
-working directory. Then client doesn't need to have knowledge of the absolute
+Because of the ``cd`` command, the server automatically changes the current
+working directory. The client then does not need to know the absolute
 or relative remote repository path and can directly access the repositories at
 ``ssh://<user>@<host>/./<repo>``.
 
-.. note:: The setup above ignores all client given commandline parameters
-          which are normally appended to the `borg serve` command.
+.. note:: The setup above ignores all client-given command line parameters
+          that are normally appended to the `borg serve` command.
 
 Client
 ------
@@ -96,15 +96,15 @@ The client needs to initialize the `pictures` repository like this:
 
  borg init ssh://backup@backup01.srv.local/./pictures
 
-Or with the full path (should actually never be used, as only for demonstration purposes).
-The server should automatically change the current working directory to the `<client fqdn>` folder.
+Or with the full path (this should not be used in practice; it is only for demonstration purposes).
+The server automatically changes the current working directory to the `<client fqdn>` directory.
 
 ::
 
   borg init ssh://backup@backup01.srv.local/home/backup/repos/johndoe.clnt.local/pictures
 
-When `johndoe.clnt.local` tries to access a not restricted path the following error is raised.
-John Doe tries to back up into the Web 01 path:
+When `johndoe.clnt.local` tries to access a path outside its restriction, the following error is raised.
+John Doe tries to back up into the web01 path:
 
 ::
 

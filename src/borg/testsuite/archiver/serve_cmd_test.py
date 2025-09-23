@@ -12,20 +12,20 @@ from ...helpers import get_runtime_dir
 
 
 def have_a_short_runtime_dir(mp):
-    # under pytest, we use BORG_BASE_DIR to keep stuff away from the user's normal borg dirs.
-    # this leads to a very long get_runtime_dir() path - too long for a socket file!
-    # thus, we override that again via BORG_RUNTIME_DIR to get a shorter path.
+    # Under pytest, we use BORG_BASE_DIR to keep stuff away from the user's normal Borg directories.
+    # This leads to a very long get_runtime_dir() path — too long for a socket file!
+    # Thus, we override that again via BORG_RUNTIME_DIR to get a shorter path.
     mp.setenv("BORG_RUNTIME_DIR", os.path.join(platformdirs.user_runtime_dir(), "pytest"))
 
 
 @pytest.fixture
 def serve_socket(monkeypatch):
     have_a_short_runtime_dir(monkeypatch)
-    # use a random unique socket filename, so tests can run in parallel.
+    # Use a random unique socket filename, so tests can run in parallel.
     socket_file = tempfile.mktemp(suffix=".sock", prefix="borg-", dir=get_runtime_dir())
     with subprocess.Popen(["borg", "serve", f"--socket={socket_file}"]) as p:
         while not os.path.exists(socket_file):
-            time.sleep(0.01)  # wait until socket server has started
+            time.sleep(0.01)  # wait until the socket server has started
         yield socket_file
         p.terminate()
 

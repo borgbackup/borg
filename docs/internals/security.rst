@@ -24,7 +24,7 @@ The attack model of Borg is that the environment of the client process
 attacker has any and all access to the repository, including interactive
 manipulation (man-in-the-middle) for remote repositories.
 
-Furthermore the client environment is assumed to be persistent across
+Furthermore, the client environment is assumed to be persistent across
 attacks (practically this means that the security database cannot be
 deleted between attacks).
 
@@ -37,8 +37,8 @@ Under these circumstances Borg guarantees that the attacker cannot
    structural information such as the object graph (which archives
    refer to what chunks)
 
-The attacker can always impose a denial of service per definition (he could
-forbid connections to the repository, or delete it partly or entirely).
+The attacker can always impose a denial of service by definition (they could
+block connections to the repository, or delete it partly or entirely).
 
 
 .. _security_structural_auth:
@@ -361,12 +361,18 @@ The chunks stored in the repo are the (compressed, encrypted and authenticated)
 output of the chunker. The sizes of these stored chunks are influenced by the
 compression, encryption and authentication.
 
-buzhash chunker
-~~~~~~~~~~~~~~~
+buzhash and buzhash64 chunker
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The buzhash chunker chunks according to the input data, the chunker's
-parameters and the secret chunker seed (which all influence the chunk boundary
+The buzhash chunkers chunk according to the input data, the chunker's
+parameters and secret key material (which all influence the chunk boundary
 positions).
+
+Secret key material:
+
+- "buzhash": chunker seed (32bits), used for XORing the hardcoded buzhash table
+- "buzhash64": bh64_key (256bits) is derived from ID key, used to cryptographically
+  generate the table.
 
 Small files below some specific threshold (default: 512 KiB) result in only one
 chunk (identical content / size as the original file), bigger files result in

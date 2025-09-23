@@ -14,7 +14,7 @@ from borg.archiver import Archiver  # noqa: E402
 from borg.testsuite import has_lchflags, has_llfuse, has_pyfuse3  # noqa: E402
 from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported  # noqa: E402
 from borg.testsuite.archiver import BORG_EXES
-from borg.testsuite.platform_test import fakeroot_detected  # noqa: E402
+from borg.testsuite.platform.platform_test import fakeroot_detected  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

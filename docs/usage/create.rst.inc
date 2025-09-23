@@ -67,8 +67,6 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--keep-exclude-tags``                           | if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive                                                                         |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--exclude-nodump``                              | exclude files flagged NODUMP                                                                                                                                                                      |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Filesystem options**                                                                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-x``, ``--one-file-system``                     | stay in the same file system and do not store mount points of other file systems - this might behave different from your expectations, see the description below.                                 |
@@ -90,6 +88,8 @@ borg create
     |                                                       | ``--sparse``                                      | detect sparse holes in input (supported only by fixed chunker)                                                                                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--files-cache MODE``                            | operate files cache in MODE. default: ctime,size,inode                                                                                                                                            |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--files-changed MODE``                          | specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime                                                                                                |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--read-special``                                | open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.                                                 |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -147,7 +147,6 @@ borg create
         --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.bford.info/cachedir/spec.html)
         --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
         --keep-exclude-tags               if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive
-        --exclude-nodump                  exclude files flagged NODUMP
 
 
     Filesystem options
@@ -161,6 +160,7 @@ borg create
         --noxattrs                do not read and store xattrs into archive
         --sparse                  detect sparse holes in input (supported only by fixed chunker)
         --files-cache MODE        operate files cache in MODE. default: ctime,size,inode
+        --files-changed MODE      specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 
 
@@ -234,6 +234,13 @@ ctime vs. mtime: safety vs. speed
   can be arbitrarily set from userspace, e.g. to set mtime back to the same value
   it had before a content change happened. This can be used maliciously as well as
   well-meant, but in both cases mtime based cache modes can be problematic.
+
+The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
+ - ctime (default): Use ctime to detect changes. This is the safest option.
+ - mtime: Use mtime to detect changes.
+ - disabled: Disable the "file has changed while we backed it up" detection completely.
+   This is not recommended unless you know what you're doing, as it could lead to
+   inconsistent backups if files change during the backup process.
 
 The mount points of filesystems or filesystem snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that

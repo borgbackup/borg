@@ -12,7 +12,7 @@ from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, llfuse
 from .. import changedir, no_selinux, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
-from ..platform_test import fakeroot_detected
+from ..platform.platform_test import fakeroot_detected
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
 
@@ -113,12 +113,12 @@ def test_fuse(archivers, request):
         assert same_ts_ns(sti1.st_ctime * 1e9, sto1.st_ctime * 1e9)
         assert same_ts_ns(sti1.st_mtime * 1e9, sto1.st_mtime * 1e9)
         if are_hardlinks_supported():
-            # note: there is another hardlink to this, see below
+            # note: there is another hard link to this, see below
             assert sti1.st_nlink == sto1.st_nlink == 2
         # read
         with open(in_fn, "rb") as in_f, open(out_fn, "rb") as out_f:
             assert in_f.read() == out_f.read()
-        # hardlink (to 'input/file1')
+        # hard link (to 'input/file1')
         if are_hardlinks_supported():
             in_fn = "input/hardlink"
             out_fn = os.path.join(mountpoint, "archive", "input", "hardlink")
@@ -191,7 +191,7 @@ def test_fuse_versions_view(archivers, request):
             hl3 = os.path.join(mountpoint, "input", "hardlink3", "hardlink3.00001")
             assert os.stat(hl1).st_ino == os.stat(hl2).st_ino == os.stat(hl3).st_ino
             assert open(hl3, "rb").read() == b"123456"
-    # similar again, but exclude the 1st hardlink:
+    # similar again, but exclude the 1st hard link:
     with fuse_mount(archiver, mountpoint, "-o", "versions", "-e", "input/hardlink1"):
         if are_hardlinks_supported():
             hl2 = os.path.join(mountpoint, "input", "hardlink2", "hardlink2.00001")

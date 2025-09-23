@@ -39,7 +39,7 @@ def test_info_json(archivers, request):
 
 
 def test_info_json_of_empty_archive(archivers, request):
-    """See https://github.com/borgbackup/borg/issues/6120"""
+    """See https://github.com/borgbackup/borg/issues/6120."""
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     info_repo = json.loads(cmd(archiver, "info", "--json", "--first=1"))

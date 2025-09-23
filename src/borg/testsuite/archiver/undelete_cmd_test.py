@@ -38,7 +38,7 @@ def test_undelete_multiple_dryrun(archivers, request):
     assert "normal" not in output  # not a candidate for undeletion
     assert "deleted1" in output  # candidate for undeletion
     assert "deleted2" in output  # candidate for undeletion
-    output = cmd(archiver, "repo-list")  # nothing change, it was a dry-run
+    output = cmd(archiver, "repo-list")  # nothing changed; it was a dry-run
     assert "normal" in output
     assert "deleted1" not in output
     assert "deleted2" not in output
@@ -61,7 +61,7 @@ def test_undelete_multiple_run(archivers, request):
     assert "normal" not in output  # not undeleted
     assert "deleted1" in output  # undeleted
     assert "deleted2" in output  # undeleted
-    output = cmd(archiver, "repo-list")  # nothing change, it was a dry-run
+    output = cmd(archiver, "repo-list")  # nothing changed; it was a dry-run
     assert "normal" in output
     assert "deleted1" in output
     assert "deleted2" in output

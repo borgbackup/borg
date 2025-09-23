@@ -7,6 +7,7 @@ import stat
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 import platformdirs
 
@@ -24,17 +25,19 @@ logger = create_logger()
 
 def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_deadly=True):
     """
-    Ensures that the dir exists with the right permissions.
-    1) Make sure the directory exists in a race-free operation
-    2) If mode is not None and the directory has been created, give the right
-    permissions to the leaf directory. The current umask value is masked out first.
-    3) If pretty_deadly is True, catch exceptions, reraise them with a pretty
-    message.
-    Returns if the directory has been created and has the right permissions,
-    An exception otherwise. If a deadly exception happened it is reraised.
+    Ensure that the directory exists with the correct permissions.
+
+    1) Create the directory in a race-free manner.
+    2) If mode is not None and the directory was created, set the correct
+       permissions on the leaf directory (masking out the current umask first).
+    3) If pretty_deadly is True, catch exceptions and re-raise them with a clearer
+       message.
+
+    Returns normally if the directory exists (with correct permissions) or was created.
+    Raises an exception otherwise. If a fatal exception occurs, it is re-raised.
     """
     try:
-        os.makedirs(path, mode=mode, exist_ok=True)
+        Path(path).mkdir(mode=mode, parents=True, exist_ok=True)
     except OSError as e:
         if pretty_deadly:
             raise Error(str(e))
@@ -43,7 +46,7 @@ def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_dea
 
 
 def get_base_dir(*, legacy=False):
-    """Get home directory / base directory for borg:
+    """Get home directory / base directory for Borg:
 
     - BORG_BASE_DIR, if set
     - HOME, if set
@@ -52,12 +55,12 @@ def get_base_dir(*, legacy=False):
     """
     if legacy:
         base_dir = os.environ.get("BORG_BASE_DIR") or os.environ.get("HOME")
-        # os.path.expanduser() behaves differently for '~' and '~someuser' as
+        # Path.expanduser() behaves differently for '~' and '~someuser' as
         # parameters: when called with an explicit username, the possibly set
         # environment variable HOME is no longer respected. So we have to check if
         # it is set and only expand the user's home directory if HOME is unset.
         if not base_dir:
-            base_dir = os.path.expanduser("~%s" % os.environ.get("USER", ""))
+            base_dir = str(Path(f"~{os.environ.get('USER', '')}").expanduser())
     else:
         # we only care for BORG_BASE_DIR here, as it can be used to override the base dir
         # and not use any more or less platform specific way to determine the base dir.
@@ -68,15 +71,15 @@ def get_base_dir(*, legacy=False):
 def join_base_dir(*paths, **kw):
     legacy = kw.get("legacy", True)
     base_dir = get_base_dir(legacy=legacy)
-    return None if base_dir is None else os.path.join(base_dir, *paths)
+    return None if base_dir is None else str(Path(base_dir).joinpath(*paths))
 
 
 def get_keys_dir(*, legacy=False, create=True):
-    """Determine where to repository keys and cache"""
+    """Determine where to store repository keys."""
     keys_dir = os.environ.get("BORG_KEYS_DIR")
     if keys_dir is None:
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        keys_dir = os.path.join(get_config_dir(legacy=legacy), "keys")
+        keys_dir = str(Path(get_config_dir(legacy=legacy)) / "keys")
     if create:
         ensure_dir(keys_dir)
     return keys_dir
@@ -88,9 +91,9 @@ def get_security_dir(repository_id=None, *, legacy=False, create=True):
     if security_dir is None:
         get_dir = get_config_dir if legacy else get_data_dir
         # note: do not just give this as default to the environment.get(), see issue #5979.
-        security_dir = os.path.join(get_dir(legacy=legacy), "security")
+        security_dir = str(Path(get_dir(legacy=legacy)) / "security")
     if repository_id:
-        security_dir = os.path.join(security_dir, repository_id)
+        security_dir = str(Path(security_dir) / repository_id)
     if create:
         ensure_dir(security_dir)
     return security_dir
@@ -119,11 +122,11 @@ def get_runtime_dir(*, legacy=False, create=True):
 
 
 def get_socket_filename():
-    return os.path.join(get_runtime_dir(), "borg.sock")
+    return str(Path(get_runtime_dir()) / "borg.sock")
 
 
 def get_cache_dir(*, legacy=False, create=True):
-    """Determine where to repository keys and cache"""
+    """Determine where to store Borg cache data."""
 
     if legacy:
         # Get cache home path
@@ -132,15 +135,15 @@ def get_cache_dir(*, legacy=False, create=True):
         if not os.environ.get("BORG_BASE_DIR"):
             cache_home = os.environ.get("XDG_CACHE_HOME", cache_home)
         # Use BORG_CACHE_DIR if set, otherwise assemble final path from cache home path
-        cache_dir = os.environ.get("BORG_CACHE_DIR", os.path.join(cache_home, "borg"))
+        cache_dir = os.environ.get("BORG_CACHE_DIR", str(Path(cache_home) / "borg"))
     else:
         cache_dir = os.environ.get(
             "BORG_CACHE_DIR", join_base_dir(".cache", "borg", legacy=legacy) or platformdirs.user_cache_dir("borg")
         )
     if create:
         ensure_dir(cache_dir)
-        cache_tag_fn = os.path.join(cache_dir, CACHE_TAG_NAME)
-        if not os.path.exists(cache_tag_fn):
+        cache_tag_fn = Path(cache_dir) / CACHE_TAG_NAME
+        if not cache_tag_fn.exists():
             cache_tag_contents = (
                 CACHE_TAG_CONTENTS
                 + textwrap.dedent(
@@ -159,7 +162,7 @@ def get_cache_dir(*, legacy=False, create=True):
 
 
 def get_config_dir(*, legacy=False, create=True):
-    """Determine where to store whole config"""
+    """Determine where to store the configuration."""
 
     # Get config home path
     if legacy:
@@ -168,7 +171,7 @@ def get_config_dir(*, legacy=False, create=True):
         if not os.environ.get("BORG_BASE_DIR"):
             config_home = os.environ.get("XDG_CONFIG_HOME", config_home)
         # Use BORG_CONFIG_DIR if set, otherwise assemble final path from config home path
-        config_dir = os.environ.get("BORG_CONFIG_DIR", os.path.join(config_home, "borg"))
+        config_dir = os.environ.get("BORG_CONFIG_DIR", str(Path(config_home) / "borg"))
     else:
         config_dir = os.environ.get(
             "BORG_CONFIG_DIR", join_base_dir(".config", "borg", legacy=legacy) or platformdirs.user_config_dir("borg")
@@ -191,7 +194,7 @@ def dir_is_cachedir(path=None, dir_fd=None):
         if dir_fd is not None:
             tag_fd = os.open(CACHE_TAG_NAME, os.O_RDONLY, dir_fd=dir_fd)
         else:
-            tag_fd = os.open(os.path.join(path, CACHE_TAG_NAME), os.O_RDONLY)
+            tag_fd = os.open(str(Path(path) / CACHE_TAG_NAME), os.O_RDONLY)
         return os.read(tag_fd, len(CACHE_TAG_CONTENTS)) == CACHE_TAG_CONTENTS
     except (FileNotFoundError, OSError):
         return False
@@ -228,8 +231,8 @@ def dir_is_tagged(path=None, exclude_caches=None, exclude_if_present=None, dir_f
             tag_names.append(CACHE_TAG_NAME)
         if exclude_if_present is not None:
             for tag in exclude_if_present:
-                tag_path = os.path.join(path, tag)
-                if os.path.exists(tag_path):
+                tag_path = Path(path) / tag
+                if tag_path.exists():
                     tag_names.append(tag)
 
     return tag_names
@@ -317,7 +320,7 @@ def to_sanitized_path(path):
 
 class HardLinkManager:
     """
-    Manage hardlinks (and avoid code duplication doing so).
+    Manage hard links (and avoid code duplication doing so).
 
     A) When creating a borg2 archive from the filesystem, we have to maintain a mapping like:
        (dev, ino) -> (hlid, chunks)  # for fs_hl_targets
@@ -325,17 +328,18 @@ class HardLinkManager:
 
     B) When extracting a borg2 archive to the filesystem, we have to maintain a mapping like:
        hlid -> path
-       If we encounter the same hlid again later, we hardlink to the path of the already extracted content of same hlid.
+       If we encounter the same hlid again later, we hard link to the path of the already extracted
+       content of same hlid.
 
     C) When transferring from a borg1 archive, we need:
        path -> chunks_correct  # for borg1_hl_targets, chunks_correct must be either from .chunks_healthy or .chunks.
        If we encounter a regular file item with source == path later, we reuse chunks_correct
        and create the same hlid = hardlink_id_from_path(source).
 
-    D) When importing a tar file (simplified 1-pass way for now, not creating borg hardlink items):
+    D) When importing a tar file (simplified 1-pass way for now, not creating borg hard link items):
        path -> chunks
        If we encounter a LNK tar entry later with linkname==path, we re-use the chunks and create a regular file item.
-       For better hardlink support (including the very first hardlink item for each group of same-target hardlinks),
+       For better hard link support (including the very first hard link item for each group of same-target hard links),
        we would need a 2-pass processing, which is not yet implemented.
     """
 
@@ -354,12 +358,12 @@ class HardLinkManager:
         return "source" in item and self.borg1_hardlinkable(item.mode)
 
     def hardlink_id_from_path(self, path):
-        """compute a hardlink id from a path"""
+        """compute a hard link id from a path"""
         assert isinstance(path, str)
         return hashlib.sha256(path.encode("utf-8", errors="surrogateescape")).digest()
 
     def hardlink_id_from_inode(self, *, ino, dev):
-        """compute a hardlink id from an inode"""
+        """compute a hard link id from an inode"""
         assert isinstance(ino, int)
         assert isinstance(dev, int)
         return hashlib.sha256(f"{ino}/{dev}".encode()).digest()
@@ -411,19 +415,20 @@ def secure_erase(path, *, avoid_collateral_damage):
 
     If avoid_collateral_damage is True, we only secure erase if the total link count is 1,
     otherwise we just do a normal "delete" (unlink) without first overwriting it with random.
-    This avoids other hardlinks pointing to same inode as <path> getting damaged, but might be less secure.
-    A typical scenario where this is useful are quick "hardlink copies" of bigger directories.
+    This avoids other hard links pointing to same inode as <path> getting damaged, but might be less secure.
+    A typical scenario where this is useful are quick "hard link copies" of bigger directories.
 
     If avoid_collateral_damage is False, we always secure erase.
-    If there are hardlinks pointing to the same inode as <path>, they will contain random garbage afterwards.
+    If there are hard links pointing to the same inode as <path>, they will contain random garbage afterwards.
     """
-    with open(path, "r+b") as fd:
+    path_obj = Path(path)
+    with path_obj.open("r+b") as fd:
         st = os.stat(fd.fileno())
         if not (st.st_nlink > 1 and avoid_collateral_damage):
             fd.write(os.urandom(st.st_size))
             fd.flush()
             os.fsync(fd.fileno())
-    os.unlink(path)
+    path_obj.unlink()
 
 
 def safe_unlink(path):
@@ -431,25 +436,26 @@ def safe_unlink(path):
     Safely unlink (delete) *path*.
 
     If we run out of space while deleting the file, we try truncating it first.
-    BUT we truncate only if path is the only hardlink referring to this content.
+    BUT we truncate only if path is the only hard link referring to this content.
 
     Use this when deleting potentially large files when recovering
     from a VFS error such as ENOSPC. It can help a full file system
     recover. Refer to the "File system interaction" section
     in legacyrepository.py for further explanations.
     """
+    path_obj = Path(path)
     try:
-        os.unlink(path)
+        path_obj.unlink()
     except OSError as unlink_err:
         if unlink_err.errno != errno.ENOSPC:
             # not free space related, give up here.
             raise
         # we ran out of space while trying to delete the file.
-        st = os.stat(path)
+        st = path_obj.stat()
         if st.st_nlink > 1:
-            # rather give up here than cause collateral damage to the other hardlink.
+            # rather give up here than cause collateral damage to the other hard link.
             raise
-        # no other hardlink! try to recover free space by truncating this file.
+        # no other hard link! try to recover free space by truncating this file.
         try:
             # Do not create *path* if it does not exist, open for truncation in r+b mode (=O_RDWR|O_BINARY).
             with open(path, "r+b") as fd:
@@ -459,7 +465,7 @@ def safe_unlink(path):
             raise unlink_err
         else:
             # successfully truncated the file, try again deleting it:
-            os.unlink(path)
+            path_obj.unlink()
 
 
 def dash_open(path, mode):

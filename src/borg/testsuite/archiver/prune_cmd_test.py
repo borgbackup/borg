@@ -29,7 +29,7 @@ def test_prune_repository(archivers, request):
     cmd(archiver, "create", "test2", src_dir)
     output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-daily=1")
     assert re.search(r"Would prune:\s+test1", output)
-    # must keep the latest archive:
+    # Must keep the latest archive:
     assert re.search(r"Keeping archive \(rule: daily #1\):\s+test2", output)
     output = cmd(archiver, "repo-list")
     assert "test1" in output
@@ -37,7 +37,7 @@ def test_prune_repository(archivers, request):
     cmd(archiver, "prune", "--keep-daily=1")
     output = cmd(archiver, "repo-list")
     assert "test1" not in output
-    # the latest archive must be still there:
+    # The latest archive must still be there:
     assert "test2" in output
 
 
@@ -105,13 +105,13 @@ def test_prune_repository_example(archivers, request):
 
 
 def test_prune_quarterly(archivers, request):
-    # Example worked through by hand when developing quarterly
-    # strategy, based upon existing backups where quarterly strategy
-    # is desired. Weekly/monthly backups that don't affect results were
+    # Example worked through by hand when developing the quarterly
+    # strategy, based on existing backups where the quarterly strategy
+    # is desired. Weekly/monthly backups that do not affect results were
     # trimmed to speed up the test.
     #
-    # Week number is shown in comment for every row in the below list.
-    # Year is also shown when it doesn't match the year given in the
+    # The ISO week number is shown in a comment for each row in the list below.
+    # The year is also shown when it does not match the year given in the
     # date tuple.
     archiver = request.getfixturevalue(archivers)
     test_dates = [

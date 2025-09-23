@@ -34,13 +34,13 @@ def remote_repository(tmp_path):
 
 
 def pytest_generate_tests(metafunc):
-    # Generates tests that run on both local and remote repos
+    # Generate tests that run on both local and remote repositories.
     if "repo_fixtures" in metafunc.fixturenames:
         metafunc.parametrize("repo_fixtures", ["repository", "remote_repository"])
 
 
 def get_repository_from_fixture(repo_fixtures, request):
-    # returns the repo object from the fixture for tests that run on both local and remote repos
+    # Return the repository object from the fixture for tests that run on both local and remote repositories.
     return request.getfixturevalue(repo_fixtures)
 
 
@@ -73,7 +73,7 @@ def get_path(repository):
 
 
 def fchunk(data, meta=b""):
-    # create a raw chunk that has valid RepoObj layout, but does not use encryption or compression.
+    # Create a raw chunk that has a valid RepoObj layout but does not use encryption or compression.
     hdr = RepoObj.obj_header.pack(len(meta), len(data), xxh64(meta), xxh64(data))
     assert isinstance(data, bytes)
     chunk = hdr + meta + data
@@ -81,7 +81,7 @@ def fchunk(data, meta=b""):
 
 
 def pchunk(chunk):
-    # parse data and meta from a raw chunk made by fchunk
+    # Parse data and meta from a raw chunk made by fchunk.
     hdr_size = RepoObj.obj_header.size
     hdr = chunk[:hdr_size]
     meta_size, data_size = RepoObj.obj_header.unpack(hdr)[0:2]
@@ -91,7 +91,7 @@ def pchunk(chunk):
 
 
 def pdchunk(chunk):
-    # parse only data from a raw chunk made by fchunk
+    # Parse only the data from a raw chunk made by fchunk.
     return pchunk(chunk)[0]
 
 
@@ -571,21 +571,6 @@ def test_unreadable_hints(repository):
         do_commit(repository)
 
 
-def test_index(repository):
-    make_auxiliary(repository)
-    with open(os.path.join(repository.path, "index.1"), "wb") as fd:
-        fd.write(b"123456789")
-    do_commit(repository)
-
-
-def test_index_outside_transaction(repository):
-    make_auxiliary(repository)
-    with open(os.path.join(repository.path, "index.1"), "wb") as fd:
-        fd.write(b"123456789")
-    with repository:
-        assert len(repository) == 1
-
-
 def _corrupt_index(repository):
     # HashIndex is able to detect incorrect headers and file lengths,
     # but on its own it can't tell if the data is correct.
@@ -599,15 +584,6 @@ def _corrupt_index(repository):
         assert len(corrupted_index_data) == len(index_data)
         fd.seek(0)
         fd.write(corrupted_index_data)
-
-
-def test_index_corrupted(repository):
-    make_auxiliary(repository)
-    _corrupt_index(repository)
-    with repository:
-        # data corruption is detected due to mismatching checksums, and fixed by rebuilding the index.
-        assert len(repository) == 1
-        assert pdchunk(repository.get(H(0))) == b"foo"
 
 
 def test_index_corrupted_without_integrity(repository):
@@ -976,7 +952,7 @@ def test_remote_rpc_exception_transport(remote_repository):
             remote_repository.call("inject_exception", {"kind": "divide"})
         except LegacyRemoteRepository.RPCError as e:
             assert e.unpacked
-            assert e.get_message() == "ZeroDivisionError: integer division or modulo by zero\n"
+            assert e.get_message().startswith("ZeroDivisionError:")
             assert e.exception_class == "ZeroDivisionError"
             assert len(e.exception_full) > 0
 

@@ -1,7 +1,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Automated creation of testing environments / binaries on misc. platforms
+# Automated creation of testing environments/binaries on miscellaneous platforms
 
 $cpus = Integer(ENV.fetch('VMCPUS', '8'))  # create VMs with that many cpus
 $xdistn = Integer(ENV.fetch('XDISTN', '8'))  # dispatch tests to that many pytest workers
@@ -213,7 +213,7 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
-    pyenv install 3.12.10
+    pyenv install 3.13.5
     pyenv rehash
   EOF
 end
@@ -230,9 +230,9 @@ def build_pyenv_venv(boxname)
   return <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
-    # use the latest 3.12 release
-    pyenv global 3.12.10
-    pyenv virtualenv 3.12.10 borg-env
+    # use the latest 3.13 release
+    pyenv global 3.13.5
+    pyenv virtualenv 3.13.5 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -258,7 +258,7 @@ def install_pyinstaller()
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    pip install 'pyinstaller==6.11.1'
+    pip install 'pyinstaller==6.14.2'
   EOF
 end
 
@@ -281,8 +281,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.12.10
-      pyenv local 3.12.10
+      pyenv global 3.13.5
+      pyenv local 3.13.5
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -345,6 +345,22 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jammy")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jammy", ".*none.*")
+  end
+
+  config.vm.define "trixie" do |b|
+    b.vm.box = "debian/testing64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("trixie")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("trixie")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("trixie")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("trixie")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trixie", ".*none.*")
   end
 
   config.vm.define "bookworm32" do |b|

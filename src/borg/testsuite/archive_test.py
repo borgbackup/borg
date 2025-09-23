@@ -247,7 +247,7 @@ def test_invalid_msgpacked_item(packed, item_keys_serialized):
     assert not valid_msgpacked_dict(packed, item_keys_serialized)
 
 
-# pytest-xdist requires always same order for the keys and dicts:
+# pytest-xdist always requires the same order for the keys and dicts:
 IK = sorted(list(ITEM_KEYS))
 
 
@@ -309,7 +309,7 @@ def test_get_item_uid_gid():
         puid, pgid = 0, 0
     puser, pgroup = uid2user(puid), gid2group(pgid)
 
-    # this is intentionally a "strange" item, with not matching ids/names.
+    # This is intentionally a "strange" item, with non-matching IDs/names.
     item = Item(path="filename", uid=1, gid=2, user=puser, group=pgroup)
 
     uid, gid = get_item_uid_gid(item, numeric=False)
@@ -354,8 +354,8 @@ def test_get_item_uid_gid():
     assert gid == 8
 
     if not is_win32:
-        # due to the hack in borg.platform.windows user2uid / group2gid, these always return 0
-        # (no matter which username we ask for) and they never raise a KeyError (like e.g. for
+        # Due to the hack in borg.platform.windows, user2uid/group2gid always return 0
+        # (no matter which username we ask for), and they never raise a KeyError (e.g., for
         # a non-existing user/group name). Thus, these tests can currently not succeed on win32.
 
         # item metadata has valid uid/gid, but non-existing user/group names.
@@ -375,7 +375,7 @@ def test_get_item_uid_gid():
     item = Item(path="filename", uid=13, gid=14)
 
     uid, gid = get_item_uid_gid(item, numeric=False)
-    # it'll check user/group first, but as there is nothing in the item, falls back to uid/gid.
+    # It will check user/group first, but as there is nothing in the item, it falls back to uid/gid.
     assert uid == 13
     assert gid == 14
 
@@ -388,12 +388,12 @@ def test_get_item_uid_gid():
     item = Item(path="filename")
 
     uid, gid = get_item_uid_gid(item, numeric=False, uid_default=15)
-    # as there is nothing, it'll fall back to uid_default/gid_default.
+    # As there is nothing, it will fall back to uid_default/gid_default.
     assert uid == 15
     assert gid == 0
 
     uid, gid = get_item_uid_gid(item, numeric=True, gid_default=16)
-    # as there is nothing, it'll fall back to uid_default/gid_default.
+    # As there is nothing, it will fall back to uid_default/gid_default.
     assert uid == 0
     assert gid == 16
 

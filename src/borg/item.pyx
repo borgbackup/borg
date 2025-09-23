@@ -21,7 +21,7 @@ API_VERSION = '1.2_01'
 
 
 def fix_key(data, key, *, errors='strict'):
-    """if k is a bytes-typed key, migrate key/value to a str-typed key in dict data"""
+    """If the key is bytes-typed, migrate the key/value to a str-typed key in the data dict."""
     if isinstance(key, bytes):
         value = data.pop(key)
         key = key.decode('utf-8', errors=errors)
@@ -31,7 +31,7 @@ def fix_key(data, key, *, errors='strict'):
 
 
 def fix_str_value(data, key, errors='surrogateescape'):
-    """makes sure that data[key] is a str (decode if it is bytes)"""
+    """Ensure that data[key] is a str (decode if it is bytes)."""
     assert isinstance(key, str)  # fix_key must be called first
     value = data[key]
     value = want_str(value, errors=errors)
@@ -40,7 +40,7 @@ def fix_str_value(data, key, errors='surrogateescape'):
 
 
 def fix_bytes_value(data, key):
-    """makes sure that data[key] is bytes (encode if it is str)"""
+    """Ensure that data[key] is bytes (encode if it is str)."""
     assert isinstance(key, str)  # fix_key must be called first
     value = data[key]
     value = want_bytes(value)
@@ -49,19 +49,19 @@ def fix_bytes_value(data, key):
 
 
 def fix_list_of_str(v):
-    """make sure we have a list of str"""
+    """Ensure that we have a list of str."""
     assert isinstance(v, (tuple, list))
     return [want_str(e) for e in v]
 
 
 def fix_list_of_bytes(v):
-    """make sure we have a list of bytes"""
+    """Ensure that we have a list of bytes."""
     assert isinstance(v, (tuple, list))
     return [want_bytes(e) for e in v]
 
 
 def fix_list_of_chunkentries(v):
-    """make sure we have a list of correct chunkentries"""
+    """Ensure that we have a list of valid chunk entries."""
     assert isinstance(v, (tuple, list))
     chunks = []
     for ce in v:
@@ -75,13 +75,13 @@ def fix_list_of_chunkentries(v):
 
 
 def fix_tuple_of_str(v):
-    """make sure we have a tuple of str"""
+    """Ensure that we have a tuple of str."""
     assert isinstance(v, (tuple, list))
     return tuple(want_str(e) for e in v)
 
 
 def fix_tuple_of_str_and_int(v):
-    """make sure we have a tuple of str or int"""
+    """Ensure that we have a tuple of str or int."""
     assert isinstance(v, (tuple, list))
     t = tuple(e.decode() if isinstance(e, bytes) else e for e in v)
     assert all(isinstance(e, (str, int)) for e in t), repr(t)
@@ -89,7 +89,7 @@ def fix_tuple_of_str_and_int(v):
 
 
 def fix_timestamp(v):
-    """make sure v is a Timestamp"""
+    """Ensure that v is a Timestamp."""
     if isinstance(v, Timestamp):
         return v
     # legacy support
@@ -100,7 +100,7 @@ def fix_timestamp(v):
 
 
 def want_bytes(v, *, errors='surrogateescape'):
-    """we know that we want bytes and the value should be bytes"""
+    """Ensure that the value is bytes (encode if necessary)."""
     # legacy support: it being str can be caused by msgpack unpack decoding old data that was packed with use_bin_type=False
     if isinstance(v, str):
         v = v.encode('utf-8', errors=errors)
@@ -109,7 +109,7 @@ def want_bytes(v, *, errors='surrogateescape'):
 
 
 def want_str(v, *, errors='surrogateescape'):
-    """we know that we want str and the value should be str"""
+    """Ensure that the value is str (decode if necessary)."""
     if isinstance(v, bytes):
         v = v.decode('utf-8', errors=errors)
     assert isinstance(v, str), f'not a str object, but {v!r}'

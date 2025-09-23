@@ -26,5 +26,5 @@ def test_delete_repo(archivers, request):
     assert os.path.exists(archiver.repository_path)
     os.environ["BORG_DELETE_I_KNOW_WHAT_I_AM_DOING"] = "YES"
     cmd(archiver, "repo-delete")
-    # Make sure the repo is gone
+    # Make sure the repository is gone
     assert not os.path.exists(archiver.repository_path)

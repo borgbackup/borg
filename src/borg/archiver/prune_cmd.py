@@ -147,7 +147,7 @@ def prune_split(archives, rule, n_or_interval, base_timestamp, kept_because={}):
 class PruneMixIn:
     @with_repository(compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest):
-        """Prune repository archives according to specified rules"""
+        """Prune archives according to specified rules."""
         if all(
             e is None
             for e in (
@@ -311,9 +311,11 @@ class PruneMixIn:
             help="prune archives",
         )
         subparser.set_defaults(func=self.do_prune)
-        subparser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository")
         subparser.add_argument(
-            "--list", dest="output_list", action="store_true", help="output verbose list of archives it keeps/prunes"
+            "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
+        )
+        subparser.add_argument(
+            "--list", dest="output_list", action="store_true", help="output a verbose list of archives it keeps/prunes"
         )
         subparser.add_argument("--short", dest="short", action="store_true", help="use a less wide archive part format")
         subparser.add_argument(

@@ -1,3 +1,4 @@
+import glob
 import hashlib
 import json
 import os
@@ -13,7 +14,7 @@ from ...constants import *  # NOQA
 from ...helpers import open_item
 from ...helpers.time import parse_timestamp
 from ...helpers.parseformat import parse_file_size, ChunkerParams
-from ..platform_test import is_win32
+from ..platform.platform_test import is_win32
 from . import cmd, create_regular_file, create_test_files, RK_ENCRYPTION, open_archive, generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote")  # NOQA
@@ -102,7 +103,7 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
             # borg 2 parseformat uses .get("bsdflags"), so the json has either an int
             # (if the archived item has bsdflags) or None (if the item has no bsdflags).
             if e["flags"] == 0 and g["flags"] is None:
-                # this is expected behaviour, fix the expectation
+                # this is expected behavior, fix the expectation
                 e["flags"] = None
 
             # borg2 parseformat falls back to str(item.uid) if it does not have item.user,
@@ -118,24 +119,24 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
                 if key in e:
                     e[key] = convert_tz(e[key], repo12_tzoffset, None)
 
-            # borg 1 used hardlink slaves linking back to their hardlink masters.
-            # borg 2 uses symmetric approach: just normal items. if they are hardlinks,
+            # borg 1 used hard link slaves linking back to their hard link masters.
+            # borg 2 uses symmetric approach: just normal items. if they are hard links,
             # each item has normal attributes, including the chunks list, size. additionally,
-            # they have a hlid and same hlid means same inode / belonging to same set of hardlinks.
+            # they have a hlid and same hlid means same inode / belonging to same set of hard links.
             hardlink = bool(g.get("hlid"))  # note: json has "" as hlid if there is no hlid in the item
             if hardlink:
                 hardlinks[g["path"]] = g["hlid"]
                 if e["mode"].startswith("h"):
-                    # fix expectations: borg1 signalled a hardlink slave with "h"
-                    # borg2 treats all hardlinks symmetrically as normal files
+                    # fix expectations: borg1 signalled a hard link slave with "h"
+                    # borg2 treats all hard links symmetrically as normal files
                     e["mode"] = g["mode"][0] + e["mode"][1:]
-                    # borg1 used source/linktarget to link back to hardlink master
+                    # borg1 used source/linktarget to link back to hard link master
                     assert e["source"] != ""
                     assert e["linktarget"] != ""
-                    # fix expectations: borg2 does not use source/linktarget any more for hardlinks
+                    # fix expectations: borg2 does not use source/linktarget any more for hard links
                     e["source"] = ""
                     e["linktarget"] = ""
-                    # borg 1 has size == 0 for hardlink slaves, borg 2 has the real file size
+                    # borg 1 has size == 0 for hard link slaves, borg 2 has the real file size
                     assert e["size"] == 0
                     assert g["size"] >= 0
                     # fix expectation for size
@@ -159,7 +160,7 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
             assert g == e
 
         if name == "archive1":
-            # hardlinks referring to same inode have same hlid
+            # hard links referring to same inode have same hlid
             assert hardlinks["tmp/borgtest/hardlink1"] == hardlinks["tmp/borgtest/hardlink2"]
 
     repo_path = f"{original_location}2"
@@ -469,3 +470,58 @@ def test_transfer_rechunk(archivers, request, monkeypatch):
                 # Verify that the file hash is identical to the source
                 assert item.path in source_file_hashes, f"File {item.path} not found in source archive"
                 assert dest_hash == source_file_hashes[item.path], f"Content hash mismatch for {item.path}"
+
+
+def test_issue_9022(archivers, request, monkeypatch):
+    """
+    Regression test for borgbackup/borg#9022: After "borg transfer --from-borg1",
+    the source Borg 1.x repository index must not be changed.
+    """
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() in ["remote", "binary"]:
+        pytest.skip("only works locally")
+
+    # Prepare source (borg 1.2) repo from tarball next to this test file
+    repo12_tar = os.path.join(os.path.dirname(__file__), "repo12.tar.gz")
+
+    original_location = archiver.repository_location
+    extract_dir = f"{original_location}1"
+    os.makedirs(extract_dir)
+    with tarfile.open(repo12_tar) as tf:
+        tf.extractall(extract_dir)
+
+    def index_meta(repo_path):
+        index_files = sorted(glob.glob(os.path.join(repo_path, "index.*")))
+        assert len(index_files) == 1, f"Expected exactly 1 index file before transfer, found {len(index_files)}"
+        st = os.stat(index_files[0])
+        # Return (mtime_ns, size, inode). Use fallbacks where attributes may not exist on some platforms.
+        mtime_ns = getattr(st, "st_mtime_ns", int(st.st_mtime * 1e9))
+        inode = getattr(st, "st_ino", None)
+        return (mtime_ns, st.st_size, inode)
+
+    # Record pre-transfer index file metadata
+    pre_meta = index_meta(extract_dir)
+
+    other_repo1 = f"--other-repo={original_location}1"
+
+    # Destination repo where we transfer to (borg 2 repo)
+    archiver.repository_location = f"{original_location}2"
+
+    # Set passphrases: repo12 testdata uses "waytooeasyonlyfortests"
+    monkeypatch.setenv("BORG_PASSPHRASE", "pw2")
+    monkeypatch.setenv("BORG_OTHER_PASSPHRASE", "waytooeasyonlyfortests")
+    # For this test, we must not weaken KDF, otherwise borg2 couldn't decrypt the borg1 key
+    os.environ["BORG_TESTONLY_WEAKEN_KDF"] = "0"
+
+    # Create destination repo and run transfer from borg1 source
+    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1, "--from-borg1")
+    cmd(archiver, "transfer", other_repo1, "--from-borg1")
+
+    # After transfer, ensure the source borg1 index file looks valid and unchanged.
+    post_meta = index_meta(extract_dir)
+
+    assert post_meta == pre_meta, (
+        f"Index file metadata changed after transfer!\n"
+        f"Before: mtime_ns={pre_meta[0]}, size={pre_meta[1]}, inode={pre_meta[2]}\n"
+        f"After:  mtime_ns={post_meta[0]}, size={post_meta[1]}, inode={post_meta[2]}"
+    )

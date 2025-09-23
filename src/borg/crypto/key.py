@@ -3,6 +3,7 @@ import hmac
 import os
 import textwrap
 from hashlib import sha256, pbkdf2_hmac
+from pathlib import Path
 from typing import Literal, ClassVar
 from collections.abc import Callable
 
@@ -72,7 +73,7 @@ class RepoKeyNotFoundError(Error):
 
 
 class UnsupportedKeyFormatError(Error):
-    """Your borg key is stored in an unsupported format. Try using a newer version of borg."""
+    """Your Borg key is stored in an unsupported format. Try using a newer version of Borg."""
 
     exit_mcode = 49
 
@@ -160,6 +161,12 @@ class KeyBase:
     # type is int
     chunk_seed: int = None
 
+    # crypt_key dummy, needs to be overwritten by subclass
+    crypt_key: bytes = None
+
+    # id_key dummy, needs to be overwritten by subclass
+    id_key: bytes = None
+
     # Whether this *particular instance* is encrypted from a practical point of view,
     # i.e. when it's using encryption with a empty passphrase, then
     # that may be *technically* called encryption, but for all intents and purposes
@@ -196,6 +203,21 @@ class KeyBase:
             id_str = bin_to_hex(id) if id is not None else "(unknown)"
             raise IntegrityError(f"Chunk {id_str}: Invalid encryption envelope")
 
+    def derive_key(self, *, salt, domain, size, from_id_key=False):
+        """
+        create a new crypto key (<size> bytes long) from existing key material, a given salt and domain.
+        from_id_key == False: derive from self.crypt_key (default)
+        from_id_key == True: derive from self.id_key (note: related repos have same ID key)
+        """
+        from_key = self.id_key if from_id_key else self.crypt_key
+        assert isinstance(from_key, bytes)
+        assert isinstance(salt, bytes)
+        assert isinstance(domain, bytes)
+        assert size <= 32  # sha256 gives us 32 bytes
+        # Because crypt_key is already a PRK, we do not need KDF security here, PRF security is good enough.
+        # See https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Cr2.pdf section 4 "one-step KDF".
+        return sha256(from_key + salt + domain).digest()[:size]
+
     def pack_metadata(self, metadata_dict):
         metadata_dict = StableDict(metadata_dict)
         return msgpack.packb(metadata_dict)
@@ -229,6 +251,9 @@ class PlaintextKey(KeyBase):
     ARG_NAME = "none"
 
     chunk_seed = 0
+    crypt_key = b""  # makes .derive_key() work, nothing secret here
+    id_key = b""  # makes .derive_key() work, nothing secret here
+
     logically_encrypted = False
 
     @classmethod
@@ -618,11 +643,11 @@ class FlexiKey:
 
     def _find_key_in_keys_dir(self):
         id = self.repository.id
-        keys_dir = get_keys_dir()
-        for name in os.listdir(keys_dir):
-            filename = os.path.join(keys_dir, name)
+        keys_path = Path(get_keys_dir())
+        for entry in keys_path.iterdir():
+            filename = keys_path / entry.name
             try:
-                return self.sanity_check(filename, id)
+                return self.sanity_check(str(filename), id)
             except (KeyfileInvalidError, KeyfileMismatchError):
                 pass
 
@@ -644,12 +669,12 @@ class FlexiKey:
 
     def _get_new_target_in_keys_dir(self, args):
         filename = args.location.to_key_filename()
-        path = filename
+        path = Path(filename)
         i = 1
-        while os.path.exists(path):
+        while path.exists():
             i += 1
-            path = filename + ".%d" % i
-        return path
+            path = Path(filename + ".%d" % i)
+        return str(path)
 
     def load(self, target, passphrase):
         if self.STORAGE == KeyBlobStorage.KEYFILE:
@@ -891,9 +916,7 @@ class AEADKeyBase(KeyBase):
         assert len(sessionid) == 24  # 192bit
         if domain is None:
             domain = b"borg-session-key-" + self.CIPHERSUITE.__name__.encode()
-        # Because crypt_key is already a PRK, we do not need KDF security here, PRF security is good enough.
-        # See https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Cr2.pdf section 4 "one-step KDF".
-        return sha256(self.crypt_key + sessionid + domain).digest()
+        return self.derive_key(salt=sessionid, domain=domain, size=32)  # 256bit
 
     def _get_cipher(self, sessionid, iv):
         assert isinstance(iv, int)

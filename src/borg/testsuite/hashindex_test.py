@@ -7,12 +7,12 @@ from ..hashindex import ChunkIndex, ChunkIndexEntry
 
 
 def H(x):
-    # make some 32byte long thing that depends on x
+    # Make a 32-byte value that depends on x
     return bytes("%-0.32d" % x, "ascii")
 
 
 def H2(x):
-    # like H(x), but with pseudo-random distribution of the output value
+    # Like H(x), but with a pseudo-random distribution of the output value
     return hashlib.sha256(H(x)).digest()
 
 
@@ -45,7 +45,7 @@ def test_new():
     chunks = ChunkIndex()
     key1, value1a = H2(1), ChunkIndexEntry(flags=ChunkIndex.F_USED, size=23)
     key2, value2a = H2(2), ChunkIndexEntry(flags=ChunkIndex.F_USED, size=42)
-    # tracking of new entries
+    # Tracking of new entries
     assert new_chunks() == []
     chunks[key1] = value1a
     assert new_chunks() == [(key1, value1a)]

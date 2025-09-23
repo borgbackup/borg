@@ -52,7 +52,7 @@ def test_basic_functionality(archivers, request):
     if archiver.EXE:
         pytest.skip("test_basic_functionality seems incompatible with fakeroot and/or the binary.")
     have_root = create_test_files(archiver.input_path)
-    # fork required to test show-rc output
+    # Fork required to test --show-rc output.
     output = cmd(archiver, "repo-create", RK_ENCRYPTION, "--show-version", "--show-rc", fork=True)
     assert "borgbackup version" in output
     assert "terminating with success status, rc 0" in output
@@ -85,7 +85,7 @@ def test_basic_functionality(archivers, request):
     if are_hardlinks_supported():
         expected.append("input/hardlink")
     if not have_root:
-        # we could not create these device files without (fake)root
+        # We could not create these device files without (fake)root.
         expected.remove("input/bdev")
         expected.remove("input/cdev")
     if has_lchflags:
@@ -105,7 +105,7 @@ def test_basic_functionality(archivers, request):
     info_output2 = cmd(archiver, "info", "-a", "test")
 
     def filter(output):
-        # filter for interesting "info" output, ignore cache rebuilding related stuff
+        # Filter for interesting 'info' output; ignore cache-rebuilding related messages.
         prefixes = ["Name:", "Fingerprint:", "Number of files:", "This archive:", "All archives:", "Chunk index:"]
         result = []
         for line in output.splitlines():
@@ -114,15 +114,15 @@ def test_basic_functionality(archivers, request):
                     result.append(line)
         return "\n".join(result)
 
-    # the interesting parts of info_output2 and info_output should be same
+    # The interesting parts of info_output2 and info_output should be the same.
     assert filter(info_output) == filter(info_output2)
 
 
 def test_archived_paths(archivers, request):
-    # As borg comes from the POSIX (Linux, UNIX) world, a lot of stuff assumes path separators
-    # to be slashes "/", e.g.: in archived items, for pattern matching.
-    # To make our lives easier and to support cross-platform extraction we always use slashes.
-    # Similarly, archived paths are expected to be full, but relative (have no leading slash).
+    # As Borg comes from the POSIX (Linux/UNIX) world, much assumes path separators
+    # to be slashes "/", e.g., in archived items or for pattern matching.
+    # To make our lives easier and to support cross-platform extraction, we always use slashes.
+    # Similarly, archived paths are expected to be full but relative (have no leading slash).
     archiver = request.getfixturevalue(archivers)
     full_path = os.path.abspath(os.path.join(archiver.input_path, "test"))
     # remove windows drive letter, if any:
@@ -959,6 +959,10 @@ def test_create_big_zeros_files(archivers, request):
             # Also verify the directory structure matches
             assert_dirs_equal(archiver.input_path, os.path.join(extract_path, "input"))
 
+    # Remove input files
+    for i in range(count):
+        os.unlink(os.path.join(archiver.input_path, f"zeros_{i}"))
+
 
 def test_create_big_random_files(archivers, request):
     """Test creating an archive from 10 files with 10MB random data each."""
@@ -990,6 +994,10 @@ def test_create_big_random_files(archivers, request):
 
             # Also verify the directory structure matches
             assert_dirs_equal(archiver.input_path, os.path.join(extract_path, "input"))
+
+    # Remove input files
+    for i in range(count):
+        os.unlink(os.path.join(archiver.input_path, f"random_{i}"))
 
 
 def test_create_with_compression_algorithms(archivers, request):
@@ -1052,3 +1060,8 @@ def test_create_with_compression_algorithms(archivers, request):
 
                 # Also verify the directory structure matches
                 assert_dirs_equal(archiver.input_path, os.path.join(extract_path, "input"))
+
+    # Remove input files
+    for i in range(count):
+        os.unlink(os.path.join(archiver.input_path, f"zeros_{i}"))
+        os.unlink(os.path.join(archiver.input_path, f"random_{i}"))

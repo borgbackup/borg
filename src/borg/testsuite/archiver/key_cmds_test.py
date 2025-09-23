@@ -10,7 +10,7 @@ from ...helpers import CommandError
 from ...helpers import bin_to_hex, hex_to_bin
 from ...helpers import msgpack
 from ...repository import Repository
-from ..key_test import TestKey
+from ..crypto.key_test import TestKey
 from . import RK_ENCRYPTION, KF_ENCRYPTION, cmd, _extract_repository_id, _set_repository_id, generate_archiver_tests
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -20,7 +20,7 @@ def test_change_passphrase(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     os.environ["BORG_NEW_PASSPHRASE"] = "newpassphrase"
-    # here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
+    # Here we have both BORG_PASSPHRASE and BORG_NEW_PASSPHRASE set:
     cmd(archiver, "key", "change-passphrase")
     os.environ["BORG_PASSPHRASE"] = "newpassphrase"
     cmd(archiver, "repo-list")

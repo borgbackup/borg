@@ -382,7 +382,7 @@ class Archiver(
         return parser
 
     def get_args(self, argv, cmd):
-        """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
+        """Usually just returns argv, except when dealing with an SSH forced command for borg serve."""
         result = self.parse_args(argv[1:])
         if cmd is not None and result.func == self.do_serve:
             # borg serve case:
@@ -457,7 +457,7 @@ class Archiver(
         selftest(logger)
 
     def _setup_implied_logging(self, args):
-        """turn on INFO level logging for args that imply that they will produce output"""
+        """Turn on INFO-level logging for arguments that imply they will produce output."""
         # map of option name to name of logger for that option
         option_logger = {
             "show_version": "borg.output.show-version",
@@ -544,7 +544,7 @@ class Archiver(
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover
-    """search the stack for infos about the currently processed file and print them"""
+    """Search the stack for information about the currently processed file and print it."""
     with signal_handler(sig_no, signal.SIG_IGN):
         for frame in inspect.getouterframes(stack):
             func, loc = frame[3], frame[0].f_locals

@@ -11,7 +11,7 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 
 def test_repository_permissions_all(archivers, request, monkeypatch):
-    """Test repository with 'all' permissions setting"""
+    """Test repository with 'all' permissions setting."""
     archiver = request.getfixturevalue(archivers)
 
     # Create a repository with unrestricted permissions.
@@ -35,7 +35,7 @@ def test_repository_permissions_all(archivers, request, monkeypatch):
 
 
 def test_repository_permissions_no_delete(archivers, request, monkeypatch):
-    """Test repository with 'no-delete' permissions setting"""
+    """Test repository with 'no-delete' permissions setting."""
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
 
@@ -93,7 +93,7 @@ def test_repository_permissions_no_delete(archivers, request, monkeypatch):
 
 
 def test_repository_permissions_read_only(archivers, request, monkeypatch):
-    """Test repository with 'read-only' permissions setting"""
+    """Test repository with 'read-only' permissions setting."""
     archiver = request.getfixturevalue(archivers)
 
     # Create a repository first (need unrestricted permissions for that).

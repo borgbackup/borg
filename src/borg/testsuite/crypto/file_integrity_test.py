@@ -1,6 +1,6 @@
 import pytest
 
-from ..crypto.file_integrity import DetachedIntegrityCheckedFile, FileIntegrityError
+from ...crypto.file_integrity import DetachedIntegrityCheckedFile, FileIntegrityError
 
 
 class TestReadIntegrityFile:

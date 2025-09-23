@@ -48,7 +48,7 @@ def test_format_parse_roundtrip_borg1(key):  # legacy
     meta = {}  # borg1 does not support this kind of metadata
     cdata = repo_objs.format(id, meta, data, ro_type=ROBJ_FILE_STREAM)
 
-    # borg1 does not support separate metadata and borg2 does not invoke parse_meta for borg1 repos
+    # Borg 1 does not support separate metadata, and Borg 2 does not invoke parse_meta for Borg 1 repositories.
 
     got_meta, got_data = repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
     assert got_meta["size"] == len(data)
@@ -62,8 +62,8 @@ def test_format_parse_roundtrip_borg1(key):  # legacy
 
 
 def test_borg1_borg2_transition(key):
-    # borg transfer reads borg 1.x repo objects (without decompressing them),
-    # writes borg 2 repo objects (giving already compressed data to avoid compression).
+    # Borg transfer reads Borg 1.x repository objects (without decompressing them),
+    # and writes Borg 2 repository objects (providing already-compressed data to avoid recompression).
     meta = {}  # borg1 does not support this kind of metadata
     data = b"foobar" * 10
     len_data = len(data)
@@ -73,14 +73,14 @@ def test_borg1_borg2_transition(key):
     meta1, compr_data1 = repo_objs1.parse(
         id, borg1_cdata, decompress=True, want_compressed=True, ro_type=ROBJ_FILE_STREAM
     )  # avoid re-compression
-    # in borg 1, we can only get this metadata after decrypting the whole chunk (and we do not have "size" here):
-    assert meta1["ctype"] == LZ4.ID  # default compression
-    assert meta1["clevel"] == 0xFF  # lz4 does not know levels (yet?)
-    assert meta1["csize"] < len_data  # lz4 should make it smaller
+    # In Borg 1, we can only get this metadata after decrypting the whole chunk (and we do not have "size" here):
+    assert meta1["ctype"] == LZ4.ID  # Default compression.
+    assert meta1["clevel"] == 0xFF  # LZ4 does not support levels (yet?).
+    assert meta1["csize"] < len_data  # LZ4 should make it smaller.
 
     repo_objs2 = RepoObj(key)
-    # note: as we did not decompress, we do not have "size" and we need to get it from somewhere else.
-    # here, we just use len_data. for borg transfer, we also know the size from another metadata source.
+    # Note: As we did not decompress, we do not have "size" and need to get it from somewhere else.
+    # Here, we just use len_data. For Borg transfer, we also know the size from another metadata source.
     borg2_cdata = repo_objs2.format(
         id,
         dict(meta1),
@@ -95,36 +95,36 @@ def test_borg1_borg2_transition(key):
     assert data2 == data
     assert meta2["ctype"] == LZ4.ID
     assert meta2["clevel"] == 0xFF
-    assert meta2["csize"] == meta1["csize"] - 2  # borg2 does not store the type/level bytes there
+    assert meta2["csize"] == meta1["csize"] - 2  # Borg 2 does not store the type/level bytes there.
     assert meta2["size"] == len_data
 
     meta2 = repo_objs2.parse_meta(id, borg2_cdata, ro_type=ROBJ_FILE_STREAM)
-    # now, in borg 2, we have nice and separately decrypted metadata (no need to decrypt the whole chunk):
+    # Now, in Borg 2, we have nice and separately decrypted metadata (no need to decrypt the whole chunk).
     assert meta2["ctype"] == LZ4.ID
     assert meta2["clevel"] == 0xFF
-    assert meta2["csize"] == meta1["csize"] - 2  # borg2 does not store the type/level bytes there
+    assert meta2["csize"] == meta1["csize"] - 2  # Borg 2 does not store the type/level bytes there.
     assert meta2["size"] == len_data
 
 
 def test_spoof_manifest(key):
     repo_objs = RepoObj(key)
-    data = b"fake or malicious manifest data"  # file content could be provided by attacker.
+    data = b"fake or malicious manifest data"  # File content could be provided by an attacker.
     id = repo_objs.id_hash(data)
-    # create a repo object containing user data (file content data).
+    # Create a repository object containing user data (file content data).
     cdata = repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM)
-    # let's assume an attacker somehow managed to replace the manifest with that repo object.
-    # as borg always give the ro_type it wants to read, this should fail:
+    # Let's assume an attacker managed to replace the manifest with that repository object.
+    # As Borg always gives the ro_type it intends to read, this should fail:
     with pytest.raises(IntegrityError):
         repo_objs.parse(id, cdata, ro_type=ROBJ_MANIFEST)
 
 
 def test_spoof_archive(key):
     repo_objs = RepoObj(key)
-    data = b"fake or malicious archive data"  # file content could be provided by attacker.
+    data = b"fake or malicious archive data"  # File content could be provided by an attacker.
     id = repo_objs.id_hash(data)
-    # create a repo object containing user data (file content data).
+    # Create a repository object containing user data (file content data).
     cdata = repo_objs.format(id, {}, data, ro_type=ROBJ_FILE_STREAM)
-    # let's assume an attacker somehow managed to replace an archive with that repo object.
-    # as borg always give the ro_type it wants to read, this should fail:
+    # Let's assume an attacker managed to replace an archive with that repository object.
+    # As Borg always gives the ro_type it intends to read, this should fail:
     with pytest.raises(IntegrityError):
         repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)

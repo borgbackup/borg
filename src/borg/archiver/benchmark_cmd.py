@@ -125,7 +125,7 @@ class BenchmarkMixIn:
             print(fmt % ("D", msg, total_size_MB / dt_delete, count, file_size_formatted, content, dt_delete))
 
     def do_benchmark_cpu(self, args):
-        """Benchmark CPU bound operations."""
+        """Benchmark CPU-bound operations."""
         from timeit import timeit
 
         random_10M = os.urandom(10 * 1000 * 1000)
@@ -134,22 +134,33 @@ class BenchmarkMixIn:
         key_96 = os.urandom(12)
 
         import io
-        from ..chunker import get_chunker
+        from ..chunkers import get_chunker  # noqa
 
         print("Chunkers =======================================================")
         size = "1GB"
 
-        def chunkit(chunker_name, *args, **kwargs):
+        def chunkit(ch):
             with io.BytesIO(random_10M) as data_file:
-                ch = get_chunker(chunker_name, *args, **kwargs)
                 for _ in ch.chunkify(fd=data_file):
                     pass
 
-        for spec, func in [
-            ("buzhash,19,23,21,4095", lambda: chunkit("buzhash", 19, 23, 21, 4095, seed=0, sparse=False)),
-            ("fixed,1048576", lambda: chunkit("fixed", 1048576, sparse=False)),
+        for spec, setup, func, vars in [
+            (
+                "buzhash,19,23,21,4095",
+                "ch = get_chunker('buzhash', 19, 23, 21, 4095, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
+            # note: the buzhash64 chunker creation is rather slow, so we must keep it in setup
+            (
+                "buzhash64,19,23,21,4095",
+                "ch = get_chunker('buzhash64', 19, 23, 21, 4095, sparse=False)",
+                "chunkit(ch)",
+                locals(),
+            ),
+            ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
         ]:
-            print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
+            print(f"{spec:<24} {size:<10} {timeit(func, setup, number=100, globals=vars):.3f}s")
 
         from ..checksums import crc32, xxh64
 
@@ -261,11 +272,11 @@ class BenchmarkMixIn:
             """
         This command benchmarks borg CRUD (create, read, update, delete) operations.
 
-        It creates input data below the given PATH and backups this data into the given REPO.
+        It creates input data below the given PATH and backs up this data into the given REPO.
         The REPO must already exist (it could be a fresh empty repo or an existing repo, the
         command will create / read / update / delete some archives named borg-benchmark-crud\\* there.
 
-        Make sure you have free space there, you'll need about 1GB each (+ overhead).
+        Make sure you have free space there; you will need about 1 GB each (+ overhead).
 
         If your repository is encrypted and borg needs a passphrase to unlock the key, use::
 
@@ -305,15 +316,15 @@ class BenchmarkMixIn:
             description=self.do_benchmark_crud.__doc__,
             epilog=bench_crud_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="benchmarks borg CRUD (create, extract, update, delete).",
+            help="benchmarks Borg CRUD (create, extract, update, delete).",
         )
         subparser.set_defaults(func=self.do_benchmark_crud)
 
-        subparser.add_argument("path", metavar="PATH", help="path were to create benchmark input data")
+        subparser.add_argument("path", metavar="PATH", help="path where to create benchmark input data")
 
         bench_cpu_epilog = process_epilog(
             """
-        This command benchmarks misc. CPU bound borg operations.
+        This command benchmarks miscellaneous CPU-bound Borg operations.
 
         It creates input data in memory, runs the operation and then displays throughput.
         To reduce outside influence on the timings, please make sure to run this with:
@@ -329,6 +340,6 @@ class BenchmarkMixIn:
             description=self.do_benchmark_cpu.__doc__,
             epilog=bench_cpu_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="benchmarks borg CPU bound operations.",
+            help="benchmarks Borg CPU-bound operations.",
         )
         subparser.set_defaults(func=self.do_benchmark_cpu)

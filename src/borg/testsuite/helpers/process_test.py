@@ -5,7 +5,7 @@ from ...helpers.process import popen_with_error_handling
 
 
 class TestPopenWithErrorHandling:
-    @pytest.mark.skipif(not shutil.which("test"), reason='"test" binary is needed')
+    @pytest.mark.skipif(not shutil.which("test"), reason='"test" binary is required')
     def test_simple(self):
         proc = popen_with_error_handling("test 1")
         assert proc.wait() == 0

@@ -1,4 +1,4 @@
-from ..platform import swidth
+from ...platform import swidth
 from .platform_test import skipif_not_posix
 
 

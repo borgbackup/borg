@@ -22,7 +22,7 @@ from .repoobj import RepoObj
 
 
 class MandatoryFeatureUnsupported(Error):
-    """Unsupported repository feature(s) {}. A newer version of borg is required to access this repository."""
+    """Unsupported repository feature(s) {}. A newer version of Borg is required to access this repository."""
 
     exit_mcode = 25
 

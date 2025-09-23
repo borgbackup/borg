@@ -50,11 +50,11 @@ def process_directive(directive, arguments, out, state_hook):
 
 def rst_to_text(text, state_hook=None, references=None):
     """
-    Convert rST to a more human text form.
+    Convert rST to a more human-friendly text form.
 
     This is a very loose conversion. No advanced rST features are supported.
-    The generated output directly depends on the input (e.g. indentation of
-    admonitions).
+    The generated output depends directly on the input (for example, the
+    indentation of admonitions).
     """
     state_hook = state_hook or (lambda old_state, new_state, out: None)
     references = references or {}
@@ -206,7 +206,7 @@ def rst_to_terminal(rst, references=None, destination=sys.stdout):
     Convert *rst* to a lazy string.
 
     If *destination* is a file-like object connected to a terminal,
-    enrich text with suitable ANSI escapes. Otherwise return plain text.
+    enrich the text with suitable ANSI escapes. Otherwise, return plain text.
     """
     if is_terminal(destination):
         rst_state_hook = ansi_escapes

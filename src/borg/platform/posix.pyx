@@ -39,7 +39,7 @@ def process_alive(host, pid, thread):
     Check whether the (host, pid, thread_id) combination corresponds to a process potentially alive.
 
     If the process is local, then this will be accurate. If the process is not local, then this
-    returns always True, since there is no real way to check.
+    always returns True, since there is no real way to check.
     """
     from . import local_pid_alive
     from . import hostid
@@ -53,8 +53,8 @@ def process_alive(host, pid, thread):
         return True
 
     if thread != 0:
-        # Currently thread is always 0, if we ever decide to set this to a non-zero value,
-        # this code needs to be revisited, too, to do a sensible thing
+        # Currently, thread is always 0; if we ever decide to set this to a non-zero value,
+        # this code needs to be revisited to do a sensible thing.
         return True
 
     return local_pid_alive(pid)
@@ -73,7 +73,7 @@ def local_pid_alive(pid):
         if err.errno == errno.ESRCH:
             # ESRCH = no such process
             return False
-        # Any other error (eg. permissions) means that the process ID refers to a live process.
+        # Any other error (e.g., permissions) means that the process ID refers to a live process.
         return True
 
 
@@ -114,8 +114,7 @@ def group2gid(group, default=None):
 
 
 def posix_acl_use_stored_uid_gid(acl):
-    """Replace the user/group field with the stored uid/gid
-    """
+    """Replace the user/group field with the stored uid/gid."""
     assert isinstance(acl, bytes)
     from ..helpers import safe_decode, safe_encode
     entries = []
@@ -130,6 +129,6 @@ def posix_acl_use_stored_uid_gid(acl):
 
 
 def getosusername():
-    """Return the os user name."""
+    """Return the OS username."""
     uid = os.getuid()
     return uid2user(uid, uid)

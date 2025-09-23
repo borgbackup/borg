@@ -56,7 +56,7 @@ class UpgraderFrom12To20:
         self.hlm = HardLinkManager(id_type=bytes, info_type=list)  # hlid -> chunks_correct
 
     def upgrade_item(self, *, item):
-        """upgrade item as needed, get rid of legacy crap"""
+        """Upgrades the item as needed and removes legacy data."""
         ITEM_KEY_WHITELIST = {
             "path",
             "rdev",
@@ -90,7 +90,7 @@ class UpgraderFrom12To20:
                 item.chunks = chunks
                 for chunk_id, chunk_size in chunks:
                     self.cache.reuse_chunk(chunk_id, chunk_size, self.archive.stats)
-            del item.source  # not used for hardlinks any more, replaced by hlid
+            del item.source  # not used for hard links anymore, replaced by hlid
         # make sure we only have desired stuff in the new item. specifically, make sure to get rid of:
         # - 'acl' remnants of bug in attic <= 0.13
         # - 'hardlink_master' (superseded by hlid)

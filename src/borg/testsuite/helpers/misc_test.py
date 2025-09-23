@@ -34,19 +34,19 @@ def test_chunkit():
 
 
 def test_iter_separated():
-    # newline and utf-8
+    # Newline and UTF-8
     sep, items = "\n", ["foo", "bar/baz", "αáčő"]
     fd = StringIO(sep.join(items))
     assert list(iter_separated(fd)) == items
-    # null and bogus ending
+    # NUL and bogus ending
     sep, items = "\0", ["foo/bar", "baz", "spam"]
     fd = StringIO(sep.join(items) + "\0")
     assert list(iter_separated(fd, sep=sep)) == ["foo/bar", "baz", "spam"]
-    # multichar
+    # Multi-character
     sep, items = "SEP", ["foo/bar", "baz", "spam"]
     fd = StringIO(sep.join(items))
     assert list(iter_separated(fd, sep=sep)) == items
-    # bytes
+    # Bytes
     sep, items = b"\n", [b"foo", b"blop\t", b"gr\xe4ezi"]
     fd = BytesIO(sep.join(items))
     assert list(iter_separated(fd)) == items

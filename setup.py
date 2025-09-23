@@ -30,7 +30,7 @@ sys.path += [os.path.dirname(__file__)]
 is_win32 = sys.platform.startswith("win32")
 is_openbsd = sys.platform.startswith("openbsd")
 
-# Number of threads to use for cythonize, not used on windows
+# Number of threads to use for cythonize, not used on Windows
 cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != "spawn" else None
 
 # How the build process finds the system libs:
@@ -91,8 +91,8 @@ else:
     cython_c_files = [fn.replace(".pyx", ".c") for fn in cython_sources]
     if not on_rtd and not all(os.path.exists(path) for path in cython_c_files):
         raise ImportError(
-            "The GIT version of Borg needs a working Cython. "
-            + "Install or fix Cython or use a released borg version. "
+            "The Git version of Borg needs a working Cython. "
+            + "Install or fix Cython or use a released Borg version. "
             + "Importing cythonize failed with: "
             + cythonize_import_error_msg
         )
@@ -115,7 +115,7 @@ if not on_rtd:
     try:
         import pkgconfig as pc
     except ImportError:
-        print("Warning: can not import pkgconfig python package.")
+        print("Warning: cannot import pkgconfig Python package.")
         pc = None
 
     def lib_ext_kwargs(pc, prefix_env_var, lib_name, lib_pkg_name, pc_version, lib_subdir="lib"):
@@ -139,7 +139,7 @@ if not on_rtd:
     if is_win32:
         crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "libcrypto", "libcrypto", ">=1.1.1", lib_subdir="")
     elif is_openbsd:
-        # Use openssl (not libressl) because we need AES-OCB via EVP api. Link
+        # Use OpenSSL (not LibreSSL) because we need AES-OCB via the EVP API. Link
         # it statically to avoid conflicting with shared libcrypto from the base
         # OS pulled in via dependencies.
         openssl_prefix = os.environ.get("BORG_OPENSSL_PREFIX", "/usr/local")
@@ -225,7 +225,7 @@ if not on_rtd:
         # we only set this to avoid the related FutureWarning from Cython3.
         cython_opts = dict(compiler_directives={"language_level": "3str"})
         if not is_win32:
-            # compile .pyx extensions to .c in parallel, does not work on windows
+            # Compile .pyx extensions to .c in parallel; does not work on Windows
             cython_opts["nthreads"] = cpu_threads
 
         # generate C code from Cython for ALL supported platforms, so we have them in the sdist.

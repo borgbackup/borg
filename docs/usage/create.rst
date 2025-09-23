@@ -23,14 +23,14 @@ Examples
     # /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
     $ borg create my-files /home --exclude 'sh:home/*/.thumbnails'
 
-    # Backup the root filesystem into an archive named "root-archive"
-    # use zlib compression (good, but slow) - default is lz4 (fast, low compression ratio)
+    # Back up the root filesystem into an archive named "root-archive"
+    # Use zlib compression (good, but slow) — default is LZ4 (fast, low compression ratio)
     $ borg create -C zlib,6 --one-file-system root-archive /
 
     # Backup into an archive name like FQDN-root
     $ borg create '{fqdn}-root' /
 
-    # Backup a remote host locally ("pull" style) using sshfs
+    # Back up a remote host locally ("pull" style) using SSHFS
     $ mkdir sshfs-mount
     $ sshfs root@example.com:/ sshfs-mount
     $ cd sshfs-mount
@@ -38,8 +38,8 @@ Examples
     $ cd ..
     $ fusermount -u sshfs-mount
 
-    # Make a big effort in fine granular deduplication (big chunk management
-    # overhead, needs a lot of RAM and disk space, see formula in internals docs):
+    # Make a big effort in fine-grained deduplication (big chunk management
+    # overhead, needs a lot of RAM and disk space; see the formula in the internals docs):
     $ borg create --chunker-params buzhash,10,23,16,4095 small /smallstuff
 
     # Backup a raw device (must not be active/in use/mounted at that time)
@@ -63,16 +63,16 @@ Examples
     # Only compress compressible data with lzma,N (N = 0..9)
     $ borg create --compression auto,lzma,N arch ~
 
-    # Use short hostname and user name as archive name
+    # Use the short hostname and username as the archive name
     $ borg create '{hostname}-{user}' ~
 
-    # Backing up relative paths by moving into the correct directory first
+    # Back up relative paths by moving into the correct directory first
     $ cd /home/user/Documents
     # The root directory of the archive will be "projectA"
     $ borg create 'daily-projectA' projectA
 
     # Use external command to determine files to archive
-    # Use --paths-from-stdin with find to back up only files less than 1MB in size
+    # Use --paths-from-stdin with find to back up only files less than 1 MB in size
     $ find ~ -size -1000k | borg create --paths-from-stdin small-files-only
     # Use --paths-from-command with find to back up files from only a given user
     $ borg create --paths-from-command joes-files -- find /srv/samba/shared -user joe

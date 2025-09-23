@@ -243,7 +243,7 @@ def with_archive(method):
 # e.g. through "borg ... --help", define a substitution for the reference here.
 # It will replace the entire :ref:`foo` verbatim.
 rst_plain_text_references = {
-    "a_status_oddity": '"I am seeing ‘A’ (added) status for a unchanged file!?"',
+    "a_status_oddity": '"I am seeing ‘A’ (added) status for an unchanged file!?"',
     "separate_compaction": '"Separate compaction"',
     "list_item_flags": '"Item flags"',
     "borg_patterns": '"borg help patterns"',
@@ -306,14 +306,14 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
             dest="exclude_if_present",
             action="append",
             type=str,
-            help="exclude directories that are tagged by containing a filesystem object with " "the given NAME",
+            help="exclude directories that are tagged by containing a filesystem object with the given NAME",
         )
         add_option(
             "--keep-exclude-tags",
             dest="keep_exclude_tags",
             action="store_true",
             help="if tag objects are specified with ``--exclude-if-present``, "
-            "don't omit the tag objects themselves from the backup archive",
+            "do not omit the tag objects themselves from the backup archive",
         )
 
     if strip_components:
@@ -348,7 +348,7 @@ def define_archive_filters_group(
         metavar="PATTERN",
         dest="match_archives",
         action="append",
-        help='only consider archives matching all patterns. see "borg help match-archives".',
+        help='only consider archives matching all patterns. See "borg help match-archives".',
     )
 
     if sort_by:
@@ -374,7 +374,7 @@ def define_archive_filters_group(
             type=positive_int_validator,
             default=0,
             action=Highlander,
-            help="consider first N archives after other filters were applied",
+            help="consider the first N archives after other filters are applied",
         )
         group.add_argument(
             "--last",
@@ -383,7 +383,7 @@ def define_archive_filters_group(
             type=positive_int_validator,
             default=0,
             action=Highlander,
-            help="consider last N archives after other filters were applied",
+            help="consider the last N archives after other filters are applied",
         )
 
     if oldest_newest:
@@ -394,7 +394,7 @@ def define_archive_filters_group(
             dest="oldest",
             type=relative_time_marker_validator,
             action=Highlander,
-            help="consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.",
+            help="consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.",
         )
         group.add_argument(
             "--newest",
@@ -402,7 +402,7 @@ def define_archive_filters_group(
             dest="newest",
             type=relative_time_marker_validator,
             action=Highlander,
-            help="consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.",
+            help="consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.",
         )
 
     if older_newer:
@@ -413,7 +413,7 @@ def define_archive_filters_group(
             dest="older",
             type=relative_time_marker_validator,
             action=Highlander,
-            help="consider archives older than (now - TIMESPAN), e.g. 7d or 12m.",
+            help="consider archives older than (now - TIMESPAN), e.g., 7d or 12m.",
         )
         group.add_argument(
             "--newer",
@@ -421,7 +421,7 @@ def define_archive_filters_group(
             dest="newer",
             type=relative_time_marker_validator,
             action=Highlander,
-            help="consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.",
+            help="consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.",
         )
 
     if deleted:

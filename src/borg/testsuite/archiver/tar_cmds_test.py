@@ -37,7 +37,7 @@ def test_export_tar(archivers, request):
     cmd(archiver, "create", "test", "input")
     cmd(archiver, "export-tar", "test", "simple.tar", "--progress", "--tar-format=GNU")
     with changedir("output"):
-        # This probably assumes GNU tar. Note -p switch to extract permissions regardless of umask.
+        # This probably assumes GNU tar. Note: use the -p switch to extract permissions regardless of umask.
         subprocess.check_call(["tar", "xpf", "../simple.tar", "--warning=no-timestamp"])
     assert_dirs_equal("input", "output/input", ignore_flags=True, ignore_xattrs=True, ignore_ns=True)
 
@@ -67,7 +67,7 @@ def test_export_tar_strip_components(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     test_list = cmd(archiver, "export-tar", "test", "simple.tar", "--strip-components=1", "--list", "--tar-format=GNU")
-    # --list's path are those before processing with --strip-components
+    # --list's paths are those before processing with --strip-components
     assert "input/file1\n" in test_list
     assert "input/dir2\n" in test_list
     with changedir("output"):
@@ -105,7 +105,7 @@ def test_extract_hardlinks_tar(archivers, request):
 
 def test_import_tar(archivers, request, tar_format="PAX"):
     archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
     cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "create", "src", "input")
@@ -148,7 +148,7 @@ def test_import_tar_with_dotdot(archivers, request):
 @requires_gzip
 def test_import_tar_gz(archivers, request, tar_format="GNU"):
     archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
     cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "create", "src", "input")
@@ -162,7 +162,7 @@ def test_import_tar_gz(archivers, request, tar_format="GNU"):
 @requires_gnutar
 def test_import_concatenated_tar_with_ignore_zeros(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
     with changedir("input"):
         subprocess.check_call(["tar", "cf", "file1.tar", "file1"])
@@ -191,7 +191,7 @@ def test_import_concatenated_tar_with_ignore_zeros(archivers, request):
 @requires_gnutar
 def test_import_concatenated_tar_without_ignore_zeros(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
 
     with changedir("input"):

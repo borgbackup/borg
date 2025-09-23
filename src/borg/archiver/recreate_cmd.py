@@ -17,7 +17,7 @@ logger = create_logger()
 class RecreateMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, cache):
-        """Re-create archives"""
+        """Recreate archives."""
         matcher = build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter
@@ -63,15 +63,15 @@ class RecreateMixIn:
             """
         Recreate the contents of existing archives.
 
-        recreate is a potentially dangerous function and might lead to data loss
+        Recreate is a potentially dangerous function and might lead to data loss
         (if used wrongly). BE VERY CAREFUL!
 
         Important: Repository disk space is **not** freed until you run ``borg compact``.
 
         ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``
         and PATH have the exact same semantics as in "borg create", but they only check
-        for files in the archives and not in the local file system. If PATHs are specified,
-        the resulting archives will only contain files from these PATHs.
+        files in the archives and not in the local filesystem. If paths are specified,
+        the resulting archives will contain only files from those paths.
 
         Note that all paths in an archive are relative, therefore absolute patterns/paths
         will *not* match (``--exclude``, ``--exclude-from``, PATHs).
@@ -80,9 +80,9 @@ class RecreateMixIn:
         used to have upgraded Borg 0.xx archives deduplicate with Borg 1.x archives.
 
         **USE WITH CAUTION.**
-        Depending on the PATHs and patterns given, recreate can be used to
+        Depending on the paths and patterns given, recreate can be used to
         delete files from archives permanently.
-        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
+        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/paths are
         interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
 
         The archive being recreated is only removed after the operation completes. The
@@ -97,8 +97,8 @@ class RecreateMixIn:
 
         If your most recent borg check found missing chunks, please first run another
         backup for the same data, before doing any rechunking. If you are lucky, that
-        will re-create the missing chunks. Optionally, do another borg check, to see
-        if the chunks are still missing).
+        will recreate the missing chunks. Optionally, do another borg check to see
+        if the chunks are still missing.
         """
         )
         subparser = subparsers.add_parser(

@@ -15,14 +15,14 @@ buffer = Buffer(bytearray, limit=2**24)
 
 
 def split_string0(buf):
-    """split a list of zero-terminated strings into python not-zero-terminated bytes"""
+    """Split a list of zero-terminated byte strings into Python bytes (without zero termination)."""
     if isinstance(buf, bytearray):
-        buf = bytes(buf)  # use a bytes object, so we return a list of bytes objects
+        buf = bytes(buf)  # Use a bytes object so we return a list of bytes objects.
     return buf.split(b"\0")[:-1]
 
 
 def split_lstring(buf):
-    """split a list of length-prefixed strings into python not-length-prefixed bytes"""
+    """Split a list of length-prefixed strings into Python bytes (without length prefixes)."""
     result = []
     mv = memoryview(buf)
     while mv:
@@ -33,7 +33,7 @@ def split_lstring(buf):
 
 
 class BufferTooSmallError(Exception):
-    """the buffer given to a xattr function was too small for the result."""
+    """The buffer given to an xattr function was too small for the result."""
 
 
 def _check(rv, path=None, detect_buffer_too_small=False):
@@ -43,7 +43,7 @@ def _check(rv, path=None, detect_buffer_too_small=False):
         e = get_errno()
         if detect_buffer_too_small and e == errno.ERANGE:
             # listxattr and getxattr signal with ERANGE that they need a bigger result buffer.
-            # setxattr signals this way that e.g. a xattr key name is too long / inacceptable.
+            # setxattr signals this when, e.g., an xattr key name is too long or unacceptable.
             raise BufferTooSmallError
         else:
             try:
@@ -54,9 +54,9 @@ def _check(rv, path=None, detect_buffer_too_small=False):
                 path = "<FD %d>" % path
             raise OSError(e, msg, path)
     if detect_buffer_too_small and rv >= len(buffer):
-        # freebsd does not error with ERANGE if the buffer is too small,
-        # it just fills the buffer, truncates and returns.
-        # so, we play safe and just assume that result is truncated if
+        # FreeBSD does not error with ERANGE if the buffer is too small;
+        # it just fills the buffer, truncates, and returns.
+        # So, we play it safe and assume the result is truncated if
         # it happens to be a full buffer.
         raise BufferTooSmallError
     return rv

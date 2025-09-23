@@ -51,7 +51,7 @@ def test_size_nfiles(archivers, request):
     o_t = output.split()
     assert o_t[0] == "test"
     assert int(o_t[1]) == 2
-    assert 123456 <= int(o_t[2]) < 123999  # there is some metadata overhead
+    assert 123456 <= int(o_t[2]) < 123999  # There is some metadata overhead
 
 
 def test_date_matching(archivers, request):

@@ -16,7 +16,7 @@ logger = create_logger()
 
 class MountMixIn:
     def do_mount(self, args):
-        """Mount archive or an entire repository as a FUSE filesystem"""
+        """Mounts an archive or an entire repository as a FUSE filesystem."""
         # Perform these checks before opening the repository and asking for a passphrase.
 
         from ..fuse_impl import llfuse, BORG_FUSE_IMPL
@@ -46,7 +46,7 @@ class MountMixIn:
                 raise RTError("FUSE mount failed")
 
     def do_umount(self, args):
-        """un-mount the FUSE filesystem"""
+        """Unmounts the FUSE filesystem."""
         umount(args.mountpoint)
 
     def build_parser_mount_umount(self, subparsers, common_parser, mid_common_parser):
@@ -64,15 +64,15 @@ class MountMixIn:
         archives and the directory structure below these will be loaded on-demand from
         the repository when entering these directories, so expect some delay.
 
-        Unless the ``--foreground`` option is given the command will run in the
-        background until the filesystem is ``umounted``.
+        Unless the ``--foreground`` option is given, the command will run in the
+        background until the filesystem is ``unmounted``.
 
         Performance tips:
 
-        - when doing a "whole repository" mount:
-          do not enter archive dirs if not needed, this avoids on-demand loading.
-        - only mount a specific archive, not the whole repository.
-        - only mount specific paths in a specific archive, not the complete archive.
+        - When doing a "whole repository" mount:
+          do not enter archive directories if not needed; this avoids on-demand loading.
+        - Only mount a specific archive, not the whole repository.
+        - Only mount specific paths in a specific archive, not the complete archive.
 
         The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
         used in fstab entries:
@@ -84,35 +84,35 @@ class MountMixIn:
         For FUSE configuration and mount options, see the mount.fuse(8) manual page.
 
         Borg's default behavior is to use the archived user and group names of each
-        file and map them to the system's respective user and group ids.
+        file and map them to the system's respective user and group IDs.
         Alternatively, using ``numeric-ids`` will instead use the archived user and
-        group ids without any mapping.
+        group IDs without any mapping.
 
         The ``uid`` and ``gid`` mount options (implemented by Borg) can be used to
-        override the user and group ids of all files (i.e., ``borg mount -o
+        override the user and group IDs of all files (i.e., ``borg mount -o
         uid=1000,gid=1000``).
 
         The man page references ``user_id`` and ``group_id`` mount options
-        (implemented by fuse) which specify the user and group id of the mount owner
-        (aka, the user who does the mounting). It is set automatically by libfuse (or
+        (implemented by FUSE) which specify the user and group ID of the mount owner
+        (also known as the user who does the mounting). It is set automatically by libfuse (or
         the filesystem if libfuse is not used). However, you should not specify these
-        manually. Unlike the ``uid`` and ``gid`` mount options which affect all files,
-        ``user_id`` and ``group_id`` affect the user and group id of the mounted
+        manually. Unlike the ``uid`` and ``gid`` mount options, which affect all files,
+        ``user_id`` and ``group_id`` affect the user and group ID of the mounted
         (base) directory.
 
-        Additional mount options supported by borg:
+        Additional mount options supported by Borg:
 
         - ``versions``: when used with a repository mount, this gives a merged, versioned
-          view of the files in the archives. EXPERIMENTAL, layout may change in future.
-        - ``allow_damaged_files``: by default damaged files (where chunks are missing)
+          view of the files in the archives. EXPERIMENTAL; layout may change in the future.
+        - ``allow_damaged_files``: by default, damaged files (where chunks are missing)
           will return EIO (I/O error) when trying to read the related parts of the file.
           Set this option to replace the missing parts with all-zero bytes.
         - ``ignore_permissions``: for security reasons the ``default_permissions`` mount
-          option is internally enforced by borg. ``ignore_permissions`` can be given to
+          option is internally enforced by Borg. ``ignore_permissions`` can be given to
           not enforce ``default_permissions``.
 
-        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
-        to tweak the performance. It sets the number of cached data chunks; additional
+        The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is intended for advanced users
+        to tweak performance. It sets the number of cached data chunks; additional
         memory usage can be up to ~8 MiB times this number. The default is the number
         of CPU cores.
 
@@ -131,13 +131,13 @@ class MountMixIn:
             description=self.do_mount.__doc__,
             epilog=mount_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="mount repository",
+            help="mount a repository",
         )
         self._define_borg_mount(subparser)
 
         umount_epilog = process_epilog(
             """
-        This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
+        This command unmounts a FUSE filesystem that was mounted with ``borg mount``.
 
         This is a convenience wrapper that just calls the platform-specific shell
         command - usually this is either umount or fusermount -u.
@@ -150,11 +150,11 @@ class MountMixIn:
             description=self.do_umount.__doc__,
             epilog=umount_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="umount repository",
+            help="unmount a repository",
         )
         subparser.set_defaults(func=self.do_umount)
         subparser.add_argument(
-            "mountpoint", metavar="MOUNTPOINT", type=str, help="mountpoint of the filesystem to umount"
+            "mountpoint", metavar="MOUNTPOINT", type=str, help="mountpoint of the filesystem to unmount"
         )
 
     def build_parser_borgfs(self, parser):
@@ -162,7 +162,7 @@ class MountMixIn:
         parser.description = self.do_mount.__doc__
         parser.epilog = "For more information, see borg mount --help."
         parser.formatter_class = argparse.RawDescriptionHelpFormatter
-        parser.help = "mount repository"
+        parser.help = "mount a repository"
         self._define_borg_mount(parser)
         return parser
 
@@ -170,16 +170,16 @@ class MountMixIn:
         from ._common import define_exclusion_group, define_archive_filters_group
 
         parser.set_defaults(func=self.do_mount)
-        parser.add_argument("mountpoint", metavar="MOUNTPOINT", type=str, help="where to mount filesystem")
+        parser.add_argument("mountpoint", metavar="MOUNTPOINT", type=str, help="where to mount the filesystem")
         parser.add_argument(
             "-f", "--foreground", dest="foreground", action="store_true", help="stay in foreground, do not daemonize"
         )
-        parser.add_argument("-o", dest="options", type=str, action=Highlander, help="Extra mount options")
+        parser.add_argument("-o", dest="options", type=str, action=Highlander, help="extra mount options")
         parser.add_argument(
             "--numeric-ids",
             dest="numeric_ids",
             action="store_true",
-            help="use numeric user and group identifiers from archive(s)",
+            help="use numeric user and group identifiers from archives",
         )
         define_archive_filters_group(parser)
         parser.add_argument(

@@ -68,13 +68,13 @@ class HelpMixIn:
             always normalized to a forward slash '/' before applying a pattern.
 
         Path prefix, selector ``pp:``
-            This pattern style is useful to match whole sub-directories. The pattern
+            This pattern style is useful to match whole subdirectories. The pattern
             ``pp:root/somedir`` matches ``root/somedir`` and everything therein.
             A leading path separator is always removed.
 
         Path full-match, selector ``pf:``
             This pattern style is (only) useful to match full paths.
-            This is kind of a pseudo pattern as it can not have any variable or
+            This is kind of a pseudo pattern as it cannot have any variable or
             unspecified parts - the full path must be given. ``pf:root/file.ext``
             matches ``root/file.ext`` only. A leading path separator is always
             removed.
@@ -101,15 +101,15 @@ class HelpMixIn:
         from within a shell, the patterns should be quoted to protect them from
         expansion.
 
-        Patterns matching special characters, e.g. white space, within a shell may 
+        Patterns matching special characters, e.g. whitespace, within a shell may
         require adjustments, such as putting quotation marks around the arguments.
-        Example: 
+        Example:
         Using bash, the following command line option would match and exclude "item name":
         ``--pattern='-path/item name'``
-        Note that when patterns are used within a pattern file directly read by borg,  
-        e.g. when using ``--exclude-from`` or ``--patterns-from``, there is no shell 
+        Note that when patterns are used within a pattern file directly read by borg,
+        e.g. when using ``--exclude-from`` or ``--patterns-from``, there is no shell
         involved and thus no quotation marks are required.
-        
+
         The ``--exclude-from`` option permits loading exclusion patterns from a text
         file with one pattern per line. Lines empty or starting with the hash sign
         '#' after removing whitespace on both ends are ignored. The optional style
@@ -216,7 +216,7 @@ class HelpMixIn:
 
         .. note::
 
-            It's possible that a sub-directory/file is matched while parent
+            It is possible that a subdirectory or file is matched while its parent
             directories are not. In that case, parent directories are not backed
             up and thus their user, group, permission, etc. cannot be restored.
 
@@ -382,14 +382,14 @@ class HelpMixIn:
     )
     helptext["compression"] = textwrap.dedent(
         """
-        It is no problem to mix different compression methods in one repo,
+        It is no problem to mix different compression methods in one repository,
         deduplication is done on the source data chunks (not on the compressed
         or encrypted data).
 
-        If some specific chunk was once compressed and stored into the repo, creating
+        If some specific chunk was once compressed and stored into the repository, creating
         another backup that also uses this chunk will not change the stored chunk.
         So if you use different compression specs for the backups, whichever stores a
-        chunk first determines its compression. See also borg recreate.
+        chunk first determines its compression. See also ``borg recreate``.
 
         Compression is lz4 by default. If you want something else, you have to specify what you want.
 

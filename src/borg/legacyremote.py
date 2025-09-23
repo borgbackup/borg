@@ -44,7 +44,7 @@ RATELIMIT_PERIOD = 0.1
 
 
 class ConnectionClosed(Error):
-    """Connection closed by remote host"""
+    """Connection closed by remote host."""
 
     exit_mcode = 80
 
@@ -56,13 +56,13 @@ class ConnectionClosedWithHint(ConnectionClosed):
 
 
 class PathNotAllowed(Error):
-    """Repository path not allowed: {}"""
+    """Repository path not allowed: {}."""
 
     exit_mcode = 83
 
 
 class InvalidRPCMethod(Error):
-    """RPC method {} is not valid"""
+    """RPC method {} is not valid."""
 
     exit_mcode = 82
 
@@ -95,7 +95,7 @@ class ConnectionBrokenWithHint(Error):
 
 
 # Protocol compatibility:
-# In general the server is responsible for rejecting too old clients and the client it responsible for rejecting
+# In general the server is responsible for rejecting too old clients and the client is responsible for rejecting
 # too old servers. This ensures that the knowledge what is compatible is always held by the newer component.
 #
 # For the client the return of the negotiate method is a dict which includes the server version.

@@ -73,9 +73,9 @@ FILES = 4
 
 class ItemCache:
     """
-    This is the "meat" of the file system's metadata storage.
+    This is the "meat" of the filesystem's metadata storage.
 
-    This class generates inode numbers that efficiently index items in archives,
+    This class generates inode numbers that efficiently index items in archives
     and retrieves items from these inode numbers.
     """
 
@@ -422,7 +422,7 @@ class FuseBackend:
             else:
                 inode = item_inode
                 self._items[inode] = item
-                # remember extracted item path, so that following hardlinks don't extract twice.
+                # remember extracted item path, so that following hard links don't extract twice.
                 hlm.remember(id=item.hlid, info=path)
         else:
             inode = item_inode

@@ -37,14 +37,14 @@ def test_chunkpoints_unchanged():
                         runs.append(H(b"".join(chunks)))
 
     # The "correct" hash below matches the existing chunker behavior.
-    # Future chunker optimisations must not change this, or existing repos will bloat.
+    # Future chunker optimizations must not change this, or existing repos will bloat.
     overall_hash = H(b"".join(runs))
     assert overall_hash == hex_to_bin("a43d0ecb3ae24f38852fcc433a83dacd28fe0748d09cc73fc11b69cf3f1a7299")
 
 
 def test_buzhash_chunksize_distribution():
     data = os.urandom(1048576)
-    min_exp, max_exp, mask = 10, 16, 14  # chunk size target 16kiB, clip at 1kiB and 64kiB
+    min_exp, max_exp, mask = 10, 16, 14  # chunk size target 16 KiB, clip at 1 KiB and 64 KiB
     chunker = Chunker(0, min_exp, max_exp, mask, 4095)
     f = BytesIO(data)
     chunks = cf(chunker.chunkify(f))
@@ -59,7 +59,7 @@ def test_buzhash_chunksize_distribution():
         f"count: {chunks_count} min: {min_chunksize_observed} max: {max_chunksize_observed} "
         f"min count: {min_count} max count: {max_count}"
     )
-    # usually there will about 64 chunks
+    # usually there will be about 64 chunks
     assert 32 < chunks_count < 128
     # chunks always must be between min and max (clipping must work):
     assert min_chunksize_observed >= 2**min_exp

@@ -18,7 +18,7 @@ class ChunkerFailing:
     def __init__(self, block_size: int, map: str) -> None:
         self.block_size = block_size
         # one char per block: r/R = successful read, e/E = I/O Error, e.g.: "rrrrErrrEEr"
-        # blocks beyond the map will have same behaviour as the last map char indicates.
+        # blocks beyond the map will have the same behavior as the last map char indicates.
         map = map.upper()
         if not set(map).issubset({"R", "E"}):
             raise ValueError("unsupported map character")
@@ -41,12 +41,12 @@ class ChunkerFailing:
             got = len(data)
             if got > 0:
                 idx = self.count if self.count < len(self.map) else -1
-                behaviour = self.map[idx]
-                if behaviour == "E":
+                behavior = self.map[idx]
+                if behavior == "E":
                     self.count += 1
                     fname = None if use_fh else getattr(fd, "name", None)
                     raise OSError(errno.EIO, "simulated I/O error", fname)
-                elif behaviour == "R":
+                elif behavior == "R":
                     self.count += 1
                     yield Chunk(data, size=got, allocation=CH_DATA)
                 else:

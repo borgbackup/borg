@@ -47,9 +47,9 @@ class FileHashingWrapper(FileLikeWrapper):
     Wrapper for file-like objects that computes a hash on-the-fly while reading/writing.
 
     WARNING: Seeks should only be used to query the size of the file, not
-    to skip data, because skipped data isn't read and not hashed into the digest.
+    to skip data, because skipped data is not read and not hashed into the digest.
 
-    Similarly skipping while writing to create sparse files is also not supported.
+    Similarly, skipping while writing to create sparse files is not supported.
 
     Data has to be read/written in a symmetric fashion, otherwise different
     digests will be generated.
@@ -89,9 +89,9 @@ class FileHashingWrapper(FileLikeWrapper):
 
     def hexdigest(self):
         """
-        Return current digest bytes as hex-string.
+        Return current digest bytes as a hex string.
 
-        Note: this can be called multiple times.
+        Note: This can be called multiple times.
         """
         return self.hash.hexdigest()
 

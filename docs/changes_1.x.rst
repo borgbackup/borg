@@ -73,7 +73,7 @@ no matter what encryption mode they use, including "none"):
    for normal production operations - it is only needed once to get the archives in a
    repository into a good state. All archives have a valid TAM now.
 
-Vulnerability time line:
+Vulnerability timeline:
 
 * 2023-06-13: Vulnerability discovered during code review by Thomas Waldmann
 * 2023-06-13...: Work on fixing the issue, upgrade procedure, docs.

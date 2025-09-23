@@ -16,7 +16,7 @@ logger = create_logger()
 class RepoListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_repo_list(self, args, repository, manifest):
-        """List the archives contained in a repository"""
+        """List the archives contained in a repository."""
         if args.format is not None:
             format = args.format
         elif args.short:
@@ -52,7 +52,7 @@ class RepoListMixIn:
         The FORMAT specifier syntax
         +++++++++++++++++++++++++++
 
-        The ``--format`` option uses python's `format string syntax
+        The ``--format`` option uses Python's `format string syntax
         <https://docs.python.org/3.9/library/string.html#formatstrings>`_.
 
         Examples:

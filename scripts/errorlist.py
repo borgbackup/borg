@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# this script automatically generates the error list for the docs by
+# This script automatically generates the error list for the documentation by
 # looking at the "Error" class and its subclasses.
 
 from textwrap import indent

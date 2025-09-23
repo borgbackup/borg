@@ -17,7 +17,7 @@ borg 1.2.x/1.4.x to borg 2.0
 
 Compatibility notes:
 
-- this is a major "breaking" release that is not compatible with existing repos.
+- This is a major "breaking" release that is not compatible with existing repositories.
 
   We tried to put all the necessary "breaking" changes into this release, so we
   hopefully do not need another breaking release in the near future. The changes
@@ -33,24 +33,24 @@ Compatibility notes:
   you must have followed the upgrade instructions at top of the change log
   relating to manifest and archive TAMs (borg2 just requires these TAMs now).
 
-- command line syntax was changed, scripts and wrappers will need changes:
+- Command-line syntax was changed; scripts and wrappers will need changes:
 
-  - you will usually either export BORG_REPO=<MYREPO> into your environment or
+  - You will usually either export BORG_REPO=<MYREPO> into your environment or
     call borg like: "borg -r <MYREPO> <COMMAND>".
-    in the docs, we usually omit "-r ..." for brevity.
-  - the scp-style REPO syntax was removed, please use ssh://..., #6697
-  - ssh:// URLs: removed support for /~otheruser/, /~/ and /./, #6855.
+    In the docs, we usually omit "-r ..." for brevity.
+  - The scp-style REPO syntax was removed; please use ssh://..., #6697
+  - ssh:// URLs: Removed support for /~otheruser/, /~/ and /./, #6855.
     New format:
 
     - ssh://user@host:port/relative/path
     - ssh://user@host:port//absolute/path
-  - -P / --prefix option was removed, please use the similar -a / --match-archives.
-  - archive names don't need to be unique anymore. to the contrary:
-    it is now strongly recommended to use the identical name for borg create
+  - -P / --prefix option was removed; please use the similar -a / --match-archives.
+  - Archive names don't need to be unique anymore. To the contrary:
+    It is now strongly recommended to use the identical name for borg create
     within the same series of archives to make borg work more efficiently.
-    the name now identifies a series of archive, to identify a single archive
-    please use aid:<archive-hash-prefix>, e.g.: borg delete aid:d34db33f
-  - in case you do NOT want to adopt the "series name" way of naming archives
+    The name now identifies a series of archives; to identify a single archive,
+    please use aid:<archive-hash-prefix>, e.g., borg delete aid:d34db33f
+  - In case you do NOT want to adopt the "series name" way of naming archives
     (like "myarchive") as we recommend, but keep using always-changing names
     (like "myserver-myarchive-20241231"), you can do that, but then you must
     make use of BORG_FILES_CACHE_SUFFIX and either set it to a constant suffix
@@ -60,9 +60,9 @@ Compatibility notes:
     greater than the count of different archives series you write to that repo.
     Usually borg uses a different files cache suffix per archive (series) name
     and defaults to BORG_FILES_CACHE_TTL=2 because that is sufficient for that.
-  - the archive id is always given separately from the repository
-    (differently than with borg 1.x you must not give repo::archive).
-  - the series name or archive id is either given as a positional parameter,
+  - The archive ID is always given separately from the repository.
+    Unlike in borg 1.x, you must not give repo::archive.
+  - The series name or archive ID is either given as a positional parameter,
     like:
 
     - borg create documents ~/Documents

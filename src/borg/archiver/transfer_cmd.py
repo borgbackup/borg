@@ -72,14 +72,14 @@ def transfer_chunks(
                     try:
                         cdata = other_repository.get(chunk_id)
                     except (Repository.ObjectNotFound, LegacyRepository.ObjectNotFound):
-                        # missing correct chunk in other_repository (source) will result in
+                        # A missing correct chunk in other_repository (source) will result in
                         # a missing chunk in repository (destination).
-                        # we do NOT want to transfer all-zero replacement chunks from borg1 repos.
+                        # We do NOT want to transfer all-zero replacement chunks from Borg 1 repositories.
                         pass
                     else:
                         if recompress == "never":
-                            # keep compressed payload same, verify via assert_id (that will
-                            # decompress, but avoid needing to compress it again):
+                            # Keep the compressed payload the same; verify via assert_id (that will
+                            # decompress, but avoids needing to compress it again):
                             meta, data = other_manifest.repo_objs.parse(
                                 chunk_id, cdata, decompress=True, want_compressed=True, ro_type=ROBJ_FILE_STREAM
                             )
@@ -182,18 +182,18 @@ class TransferMixIn:
             id_hex, ts_str = bin_to_hex(id), ts.isoformat()
             transfer_size = 0
             present_size = 0
-            # at least for borg 1.x -> borg2 transfers, we can not use the id to check for
-            # already transferred archives (due to upgrade of metadata stream, id will be
-            # different anyway). so we use archive name and timestamp.
-            # the name alone might be sufficient for borg 1.x -> 2 transfers, but isn't
-            # for 2 -> 2 transfers, because borg2 allows duplicate names ("series" feature).
-            # so, best is to check for both name/ts and name/id.
+            # At least for Borg 1.x -> Borg 2 transfers, we cannot use the ID to check for
+            # already transferred archives (due to upgrade of the metadata stream, the ID will be
+            # different anyway). So we use the archive name and timestamp.
+            # The name alone might be sufficient for Borg 1.x -> 2 transfers, but it isn't
+            # for 2 -> 2 transfers, because Borg 2 allows duplicate names ("series" feature).
+            # So, the best is to check for both name/ts and name/id.
             if not dry_run and manifest.archives.exists_name_and_ts(name, archive_info.ts):
-                # useful for borg 1.x -> 2 transfers, we have unique names in borg 1.x.
-                # also useful for borg 2 -> 2 transfers with metadata changes (id changes).
+                # Useful for Borg 1.x -> 2 transfers; we have unique names in Borg 1.x.
+                # Also useful for Borg 2 -> 2 transfers with metadata changes (ID changes).
                 print(f"{name} {ts_str}: archive is already present in destination repo, skipping.")
             elif not dry_run and manifest.archives.exists_name_and_id(name, id):
-                # useful for borg 2 -> 2 transfers without changes (id stays the same)
+                # Useful for Borg 2 -> 2 transfers without changes (ID stays the same)
                 print(f"{name} {id_hex}: archive is already present in destination repo, skipping.")
             else:
                 if not dry_run:
@@ -206,11 +206,11 @@ class TransferMixIn:
                 for item in other_archive.iter_items():
                     is_part = bool(item.get("part", False))
                     if is_part:
-                        # borg 1.x created part files while checkpointing (in addition to the full
+                        # Borg 1.x created part files while checkpointing (in addition to the full
                         # file in the final archive), like <filename>.borg_part_<part> with item.part >= 1.
-                        # borg2 archives do not have such special part items anymore.
-                        # so let's remove them from old archives also, considering there is no
-                        # code any more that deals with them in special ways (e.g. to get stats right).
+                        # Borg 2 archives do not have such special part items anymore.
+                        # So let's remove them from old archives also, considering there is no
+                        # code anymore that deals with them in special ways (e.g., to get stats right).
                         continue
                     if "chunks_healthy" in item:  # legacy
                         other_chunks = item.chunks_healthy  # chunks_healthy has the CORRECT chunks list, if present.

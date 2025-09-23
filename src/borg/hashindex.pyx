@@ -67,7 +67,7 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         return value._replace(flags=user_flags)
 
     def iteritems(self, *, only_new=False):
-        """iterate items (optionally only new items), hide system flags."""
+        """Iterates items (optionally only new items); hides system flags."""
         for key, value in self.ht.items():
             if not only_new or (value.flags & self.F_NEW):
                 yield key, self.hide_system_flags(value)
@@ -82,12 +82,12 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         self[key] = ChunkIndexEntry(flags=flags, size=size)
 
     def __getitem__(self, key):
-        """specialized __getitem__ that hides system flags."""
+        """Specialized __getitem__ that hides system flags."""
         value = self.ht[key]
         return self.hide_system_flags(value)
 
     def __setitem__(self, key, value):
-        """specialized __setitem__ that protects system flags, manages F_NEW flag."""
+        """Specialized __setitem__ that protects system flags and manages the F_NEW flag."""
         try:
             prev = self.ht[key]
         except KeyError:
@@ -105,7 +105,7 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         self.ht[key] = value._replace(flags=system_flags | user_flags)
 
     def clear_new(self):
-        """clear F_NEW flag of all items"""
+        """Clears the F_NEW flag of all items."""
         for key, value in self.ht.items():
             if value.flags & self.F_NEW:
                 flags = value.flags & ~self.F_NEW
@@ -152,7 +152,7 @@ NSIndex1EntryFormat = NSIndex1EntryFormatT(segment="I", offset="I")
 
 class NSIndex1(HTProxyMixin, MutableMapping):
     """
-    Mapping from key256 to (segment32, offset32), as used by legacy repo index of borg 1.x.
+    Mapping from key256 to (segment32, offset32), as used by the legacy repository index of Borg 1.x.
     """
     MAX_VALUE = 2**32 - 1  # borghash has the full uint32_t range
     MAGIC = b"BORG_IDX"  # borg 1.x
@@ -217,21 +217,21 @@ class NSIndex1(HTProxyMixin, MutableMapping):
         header_size = struct.calcsize(self.HEADER_FMT)
         header_bytes = fd.read(header_size)
         if len(header_bytes) < header_size:
-            raise ValueError(f"Invalid file, file is too short (header).")
+            raise ValueError(f"Invalid file: file is too short (header).")
         # verify the header as a separate integrity-hash part if supported
         hash_part = getattr(fd, "hash_part", None)
         if hash_part:
             hash_part("HashHeader")
         magic, entries, buckets, ksize, vsize = struct.unpack(self.HEADER_FMT, header_bytes)
         if magic != self.MAGIC:
-            raise ValueError(f"Invalid file, magic {self.MAGIC.decode()} not found.")
+            raise ValueError(f"Invalid file: magic {self.MAGIC.decode()} not found.")
         assert ksize == self.KEY_SIZE, "invalid key size"
         assert vsize == self.VALUE_SIZE, "invalid value size"
         buckets_size = buckets * (ksize + vsize)
         current_pos = fd.tell()
         end_of_file = fd.seek(0, os.SEEK_END)
         if current_pos + buckets_size != end_of_file:
-            raise ValueError(f"Invalid file, file size does not match (buckets).")
+            raise ValueError(f"Invalid file: file size does not match (buckets).")
         fd.seek(current_pos)
         for i in range(buckets):
             key = fd.read(ksize)

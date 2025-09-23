@@ -14,12 +14,12 @@ from ..version import parse_version, format_version
         ("1.0.0a1.dev204+g8866961.d20170606", (1, 0, 0, -4, 1)),
         ("1.0.0a1.dev204+g8866961", (1, 0, 0, -4, 1)),
         ("1.0.0+d20170606", (1, 0, 0, -1)),
-        # pre-release versions:
+        # Pre-release versions:
         ("1.0.0a1", (1, 0, 0, -4, 1)),
         ("1.0.0a2", (1, 0, 0, -4, 2)),
         ("1.0.0b3", (1, 0, 0, -3, 3)),
         ("1.0.0rc4", (1, 0, 0, -2, 4)),
-        # release versions:
+        # Release versions:
         ("0.0.0", (0, 0, 0, -1)),
         ("0.0.11", (0, 0, 11, -1)),
         ("0.11.0", (0, 11, 0, -1)),
@@ -33,7 +33,7 @@ def test_parse_version(version_str, version_tuple):
 @pytest.mark.parametrize("invalid_version", ["", "1", "1.2", "crap"])
 def test_parse_version_invalid(invalid_version):
     with pytest.raises(ValueError):
-        assert parse_version(invalid_version)  # we require x.y.z versions
+        assert parse_version(invalid_version)  # We require x.y.z versions
 
 
 @pytest.mark.parametrize(

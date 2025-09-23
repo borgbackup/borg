@@ -29,7 +29,7 @@ RACE_TEST_DURATION = 0.4  # seconds
 
 @pytest.fixture()
 def free_pid():
-    """Return a free PID not used by any process (naturally this is racy)"""
+    """Return a free PID not used by any process (naturally this is racy)."""
     host, pid, tid = get_process_id()
     while True:
         # PIDs are often restricted to a small range. On Linux the range >32k is by default not used.
@@ -96,14 +96,14 @@ class TestExclusiveLock:
         old_id, new_id = ID1, ID2
         assert old_id[1] != new_id[1]  # different PIDs (like when doing daemonize())
         lock = ExclusiveLock(lockpath, id=old_id).acquire()
-        assert lock.id == old_id  # lock is for old id / PID
+        assert lock.id == old_id  # Lock is for the old ID/PID.
         old_unique_name = lock.unique_name
         assert lock.by_me()  # we have the lock
         lock.migrate_lock(old_id, new_id)  # fix the lock
-        assert lock.id == new_id  # lock corresponds to the new id / PID
+        assert lock.id == new_id  # Lock corresponds to the new ID/PID.
         new_unique_name = lock.unique_name
         assert lock.by_me()  # we still have the lock
-        assert old_unique_name != new_unique_name  # locking filename is different now
+        assert old_unique_name != new_unique_name  # Locking filename is different now.
 
     def test_race_condition(self, lockpath):
         class SynchronizedCounter:

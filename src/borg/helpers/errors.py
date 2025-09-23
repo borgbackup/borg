@@ -67,11 +67,11 @@ class CancelledByUser(Error):
 
 
 class RTError(Error):
-    """Runtime Error: {}"""
+    """Runtime error: {}"""
 
 
 class CommandError(Error):
-    """Command Error: {}"""
+    """Command error: {}"""
 
     exit_mcode = 4
 
@@ -101,7 +101,7 @@ class BorgWarning:
 
 
 class FileChangedWarning(BorgWarning):
-    """{}: file changed while we backed it up"""
+    """{}: file changed while we backed it up."""
 
     exit_mcode = 100
 
@@ -185,4 +185,4 @@ class BackupFileNotFoundError(BackupOSError):
 
 
 class BackupItemExcluded(Exception):
-    """used internally to skip an item from processing, when it is excluded."""
+    """Used internally to skip an item from processing when it is excluded."""

@@ -39,7 +39,7 @@ if sys.platform.startswith("linux"):
 
 
 def is_enabled(path=None):
-    """Determine if xattr is enabled on the filesystem"""
+    """Determines whether xattrs are enabled on the filesystem."""
     with tempfile.NamedTemporaryFile(dir=path, prefix="borg-tmp") as f:
         fd = f.fileno()
         name, value = b"user.name", b"value"
@@ -65,7 +65,7 @@ def get_all(path, follow_symlinks=False):
     and only applies when *path* is not an open file descriptor.
 
     The returned mapping maps xattr names (bytes) to values (bytes or None).
-    None indicates, as a xattr value, an empty value, i.e. a value of length zero.
+    None indicates, as an xattr value, an empty value, i.e. a value of length zero.
     """
     if isinstance(path, str):
         path = os.fsencode(path)
@@ -84,7 +84,7 @@ def get_all(path, follow_symlinks=False):
                 else:  # all others: warn, skip this single xattr name, continue processing other xattrs
                     # EPERM: we were not permitted to read this attribute
                     # EINVAL: maybe xattr name is invalid or other issue, #6988
-                    logger.warning("when getting extended attribute %s: %s", name.decode(errors="replace"), str(e))
+                    logger.warning("When getting extended attribute %s: %s", name.decode(errors="replace"), str(e))
     except OSError as e:
         if e.errno in (errno.ENOTSUP, errno.EPERM):
             # if xattrs are not supported on the filesystem, we give up.
@@ -102,10 +102,10 @@ def set_all(path, xattrs, follow_symlinks=False):
     *path* can either be a path (str or bytes) or an open file descriptor (int).
     *follow_symlinks* indicates whether symlinks should be followed
     and only applies when *path* is not an open file descriptor.
-    *xattrs* is mapping maps xattr names (bytes) to values (bytes or None).
-    None indicates, as a xattr value, an empty value, i.e. a value of length zero.
+    *xattrs* is a mapping that maps xattr names (bytes) to values (bytes or None).
+    None indicates, as an xattr value, an empty value, i.e. a value of length zero.
 
-    Return warning status (True means a non-fatal exception has happened and was dealt with).
+    Returns the warning status (True means a non-fatal exception occurred and was handled).
     """
     if isinstance(path, str):
         path = os.fsencode(path)
@@ -127,5 +127,5 @@ def set_all(path, xattrs, follow_symlinks=False):
                 # EACCES: permission denied to set this specific xattr (this may happen related to security.* keys)
                 # EPERM: operation not permitted
                 err_str = str(e)
-            logger.warning("when setting extended attribute %s: %s", k.decode(errors="replace"), err_str)
+            logger.warning("When setting extended attribute %s: %s", k.decode(errors="replace"), err_str)
     return warning

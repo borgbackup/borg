@@ -118,15 +118,15 @@ class PatternMatcher:
             self._add(pattern, cmd)
 
     def add_includepaths(self, include_paths):
-        """Used to add inclusion-paths from args.paths (from commandline)."""
+        """Used to add inclusion-paths from args.paths (from the command line)."""
         include_patterns = [parse_pattern(p, PathPrefixPattern) for p in include_paths]
         self.add(include_patterns, IECommand.Include)
         self.fallback = not include_patterns
         self.include_patterns = include_patterns
 
     def get_unmatched_include_patterns(self):
-        """Note that this only returns patterns added via *add_includepaths* and it
-        won't return PathFullPattern patterns as we do not match_count for them.
+        """Note that this only returns patterns added via *add_includepaths*, and it
+        won't return PathFullPattern patterns, as we do not maintain match_count for them.
         """
         return [p for p in self.include_patterns if p.match_count == 0 and not isinstance(p, PathFullPattern)]
 

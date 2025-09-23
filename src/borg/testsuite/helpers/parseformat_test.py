@@ -59,13 +59,13 @@ def test_text_to_json(key, value, strict):
     d = text_to_json(key, value)
     value_b = value.encode("utf-8", errors="surrogateescape")
     if strict:
-        # no surrogate-escapes, just unicode text
+        # No surrogate escapes; just Unicode text.
         assert key in d
         assert d[key] == value_b.decode("utf-8", errors="strict")
         assert d[key].encode("utf-8", errors="strict") == value_b
-        assert key_b64 not in d  # not needed. pure valid unicode.
+        assert key_b64 not in d  # Not needed; pure valid Unicode.
     else:
-        # requiring surrogate-escapes. text has replacement chars, base64 representation is present.
+        # Requires surrogate escapes. The text has replacement characters; Base64 representation is present.
         assert key in d
         assert d[key] == value.encode("utf-8", errors="replace").decode("utf-8", errors="strict")
         assert d[key].encode("utf-8", errors="strict") == value.encode("utf-8", errors="replace")
@@ -245,7 +245,7 @@ class TestLocationWithoutEnv:
 
     def test_relpath(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
-        # for a local path, borg creates a Location instance with an absolute path
+        # For a local path, Borg creates a Location instance with an absolute path.
         rel_path = "relative/path"
         abs_path = os.path.abspath(rel_path)
         assert (
@@ -299,7 +299,7 @@ class TestLocationWithoutEnv:
 
     def test_bad_syntax(self):
         with pytest.raises(ValueError):
-            # this is invalid due to the 2nd colon, correct: 'ssh://user@host/path'
+            # This is invalid due to the second colon. Correct: 'ssh://user@host/path'.
             Location("ssh://user@host:/path")
 
 
@@ -307,7 +307,7 @@ class TestLocationWithoutEnv:
     "name",
     [
         "foobar",
-        # placeholders
+        # Placeholders
         "foobar-{now}",
     ],
 )
@@ -320,7 +320,7 @@ def test_archivename_ok(name):
     [
         "",  # too short
         "x" * 201,  # too long
-        # invalid chars:
+        # Invalid characters:
         "foo/bar",
         "foo\\bar",
         ">foo",
@@ -331,10 +331,10 @@ def test_archivename_ok(name):
         "*bar",
         "foo\nbar",
         "foo\0bar",
-        # leading/trailing blanks
+        # Leading/trailing blanks
         " foo",
         "bar  ",
-        # contains surrogate-escapes
+        # Contains surrogate escapes
         "foo\udc80bar",
         "foo\udcffbar",
     ],
@@ -353,9 +353,9 @@ def test_text_ok(text):
     "text",
     [
         "x" * 101,  # too long
-        # invalid chars:
+        # Invalid characters:
         "foo\0bar",
-        # contains surrogate-escapes
+        # Contains surrogate escapes
         "foo\udc80bar",
         "foo\udcffbar",
     ],
@@ -417,7 +417,7 @@ def test_parse_timestamp():
 @pytest.mark.parametrize(
     "size, fmt",
     [
-        (0, "0 B"),  # no rounding necessary for those
+        (0, "0 B"),  # No rounding necessary for these.
         (1, "1 B"),
         (142, "142 B"),
         (999, "999 B"),
@@ -428,7 +428,7 @@ def test_parse_timestamp():
         (1010, "1.01 kB"),  # rounded down as well
         (999990000, "999.99 MB"),  # rounded down
         (999990001, "999.99 MB"),  # rounded down
-        (999995000, "1.00 GB"),  # rounded up to next unit
+        (999995000, "1.00 GB"),  # Rounded up to the next unit.
         (10**6, "1.00 MB"),  # and all the remaining units, megabytes
         (10**9, "1.00 GB"),  # gigabytes
         (10**12, "1.00 TB"),  # terabytes

@@ -18,7 +18,7 @@ def corrupt_archiver(archiver):
 def test_old_version_interfered(archiver):
     corrupt_archiver(archiver)
     if archiver.cache_path is None:
-        pytest.skip("no cache path for this kind of Cache implementation")
+        pytest.skip("No cache path for this kind of cache implementation.")
 
     # Modify the main manifest ID without touching the manifest ID in the integrity section.
     # This happens if a version without integrity checking modifies the cache.

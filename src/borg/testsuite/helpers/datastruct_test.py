@@ -15,7 +15,7 @@ class TestBuffer:
     def test_type(self):
         buffer = Buffer(bytearray)
         assert isinstance(buffer.get(), bytearray)
-        buffer = Buffer(bytes)  # don't do that in practice
+        buffer = Buffer(bytes)  # Do not do that in practice.
         assert isinstance(buffer.get(), bytes)
 
     def test_len(self):
@@ -33,15 +33,15 @@ class TestBuffer:
         buffer.resize(200)
         assert len(buffer) == 200
         b2 = buffer.get()
-        assert b2 is not b1  # new, bigger buffer
+        assert b2 is not b1  # New, bigger buffer.
         buffer.resize(100)
         assert len(buffer) >= 100
         b3 = buffer.get()
-        assert b3 is b2  # still same buffer (200)
+        assert b3 is b2  # Still the same buffer (200).
         buffer.resize(100, init=True)
-        assert len(buffer) == 100  # except on init
+        assert len(buffer) == 100  # Except on init.
         b4 = buffer.get()
-        assert b4 is not b3  # new, smaller buffer
+        assert b4 is not b3  # New, smaller buffer.
 
     def test_limit(self):
         buffer = Buffer(bytearray, size=100, limit=200)
@@ -57,10 +57,10 @@ class TestBuffer:
         assert len(b1) >= 50  # == 100
         b2 = buffer.get(100)
         assert len(b2) >= 100  # == 100
-        assert b2 is b1  # did not need resizing yet
+        assert b2 is b1  # Did not need resizing yet.
         b3 = buffer.get(200)
         assert len(b3) == 200
-        assert b3 is not b2  # new, resized buffer
+        assert b3 is not b2  # New, resized buffer.
         with pytest.raises(Buffer.MemoryLimitExceeded):
-            buffer.get(201)  # beyond limit
+            buffer.get(201)  # Beyond limit.
         assert len(buffer) == 200

@@ -54,9 +54,9 @@ def _daemonize():
 
 
 def daemonize():
-    """Detach process from controlling terminal and run in background
+    """Detach the process from the controlling terminal and run in the background.
 
-    Returns: old and new get_process_id tuples
+    Returns: old and new get_process_id tuples.
     """
     with _daemonize() as (old_id, new_id):
         return old_id, new_id
@@ -64,7 +64,7 @@ def daemonize():
 
 @contextlib.contextmanager
 def daemonizing(*, timeout=5):
-    """Like daemonize(), but as context manager.
+    """Like daemonize(), but as a context manager.
 
     The with-body is executed in the background process,
     while the foreground process survives until the body is left
@@ -146,28 +146,28 @@ class _ExitCodeException(BaseException):
 
 
 class SignalException(BaseException):
-    """base class for all signal-based exceptions"""
+    """Base class for all signal-based exceptions."""
 
 
 class SigHup(SignalException):
-    """raised on SIGHUP signal"""
+    """Raised on SIGHUP signal."""
 
 
 class SigTerm(SignalException):
-    """raised on SIGTERM signal"""
+    """Raised on SIGTERM signal."""
 
 
 @contextlib.contextmanager
 def signal_handler(sig, handler):
     """
-    when entering context, set up signal handler <handler> for signal <sig>.
-    when leaving context, restore original signal handler.
+    When entering the context, set up signal handler <handler> for signal <sig>.
+    When leaving the context, restore the original signal handler.
 
-    <sig> can bei either a str when giving a signal.SIGXXX attribute name (it
-    won't crash if the attribute name does not exist as some names are platform
-    specific) or a int, when giving a signal number.
+    <sig> can be either a str (the name of a signal.SIGXXX attribute; it
+    will not crash if the attribute name does not exist, as some names are platform
+    specific) or an int (a signal number).
 
-    <handler> is any handler value as accepted by the signal.signal(sig, handler).
+    <handler> is any handler value accepted by signal.signal(sig, handler).
     """
     if isinstance(sig, str):
         sig = getattr(signal, sig, None)
@@ -252,13 +252,13 @@ sig_int = SigIntManager()
 
 def ignore_sigint():
     """
-    Ignore SIGINT, see also issue #6912.
+    Ignore SIGINT (see also issue #6912).
 
     Ctrl-C will send a SIGINT to both the main process (borg) and subprocesses
-    (e.g. ssh for remote ssh:// repos), but often we do not want the subprocess
-    getting killed (e.g. because it is still needed to shut down borg cleanly).
+    (e.g., ssh for remote ssh:// repositories), but often we do not want the subprocess
+    to be killed (e.g., because it is still needed to shut down borg cleanly).
 
-    To avoid that: Popen(..., preexec_fn=ignore_sigint)
+    To avoid this, use: Popen(..., preexec_fn=ignore_sigint)
     """
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
@@ -303,9 +303,9 @@ def prepare_subprocess_env(system, env=None):
     Prepare the environment for a subprocess we are going to create.
 
     :param system: True for preparing to invoke system-installed binaries,
-                   False for stuff inside the pyinstaller environment (like borg, python).
-    :param env: optionally give a environment dict here. if not given, default to os.environ.
-    :return: a modified copy of the environment
+                   False for stuff inside the PyInstaller environment (like borg, python).
+    :param env: optionally provide an environment dict here. If not given, defaults to os.environ.
+    :return: a modified copy of the environment.
     """
     env = dict(env if env is not None else os.environ)
     if system:

@@ -1,9 +1,9 @@
 borg benchmark crud
 ===================
 
-Here is some example of borg benchmark crud output.
+Here is an example of borg benchmark crud output.
 
-I ran it on my laptop, Core i5-4200u, 8GB RAM, SATA SSD, Linux, ext4 fs.
+I ran it on my laptop: Core i5-4200U, 8 GB RAM, SATA SSD, Linux, ext4 filesystem.
 "src" as well as repo is local, on this SSD.
 
 $ BORG_PASSPHRASE=secret borg init --encryption repokey-blake2 repo

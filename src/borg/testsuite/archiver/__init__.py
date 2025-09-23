@@ -35,11 +35,11 @@ from ...xattr import get_all
 RK_ENCRYPTION = "--encryption=repokey-aes-ocb"
 KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"
 
-# this points to src/borg/archiver directory (which is small and has only a few files)
+# This points to the ``src/borg/archiver`` directory (small, with only a few files).
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "archiver"))
 src_file = "archiver/__init__.py"  # relative path of one file in src_dir
 
-requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
+requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason="hard links not supported")
 
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_output=False, **kw):
@@ -77,9 +77,9 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             init_ec_warnings()
             try:
                 args = archiver.parse_args(list(args))
-                # argparse parsing may raise SystemExit when the command line is bad or
-                # actions that abort early (eg. --help) where given. Catch this and return
-                # the error code as-if we invoked a Borg binary.
+                # argparse may raise SystemExit when the command line is bad or
+                # actions that abort early (e.g., --help) were given. Catch this and return
+                # the error code as if we invoked a Borg binary.
             except SystemExit as e:
                 output_text.flush()
                 return e.code, output.getvalue() if binary_output else output.getvalue().decode()
@@ -93,7 +93,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
 
 
-# check if the binary "borg.exe" is available (for local testing a symlink to virtualenv/bin/borg should do)
+# Check whether the binary "borg.exe" is available (for local testing, a symlink to virtualenv/bin/borg will do).
 try:
     exec_cmd("help", exe="borg.exe", fork=True)
     BORG_EXES = ["python", "binary"]
@@ -108,7 +108,7 @@ def cmd_fixture(request):
     elif request.param == "binary":
         exe = "borg.exe"
     else:
-        raise ValueError("param must be 'python' or 'binary'")
+        raise ValueError("param must be 'python' or 'binary'.")
 
     def exec_fn(*args, **kw):
         return exec_cmd(*args, exe=exe, fork=True, **kw)
@@ -134,7 +134,7 @@ def generate_archiver_tests(metafunc, kinds: str):
 
 
 def checkts(ts):
-    # check if the timestamp is in the expected format
+    # Check whether the timestamp is in the expected format
     assert datetime.strptime(ts, ISO_FORMAT + "%z")  # must not raise
 
 
@@ -210,18 +210,18 @@ def create_test_files(input_path, create_hardlinks=True):
     create_regular_file(input_path, "fusexattr", size=1)
     if not xattr.XATTR_FAKEROOT and xattr.is_enabled(input_path):
         fn = os.fsencode(os.path.join(input_path, "fusexattr"))
-        # ironically, due to the way how fakeroot works, comparing FUSE file xattrs to orig file xattrs
+        # Ironically, due to how fakeroot works, comparing FUSE file xattrs to original file xattrs
         # will FAIL if fakeroot supports xattrs, thus we only set the xattr if XATTR_FAKEROOT is False.
         # This is because fakeroot with xattr-support does not propagate xattrs of the underlying file
         # into "fakeroot space". Because the xattrs exposed by borgfs are these of an underlying file
-        # (from fakeroots point of view) they are invisible to the test process inside the fakeroot.
+        # (from fakeroot's point of view) they are invisible to the test process inside fakeroot.
         xattr.setxattr(fn, b"user.foo", b"bar")
         xattr.setxattr(fn, b"user.empty", b"")
         # XXX this always fails for me
         # ubuntu 14.04, on a TMP dir filesystem with user_xattr, using fakeroot
         # same for newer ubuntu and centos.
-        # if this is supported just on specific platform, platform should be checked first,
-        # so that the test setup for all tests using it does not fail here always for others.
+        # If this is supported only on specific platforms, the platform should be checked first,
+        # so that the test setup for all tests using it does not always fail for others.
     # FIFO node
     if are_fifos_supported():
         os.mkfifo(os.path.join(input_path, "fifo1"))
@@ -392,8 +392,8 @@ def _assert_dirs_equal_cmp(diff, ignore_flags=False, ignore_xattrs=False, ignore
             d1[4] = None
         if not stat.S_ISCHR(s2.st_mode) and not stat.S_ISBLK(s2.st_mode):
             d2[4] = None
-        # If utime isn't fully supported, borg can't set mtime.
-        # Therefore, we shouldn't test it in that case.
+        # If utime is not fully supported, Borg cannot set mtime.
+        # Therefore, we should not test it in that case.
         if is_utime_fully_supported():
             # Older versions of llfuse do not support ns precision properly
             if ignore_ns:
@@ -473,7 +473,7 @@ def fuse_mount(archiver, mountpoint=None, *options, fork=True, os_fork=False, **
     # `FORK_DEFAULT`. However, leaving the possibility to run
     # the command with `fork = False` is still necessary for
     # testing for mount failures, for example attempting to
-    # mount a read-only repo.
+    # mount a read-only repository.
     #    `os_fork = True` is needed for testing (the absence of)
     # a race condition of the Lock during lock migration when
     # borg mount (local repo) is daemonizing (#4953). This is another

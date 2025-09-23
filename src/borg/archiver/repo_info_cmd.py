@@ -14,7 +14,7 @@ logger = create_logger()
 class RepoInfoMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.READ,))
     def do_repo_info(self, args, repository, manifest, cache):
-        """Show repository infos"""
+        """Show repository information."""
         key = manifest.key
         info = basic_json_data(manifest, cache=cache, extra={"security_dir": cache.security_manager.dir})
 
@@ -37,7 +37,7 @@ class RepoInfoMixIn:
             Location: {location}
             Repository version: {version}
             {encryption}
-            Security dir: {security_dir}
+            Security directory: {security_dir}
             """
                 )
                 .strip()

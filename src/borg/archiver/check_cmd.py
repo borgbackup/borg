@@ -13,7 +13,7 @@ logger = create_logger()
 class CheckMixIn:
     @with_repository(exclusive=True, manifest=False)
     def do_check(self, args, repository):
-        """Check repository consistency"""
+        """Checks repository consistency."""
         if args.repair:
             msg = (
                 "This is a potentially dangerous function.\n"
@@ -85,7 +85,7 @@ class CheckMixIn:
            the repository. The read data is checked by size and hash. Bit rot and other
            types of accidental damage can be detected this way. Running the repository
            check can be split into multiple partial checks using ``--max-duration``.
-           When checking a ssh:// remote repository, please note that the checks run on
+           When checking an ssh:// remote repository, please note that the checks run on
            the server and do not cause significant network traffic.
 
         2. Checking consistency and correctness of the archive metadata and optionally
@@ -94,9 +94,9 @@ class CheckMixIn:
            all chunks referencing files (items) in the archive exist. This requires
            reading archive and file metadata, but not data. To scan for archives whose
            entries were lost from the archive directory, pass ``--find-lost-archives``.
-           It requires reading all data and is hence very time consuming.
+           It requires reading all data and is hence very time-consuming.
            To additionally cryptographically verify the file (content) data integrity,
-           pass ``--verify-data``, which is even more time consuming.
+           pass ``--verify-data``, which is even more time-consuming.
 
            When checking archives of a remote repository, archive checks run on the client
            machine because they require decrypting data and therefore the encryption key.
@@ -106,7 +106,7 @@ class CheckMixIn:
         only.
 
         The ``--max-duration`` option can be used to split a long-running repository
-        check into multiple partial checks. After the given number of seconds the check
+        check into multiple partial checks. After the given number of seconds, the check
         is interrupted. The next partial check will continue where the previous one
         stopped, until the full repository has been checked. Assuming a complete check
         would take 7 hours, then running a daily check with ``--max-duration=3600``
@@ -117,33 +117,33 @@ class CheckMixIn:
         ``--max-duration`` you must also pass ``--repository-only``, and must not pass
         ``--archives-only``, nor ``--repair``.
 
-        **Warning:** Please note that partial repository checks (i.e. running it with
+        **Warning:** Please note that partial repository checks (i.e., running with
         ``--max-duration``) can only perform non-cryptographic checksum checks on the
-        repository files. Enabling partial repository checks excepts archive checks
-        for the same reason. Therefore partial checks may be useful with very large
-        repositories only where a full check would take too long.
+        repository files. Enabling partial repository checks excludes archive checks
+        for the same reason. Therefore, partial checks may be useful only with very large
+        repositories where a full check would take too long.
 
         The ``--verify-data`` option will perform a full integrity verification (as
         opposed to checking just the xxh64) of data, which means reading the
         data from the repository, decrypting and decompressing it. It is a complete
-        cryptographic verification and hence very time consuming, but will detect any
+        cryptographic verification and hence very time-consuming, but will detect any
         accidental and malicious corruption. Tamper-resistance is only guaranteed for
-        encrypted repositories against attackers without access to the keys. You can
-        not use ``--verify-data`` with ``--repository-only``.
+        encrypted repositories against attackers without access to the keys. You cannot
+        use ``--verify-data`` with ``--repository-only``.
 
         The ``--find-lost-archives`` option will also scan the whole repository, but
         tells Borg to search for lost archive metadata. If Borg encounters any archive
-        metadata that doesn't match with an archive directory entry (including
+        metadata that does not match an archive directory entry (including
         soft-deleted archives), it means that an entry was lost.
         Unless ``borg compact`` is called, these archives can be fully restored with
         ``--repair``. Please note that ``--find-lost-archives`` must read a lot of
-        data from the repository and is thus very time consuming. You can not use
+        data from the repository and is thus very time-consuming. You cannot use
         ``--find-lost-archives`` with ``--repository-only``.
 
         About repair mode
         +++++++++++++++++
 
-        The check command is a readonly task by default. If any corruption is found,
+        The check command is a read-only task by default. If any corruption is found,
         Borg will report the issue and proceed with checking. To actually repair the
         issues found, pass ``--repair``.
 
@@ -163,7 +163,7 @@ class CheckMixIn:
         in repair mode (i.e. running it with ``--repair``).
 
         Repair mode will attempt to fix any corruptions found. Fixing corruptions does
-        not mean recovering lost data: Borg can not magically restore data lost due to
+        not mean recovering lost data: Borg cannot magically restore data lost due to
         e.g. a hardware failure. Repairing a repository means sacrificing some data
         for the sake of the repository as a whole and the remaining data. Hence it is,
         by definition, a potentially lossy task.
@@ -189,20 +189,20 @@ class CheckMixIn:
             description=self.do_check.__doc__,
             epilog=check_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="verify repository",
+            help="verify the repository",
         )
         subparser.set_defaults(func=self.do_check)
         subparser.add_argument(
             "--repository-only", dest="repo_only", action="store_true", help="only perform repository checks"
         )
         subparser.add_argument(
-            "--archives-only", dest="archives_only", action="store_true", help="only perform archives checks"
+            "--archives-only", dest="archives_only", action="store_true", help="only perform archive checks"
         )
         subparser.add_argument(
             "--verify-data",
             dest="verify_data",
             action="store_true",
-            help="perform cryptographic archive data integrity verification " "(conflicts with ``--repository-only``)",
+            help="perform cryptographic archive data integrity verification (conflicts with ``--repository-only``)",
         )
         subparser.add_argument(
             "--repair", dest="repair", action="store_true", help="attempt to repair any inconsistencies found"
@@ -217,6 +217,6 @@ class CheckMixIn:
             type=int,
             default=0,
             action=Highlander,
-            help="do only a partial repo check for max. SECONDS seconds (Default: unlimited)",
+            help="perform only a partial repository check for at most SECONDS seconds (default: unlimited)",
         )
         define_archive_filters_group(subparser)

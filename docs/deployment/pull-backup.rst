@@ -6,12 +6,12 @@
 Backing up in pull mode
 =======================
 
-Typically the borg client connects to a backup server using SSH as a transport
+Typically the Borg client connects to a backup server using SSH as a transport
 when initiating a backup. This is referred to as push mode.
 
-If you however require the backup server to initiate the connection or prefer
+However, if you require the backup server to initiate the connection, or prefer
 it to initiate the backup run, one of the following workarounds is required to
-allow such a pull mode setup.
+allow such a pull-mode setup.
 
 A common use case for pull mode is to back up a remote server to a local personal
 computer.
@@ -19,38 +19,38 @@ computer.
 SSHFS
 =====
 
-Assuming you have a pull backup system set up with borg, where a backup server
-pulls the data from the target via SSHFS. In this mode, the backup client's file
-system is mounted remotely on the backup server. Pull mode is even possible if
+Assume you have a pull backup system set up with Borg, where a backup server
+pulls data from the target via SSHFS. In this mode, the backup client's filesystem
+is mounted remotely on the backup server. Pull mode is even possible if
 the SSH connection must be established by the client via a remote tunnel. Other
 network file systems like NFS or SMB could be used as well, but SSHFS is very
 simple to set up and probably the most secure one.
 
 There are some restrictions caused by SSHFS. For example, unless you define UID
 and GID mappings when mounting via ``sshfs``, owners and groups of the mounted
-file system will probably change, and you may not have access to those files if
-BorgBackup is not run with root privileges.
+filesystem will probably change, and you may not have access to those files if
+Borg is not run with root privileges.
 
-SSHFS is a FUSE file system and uses the SFTP protocol, so there may be also
-other unsupported features that the actual implementations of sshfs, libfuse and
-sftp on the backup server do not support, like file name encodings, ACLs, xattrs
-or flags. So there is no guarantee that you are able to restore a system
+SSHFS is a FUSE filesystem and uses the SFTP protocol, so there may also be
+unsupported features that the actual implementations of SSHFS, libfuse, and
+SFTP on the backup server do not support, like filename encodings, ACLs, xattrs,
+or flags. Therefore, there is no guarantee that you can restore a system
 completely in every aspect from such a backup.
 
 .. warning::
 
-    To mount the client's root file system you will need root access to the
-    client. This contradicts to the usual threat model of BorgBackup, where
-    clients don't need to trust the backup server (data is encrypted). In pull
+    To mount the client's root filesystem you will need root access to the
+    client. This contradicts the usual threat model of Borg, where
+    clients do not need to trust the backup server (data is encrypted). In pull
     mode the server (when logged in as root) could cause unlimited damage to the
-    client. Therefore, pull mode should be used only from servers you do fully
+    client. Therefore, pull mode should be used only with servers you fully
     trust!
 
 .. warning::
 
-    Additionally, while being chrooted into the client's root file system,
-    code from the client will be executed. Thus, you should only do that when
-    fully trusting the client.
+    Additionally, while chrooted into the client's root filesystem,
+    code from the client will be executed. Therefore, you should do this only when
+    you fully trust the client.
 
 .. warning::
 

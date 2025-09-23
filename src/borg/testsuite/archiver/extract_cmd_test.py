@@ -46,7 +46,7 @@ def test_symlink_extract(archivers, request):
 
 @pytest.mark.skipif(
     not are_symlinks_supported() or not are_hardlinks_supported() or is_darwin,
-    reason="symlinks or hardlinks or hardlinked symlinks not supported",
+    reason="symbolic links or hard links or hard-linked sym-links not supported",
 )
 def test_hardlinked_symlinks_extract(archivers, request):
     archiver = request.getfixturevalue(archivers)
@@ -76,13 +76,13 @@ def test_directory_timestamps1(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    # default file archiving order (internal recursion)
+    # Default file archiving order (internal recursion)
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         cmd(archiver, "extract", "test")
-    # extracting a file inside a directory touches the directory mtime
+    # Extracting a file inside a directory touches the directory mtime
     assert os.path.exists("output/input/dir2/file2")
-    # make sure borg fixes the directory mtime after touching it
+    # Make sure Borg fixes the directory mtime after touching it
     sti = os.stat("input/dir2")
     sto = os.stat("output/input/dir2")
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
@@ -93,14 +93,14 @@ def test_directory_timestamps2(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    # given order, dir first, file second
+    # Given order, directory first, file second
     flist_dir_first = b"input/dir2\ninput/dir2/file2\n"
     cmd(archiver, "create", "--paths-from-stdin", "test", input=flist_dir_first)
     with changedir("output"):
         cmd(archiver, "extract", "test")
-    # extracting a file inside a directory touches the directory mtime
+    # Extracting a file inside a directory touches the directory mtime
     assert os.path.exists("output/input/dir2/file2")
-    # make sure borg fixes the directory mtime after touching it
+    # Make sure Borg fixes the directory mtime after touching it
     sti = os.stat("input/dir2")
     sto = os.stat("output/input/dir2")
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
@@ -111,14 +111,14 @@ def test_directory_timestamps3(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    # given order, file first, dir second
+    # Given order, file first, directory second
     flist_file_first = b"input/dir2/file2\ninput/dir2\n"
     cmd(archiver, "create", "--paths-from-stdin", "test", input=flist_file_first)
     with changedir("output"):
         cmd(archiver, "extract", "test")
-    # extracting a file inside a directory touches the directory mtime
+    # Extracting a file inside a directory touches the directory mtime
     assert os.path.exists("output/input/dir2/file2")
-    # make sure borg fixes the directory mtime after touching it
+    # Make sure Borg fixes the directory mtime after touching it
     sti = os.stat("input/dir2")
     sto = os.stat("output/input/dir2")
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
@@ -323,7 +323,7 @@ def test_extract_hardlinks_twice(archivers, request):
         # if issue #5603 happens, extraction gives rc == 1 (triggering AssertionError) and warnings like:
         # input/a/hardlink: link: [Errno 2] No such file or directory: 'input/a/hardlink' -> 'input/a/hardlink'
         # input/b/hardlink: link: [Errno 2] No such file or directory: 'input/a/hardlink' -> 'input/b/hardlink'
-        # otherwise, when fixed, the hardlinks should be there and have a link count of 2
+        # otherwise, when fixed, the hard links should be there and have a link count of 2
         assert os.stat("input/a/hardlink").st_nlink == 2
         assert os.stat("input/b/hardlink").st_nlink == 2
 
@@ -690,12 +690,12 @@ def test_extract_continue(archivers, request):
         file1_st = os.stat("input/file1")
         # simulate a partially extracted file2 (smaller size, archived mtime not yet set)
         file2_st = os.stat("input/file2")
-        # make a hardlink, so it does not free the inode when unlinking input/file2
+        # make a hard link, so it does not free the inode when unlinking input/file2
         os.link("input/file2", "hardlink-to-keep-inode-f2")
         os.truncate("input/file2", 123)  # -> incorrect size, incorrect mtime
         # simulate file3 has not yet been extracted
         file3_st = os.stat("input/file3")
-        # make a hardlink, so it does not free the inode when unlinking input/file3
+        # make a hard link, so it does not free the inode when unlinking input/file3
         os.link("input/file3", "hardlink-to-keep-inode-f3")
         os.remove("input/file3")
     time.sleep(1)  # needed due to timestamp granularity of apple hfs+

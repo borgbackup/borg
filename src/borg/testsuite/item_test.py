@@ -37,7 +37,7 @@ def test_item_empty():
 
 @pytest.mark.parametrize(
     "item_dict, path, mode",
-    [  # does not matter whether we get str or bytes keys
+    [  # It does not matter whether we get str or bytes keys
         ({b"path": "a/b/c", b"mode": 0o666}, "a/b/c", 0o666),
         ({"path": "a/b/c", "mode": 0o666}, "a/b/c", 0o666),
     ],
@@ -89,7 +89,7 @@ def test_item_mptimestamp_property(atime):
 
 
 def test_item_se_str_property():
-    # start simple
+    # Start simple
     item = Item()
     item.path = "a/b/c"
     assert item.path == "a/b/c"
@@ -99,7 +99,7 @@ def test_item_se_str_property():
     with pytest.raises(TypeError):
         item.path = 42
 
-    # non-utf-8 path, needing surrogate-escaping for latin-1 u-umlaut
+    # Non-UTF-8 path, requiring surrogate escaping for a Latin-1 u-umlaut
     item = Item(internal_dict={"path": b"a/\xfc/c"})
     assert item.path == "a/\udcfc/c"  # getting a surrogate-escaped representation
     assert item.as_dict() == {"path": "a/\udcfc/c"}
@@ -132,9 +132,9 @@ def test_item_dict_property():
 
 
 def test_unknown_property():
-    # we do not want the user to be able to set unknown attributes -
-    # they won't get into the .as_dict() result dictionary.
-    # also they might be just typos of known attributes.
+    # We do not want the user to be able to set unknown attributes —
+    # they will not appear in the .as_dict() result dictionary.
+    # Also, they might just be typos of known attributes.
     item = Item()
     with pytest.raises(AttributeError):
         item.unknown_attribute = None
@@ -163,7 +163,7 @@ def test_item_optr():
         (["1234", "567A", "bC"], ["1", "23", "4567A", "b", "C"], True),  # equal
         (["12345"], ["1234", "56"], False),  # one iterator exhausted before the other
         (["1234", "65"], ["1234", "56"], False),  # content mismatch
-        (["1234", "56"], ["1234", "565"], False),  # first is the prefix of second
+        (["1234", "56"], ["1234", "565"], False),  # the first is a prefix of the second
     ],
 )
 def test_chunk_content_equal(chunk_a: str, chunk_b: str, chunks_equal):

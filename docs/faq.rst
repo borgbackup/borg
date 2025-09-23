@@ -8,19 +8,19 @@ Frequently asked questions
 Usage & Limitations
 ###################
 
-What is the difference between a repo on an external hard drive vs. repo on a server?
--------------------------------------------------------------------------------------
+What is the difference between a repository on an external hard drive and a repository on a server?
+---------------------------------------------------------------------------------------------------
 
 If Borg is running in client/server mode, the client uses SSH as a transport to
-talk to the remote agent, which is another Borg process (Borg is installed on
-the server, too) started automatically by the client. The Borg server is doing
-storage-related low-level repo operations (list, load and store objects),
+talk to a remote agent, which is another Borg process (Borg is also installed on
+the server) started automatically by the client. The Borg server performs
+storage-related, low-level repository operations (list, load, and store objects),
 while the Borg client does the high-level stuff: deduplication, encryption,
 compression, dealing with archives, backups, restores, etc., which reduces the
 amount of data that goes over the network.
 
-When Borg is writing to a repo on a locally mounted remote file system, e.g.
-SSHFS, the Borg client only can do file system operations and has no agent
+When Borg is writing to a repo on a locally mounted remote filesystem, e.g.
+SSHFS, the Borg client can only perform filesystem operations and has no agent
 running on the remote side, so *every* operation needs to go over the network,
 which is slower.
 
@@ -29,7 +29,7 @@ Can I back up from multiple servers into a single repository?
 
 Yes, you can! Even simultaneously.
 
-Can I back up to multiple, swapped backup targets?
+Can I back up to multiple swapped backup targets?
 --------------------------------------------------
 
 It is possible to swap your backup disks if each backup medium is assigned its
@@ -43,41 +43,41 @@ locations), the recommended way to do that is like this:
 
 - ``borg repo-create repo1 --encryption=X``
 - ``borg repo-create repo2 --encryption=X --other-repo=repo1``
-- maybe do a snapshot to have stable and same input data for both borg create.
+- Optionally, create a snapshot to have stable and identical input data for both borg create runs.
 - client machine ---borg create---> repo1
 - client machine ---borg create---> repo2
 
-This will create distinct (different repo ID), but related repositories.
+This will create distinct (different repository ID) but related repositories.
 Related means using the same chunker secret and the same id_key, thus producing
-the same chunks / the same chunk ids if the input data is the same.
+the same chunks / the same chunk IDs if the input data is the same.
 
-The 2 independent borg create invocations mean that there is no error propagation
+The two independent borg create invocations mean there is no error propagation
 from repo1 to repo2 when done like that.
 
-An alternative way would be to use ``borg transfer`` to copy backup archives
-from repo1 to repo2. Likely a bit more efficient and the archives would be identical,
-but suffering from potential error propagation.
+An alternative is to use ``borg transfer`` to copy backup archives
+from repo1 to repo2. This is likely a bit more efficient and the archives would be identical,
+but it may suffer from potential error propagation.
 
-Warning: using borg with multiple repositories with identical repository ID (like when
-creating 1:1 repository copies) is not supported and can lead to all sorts of issues,
-like e.g. cache coherency issues, malfunction, data corruption.
+Warning: Using Borg with multiple repositories that have identical repository IDs (such as
+creating 1:1 repository copies) is not supported and can lead to various issues,
+for example cache coherency issues, malfunction, or data corruption.
 
 "this is either an attack or unsafe" warning
 --------------------------------------------
 
 About the warning:
 
-  Cache, or information obtained from the security directory is newer than
-  repository - this is either an attack or unsafe (multiple repos with same ID)
+  Cache or information obtained from the security directory is newer than the
+  repository — this is either an attack or unsafe (multiple repositories with the same ID)
 
 "unsafe": If not following the advice from the previous section, you can easily
 run into this by yourself by restoring an older copy of your repository.
 
-"attack": maybe an attacker has replaced your repo by an older copy, trying to
-trick you into AES counter reuse, trying to break your repo encryption.
+"attack": An attacker may have replaced your repo with an older copy, trying to
+trigger AES counter reuse and break your repo encryption.
 
-Borg users have also reported that fs issues (like hw issues / I/O errors causing
-the fs to become read-only) can cause this warning, see :issue:`7853`.
+Borg users have also reported that file system issues (e.g., hardware issues or I/O errors causing
+the file system to become read-only) can cause this warning, see :issue:`7853`.
 
 If you decide to ignore this and accept unsafe operation for this repository,
 you could delete the manifest-timestamp and the local cache:
@@ -88,7 +88,7 @@ you could delete the manifest-timestamp and the local cache:
   rm ~/.config/borg/security/REPO_ID/manifest-timestamp
   borg repo-delete --cache-only
 
-This is an unsafe and unsupported way to use borg, you have been warned.
+This is an unsafe and unsupported way to use Borg. You have been warned.
 
 Which file types, attributes, etc. are *not* preserved?
 -------------------------------------------------------

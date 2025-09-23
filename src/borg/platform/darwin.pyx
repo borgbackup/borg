@@ -101,8 +101,7 @@ def setxattr(path, name, value, *, follow_symlinks=False):
 
 
 def _remove_numeric_id_if_possible(acl):
-    """Replace the user/group field with the local uid/gid if possible
-    """
+    """Replace the user/group field with the local uid/gid, if possible."""
     assert isinstance(acl, bytes)
     entries = []
     for entry in safe_decode(acl).split('\n'):

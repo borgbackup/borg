@@ -1,18 +1,18 @@
 """
-test_disk_full is very slow and not recommended to be included in daily testing.
-for this test, an empty, writable 700MB filesystem mounted on DF_MOUNT is required.
-for speed and other reasons, it is recommended that the underlying block device is
+test_disk_full is very slow and not recommended for daily test runs.
+For this test, an empty, writable 700 MB filesystem mounted on DF_MOUNT is required.
+For speed and other reasons, it is recommended that the underlying block device is
 in RAM, not a magnetic or flash disk.
 
-assuming /dev/shm is a tmpfs (in memory filesystem), one can use this:
+Assuming /dev/shm is a tmpfs (in-memory filesystem), one can use this:
 
-dd if=/dev/zero of=/dev/shm/borg-disk bs=1M count=700
-mkfs.ext4 /dev/shm/borg-disk
-mkdir /tmp/borg-mount
-sudo mount /dev/shm/borg-disk /tmp/borg-mount
-sudo chown myuser /tmp/borg-mount/
+    dd if=/dev/zero of=/dev/shm/borg-disk bs=1M count=700
+    mkfs.ext4 /dev/shm/borg-disk
+    mkdir /tmp/borg-mount
+    sudo mount /dev/shm/borg-disk /tmp/borg-mount
+    sudo chown myuser /tmp/borg-mount/
 
-if the directory does not exist, the test will be skipped.
+If the directory does not exist, the test will be skipped.
 """
 
 import errno

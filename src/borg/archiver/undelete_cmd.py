@@ -14,7 +14,7 @@ logger = create_logger()
 class UnDeleteMixIn:
     @with_repository(manifest=False)
     def do_undelete(self, args, repository):
-        """Undelete archives"""
+        """Undeletes archives."""
         self.output_list = args.output_list
         dry_run = args.dry_run
         manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
@@ -61,14 +61,15 @@ class UnDeleteMixIn:
 
         Important: Undeleting archives is only possible before compacting.
         Once ``borg compact`` has run, all disk space occupied only by the
-        soft-deleted archives will be freed and undelete is not possible
-        anymore.
+        soft-deleted archives will be freed, and undeleting is no longer
+        possible.
 
-        When in doubt, use ``--dry-run --list`` to see what would be undeleted.
+        When in doubt, use ``--dry-run --list`` to see what would be
+        undeleted.
 
-        You can undelete multiple archives by specifying a matching pattern,
-        using the ``--match-archives PATTERN`` option (for more info on these patterns,
-        see :ref:`borg_patterns`).
+        You can undelete multiple archives by specifying a match pattern using
+        the ``--match-archives PATTERN`` option (for more information on these
+        patterns, see :ref:`borg_patterns`).
         """
         )
         subparser = subparsers.add_parser(
@@ -78,12 +79,14 @@ class UnDeleteMixIn:
             description=self.do_undelete.__doc__,
             epilog=undelete_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="undelete archive",
+            help="undelete archives",
         )
         subparser.set_defaults(func=self.do_undelete)
-        subparser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository")
         subparser.add_argument(
-            "--list", dest="output_list", action="store_true", help="output verbose list of archives"
+            "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
+        )
+        subparser.add_argument(
+            "--list", dest="output_list", action="store_true", help="output a verbose list of archives"
         )
         define_archive_filters_group(subparser)
         subparser.add_argument(

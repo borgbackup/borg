@@ -11,9 +11,9 @@ Compatibility notes:
 - The new default logging level is WARNING. Previously, it was INFO, which was
   more verbose. Use -v (or --info) to show once again log level INFO messages.
   See the "general" section in the usage docs.
-- for borg create, you need --list (additionally to -v) to see the long file
+- For borg create, you need --list (in addition to -v) to see the long file
   list (was needed so you can have e.g. --stats alone without the long list)
-- see below about BORG_DELETE_I_KNOW_WHAT_I_AM_DOING (was:
+- See below about BORG_DELETE_I_KNOW_WHAT_I_AM_DOING (was:
   BORG_CHECK_I_KNOW_WHAT_I_AM_DOING)
 
 Bug fixes:
@@ -48,7 +48,7 @@ New features:
 - update progress indication more often (e.g. for borg create within big
   files or for borg check repo), #500
 - finer chunker granularity for items metadata stream, #547, #487
-- borg create --list now used (additionally to -v) to enable the verbose
+- borg create --list is now used (in addition to -v) to enable the verbose
   file list output
 - display borg version below tracebacks, #532
 
@@ -86,17 +86,17 @@ Version 0.29.0 (2015-12-13)
 
 Compatibility notes:
 
-- when upgrading to 0.29.0 you need to upgrade client as well as server
-  installations due to the locking and commandline interface changes otherwise
-  you'll get an error msg about a RPC protocol mismatch or a wrong commandline
+- When upgrading to 0.29.0, you need to upgrade client as well as server
+  installations due to the locking and command-line interface changes; otherwise
+  you'll get an error message about an RPC protocol mismatch or a wrong command-line
   option.
-  if you run a server that needs to support both old and new clients, it is
+  If you run a server that needs to support both old and new clients, it is
   suggested that you have a "borg-0.28.2" and a "borg-0.29.0" command.
   clients then can choose via e.g. "borg --remote-path=borg-0.29.0 ...".
-- the default waiting time for a lock changed from infinity to 1 second for a
-  better interactive user experience. if the repo you want to access is
+- The default waiting time for a lock changed from infinity to 1 second for a
+  better interactive user experience. If the repo you want to access is
   currently locked, borg will now terminate after 1s with an error message.
-  if you have scripts that shall wait for the lock for a longer time, use
+  If you have scripts that should wait for the lock for a longer time, use
   --lock-wait N (with N being the maximum wait time in seconds).
 
 Bug fixes:

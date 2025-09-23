@@ -15,8 +15,8 @@ def test_repo_space_basics(archivers, request):
 
     # Test reserving some space.
     output = cmd(archiver, "repo-space", "--reserve", "100M")
-    # The actual size will be rounded up to a multiple of 64MiB blocks.
-    # For 100MB, it should be 128MiB (2 blocks) == 134.22MB.
+    # The actual size will be rounded up to a multiple of 64 MiB blocks.
+    # For 100 MB, it should be 128 MiB (2 blocks) == 134.22 MB.
     assert "There is 134.22 MB reserved space in this repository now." in output
 
     # Check that space is reserved.
@@ -25,7 +25,7 @@ def test_repo_space_basics(archivers, request):
 
     # Test freeing the space.
     output = cmd(archiver, "repo-space", "--free")
-    assert "Freed 134.22 MB in repository." in output
+    assert "Freed 134.22 MB in the repository." in output
 
     # Check that no space is reserved.
     output = cmd(archiver, "repo-space")
@@ -52,9 +52,9 @@ def test_repo_space_modify_reservation(archivers, request):
     output = cmd(archiver, "repo-space")
     assert "There is 134.22 MB reserved space in this repository." in output
 
-    # note: --reserve can only INCREASE the amount of reserved space.
+    # Note: --reserve can only INCREASE the amount of reserved space.
 
-    cmd(archiver, "repo-space", "--free")  # save space on TMPDIR
+    cmd(archiver, "repo-space", "--free")  # save space in TMPDIR
 
 
 def test_repo_space_edge_cases(archivers, request):
@@ -70,7 +70,7 @@ def test_repo_space_edge_cases(archivers, request):
 
     # Test freeing when no space is reserved.
     output = cmd(archiver, "repo-space", "--free")
-    assert "Freed 0 B in repository." in output
+    assert "Freed 0 B in the repository." in output
 
     # Test reserving a very small amount of space (1KB).
     # This should round up to at least one 64MiB block.

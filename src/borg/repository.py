@@ -33,7 +33,7 @@ def repo_lister(repository, *, limit=None):
 
 
 class Repository:
-    """borgstore based key value store"""
+    """borgstore-based key/value store."""
 
     class AlreadyExists(Error):
         """A repository already exists at {}."""
@@ -51,17 +51,17 @@ class Repository:
         exit_mcode = 13
 
     class InsufficientFreeSpaceError(Error):
-        """Insufficient free space to complete transaction (required: {}, available: {})."""
+        """Insufficient free space to complete the transaction (required: {}, available: {})."""
 
         exit_mcode = 14
 
     class InvalidRepository(Error):
-        """{} is not a valid repository. Check repo config."""
+        """{} is not a valid repository. Check the repository config."""
 
         exit_mcode = 15
 
     class InvalidRepositoryConfig(Error):
-        """{} does not have a valid configuration. Check repo config [{}]."""
+        """{} does not have a valid config. Check the repository config [{}]."""
 
         exit_mcode = 16
 
@@ -76,7 +76,7 @@ class Repository:
             super().__init__(id, repo)
 
     class ParentPathDoesNotExist(Error):
-        """The parent path of the repo directory [{}] does not exist."""
+        """The parent path of the repository directory [{}] does not exist."""
 
         exit_mcode = 18
 

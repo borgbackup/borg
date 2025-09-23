@@ -11,7 +11,7 @@ from .key import CHPOKeyfileKey, RepoKeyNotFoundError, KeyBlobStorage, identify_
 
 
 class NotABorgKeyFile(Error):
-    """This file is not a borg key backup, aborting."""
+    """This file is not a Borg key backup, aborting."""
 
     exit_mcode = 43
 

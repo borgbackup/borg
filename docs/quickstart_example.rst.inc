@@ -7,12 +7,12 @@
 
     $ borg -r /path/to/repo create docs ~/src ~/Documents
 
-3. The next day create a new archive using the same archive name::
+3. The next day, create a new archive using the same archive name::
 
     $ borg -r /path/to/repo create --stats docs ~/src ~/Documents
 
-   This backup will be a lot quicker and a lot smaller since only new, never
-   before seen data is stored. The ``--stats`` option causes Borg to
+   This backup will be much quicker and much smaller, since only new,
+   never-before-seen data is stored. The ``--stats`` option causes Borg to
    output statistics about the newly created archive such as the deduplicated
    size (the amount of unique data not shared with other archives)::
 
@@ -22,7 +22,7 @@
     Time (start): Sat, 2022-06-25 20:21:43
     Time (end):   Sat, 2022-06-25 20:21:43
     Duration: 0.07 seconds
-    Utilization of max. archive size: 0%
+    Utilization of maximum archive size: 0%
     Number of files: 699
     Original size: 31.14 MB
     Deduplicated size: 502 B
@@ -44,14 +44,14 @@
 
     $ borg -r /path/to/repo extract aid:b80e24d2
 
-7. Delete the first archive (please note that this does **not** free repo disk space)::
+7. Delete the first archive (please note that this does **not** free repository disk space)::
 
     $ borg -r /path/to/repo delete aid:b80e24d2
 
-   Be careful if you use an archive NAME (and not an archive ID), that might match multiple archives!
-   Always first use with ``--dry-run`` and ``--list``!
+   Be careful if you use an archive NAME (and not an archive ID), as it might match multiple archives.
+   Always use ``--dry-run`` and ``--list`` first!
 
-8. Recover disk space by compacting the segment files in the repo::
+8. Recover disk space by compacting the segment files in the repository::
 
     $ borg -r /path/to/repo compact -v
 

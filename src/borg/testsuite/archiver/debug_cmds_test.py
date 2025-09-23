@@ -79,7 +79,7 @@ def test_debug_put_get_delete_obj(archivers, request):
 
 
 def test_debug_id_hash_format_put_get_parse_obj(archivers, request):
-    """Test format-obj and parse-obj commands"""
+    """Test format-obj and parse-obj commands."""
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     data = b"some data" * 100

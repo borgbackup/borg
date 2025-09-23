@@ -7,12 +7,12 @@ from .helpers import msgpack, workarounds
 from .helpers.errors import IntegrityError
 from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
 
-# workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
+# Workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
 AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 
 class RepoObj:
-    # Object header format includes size infos for parsing the object into meta and data,
+    # Object header format includes size information for parsing the object into meta and data,
     # as well as hashes to enable checking consistency without having the borg key.
     obj_header = Struct("<II8s8s")  # meta size (32b), data size (32b), meta hash (64b), data hash (64b)
     ObjHeader = namedtuple("ObjHeader", "meta_size data_size meta_hash data_hash")

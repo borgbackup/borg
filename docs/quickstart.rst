@@ -7,7 +7,7 @@ Quick Start
 
 This chapter will get you started with Borg and covers various use cases.
 
-A step by step example
+A step-by-step example
 ----------------------
 
 .. include:: quickstart_example.rst.inc
@@ -20,10 +20,10 @@ stores a snapshot of the data of the files "inside" it. One can later extract or
 mount an archive to restore from a backup.
 
 *Repositories* are filesystem directories acting as self-contained stores of archives.
-Repositories can be accessed locally via path or remotely via ssh. Under the hood,
+Repositories can be accessed locally via path or remotely via SSH. Under the hood,
 repositories contain data blocks and a manifest that tracks which blocks are in each
 archive. If some data hasn't changed between backups, Borg simply
-references an already uploaded data chunk (deduplication).
+references an already-uploaded data chunk (deduplication).
 
 .. _about_free_space:
 
@@ -43,7 +43,7 @@ in your backup log files (you check them regularly anyway, right?).
 
 Also helpful:
 
-- use `borg repo-space` to reserve some disk space that can be freed when the fs
+- use `borg repo-space` to reserve some disk space that can be freed when the filesystem
   does not have free space any more.
 - if you use LVM: use a LV + a filesystem that you can resize later and have
   some unallocated PEs you can add to the LV.
@@ -64,8 +64,8 @@ If you only back up your own files, run it as your normal user (i.e. not root).
 
 For a local repository always use the same user to invoke borg.
 
-For a remote repository: always use e.g. ssh://borg@remote_host. You can use this
-from different local users, the remote user running borg and accessing the
+For a remote repository: always use e.g., ssh://borg@remote_host. You can use this
+from different local users; the remote user running borg and accessing the
 repo will always be `borg`.
 
 If you need to access a local repository from different users, you can use the

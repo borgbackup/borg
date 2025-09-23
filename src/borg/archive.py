@@ -240,7 +240,7 @@ def stat_update_check(st_old, st_curr):
         # in this case, we dispatched to wrong handler - abort
         raise BackupRaceConditionError("file type changed (race condition), skipping file")
     if st_old.st_ino != st_curr.st_ino:
-        # in this case, the hardlinks-related code in create_helper has the wrong inode - abort!
+        # in this case, the hard-links-related code in create_helper has the wrong inode - abort!
         raise BackupRaceConditionError("file inode changed (race condition), skipping file")
     # looks ok, we are still dealing with the same thing - return current stat:
     return st_curr
@@ -290,7 +290,7 @@ class DownloadPipeline:
         """
         Preloads the content data chunks of an item (if any).
         optimize_hardlinks can be set to True if item chunks only need to be preloaded for
-        1st hardlink, but not for any further hardlink to same inode / with same hlid.
+        1st hard link, but not for any further hard link to same inode / with same hlid.
         Returns True if chunks were preloaded.
 
         Warning: if data chunks are preloaded then all data chunks have to be retrieved,
@@ -305,7 +305,7 @@ class DownloadPipeline:
                 elif hlid in self.hlids_preloaded:
                     preload_chunks = False
                 else:
-                    # not having the hardlink's chunks already preloaded for other hardlink to same inode
+                    # not having the hard link's chunks already preloaded for other hard link to same inode
                     preload_chunks = True
                     self.hlids_preloaded.add(hlid)
             else:
@@ -730,15 +730,15 @@ Duration: {0.duration}
             link_target = hlm.retrieve(id=item.hlid)
             if link_target is not None and has_link:
                 if not dry_run:
-                    # another hardlink to same inode (same hlid) was extracted previously, just link to it
+                    # another hard link to same inode (same hlid) was extracted previously, just link to it
                     with backup_io("link"):
                         os.link(link_target, path, follow_symlinks=False)
                 hardlink_set = True
         yield hardlink_set
         if not hardlink_set:
             if "hlid" in item and has_link:
-                # Update entry with extracted item path, so that following hardlinks don't extract twice.
-                # We have hardlinking support, so we will hardlink not extract.
+                # Update entry with extracted item path, so that following hard links don't extract twice.
+                # We have hardlinking support, so we will hard link not extract.
                 hlm.remember(id=item.hlid, info=path)
             else:
                 # Broken platform with no hardlinking support.
@@ -765,13 +765,13 @@ Duration: {0.duration}
         :param dry_run: do not write any data
         :param stdout: write extracted data to stdout
         :param sparse: write sparse files (chunk-granularity, independent of the original being sparse)
-        :param hlm: maps hlid to link_target for extracting subtrees with hardlinks correctly
+        :param hlm: maps hlid to link_target for extracting subtrees with hard links correctly
         :param pi: ProgressIndicatorPercent (or similar) for file extraction progress (in bytes)
-        :param continue_extraction: continue a previously interrupted extraction of same archive
+        :param continue_extraction: continue a previously interrupted extraction of the same archive
         """
 
         def same_item(item, st):
-            """is the archived item the same as the fs item at same path with stat st?"""
+            """Is the archived item the same as the filesystem item at the same path with stat st?"""
             if not stat.S_ISREG(st.st_mode):
                 # we only "optimize" for regular files.
                 # other file types are less frequent and have no content extraction we could "optimize away".
@@ -791,7 +791,7 @@ Duration: {0.duration}
         if dry_run or stdout:
             with self.extract_helper(item, "", hlm, dry_run=dry_run or stdout) as hardlink_set:
                 if not hardlink_set:
-                    # it does not really set hardlinks due to dry_run, but we need to behave same
+                    # it does not really set hard links due to dry_run, but we need to behave same
                     # as non-dry_run concerning fetching preloaded chunks from the pipeline or
                     # it would get stuck.
                     if "chunks" in item:
@@ -1248,7 +1248,7 @@ class FilesystemObjectProcessors:
         hl_chunks = None
         update_map = False
         if hardlinked:
-            status = "h"  # hardlink
+            status = "h"  # hard link
             nothing = object()
             chunks = self.hlm.retrieve(id=(st.st_ino, st.st_dev), default=nothing)
             if chunks is nothing:
@@ -1261,7 +1261,7 @@ class FilesystemObjectProcessors:
         self.add_item(item, stats=self.stats)
         if update_map:
             # remember the hlid of this fs object and if the item has chunks,
-            # also remember them, so we do not have to re-chunk a hardlink.
+            # also remember them, so we do not have to re-chunk a hard link.
             chunks = item.chunks if "chunks" in item else None
             self.hlm.remember(id=(st.st_ino, st.st_dev), info=chunks)
 
@@ -1394,13 +1394,13 @@ class FilesystemObjectProcessors:
                     # this needs to be done early, so that part files also get the patched mode.
                     item.mode = stat.S_IFREG | stat.S_IMODE(item.mode)
                 # we begin processing chunks now.
-                if hl_chunks is not None:  # create_helper gave us chunks from a previous hardlink
+                if hl_chunks is not None:  # create_helper gave us chunks from a previous hard link
                     item.chunks = []
                     for chunk_id, chunk_size in hl_chunks:
                         # process one-by-one, so we will know in item.chunks how far we got
                         chunk_entry = cache.reuse_chunk(chunk_id, chunk_size, self.stats)
                         item.chunks.append(chunk_entry)
-                else:  # normal case, no "2nd+" hardlink
+                else:  # normal case, no "2nd+" hard link
                     if not is_special_file:
                         hashed_path = safe_encode(item.path)  # path as in archive item!
                         started_hashing = time.monotonic()

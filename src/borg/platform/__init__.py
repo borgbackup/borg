@@ -42,7 +42,7 @@ elif is_darwin:  # pragma: darwin only
     from .posix import get_errno
     from .posix import uid2user, user2uid, gid2group, group2gid, getosusername
 elif not is_win32:  # pragma: posix only
-    # generic stuff for all other posix OSes
+    # Generic code for all other POSIX OSes
     OS_API_VERSION = API_VERSION
     from .base import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
@@ -53,7 +53,7 @@ elif not is_win32:  # pragma: posix only
     from .posix import get_errno
     from .posix import uid2user, user2uid, gid2group, group2gid, getosusername
 else:  # pragma: win32 only
-    # win32 specific stuff
+    # Win32-specific stuff
     OS_API_VERSION = API_VERSION
     from .base import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
@@ -66,7 +66,7 @@ else:  # pragma: win32 only
 
 def get_birthtime_ns(st, path, fd=None):
     if hasattr(st, "st_birthtime_ns"):
-        # added in Python 3.12 but not always available.
+        # Added in Python 3.12, but not always available.
         return st.st_birthtime_ns
     elif is_darwin and is_darwin_feature_64_bit_inode:
         return _get_birthtime_ns(fd or path, follow_symlinks=False)

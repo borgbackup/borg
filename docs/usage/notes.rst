@@ -1,41 +1,41 @@
 Additional Notes
 ----------------
 
-Here are misc. notes about topics that are maybe not covered in enough detail in the usage section.
+Here are miscellaneous notes about topics that may not be covered in enough detail in the usage section.
 
 .. _chunker-params:
 
 ``--chunker-params``
 ~~~~~~~~~~~~~~~~~~~~
 
-The chunker params influence how input files are cut into pieces (chunks)
+The chunker parameters influence how input files are cut into pieces (chunks)
 which are then considered for deduplication. They also have a big impact on
 resource usage (RAM and disk space) as the amount of resources needed is
-(also) determined by the total amount of chunks in the repository (see
+(also) determined by the total number of chunks in the repository (see
 :ref:`cache-memory-usage` for details).
 
 ``--chunker-params=buzhash,10,23,16,4095`` results in a fine-grained deduplication|
-and creates a big amount of chunks and thus uses a lot of resources to manage
+and creates a large number of chunks and thus uses a lot of resources to manage
 them. This is good for relatively small data volumes and if the machine has a
 good amount of free RAM and disk space.
 
 ``--chunker-params=buzhash,19,23,21,4095`` (default) results in a coarse-grained
-deduplication and creates a much smaller amount of chunks and thus uses less
+deduplication and creates a much smaller number of chunks and thus uses less
 resources. This is good for relatively big data volumes and if the machine has
 a relatively low amount of free RAM and disk space.
 
-``--chunker-params=fixed,4194304`` results in fixed 4MiB sized block
-deduplication and is more efficient than the previous example when used for
+``--chunker-params=fixed,4194304`` results in fixed 4 MiB-sized block
+deduplication and is more efficient than the previous example when used with
 for block devices (like disks, partitions, LVM LVs) or raw disk image files.
 
-``--chunker-params=fixed,4096,512`` results in fixed 4kiB sized blocks,
+``--chunker-params=fixed,4096,512`` results in fixed 4 KiB-sized blocks,
 but the first header block will only be 512B long. This might be useful to
 dedup files with 1 header + N fixed size data blocks. Be careful not to
-produce a too big amount of chunks (like using small block size for huge
+produce too many chunks (for example, using a small block size for huge
 files).
 
-If you already have made some archives in a repository and you then change
-chunker params, this of course impacts deduplication as the chunks will be
+If you have already created some archives in a repository and then change
+chunker parameters, this of course impacts deduplication as the chunks will be
 cut differently.
 
 In the worst case (all files are big and were touched in between backups), this
@@ -45,17 +45,17 @@ Usually, it is not that bad though:
 
 - usually most files are not touched, so it will just re-use the old chunks
   it already has in the repo
-- files smaller than the (both old and new) minimum chunksize result in only
-  one chunk anyway, so the resulting chunks are same and deduplication will apply
+- files smaller than the (both old and new) minimum chunk size result in only
+  one chunk anyway, so the resulting chunks are the same and deduplication will apply
 
-If you switch chunker params to save resources for an existing repo that
+If you switch chunker parameters to save resources for an existing repository that
 already has some backup archives, you will see an increasing effect over time,
 when more and more files have been touched and stored again using the bigger
-chunksize **and** all references to the smaller older chunks have been removed
+chunk size **and** all references to the smaller, older chunks have been removed
 (by deleting / pruning archives).
 
-If you want to see an immediate big effect on resource usage, you better start
-a new repository when changing chunker params.
+If you want to see an immediate, significant effect on resource usage, you should start
+a new repository when changing chunker parameters.
 
 For more details, see :ref:`chunker_details`.
 
@@ -63,19 +63,19 @@ For more details, see :ref:`chunker_details`.
 ``--noatime / --noctime``
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can use these ``borg create`` options not to store the respective timestamp
+You can use these ``borg create`` options to not store the respective timestamp
 into the archive, in case you do not really need it.
 
-Besides saving a little space for the not archived timestamp, it might also
+Besides saving a little space by omitting the timestamp, it might also
 affect metadata stream deduplication: if only this timestamp changes between
 backups and is stored into the metadata stream, the metadata stream chunks
-won't deduplicate just because of that.
+will not deduplicate just because of that.
 
 ``--nobsdflags / --noflags``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can use this not to query and store (or not extract and set) flags - in case
-you don't need them or if they are broken somehow for your fs.
+You can use this to avoid querying and storing (or extracting and setting) flags — in case
+you don't need them or if they are broken for your filesystem.
 
 On Linux, dealing with the flags needs some additional syscalls. Especially when
 dealing with lots of small files, this causes a noticeable overhead, so you can

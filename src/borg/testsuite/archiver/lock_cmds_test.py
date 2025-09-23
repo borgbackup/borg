@@ -20,7 +20,7 @@ def test_with_lock(tmp_path):
     env = os.environ.copy()
     env["BORG_REPO"] = "file://" + str(repo_path)
     command0 = "python3", "-m", "borg", "repo-create", "--encryption=none"
-    # timings must be adjusted so that command1 keeps running while command2 tries to get the lock,
+    # Timings must be adjusted so that command1 keeps running while command2 tries to get the lock,
     # so that lock acquisition for command2 fails as the test expects it.
     lock_wait, execution_time, startup_wait = 2, 4, 1
     assert lock_wait < execution_time - startup_wait
@@ -31,8 +31,8 @@ def test_with_lock(tmp_path):
     subprocess.run(command0, env=env, check=True, text=True, capture_output=True)
     assert repo_path.exists()
     with subprocess.Popen([*borgwl, *command1], **popen_options) as p1:
-        time.sleep(startup_wait)  # wait until p1 is running
-        # now try to get another lock on the same repository:
+        time.sleep(startup_wait)  # Wait until p1 is running
+        # Now try to acquire another lock on the same repository:
         with subprocess.Popen([*borgwl, *command2], **popen_options) as p2:
             out, err_out = p2.communicate()
             assert "second command" not in out  # command2 is "locked out"

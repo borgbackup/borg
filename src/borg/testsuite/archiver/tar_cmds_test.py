@@ -105,7 +105,7 @@ def test_extract_hardlinks_tar(archivers, request):
 
 def test_import_tar(archivers, request, tar_format="PAX"):
     archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
     cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "create", "src", "input")
@@ -148,7 +148,7 @@ def test_import_tar_with_dotdot(archivers, request):
 @requires_gzip
 def test_import_tar_gz(archivers, request, tar_format="GNU"):
     archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
     cmd(archiver, "repo-create", "--encryption=none")
     cmd(archiver, "create", "src", "input")
@@ -162,7 +162,7 @@ def test_import_tar_gz(archivers, request, tar_format="GNU"):
 @requires_gnutar
 def test_import_concatenated_tar_with_ignore_zeros(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
     with changedir("input"):
         subprocess.check_call(["tar", "cf", "file1.tar", "file1"])
@@ -191,7 +191,7 @@ def test_import_concatenated_tar_with_ignore_zeros(archivers, request):
 @requires_gnutar
 def test_import_concatenated_tar_without_ignore_zeros(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    create_test_files(archiver.input_path, create_hardlinks=False)  # hardlinks become separate files
+    create_test_files(archiver.input_path, create_hardlinks=False)  # hard links become separate files
     os.unlink("input/flagfile")
 
     with changedir("input"):

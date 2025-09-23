@@ -140,8 +140,8 @@ class TarMixIn:
             tarinfo.uname = item.get("user", "")
             tarinfo.gname = item.get("group", "")
             # The linkname in tar has 2 uses:
-            # for symlinks it means the destination, while for hardlinks it refers to the file.
-            # Since hardlinks in tar have a different type code (LNKTYPE) the format might
+            # for symlinks it means the destination, while for hard links it refers to the file.
+            # Since hard links in tar have a different type code (LNKTYPE) the format might
             # support hardlinking arbitrary objects (including symlinks and directories), but
             # whether implementations actually support that is a whole different question...
             tarinfo.linkname = ""
@@ -152,7 +152,7 @@ class TarMixIn:
                 if "hlid" in item:
                     linkname = hlm.retrieve(id=item.hlid)
                     if linkname is not None:
-                        # the first hardlink was already added to the archive, add a tar-hardlink reference to it.
+                        # the first hard link was already added to the archive, add a tar-hard-link reference to it.
                         tarinfo.type = tarfile.LNKTYPE
                         tarinfo.linkname = linkname
                     else:
@@ -309,7 +309,7 @@ class TarMixIn:
             elif tarinfo.issym():
                 status = tfo.process_symlink(tarinfo=tarinfo, status="s", type=stat.S_IFLNK)
             elif tarinfo.islnk():
-                # tar uses a hardlink model like: the first instance of a hardlink is stored as a regular file,
+                # tar uses a hard link model like: the first instance of a hard link is stored as a regular file,
                 # later instances are special entries referencing back to the first instance.
                 status = tfo.process_hardlink(tarinfo=tarinfo, status="h", type=stat.S_IFREG)
             elif tarinfo.isblk():

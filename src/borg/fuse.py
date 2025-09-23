@@ -422,7 +422,7 @@ class FuseBackend:
             else:
                 inode = item_inode
                 self._items[inode] = item
-                # remember extracted item path, so that following hardlinks don't extract twice.
+                # remember extracted item path, so that following hard links don't extract twice.
                 hlm.remember(id=item.hlid, info=path)
         else:
             inode = item_inode

@@ -39,7 +39,7 @@ KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "archiver"))
 src_file = "archiver/__init__.py"  # relative path of one file in src_dir
 
-requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
+requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason="hard links not supported")
 
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_output=False, **kw):

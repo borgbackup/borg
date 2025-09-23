@@ -338,7 +338,7 @@ class LegacyRepository:
 
         if os.path.isfile(config_path):
             link_error_msg = (
-                "Failed to erase old repository config file securely (hardlinks not supported). "
+                "Failed to erase old repository config file securely (hard links not supported). "
                 "Old repokey data, if any, might persist on physical storage."
             )
             try:

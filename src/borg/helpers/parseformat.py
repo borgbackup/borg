@@ -945,7 +945,7 @@ class ItemFormatter(BaseFormatter):
         return len(item.get("chunks", []))
 
     def calculate_size(self, item):
-        # note: does not support hardlink slaves, they will be size 0
+        # note: does not support hard link slaves, they will be size 0
         return item.get_size()
 
     def hash_item(self, hash_function, item):

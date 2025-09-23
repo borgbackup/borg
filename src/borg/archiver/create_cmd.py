@@ -696,7 +696,7 @@ class CreateMixIn:
         - 'd' = directory
         - 'b' = block device
         - 'c' = char device
-        - 'h' = regular file, hardlink (to already seen inodes)
+        - 'h' = regular file, hard link (to already seen inodes)
         - 's' = symlink
         - 'f' = fifo
 

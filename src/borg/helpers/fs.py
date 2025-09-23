@@ -320,7 +320,7 @@ def to_sanitized_path(path):
 
 class HardLinkManager:
     """
-    Manage hardlinks (and avoid code duplication doing so).
+    Manage hard links (and avoid code duplication doing so).
 
     A) When creating a borg2 archive from the filesystem, we have to maintain a mapping like:
        (dev, ino) -> (hlid, chunks)  # for fs_hl_targets
@@ -328,17 +328,18 @@ class HardLinkManager:
 
     B) When extracting a borg2 archive to the filesystem, we have to maintain a mapping like:
        hlid -> path
-       If we encounter the same hlid again later, we hardlink to the path of the already extracted content of same hlid.
+       If we encounter the same hlid again later, we hard link to the path of the already extracted
+       content of same hlid.
 
     C) When transferring from a borg1 archive, we need:
        path -> chunks_correct  # for borg1_hl_targets, chunks_correct must be either from .chunks_healthy or .chunks.
        If we encounter a regular file item with source == path later, we reuse chunks_correct
        and create the same hlid = hardlink_id_from_path(source).
 
-    D) When importing a tar file (simplified 1-pass way for now, not creating borg hardlink items):
+    D) When importing a tar file (simplified 1-pass way for now, not creating borg hard link items):
        path -> chunks
        If we encounter a LNK tar entry later with linkname==path, we re-use the chunks and create a regular file item.
-       For better hardlink support (including the very first hardlink item for each group of same-target hardlinks),
+       For better hard link support (including the very first hard link item for each group of same-target hard links),
        we would need a 2-pass processing, which is not yet implemented.
     """
 
@@ -357,12 +358,12 @@ class HardLinkManager:
         return "source" in item and self.borg1_hardlinkable(item.mode)
 
     def hardlink_id_from_path(self, path):
-        """compute a hardlink id from a path"""
+        """compute a hard link id from a path"""
         assert isinstance(path, str)
         return hashlib.sha256(path.encode("utf-8", errors="surrogateescape")).digest()
 
     def hardlink_id_from_inode(self, *, ino, dev):
-        """compute a hardlink id from an inode"""
+        """compute a hard link id from an inode"""
         assert isinstance(ino, int)
         assert isinstance(dev, int)
         return hashlib.sha256(f"{ino}/{dev}".encode()).digest()
@@ -414,11 +415,11 @@ def secure_erase(path, *, avoid_collateral_damage):
 
     If avoid_collateral_damage is True, we only secure erase if the total link count is 1,
     otherwise we just do a normal "delete" (unlink) without first overwriting it with random.
-    This avoids other hardlinks pointing to same inode as <path> getting damaged, but might be less secure.
-    A typical scenario where this is useful are quick "hardlink copies" of bigger directories.
+    This avoids other hard links pointing to same inode as <path> getting damaged, but might be less secure.
+    A typical scenario where this is useful are quick "hard link copies" of bigger directories.
 
     If avoid_collateral_damage is False, we always secure erase.
-    If there are hardlinks pointing to the same inode as <path>, they will contain random garbage afterwards.
+    If there are hard links pointing to the same inode as <path>, they will contain random garbage afterwards.
     """
     path_obj = Path(path)
     with path_obj.open("r+b") as fd:
@@ -435,7 +436,7 @@ def safe_unlink(path):
     Safely unlink (delete) *path*.
 
     If we run out of space while deleting the file, we try truncating it first.
-    BUT we truncate only if path is the only hardlink referring to this content.
+    BUT we truncate only if path is the only hard link referring to this content.
 
     Use this when deleting potentially large files when recovering
     from a VFS error such as ENOSPC. It can help a full file system
@@ -452,9 +453,9 @@ def safe_unlink(path):
         # we ran out of space while trying to delete the file.
         st = path_obj.stat()
         if st.st_nlink > 1:
-            # rather give up here than cause collateral damage to the other hardlink.
+            # rather give up here than cause collateral damage to the other hard link.
             raise
-        # no other hardlink! try to recover free space by truncating this file.
+        # no other hard link! try to recover free space by truncating this file.
         try:
             # Do not create *path* if it does not exist, open for truncation in r+b mode (=O_RDWR|O_BINARY).
             with open(path, "r+b") as fd:

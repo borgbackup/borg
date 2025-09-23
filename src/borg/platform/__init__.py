@@ -13,7 +13,7 @@ from .base import get_process_id, fqdn, hostname, hostid
 if is_linux:  # pragma: linux only
     from .linux import API_VERSION as OS_API_VERSION
     from .linux import listxattr, getxattr, setxattr
-    from .linux import acl_get, acl_set
+    from .linux import acl_get, acl_set, get_binary_acl
     from .linux import set_flags, get_flags
     from .linux import SyncFile
     from .posix import process_alive, local_pid_alive
@@ -23,7 +23,7 @@ if is_linux:  # pragma: linux only
 elif is_freebsd:  # pragma: freebsd only
     from .freebsd import API_VERSION as OS_API_VERSION
     from .freebsd import listxattr, getxattr, setxattr
-    from .freebsd import acl_get, acl_set
+    from .freebsd import acl_get, acl_set, get_binary_acl
     from .base import set_flags, get_flags
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
@@ -33,7 +33,7 @@ elif is_freebsd:  # pragma: freebsd only
 elif is_darwin:  # pragma: darwin only
     from .darwin import API_VERSION as OS_API_VERSION
     from .darwin import listxattr, getxattr, setxattr
-    from .darwin import acl_get, acl_set
+    from .darwin import acl_get, acl_set, get_binary_acl
     from .darwin import is_darwin_feature_64_bit_inode, _get_birthtime_ns
     from .base import set_flags, get_flags
     from .base import SyncFile
@@ -45,7 +45,7 @@ elif not is_win32:  # pragma: posix only
     # Generic code for all other POSIX OSes
     OS_API_VERSION = API_VERSION
     from .base import listxattr, getxattr, setxattr
-    from .base import acl_get, acl_set
+    from .base import acl_get, acl_set, get_binary_acl
     from .base import set_flags, get_flags
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive

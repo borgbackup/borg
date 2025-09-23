@@ -44,7 +44,7 @@ from .helpers import HardLinkManager
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
 from .item import Item
-from .platform import uid2user, gid2group
+from .platform import uid2user, gid2group, get_binary_acl
 from .platformflags import is_darwin
 from .repository import Repository
 from .remote import RemoteRepository
@@ -57,6 +57,7 @@ def fuse_main():
         except KeyboardInterrupt:
             return SIGINT
         except:  # noqa
+            logger.exception("Exception in fuse_main:")
             return -1  # avoid colliding with signal numbers
         else:
             return None
@@ -454,6 +455,8 @@ class FuseBackend:
 class FuseOperations(llfuse.Operations, FuseBackend):
     """Export archive as a FUSE filesystem"""
 
+    enable_acl = True
+
     def __init__(self, manifest, args, decrypted_repository):
         llfuse.Operations.__init__(self)
         FuseBackend.__init__(self, manifest, args, decrypted_repository)
@@ -630,13 +633,23 @@ class FuseOperations(llfuse.Operations, FuseBackend):
     @async_wrapper
     def listxattr(self, inode, ctx=None):
         item = self.get_item(inode)
-        return item.get("xattrs", {}).keys()
+        xattrs = list(item.get("xattrs", {}).keys())
+        if "acl_access" in item:
+            xattrs.append(b"system.posix_acl_access")
+        if "acl_default" in item:
+            xattrs.append(b"system.posix_acl_default")
+        return xattrs
 
     @async_wrapper
     def getxattr(self, inode, name, ctx=None):
         item = self.get_item(inode)
         try:
-            return item.get("xattrs", {})[name] or b""
+            if name == b"system.posix_acl_access":
+                return get_binary_acl(item, "acl_access", self.numeric_ids)
+            elif name == b"system.posix_acl_default":
+                return get_binary_acl(item, "acl_default", self.numeric_ids)
+            else:
+                return item.get("xattrs", {})[name] or b""
         except KeyError:
             raise llfuse.FUSEError(llfuse.ENOATTR) from None
 

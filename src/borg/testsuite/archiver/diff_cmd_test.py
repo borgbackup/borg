@@ -325,6 +325,9 @@ def test_sort_option(archivers, request):
 def test_hard_link_deletion_and_replacement(archivers, request):
     archiver = request.getfixturevalue(archivers)
 
+    # repo-create changes umask, so create the repo first to avoid any
+    # unexpected permission changes.
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     path_a = os.path.join(archiver.input_path, "a")
     path_b = os.path.join(archiver.input_path, "b")
     os.mkdir(path_a)
@@ -334,9 +337,8 @@ def test_hard_link_deletion_and_replacement(archivers, request):
     create_regular_file(archiver.input_path, hl_a, contents=b"123456")
     os.link(hl_a, hl_b)
 
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test0", "input")
-    os.unlink(hl_a)  # Don't duplicate warning message- one is enough.
+    os.unlink(hl_a)  # Don't duplicate warning message - one is enough.
     cmd(archiver, "create", "test1", "input")
 
     # Moral equivalent of test_multiple_link_exclusion in borg v1.x... see #8344
@@ -384,11 +386,14 @@ def test_hard_link_deletion_and_replacement(archivers, request):
     # modifications should be a hint that something hard-link related is going on.
     assert_line_exists(lines, "[cm]time:.*[cm]time:.*input/a/hardlink")
     assert_line_not_exists(lines, "modified.*B.*input/a/hardlink")
-    assert_line_not_exists(lines, "[.* -> .*].*input/dir_replaced_with_file")
-    # The hard-link count went down, but file content isn't modified.
+    assert_line_not_exists(lines, "-[r-][w-][x-].*input/a/hardlink")
+    # ctime changed because the hard-link count went down. But no mtime changes
+    # because file content isn't modified. No permissions changes either.
+    # This is another hint that something hard-link related changed.
     assert_line_exists(lines, "ctime:.*input/b/hardlink")
     assert_line_not_exists(lines, ".*mtime:.*input/b/hardlink")
     assert_line_not_exists(lines, "modified.*B.*input/b/hardlink")
+    assert_line_not_exists(lines, "-[r-][w-][x-].*input/b/hardlink")
 
     # Finally, compare test1 and test2.
     output = cmd(archiver, "diff", "test1", "test2", exit_code=EXIT_SUCCESS)

@@ -1073,14 +1073,9 @@ def test_exclude_nodump_dir_with_file(archivers, request):
     if not has_lchflags:
         pytest.skip("platform does not support setting UF_NODUMP")
 
-    # Prepare input tree: input/nd (NODUMP) containing a file.
-    ndir = os.path.join(archiver.input_path, "nd")
-    os.mkdir(ndir)
-    with open(os.path.join(ndir, "file_in_ndir"), "wb") as f:
-        f.write(b"hello")
-
-    # Set NODUMP flag on the directory (Linux: chattr +d, BSD: chflags nodump)
-    platform.set_flags(ndir, stat.UF_NODUMP)
+    # Prepare input tree: input/nd directory (NODUMP) containing a file.
+    create_regular_file(archiver.input_path, "nd/file_in_ndir", contents=b"hello")
+    platform.set_flags(os.path.join(archiver.input_path, "nd"), stat.UF_NODUMP)
 
     # Create repo and archive
     cmd(archiver, "repo-create", RK_ENCRYPTION)

@@ -156,6 +156,7 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
                 del e["mode"], g["mode"]
 
             del e["healthy"]  # not supported anymore
+            del g["inode"]  # new in borg2
 
             assert g == e
 

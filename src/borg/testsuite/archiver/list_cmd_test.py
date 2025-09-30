@@ -1,8 +1,9 @@
 import json
 import os
+import pytest
 
 from ...constants import *  # NOQA
-from . import src_dir, cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
+from . import src_dir, cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION, requires_hardlinks
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -137,3 +138,43 @@ def test_list_depth(archivers, request):
     assert "input/dir1/file_at_depth_2.txt" in output_no_depth
     assert "input/dir1/dir2" in output_no_depth
     assert "input/dir1/dir2/file_at_depth_3.txt" in output_no_depth
+
+
+@requires_hardlinks
+def test_list_inode_hardlinks(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+
+    # Prepare repository and input files: two hardlinks to same file and one separate file
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "fileA", contents=b"DATA")
+    os.link(os.path.join(archiver.input_path, "fileA"), os.path.join(archiver.input_path, "fileB"))
+    create_regular_file(archiver.input_path, "fileC", contents=b"DATA")
+
+    # Create archive
+    cmd(archiver, "create", "test", "input")
+
+    # Use ItemFormatter via list --format to output {inode}
+    output = cmd(archiver, "list", "test", "--format", "{path} {inode}{NL}")
+
+    # Parse output lines and collect inode numbers for our files
+    inodes = {}
+    for line in output.splitlines():
+        try:
+            path, inode_str = line.rsplit(" ", 1)
+        except ValueError:
+            continue
+        if path in {"input/fileA", "input/fileB", "input/fileC"}:
+            # inode may be missing (None) on some platforms; convert to int if possible
+            inode = None if inode_str in ("", "None") else int(inode_str)
+            inodes[path] = inode
+
+    # Ensure we captured all three files
+    assert set(inodes) == {"input/fileA", "input/fileB", "input/fileC"}
+
+    # On platforms where inode is available, verify hardlinks share same inode
+    # If inode is None, the formatter still worked, but platform didn't provide an inode; skip in that case.
+    if inodes["input/fileA"] is not None and inodes["input/fileB"] is not None and inodes["input/fileC"] is not None:
+        assert inodes["input/fileA"] == inodes["input/fileB"]
+        assert inodes["input/fileA"] != inodes["input/fileC"]
+    else:
+        pytest.skip("Platform does not provide inode numbers for items")

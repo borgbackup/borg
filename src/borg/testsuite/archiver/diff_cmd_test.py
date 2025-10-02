@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import stat
 import time
+import pytest
 
 from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported
@@ -318,3 +319,88 @@ def test_sort_option(archivers, request):
     outputs = output.splitlines()
     assert len(outputs) == len(expected)
     assert all(x in line for x, line in zip(expected, outputs))
+
+
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
+def test_hard_link_deletion_and_replacement(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+
+    # repo-create changes umask, so create the repo first to avoid any
+    # unexpected permission changes.
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    path_a = os.path.join(archiver.input_path, "a")
+    path_b = os.path.join(archiver.input_path, "b")
+    os.mkdir(path_a)
+    os.mkdir(path_b)
+    hl_a = os.path.join(path_a, "hardlink")
+    hl_b = os.path.join(path_b, "hardlink")
+    create_regular_file(archiver.input_path, hl_a, contents=b"123456")
+    os.link(hl_a, hl_b)
+
+    cmd(archiver, "create", "test0", "input")
+    os.unlink(hl_a)  # Don't duplicate warning message - one is enough.
+    cmd(archiver, "create", "test1", "input")
+
+    # Moral equivalent of test_multiple_link_exclusion in borg v1.x... see #8344
+    # Borg v2 doesn't have this issue comparing hard-links, so we'll defer to
+    # POSIX behavior:
+    # https://pubs.opengroup.org/onlinepubs/9799919799/functions/unlink.html
+    # Upon successful completion, unlink() shall mark for update the last data modification
+    # and last file status change timestamps of the parent directory. Also, if the
+    # file's link count is not 0, the last file status change timestamp of the
+    # file shall be marked for update.
+    output = cmd(
+        archiver, "diff", "--pattern=+ fm:input/b", "--pattern=! **/", "test0", "test1", exit_code=EXIT_SUCCESS
+    )
+    lines = output.splitlines()
+    # Directory was excluded.
+    assert_line_not_exists(lines, "input/a$")
+    # Remaining hardlink
+    assert_line_exists(lines, "ctime:.*input/b/hardlink")
+    assert_line_not_exists(lines, ".*mtime:.*input/b/hardlink")
+    # Deleted hardlink was excluded
+    assert_line_not_exists(lines, "input/a/hardlink$")
+
+    # Now try again, except with no patterns!
+    output = cmd(archiver, "diff", "test0", "test1", exit_code=EXIT_SUCCESS)
+    lines = output.splitlines()
+    # Directory... preferably, let's not care about order differences are presented.
+    assert_line_exists(lines, "[cm]time:.*[cm]time:.*input/a")
+    # Remaining hardlink
+    assert_line_exists(lines, "ctime:.*input/b/hardlink")
+    assert_line_not_exists(lines, ".*mtime:.*input/b/hardlink")
+    # Deleted hardlink
+    assert_line_exists(lines, "removed:.*input/a/hardlink")
+
+    # Now recreate the unlinked file as a different entity with identical
+    # contents.
+    create_regular_file(archiver.input_path, hl_a, contents=b"123456")
+    cmd(archiver, "create", "test2", "input")
+
+    # Compare test0 and test2.
+    output = cmd(archiver, "diff", "test0", "test2", exit_code=EXIT_SUCCESS)
+    lines = output.splitlines()
+    # Adding a file changes c/mtime.
+    assert_line_exists(lines, "[cm]time:.*[cm]time:.*input/a$")
+    # Different c/mtime but no apparent changes (i.e. perms) or content
+    # modifications should be a hint that something hard-link related is going on.
+    assert_line_exists(lines, "[cm]time:.*[cm]time:.*input/a/hardlink")
+    assert_line_not_exists(lines, "modified.*B.*input/a/hardlink")
+    assert_line_not_exists(lines, "-[r-][w-][x-].*input/a/hardlink")
+    # ctime changed because the hard-link count went down. But no mtime changes
+    # because file content isn't modified. No permissions changes either.
+    # This is another hint that something hard-link related changed.
+    assert_line_exists(lines, "ctime:.*input/b/hardlink")
+    assert_line_not_exists(lines, ".*mtime:.*input/b/hardlink")
+    assert_line_not_exists(lines, "modified.*B.*input/b/hardlink")
+    assert_line_not_exists(lines, "-[r-][w-][x-].*input/b/hardlink")
+
+    # Finally, compare test1 and test2.
+    output = cmd(archiver, "diff", "test1", "test2", exit_code=EXIT_SUCCESS)
+    lines = output.splitlines()
+    # Same situation applies as previous diff for a.
+    assert_line_exists(lines, "[cm]time:.*[cm]time:.*input/a$")
+    # From test1 to test2's POV, the a/hardlink file is a fresh new file.
+    assert_line_exists(lines, "added.*B.*input/a/hardlink")
+    # But the b/hardlink file was not modified at all.
+    assert_line_not_exists(lines, ".*input/b/hardlink")

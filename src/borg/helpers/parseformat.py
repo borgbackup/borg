@@ -860,6 +860,7 @@ class ItemFormatter(BaseFormatter):
         "path": "file path",
         "target": "link target for symlinks",
         "hlid": "hard link identity (same if hardlinking same fs object)",
+        "inode": "inode number",
         "flags": "file flags",
         "extra": 'prepends {target} with " -> " for soft links and " link to " for hard links',
         "size": "file size",
@@ -875,7 +876,7 @@ class ItemFormatter(BaseFormatter):
         "archivename": "name of the archive",
     }
     KEY_GROUPS = (
-        ("type", "mode", "uid", "gid", "user", "group", "path", "target", "hlid", "flags"),
+        ("type", "mode", "uid", "gid", "user", "group", "path", "target", "hlid", "inode", "flags"),
         ("size", "num_chunks"),
         ("mtime", "ctime", "atime", "isomtime", "isoctime", "isoatime"),
         tuple(sorted(hash_algorithms)),
@@ -937,6 +938,8 @@ class ItemFormatter(BaseFormatter):
         item_data.update(text_to_json("group", item.get("group", str(item_data["gid"]))))
 
         item_data["flags"] = item.get("bsdflags")  # int if flags known, else (if flags unknown) None
+        # inode number from source filesystem (may be absent on some platforms)
+        item_data["inode"] = item.get("inode")
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
         return item_data

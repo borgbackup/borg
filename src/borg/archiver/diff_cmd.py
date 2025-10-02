@@ -90,8 +90,39 @@ class DiffMixIn:
         # Conversion to string and filtering for diff.equal to save memory if sorting
         diffs = (diff for diff in diffs_iter if not diff.equal(args.content_only))
 
-        if args.sort:
-            diffs = sorted(diffs, key=lambda diff: diff.path)
+        sort_fields = args.sort or ["path"]
+
+        def make_sort_key(diff):
+            keys = []
+            for field in sort_fields:
+                direction = 1
+                if field.startswith(">"):
+                    direction = -1
+                    field = field[1:]
+                elif field.startswith("<"):
+                    field = field[1:]
+
+                # get the attribute from diff or its changes
+                value = getattr(diff, field, None)
+                if value is None:
+                    changes = diff.changes()
+                    if field in changes:
+                        value = changes[field]
+                    else:
+                        # fallback to path if unknown
+                        value = diff.path
+
+                # for string fields, use tuple for stable sorting
+                if isinstance(value, str):
+                    keys.append((direction, value.lower()))
+                else:
+                    try:
+                        keys.append(direction * value)
+                    except TypeError:
+                        keys.append(value)
+            return tuple(keys)
+
+        diffs = sorted(diffs, key=make_sort_key)
 
         formatter = DiffFormatter(format, args.content_only)
         for diff in diffs:
@@ -172,7 +203,14 @@ class DiffMixIn:
             action="store_true",
             help="override the check of chunker parameters",
         )
-        subparser.add_argument("--sort", dest="sort", action="store_true", help="Sort the output lines by file path.")
+        subparser.add_argument(
+            "--sort", 
+            dest="sort", 
+            metavar="FIELD",
+            action="append", # Allow --sort to be passed multiple times.
+            help="Sort by FIELD (path, size_added, size_removed, mode, user, uid, group, gid, ctime, mtime)."
+                 "Can be given multiple times. Prefix with '>' to descend, '<' to ascend."
+        )
         subparser.add_argument(
             "--format",
             metavar="FORMAT",

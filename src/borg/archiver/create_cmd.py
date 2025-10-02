@@ -510,7 +510,13 @@ class CreateMixIn:
                             return
                     if not recurse_excluded_dir:
                         if not dry_run:
-                            status = fso.process_dir_with_fd(path=path, fd=child_fd, st=st, strip_prefix=strip_prefix)
+                            try:
+                                status = fso.process_dir_with_fd(
+                                    path=path, fd=child_fd, st=st, strip_prefix=strip_prefix
+                                )
+                            except BackupItemExcluded:
+                                status = "-"  # excluded (dir)
+                                recurse = False
                         else:
                             status = "+"  # included (dir)
                     if recurse:

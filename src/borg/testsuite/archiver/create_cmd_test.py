@@ -1065,3 +1065,23 @@ def test_create_with_compression_algorithms(archivers, request):
     for i in range(count):
         os.unlink(os.path.join(archiver.input_path, f"zeros_{i}"))
         os.unlink(os.path.join(archiver.input_path, f"random_{i}"))
+
+
+def test_exclude_nodump_dir_with_file(archivers, request):
+    """A directory flagged NODUMP and its contents must not be archived."""
+    archiver = request.getfixturevalue(archivers)
+    if not has_lchflags:
+        pytest.skip("platform does not support setting UF_NODUMP")
+
+    # Prepare input tree: input/nd directory (NODUMP) containing a file.
+    create_regular_file(archiver.input_path, "nd/file_in_ndir", contents=b"hello")
+    platform.set_flags(os.path.join(archiver.input_path, "nd"), stat.UF_NODUMP)
+
+    # Create repo and archive
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+
+    # Verify: neither the directory nor its contained file are present in the archive
+    list_output = cmd(archiver, "list", "test", "--short")
+    assert "input/nd\n" not in list_output
+    assert "input/nd/file_in_ndir\n" not in list_output

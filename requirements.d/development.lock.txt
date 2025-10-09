@@ -11,5 +11,5 @@ pytest-xdist==3.7.0
 coverage[toml]==7.9.1
 pytest-cov==6.2.1
 pytest-benchmark==5.1.0
-Cython==3.1.2
+Cython==3.1.4
 pre-commit==4.2.0

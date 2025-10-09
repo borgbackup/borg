@@ -36,7 +36,7 @@ dependencies = [
     # Please note:
     # Using any other msgpack version is not supported by Borg development and
     # any feedback related to issues caused by this will be ignored.
-    "msgpack >=1.0.3, <=1.1.1",
+    "msgpack >=1.0.3, <=1.1.2",
     "packaging",
 ]
 

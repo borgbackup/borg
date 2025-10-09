@@ -63,7 +63,7 @@ jobs:
               python-version: '3.13'
               toxenv: py313-fuse3
             - os: ubuntu-24.04
-              python-version: '3.14-dev'
+              python-version: '3.14'
               toxenv: py314-fuse3
             - os: macos-14
               python-version: '3.11'

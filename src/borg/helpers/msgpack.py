@@ -137,7 +137,7 @@ def is_slow_msgpack():
 def is_supported_msgpack():
     # DO NOT CHANGE OR REMOVE! See also requirements and comments in pyproject.toml.
     import msgpack
-    return (1, 0, 3) <= msgpack.version[:3] <= (1, 1, 1) and \
+    return (1, 0, 3) <= msgpack.version[:3] <= (1, 1, 2) and \
            msgpack.version not in []  # < add bad releases here to deny list
 
 

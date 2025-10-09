@@ -29,7 +29,9 @@ have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, "st_mtime_ns") if llfuse el
 has_lchflags = hasattr(os, "lchflags") or sys.platform.startswith("linux")
 try:
     with tempfile.NamedTemporaryFile() as file:
-        platform.set_flags(file.name, stat.UF_NODUMP)
+        st = os.stat(file.name, follow_symlinks=False)
+        flags = platform.get_flags(file.name, st)
+        platform.set_flags(file.name, flags | stat.UF_NODUMP)
 except OSError:
     has_lchflags = False
 

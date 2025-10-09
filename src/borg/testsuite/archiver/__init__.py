@@ -226,7 +226,10 @@ def create_test_files(input_path, create_hardlinks=True):
     if are_fifos_supported():
         os.mkfifo(os.path.join(input_path, "fifo1"))
     if has_lchflags:
-        platform.set_flags(os.path.join(input_path, "flagfile"), stat.UF_NODUMP)
+        file = os.path.join(input_path, "flagfile")
+        st = os.stat(file, follow_symlinks=False)
+        flags = platform.get_flags(file, st)
+        platform.set_flags(file, flags | stat.UF_NODUMP)
 
     if is_win32:
         have_root = False

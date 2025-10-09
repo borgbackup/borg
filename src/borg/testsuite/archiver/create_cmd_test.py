@@ -721,7 +721,10 @@ def test_file_status_excluded(archivers, request):
     create_regular_file(archiver.input_path, "file2", size=1024 * 80)
     if has_lchflags:
         create_regular_file(archiver.input_path, "file3", size=1024 * 80)
-        platform.set_flags(os.path.join(archiver.input_path, "file3"), stat.UF_NODUMP)
+        file = os.path.join(archiver.input_path, "file3")
+        st = os.stat(file, follow_symlinks=False)
+        flags = platform.get_flags(file, st)
+        platform.set_flags(file, flags | stat.UF_NODUMP)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = cmd(archiver, "create", "--list", "test", "input")
     assert "A input/file1" in output
@@ -1075,7 +1078,10 @@ def test_exclude_nodump_dir_with_file(archivers, request):
 
     # Prepare input tree: input/nd directory (NODUMP) containing a file.
     create_regular_file(archiver.input_path, "nd/file_in_ndir", contents=b"hello")
-    platform.set_flags(os.path.join(archiver.input_path, "nd"), stat.UF_NODUMP)
+    file = os.path.join(archiver.input_path, "nd")
+    st = os.stat(file, follow_symlinks=False)
+    flags = platform.get_flags(file, st)
+    platform.set_flags(file, flags | stat.UF_NODUMP)
 
     # Create repo and archive
     cmd(archiver, "repo-create", RK_ENCRYPTION)

@@ -420,27 +420,56 @@ Version 1.4.2 (not released yet)
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
 
+New features:
+
+- diff --sort-by: enhanced sorting, #8998
+- create: --files-changed=MODE option (control how borg detects whether
+  a file has changed while it was backed up)
+
 Fixes:
 
 - import-tar: fix the dotslash issue, add test, #8947
 - import-tar: when printing the path, use the already normalized item.path.
+- preprocess_args: fix option name matching
+- fix ChunkerParams validation
 
 Other changes:
 
 - support Python 3.14
-- msgpack: allow 1.1.1
+- msgpack: allow 1.1.2
 - msgpack version check: ignore "rc" or other version elements
+- pyproject.toml: SPDX expression for license, add license-files, #8771.
+  Also: raise setuptools version requirement appropriately.
+
+  In case the setuptools requirement turns out to be a problem when
+  packaging borg for some OS distribution and an older setuptools must
+  be used, just do a reverse patch when packaging borg - there should
+  be no problem if you use some older setuptools.
 - Chunker params: warn for even window size for buzhash, #8868
 - suppress compiler warning about CYTHON_FALLTHROUGH
 - remove unnecessary check that Padmé overhead is at most 12%
-- docs: borg-serve: simplify example of env in authorized_keys, #8318
-- coverage: use pyproject.toml
-- tox: use native pyproject.toml configuration
+- pyinstaller spec: avoid pkg_resources warning
+- update requirements.lock.txt to current versions
+- docs:
+
+  - borg-serve: simplify example of env in authorized_keys, #8318
+  - unify `master` and `1.4-maint` install docs
+  - update install docs to include `SETUPTOOLS_SCM_PRETEND_VERSION`
+  - add Arch Linux to "installing from source" docs
+  - adds systemd-inhibit and examples, #8989
+  - fix typos / grammar in docs and code
 - tests:
 
   - save temp space
   - test_chunkpoints_unchanged: do not use blake2b_256
   - fix diff cmd test on macOS HFS+, #8860
+  - fuzzing test for default chunker
+  - read_only CM: skip test if cmd_immutable is unsuccessful, #9021
+  - vagrant: add debian trixie box
+  - vagrant: use Python 3.11.13
+  - pyproject.toml: correctly define test envs for fuse testing
+  - coverage: use pyproject.toml
+  - tox: use native pyproject.toml configuration
 
 
 Version 1.4.1 (2025-04-19)

@@ -32,7 +32,7 @@ license-files = ["LICENSE", "AUTHORS"]
 dependencies = [
   "borghash ~= 0.1.0",
   "borgstore ~= 0.3.0",
-  "msgpack >=1.0.3, <=1.1.1",
+  "msgpack >=1.0.3, <=1.1.2",
   "packaging",
   "platformdirs >=3.0.0, <5.0.0; sys_platform == 'darwin'",  # for macOS: breaking changes in 3.0.0.
   "platformdirs >=2.6.0, <5.0.0; sys_platform != 'darwin'",  # for others: 2.6+ works consistently.

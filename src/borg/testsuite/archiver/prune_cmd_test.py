@@ -272,6 +272,32 @@ class MockArchive:
         return f"{self.id}: {self.ts.isoformat()}"
 
 
+def test_prune_keep_all(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    # create a few archives with distinct seconds so 'secondly' rule can keep all
+    _create_archive_ts(archiver, "a1", 2025, 1, 1, 0, 0, 0)
+    _create_archive_ts(archiver, "a2", 2025, 1, 1, 0, 0, 1)
+    _create_archive_ts(archiver, "a3", 2025, 1, 1, 0, 0, 2)
+
+    # Dry-run prune: nothing should be pruned, all should be kept under 'secondly' rule
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-all")
+    assert re.search(r"Keeping archive \(rule: secondly(?:\[oldest\])? #\d+\):\s+a1", output)
+    assert re.search(r"Keeping archive \(rule: secondly(?:\[oldest\])? #\d+\):\s+a2", output)
+    assert re.search(r"Keeping archive \(rule: secondly(?:\[oldest\])? #\d+\):\s+a3", output)
+    assert "Would prune:" not in output
+    assert "Pruning archive" not in output
+    output = cmd(archiver, "repo-list", "--format", "{name}{NL}")
+    names = set(output.splitlines())
+    assert names == {"a1", "a2", "a3"}
+
+    # Real prune with --keep-all should also not delete anything
+    cmd(archiver, "prune", "--keep-all")
+    output = cmd(archiver, "repo-list", "--format", "{name}{NL}")
+    names = set(output.splitlines())
+    assert names == {"a1", "a2", "a3"}
+
+
 # This is the local timezone of the system running the tests.
 # We need this e.g. to construct archive timestamps for the prune tests,
 # because borg prune operates in the local timezone (it first converts the

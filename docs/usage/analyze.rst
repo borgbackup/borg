@@ -1,0 +1,1 @@
+.. include:: analyze.rst.inc

@@ -1,6 +1,6 @@
-setuptools >=45, !=60.6.0, !=60.7.0
+setuptools >=78.1.1
 setuptools_scm
-pip
+pip !=24.2
 wheel
 virtualenv
 build
@@ -8,7 +8,9 @@ pkgconfig
 tox
 pytest
 pytest-xdist
+coverage[toml]
 pytest-cov
 pytest-benchmark
 Cython
 pre-commit
+bandit[toml]

@@ -1,4 +1,3 @@
-import argparse
 import functools
 import os
 import textwrap
@@ -13,7 +12,9 @@ from ..helpers import Highlander
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
+from ..legacyremote import LegacyRemoteRepository
 from ..remote import RemoteRepository
+from ..legacyrepository import LegacyRepository
 from ..repository import Repository
 from ..repoobj import RepoObj, RepoObj1
 from ..patterns import (
@@ -29,30 +30,21 @@ from ..logger import create_logger
 logger = create_logger(__name__)
 
 
-def get_repository(location, *, create, exclusive, lock_wait, lock, append_only, make_parent_dirs, storage_quota, args):
+def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_or_v2):
     if location.proto in ("ssh", "socket"):
-        repository = RemoteRepository(
-            location,
-            create=create,
-            exclusive=exclusive,
-            lock_wait=lock_wait,
-            lock=lock,
-            append_only=append_only,
-            make_parent_dirs=make_parent_dirs,
-            args=args,
+        RemoteRepoCls = LegacyRemoteRepository if v1_or_v2 else RemoteRepository
+        repository = RemoteRepoCls(
+            location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, args=args
         )
 
+    elif (
+        location.proto in ("sftp", "file", "rclone", "s3", "b2") and not v1_or_v2
+    ):  # stuff directly supported by borgstore
+        repository = Repository(location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
+
     else:
-        repository = Repository(
-            location.path,
-            create=create,
-            exclusive=exclusive,
-            lock_wait=lock_wait,
-            lock=lock,
-            append_only=append_only,
-            make_parent_dirs=make_parent_dirs,
-            storage_quota=storage_quota,
-        )
+        RepoCls = LegacyRepository if v1_or_v2 else Repository
+        repository = RepoCls(location.path, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
     return repository
 
 
@@ -98,8 +90,7 @@ def with_repository(
         decorator_name="with_repository",
     )
 
-    # To process the `--bypass-lock` option if specified, we need to
-    # modify `lock` inside `wrapper`. Therefore we cannot use the
+    # We may need to modify `lock` inside `wrapper`. Therefore we cannot use the
     # `nonlocal` statement to access `lock` as modifications would also
     # affect the scope outside of `wrapper`. Subsequent calls would
     # only see the overwritten value of `lock`, not the original one.
@@ -115,9 +106,6 @@ def with_repository(
                 raise Error("missing repository, please use --repo or BORG_REPO env var!")
             assert isinstance(exclusive, bool)
             lock = getattr(args, "lock", _lock)
-            append_only = getattr(args, "append_only", False)
-            storage_quota = getattr(args, "storage_quota", None)
-            make_parent_dirs = getattr(args, "make_parent_dirs", False)
 
             repository = get_repository(
                 location,
@@ -125,32 +113,31 @@ def with_repository(
                 exclusive=exclusive,
                 lock_wait=self.lock_wait,
                 lock=lock,
-                append_only=append_only,
-                make_parent_dirs=make_parent_dirs,
-                storage_quota=storage_quota,
                 args=args,
+                v1_or_v2=False,
             )
 
             with repository:
-                if repository.version not in (2,):
+                if repository.version not in (3,):
                     raise Error(
-                        "This borg version only accepts version 2 repos for -r/--repo. "
-                        "You can use 'borg transfer' to copy archives from old to new repos."
+                        f"This borg version only accepts version 3 repos for -r/--repo, "
+                        f"but not version {repository.version}. "
+                        f"You can use 'borg transfer' to copy archives from old to new repos."
                     )
                 if manifest or cache:
-                    manifest_ = Manifest.load(repository, compatibility)
+                    manifest_ = Manifest.load(repository, compatibility, other=False)
                     kwargs["manifest"] = manifest_
                     if "compression" in args:
                         manifest_.repo_objs.compressor = args.compression.compressor
                     if secure:
-                        assert_secure(repository, manifest_, self.lock_wait)
+                        assert_secure(repository, manifest_)
                 if cache:
                     with Cache(
                         repository,
                         manifest_,
                         progress=getattr(args, "progress", False),
-                        lock_wait=self.lock_wait,
                         cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
+                        start_backup=getattr(self, "start_backup", None),
                         iec=getattr(args, "iec", False),
                     ) as cache_:
                         return method(self, args, repository=repository, cache=cache_, **kwargs)
@@ -185,27 +172,31 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
             if not location.valid:  # nothing to do
                 return method(self, args, **kwargs)
 
+            v1_or_v2 = getattr(args, "v1_or_v2", False)
+
             repository = get_repository(
                 location,
                 create=False,
                 exclusive=True,
                 lock_wait=self.lock_wait,
                 lock=True,
-                append_only=False,
-                make_parent_dirs=False,
-                storage_quota=None,
                 args=args,
+                v1_or_v2=v1_or_v2,
             )
 
             with repository:
-                if repository.version not in (1, 2):
-                    raise Error("This borg version only accepts version 1 or 2 repos for --other-repo.")
+                acceptable_versions = (1, 2) if v1_or_v2 else (3,)
+                if repository.version not in acceptable_versions:
+                    raise Error(
+                        f"This borg version only accepts version {' or '.join(acceptable_versions)} "
+                        f"repos for --other-repo."
+                    )
                 kwargs["other_repository"] = repository
                 if manifest or cache:
                     manifest_ = Manifest.load(
-                        repository, compatibility, ro_cls=RepoObj if repository.version > 1 else RepoObj1
+                        repository, compatibility, other=True, ro_cls=RepoObj if repository.version > 1 else RepoObj1
                     )
-                    assert_secure(repository, manifest_, self.lock_wait)
+                    assert_secure(repository, manifest_)
                     if manifest:
                         kwargs["other_manifest"] = manifest_
                 if cache:
@@ -213,7 +204,6 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                         repository,
                         manifest_,
                         progress=False,
-                        lock_wait=self.lock_wait,
                         cache_mode=getattr(args, "files_cache_mode", FILES_CACHE_MODE_DISABLED),
                         iec=getattr(args, "iec", False),
                     ) as cache_:
@@ -232,9 +222,10 @@ def with_archive(method):
     def wrapper(self, args, repository, manifest, **kwargs):
         archive_name = getattr(args, "name", None)
         assert archive_name is not None
+        archive_info = manifest.archives.get_one([archive_name])
         archive = Archive(
             manifest,
-            archive_name,
+            archive_info.id,
             numeric_ids=getattr(args, "numeric_ids", False),
             noflags=getattr(args, "noflags", False),
             noacls=getattr(args, "noacls", False),
@@ -252,7 +243,7 @@ def with_archive(method):
 # e.g. through "borg ... --help", define a substitution for the reference here.
 # It will replace the entire :ref:`foo` verbatim.
 rst_plain_text_references = {
-    "a_status_oddity": '"I am seeing ‘A’ (added) status for a unchanged file!?"',
+    "a_status_oddity": '"I am seeing ‘A’ (added) status for an unchanged file!?"',
     "separate_compaction": '"Separate compaction"',
     "list_item_flags": '"Item flags"',
     "borg_patterns": '"borg help patterns"',
@@ -315,14 +306,14 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
             dest="exclude_if_present",
             action="append",
             type=str,
-            help="exclude directories that are tagged by containing a filesystem object with " "the given NAME",
+            help="exclude directories that are tagged by containing a filesystem object with the given NAME",
         )
         add_option(
             "--keep-exclude-tags",
             dest="keep_exclude_tags",
             action="store_true",
             help="if tag objects are specified with ``--exclude-if-present``, "
-            "don't omit the tag objects themselves from the backup archive",
+            "do not omit the tag objects themselves from the backup archive",
         )
 
     if strip_components:
@@ -344,7 +335,9 @@ def define_exclusion_group(subparser, **kwargs):
     return exclude_group
 
 
-def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, oldest_newest=True, older_newer=True):
+def define_archive_filters_group(
+    subparser, *, sort_by=True, first_last=True, oldest_newest=True, older_newer=True, deleted=False
+):
     filters_group = subparser.add_argument_group(
         "Archive filters", "Archive filters can be applied to repository targets."
     )
@@ -354,8 +347,8 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
         "--match-archives",
         metavar="PATTERN",
         dest="match_archives",
-        action=Highlander,
-        help='only consider archive names matching the pattern. see "borg help match-archives".',
+        action="append",
+        help='only consider archives matching all patterns. See "borg help match-archives".',
     )
 
     if sort_by:
@@ -381,7 +374,7 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             type=positive_int_validator,
             default=0,
             action=Highlander,
-            help="consider first N archives after other filters were applied",
+            help="consider the first N archives after other filters are applied",
         )
         group.add_argument(
             "--last",
@@ -390,7 +383,7 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             type=positive_int_validator,
             default=0,
             action=Highlander,
-            help="consider last N archives after other filters were applied",
+            help="consider the last N archives after other filters are applied",
         )
 
     if oldest_newest:
@@ -401,7 +394,7 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             dest="oldest",
             type=relative_time_marker_validator,
             action=Highlander,
-            help="consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.",
+            help="consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.",
         )
         group.add_argument(
             "--newest",
@@ -409,7 +402,7 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             dest="newest",
             type=relative_time_marker_validator,
             action=Highlander,
-            help="consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.",
+            help="consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.",
         )
 
     if older_newer:
@@ -420,7 +413,7 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             dest="older",
             type=relative_time_marker_validator,
             action=Highlander,
-            help="consider archives older than (now - TIMESPAN), e.g. 7d or 12m.",
+            help="consider archives older than (now - TIMESPAN), e.g., 7d or 12m.",
         )
         group.add_argument(
             "--newer",
@@ -428,7 +421,12 @@ def define_archive_filters_group(subparser, *, sort_by=True, first_last=True, ol
             dest="newer",
             type=relative_time_marker_validator,
             action=Highlander,
-            help="consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.",
+            help="consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.",
+        )
+
+    if deleted:
+        filters_group.add_argument(
+            "--deleted", dest="deleted", action="store_true", help="consider only soft-deleted archives."
         )
 
     return filters_group
@@ -500,16 +498,9 @@ def define_common_options(add_common_option):
         metavar="SECONDS",
         dest="lock_wait",
         type=int,
-        default=int(os.environ.get("BORG_LOCK_WAIT", 1)),
+        default=int(os.environ.get("BORG_LOCK_WAIT", 10)),
         action=Highlander,
         help="wait at most SECONDS for acquiring a repository/cache lock (default: %(default)d).",
-    )
-    add_common_option(
-        "--bypass-lock",
-        dest="lock",
-        action="store_false",
-        default=argparse.SUPPRESS,  # only create args attribute if option is specified
-        help="Bypass locking mechanism",
     )
     add_common_option("--show-version", dest="show_version", action="store_true", help="show/log the borg version")
     add_common_option("--show-rc", dest="show_rc", action="store_true", help="show/log the return code (rc)")

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-CREATE" "1" "2025-08-02" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -53,9 +53,9 @@ stdin\fP below for details.
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
 .sp
-The archive name needs to be unique. It must not end in \(aq.checkpoint\(aq or
-\(aq.checkpoint.N\(aq (with N being a number), because these names are used for
-checkpoints and treated in special ways.
+The archive name does NOT need to be unique, you can and should use the same
+name for a series of archives. The unique archive identifier is its ID (hash)
+and you can abbreviate the ID as long as it is unique.
 .sp
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
@@ -106,6 +106,20 @@ can be arbitrarily set from userspace, e.g. to set mtime back to the same value
 it had before a content change happened. This can be used maliciously as well as
 well\-meant, but in both cases mtime based cache modes can be problematic.
 .UNINDENT
+.INDENT 0.0
+.TP
+.B The \fB\-\-files\-changed\fP option controls how Borg detects if a file has changed during backup:
+.INDENT 7.0
+.IP \(bu 2
+ctime (default): Use ctime to detect changes. This is the safest option.
+.IP \(bu 2
+mtime: Use mtime to detect changes.
+.IP \(bu 2
+disabled: Disable the \(dqfile has changed while we backed it up\(dq detection completely.
+This is not recommended unless you know what you\(aqre doing, as it could lead to
+inconsistent backups if files change during the backup process.
+.UNINDENT
+.UNINDENT
 .sp
 The mount points of filesystems or filesystem snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that
@@ -137,7 +151,7 @@ specify the archive name
 .B PATH
 paths to archive
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
@@ -154,15 +168,6 @@ only display items with the given status characters (see description)
 .TP
 .B  \-\-json
 output stats as JSON. Implies \fB\-\-stats\fP\&.
-.TP
-.B  \-\-no\-cache\-sync
-experimental: do not synchronize the chunks cache.
-.TP
-.B  \-\-no\-cache\-sync\-forced
-experimental: do not synchronize the chunks cache (forced).
-.TP
-.B  \-\-prefer\-adhoc\-cache
-experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).
 .TP
 .BI \-\-stdin\-name \ NAME
 use NAME in archive for stdin data (default: \(aqstdin\(aq)
@@ -204,16 +209,13 @@ include/exclude paths matching PATTERN
 read include/exclude patterns from PATTERNFILE, one per line
 .TP
 .B  \-\-exclude\-caches
-exclude directories that contain a CACHEDIR.TAG file (\fI\%http://www.bford.info/cachedir/spec.html\fP)
+exclude directories that contain a CACHEDIR.TAG file ( <http://www.bford.info/cachedir/spec.html> )
 .TP
 .BI \-\-exclude\-if\-present \ NAME
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
 .B  \-\-keep\-exclude\-tags
 if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
-.TP
-.B  \-\-exclude\-nodump
-exclude files flagged NODUMP
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
@@ -248,6 +250,9 @@ detect sparse holes in input (supported only by fixed chunker)
 .BI \-\-files\-cache \ MODE
 operate files cache in MODE. default: ctime,size,inode
 .TP
+.BI \-\-files\-changed \ MODE
+specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime
+.TP
 .B  \-\-read\-special
 open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 .UNINDENT
@@ -260,12 +265,6 @@ add a comment text to the archive
 .BI \-\-timestamp \ TIMESTAMP
 manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
 .TP
-.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
-write checkpoint every SECONDS seconds (Default: 1800)
-.TP
-.BI \-\-checkpoint\-volume \ BYTES
-write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)
-.TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
 .TP
@@ -276,8 +275,7 @@ select compression algorithm, see the output of the \(dqborg help compression\(d
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Backup ~/Documents into an archive named \(dqmy\-documents\(dq
 $ borg create my\-documents ~/Documents
 
@@ -285,7 +283,7 @@ $ borg create my\-documents ~/Documents
 $ borg create \-\-list my\-documents ~/Documents
 
 # Backup /mnt/disk/docs, but strip path prefix using the slashdot hack
-$ borg create /path/to/repo::docs /mnt/disk/./docs
+$ borg create \-\-repo /path/to/repo docs /mnt/disk/./docs
 
 # Backup ~/Documents and ~/src but exclude pyc files
 $ borg create my\-files                \e
@@ -297,18 +295,18 @@ $ borg create my\-files                \e
 # /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
 $ borg create my\-files /home \-\-exclude \(aqsh:home/*/.thumbnails\(aq
 
-# Backup the root filesystem into an archive named \(dqroot\-YYYY\-MM\-DD\(dq
+# Backup the root filesystem into an archive named \(dqroot\-archive\(dq
 # use zlib compression (good, but slow) \- default is lz4 (fast, low compression ratio)
-$ borg create \-C zlib,6 \-\-one\-file\-system root\-{now:%Y\-%m\-%d} /
+$ borg create \-C zlib,6 \-\-one\-file\-system root\-archive /
 
-# Backup into an archive name like FQDN\-root\-TIMESTAMP
-$ borg create \(aq{fqdn}\-root\-{now}\(aq /
+# Backup into an archive name like FQDN\-root
+$ borg create \(aq{fqdn}\-root\(aq /
 
 # Backup a remote host locally (\(dqpull\(dq style) using sshfs
 $ mkdir sshfs\-mount
 $ sshfs root@example.com:/ sshfs\-mount
 $ cd sshfs\-mount
-$ borg create example.com\-root\-{now:%Y\-%m\-%d} .
+$ borg create example.com\-root .
 $ cd ..
 $ fusermount \-u sshfs\-mount
 
@@ -337,17 +335,13 @@ $ borg create \-\-compression lzma,N arch ~
 # Only compress compressible data with lzma,N (N = 0..9)
 $ borg create \-\-compression auto,lzma,N arch ~
 
-# Use short hostname, user name and current time in archive name
-$ borg create \(aq{hostname}\-{user}\-{now}\(aq ~
-# Similar, use the same datetime format that is default as of borg 1.1
-$ borg create \(aq{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S}\(aq ~
-# As above, but add nanoseconds
-$ borg create \(aq{hostname}\-{user}\-{now:%Y\-%m\-%dT%H:%M:%S.%f}\(aq ~
+# Use short hostname and user name as archive name
+$ borg create \(aq{hostname}\-{user}\(aq ~
 
 # Backing up relative paths by moving into the correct directory first
 $ cd /home/user/Documents
 # The root directory of the archive will be \(dqprojectA\(dq
-$ borg create \(aqdaily\-projectA\-{now:%Y\-%m\-%d}\(aq projectA
+$ borg create \(aqdaily\-projectA\(aq projectA
 
 # Use external command to determine files to archive
 # Use \-\-paths\-from\-stdin with find to back up only files less than 1MB in size
@@ -359,8 +353,7 @@ $ find ~ \-size \-1000k \-print0 | borg create \e
     \-\-paths\-from\-stdin \e
     \-\-paths\-delimiter \(dq\e0\(dq \e
     smallfiles\-handle\-newline
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SH NOTES
@@ -451,11 +444,9 @@ pipe directly to borg:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
-backup\-vm \-\-id myvm \-\-stdout | borg create REPO::ARCHIVE \-
-.ft P
-.fi
+.EX
+backup\-vm \-\-id myvm \-\-stdout | borg create \-\-repo REPO ARCHIVE \-
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -466,11 +457,9 @@ to the command:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
-borg create \-\-content\-from\-command REPO::ARCHIVE \-\- backup\-vm \-\-id myvm \-\-stdout
-.ft P
-.fi
+.EX
+borg create \-\-content\-from\-command \-\-repo REPO ARCHIVE \-\- backup\-vm \-\-id myvm \-\-stdout
+.EE
 .UNINDENT
 .UNINDENT
 .sp
@@ -506,7 +495,7 @@ Borg supports paths with the slashdot hack to strip path prefixes here also.
 So, be careful not to unintentionally trigger that.
 .SH SEE ALSO
 .sp
-\fIborg\-common(1)\fP, \fIborg\-delete(1)\fP, \fIborg\-prune(1)\fP, \fIborg\-check(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP, \fIborg\-compression(1)\fP, \fIborg\-rcreate(1)\fP
+\fIborg\-common(1)\fP, \fIborg\-delete(1)\fP, \fIborg\-prune(1)\fP, \fIborg\-check(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP, \fIborg\-compression(1)\fP, \fIborg\-repo\-create(1)\fP
 .SH AUTHOR
 The Borg Collective
 .\" Generated by docutils manpage writer.

@@ -11,8 +11,8 @@ but does mean that there are no release-to-release guarantees on what you might 
 even for point releases (1.1.x), and there is no documentation beyond the code and the internals documents.
 
 Borg does on the other hand provide an API on a command-line level. In other words, a frontend should
-(for example) create a backup archive just invoke :ref:`borg_create`, give commandline parameters/options
-as needed and parse JSON output from borg.
+(for example) create a backup archive by invoking :ref:`borg_create`, provide command-line parameters/options
+as needed, and parse JSON output from Borg.
 
 Important: JSON output is expected to be UTF-8, but currently borg depends on the locale being configured
 for that (must be a UTF-8 locale and *not* "C" or "ascii"), so that Python will choose to encode to UTF-8.
@@ -255,7 +255,7 @@ Passphrase prompts should be handled differently. Use the environment variables 
 and *BORG_NEW_PASSPHRASE* (see :ref:`env_vars` for reference) to pass passphrases to Borg, don't
 use the interactive passphrase prompts.
 
-When setting a new passphrase (:ref:`borg_rcreate`, :ref:`borg_key_change-passphrase`) normally
+When setting a new passphrase (:ref:`borg_repo-create`, :ref:`borg_key_change-passphrase`) normally
 Borg prompts whether it should display the passphrase. This can be suppressed by setting
 the environment variable *BORG_DISPLAY_PASSPHRASE* to *no*.
 
@@ -299,7 +299,7 @@ last_modified
 The *encryption* key, if present, contains:
 
 mode
-    Textual encryption mode name (same as :ref:`borg_rcreate` ``--encryption`` names)
+    Textual encryption mode name (same as :ref:`borg_repo-create` ``--encryption`` names)
 keyfile
     Path to the local key file used for access. Depending on *mode* this key may be absent.
 
@@ -480,8 +480,8 @@ Refer to the *borg list* documentation for the available keys and their meaning.
 
 Example (excerpt) of ``borg list --json-lines``::
 
-    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux", "healthy": true, "target": "", "flags": null, "mtime": "2017-02-27T12:27:20.023407", "size": 0}
-    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux/baz", "healthy": true, "target": "", "flags": null, "mtime": "2017-02-27T12:27:20.585407", "size": 0}
+    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux", "target": "", "flags": null, "mtime": "2017-02-27T12:27:20.023407", "size": 0}
+    {"type": "d", "mode": "drwxr-xr-x", "user": "user", "group": "user", "uid": 1000, "gid": 1000, "path": "linux/baz", "target": "", "flags": null, "mtime": "2017-02-27T12:27:20.585407", "size": 0}
 
 
 Archive Differencing
@@ -610,8 +610,6 @@ Errors
         The parent path of the repo directory [{}] does not exist.
     Repository.PathAlreadyExists rc: 19 traceback: no
         There is already something at {}.
-    Repository.StorageQuotaExceeded rc: 20 traceback: no
-        The storage quota ({}) has been exceeded ({}). Try deleting some archives.
     Repository.PathPermissionDenied rc: 21 traceback: no
         Permission denied to {}.
 

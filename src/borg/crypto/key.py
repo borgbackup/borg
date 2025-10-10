@@ -3,7 +3,9 @@ import hmac
 import os
 import textwrap
 from hashlib import sha256, pbkdf2_hmac
-from typing import Literal, Callable, ClassVar
+from pathlib import Path
+from typing import Literal, ClassVar
+from collections.abc import Callable
 
 from ..logger import create_logger
 
@@ -71,7 +73,7 @@ class RepoKeyNotFoundError(Error):
 
 
 class UnsupportedKeyFormatError(Error):
-    """Your borg key is stored in an unsupported format. Try using a newer version of borg."""
+    """Your Borg key is stored in an unsupported format. Try using a newer version of Borg."""
 
     exit_mcode = 49
 
@@ -101,10 +103,10 @@ def identify_key(manifest_data):
         raise UnsupportedPayloadError(key_type)
 
 
-def key_factory(repository, manifest_chunk, *, ro_cls=RepoObj):
+def key_factory(repository, manifest_chunk, *, other=False, ro_cls=RepoObj):
     manifest_data = ro_cls.extract_crypted_data(manifest_chunk)
     assert manifest_data, "manifest data must not be zero bytes long"
-    return identify_key(manifest_data).detect(repository, manifest_data)
+    return identify_key(manifest_data).detect(repository, manifest_data, other=other)
 
 
 def uses_same_chunker_secret(other_key, key):
@@ -159,6 +161,12 @@ class KeyBase:
     # type is int
     chunk_seed: int = None
 
+    # crypt_key dummy, needs to be overwritten by subclass
+    crypt_key: bytes = None
+
+    # id_key dummy, needs to be overwritten by subclass
+    id_key: bytes = None
+
     # Whether this *particular instance* is encrypted from a practical point of view,
     # i.e. when it's using encryption with a empty passphrase, then
     # that may be *technically* called encryption, but for all intents and purposes
@@ -195,6 +203,21 @@ class KeyBase:
             id_str = bin_to_hex(id) if id is not None else "(unknown)"
             raise IntegrityError(f"Chunk {id_str}: Invalid encryption envelope")
 
+    def derive_key(self, *, salt, domain, size, from_id_key=False):
+        """
+        create a new crypto key (<size> bytes long) from existing key material, a given salt and domain.
+        from_id_key == False: derive from self.crypt_key (default)
+        from_id_key == True: derive from self.id_key (note: related repos have same ID key)
+        """
+        from_key = self.id_key if from_id_key else self.crypt_key
+        assert isinstance(from_key, bytes)
+        assert isinstance(salt, bytes)
+        assert isinstance(domain, bytes)
+        assert size <= 32  # sha256 gives us 32 bytes
+        # Because crypt_key is already a PRK, we do not need KDF security here, PRF security is good enough.
+        # See https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Cr2.pdf section 4 "one-step KDF".
+        return sha256(from_key + salt + domain).digest()[:size]
+
     def pack_metadata(self, metadata_dict):
         metadata_dict = StableDict(metadata_dict)
         return msgpack.packb(metadata_dict)
@@ -228,6 +251,9 @@ class PlaintextKey(KeyBase):
     ARG_NAME = "none"
 
     chunk_seed = 0
+    crypt_key = b""  # makes .derive_key() work, nothing secret here
+    id_key = b""  # makes .derive_key() work, nothing secret here
+
     logically_encrypted = False
 
     @classmethod
@@ -236,7 +262,7 @@ class PlaintextKey(KeyBase):
         return cls(repository)
 
     @classmethod
-    def detect(cls, repository, manifest_data):
+    def detect(cls, repository, manifest_data, *, other=False):
         return cls(repository)
 
     def id_hash(self, data):
@@ -359,11 +385,11 @@ class FlexiKey:
     STORAGE: ClassVar[str] = KeyBlobStorage.NO_STORAGE  # override in subclass
 
     @classmethod
-    def detect(cls, repository, manifest_data):
+    def detect(cls, repository, manifest_data, *, other=False):
         key = cls(repository)
         target = key.find_key()
         prompt = "Enter passphrase for key %s: " % target
-        passphrase = Passphrase.env_passphrase()
+        passphrase = Passphrase.env_passphrase(other=other)
         if passphrase is None:
             passphrase = Passphrase()
             if not key.load(target, passphrase):
@@ -371,10 +397,12 @@ class FlexiKey:
                     passphrase = Passphrase.getpass(prompt)
                     if key.load(target, passphrase):
                         break
+                    Passphrase.display_debug_info(passphrase)
                 else:
                     raise PasswordRetriesExceeded
         else:
             if not key.load(target, passphrase):
+                Passphrase.display_debug_info(passphrase)
                 raise PassphraseWrong
         key.init_ciphers(manifest_data)
         key._passphrase = passphrase
@@ -539,10 +567,9 @@ class FlexiKey:
                 # borg transfer re-encrypts all data anyway, thus we can default to a new, random AE key
                 crypt_key = os.urandom(64)
             key.init_from_given_data(crypt_key=crypt_key, id_key=other_key.id_key, chunk_seed=other_key.chunk_seed)
-            passphrase = other_key._passphrase
         else:
             key.init_from_random_data()
-            passphrase = Passphrase.new(allow_empty=True)
+        passphrase = Passphrase.new(allow_empty=True)
         key.init_ciphers()
         target = key.get_new_target(args)
         key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS["argon2"])
@@ -562,7 +589,7 @@ class FlexiKey:
                 raise KeyfileMismatchError(self.repository._location.canonical_path(), filename)
         # we get here if it really looks like a borg key for this repo,
         # do some more checks that are close to how borg reads/parses the key.
-        with open(filename, "r") as fd:
+        with open(filename) as fd:
             lines = fd.readlines()
             if len(lines) < 2:
                 logger.warning(f"borg key sanity check: expected 2+ lines total. [{filename}]")
@@ -616,11 +643,11 @@ class FlexiKey:
 
     def _find_key_in_keys_dir(self):
         id = self.repository.id
-        keys_dir = get_keys_dir()
-        for name in os.listdir(keys_dir):
-            filename = os.path.join(keys_dir, name)
+        keys_path = Path(get_keys_dir())
+        for entry in keys_path.iterdir():
+            filename = keys_path / entry.name
             try:
-                return self.sanity_check(filename, id)
+                return self.sanity_check(str(filename), id)
             except (KeyfileInvalidError, KeyfileMismatchError):
                 pass
 
@@ -642,12 +669,12 @@ class FlexiKey:
 
     def _get_new_target_in_keys_dir(self, args):
         filename = args.location.to_key_filename()
-        path = filename
+        path = Path(filename)
         i = 1
-        while os.path.exists(path):
+        while path.exists():
             i += 1
-            path = filename + ".%d" % i
-        return path
+            path = Path(filename + ".%d" % i)
+        return str(path)
 
     def load(self, target, passphrase):
         if self.STORAGE == KeyBlobStorage.KEYFILE:
@@ -656,7 +683,7 @@ class FlexiKey:
         elif self.STORAGE == KeyBlobStorage.REPO:
             # While the repository is encrypted, we consider a repokey repository with a blank
             # passphrase an unencrypted repository.
-            self.logically_encrypted = passphrase != ""
+            self.logically_encrypted = passphrase != ""  # nosec B105
 
             # what we get in target is just a repo location, but we already have the repo obj:
             target = self.repository
@@ -686,7 +713,7 @@ class FlexiKey:
                 fd.write(key_data)
                 fd.write("\n")
         elif self.STORAGE == KeyBlobStorage.REPO:
-            self.logically_encrypted = passphrase != ""
+            self.logically_encrypted = passphrase != ""  # nosec B105
             key_data = key_data.encode("utf-8")  # remote repo: msgpack issue #99, giving bytes
             target.save_key(key_data)
         else:
@@ -889,9 +916,7 @@ class AEADKeyBase(KeyBase):
         assert len(sessionid) == 24  # 192bit
         if domain is None:
             domain = b"borg-session-key-" + self.CIPHERSUITE.__name__.encode()
-        # Because crypt_key is already a PRK, we do not need KDF security here, PRF security is good enough.
-        # See https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Cr2.pdf section 4 "one-step KDF".
-        return sha256(self.crypt_key + sessionid + domain).digest()
+        return self.derive_key(salt=sessionid, domain=domain, size=32)  # 256bit
 
     def _get_cipher(self, sessionid, iv):
         assert isinstance(iv, int)

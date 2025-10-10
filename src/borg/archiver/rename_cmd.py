@@ -11,14 +11,12 @@ logger = create_logger()
 
 
 class RenameMixIn:
-    @with_repository(exclusive=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(cache=True, compatibility=(Manifest.Operation.CHECK,))
     @with_archive
     def do_rename(self, args, repository, manifest, cache, archive):
-        """Rename an existing archive"""
+        """Rename an existing archive."""
         archive.rename(args.newname)
         manifest.write()
-        repository.commit(compact=False)
-        cache.commit()
 
     def build_parser_rename(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -37,10 +35,12 @@ class RenameMixIn:
             description=self.do_rename.__doc__,
             epilog=rename_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="rename archive",
+            help="rename an archive",
         )
         subparser.set_defaults(func=self.do_rename)
-        subparser.add_argument("name", metavar="OLDNAME", type=archivename_validator, help="specify the archive name")
+        subparser.add_argument(
+            "name", metavar="OLDNAME", type=archivename_validator, help="specify the current archive name"
+        )
         subparser.add_argument(
             "newname", metavar="NEWNAME", type=archivename_validator, help="specify the new archive name"
         )

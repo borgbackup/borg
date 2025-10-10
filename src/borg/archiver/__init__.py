@@ -3,6 +3,17 @@
 import sys
 import traceback
 
+# quickfix to disallow running borg with assertions switched off
+try:
+    assert False
+except AssertionError:
+    pass  # OK
+else:
+    print(
+        "Borg requires working assertions. Please run Python without -O and/or unset PYTHONOPTIMIZE.", file=sys.stderr
+    )
+    sys.exit(2)  # == EXIT_ERROR
+
 try:
     import argparse
     import faulthandler
@@ -14,7 +25,6 @@ try:
     import os
     import shlex
     import signal
-    import time
     from datetime import datetime, timezone
 
     from ..logger import create_logger, setup_logging
@@ -65,10 +75,10 @@ def get_func(args):
     raise Exception("expected func attributes not found")
 
 
+from .analyze_cmd import AnalyzeMixIn
 from .benchmark_cmd import BenchmarkMixIn
 from .check_cmd import CheckMixIn
 from .compact_cmd import CompactMixIn
-from .config_cmd import ConfigMixIn
 from .create_cmd import CreateMixIn
 from .debug_cmd import DebugMixIn
 from .delete_cmd import DeleteMixIn
@@ -81,24 +91,27 @@ from .list_cmd import ListMixIn
 from .lock_cmds import LocksMixIn
 from .mount_cmds import MountMixIn
 from .prune_cmd import PruneMixIn
-from .rcompress_cmd import RCompressMixIn
+from .repo_compress_cmd import RepoCompressMixIn
 from .recreate_cmd import RecreateMixIn
 from .rename_cmd import RenameMixIn
-from .rcreate_cmd import RCreateMixIn
-from .rinfo_cmd import RInfoMixIn
-from .rdelete_cmd import RDeleteMixIn
-from .rlist_cmd import RListMixIn
+from .repo_create_cmd import RepoCreateMixIn
+from .repo_info_cmd import RepoInfoMixIn
+from .repo_delete_cmd import RepoDeleteMixIn
+from .repo_list_cmd import RepoListMixIn
+from .repo_space_cmd import RepoSpaceMixIn
 from .serve_cmd import ServeMixIn
+from .tag_cmd import TagMixIn
 from .tar_cmds import TarMixIn
 from .transfer_cmd import TransferMixIn
+from .undelete_cmd import UnDeleteMixIn
 from .version_cmd import VersionMixIn
 
 
 class Archiver(
+    AnalyzeMixIn,
     BenchmarkMixIn,
     CheckMixIn,
     CompactMixIn,
-    ConfigMixIn,
     CreateMixIn,
     DebugMixIn,
     DeleteMixIn,
@@ -113,20 +126,23 @@ class Archiver(
     PruneMixIn,
     RecreateMixIn,
     RenameMixIn,
-    RCompressMixIn,
-    RCreateMixIn,
-    RDeleteMixIn,
-    RInfoMixIn,
-    RListMixIn,
+    RepoCompressMixIn,
+    RepoCreateMixIn,
+    RepoDeleteMixIn,
+    RepoInfoMixIn,
+    RepoListMixIn,
+    RepoSpaceMixIn,
     ServeMixIn,
+    TagMixIn,
     TarMixIn,
     TransferMixIn,
+    UnDeleteMixIn,
     VersionMixIn,
 ):
     def __init__(self, lock_wait=None, prog=None):
         self.lock_wait = lock_wait
         self.prog = prog
-        self.last_checkpoint = time.monotonic()
+        self.start_backup = None
 
     def print_warning(self, msg, *args, **kw):
         warning_code = kw.get("wc", EXIT_WARNING)  # note: wc=None can be used to not influence exit code
@@ -333,10 +349,10 @@ class Archiver(
 
         subparsers = parser.add_subparsers(title="required arguments", metavar="<command>")
 
+        self.build_parser_analyze(subparsers, common_parser, mid_common_parser)
         self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
         self.build_parser_check(subparsers, common_parser, mid_common_parser)
         self.build_parser_compact(subparsers, common_parser, mid_common_parser)
-        self.build_parser_config(subparsers, common_parser, mid_common_parser)
         self.build_parser_create(subparsers, common_parser, mid_common_parser)
         self.build_parser_debug(subparsers, common_parser, mid_common_parser)
         self.build_parser_delete(subparsers, common_parser, mid_common_parser)
@@ -349,21 +365,24 @@ class Archiver(
         self.build_parser_locks(subparsers, common_parser, mid_common_parser)
         self.build_parser_mount_umount(subparsers, common_parser, mid_common_parser)
         self.build_parser_prune(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rcompress(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rcreate(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rdelete(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rinfo(subparsers, common_parser, mid_common_parser)
-        self.build_parser_rlist(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_compress(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_create(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_delete(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_info(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_list(subparsers, common_parser, mid_common_parser)
         self.build_parser_recreate(subparsers, common_parser, mid_common_parser)
         self.build_parser_rename(subparsers, common_parser, mid_common_parser)
+        self.build_parser_repo_space(subparsers, common_parser, mid_common_parser)
         self.build_parser_serve(subparsers, common_parser, mid_common_parser)
+        self.build_parser_tag(subparsers, common_parser, mid_common_parser)
         self.build_parser_tar(subparsers, common_parser, mid_common_parser)
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)
+        self.build_parser_undelete(subparsers, common_parser, mid_common_parser)
         self.build_parser_version(subparsers, common_parser, mid_common_parser)
         return parser
 
     def get_args(self, argv, cmd):
-        """usually, just returns argv, except if we deal with a ssh forced command for borg serve."""
+        """Usually just returns argv, except when dealing with an SSH forced command for borg serve."""
         result = self.parse_args(argv[1:])
         if cmd is not None and result.func == self.do_serve:
             # borg serve case:
@@ -382,7 +401,7 @@ class Archiver(
                 # client is allowed to specify the allowlisted options,
                 # everything else comes from the forced "borg serve" command (or the defaults).
                 # stuff from denylist must never be used from the client.
-                denylist = {"restrict_to_paths", "restrict_to_repositories", "append_only", "storage_quota", "umask"}
+                denylist = {"restrict_to_paths", "restrict_to_repositories", "umask", "permissions"}
                 allowlist = {"debug_topics", "lock_wait", "log_level"}
                 not_present = object()
                 for attr_name in allowlist:
@@ -412,22 +431,6 @@ class Archiver(
             elif not args.paths_from_stdin:
                 # need at least 1 path but args.paths may also be populated from patterns
                 parser.error("Need at least one PATH argument.")
-        if not getattr(args, "lock", True):  # Option --bypass-lock sets args.lock = False
-            bypass_allowed = {
-                self.do_check,
-                self.do_config,
-                self.do_diff,
-                self.do_export_tar,
-                self.do_extract,
-                self.do_info,
-                self.do_rinfo,
-                self.do_list,
-                self.do_rlist,
-                self.do_mount,
-                self.do_umount,
-            }
-            if func not in bypass_allowed:
-                raise Error("Not allowed to bypass locking mechanism for chosen command")
         # we can only have a complete knowledge of placeholder replacements we should do **after** arg parsing,
         # e.g. due to options like --timestamp that override the current time.
         # thus we have to initialize replace_placeholders here and process all args that need placeholder replacement.
@@ -435,10 +438,14 @@ class Archiver(
             replace_placeholders.override("now", DatetimeWrapper(args.timestamp))
             replace_placeholders.override("utcnow", DatetimeWrapper(args.timestamp.astimezone(timezone.utc)))
             args.location = args.location.with_timestamp(args.timestamp)
-        for name in "name", "other_name", "newname", "match_archives", "comment":
+        for name in "name", "other_name", "newname", "comment":
             value = getattr(args, name, None)
             if value is not None:
                 setattr(args, name, replace_placeholders(value))
+        for name in ("match_archives",):  # lists
+            value = getattr(args, name, None)
+            if value:
+                setattr(args, name, [replace_placeholders(elem) for elem in value])
 
         return args
 
@@ -450,7 +457,7 @@ class Archiver(
         selftest(logger)
 
     def _setup_implied_logging(self, args):
-        """turn on INFO level logging for args that imply that they will produce output"""
+        """Turn on INFO-level logging for arguments that imply they will produce output."""
         # map of option name to name of logger for that option
         option_logger = {
             "show_version": "borg.output.show-version",
@@ -473,20 +480,6 @@ class Archiver(
                 topic = "borg.debug." + topic
             logger.debug("Enabling debug topic %s", topic)
             logging.getLogger(topic).setLevel("DEBUG")
-
-    def maybe_checkpoint(self, *, checkpoint_func, checkpoint_interval):
-        checkpointed = False
-        sig_int_triggered = sig_int and sig_int.action_triggered()
-        if sig_int_triggered or checkpoint_interval and time.monotonic() - self.last_checkpoint > checkpoint_interval:
-            if sig_int_triggered:
-                logger.info("checkpoint requested: starting checkpoint creation...")
-            checkpoint_func()
-            checkpointed = True
-            self.last_checkpoint = time.monotonic()
-            if sig_int_triggered:
-                sig_int.action_completed()
-                logger.info("checkpoint requested: finished checkpoint creation!")
-        return checkpointed
 
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
@@ -551,7 +544,7 @@ class Archiver(
 
 
 def sig_info_handler(sig_no, stack):  # pragma: no cover
-    """search the stack for infos about the currently processed file and print them"""
+    """Search the stack for information about the currently processed file and print it."""
     with signal_handler(sig_no, signal.SIG_IGN):
         for frame in inspect.getouterframes(stack):
             func, loc = frame[3], frame[0].f_locals
@@ -617,14 +610,13 @@ def main():  # pragma: no cover
 
     # Register fault handler for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL.
     faulthandler.enable()
-    with signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)), signal_handler(
-        "SIGHUP", raising_signal_handler(SigHup)
-    ), signal_handler("SIGTERM", raising_signal_handler(SigTerm)), signal_handler(
-        "SIGUSR1", sig_info_handler
-    ), signal_handler(
-        "SIGUSR2", sig_trace_handler
-    ), signal_handler(
-        "SIGINFO", sig_info_handler
+    with (
+        signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)),
+        signal_handler("SIGHUP", raising_signal_handler(SigHup)),
+        signal_handler("SIGTERM", raising_signal_handler(SigTerm)),
+        signal_handler("SIGUSR1", sig_info_handler),
+        signal_handler("SIGUSR2", sig_trace_handler),
+        signal_handler("SIGINFO", sig_info_handler),
     ):
         archiver = Archiver()
         msg = msgid = tb = None

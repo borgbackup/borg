@@ -4,8 +4,6 @@ import textwrap
 from hashlib import sha256
 
 from ..helpers import Error, yes, bin_to_hex, hex_to_bin, dash_open
-from ..manifest import Manifest, NoManifestError
-from ..repository import Repository
 from ..repoobj import RepoObj
 
 
@@ -13,7 +11,7 @@ from .key import CHPOKeyfileKey, RepoKeyNotFoundError, KeyBlobStorage, identify_
 
 
 class NotABorgKeyFile(Error):
-    """This file is not a borg key backup, aborting."""
+    """This file is not a Borg key backup, aborting."""
 
     exit_mcode = 43
 
@@ -48,11 +46,7 @@ class KeyManager:
         self.keyblob = None
         self.keyblob_storage = None
 
-        try:
-            manifest_chunk = self.repository.get(Manifest.MANIFEST_ID)
-        except Repository.ObjectNotFound:
-            raise NoManifestError
-
+        manifest_chunk = repository.get_manifest()
         manifest_data = RepoObj.extract_crypted_data(manifest_chunk)
         key = identify_key(manifest_data)
         self.keyblob_storage = key.STORAGE
@@ -187,7 +181,7 @@ class KeyManager:
                     try:
                         (id_lines, id_repoid, id_complete_checksum) = data.split("/")
                     except ValueError:
-                        print("the id line must contain exactly three '/', try again")
+                        print("the id line must contain exactly two '/', try again")
                         continue
                     if sha256_truncated(data.lower().encode("ascii"), 2) != checksum:
                         print("line checksum did not match, try same line again")

@@ -9,7 +9,7 @@ import time
 from ..archive import Archive, TarfileObjectProcessors, ChunksProcessor
 from ..compress import CompressionSpec
 from ..constants import *  # NOQA
-from ..helpers import HardLinkManager
+from ..helpers import HardLinkManager, IncludePatternNeverMatchedWarning
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import dash_open
 from ..helpers import msgpack
@@ -62,7 +62,7 @@ class TarMixIn:
 
         # A quick note about the general design of tar_filter and tarfile;
         # The tarfile module of Python can provide some compression mechanisms
-        # by itself, using the builtin gzip, bz2 and lzma modules (and "tarmodes"
+        # by itself, using the built-in gzip, bz2, and lzma modules (and "tar modes"
         # such as "w:xz").
         #
         # Doing so would have three major drawbacks:
@@ -113,9 +113,7 @@ class TarMixIn:
             """
             Return a file-like object that reads from the chunks of *item*.
             """
-            chunk_iterator = archive.pipeline.fetch_many(
-                [chunk_id for chunk_id, _ in item.chunks], is_preloaded=True, ro_type=ROBJ_FILE_STREAM
-            )
+            chunk_iterator = archive.pipeline.fetch_many(item.chunks, is_preloaded=True, ro_type=ROBJ_FILE_STREAM)
             if pi:
                 info = [remove_surrogates(item.path)]
                 return ChunkIteratorFileWrapper(
@@ -142,8 +140,8 @@ class TarMixIn:
             tarinfo.uname = item.get("user", "")
             tarinfo.gname = item.get("group", "")
             # The linkname in tar has 2 uses:
-            # for symlinks it means the destination, while for hardlinks it refers to the file.
-            # Since hardlinks in tar have a different type code (LNKTYPE) the format might
+            # for symlinks it means the destination, while for hard links it refers to the file.
+            # Since hard links in tar have a different type code (LNKTYPE) the format might
             # support hardlinking arbitrary objects (including symlinks and directories), but
             # whether implementations actually support that is a whole different question...
             tarinfo.linkname = ""
@@ -154,7 +152,7 @@ class TarMixIn:
                 if "hlid" in item:
                     linkname = hlm.retrieve(id=item.hlid)
                     if linkname is not None:
-                        # the first hardlink was already added to the archive, add a tar-hardlink reference to it.
+                        # the first hard link was already added to the archive, add a tar-hard-link reference to it.
                         tarinfo.type = tarfile.LNKTYPE
                         tarinfo.linkname = linkname
                     else:
@@ -211,6 +209,20 @@ class TarMixIn:
                 if hasattr(item, name):
                     ns = getattr(item, name)
                     ph[name] = str(ns / 1e9)
+            if hasattr(item, "xattrs"):
+                for bkey, bvalue in item.xattrs.items():
+                    # we have bytes key and bytes value, but the tarfile code
+                    # expects str key and str value.
+                    key = SCHILY_XATTR + bkey.decode("utf-8", errors="surrogateescape")
+                    value = bvalue.decode("utf-8", errors="surrogateescape")
+                    ph[key] = value
+            # Add POSIX access and default ACL if present
+            acl_access = item.get("acl_access")
+            if acl_access is not None:
+                ph[SCHILY_ACL_ACCESS] = acl_access.decode("utf-8", errors="surrogateescape")
+            acl_default = item.get("acl_default")
+            if acl_default is not None:
+                ph[SCHILY_ACL_DEFAULT] = acl_default.decode("utf-8", errors="surrogateescape")
             if format == "BORG":  # BORG format additions
                 ph["BORG.item.version"] = "1"
                 # BORG.item.meta - just serialize all metadata we have:
@@ -219,7 +231,8 @@ class TarMixIn:
                 ph["BORG.item.meta"] = meta_text
             return ph
 
-        for item in archive.iter_items(filter, preload=True):
+        for item in archive.iter_items(filter):
+            archive.preload_item_chunks(item, optimize_hardlinks=True)
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
@@ -240,7 +253,7 @@ class TarMixIn:
         for pattern in matcher.get_unmatched_include_patterns():
             self.print_warning_instance(IncludePatternNeverMatchedWarning(pattern))
 
-    @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(cache=True, compatibility=(Manifest.Operation.WRITE,))
     def do_import_tar(self, args, repository, manifest, cache):
         """Create a backup archive from a tarball"""
         self.output_filter = args.output_filter
@@ -269,16 +282,7 @@ class TarMixIn:
             start_monotonic=t0_monotonic,
             log_json=args.log_json,
         )
-        cp = ChunksProcessor(
-            cache=cache,
-            key=key,
-            add_item=archive.add_item,
-            prepare_checkpoint=archive.prepare_checkpoint,
-            write_checkpoint=archive.write_checkpoint,
-            checkpoint_interval=args.checkpoint_interval,
-            checkpoint_volume=args.checkpoint_volume,
-            rechunkify=False,
-        )
+        cp = ChunksProcessor(cache=cache, key=key, add_item=archive.add_item, rechunkify=False)
         tfo = TarfileObjectProcessors(
             cache=cache,
             key=key,
@@ -305,7 +309,7 @@ class TarMixIn:
             elif tarinfo.issym():
                 status = tfo.process_symlink(tarinfo=tarinfo, status="s", type=stat.S_IFLNK)
             elif tarinfo.islnk():
-                # tar uses a hardlink model like: the first instance of a hardlink is stored as a regular file,
+                # tar uses a hard link model like: the first instance of a hard link is stored as a regular file,
                 # later instances are special entries referencing back to the first instance.
                 status = tfo.process_hardlink(tarinfo=tarinfo, status="h", type=stat.S_IFREG)
             elif tarinfo.isblk():
@@ -356,7 +360,7 @@ class TarMixIn:
         read the uncompressed tar stream from stdin and write a compressed/filtered
         tar stream to stdout.
 
-        Depending on the ``-tar-format`` option, these formats are created:
+        Depending on the ``--tar-format`` option, these formats are created:
 
         +--------------+---------------------------+----------------------------+
         | --tar-format | Specification             | Metadata                   |
@@ -364,6 +368,7 @@ class TarMixIn:
         | BORG         | BORG specific, like PAX   | all as supported by borg   |
         +--------------+---------------------------+----------------------------+
         | PAX          | POSIX.1-2001 (pax) format | GNU + atime/ctime/mtime ns |
+        |              |                           | + xattrs                   |
         +--------------+---------------------------+----------------------------+
         | GNU          | GNU tar format            | mtime s, no atime/ctime,   |
         |              |                           | no ACLs/xattrs/bsdflags    |
@@ -405,7 +410,7 @@ class TarMixIn:
             "--tar-format",
             metavar="FMT",
             dest="tar_format",
-            default="GNU",
+            default="PAX",
             choices=("BORG", "PAX", "GNU"),
             action=Highlander,
             help="select tar format: BORG, PAX or GNU",
@@ -523,25 +528,6 @@ class TarMixIn:
             metavar="TIMESTAMP",
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
             "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
-        )
-        archive_group.add_argument(
-            "-c",
-            "--checkpoint-interval",
-            dest="checkpoint_interval",
-            type=int,
-            default=1800,
-            action=Highlander,
-            metavar="SECONDS",
-            help="write checkpoint every SECONDS seconds (Default: 1800)",
-        )
-        archive_group.add_argument(
-            "--checkpoint-volume",
-            metavar="BYTES",
-            dest="checkpoint_volume",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
         )
         archive_group.add_argument(
             "--chunker-params",

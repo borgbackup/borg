@@ -10,16 +10,16 @@ def check_python():
     else:
         required_funcs = {os.stat, os.utime, os.chown}
     if not os.supports_follow_symlinks.issuperset(required_funcs):
-        raise RTError("""FATAL: this Python was compiled for a too old (g)libc and misses required functionality.""")
+        raise RTError("""FATAL: This Python was compiled for a too old (g)libc and lacks required functionality.""")
 
 
 def check_extension_modules():
-    from .. import platform, compress, crypto, item, chunker, hashindex
+    from .. import platform, compress, crypto, item, hashindex, chunkers
 
     msg = """The Borg binary extension modules do not seem to be properly installed."""
     if hashindex.API_VERSION != "1.2_01":
         raise RTError(msg)
-    if chunker.API_VERSION != "1.2_01":
+    if chunkers.API_VERSION != "1.2_01":
         raise RTError(msg)
     if compress.API_VERSION != "1.2_02":
         raise RTError(msg)

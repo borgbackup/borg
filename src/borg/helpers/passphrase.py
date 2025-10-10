@@ -3,6 +3,7 @@ import os
 import shlex
 import subprocess
 import sys
+import textwrap
 
 from . import bin_to_hex
 from . import Error
@@ -15,25 +16,25 @@ logger = create_logger()
 
 
 class NoPassphraseFailure(Error):
-    """can not acquire a passphrase: {}"""
+    """Cannot acquire a passphrase: {}."""
 
     exit_mcode = 50
 
 
 class PasscommandFailure(Error):
-    """passcommand supplied in BORG_PASSCOMMAND failed: {}"""
+    """Passcommand supplied in BORG_PASSCOMMAND failed: {}."""
 
     exit_mcode = 51
 
 
 class PassphraseWrong(Error):
-    """passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND or via BORG_PASSPHRASE_FD is incorrect."""
+    """Passphrase supplied in BORG_PASSPHRASE, by BORG_PASSCOMMAND, or via BORG_PASSPHRASE_FD is incorrect."""
 
     exit_mcode = 52
 
 
 class PasswordRetriesExceeded(Error):
-    """exceeded the maximum password retries"""
+    """Exceeded the maximum password retries."""
 
     exit_mcode = 53
 
@@ -46,33 +47,36 @@ class Passphrase(str):
             return cls(passphrase)
 
     @classmethod
-    def env_passphrase(cls, default=None):
-        passphrase = cls._env_passphrase("BORG_PASSPHRASE", default)
+    def env_passphrase(cls, default=None, other=False):
+        env_var = "BORG_OTHER_PASSPHRASE" if other else "BORG_PASSPHRASE"
+        passphrase = cls._env_passphrase(env_var, default)
         if passphrase is not None:
             return passphrase
-        passphrase = cls.env_passcommand()
+        passphrase = cls.env_passcommand(other=other)
         if passphrase is not None:
             return passphrase
-        passphrase = cls.fd_passphrase()
+        passphrase = cls.fd_passphrase(other=other)
         if passphrase is not None:
             return passphrase
 
     @classmethod
-    def env_passcommand(cls, default=None):
-        passcommand = os.environ.get("BORG_PASSCOMMAND", None)
+    def env_passcommand(cls, default=None, other=False):
+        env_var = "BORG_OTHER_PASSCOMMAND" if other else "BORG_PASSCOMMAND"
+        passcommand = os.environ.get(env_var, None)
         if passcommand is not None:
             # passcommand is a system command (not inside pyinstaller env)
             env = prepare_subprocess_env(system=True)
             try:
-                passphrase = subprocess.check_output(shlex.split(passcommand), text=True, env=env)
+                passphrase = subprocess.check_output(shlex.split(passcommand), text=True, env=env)  # nosec B603
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 raise PasscommandFailure(e)
             return cls(passphrase.rstrip("\n"))
 
     @classmethod
-    def fd_passphrase(cls):
+    def fd_passphrase(cls, other=False):
+        env_var = "BORG_OTHER_PASSPHRASE_FD" if other else "BORG_PASSPHRASE_FD"
         try:
-            fd = int(os.environ.get("BORG_PASSPHRASE_FD"))
+            fd = int(os.environ.get(env_var))
         except (ValueError, TypeError):
             return None
         with os.fdopen(fd, mode="r") as f:
@@ -109,20 +113,42 @@ class Passphrase(str):
             retry=True,
             env_var_override="BORG_DISPLAY_PASSPHRASE",
         ):
-            print('Your passphrase (between double-quotes): "%s"' % passphrase, file=sys.stderr)
-            print("Make sure the passphrase displayed above is exactly what you wanted.", file=sys.stderr)
-            try:
-                passphrase.encode("ascii")
-            except UnicodeEncodeError:
-                print(
-                    "Your passphrase (UTF-8 encoding in hex): %s" % bin_to_hex(passphrase.encode("utf-8")),
-                    file=sys.stderr,
-                )
-                print(
-                    "As you have a non-ASCII passphrase, it is recommended to keep the "
-                    "UTF-8 encoding in hex together with the passphrase at a safe place.",
-                    file=sys.stderr,
-                )
+            pw_msg = textwrap.dedent(
+                f"""\
+            Your passphrase (between double-quotes): "{passphrase}"
+            Make sure the passphrase displayed above is exactly what you wanted.
+            Your passphrase (UTF-8 encoding in hex): {bin_to_hex(passphrase.encode("utf-8"))}
+            It is recommended to keep the UTF-8 encoding in hex together with the passphrase in a safe place.
+            In case you should ever run into passphrase issues, it could sometimes help debug them.
+            """
+            )
+            print(pw_msg, file=sys.stderr)
+
+    @staticmethod
+    def display_debug_info(passphrase):
+        def fmt_var(env_var):
+            env_var_value = os.environ.get(env_var)
+            if env_var_value is not None:
+                return f'{env_var} = "{env_var_value}"'
+            else:
+                return f"# {env_var} is not set"
+
+        if os.environ.get("BORG_DEBUG_PASSPHRASE") == "YES":
+            passphrase_info = textwrap.dedent(
+                f"""\
+                Incorrect passphrase!
+                Passphrase used (between double-quotes): "{passphrase}"
+                Same, UTF-8 encoded, in hex: {bin_to_hex(passphrase.encode('utf-8'))}
+                Relevant Environment Variables:
+                {fmt_var("BORG_PASSPHRASE")}
+                {fmt_var("BORG_PASSCOMMAND")}
+                {fmt_var("BORG_PASSPHRASE_FD")}
+                {fmt_var("BORG_OTHER_PASSPHRASE")}
+                {fmt_var("BORG_OTHER_PASSCOMMAND")}
+                {fmt_var("BORG_OTHER_PASSPHRASE_FD")}
+                """
+            )
+            print(passphrase_info, file=sys.stderr)
 
     @classmethod
     def new(cls, allow_empty=False):

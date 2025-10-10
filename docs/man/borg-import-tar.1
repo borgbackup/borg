@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-IMPORT-TAR" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-IMPORT-TAR" "1" "2025-08-02" "" "borg backup tool"
 .SH NAME
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -96,7 +96,7 @@ specify the archive name
 .B TARFILE
 input tar file. \(dq\-\(dq to read from stdin instead.
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-\-tar\-filter
@@ -126,12 +126,6 @@ add a comment text to the archive
 .BI \-\-timestamp \ TIMESTAMP
 manually specify the archive creation date/time (yyyy\-mm\-ddThh:mm:ss[(+|\-)HH:MM] format, (+|\-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
 .TP
-.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
-write checkpoint every SECONDS seconds (Default: 1800)
-.TP
-.BI \-\-checkpoint\-volume \ BYTES
-write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)
-.TP
 .BI \-\-chunker\-params \ PARAMS
 specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
 .TP
@@ -142,8 +136,7 @@ select compression algorithm, see the output of the \(dqborg help compression\(d
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # export as uncompressed tar
 $ borg export\-tar Monday Monday.tar
 
@@ -164,8 +157,7 @@ $ borg export\-tar Monday \- | curl \-\-data\-binary @\- https://somewhere/to/PO
 
 # remote extraction via \(dqtarpipe\(dq
 $ borg export\-tar Monday \- | ssh somewhere \(dqcd extracted; tar x\(dq
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .SS Archives transfer script
@@ -174,14 +166,12 @@ Outputs a script that copies all archives from repo1 to repo2:
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
-for A T in \(gaborg list \-\-format=\(aq{archive} {time:%Y\-%m\-%dT%H:%M:%S}{NL}\(aq\(ga
+.EX
+for N I T in \(gaborg list \-\-format=\(aq{archive} {id} {time:%Y\-%m\-%dT%H:%M:%S}{NL}\(aq\(ga
 do
-  echo \(dqborg \-r repo1 export\-tar \-\-tar\-format=BORG $A \- | borg \-r repo2 import\-tar \-\-timestamp=$T $A \-\(dq
+  echo \(dqborg \-r repo1 export\-tar \-\-tar\-format=BORG aid:$I \- | borg \-r repo2 import\-tar \-\-timestamp=$T $N \-\(dq
 done
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

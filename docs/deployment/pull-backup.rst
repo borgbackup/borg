@@ -6,12 +6,12 @@
 Backing up in pull mode
 =======================
 
-Typically the borg client connects to a backup server using SSH as a transport
+Typically the Borg client connects to a backup server using SSH as a transport
 when initiating a backup. This is referred to as push mode.
 
-If you however require the backup server to initiate the connection or prefer
+However, if you require the backup server to initiate the connection, or prefer
 it to initiate the backup run, one of the following workarounds is required to
-allow such a pull mode setup.
+allow such a pull-mode setup.
 
 A common use case for pull mode is to back up a remote server to a local personal
 computer.
@@ -19,38 +19,38 @@ computer.
 SSHFS
 =====
 
-Assuming you have a pull backup system set up with borg, where a backup server
-pulls the data from the target via SSHFS. In this mode, the backup client's file
-system is mounted remotely on the backup server. Pull mode is even possible if
+Assume you have a pull backup system set up with Borg, where a backup server
+pulls data from the target via SSHFS. In this mode, the backup client's filesystem
+is mounted remotely on the backup server. Pull mode is even possible if
 the SSH connection must be established by the client via a remote tunnel. Other
 network file systems like NFS or SMB could be used as well, but SSHFS is very
 simple to set up and probably the most secure one.
 
 There are some restrictions caused by SSHFS. For example, unless you define UID
 and GID mappings when mounting via ``sshfs``, owners and groups of the mounted
-file system will probably change, and you may not have access to those files if
-BorgBackup is not run with root privileges.
+filesystem will probably change, and you may not have access to those files if
+Borg is not run with root privileges.
 
-SSHFS is a FUSE file system and uses the SFTP protocol, so there may be also
-other unsupported features that the actual implementations of sshfs, libfuse and
-sftp on the backup server do not support, like file name encodings, ACLs, xattrs
-or flags. So there is no guarantee that you are able to restore a system
+SSHFS is a FUSE filesystem and uses the SFTP protocol, so there may also be
+unsupported features that the actual implementations of SSHFS, libfuse, and
+SFTP on the backup server do not support, like filename encodings, ACLs, xattrs,
+or flags. Therefore, there is no guarantee that you can restore a system
 completely in every aspect from such a backup.
 
 .. warning::
 
-    To mount the client's root file system you will need root access to the
-    client. This contradicts to the usual threat model of BorgBackup, where
-    clients don't need to trust the backup server (data is encrypted). In pull
+    To mount the client's root filesystem you will need root access to the
+    client. This contradicts the usual threat model of Borg, where
+    clients do not need to trust the backup server (data is encrypted). In pull
     mode the server (when logged in as root) could cause unlimited damage to the
-    client. Therefore, pull mode should be used only from servers you do fully
+    client. Therefore, pull mode should be used only with servers you fully
     trust!
 
 .. warning::
 
-    Additionally, while being chrooted into the client's root file system,
-    code from the client will be executed. Thus, you should only do that when
-    fully trusting the client.
+    Additionally, while chrooted into the client's root filesystem,
+    code from the client will be executed. Therefore, you should do this only when
+    you fully trust the client.
 
 .. warning::
 
@@ -98,7 +98,7 @@ create the backup, retaining the original paths, excluding the repository:
 
 ::
 
-    borg create --exclude borgrepo --files-cache ctime,size /borgrepo::archive /
+    borg create --exclude borgrepo --files-cache ctime,size --repo /borgrepo archive  /
 
 For the sake of simplicity only ``borgrepo`` is excluded here. You may want to
 set up an exclude file with additional files and folders to be excluded. Also
@@ -159,7 +159,7 @@ Now we can run
 
 ::
 
-    borg extract /borgrepo::archive PATH
+    borg extract --repo /borgrepo archive PATH
 
 to restore whatever we like partially. Finally, do the clean-up:
 
@@ -187,7 +187,7 @@ and extract a backup, utilizing the ``--numeric-ids`` option:
 
     sshfs root@host:/ /mnt/sshfs
     cd /mnt/sshfs
-    borg extract --numeric-ids /path/to/repo::archive
+    borg extract --numeric-ids --repo /path/to/repo archive
     cd ~
     umount /mnt/sshfs
 
@@ -199,7 +199,7 @@ directly extract it without the need of mounting with SSHFS:
 
 ::
 
-    borg export-tar /path/to/repo::archive - | ssh root@host 'tar -C / -x'
+    borg export-tar --repo /path/to/repo archive - | ssh root@host 'tar -C / -x'
 
 Note that in this scenario the tar format is the limiting factor – it cannot
 restore all the advanced features that BorgBackup supports. See
@@ -247,7 +247,7 @@ to *borg-client* has to have read and write permissions on ``/run/borg``::
 On *borg-server*, we have to start the command ``borg serve`` and make its
 standard input and output available to a unix socket::
 
-   borg-server:~$ socat UNIX-LISTEN:/run/borg/reponame.sock,fork EXEC:"borg serve --append-only --restrict-to-path /path/to/repo"
+   borg-server:~$ socat UNIX-LISTEN:/run/borg/reponame.sock,fork EXEC:"borg serve --restrict-to-path /path/to/repo"
 
 Socat will wait until a connection is opened. Then socat will execute the
 command given, redirecting Standard Input and Output to the unix socket. The
@@ -301,7 +301,7 @@ ignore all arguments intended for the SSH command.
 All Borg commands can now be executed on *borg-client*. For example to create a
 backup execute the ``borg create`` command::
 
-   borg-client:~$ borg create ssh://borg-server/path/to/repo::archive /path_to_backup
+   borg-client:~$ borg create --repo ssh://borg-server/path/to/repo archive /path_to_backup
 
 When automating backup creation, the
 interactive ssh session may seem inappropriate. An alternative way of creating
@@ -312,7 +312,7 @@ a backup may be the following command::
       borgc@borg-client \
       borg create \
       --rsh "sh -c 'exec socat STDIO UNIX-CONNECT:/run/borg/reponame.sock'" \
-      ssh://borg-server/path/to/repo::archive /path_to_backup \
+      --repo ssh://borg-server/path/to/repo archive /path_to_backup \
       ';' rm /run/borg/reponame.sock
 
 This command also automatically removes the socket file after the ``borg
@@ -350,7 +350,7 @@ dedicated ssh key:
 
   borgs@borg-server$ install -m 700 -d ~/.ssh/
   borgs@borg-server$ ssh-keygen -N '' -t rsa  -f ~/.ssh/borg-client_key
-  borgs@borg-server$ { echo -n 'command="borg serve --append-only --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys
+  borgs@borg-server$ { echo -n 'command="borg serve --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys
   borgs@borg-server$ chmod 600 ~/.ssh/authorized_keys
 
 ``install -m 700 -d ~/.ssh/``
@@ -365,12 +365,10 @@ dedicated ssh key:
   Another more complex approach is using a unique ssh key for each pull operation.
   This is more secure as it guarantees that the key will not be used for other purposes.
 
-``{ echo -n 'command="borg serve --append-only --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys``
+``{ echo -n 'command="borg serve --restrict-to-repo ~/repo",restrict '; cat ~/.ssh/borg-client_key.pub; } >> ~/.ssh/authorized_keys``
 
   Add borg-client's ssh public key to ~/.ssh/authorized_keys with forced command and restricted mode.
-  The borg client is restricted to use one repo at the specified path and to append-only operation.
-  Commands like *delete*, *prune* and *compact* have to be executed another way, for example directly on *borg-server*
-  side or from a privileged, less restricted client (using another authorized_keys entry).
+  The borg client is restricted to use one repo at the specified path.
 
 ``chmod 600 ~/.ssh/authorized_keys``
 

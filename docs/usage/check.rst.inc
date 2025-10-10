@@ -12,41 +12,43 @@ borg check
 
     .. class:: borg-options-table
 
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                                                 |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--repository-only``                        | only perform repository checks                                                                            |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--archives-only``                          | only perform archives checks                                                                              |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--verify-data``                            | perform cryptographic archive data integrity verification (conflicts with ``--repository-only``)          |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--repair``                                 | attempt to repair any inconsistencies found                                                               |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--max-duration SECONDS``                   | do only a partial repo check for max. SECONDS seconds (Default: unlimited)                                |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                                                                                                                                                         |
-    |                                                                                                                                                                                                                                        |
-    | :ref:`common_options`                                                                                                                                                                                                                  |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                            |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archive names matching the pattern. see "borg help match-archives".                         |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--first N``                                | consider first N archives after other filters were applied                                                |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--last N``                                 | consider last N archives after other filters were applied                                                 |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.         |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.         |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g. 7d or 12m.                                            |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.                                            |
-    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------+
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    | **options**                                                                                                                                                                                                                                              |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--repository-only``                        | only perform repository checks                                                                                              |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--archives-only``                          | only perform archives checks                                                                                                |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--verify-data``                            | perform cryptographic archive data integrity verification (conflicts with ``--repository-only``)                            |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--repair``                                 | attempt to repair any inconsistencies found                                                                                 |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--find-lost-archives``                     | attempt to find lost archives                                                                                               |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--max-duration SECONDS``                   | do only a partial repo check for max. SECONDS seconds (Default: unlimited)                                                  |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                                                                                                                                                           |
+    |                                                                                                                                                                                                                                                          |
+    | :ref:`common_options`                                                                                                                                                                                                                                    |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                              |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. see "borg help match-archives".                                               |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--first N``                                | consider first N archives after other filters were applied                                                                  |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--last N``                                 | consider last N archives after other filters were applied                                                                   |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.                           |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.                           |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g. 7d or 12m.                                                              |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
+    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.                                                              |
+    +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
 
@@ -60,11 +62,12 @@ borg check
 
 
 
-    optional arguments
+    options
         --repository-only    only perform repository checks
         --archives-only    only perform archives checks
         --verify-data     perform cryptographic archive data integrity verification (conflicts with ``--repository-only``)
         --repair          attempt to repair any inconsistencies found
+        --find-lost-archives    attempt to find lost archives
         --max-duration SECONDS    do only a partial repo check for max. SECONDS seconds (Default: unlimited)
 
 
@@ -72,8 +75,8 @@ borg check
         |
 
     Archive filters
-        -a PATTERN, --match-archives PATTERN     only consider archive names matching the pattern. see "borg help match-archives".
-        --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp
+        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. see "borg help match-archives".
+        --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
         --first N                                consider first N archives after other filters were applied
         --last N                                 consider last N archives after other filters were applied
         --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
@@ -89,23 +92,25 @@ The check command verifies the consistency of a repository and its archives.
 It consists of two major steps:
 
 1. Checking the consistency of the repository itself. This includes checking
-   the segment magic headers, and both the metadata and data of all objects in
-   the segments. The read data is checked by size and CRC. Bit rot and other
+   the file magic headers, and both the metadata and data of all objects in
+   the repository. The read data is checked by size and hash. Bit rot and other
    types of accidental damage can be detected this way. Running the repository
    check can be split into multiple partial checks using ``--max-duration``.
-   When checking a remote repository, please note that the checks run on the
-   server and do not cause significant network traffic.
+   When checking a ssh:// remote repository, please note that the checks run on
+   the server and do not cause significant network traffic.
 
 2. Checking consistency and correctness of the archive metadata and optionally
    archive data (requires ``--verify-data``). This includes ensuring that the
    repository manifest exists, the archive metadata chunk is present, and that
    all chunks referencing files (items) in the archive exist. This requires
-   reading archive and file metadata, but not data. To cryptographically verify
-   the file (content) data integrity pass ``--verify-data``, but keep in mind
-   that this requires reading all data and is hence very time consuming. When
-   checking archives of a remote repository, archive checks run on the client
-   machine because they require decrypting data and therefore the encryption
-   key.
+   reading archive and file metadata, but not data. To scan for archives whose
+   entries were lost from the archive directory, pass ``--find-lost-archives``.
+   It requires reading all data and is hence very time consuming.
+   To additionally cryptographically verify the file (content) data integrity,
+   pass ``--verify-data``, which is even more time consuming.
+
+   When checking archives of a remote repository, archive checks run on the client
+   machine because they require decrypting data and therefore the encryption key.
 
 Both steps can also be run independently. Pass ``--repository-only`` to run the
 repository checks only, or pass ``--archives-only`` to run the archive checks
@@ -125,18 +130,26 @@ archive checks, nor enable repair mode. Consequently, if you want to use
 
 **Warning:** Please note that partial repository checks (i.e. running it with
 ``--max-duration``) can only perform non-cryptographic checksum checks on the
-segment files. A full repository check (i.e. without ``--max-duration``) can
-also do a repository index check. Enabling partial repository checks excepts
-archive checks for the same reason. Therefore partial checks may be useful with
-very large repositories only where a full check would take too long.
+repository files. Enabling partial repository checks excepts archive checks
+for the same reason. Therefore partial checks may be useful with very large
+repositories only where a full check would take too long.
 
 The ``--verify-data`` option will perform a full integrity verification (as
-opposed to checking the CRC32 of the segment) of data, which means reading the
+opposed to checking just the xxh64) of data, which means reading the
 data from the repository, decrypting and decompressing it. It is a complete
 cryptographic verification and hence very time consuming, but will detect any
 accidental and malicious corruption. Tamper-resistance is only guaranteed for
 encrypted repositories against attackers without access to the keys. You can
 not use ``--verify-data`` with ``--repository-only``.
+
+The ``--find-lost-archives`` option will also scan the whole repository, but
+tells Borg to search for lost archive metadata. If Borg encounters any archive
+metadata that doesn't match with an archive directory entry (including
+soft-deleted archives), it means that an entry was lost.
+Unless ``borg compact`` is called, these archives can be fully restored with
+``--repair``. Please note that ``--find-lost-archives`` must read a lot of
+data from the repository and is thus very time consuming. You can not use
+``--find-lost-archives`` with ``--repository-only``.
 
 About repair mode
 +++++++++++++++++
@@ -168,32 +181,13 @@ by definition, a potentially lossy task.
 
 In practice, repair mode hooks into both the repository and archive checks:
 
-1. When checking the repository's consistency, repair mode will try to recover
-   as many objects from segments with integrity errors as possible, and ensure
-   that the index is consistent with the data stored in the segments.
+1. When checking the repository's consistency, repair mode removes corrupted
+   objects from the repository after it did a 2nd try to read them correctly.
 
 2. When checking the consistency and correctness of archives, repair mode might
    remove whole archives from the manifest if their archive metadata chunk is
-   corrupt or lost. On a chunk level (i.e. the contents of files), repair mode
-   will replace corrupt or lost chunks with a same-size replacement chunk of
-   zeroes. If a previously zeroed chunk reappears, repair mode will restore
-   this lost chunk using the new chunk. Lastly, repair mode will also delete
-   orphaned chunks (e.g. caused by read errors while creating the archive).
+   corrupt or lost. Borg will also report files that reference missing chunks.
 
-Most steps taken by repair mode have a one-time effect on the repository, like
-removing a lost archive from the repository. However, replacing a corrupt or
-lost chunk with an all-zero replacement will have an ongoing effect on the
-repository: When attempting to extract a file referencing an all-zero chunk,
-the ``extract`` command will distinctly warn about it. The FUSE filesystem
-created by the ``mount`` command will reject reading such a "zero-patched"
-file unless a special mount option is given.
-
-As mentioned earlier, Borg might be able to "heal" a "zero-patched" file in
-repair mode, if all its previously lost chunks reappear (e.g. via a later
-backup). This is achieved by Borg not only keeping track of the all-zero
-replacement chunks, but also by keeping metadata about the lost chunks. In
-repair mode Borg will check whether a previously lost chunk reappeared and will
-replace the all-zero replacement chunk by the reappeared chunk. If all lost
-chunks of a "zero-patched" file reappear, this effectively "heals" the file.
-Consequently, if lost chunks were repaired earlier, it is advised to run
-``--repair`` a second time after creating some new backups.
+If ``--repair --find-lost-archives`` is given, previously lost entries will
+be recreated in the archive directory. This is only possible before
+``borg compact`` would remove the archives' data completely.

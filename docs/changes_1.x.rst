@@ -73,7 +73,7 @@ no matter what encryption mode they use, including "none"):
    for normal production operations - it is only needed once to get the archives in a
    repository into a good state. All archives have a valid TAM now.
 
-Vulnerability time line:
+Vulnerability timeline:
 
 * 2023-06-13: Vulnerability discovered during code review by Thomas Waldmann
 * 2023-06-13...: Work on fixing the issue, upgrade procedure, docs.
@@ -3469,7 +3469,7 @@ Other changes:
   - archiver tests: add check_cache tool - lints refcounts
 
 - fixed cache sync performance regression from 1.1.0b1 onwards, #1940
-- syncing the cache without chunks.archive.d (see :ref:`disable_archive_chunks`)
+- syncing the cache without chunks.archive.d
   now avoids any merges and is thus faster, #1940
 - borg check --verify-data: faster due to linear on-disk-order scan
 - borg debug-xxx commands removed, we use "debug xxx" subcommands now, #1627

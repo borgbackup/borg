@@ -1,7 +1,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# Automated creation of testing environments / binaries on misc. platforms
+# Automated creation of testing environments/binaries on miscellaneous platforms
 
 $cpus = Integer(ENV.fetch('VMCPUS', '8'))  # create VMs with that many cpus
 $xdistn = Integer(ENV.fetch('XDISTN', '8'))  # dispatch tests to that many pytest workers
@@ -41,13 +41,14 @@ def packages_freebsd
     pkg install -y xxhash liblz4 zstd pkgconf
     pkg install -y fusefs-libs || true
     pkg install -y fusefs-libs3 || true
+    pkg install -y rust
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
-    # for building python (for the tests we use pyenv built pythons):
     pkg install -y python310 py310-sqlite3
-    # make sure there is a python3 command
-    ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3
-    python3 -m ensurepip
-    pip3 install virtualenv
+    pkg install -y python311 py311-sqlite3 py311-pip py311-virtualenv
+    # make sure there is a python3/pip3/virtualenv command
+    ln -sf /usr/local/bin/python3.11 /usr/local/bin/python3
+    ln -sf /usr/local/bin/pip-3.11 /usr/local/bin/pip3
+    ln -sf /usr/local/bin/virtualenv-3.11 /usr/local/bin/virtualenv
     # make bash default / work:
     chsh -s bash vagrant
     mount -t fdescfs fdesc /dev/fd
@@ -71,15 +72,18 @@ end
 
 def packages_openbsd
   return <<-EOF
+    echo "https://ftp.eu.openbsd.org/pub/OpenBSD" > /etc/installurl
     pkg_add bash
     chsh -s bash vagrant
     pkg_add xxhash
     pkg_add lz4
     pkg_add zstd
     pkg_add git  # no fakeroot
+    pkg_add rust
     pkg_add openssl%3.0
     pkg_add py3-pip
     pkg_add py3-virtualenv
+    echo 'export BORG_OPENSSL_NAME=eopenssl30' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -89,6 +93,7 @@ def packages_netbsd
     pkgin update
     pkgin -y upgrade
     pkg_add zstd lz4 xxhash git
+    pkg_add rust
     pkg_add bash
     chsh -s bash vagrant
     echo "export PROMPT_COMMAND=" >> ~vagrant/.bash_profile  # bug in netbsd 9.3, .bash_profile broken for screen
@@ -114,15 +119,62 @@ def packages_macos
     sudo softwareupdate --ignore Safari
     sudo softwareupdate --ignore "Install macOS High Sierra"
     sudo softwareupdate --install --all
-    which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-    brew update > /dev/null
-    brew install pkg-config readline xxhash openssl@3.0 zstd lz4 xz
+
+    # this box has openssl 1.1 installed
+    export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig
+
+    # the box "as is" has troubles downloading ca-certificates, needs a better working curl:
+    # https://curl.se/docs/install.html
+    curl -L https://github.com/curl/curl/releases/download/curl-8_10_1/curl-8.10.1.tar.gz | tar -xz
+    cd curl-8.10.1/
+    export ARCH=x86_64
+    export SDK=macosx
+    export DEPLOYMENT_TARGET=10.12
+    export CFLAGS="-arch $ARCH -isysroot $(xcrun -sdk $SDK --show-sdk-path) -m$SDK-version-min=$DEPLOYMENT_TARGET"
+    ./configure --host=$ARCH-apple-darwin --prefix /usr/local --with-openssl --without-libpsl --disable-ldap
+    make -j8
+    sudo make install
+    unset ARCH
+    unset SDK
+    unset DEPLOYMENT_TARGET
+    unset CFLAGS
+    cd ..
+    export HOMEBREW_DEVELOPER=1
+    export HOMEBREW_CURL_PATH=/usr/local/bin/curl
+    echo "finished building curl from source"
+    echo "----------------------------------"
+
+    # now the self-built curl should work for homebrew:
+    brew update
+    brew install ca-certificates
+    brew install openssl@3
+    export LDFLAGS=-L/usr/local/opt/openssl@3/lib
+    export CPPFLAGS=-I/usr/local/opt/openssl@3/include
+    export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig
+    echo 'export LDFLAGS=-L/usr/local/opt/openssl@3/lib' >> ~vagrant/.bash_profile
+    echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3/include' >> ~vagrant/.bash_profile
+    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig' >> ~vagrant/.bash_profile
+    echo "finished building ca-certificates and openssl@3"
+    echo "-----------------------------------------------"
+
+    # install curl from homebrew and use it for homebrew:
+    brew install curl
+    export PATH="/usr/local/opt/curl/bin:$PATH"
+    echo 'export PATH="/usr/local/opt/curl/bin:$PATH"' >> ~vagrant/.bash_profile
+    export HOMEBREW_FORCE_BREWED_CURL=1
+    echo 'export HOMEBREW_FORCE_BREWED_CURL=1' >> ~vagrant/.bash_profile
+    unset HOMEBREW_CURL_PATH
+    unset HOMEBREW_DEVELOPER
+    echo "finished install homebrew curl"
+    echo "------------------------------"
+
+    # now brew, curl, ca-certificates, openssl@3 should be all ok.
+    brew update
+    brew install pkgconf readline xxhash zstd lz4 xz
     brew install --cask macfuse
     # brew upgrade  # upgrade everything (takes rather long)
-    echo 'export LDFLAGS=-L/usr/local/opt/openssl@3.0/lib' >> ~vagrant/.bash_profile
-    echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3.0/include' >> ~vagrant/.bash_profile
-    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3.0/lib/pkgconfig' >> ~vagrant/.bash_profile
-    echo 'export PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@3.0' >> ~vagrant/.bash_profile
+    # pyenv shall use the openssl@3 from homebrew:
+    echo 'export PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@3' >> ~vagrant/.bash_profile
   EOF
 end
 
@@ -130,11 +182,7 @@ def packages_openindiana
   return <<-EOF
     # needs separate provisioning step + reboot:
     #pkg update
-    pkg install gcc-13 git pkg-config libxxhash
-    ln -sf /usr/bin/python3.9 /usr/bin/python3
-    python3 -m ensurepip
-    ln -sf /usr/bin/pip3.9 /usr/bin/pip3
-    pip3 install virtualenv
+    pkg install gcc-13 git pkg-config libxxhash pip virtualenv
     # let borg's pkg-config find openssl:
     pfexec pkg set-mediator -V 3.1 openssl
   EOF
@@ -165,10 +213,7 @@ def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
-    pyenv install 3.12.0  # tests
-    pyenv install 3.11.9  # tests, binary build
-    pyenv install 3.10.2  # tests
-    pyenv install 3.9.4  # tests
+    pyenv install 3.13.8
     pyenv rehash
   EOF
 end
@@ -185,9 +230,9 @@ def build_pyenv_venv(boxname)
   return <<-EOF
     . ~/.bash_profile
     cd /vagrant/borg
-    # use the latest 3.11 release
-    pyenv global 3.11.9
-    pyenv virtualenv 3.11.9 borg-env
+    # use the latest 3.13 release
+    pyenv global 3.13.8
+    pyenv virtualenv 3.13.8 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -201,6 +246,9 @@ def install_borg(fuse)
     cd borg
     pip install -r requirements.d/development.lock.txt
     python3 scripts/make.py clean
+    # install borgstore WITH all options, so it pulls in the needed
+    # requirements, so they will also get into the binaries built. #8574
+    pip install borgstore[sftp,s3]
     pip install -e .[#{fuse}]
   EOF
 end
@@ -210,7 +258,7 @@ def install_pyinstaller()
     . ~/.bash_profile
     cd /vagrant/borg
     . borg-env/bin/activate
-    pip install 'pyinstaller==6.7.0'
+    pip install 'pyinstaller==6.14.2'
   EOF
 end
 
@@ -233,8 +281,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.9.4 3.10.2 3.11.9 3.12.0
-      pyenv local 3.9.4 3.10.2 3.11.9 3.12.0
+      pyenv global 3.13.8
+      pyenv local 3.13.8
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -276,7 +324,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "noble" do |b|
-    b.vm.box = "ubuntu/noble64"
+    b.vm.box = "bento/ubuntu-24.04"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -297,6 +345,38 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("jammy")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("jammy", ".*none.*")
+  end
+
+  config.vm.define "trixie" do |b|
+    b.vm.box = "debian/testing64"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("trixie")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("trixie")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("trixie")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("trixie")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("trixie", ".*none.*")
+  end
+
+  config.vm.define "bookworm32" do |b|
+    b.vm.box = "generic-x32/debian12"
+    b.vm.provider :virtualbox do |v|
+      v.memory = 1024 + $wmem
+    end
+    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
+    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("bookworm32")
+    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("bookworm32")
+    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("bookworm32")
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
+    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
+    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("bookworm32")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bookworm32", ".*none.*")
   end
 
   config.vm.define "bookworm" do |b|
@@ -392,7 +472,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "macos1012" do |b|
     b.vm.box = "macos-sierra"
     b.vm.provider :virtualbox do |v|
-      v.memory = 4096 + $wmem
+      v.memory = 8192 + $wmem
       v.customize ['modifyvm', :id, '--ostype', 'MacOS_64']
       v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
       v.customize ['modifyvm', :id, '--nested-hw-virt', 'on']

@@ -1,51 +1,51 @@
-"""logging facilities
+"""Logging facilities.
 
-The way to use this is as follows:
+Usage:
 
-* each module declares its own logger, using:
+- Each module declares its own logger using:
 
-    from .logger import create_logger
-    logger = create_logger()
+      from .logger import create_logger
+      logger = create_logger()
 
-* then each module uses logger.info/warning/debug/etc according to the
-  level it believes is appropriate:
+- Then each module uses logger.info/warning/debug/etc. according to the
+  appropriate level:
 
-    logger.debug('debugging info for developers or power users')
-    logger.info('normal, informational output')
-    logger.warning('warn about a non-fatal error or sth else')
-    logger.error('a fatal error')
+      logger.debug('debugging info for developers or power users')
+      logger.info('normal, informational output')
+      logger.warning('warn about a non-fatal error or something else')
+      logger.error('a fatal error')
 
-  ... and so on. see the `logging documentation
+  See the `logging documentation
   <https://docs.python.org/3/howto/logging.html#when-to-use-logging>`_
-  for more information
+  for more information.
 
-* console interaction happens on stderr, that includes interactive
-  reporting functions like `help`, `info` and `list`
+- Console interaction happens on stderr; that includes interactive
+  reporting functions like `help`, `info`, and `list`.
 
-* ...except ``input()`` is special, because we can't control the
-  stream it is using, unfortunately. we assume that it won't clutter
-  stdout, because interaction would be broken then anyways
+- ``input()`` is special because we cannot control the stream it uses.
+  We assume it will not clutter stdout, because interaction would be broken
+  otherwise.
 
-* what is output on INFO level is additionally controlled by commandline
-  flags
+- What is output at INFO level is additionally controlled by command-line
+  flags.
 
-Logging setup is a bit complicated in borg, as it needs to work under misc. conditions:
-- purely local, not client/server (easy)
-- client/server: RemoteRepository ("borg serve" process) writes log records into a global
-  queue, which is then sent to the client side by the main serve loop (via the RPC protocol,
-  either over ssh stdout, more directly via process stdout without ssh [used in the tests]
-  or via a socket. On the client side, the log records are fed into the clientside logging
-  system. When remote_repo.close() is called, server side must send all queued log records
+Logging setup in Borg needs to work under various conditions:
+- Purely local, not client/server (easy).
+- Client/server: RemoteRepository ("borg serve" process) writes log records into a global
+  queue, which is then sent to the client side by the main serve loop (via the RPC protocol),
+  either over SSH stdout, more directly via process stdout without SSH (used in tests),
+  or via a socket. On the client side, the log records are fed into the client-side logging
+  system. When remote_repo.close() is called, the server side must send all queued log records
   via the RPC channel before returning the close() call's return value (as the client will
   then shut down the connection).
-- progress output is always given as json to the logger (including the plain text inside
-  the json), but then formatted by the logging system's formatter as either plain text or
-  json depending on the cli args given (--log-json?).
-- tests: potentially running in parallel via pytest-xdist, capturing borg output into a
+- Progress output is always given as JSON to the logger (including the plain text inside
+  the JSON), but then formatted by the logging system's formatter as either plain text or
+  JSON depending on the CLI args given (--log-json?).
+- Tests: potentially running in parallel via pytest-xdist, capturing Borg output into a
   given stream.
-- logging might be short-lived (e.g. when invoking a single borg command via the cli)
-  or long-lived (e.g. borg serve --socket or when running the tests)
-- logging is global and exists only once per process.
+- Logging might be short-lived (e.g., when invoking a single Borg command via the CLI)
+  or long-lived (e.g., borg serve --socket or when running the tests).
+- Logging is global and exists only once per process.
 """
 
 import inspect
@@ -57,17 +57,17 @@ import os
 import queue
 import sys
 import time
-from typing import Optional
 import warnings
+from pathlib import Path
 
-logging_debugging_path: Optional[str] = None  # if set, write borg.logger debugging log to path/borg-*.log
+logging_debugging_path: Path | None = None  # if set, write borg.logger debugging log to that_path/borg-*.log
 
 configured = False
 borg_serve_log_queue: queue.SimpleQueue = queue.SimpleQueue()
 
 
 class BorgQueueHandler(logging.handlers.QueueHandler):
-    """borg serve writes log record dicts to a borg_serve_log_queue"""
+    """Borg serve writes log record dicts to a borg_serve_log_queue."""
 
     def prepare(self, record: logging.LogRecord) -> dict:
         return dict(
@@ -117,6 +117,12 @@ class JSONProgressFormatter(logging.Formatter):
 # warnings.filterwarnings('ignore', r'... regex for warning message to ignore ...')
 
 
+# we do not want that urllib spoils test output with LibreSSL related warnings on OpenBSD.
+# NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+,
+#                    currently the 'ssl' module is compiled with 'LibreSSL 3.8.2'.
+warnings.filterwarnings("ignore", message=r".*urllib3 v2 only supports OpenSSL.*")
+
+
 def _log_warning(message, category, filename, lineno, file=None, line=None):
     # for warnings, we just want to use the logging system, not stderr or other files
     msg = f"{filename}:{lineno}: {category.__name__}: {message}"
@@ -162,12 +168,12 @@ def setup_logging(
         conf_fname = os.environ.get(env_var, conf_fname)
     if conf_fname:
         try:
-            conf_fname = os.path.abspath(conf_fname)
+            conf_path = Path(conf_fname).absolute()
             # we open the conf file here to be able to give a reasonable
             # error message in case of failure (if we give the filename to
             # fileConfig(), it silently ignores unreadable files and gives
             # unhelpful error msgs like "No section: 'formatters'"):
-            with open(conf_fname) as f:
+            with conf_path.open() as f:
                 logging.config.fileConfig(f)
             configured = True
             logger = logging.getLogger(__name__)
@@ -190,8 +196,8 @@ def setup_logging(
 
     if logging_debugging_path is not None:
         # add an addtl. root handler for debugging purposes
-        log_fname = os.path.join(logging_debugging_path, f"borg-{'serve' if is_serve else 'client'}-root.log")
-        handler2 = logging.StreamHandler(open(log_fname, "a"))
+        log_path = logging_debugging_path / (f"borg-{'serve' if is_serve else 'client'}-root.log")
+        handler2 = logging.StreamHandler(log_path.open("a"))
         handler2.setFormatter(formatter)
         logger.addHandler(handler2)
         logger.warning(f"--- {func} ---")  # only handler2 shall get this
@@ -208,8 +214,8 @@ def setup_logging(
 
     if logging_debugging_path is not None:
         # add an addtl. progress handler for debugging purposes
-        log_fname = os.path.join(logging_debugging_path, f"borg-{'serve' if is_serve else 'client'}-progress.log")
-        bop_handler2 = logging.StreamHandler(open(log_fname, "a"))
+        log_path = logging_debugging_path / (f"borg-{'serve' if is_serve else 'client'}-progress.log")
+        bop_handler2 = logging.StreamHandler(log_path.open("a"))
         bop_handler2.setFormatter(bop_formatter)
         bop_logger.addHandler(bop_handler2)
         json_dict = dict(

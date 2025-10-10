@@ -21,7 +21,7 @@ borg export-tar
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``PATH``                              | paths to extract; patterns are supported                                                                  |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                    |
+    | **options**                                                                                                                                                                                               |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--tar-filter``                      | filter program to pipe data through                                                                       |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
@@ -64,7 +64,7 @@ borg export-tar
         paths to extract; patterns are supported
 
 
-    optional arguments
+    options
         --tar-filter         filter program to pipe data through
         --list               output verbose list of items (files, dirs, ...)
         --tar-format FMT     select tar format: BORG, PAX or GNU
@@ -110,6 +110,7 @@ Depending on the ``-tar-format`` option, these formats are created:
 | BORG         | BORG specific, like PAX   | all as supported by borg   |
 +--------------+---------------------------+----------------------------+
 | PAX          | POSIX.1-2001 (pax) format | GNU + atime/ctime/mtime ns |
+|              |                           | + xattrs                   |
 +--------------+---------------------------+----------------------------+
 | GNU          | GNU tar format            | mtime s, no atime/ctime,   |
 |              |                           | no ACLs/xattrs/bsdflags    |

@@ -5,7 +5,7 @@ from ._common import build_matcher
 from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
-from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, CommandError
+from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex
 from ..helpers import timestamp
 from ..manifest import Manifest
 
@@ -15,9 +15,9 @@ logger = create_logger()
 
 
 class RecreateMixIn:
-    @with_repository(cache=True, exclusive=True, compatibility=(Manifest.Operation.CHECK,))
+    @with_repository(cache=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, cache):
-        """Re-create archives"""
+        """Recreate archives."""
         matcher = build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter
@@ -34,25 +34,26 @@ class RecreateMixIn:
             progress=args.progress,
             stats=args.stats,
             file_status_printer=self.print_file_status,
-            checkpoint_interval=args.checkpoint_interval,
-            checkpoint_volume=args.checkpoint_volume,
             dry_run=args.dry_run,
             timestamp=args.timestamp,
         )
-
-        archive_names = tuple(archive.name for archive in manifest.archives.list_considering(args))
-        if args.target is not None and len(archive_names) != 1:
-            raise CommandError("--target: Need to specify single archive")
-        for name in archive_names:
-            if recreater.is_temporary_archive(name):
+        archive_infos = manifest.archives.list_considering(args)
+        archive_infos = [ai for ai in archive_infos if "@PROT" not in ai.tags]
+        for archive_info in archive_infos:
+            if recreater.is_temporary_archive(archive_info.name):
                 continue
-            print("Processing", name)
-            if not recreater.recreate(name, args.comment, args.target):
-                logger.info("Skipped archive %s: Nothing to do. Archive was not processed.", name)
+            name, hex_id = archive_info.name, bin_to_hex(archive_info.id)
+            print(f"Processing {name} {hex_id}")
+            if args.target:
+                target = args.target
+                delete_original = False
+            else:
+                target = archive_info.name
+                delete_original = True
+            if not recreater.recreate(archive_info.id, target, delete_original, args.comment):
+                logger.info(f"Skipped archive {name} {hex_id}: Nothing to do.")
         if not args.dry_run:
             manifest.write()
-            repository.commit(compact=False)
-            cache.commit()
 
     def build_parser_recreate(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -62,15 +63,15 @@ class RecreateMixIn:
             """
         Recreate the contents of existing archives.
 
-        recreate is a potentially dangerous function and might lead to data loss
+        Recreate is a potentially dangerous function and might lead to data loss
         (if used wrongly). BE VERY CAREFUL!
 
         Important: Repository disk space is **not** freed until you run ``borg compact``.
 
         ``--exclude``, ``--exclude-from``, ``--exclude-if-present``, ``--keep-exclude-tags``
         and PATH have the exact same semantics as in "borg create", but they only check
-        for files in the archives and not in the local file system. If PATHs are specified,
-        the resulting archives will only contain files from these PATHs.
+        files in the archives and not in the local filesystem. If paths are specified,
+        the resulting archives will contain only files from those paths.
 
         Note that all paths in an archive are relative, therefore absolute patterns/paths
         will *not* match (``--exclude``, ``--exclude-from``, PATHs).
@@ -79,9 +80,9 @@ class RecreateMixIn:
         used to have upgraded Borg 0.xx archives deduplicate with Borg 1.x archives.
 
         **USE WITH CAUTION.**
-        Depending on the PATHs and patterns given, recreate can be used to
+        Depending on the paths and patterns given, recreate can be used to
         delete files from archives permanently.
-        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
+        When in doubt, use ``--dry-run --verbose --list`` to see how patterns/paths are
         interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
 
         The archive being recreated is only removed after the operation completes. The
@@ -94,16 +95,10 @@ class RecreateMixIn:
         at least the entire deduplicated size of the archives using the previous
         chunker params.
 
-        If you recently ran borg check --repair and it had to fix lost chunks with all-zero
-        replacement chunks, please first run another backup for the same data and re-run
-        borg check --repair afterwards to heal any archives that had lost chunks which are
-        still generated from the input data.
-
-        Important: running borg recreate to re-chunk will remove the chunks_healthy
-        metadata of all items with replacement chunks, so healing will not be possible
-        any more after re-chunking (it is also unlikely it would ever work: due to the
-        change of chunking parameters, the missing chunk likely will never be seen again
-        even if you still have the data that produced it).
+        If your most recent borg check found missing chunks, please first run another
+        backup for the same data, before doing any rechunking. If you are lucky, that
+        will recreate the missing chunks. Optionally, do another borg check to see
+        if the chunks are still missing.
         """
         )
         subparser = subparsers.add_parser(
@@ -139,27 +134,7 @@ class RecreateMixIn:
             default=None,
             type=archivename_validator,
             action=Highlander,
-            help="create a new archive with the name ARCHIVE, do not replace existing archive "
-            "(only applies for a single archive)",
-        )
-        archive_group.add_argument(
-            "-c",
-            "--checkpoint-interval",
-            dest="checkpoint_interval",
-            type=int,
-            default=1800,
-            action=Highlander,
-            metavar="SECONDS",
-            help="write checkpoint every SECONDS seconds (Default: 1800)",
-        )
-        archive_group.add_argument(
-            "--checkpoint-volume",
-            metavar="BYTES",
-            dest="checkpoint_volume",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
+            help="create a new archive with the name ARCHIVE, do not replace existing archive",
         )
         archive_group.add_argument(
             "--comment",

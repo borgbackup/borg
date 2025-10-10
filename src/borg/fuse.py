@@ -7,10 +7,10 @@ import struct
 import sys
 import tempfile
 import time
-from collections import defaultdict
+from collections import defaultdict, Counter
 from signal import SIGINT
 
-from .constants import ROBJ_FILE_STREAM
+from .constants import ROBJ_FILE_STREAM, zeros
 from .fuse_impl import llfuse, has_pyfuse3
 
 
@@ -39,13 +39,14 @@ from .crypto.low_level import blake2b_128
 from .archiver._common import build_matcher, build_filter
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
-from .helpers import daemonize, daemonizing, signal_handler, format_file_size
+from .helpers import daemonize, daemonizing, signal_handler, format_file_size, bin_to_hex
 from .helpers import HardLinkManager
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
 from .item import Item
 from .platform import uid2user, gid2group
 from .platformflags import is_darwin
+from .repository import Repository
 from .remote import RemoteRepository
 
 
@@ -53,8 +54,10 @@ def fuse_main():
     if has_pyfuse3:
         try:
             trio.run(llfuse.main)
+        except KeyboardInterrupt:
+            return SIGINT
         except:  # noqa
-            return 1  # TODO return signal number if it was killed by signal
+            return -1  # avoid colliding with signal numbers
         else:
             return None
     else:
@@ -70,9 +73,9 @@ FILES = 4
 
 class ItemCache:
     """
-    This is the "meat" of the file system's metadata storage.
+    This is the "meat" of the filesystem's metadata storage.
 
-    This class generates inode numbers that efficiently index items in archives,
+    This class generates inode numbers that efficiently index items in archives
     and retrieves items from these inode numbers.
     """
 
@@ -273,19 +276,29 @@ class FuseBackend:
         self.uid_forced = None
         self.gid_forced = None
         self.umask = 0
+        self.archive_root_dir = {}  # archive ID --> directory name
 
     def _create_filesystem(self):
         self._create_dir(parent=1)  # first call, create root dir (inode == 1)
         self.versions_index = FuseVersionsIndex()
-        for archive in self._manifest.archives.list_considering(self._args):
+        archives = self._manifest.archives.list_considering(self._args)
+        name_counter = Counter(a.name for a in archives)
+        duplicate_names = {a.name for a in archives if name_counter[a.name] > 1}
+        for archive in archives:
+            name = f"{archive.name}"
+            if name in duplicate_names:
+                name += f"-{bin_to_hex(archive.id):.8}"
+            self.archive_root_dir[archive.id] = name
+        for archive in archives:
             if self.versions:
                 # process archives immediately
-                self._process_archive(archive.name)
+                self._process_archive(archive.id)
             else:
                 # lazily load archives, create archive placeholder inode
                 archive_inode = self._create_dir(parent=1, mtime=int(archive.ts.timestamp() * 1e9))
-                self.contents[1][os.fsencode(archive.name)] = archive_inode
-                self.pending_archives[archive_inode] = archive.name
+                name = self.archive_root_dir[archive.id]
+                self.contents[1][os.fsencode(name)] = archive_inode
+                self.pending_archives[archive_inode] = archive
 
     def get_item(self, inode):
         item = self._inode_cache.get(inode)
@@ -302,9 +315,9 @@ class FuseBackend:
 
     def check_pending_archive(self, inode):
         # Check if this is an archive we need to load
-        archive_name = self.pending_archives.pop(inode, None)
-        if archive_name is not None:
-            self._process_archive(archive_name, [os.fsencode(archive_name)])
+        archive_info = self.pending_archives.pop(inode, None)
+        if archive_info is not None:
+            self._process_archive(archive_info.id, [os.fsencode(self.archive_root_dir[archive_info.id])])
 
     def _allocate_inode(self):
         self.inode_count += 1
@@ -328,11 +341,11 @@ class FuseBackend:
             inode = self.contents[inode][segment]
         return inode
 
-    def _process_archive(self, archive_name, prefix=[]):
+    def _process_archive(self, archive_id, prefix=[]):
         """Build FUSE inode hierarchy from archive metadata"""
         self.file_versions = {}  # for versions mode: original path -> version
         t0 = time.perf_counter()
-        archive = Archive(self._manifest, archive_name)
+        archive = Archive(self._manifest, archive_id)
         strip_components = self._args.strip_components
         matcher = build_matcher(self._args.patterns, self._args.paths)
         hlm = HardLinkManager(id_type=bytes, info_type=str)  # hlid -> path
@@ -409,7 +422,7 @@ class FuseBackend:
             else:
                 inode = item_inode
                 self._items[inode] = item
-                # remember extracted item path, so that following hardlinks don't extract twice.
+                # remember extracted item path, so that following hard links don't extract twice.
                 hlm.remember(id=item.hlid, info=path)
         else:
             inode = item_inode
@@ -642,17 +655,6 @@ class FuseOperations(llfuse.Operations, FuseBackend):
 
     @async_wrapper
     def open(self, inode, flags, ctx=None):
-        if not self.allow_damaged_files:
-            item = self.get_item(inode)
-            if "chunks_healthy" in item:
-                # Processed archive items don't carry the path anymore; for converting the inode
-                # to the path we'd either have to store the inverse of the current structure,
-                # or search the entire archive. So we just don't print it. It's easy to correlate anyway.
-                logger.warning(
-                    "File has damaged (all-zero) chunks. Try running borg check --repair. "
-                    "Mount with allow_damaged_files to read damaged files."
-                )
-                raise llfuse.FUSEError(errno.EIO)
         return llfuse.FileInfo(fh=inode) if has_pyfuse3 else inode
 
     @async_wrapper
@@ -689,7 +691,16 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                     # evict fully read chunk from cache
                     del self.data_cache[id]
             else:
-                _, data = self.repo_objs.parse(id, self.repository_uncached.get(id), ro_type=ROBJ_FILE_STREAM)
+                try:
+                    cdata = self.repository_uncached.get(id)
+                except Repository.ObjectNotFound:
+                    if self.allow_damaged_files:
+                        data = zeros[:s]
+                        assert len(data) == s
+                    else:
+                        raise llfuse.FUSEError(errno.EIO) from None
+                else:
+                    _, data = self.repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
                 if offset + n < len(data):
                     # chunk was only partially read, cache it
                     self.data_cache[id] = data

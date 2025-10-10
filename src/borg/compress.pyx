@@ -16,6 +16,7 @@ decompressor.
 """
 
 from argparse import ArgumentTypeError
+import math
 import random
 from struct import Struct
 import zlib
@@ -25,8 +26,7 @@ try:
 except ImportError:
     lzma = None
 
-
-from .constants import MAX_DATA_SIZE
+from .constants import MAX_DATA_SIZE, ROBJ_FILE_STREAM
 from .helpers import Buffer, DecompressionError
 
 API_VERSION = '1.2_02'
@@ -55,7 +55,7 @@ cdef class CompressorBase:
     """
     base class for all (de)compression classes,
     also handles compression format auto detection and
-    adding/stripping the ID header (which enable auto detection).
+    adding/stripping the ID header (which enables auto-detection).
     """
     ID = 0xFF  # reserved and not used
                # overwrite with a unique 1-byte bytestring in child classes
@@ -526,9 +526,10 @@ class Auto(CompressorBase):
             get_meta(cheap_meta, meta)
             return meta, cheap_compressed_data
 
-    def decompress(self, data):
+    def decompress(self, meta, data):
         raise NotImplementedError
 
+    @classmethod
     def detect(cls, data):
         raise NotImplementedError
 
@@ -556,11 +557,13 @@ class ObfuscateSize(CompressorBase):
         elif 110 <= level <= 123:
             self._obfuscate = self._random_padding_obfuscate
             self.max_padding_size = 2 ** (level - 100)  # 1kiB .. 8MiB
+        elif level == 250:  # Padmé
+            self._obfuscate = self._padme_obfuscate
 
     def _obfuscate(self, compr_size):
         # implementations need to return the size of obfuscation data,
         # that the caller shall add.
-        raise NotImplemented
+        raise NotImplementedError
 
     def _relative_random_reciprocal_obfuscate(self, compr_size):
         # effect for SPEC 1:
@@ -575,19 +578,34 @@ class ObfuscateSize(CompressorBase):
     def _random_padding_obfuscate(self, compr_size):
         return int(self.max_padding_size * random.random())
 
+    def _padme_obfuscate(self, compr_size):
+        if compr_size < 2:
+            return 0
+
+        E = math.floor(math.log2(compr_size))  # Get exponent (power of 2)
+        S = math.floor(math.log2(E)) + 1       # Second log component
+        lastBits = E - S                       # Bits to be zeroed
+        bitMask = (2 ** lastBits - 1)          # Mask for rounding
+
+        padded_size = (compr_size + bitMask) & ~bitMask  # Apply rounding
+
+        return padded_size - compr_size  # Return only the additional padding size
+
     def compress(self, meta, data):
         assert not self.legacy_mode  # we never call this in legacy mode
         meta, compressed_data = self.compressor.compress(meta, data)  # compress data
         compr_size = len(compressed_data)
         assert "csize" in meta, repr(meta)
         meta["psize"] = meta["csize"]  # psize (payload size) is the csize (compressed size) of the inner compressor
-        addtl_size = self._obfuscate(compr_size)
+        # we only want to obfuscate the size of file content chunks (ROBJ_FILE_STREAM repo objects).
+        # for all other types of repo objects (e.g. borg metadata chunks), add 0 length:
+        addtl_size = self._obfuscate(compr_size) if meta["type"] == ROBJ_FILE_STREAM else 0
         addtl_size = max(0, addtl_size)  # we can only make it longer, not shorter!
         addtl_size = min(MAX_DATA_SIZE - 1024 - compr_size, addtl_size)  # stay away from MAX_DATA_SIZE
         trailer = bytes(addtl_size)
         obfuscated_data = compressed_data + trailer
         meta["csize"] = len(obfuscated_data)  # csize is the overall output size of this "obfuscation compressor"
-        meta["olevel"] = self.level  # remember the obfuscation level, useful for rcompress
+        meta["olevel"] = self.level  # remember the obfuscation level, useful for repo-compress
         return meta, obfuscated_data  # for borg2 it is enough that we have the payload size in meta["psize"]
 
     def decompress(self, meta, data):

@@ -82,9 +82,9 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _Ubuntu packages: https://launchpad.net/ubuntu/+source/borgbackup
 .. _Ubuntu PPA: https://launchpad.net/~costamagnagianfranco/+archive/ubuntu/borgbackup
 
-Please ask package maintainers to build a package or, if you can package /
+Please ask package maintainers to build a package or, if you can package/
 submit it yourself, please help us with that! See :issue:`105` on
-github to followup on packaging efforts.
+GitHub to follow up on packaging efforts.
 
 **Current status of package in the repositories**
 
@@ -106,12 +106,12 @@ Standalone Binary
 .. note:: Releases are signed with an OpenPGP key, see
           :ref:`security-contact` for more instructions.
 
-Borg x86/x64 amd/intel compatible binaries (generated with `pyinstaller`_)
+Borg x86/x64 AMD/Intel compatible binaries (generated with `pyinstaller`_)
 are available on the releases_ page for the following platforms:
 
 * **Linux**: glibc >= 2.28 (ok for most supported Linux releases).
   Older glibc releases are untested and may not work.
-* **MacOS**: 10.12 or newer (To avoid signing issues download the file via
+* **macOS**: 10.12 or newer (To avoid signing issues, download the file via
   command line **or** remove the ``quarantine`` attribute after downloading:
   ``$ xattr -dr com.apple.quarantine borg-macosx64.tgz``)
 * **FreeBSD**: 12.1 (unknown whether it works for older releases)
@@ -158,28 +158,27 @@ Dependencies
 ~~~~~~~~~~~~
 
 To install Borg from a source package (including pip), you have to install the
-following dependencies first:
+following dependencies first. For the libraries you will also need their
+development header files (sometimes in a separate `-dev` or `-devel` package).
 
-* `Python 3`_ >= 3.9.0, plus development headers.
-* Libraries (library plus development headers):
-
-  - OpenSSL_ >= 1.1.1 (LibreSSL will not work)
-  - libacl_ (which depends on libattr_)
-  - liblz4_ >= 1.7.0 (r129)
-  - libzstd_ >= 1.3.0
-  - libxxhash >= 0.8.1 (0.8.0 might work also)
-* pkg-config (cli tool) and pkgconfig python package (borg uses these to
-  discover header and library location - if it can't import pkgconfig and
-  is not pointed to header/library locations via env vars [see setup.py],
-  it will raise a fatal error).
-  **These must be present before invoking setup.py!**
-* some other Python dependencies, pip will automatically install them for you.
-* optionally, if you wish to mount an archive as a FUSE filesystem, you need
+* `Python 3`_ >= 3.10.0
+* OpenSSL_ >= 1.1.1 (LibreSSL will not work)
+* libacl_ (which depends on libattr_)
+* libxxhash_ >= 0.8.1
+* liblz4_ >= 1.7.0 (r129)
+* libzstd_ >= 1.3.0
+* libffi (required for argon2-cffi-bindings)
+* pkg-config (cli tool) - Borg uses this to discover header and library
+  locations automatically. Alternatively, you can also point to them via some
+  environment variables, see setup.py.
+* Some other Python dependencies, pip will automatically install them for you.
+* Optionally, if you wish to mount an archive as a FUSE filesystem, you need
   a FUSE implementation for Python:
 
-  - Either pyfuse3_ (preferably, newer) or llfuse_ (older).
-    See also the BORG_FUSE_IMPL env variable.
-  - See pyproject.toml about the version requirements.
+  - pyfuse3_ >= 3.1.1 (for fuse 3, use `pip install borgbackup[pyfuse3]`), or
+  - llfuse_ >= 1.3.8 (for fuse 2, use `pip install borgbackup[llfuse]`).
+  - Additionally, your OS will need to have FUSE support installed
+    (e.g. a package `fuse` for fuse 2 or a package `fuse3` for fuse 3 support).
 
 If you have troubles finding the right package names, have a look at the
 distribution specific sections below or the Vagrantfile in the git repository,
@@ -187,12 +186,23 @@ which contains installation scripts for a number of operating systems.
 
 In the following, the steps needed to install the dependencies are listed for a
 selection of platforms. If your distribution is not covered by these
-instructions, try to use your package manager to install the dependencies.  On
-FreeBSD, you may need to get a recent enough OpenSSL version from FreeBSD
-ports.
+instructions, try to use your package manager to install the dependencies.
 
 After you have installed the dependencies, you can proceed with steps outlined
 under :ref:`pip-installation`.
+
+Arch Linux
+++++++++++
+
+Install the runtime and build dependencies::
+
+    pacman -S python python-pip python-virtualenv openssl acl xxhash lz4 zstd base-devel
+    pacman -S fuse2     # needed for llfuse
+    pacman -S fuse3     # needed for pyfuse3
+
+Note that Arch Linux specifically doesn't support
+`partial upgrades <https://wiki.archlinux.org/title/Partial_upgrade>`__,
+so in case some packages cannot be retrieved from the repo, run with ``pacman -Syu``.
 
 Debian / Ubuntu
 +++++++++++++++
@@ -200,11 +210,11 @@ Debian / Ubuntu
 Install the dependencies with development headers::
 
     sudo apt-get install python3 python3-dev python3-pip python3-virtualenv \
-    libacl1-dev libacl1 \
+    libacl1-dev \
     libssl-dev \
     liblz4-dev libzstd-dev libxxhash-dev \
-    build-essential \
-    pkg-config python3-pkgconfig
+    libffi-dev \
+    build-essential pkg-config
     sudo apt-get install libfuse-dev fuse    # needed for llfuse
     sudo apt-get install libfuse3-dev fuse3  # needed for pyfuse3
 
@@ -218,10 +228,11 @@ Fedora
 Install the dependencies with development headers::
 
     sudo dnf install python3 python3-devel python3-pip python3-virtualenv \
-    libacl-devel libacl \
+    libacl-devel \
     openssl-devel \
     lz4-devel libzstd-devel xxhash-devel \
-    pkgconf python3-pkgconfig
+    libffi-devel \
+    pkgconf
     sudo dnf install gcc gcc-c++ redhat-rpm-config
     sudo dnf install fuse-devel fuse         # needed for llfuse
     sudo dnf install fuse3-devel fuse3       # needed for pyfuse3
@@ -237,6 +248,7 @@ Alternatively, you can enumerate all build dependencies in the command line::
 
     sudo zypper install python3 python3-devel \
     libacl-devel openssl-devel xxhash-devel libzstd-devel liblz4-devel \
+    libffi-devel \
     python3-Cython python3-Sphinx python3-msgpack-python python3-pkgconfig pkgconf \
     python3-pytest python3-setuptools python3-setuptools_scm \
     python3-sphinx_rtd_theme gcc gcc-c++
@@ -263,7 +275,7 @@ Brewfile::
 
     brew install python@3.11  # can be any supported python3 version
     brew bundle install  # install requirements from borg repo's ./Brewfile
-    pip3 install virtualenv pkgconfig
+    pip3 install virtualenv
 
 Be aware that for all recent macOS releases you must authorize full disk access.
 It is no longer sufficient to run borg backups as root. If you have not yet
@@ -328,7 +340,7 @@ Cygwin
 
 Use the Cygwin installer to install the dependencies::
 
-    python39 python39-devel python39-pkgconfig
+    python39 python39-devel
     python39-setuptools python39-pip python39-wheel python39-virtualenv
     libssl-devel libxxhash-devel liblz4-devel libzstd-devel
     binutils gcc-g++ git make openssh
@@ -350,7 +362,8 @@ Ensure to install the dependencies as described within :ref:`Dependencies: Windo
 
 ::
 
-    export SETUPTOOLS_USE_DISTUTILS=stdlib # Needed for pip to work - https://www.msys2.org/docs/python/#known-issues
+    # Needed for setuptools < 70.2.0 to work - https://www.msys2.org/docs/python/#known-issues
+    # export SETUPTOOLS_USE_DISTUTILS=stdlib
     pip install -e .
     pyinstaller -y scripts/borg.exe.spec
 
@@ -380,9 +393,6 @@ This will use ``pip`` to install the latest release from PyPi::
 
     # might be required if your tools are outdated
     pip install -U pip setuptools wheel
-
-    # pkgconfig MUST be available before borg is installed!
-    pip install pkgconfig
 
     # install Borg + Python dependencies into virtualenv
     pip install borgbackup
@@ -418,6 +428,10 @@ While we try not to break master, there are no guarantees on anything.
 
 Ensure to install the dependencies as described within :ref:`source-install`.
 
+Version metadata is obtained dynamically at install time using ``setuptools-scm``.
+Please ensure that your git repo either has correct tags, or provide the version
+manually using the ``SETUPTOOLS_SCM_PRETEND_VERSION`` environment variable.
+
 ::
 
     # get borg from github
@@ -427,11 +441,15 @@ Ensure to install the dependencies as described within :ref:`source-install`.
     virtualenv --python=$(which python3) borg-env
     source borg-env/bin/activate   # always before using!
 
-    # install borg + dependencies into virtualenv
+    # install borg dependencies into virtualenv
     cd borg
     pip install -r requirements.d/development.txt
     pip install -r requirements.d/docs.txt  # optional, to build the docs
 
+    # set a borg version if setuptools-scm fails to do so automatically
+    export SETUPTOOLS_SCM_PRETEND_VERSION=
+
+    # install borg into virtualenv
     pip install -e .           # in-place editable mode
     or
     pip install -e .[pyfuse3]  # in-place editable mode, use pyfuse3
@@ -449,9 +467,9 @@ If you need to use a different version of Python you can install this using ``py
 
     ...
     # create a virtual environment
-    pyenv install 3.9.0  # minimum, preferably use something more recent!
-    pyenv global 3.9.0
-    pyenv local 3.9.0
+    pyenv install 3.10.0  # minimum, preferably use something more recent!
+    pyenv global 3.10.0
+    pyenv local 3.10.0
     virtualenv --python=${pyenv which python} borg-env
     source borg-env/bin/activate   # always before using!
     ...

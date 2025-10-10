@@ -9,11 +9,11 @@ Usage
    Redirecting...
 
    <script type="text/javascript">
-   // Fixes old links which were just anchors
+   // Fixes old links that were just anchor fragments
    var hash = window.location.hash.substring(1);
 
-   // usage.html is empty, no content. Purely serves to implement a "correct" toctree
-   // due to rST/Sphinx limitations. Refer to https://github.com/sphinx-doc/sphinx/pull/3622
+   // usage.html is empty; it contains no content. It purely serves to implement a "correct" toctree
+   // due to reST/Sphinx limitations. Refer to https://github.com/sphinx-doc/sphinx/pull/3622
 
    // Redirect to general docs
    if(hash == "") {
@@ -36,27 +36,30 @@ Usage
 .. toctree::
    usage/general
 
-   usage/rcreate
-   usage/rlist
-   usage/rinfo
-   usage/rcompress
-   usage/rdelete
+   usage/repo-create
+   usage/repo-space
+   usage/repo-list
+   usage/repo-info
+   usage/repo-compress
+   usage/repo-delete
    usage/serve
    usage/version
    usage/compact
-   usage/config
    usage/lock
    usage/key
 
    usage/create
    usage/extract
    usage/check
-   usage/rename
    usage/list
+   usage/tag
+   usage/rename
    usage/diff
    usage/delete
    usage/prune
+   usage/undelete
    usage/info
+   usage/analyze
    usage/mount
    usage/recreate
    usage/tar

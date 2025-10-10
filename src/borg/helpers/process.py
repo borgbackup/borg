@@ -1,11 +1,11 @@
 import contextlib
 import os
-import os.path
 import shlex
 import signal
 import subprocess
 import sys
 import time
+import threading
 import traceback
 
 from .. import __version__
@@ -54,9 +54,9 @@ def _daemonize():
 
 
 def daemonize():
-    """Detach process from controlling terminal and run in background
+    """Detach the process from the controlling terminal and run in the background.
 
-    Returns: old and new get_process_id tuples
+    Returns: old and new get_process_id tuples.
     """
     with _daemonize() as (old_id, new_id):
         return old_id, new_id
@@ -64,7 +64,7 @@ def daemonize():
 
 @contextlib.contextmanager
 def daemonizing(*, timeout=5):
-    """Like daemonize(), but as context manager.
+    """Like daemonize(), but as a context manager.
 
     The with-body is executed in the background process,
     while the foreground process survives until the body is left
@@ -82,9 +82,11 @@ def daemonizing(*, timeout=5):
             logger.debug("Daemonizing: Foreground process (%s, %s, %s) is waiting for background process..." % old_id)
             exit_code = EXIT_SUCCESS
             # Indeed, SIGHUP and SIGTERM handlers should have been set on archiver.run(). Just in case...
-            with signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)), signal_handler(
-                "SIGHUP", raising_signal_handler(SigHup)
-            ), signal_handler("SIGTERM", raising_signal_handler(SigTerm)):
+            with (
+                signal_handler("SIGINT", raising_signal_handler(KeyboardInterrupt)),
+                signal_handler("SIGHUP", raising_signal_handler(SigHup)),
+                signal_handler("SIGTERM", raising_signal_handler(SigTerm)),
+            ):
                 try:
                     if timeout > 0:
                         time.sleep(timeout)
@@ -144,28 +146,28 @@ class _ExitCodeException(BaseException):
 
 
 class SignalException(BaseException):
-    """base class for all signal-based exceptions"""
+    """Base class for all signal-based exceptions."""
 
 
 class SigHup(SignalException):
-    """raised on SIGHUP signal"""
+    """Raised on SIGHUP signal."""
 
 
 class SigTerm(SignalException):
-    """raised on SIGTERM signal"""
+    """Raised on SIGTERM signal."""
 
 
 @contextlib.contextmanager
 def signal_handler(sig, handler):
     """
-    when entering context, set up signal handler <handler> for signal <sig>.
-    when leaving context, restore original signal handler.
+    When entering the context, set up signal handler <handler> for signal <sig>.
+    When leaving the context, restore the original signal handler.
 
-    <sig> can bei either a str when giving a signal.SIGXXX attribute name (it
-    won't crash if the attribute name does not exist as some names are platform
-    specific) or a int, when giving a signal number.
+    <sig> can be either a str (the name of a signal.SIGXXX attribute; it
+    will not crash if the attribute name does not exist, as some names are platform
+    specific) or an int (a signal number).
 
-    <handler> is any handler value as accepted by the signal.signal(sig, handler).
+    <handler> is any handler value accepted by signal.signal(sig, handler).
     """
     if isinstance(sig, str):
         sig = getattr(signal, sig, None)
@@ -244,20 +246,19 @@ class SigIntManager:
             self.ctx = None
 
 
-# global flag which might trigger some special behaviour on first ctrl-c / SIGINT,
-# e.g. if this is interrupting "borg create", it shall try to create a checkpoint.
+# global flag which might trigger some special behaviour on first ctrl-c / SIGINT.
 sig_int = SigIntManager()
 
 
 def ignore_sigint():
     """
-    Ignore SIGINT, see also issue #6912.
+    Ignore SIGINT (see also issue #6912).
 
     Ctrl-C will send a SIGINT to both the main process (borg) and subprocesses
-    (e.g. ssh for remote ssh:// repos), but often we do not want the subprocess
-    getting killed (e.g. because it is still needed to shut down borg cleanly).
+    (e.g., ssh for remote ssh:// repositories), but often we do not want the subprocess
+    to be killed (e.g., because it is still needed to shut down borg cleanly).
 
-    To avoid that: Popen(..., preexec_fn=ignore_sigint)
+    To avoid this, use: Popen(..., preexec_fn=ignore_sigint)
     """
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
@@ -284,7 +285,7 @@ def popen_with_error_handling(cmd_line: str, log_prefix="", **kwargs):
         return
     logger.debug("%scommand line: %s", log_prefix, command)
     try:
-        return subprocess.Popen(command, **kwargs)
+        return subprocess.Popen(command, **kwargs)  # nosec B603
     except FileNotFoundError:
         logger.error("%sexecutable not found: %s", log_prefix, command[0])
         return
@@ -302,9 +303,9 @@ def prepare_subprocess_env(system, env=None):
     Prepare the environment for a subprocess we are going to create.
 
     :param system: True for preparing to invoke system-installed binaries,
-                   False for stuff inside the pyinstaller environment (like borg, python).
-    :param env: optionally give a environment dict here. if not given, default to os.environ.
-    :return: a modified copy of the environment
+                   False for stuff inside the PyInstaller environment (like borg, python).
+    :param env: optionally provide an environment dict here. If not given, defaults to os.environ.
+    :return: a modified copy of the environment.
     """
     env = dict(env if env is not None else os.environ)
     if system:
@@ -397,3 +398,50 @@ def create_filter_process(cmd, stream, stream_close, inbound=True):
             if borg_succeeded and rc:
                 # if borg did not succeed, we know that we killed the filter process
                 raise Error("filter %s failed, rc=%d" % (cmd, rc))
+
+
+class ThreadRunner:
+    def __init__(self, sleep_interval, target, *args, **kwargs):
+        """
+        Initialize the ThreadRunner with a target function and its arguments.
+
+        :param sleep_interval: The interval (in seconds) to sleep between executions of the target function.
+        :param target: The target function to be run in the thread.
+        :param args: The positional arguments to be passed to the target function.
+        :param kwargs: The keyword arguments to be passed to the target function.
+        """
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs
+        self._sleep_interval = sleep_interval
+        self._thread = None
+        self._keep_running = threading.Event()
+        self._keep_running.set()
+
+    def _run_with_termination(self):
+        """
+        Wrapper function to check if the thread should keep running.
+        """
+        while self._keep_running.is_set():
+            self._target(*self._args, **self._kwargs)
+            # sleep up to self._sleep_interval, but end the sleep early if we shall not keep running:
+            count = 1000
+            micro_sleep = float(self._sleep_interval) / count
+            while self._keep_running.is_set() and count > 0:
+                time.sleep(micro_sleep)
+                count -= 1
+
+    def start(self):
+        """
+        Start the thread.
+        """
+        self._thread = threading.Thread(target=self._run_with_termination)
+        self._thread.start()
+
+    def terminate(self):
+        """
+        Signal the thread to stop and wait for it to finish.
+        """
+        if self._thread is not None:
+            self._keep_running.clear()
+            self._thread.join()

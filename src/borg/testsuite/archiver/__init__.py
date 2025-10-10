@@ -8,7 +8,6 @@ import subprocess
 import sys
 import tempfile
 import time
-from configparser import ConfigParser
 from contextlib import contextmanager
 from datetime import datetime
 from io import BytesIO, StringIO
@@ -18,11 +17,9 @@ import pytest
 from ... import xattr, platform
 from ...archive import Archive
 from ...archiver import Archiver, PURE_PYTHON_MSGPACK_WARNING
-from ...cache import Cache, LocalCache
 from ...constants import *  # NOQA
 from ...helpers import Location, umount
 from ...helpers import EXIT_SUCCESS
-from ...helpers import bin_to_hex
 from ...helpers import init_ec_warnings
 from ...logger import flush_logging
 from ...manifest import Manifest
@@ -32,17 +29,17 @@ from ...repository import Repository
 from .. import has_lchflags, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, no_selinux
 from .. import changedir
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
-from ..platform import is_win32
+from ..platform.platform_test import is_win32
 from ...xattr import get_all
 
 RK_ENCRYPTION = "--encryption=repokey-aes-ocb"
 KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"
 
-# this points to src/borg/archiver directory (which is small and has only a few files)
+# This points to the ``src/borg/archiver`` directory (small, with only a few files).
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "archiver"))
 src_file = "archiver/__init__.py"  # relative path of one file in src_dir
 
-requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
+requires_hardlinks = pytest.mark.skipif(not are_hardlinks_supported(), reason="hard links not supported")
 
 
 def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_output=False, **kw):
@@ -80,9 +77,9 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             init_ec_warnings()
             try:
                 args = archiver.parse_args(list(args))
-                # argparse parsing may raise SystemExit when the command line is bad or
-                # actions that abort early (eg. --help) where given. Catch this and return
-                # the error code as-if we invoked a Borg binary.
+                # argparse may raise SystemExit when the command line is bad or
+                # actions that abort early (e.g., --help) were given. Catch this and return
+                # the error code as if we invoked a Borg binary.
             except SystemExit as e:
                 output_text.flush()
                 return e.code, output.getvalue() if binary_output else output.getvalue().decode()
@@ -96,7 +93,7 @@ def exec_cmd(*args, archiver=None, fork=False, exe=None, input=b"", binary_outpu
             sys.stdin, sys.stdout, sys.stderr = stdin, stdout, stderr
 
 
-# check if the binary "borg.exe" is available (for local testing a symlink to virtualenv/bin/borg should do)
+# Check whether the binary "borg.exe" is available (for local testing, a symlink to virtualenv/bin/borg will do).
 try:
     exec_cmd("help", exe="borg.exe", fork=True)
     BORG_EXES = ["python", "binary"]
@@ -111,7 +108,7 @@ def cmd_fixture(request):
     elif request.param == "binary":
         exe = "borg.exe"
     else:
-        raise ValueError("param must be 'python' or 'binary'")
+        raise ValueError("param must be 'python' or 'binary'.")
 
     def exec_fn(*args, **kw):
         return exec_cmd(*args, exe=exe, fork=True, **kw)
@@ -137,7 +134,7 @@ def generate_archiver_tests(metafunc, kinds: str):
 
 
 def checkts(ts):
-    # check if the timestamp is in the expected format
+    # Check whether the timestamp is in the expected format
     assert datetime.strptime(ts, ISO_FORMAT + "%z")  # must not raise
 
 
@@ -172,7 +169,8 @@ def open_archive(repo_path, name):
     repository = Repository(repo_path, exclusive=True)
     with repository:
         manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-        archive = Archive(manifest, name)
+        archive_info = manifest.archives.get_one([name])
+        archive = Archive(manifest, archive_info.id)
     return archive, repository
 
 
@@ -212,18 +210,18 @@ def create_test_files(input_path, create_hardlinks=True):
     create_regular_file(input_path, "fusexattr", size=1)
     if not xattr.XATTR_FAKEROOT and xattr.is_enabled(input_path):
         fn = os.fsencode(os.path.join(input_path, "fusexattr"))
-        # ironically, due to the way how fakeroot works, comparing FUSE file xattrs to orig file xattrs
+        # Ironically, due to how fakeroot works, comparing FUSE file xattrs to original file xattrs
         # will FAIL if fakeroot supports xattrs, thus we only set the xattr if XATTR_FAKEROOT is False.
         # This is because fakeroot with xattr-support does not propagate xattrs of the underlying file
         # into "fakeroot space". Because the xattrs exposed by borgfs are these of an underlying file
-        # (from fakeroots point of view) they are invisible to the test process inside the fakeroot.
+        # (from fakeroot's point of view) they are invisible to the test process inside fakeroot.
         xattr.setxattr(fn, b"user.foo", b"bar")
         xattr.setxattr(fn, b"user.empty", b"")
         # XXX this always fails for me
         # ubuntu 14.04, on a TMP dir filesystem with user_xattr, using fakeroot
         # same for newer ubuntu and centos.
-        # if this is supported just on specific platform, platform should be checked first,
-        # so that the test setup for all tests using it does not fail here always for others.
+        # If this is supported only on specific platforms, the platform should be checked first,
+        # so that the test setup for all tests using it does not always fail for others.
     # FIFO node
     if are_fifos_supported():
         os.mkfifo(os.path.join(input_path, "fifo1"))
@@ -261,12 +259,8 @@ def _extract_repository_id(repo_path):
 
 
 def _set_repository_id(repo_path, id):
-    config = ConfigParser(interpolation=None)
-    config.read(os.path.join(repo_path, "config"))
-    config.set("repository", "id", bin_to_hex(id))
-    with open(os.path.join(repo_path, "config"), "w") as fd:
-        config.write(fd)
     with Repository(repo_path) as repository:
+        repository._set_id(id)
         return repository.id
 
 
@@ -283,13 +277,13 @@ def _extract_hardlinks_setup(archiver):
     create_regular_file(input_path, "dir1/source2")
     os.link(os.path.join(input_path, "dir1/source2"), os.path.join(input_path, "dir1/aaaa"))
 
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
 
 
 def _create_test_caches(archiver):
     input_path = archiver.input_path
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(input_path, "file1", size=1024 * 80)
     create_regular_file(input_path, "cache1/%s" % CACHE_TAG_NAME, contents=CACHE_TAG_CONTENTS + b" extra stuff")
     create_regular_file(input_path, "cache2/%s" % CACHE_TAG_NAME, contents=b"invalid signature")
@@ -309,7 +303,7 @@ def _assert_test_caches(archiver):
 
 def _create_test_tagged(archiver):
     input_path = archiver.input_path
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(input_path, "file1", size=1024 * 80)
     create_regular_file(input_path, "tagged1/.NOBACKUP")
     create_regular_file(input_path, "tagged2/00-NOBACKUP")
@@ -324,7 +318,7 @@ def _assert_test_tagged(archiver):
 
 def _create_test_keep_tagged(archiver):
     input_path = archiver.input_path
-    cmd(archiver, "rcreate", RK_ENCRYPTION)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
     create_regular_file(input_path, "file0", size=1024)
     create_regular_file(input_path, "tagged1/.NOBACKUP1")
     create_regular_file(input_path, "tagged1/file1", size=1024)
@@ -348,34 +342,6 @@ def _assert_test_keep_tagged(archiver):
     assert sorted(os.listdir("output/input/taggedall")), [".NOBACKUP1", ".NOBACKUP2", CACHE_TAG_NAME]
 
 
-def check_cache(archiver):
-    # First run a regular borg check
-    cmd(archiver, "check")
-    # Then check that the cache on disk matches exactly what's in the repo.
-    with open_repository(archiver) as repository:
-        manifest = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
-        with Cache(repository, manifest, sync=False) as cache:
-            original_chunks = cache.chunks
-            # the LocalCache implementation has an on-disk chunks cache,
-            # but AdHocWithFilesCache and AdHocCache don't have persistent chunks cache.
-            persistent = isinstance(cache, LocalCache)
-        Cache.destroy(repository)
-        with Cache(repository, manifest) as cache:
-            correct_chunks = cache.chunks
-    if not persistent:
-        # there is no point in doing the checks
-        return
-    assert original_chunks is not correct_chunks
-    seen = set()
-    for id, (refcount, size) in correct_chunks.iteritems():
-        o_refcount, o_size = original_chunks[id]
-        assert refcount == o_refcount
-        assert size == o_size
-        seen.add(id)
-    for id, (refcount, size) in original_chunks.iteritems():
-        assert id in seen
-
-
 @contextmanager
 def assert_creates_file(path):
     assert not os.path.exists(path), f"{path} should not exist"
@@ -390,6 +356,12 @@ def assert_dirs_equal(dir1, dir2, **kwargs):
 
 def assert_line_exists(lines, expected_regexpr):
     assert any(re.search(expected_regexpr, line) for line in lines), f"no match for {expected_regexpr} in {lines}"
+
+
+def assert_line_not_exists(lines, expected_regexpr):
+    assert not any(
+        re.search(expected_regexpr, line) for line in lines
+    ), f"unexpected match for {expected_regexpr} in {lines}"
 
 
 def _assert_dirs_equal_cmp(diff, ignore_flags=False, ignore_xattrs=False, ignore_ns=False):
@@ -420,8 +392,8 @@ def _assert_dirs_equal_cmp(diff, ignore_flags=False, ignore_xattrs=False, ignore
             d1[4] = None
         if not stat.S_ISCHR(s2.st_mode) and not stat.S_ISBLK(s2.st_mode):
             d2[4] = None
-        # If utime isn't fully supported, borg can't set mtime.
-        # Therefore, we shouldn't test it in that case.
+        # If utime is not fully supported, Borg cannot set mtime.
+        # Therefore, we should not test it in that case.
         if is_utime_fully_supported():
             # Older versions of llfuse do not support ns precision properly
             if ignore_ns:
@@ -468,7 +440,12 @@ def read_only(path):
         pytest.skip(message)
     try:
         os.system('LD_PRELOAD= chmod -R ugo-w "%s"' % path)
-        os.system(cmd_immutable)
+        rc = os.system(cmd_immutable)
+        if rc != 0:
+            # If we cannot make the path immutable (e.g., missing CAP_LINUX_IMMUTABLE
+            # in containers or restricted environments), the read-only tests would
+            # not be meaningful. Skip them instead of failing.
+            pytest.skip(f"Unable to make path immutable with: {cmd_immutable} (rc={rc})")
         yield
     finally:
         # Restore permissions to ensure clean-up doesn't fail
@@ -496,7 +473,7 @@ def fuse_mount(archiver, mountpoint=None, *options, fork=True, os_fork=False, **
     # `FORK_DEFAULT`. However, leaving the possibility to run
     # the command with `fork = False` is still necessary for
     # testing for mount failures, for example attempting to
-    # mount a read-only repo.
+    # mount a read-only repository.
     #    `os_fork = True` is needed for testing (the absence of)
     # a race condition of the Lock during lock migration when
     # borg mount (local repo) is daemonizing (#4953). This is another

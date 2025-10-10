@@ -7,7 +7,7 @@ Quick Start
 
 This chapter will get you started with Borg and covers various use cases.
 
-A step by step example
+A step-by-step example
 ----------------------
 
 .. include:: quickstart_example.rst.inc
@@ -20,10 +20,10 @@ stores a snapshot of the data of the files "inside" it. One can later extract or
 mount an archive to restore from a backup.
 
 *Repositories* are filesystem directories acting as self-contained stores of archives.
-Repositories can be accessed locally via path or remotely via ssh. Under the hood,
+Repositories can be accessed locally via path or remotely via SSH. Under the hood,
 repositories contain data blocks and a manifest that tracks which blocks are in each
 archive. If some data hasn't changed between backups, Borg simply
-references an already uploaded data chunk (deduplication).
+references an already-uploaded data chunk (deduplication).
 
 .. _about_free_space:
 
@@ -35,18 +35,6 @@ of free space on the destination filesystem that has your backup repository
 (and also on ~/.cache). A few GB should suffice for most hard-drive sized
 repositories. See also :ref:`cache-memory-usage`.
 
-Borg doesn't use space reserved for root on repository disks (even when run as root).
-On file systems which do not support this mechanism (e.g. XFS) we recommend to reserve
-some space in Borg itself just to be safe by adjusting the ``additional_free_space``
-setting (a good starting point is ``2G``)::
-
-    borg config additional_free_space 2G
-
-If Borg runs out of disk space, it tries to free as much space as it
-can while aborting the current operation safely, which allows the user to free more space
-by deleting/pruning archives. This mechanism is not bullet-proof in some
-circumstances [1]_.
-
 If you do run out of disk space, it can be hard or impossible to free space,
 because Borg needs free space to operate - even to delete backup archives.
 
@@ -55,18 +43,13 @@ in your backup log files (you check them regularly anyway, right?).
 
 Also helpful:
 
-- create a big file as a "space reserve", that you can delete to free space
+- use `borg repo-space` to reserve some disk space that can be freed when the filesystem
+  does not have free space any more.
 - if you use LVM: use a LV + a filesystem that you can resize later and have
   some unallocated PEs you can add to the LV.
-- consider using quotas
+- consider using quotas (e.g. fs quota, quota settings of storage provider)
 - use `prune` and `compact` regularly
 
-.. [1] This failsafe can fail in these circumstances:
-
-    - The underlying file system doesn't support statvfs(2), or returns incorrect
-      data, or the repository doesn't reside on a single file system
-    - Other tasks fill the disk simultaneously
-    - Hard quotas (which may not be reflected in statvfs(2))
 
 Important note about permissions
 --------------------------------
@@ -81,8 +64,8 @@ If you only back up your own files, run it as your normal user (i.e. not root).
 
 For a local repository always use the same user to invoke borg.
 
-For a remote repository: always use e.g. ssh://borg@remote_host. You can use this
-from different local users, the remote user running borg and accessing the
+For a remote repository: always use e.g., ssh://borg@remote_host. You can use this
+from different local users; the remote user running borg and accessing the
 repo will always be `borg`.
 
 If you need to access a local repository from different users, you can use the
@@ -184,7 +167,7 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
         --exclude 'home/*/.cache/*'     \
         --exclude 'var/tmp/*'           \
                                         \
-        '{hostname}-{now}'              \
+        '{hostname}'                    \
         /etc                            \
         /home                           \
         /root                           \
@@ -195,16 +178,16 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
     info "Pruning repository"
 
     # Use the `prune` subcommand to maintain 7 daily, 4 weekly and 6 monthly
-    # archives of THIS machine. The '{hostname}-*' globbing is very important to
-    # limit prune's operation to this machine's archives and not apply to
-    # other machines' archives also:
+    # archives of THIS machine. The '{hostname}' matching is very important to
+    # limit prune's operation to archives with exactly that name and not apply
+    # to archives with other names also:
 
-    borg prune                              \
-        --list                              \
-        --match-archives 'sh:{hostname}-*'  \
-        --show-rc                           \
-        --keep-daily    7                   \
-        --keep-weekly   4                   \
+    borg prune               \
+        '{hostname}'         \
+        --list               \
+        --show-rc            \
+        --keep-daily    7    \
+        --keep-weekly   4    \
         --keep-monthly  6
 
     prune_exit=$?
@@ -213,7 +196,7 @@ backed up and that the ``prune`` command keeps and deletes the correct backups.
 
     info "Compacting repository"
 
-    borg compact
+    borg compact -v
 
     compact_exit=$?
 
@@ -270,7 +253,7 @@ A passphrase should be a single line of text. Any trailing linefeed will be
 stripped.
 
 Do not use empty passphrases, as these can be trivially guessed, which does not
-leave any encrypted data secure. 
+leave any encrypted data secure.
 
 Avoid passphrases containing non-ASCII characters.
 Borg can process any unicode text, but problems may arise at input due to text
@@ -309,35 +292,29 @@ Backup compression
 ------------------
 
 The default is lz4 (very fast, but low compression ratio), but other methods are
-supported for different situations.
+supported for different situations. Compression not only helps you save disk space,
+but will especially speed up remote backups since less data needs to be transferred.
 
-You can use zstd for a wide range from high speed (and relatively low
-compression) using N=1 to high compression (and lower speed) using N=22.
-
-zstd is a modern compression algorithm and might be preferable over zlib and
-lzma.::
+zstd is a modern compression algorithm which can be parametrized to anything between
+N=1 for highest speed (and relatively low compression) to N=22 for highest compression
+(and lower speed)::
 
     $ borg create --compression zstd,N arch ~
 
-Other options are:
-
-If you have a fast repo storage and you want minimum CPU usage, no compression::
+If you have a fast repo storage and you want minimum CPU usage you can disable
+compression::
 
     $ borg create --compression none arch ~
 
-If you have a less fast repo storage and you want a bit more compression (N=0..9,
-0 means no compression, 9 means high compression):
+You can also use zlib and lzma instead of zstd, although zstd usually provides the
+the best compression for a given resource consumption. Please see :ref:`borg_compression`
+for all options.
 
-::
+An interesting alternative is ``auto``, which first checks with lz4 whether a chunk is
+compressible (that check is very fast), and only if it is, compresses it with the
+specified algorithm::
 
-    $ borg create --compression zlib,N arch ~
-
-If you have a very slow repo storage and you want high compression (N=0..9, 0 means
-low compression, 9 means high compression):
-
-::
-
-    $ borg create --compression lzma,N arch ~
+    $ borg create --compression auto,zstd,7 arch ~
 
 You'll need to experiment a bit to find the best compression for your use case.
 Keep an eye on CPU load and throughput.
@@ -349,10 +326,10 @@ Repository encryption
 
 You can choose the repository encryption mode at repository creation time::
 
-    $ borg rcreate --encryption=MODE
+    $ borg repo-create --encryption=MODE
 
 For a list of available encryption MODEs and their descriptions, please refer
-to :ref:`borg_rcreate`.
+to :ref:`borg_repo-create`.
 
 If you use encryption, all data is encrypted on the client before being written
 to the repository.
@@ -397,9 +374,10 @@ Borg can initialize and access repositories on remote hosts if the
 host is accessible using SSH.  This is fastest and easiest when Borg
 is installed on the remote host, in which case the following syntax is used::
 
-  $ borg -r ssh://user@hostname:port/path/to/repo rcreate ...
+  $ borg -r ssh://user@hostname:port/path/to/repo repo-create ...
 
-Note: please see the usage chapter for a full documentation of repo URLs.
+Note: Please see the usage chapter for a full documentation of repo URLs. Also
+see :ref:`ssh_configuration` for recommended settings to avoid disconnects and hangs.
 
 Remote operations over SSH can be automated with SSH keys. You can restrict the
 use of the SSH keypair by prepending a forced command to the SSH public key in
@@ -413,13 +391,23 @@ it is still possible to use the remote host to store a repository by
 mounting the remote filesystem, for example, using sshfs::
 
   $ sshfs user@hostname:/path/to /path/to
-  $ borg -r /path/to/repo rcreate ...
+  $ borg -r /path/to/repo repo-create ...
   $ fusermount -u /path/to
 
 You can also use other remote filesystems in a similar way. Just be careful,
 not all filesystems out there are really stable and working good enough to
 be acceptable for backup usage.
 
+Other kinds of repositories
+---------------------------
+
+Due to using the `borgstore` project, borg now also supports other kinds of
+(remote) repositories besides `file:` and `ssh:`:
+
+- sftp: the borg client will directly talk to an sftp server.
+  This does not require borg being installed on the sftp server.
+- rclone: the borg client will talk via rclone to cloud storage.
+- Others may come in the future, adding backends to `borgstore` is rather simple.
 
 Restoring a backup
 ------------------
@@ -509,11 +497,11 @@ Example with **borg mount**:
 
     # open a new, separate terminal (this terminal will be blocked until umount)
 
-    # now we find out the archive names we have in the repo:
-    borg rlist
+    # now we find out the archive ID of the archive we want to mount:
+    borg repo-list
 
-    # mount one archive from a borg repo:
-    borg mount -a myserver-system-2019-08-11 /mnt/borg
+    # mount one archive giving its archive ID prefix:
+    borg mount -a aid:d34db33f /mnt/borg
 
     # alternatively, mount all archives from a borg repo (slower):
     borg mount /mnt/borg
@@ -535,17 +523,17 @@ Example with **borg extract**:
     mkdir borg_restore
     cd borg_restore
 
-    # now we find out the archive names we have in the repo:
-    borg rlist
+    # now we find out the archive ID of the archive we want to extract:
+    borg repo-list
 
-    # we could find out the archive contents, esp. the path layout:
-    borg list myserver-system-2019-08-11
+    # find out how the paths stored in the the archive look like:
+    borg list aid:d34db33f
 
     # we extract only some specific path (note: no leading / !):
-    borg extract myserver-system-2019-08-11 path/to/extract
+    borg extract aid:d34db33f path/to/extract
 
     # alternatively, we could fully extract the archive:
-    borg extract myserver-system-2019-08-11
+    borg extract aid:d34db33f
 
     # now move the files to the correct place...
 

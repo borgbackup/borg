@@ -12,67 +12,88 @@ This section provides information about security and corruption issues.
 Upgrade Notes
 =============
 
-borg 1.2.x to borg 2.0
-----------------------
+borg 1.2.x/1.4.x to borg 2.0
+----------------------------
 
 Compatibility notes:
 
-- this is a major "breaking" release that is not compatible with existing repos.
+- This is a major "breaking" release that is not compatible with existing repositories.
 
   We tried to put all the necessary "breaking" changes into this release, so we
   hopefully do not need another breaking release in the near future. The changes
-  were necessary for improved security, improved speed, unblocking future
-  improvements, getting rid of legacy crap / design limitations, having less and
-  simpler code to maintain.
+  were necessary for improved security, improved speed and parallelism,
+  unblocking future improvements, getting rid of legacy crap and design
+  limitations, having less and simpler code to maintain.
 
-  You can use "borg transfer" to transfer archives from borg 1.1/1.2 repos to
+  You can use "borg transfer" to transfer archives from borg 1.2/1.4 repos to
   a new borg 2.0 repo, but it will need some time and space.
 
   Before using "borg transfer", you must have upgraded to borg >= 1.2.6 (or
-  another borg version that was patched to fix CVE-2023-CVE-2023-36811) and
+  another borg version that was patched to fix CVE-2023-36811) and
   you must have followed the upgrade instructions at top of the change log
   relating to manifest and archive TAMs (borg2 just requires these TAMs now).
 
-- command line syntax was changed, scripts and wrappers will need changes:
+- Command-line syntax was changed; scripts and wrappers will need changes:
 
-  - you will usually either export BORG_REPO=<MYREPO> into your environment or
+  - You will usually either export BORG_REPO=<MYREPO> into your environment or
     call borg like: "borg -r <MYREPO> <COMMAND>".
-    in the docs, we usually omit "-r ..." for brevity.
-  - the scp-style REPO syntax was removed, please use ssh://..., #6697
-  - ssh:// URLs: removed support for /~otheruser/, #6855.
-    If you used this, just replace it by: ssh://user@host:port/home/otheruser/
-  - -P / --prefix option was removed, please use the similar -a / --match-archives.
-  - the archive name is always given separately from the repository
-    (differently than with borg 1.x you must not give repo::archive).
-  - the archive name is either given as a positional parameter, like:
+    In the docs, we usually omit "-r ..." for brevity.
+  - The scp-style REPO syntax was removed; please use ssh://..., #6697
+  - ssh:// URLs: Removed support for /~otheruser/, /~/ and /./, #6855.
+    New format:
 
-    - borg create myarchive2 /some/path
-    - borg diff myarchive1 myarchive2
+    - ssh://user@host:port/relative/path
+    - ssh://user@host:port//absolute/path
+  - -P / --prefix option was removed; please use the similar -a / --match-archives.
+  - Archive names don't need to be unique anymore. To the contrary:
+    It is now strongly recommended to use the identical name for borg create
+    within the same series of archives to make borg work more efficiently.
+    The name now identifies a series of archives; to identify a single archive,
+    please use aid:<archive-hash-prefix>, e.g., borg delete aid:d34db33f
+  - In case you do NOT want to adopt the "series name" way of naming archives
+    (like "myarchive") as we recommend, but keep using always-changing names
+    (like "myserver-myarchive-20241231"), you can do that, but then you must
+    make use of BORG_FILES_CACHE_SUFFIX and either set it to a constant suffix
+    (like "all") or to a unique suffix per archive series (like
+    "myserver-myarchive") so that borg can find the correct files cache.
+    For the "all" variant, you must also set BORG_FILES_CACHE_TTL to a value
+    greater than the count of different archives series you write to that repo.
+    Usually borg uses a different files cache suffix per archive (series) name
+    and defaults to BORG_FILES_CACHE_TTL=2 because that is sufficient for that.
+  - The archive ID is always given separately from the repository.
+    Unlike in borg 1.x, you must not give repo::archive.
+  - The series name or archive ID is either given as a positional parameter,
+    like:
+
+    - borg create documents ~/Documents
+    - borg diff aid:deadbeef aid:d34db33f
   - or, if the command makes sense for an arbitrary amount of archives, archives
     can be selected using a glob pattern, like:
 
-    - borg delete -a 'sh:myarchive*'
-    - borg recreate -a 'sh:myarchive*'
+    - borg delete -a 'sh:myarchive-2024-??-??'
+    - borg recreate -a 'sh:myarchive-2024-??-??'
   - some borg 1.x commands that supported working on a repo AND on an archive
     were split into 2 commands, some others were renamed:
 
     - borg 2 repo commands:
 
-      - borg rcreate  # "repo create", was: borg init
-      - borg rlist  # "repo list"
-      - borg rinfo  # "repo info"
-      - borg rdelete  # "repo delete"
+      - borg repo-create  # was: borg init
+      - borg repo-list
+      - borg repo-info
+      - borg repo-delete
+      - borg repo-compress
+      - borg repo-space
     - borg 2 archive commands:
 
-      - borg create ARCHIVE ...
-      - borg list ARCHIVE
-      - borg extract ARCHIVE ...
-      - borg diff ARCH1 ARCH2
-      - borg rename OLDNAME NEWNAME
-      - borg info -a ARCH_GLOB
-      - borg delete -a ARCH_GLOB
-      - borg recreate -a ARCH_GLOB ...
-      - borg mount -a ARCH_GLOB mountpoint ...
+      - borg create NAME ...
+      - borg list ID
+      - borg extract ID ...
+      - borg diff ID1 ID2
+      - borg rename ID NEWNAME
+      - borg info ID
+      - borg delete ID
+      - borg recreate ID ...
+      - borg mount -a ID mountpoint ...
 
     For more details, please consult the docs or --help option output.
   - create/recreate/import-tar --timestamp: defaults to local timezone
@@ -84,6 +105,10 @@ Compatibility notes:
   - removed --nobsdflags (use --noflags)
   - removed --noatime (default now, see also --atime)
   - removed --save-space option (does not change behaviour)
+- removed --bypass-lock option
+- removed borg config command (only worked locally anyway)
+- compact command now requires access to the borg key if the repo is encrypted
+  or authenticated
 - using --list together with --progress is now disallowed (except with --log-json), #7219
 - the --glob-archives option was renamed to --match-archives (the short option
   name -a is unchanged) and extended to support different pattern styles:
@@ -94,8 +119,8 @@ Compatibility notes:
 
   So you might need to edit your scripts like e.g.::
 
-      borg 1.x: --glob-archives 'myserver-*'
-      borg 2.0: --match-archives 'sh:myserver-*'
+      borg 1.x: --glob-archives 'myserver-2024-*'
+      borg 2.0: --match-archives 'sh:myserver-2024-*'
 
 - use platformdirs 3.x.x instead of home-grown code. Due to that:
 
@@ -114,21 +139,514 @@ Compatibility notes:
   fail now that somehow "worked" before (but maybe didn't work as intended due to
   the contradicting options).
 
-
 .. _changelog:
 
 Change Log 2.x
 ==============
 
-Version 2.0.0b9 (2024-07-20)
-----------------------------
+Version 2.0.0b19 (2025-07-02)
+-----------------------------
 
 Please note:
 
-This is a beta release, only for testing - do not use for production repos.
+Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+Fixes:
+
+- reader: fix corruption issue "forgetting" all-zero bytestrings, #8963
+- import-tar: normalize the tarinfo name/linkname when used as hlm key.
+  also: when printing the path, use the already normalized item.path.
+- import-tar: fix the dotslash issue, add test
+
+New features:
+
+- create --files-changed=MODE option, #8958.
+  control how borg detects whether a file has changed while it was backed up,
+  valid modes are ctime (default), mtime (2nd best) or disabled (not recommended).
+
+Other changes:
+
+- to_key_filename: raise length limit to 120, #8966.
+  This works around a test failure on systems with deep build directories.
+
+
+Version 2.0.0b18 (2025-06-19)
+-----------------------------
+
+New features:
+
+- experimental new "buzhash64" chunker (later, after testing, this shall become
+  the default chunker in borg2):
+
+  - add own cryptographically secure pseudo-random number generator (CSPRNG)
+    based on AES256-CTR to create deterministic random, based on a 256bit seed.
+  - use that to deterministically create a perfectly balanced buzhash64 table.
+  - "buzhash64" chunker computes 64bit hash values for the chunking decision.
+  - performance is similar to "buzhash" (measured on Apple M3P cpu).
+
+  That should also resolve these points of criticism about the old "buzhash"
+  32bit code:
+
+  - table_base: that the bits are not randomly distributed enough
+  - that an XORed seed cancels out for specific window sizes
+  - that XORing the table with a seed is equivalent to XORing the computed hash
+    value with another constant
+
+  Please test the chunkers extensively (e.g. with borg create, borg transfer),
+  we can hardly change them "in production", because chunking differently also
+  means not deduplicating with old chunks. So, in case there are changes
+  needed, we need to find and fix them now while borg is in beta.
+
+  See also some other chunker changes listed below "Other changes".
+- serve: add --permissions option as an alternative to BORG_REPO_PERMISSIONS env var
+- create: auto-exclude items based on xattrs or NODUMP, see #4972
+
+  no options yet, just hardcoded macOS and Linux xattrs.
+  removed the --exclude-nodump option, it is also done automagically now.
+
+  also: create: read stat attrs, xattrs, ACLs early, before file contents.
+
+Fixes:
+
+- compact: fix cleaning archives directory (catch correct exception, use
+  logger.warning, improve error msg)
+
+Other changes:
+
+- support Python 3.14
+- msgpack: allow 1.1.1, version check: ignore "rc" or other version elements
+- add derive_key to derive new keys from existing key material
+- refactor the chunkers, #8882 #8883:
+
+  - transform buzhash chunker C code to Cython
+  - split concerns into FileFMAPReader, FileReader, Chunker*:
+
+    - FileFMAPReader reads blocks from the input file, supporting sparse
+      files and fmaps.
+    - FileReader uses FileFMAPReader to fill its buffer and offers clients a
+      `.read(size)` method so they can read pieces of the data.
+    - all chunkers now use the FileReader/FileFMAPReader code
+  - split code and test module into packages
+- "fixed" chunker: add fixed chunker tests to selftest
+- "fixed" chunker: do not assert on short header read
+- "buzhash*" chunker: use safe_fadvise
+- "buzhash" chunker: reject even window size, #8868
+- fish: fix archive name completion
+- refactor: modularize tests
+- refactor: use pathlib.Path
+- tests / CI:
+
+  - CI: add bandit, a security-oriented static analysis tool
+  - CI: disable windows as the file:// repo URLs are still broken on windows.
+  - tests: tox: use native pyproject.toml configuration
+  - more chunker-related tests
+- docs:
+
+  - add docs for serve --permissions / BORG_REPO_PERMISSIONS
+  - borg-serve: simplify example of env in authorized_keys, #8318
+  - fix mistyped CVE number
+
+
+Version 2.0.0b17 (2025-05-23)
+-----------------------------
+
+New features:
+
+- transfer: implement --chunker-params to re-chunk while transferring, #8706
+- list --depth=N: list files up to N depth in path hierarchy, #8268
+- compact: also clean up files cache, #8852
+- `BORG_REPO_PERMISSIONS=all|no-delete|write-only|read-only`, #8823
+
+  The posixfs borgstore backend implements permissions to make
+  testing with differently permissive stores easier.
+
+  The env var selects from pre-defined permission configurations
+  within borg and gives the chosen permissions config to borgstore.
+  borg uses borgstore's posixfs backend only for file: and ssh: repos.
+
+Fixes:
+
+- correct the signature of __set_name__ as cython 3.1 added support,
+  fixing build on Cython 3.1, #6858
+- compact/check: fix bug not writing the complete index, #8813
+- compact: add --iec option, #8831
+- check/compact/analyze: show archive timestamp in local tz, #8814
+- repo-space: enable ssh: repo testing, fix AttributeError, #8815
+- repo-info: fix output formatting
+
+Other changes:
+
+- require borgstore 0.3.x
+- some updates and fixes for shell completions, needs more work
+- dir_is_tagged/_is_cachedir: add fd-based operations
+- cython: suppress compiler warning about CYTHON_FALLTHROUGH in unreachable code
+- source code: `pyupgrade --py310-plus ./**/*.py`
+- tests:
+
+  - add/improve tests for repo-compress --stats, transfer, repo-space
+  - split helpers tests from a single module into borg.testsuite.helpers package
+  - save temp space (good for ramdisk users)
+  - fix diff cmd test on macOS HFS+, #8860
+  - test validity of shell completion files
+  - CI: fix and enable windows CI, #8728
+  - CI: upload coverage for windows tests
+  - CI: install zsh and fish so we can test shell completions
+- docs:
+
+  - must have the release tags in the local repo, #8582
+  - remove outdated docs/man files about borg change-passphrase
+  - add S3/B2 urls to documentation for repository urls, #8833
+
+
+Version 2.0.0b16 (2025-05-06)
+-----------------------------
+
+Fixes:
+
+- chunks cache: invalidate old chunk index cache, #8795
+- compact: always write updated chunkindex to repo, #8791
+- ChunksMixin: don't use self._chunks until it is demand-built, #8785
+- AdhocWithFilesCache: fix call to _maybe_write_chunks_cache
+- format_time: output date/time in local tz, #8802
+- check: ask for key passphrase early, #1931
+- only obfuscate the size of file content chunks, #7559
+- better support other repo by misc. passphrase env vars, #8457
+
+  - passphrases now come from `BORG_[OTHER_]PASSPHRASE`, `BORG_[OTHER_]PASSCOMMAND`
+    or `BORG_[OTHER_]PASSPHRASE_FD`.
+  - `borg repo-create --repo B --other-repo A` does not silently copy the
+    passphrase of key A to key B anymore, but either asks for the passphrase
+    or reads it from env vars.
+
+Other changes:
+
+- remove support for / testing on Python 3.9
+- docs: borg serve --repo is not supported, #8591
+- remove remainders of append-only and quota support
+- remove cygwin < 2.8.0 bug workaround
+- fix remote api versioning
+
+
+Version 2.0.0b15 (2025-04-22)
+-----------------------------
+
+New features:
+
+- compact: without --stats, it will be faster by using the cached chunks index.
+  with --stats it will be as slow as before, listing all repo objs.
+- compact: support --dry-run (do nothing), #8300
+- extract: --dry-run now displays +/- status flags (included/excluded), #8564
+- allow timespan to be specified with common time units, #8624
+- enhance passphrase handling, #8496.
+
+  Setting `BORG_DEBUG_PASSPHRASE=YES` enables passphrase debug logging to
+  stderr, showing passphrase, hex utf-8 byte sequence and related env vars if
+  a wrong passphrase was encountered.
+
+  Setting `BORG_DISPLAY_PASSPHRASE=YES` now always shows passphrase and its hex
+  utf-8 byte sequence.
+- add {unixtime} placeholder, #8522
+- implement padme chunk size obfuscation (SPEC 250), #8705
+- macOS: retrieve birthtime in nanosecond precision via system call, #8724
+
+Bug fixes:
+
+- borg exits when assertions are disabled with Python optimizations, #8649
+- yes(): deal with UnicodeDecodeError in input(), #6984
+- fix remote repository exception handling / modern exit codes, #8631
+- freebsd: fix nfs4 acl processing, #8756.
+  This issue only affected borg extract --numeric-ids when processing NFS4
+  ACLs, it didn't affect POSIX ACL processing.
+
+Other changes:
+
+- adapt to and require borghash 0.1.0
+- adapt to and require borgstore 0.2.0 (new s3/b2 backend, fixes/improvements)
+- create: remove --make-parent-dirs option (borgstore now does this automatically), #8619
+- iter_items: decouple item iteration and content data chunks preloading
+- remote: simplify code, add debug logging
+- pyproject.toml: SPDX expression for license, add license-files, #8771
+- Item: remove .chunks_healthy, #8559
+- OpenBSD fixes:
+
+  - support other OpenSSL versions on OpenBSD, #8553
+  - vagrant: fix OpenBSD box, #8506
+  - Filter test output with LibreSSL related warnings on OpenBSD
+- macOS: fix brew's broken pkg-config -> pkgconf transition
+- tests: ignore 'com.apple.provenance' xattr (macOS specific)
+- vagrant updates:
+
+  - use pyinstaller 6.11.1 (also use this in msys2 build scripts)
+  - use python 3.12.10
+  - build binaries with borgstore[sftp], #8574
+- docs:
+
+  - automated backup: append to SYSTEMD_WANTS rather than overwrite, #8641
+  - fix udev rule priority in automated-local.rst, #8639
+  - FAQ: Why backups are slow on a Linux server that is a member of a windows domain? #8636
+  - within a shell, cli options with special characters may require quoting, #8578
+  - update prune documentation for new --keep-within intervals, #8630
+  - borg serve: recommend using a simple shell, #3818
+  - update install docs (requirements, pkgconfig, fuse), #8342
+  - libffi-dev is required for argon2-cffi-bindings
+  - add undelete command to index
+  - borg commands updated with --repo option, #8550
+  - FAQ: add entry about pure-python msgpack warning, #8323
+  - readthedocs theme fixes
+
+    - bring back highlighted content preview in search results.
+    - fix erroneous warning about missing javascript support.
+
+
+Version 2.0.0b14 (2024-11-17)
+-----------------------------
+
+New features:
+
+- delete: now only soft-deletes archives (same for prune)
+- repo-list: --deleted lists deleted archives
+- undelete: undelete soft-deleted archives, #8500
+
+Fixes:
+
+- chunks index cache:
+
+  - enable partial/incremental updates (F_NEW flag).
+  - write chunks index every 10mins, #8503.
+    this makes sure progress is not totally lost when a backup is interrupted.
+  - write to repo/cache/chunks.<HASH> to enable parallel updates.
+- mount: fix check_pending_archive to give correct root dir, #8528
+
+Other changes:
+
+- repo-compress: reduce memory consumption (F_COMPRESS flag)
+- files cache: reduce memory consumption, #5756
+- check: rename --undelete-archives to --find-lost-archives
+- check: rebuild_archives_directory: accelerate by only reading metadata
+- shell completions: adapt zsh for borg 2.0.0b13 - needs more work!
+- chunk index: rename .refcount to .flags, use it for user and system flags.
+- vagrant:
+
+  - add bookworm32 box for 32bit platform testing
+  - fix pythons on freebsd14
+  - simplify openindiana box setup
+- docs:
+
+  - remove --bypass-lock, small changes regarding compression
+  - FAQ: clean up entries regarding SSH settings
+
+
+Version 2.0.0b13 (2024-10-31)
+-----------------------------
+
+New features:
+
+- implement special tags, @PROT tag for protecting archives, #953.
+
+  borg won't delete/prune/recreate protected archives.
+- prune: add quarterly pruning strategy, #8337.
+- import-tar/export-tar: add xattr support for PAX format, #2521.
+
+Fixes:
+
+- simple error msgs for existing / non-existing repo, no tracebacks, #8475.
+- mount: create unique directory names, #8461.
+- diff: suppress modified changes for files which weren't actually modified.
+- diff: do not test for ctime difference on windows.
+- prune: fix exception when NAME is given, #8486
+- repo-create: build and cache an empty ChunkIndex.
+- work around missing size/nfiles archive metadata, #8491
+- lock after checking repo exists, #8485
+
+Other changes:
+
+- new file:, rclone:, ssh:, sftp: URLs, #8372, #8446.
+
+  new way to deal with absolute vs. relative paths.
+- require borgstore ~= 0.1.0, require borghash ~= 0.0.1.
+- new hashtable code based on borghash project:
+
+  - borghash replaces old / hard to maintain _hashindex.c code.
+  - implement ChunkIndex, NSIndex1, FuseVersionsIndex using borghash.HashTableNT.
+  - rewrite NSIndex1 (borg 1.x) on-disk format read/write methods in Cython.
+  - remove NSIndex (early borg2) data structure / serialization code for repo index.
+  - change xxh64 seed for ChunkIndex to invalidate old cache contents.
+  - chunks index: show hashtable stats at debug log level, #506.
+- check (repository part): build and cache a ChunkIndex.
+
+  check (archives part): use cached ChunkIndex from check (repository part).
+- export-tar: switch default to PAX format.
+- docs:
+
+  - update URL docs
+  - mount: document on-demand loading, perf tips, #7173.
+  - borg/borgfs detects internally under which name it was invoked, #8207.
+  - better link modern return codes, #8370.
+  - binary: using the directory build is faster, #8008.
+  - update "Running the tests (using the pypi package)", #6386.
+- github CI:
+
+  - temporarily disabled windows CI, #8474.
+  - msys2: use pyinstaller 6.10.0.
+  - msys2: install rclone.
+- tests:
+
+  - rename test files so that pytest default discovery finds them.
+  - call register_assert_rewrite before importing borg.testsuite.
+  - move conftest.py one directory level higher.
+  - remove hashindex tests from selftests (borghash project has own tests).
+
+
+Version 2.0.0b12 (2024-10-03)
+-----------------------------
+
+New features:
+
+- tag: new command to set, add, remove tags.
+- repo-list: add tags/hostname/username/comment to default format, reorder, adjust.
+
+  Idea: not putting these into the archive name, but keeping them separate.
+- repo-list --short: only print archive IDs (unique IDs, used for scripting).
+- implement --match-archives user:USERNAME host:HOSTNAME tags:TAG1,TAG2,...
+- allow -a / --match-archives multiple times (logical AND).
+
+  E.g.: borg delete -a home -a user:kenny -a host:kenny-pc
+- analyze: list changed chunks' sizes per directory.
+
+Fixes:
+
+- locking: also refresh the lock in other repo methods. avoid repo lock
+  getting stale when processing lots of unchanged files, #8442.
+- make sure the store gets closed in case of exceptions, #8413.
+- msgpack: increase max_buffer_size to ~4GiB, #8440.
+- Location.canonical_path: fix protocol and host display, #8446.
+
+Other changes:
+
+- give borgstore.Store a complete levels configuration, #8432.
+- add BORG_STORE_DATA_LEVELS=2 env var.
+- check: also display archive timestamp.
+- vagrant:
+
+  - use python 3.12.6 for binary builds.
+  - new testing box based on bento/ubuntu-24.04.
+  - install Rust on BSD.
+
+
+Version 2.0.0b11 (2024-09-26)
+-----------------------------
+
+New features:
+
+- Support rclone:// URLs for borg repositories.
+
+  This enables 70+ cloud storage products, including Amazon S3, Backblaze B2,
+  Ceph, Dropbox, ftp(s), Google Cloud Storage, Google Drive, Microsoft Azure,
+  Microsoft OneDrive, OpenStack Swift, pCloud, Seafile, sftp, SMB / CIFS and
+  WebDAV!
+
+  See https://rclone.org/ for more details.
+- Parallel operations in same repo from same client (same user/machine).
+- Archive series feature, #7930.
+
+  TL;DR: a NAME now identifies a series of identically named archives,
+  to identify a specific single archive, use aid:<archive hash>.
+
+  in borg 1.x, we used to put a timestamp into the archive name, because borg1
+  required unique archive names.
+
+  borg2 does not require unique archive names, but it encourages you to even
+  use a identical archive names within the same SERIES of archives, e.g. you
+  could backup user files to archives named "user-files" and system files to
+  archives named "system-files".
+  that makes matching (e.g. for prune, for the files cache, ...) much simpler
+  and borg now KNOWS which archives belong to the same series (because they all
+  have the same name).
+- info/delete/prune: allow positional NAME argument, e.g.:
+
+  - borg prune --keep-daily 30 <seriesname>
+  - borg delete aid:<archive hash>
+- create: also archive inode number, #8362
+
+  Borg can use this when using archive series to rebuild the local files cache
+  from the previous archive (of the same series) in the repository.
+
+Fixes:
+
+- Remove superfluous repository.list() call. for high latency repos
+  (like sftp, cloud), this improves performance of borg check and compact.
+- repository.list: refresh lock more frequently
+- misc. commands fixed for non-unique archive names
+- remote: allow get_manifest method
+- files cache: fix rare race condition with data loss potential, #3536
+- storelocking: misc. fixes / cleanups
+
+Other changes:
+
+- Cache the chunks index in the repository, #8397.
+  Improves high latency repo performance for most commands compared to b10.
+- repo-compress: faster by using chunks index rather than repository.list().
+- Files cache entries now have both ctime AND mtime.
+- Borg updates the ctime and mtime of known and "unchanged" files, #4915.
+- Rebuild files cache from previous archive in same series, #8385.
+- Reduce RAM usage by splitting the files cache by archive series, #5658.
+- Remove AdHocCache, remove BORG_CACHE_IMPL (we only have one implementation).
+- Docs: user@ and :port are optional in sftp and ssh URLs.
+- CI: re-enable windows build after fixing it.
+- Upgrade pyinstaller to 6.10.0.
+- Increase IDS_PER_CHUNK, #6945.
+
+
+Version 2.0.0b10 (2024-09-09)
+-----------------------------
+
+New features:
+
+- borgstore based repository, file:, ssh: and sftp: for now, more possible.
+- repository stores objects separately now, not using segment files.
+  this has more fs overhead, but needs much less I/O because no segment
+  files compaction is required anymore. also, no repository index is
+  needed anymore because we can directly find the objects by their ID.
+- locking: new borgstore based repository locking with automatic stale
+  lock removal (if lock does not get refreshed, if lock owner process is dead).
+- simultaneous repository access for many borg commands except check/compact.
+  the cache lock for adhocwithfiles is still exclusive though, so use
+  BORG_CACHE_IMPL=adhoc if you want to try that out using only 1 machine
+  and 1 user (that implementation doesn't use a cache lock). When using
+  multiple client machines or users, it also works with the default cache.
+- delete/prune: much quicker now and can be undone.
+- check --repair --undelete-archives: bring archives back from the dead.
+- repo-space: manage reserved space in repository (avoid dead-end situation if
+  repository filesystem runs full).
+
+Bugs/issues fixed:
+
+- a lot! all linked from PR #8332.
+
+Other changes:
+
+- repository: remove transactions, solved differently and much simpler now
+  (convergence and write order primarily).
+- repository: replaced precise reference counting with "object exists in repo?"
+  and "garbage collection of unused objects".
+- cache: remove transactions, remove chunks cache.
+  removed LocalCache, BORG_CACHE_IMPL=local, solving all related issues.
+  as in beta 9, adhowwithfiles is the default implementation.
+- compact: needs the borg key now (run it clientside), -v gives nice stats.
+- transfer: archive transfers from borg 1.x need the --from-borg1 option
+- check: reimplemented / bigger changes.
+- code: got rid of a metric ton of not needed complexity.
+  when borg does not need to read borg 1.x repos/archives anymore, after
+  users have transferred their archives, even much more can be removed.
+- docs: updated / removed outdated stuff
+- renamed r* commands to repo-*
+
+
+Version 2.0.0b9 (2024-07-20)
+----------------------------
 
 New features:
 

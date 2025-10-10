@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORGFS" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORGFS" "1" "2025-08-02" "" "borg backup tool"
 .SH NAME
 borgfs \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
@@ -48,14 +48,11 @@ where to mount filesystem
 .B PATH
 paths to extract; patterns are supported
 .UNINDENT
-.SS optional arguments
+.SS options
 .INDENT 0.0
 .TP
 .B  \-V\fP,\fB  \-\-version
 show version number and exit
-.TP
-.B  \-\-consider\-checkpoints
-Show checkpoint archives in the repository contents list (default: hidden).
 .TP
 .B  \-f\fP,\fB  \-\-foreground
 stay in foreground, do not daemonize
@@ -70,10 +67,10 @@ use numeric user and group identifiers from archive(s)
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archive names matching the pattern. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
-Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp
+Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
 consider first N archives after other filters were applied

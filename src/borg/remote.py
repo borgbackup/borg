@@ -30,9 +30,11 @@ from .helpers import format_file_size
 from .helpers import safe_unlink
 from .helpers import prepare_subprocess_env, ignore_sigint
 from .helpers import get_socket_filename
-from .locking import LockTimeout, NotLocked, NotMyLock, LockFailed
+from .fslocking import LockTimeout, NotLocked, NotMyLock, LockFailed
 from .logger import create_logger, borg_serve_log_queue
+from .manifest import NoManifestError
 from .helpers import msgpack
+from .legacyrepository import LegacyRepository
 from .repository import Repository
 from .version import parse_version, format_version
 from .checksums import xxh64
@@ -46,25 +48,6 @@ MSGID, MSG, ARGS, RESULT, LOG = "i", "m", "a", "r", "l"
 MAX_INFLIGHT = 100
 
 RATELIMIT_PERIOD = 0.1
-
-
-def os_write(fd, data):
-    """os.write wrapper so we do not lose data for partial writes."""
-    # TODO: this issue is fixed in cygwin since at least 2.8.0, remove this
-    #       wrapper / workaround when this version is considered ancient.
-    # This is happening frequently on cygwin due to its small pipe buffer size of only 64kiB
-    # and also due to its different blocking pipe behaviour compared to Linux/*BSD.
-    # Neither Linux nor *BSD ever do partial writes on blocking pipes, unless interrupted by a
-    # signal, in which case serve() would terminate.
-    amount = remaining = len(data)
-    while remaining:
-        count = os.write(fd, data)
-        remaining -= count
-        if not remaining:
-            break
-        data = data[count:]
-        time.sleep(count * 1e-09)
-    return amount
 
 
 class ConnectionClosed(Error):
@@ -125,7 +108,7 @@ class ConnectionBrokenWithHint(Error):
 # For the client the return of the negotiate method is a dict which includes the server version.
 #
 # All method calls on the remote repository object must be allowlisted in RepositoryServer.rpc_methods and have api
-# stubs in RemoteRepository. The @api decorator on these stubs is used to set server version requirements.
+# stubs in RemoteRepository*. The @api decorator on these stubs is used to set server version requirements.
 #
 # Method parameters are identified only by name and never by position. Unknown parameters are ignored by the server.
 # If a new parameter is important and may not be ignored, on the client a parameter specific version requirement needs
@@ -135,17 +118,14 @@ class ConnectionBrokenWithHint(Error):
 
 
 class RepositoryServer:  # pragma: no cover
-    rpc_methods = (
+    _legacy_rpc_methods = (  # LegacyRepository
         "__len__",
         "check",
         "commit",
         "delete",
         "destroy",
-        "flags",
-        "flags_many",
         "get",
         "list",
-        "scan",
         "negotiate",
         "open",
         "close",
@@ -156,18 +136,45 @@ class RepositoryServer:  # pragma: no cover
         "load_key",
         "break_lock",
         "inject_exception",
+        "get_manifest",  # borg2 LegacyRepository has this
     )
 
-    def __init__(self, restrict_to_paths, restrict_to_repositories, append_only, storage_quota, use_socket):
+    _rpc_methods = (  # Repository
+        "__len__",
+        "check",
+        "delete",
+        "destroy",
+        "get",
+        "list",
+        "negotiate",
+        "open",
+        "close",
+        "info",
+        "put",
+        "save_key",
+        "load_key",
+        "break_lock",
+        "inject_exception",
+        "get_manifest",
+        "put_manifest",
+        "store_list",
+        "store_load",
+        "store_store",
+        "store_delete",
+        "store_move",
+    )
+
+    def __init__(self, restrict_to_paths, restrict_to_repositories, use_socket, permissions=None):
         self.repository = None
+        self.RepoCls = None
+        self.rpc_methods = ("open", "close", "negotiate")
         self.restrict_to_paths = restrict_to_paths
         self.restrict_to_repositories = restrict_to_repositories
+        self.permissions = permissions
         # This flag is parsed from the serve command line via Archiver.do_serve,
         # i.e. it reflects local system policy and generally ranks higher than
         # whatever the client wants, except when initializing a new repository
         # (see RepositoryServer.open below).
-        self.append_only = append_only
-        self.storage_quota = storage_quota
         self.client_version = None  # we update this after client sends version information
         if use_socket is False:
             self.socket_path = None
@@ -190,7 +197,7 @@ class RepositoryServer:  # pragma: no cover
                 break
             else:
                 msg = msgpack.packb({LOG: lr_dict})
-                os_write(self.stdout_fd, msg)
+                os.write(self.stdout_fd, msg)
 
     def serve(self):
         def inner_serve():
@@ -228,6 +235,7 @@ class RepositoryServer:  # pragma: no cover
                                 self.repository.close()
                             raise UnexpectedRPCDataFormatFromClient(__version__)
                         try:
+                            # logger.debug(f"{type(self)} method: {type(self.repository)}.{method}")
                             if method not in self.rpc_methods:
                                 raise InvalidRPCMethod(method)
                             try:
@@ -237,18 +245,26 @@ class RepositoryServer:  # pragma: no cover
                             args = self.filter_args(f, args)
                             res = f(**args)
                         except BaseException as e:
+                            # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
+                            # and will be handled just like locally raised exceptions. Suppress the remote traceback
+                            # for these, except ErrorWithTraceback, which should always display a traceback.
+                            reconstructed_exceptions = (
+                                Repository.InvalidRepository,
+                                Repository.InvalidRepositoryConfig,
+                                Repository.DoesNotExist,
+                                Repository.AlreadyExists,
+                                Repository.PathAlreadyExists,
+                                PathNotAllowed,
+                                Repository.InsufficientFreeSpaceError,
+                            )
+                            # logger.exception(e)
                             ex_short = traceback.format_exception_only(e.__class__, e)
                             ex_full = traceback.format_exception(*sys.exc_info())
                             ex_trace = True
                             if isinstance(e, Error):
                                 ex_short = [e.get_message()]
                                 ex_trace = e.traceback
-                            if isinstance(e, (Repository.DoesNotExist, Repository.AlreadyExists, PathNotAllowed)):
-                                # These exceptions are reconstructed on the client end in RemoteRepository.call_many(),
-                                # and will be handled just like locally raised exceptions. Suppress the remote traceback
-                                # for these, except ErrorWithTraceback, which should always display a traceback.
-                                pass
-                            else:
+                            if not isinstance(e, reconstructed_exceptions):
                                 logging.debug("\n".join(ex_full))
 
                             sys_info = sysinfo()
@@ -278,9 +294,9 @@ class RepositoryServer:  # pragma: no cover
                                         "sysinfo": sys_info,
                                     }
                                 )
-                            os_write(self.stdout_fd, msg)
+                            os.write(self.stdout_fd, msg)
                         else:
-                            os_write(self.stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
+                            os.write(self.stdout_fd, msgpack.packb({MSGID: msgid, RESULT: res}))
                 if es:
                     shutdown_serve = True
                     continue
@@ -333,16 +349,12 @@ class RepositoryServer:  # pragma: no cover
     def _resolve_path(self, path):
         if isinstance(path, bytes):
             path = os.fsdecode(path)
-        if path.startswith("/~/"):  # /~/x = path x relative to own home dir
-            home_dir = os.environ.get("HOME") or os.path.expanduser("~%s" % os.environ.get("USER", ""))
-            path = os.path.join(home_dir, path[3:])
-        elif path.startswith("/./"):  # /./x = path x relative to cwd
-            path = path[3:]
-        return os.path.realpath(path)
+        path = os.path.realpath(path)
+        return path
 
-    def open(
-        self, path, create=False, lock_wait=None, lock=True, exclusive=None, append_only=False, make_parent_dirs=False
-    ):
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, v1_or_v2=False):
+        self.RepoCls = LegacyRepository if v1_or_v2 else Repository
+        self.rpc_methods = self._legacy_rpc_methods if v1_or_v2 else self._rpc_methods
         logging.debug("Resolving repository path %r", path)
         path = self._resolve_path(path)
         logging.debug("Resolved repository path to %r", path)
@@ -364,21 +376,10 @@ class RepositoryServer:  # pragma: no cover
                     break
             else:
                 raise PathNotAllowed(path)
-        # "borg init" on "borg serve --append-only" (=self.append_only) does not create an append only repo,
-        # while "borg init --append-only" (=append_only) does, regardless of the --append-only (self.append_only)
-        # flag for serve.
-        append_only = (not create and self.append_only) or append_only
-        self.repository = Repository(
-            path,
-            create,
-            lock_wait=lock_wait,
-            lock=lock,
-            append_only=append_only,
-            storage_quota=self.storage_quota,
-            exclusive=exclusive,
-            make_parent_dirs=make_parent_dirs,
-            send_log_cb=self.send_queued_log,
-        )
+        kwargs = dict(lock_wait=lock_wait, lock=lock, exclusive=exclusive, send_log_cb=self.send_queued_log)
+        if not v1_or_v2:
+            kwargs["permissions"] = self.permissions
+        self.repository = self.RepoCls(path, create, **kwargs)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
 
@@ -393,17 +394,17 @@ class RepositoryServer:  # pragma: no cover
         s1 = "test string"
         s2 = "test string2"
         if kind == "DoesNotExist":
-            raise Repository.DoesNotExist(s1)
+            raise self.RepoCls.DoesNotExist(s1)
         elif kind == "AlreadyExists":
-            raise Repository.AlreadyExists(s1)
+            raise self.RepoCls.AlreadyExists(s1)
         elif kind == "CheckNeeded":
-            raise Repository.CheckNeeded(s1)
+            raise self.RepoCls.CheckNeeded(s1)
         elif kind == "IntegrityError":
             raise IntegrityError(s1)
         elif kind == "PathNotAllowed":
             raise PathNotAllowed("foo")
         elif kind == "ObjectNotFound":
-            raise Repository.ObjectNotFound(s1, s2)
+            raise self.RepoCls.ObjectNotFound(s1, s2)
         elif kind == "InvalidRPCMethod":
             raise InvalidRPCMethod(s1)
         elif kind == "divide":
@@ -545,17 +546,7 @@ class RemoteRepository:
         def required_version(self):
             return self.args[1]
 
-    def __init__(
-        self,
-        location,
-        create=False,
-        exclusive=False,
-        lock_wait=None,
-        lock=True,
-        append_only=False,
-        make_parent_dirs=False,
-        args=None,
-    ):
+    def __init__(self, location, create=False, exclusive=False, lock_wait=1.0, lock=True, args=None):
         self.location = self._location = location
         self.preload_ids = []
         self.msgid = 0
@@ -585,8 +576,9 @@ class RemoteRepository:
                 borg_cmd = self.ssh_cmd(location) + borg_cmd
             logger.debug("SSH command line: %s", borg_cmd)
             # we do not want the ssh getting killed by Ctrl-C/SIGINT because it is needed for clean shutdown of borg.
-            # borg's SIGINT handler tries to write a checkpoint and requires the remote repo connection.
-            self.p = Popen(borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, preexec_fn=ignore_sigint)
+            self.p = Popen(
+                borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, preexec_fn=ignore_sigint
+            )  # nosec B603
             self.stdin_fd = self.p.stdin.fileno()
             self.stdout_fd = self.p.stdout.fileno()
             self.stderr_fd = self.p.stderr.fileno()
@@ -633,17 +625,10 @@ class RemoteRepository:
                 raise Exception("Server insisted on using unsupported protocol version %s" % version)
 
             self.id = self.open(
-                path=self.location.path,
-                create=create,
-                lock_wait=lock_wait,
-                lock=lock,
-                exclusive=exclusive,
-                append_only=append_only,
-                make_parent_dirs=make_parent_dirs,
+                path=self.location.path, create=create, lock_wait=lock_wait, lock=lock, exclusive=exclusive
             )
             info = self.info()
             self.version = info["version"]
-            self.append_only = info["append_only"]
 
         except Exception:
             self.close()
@@ -654,7 +639,7 @@ class RemoteRepository:
             logging.debug("still %d cached responses left in RemoteRepository" % (len(self.responses),))
         if self.p or self.sock:
             self.close()
-            assert False, "cleanup happened in Repository.__del__"
+            assert False, "cleanup happened in RemoteRepository.__del__"
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.location.canonical_path()}>"
@@ -666,11 +651,8 @@ class RemoteRepository:
         try:
             if exc_type is not None:
                 self.shutdown_time = time.monotonic() + 30
-                self.rollback()
         finally:
-            # in any case, we want to close the repo cleanly, even if the
-            # rollback can not succeed (e.g. because the connection was
-            # already closed) and raised another exception:
+            # in any case, we want to close the repo cleanly.
             logger.debug(
                 "RemoteRepository: %s bytes sent, %s bytes received, %d messages sent",
                 format_file_size(self.tx_bytes),
@@ -718,9 +700,6 @@ class RemoteRepository:
                     topic = "borg.debug." + topic
                 if "repository" in topic:
                     opts.append("--debug-topic=%s" % topic)
-
-            if "storage_quota" in args and args.storage_quota:
-                opts.append("--storage-quota=%s" % args.storage_quota)
         env_vars = []
         if testing:
             return env_vars + [sys.executable, "-m", "borg", "serve"] + opts + self.extra_test_args
@@ -748,6 +727,8 @@ class RemoteRepository:
     def call_many(self, cmd, calls, wait=True, is_preloaded=False, async_wait=True):
         if not calls and cmd != "async_responses":
             return
+
+        assert not is_preloaded or cmd == "get", "is_preloaded is only supported for 'get'"
 
         def send_buffer():
             if self.to_send:
@@ -779,6 +760,8 @@ class RemoteRepository:
                 raise Error(args[0])
             elif error == "ErrorWithTraceback":
                 raise ErrorWithTraceback(args[0])
+            elif error == "InvalidRepository":
+                raise Repository.InvalidRepository(self.location.processed)
             elif error == "DoesNotExist":
                 raise Repository.DoesNotExist(self.location.processed)
             elif error == "AlreadyExists":
@@ -791,6 +774,8 @@ class RemoteRepository:
                 raise PathNotAllowed(args[0])
             elif error == "PathPermissionDenied":
                 raise Repository.PathPermissionDenied(args[0])
+            elif error == "PathAlreadyExists":
+                raise Repository.PathAlreadyExists(args[0])
             elif error == "ParentPathDoesNotExist":
                 raise Repository.ParentPathDoesNotExist(args[0])
             elif error == "ObjectNotFound":
@@ -805,6 +790,12 @@ class RemoteRepository:
                 raise NotLocked(args[0])
             elif error == "NotMyLock":
                 raise NotMyLock(args[0])
+            elif error == "NoManifestError":
+                raise NoManifestError
+            elif error == "InsufficientFreeSpaceError":
+                raise Repository.InsufficientFreeSpaceError(args[0], args[1])
+            elif error == "InvalidRepositoryConfig":
+                raise Repository.InvalidRepositoryConfig(self.location.processed, args[1])
             else:
                 raise self.RPCError(unpacked)
 
@@ -813,6 +804,9 @@ class RemoteRepository:
         maximum_to_send = 0 if wait else self.upload_buffer_size_limit
         send_buffer()  # Try to send data, as some cases (async_response) will never try to send data otherwise.
         while wait or calls:
+            logger.debug(
+                f"call_many: calls: {len(calls)} waiting_for: {len(waiting_for)} responses: {len(self.responses)}"
+            )
             if self.shutdown_time and time.monotonic() > self.shutdown_time:
                 # we are shutting this RemoteRepository down already, make sure we do not waste
                 # a lot of time in case a lot of async stuff is coming in or remote is gone or slow.
@@ -913,21 +907,23 @@ class RemoteRepository:
                     and len(waiting_for) < MAX_INFLIGHT
                 ):
                     if calls:
-                        if is_preloaded:
-                            assert cmd == "get", "is_preload is only supported for 'get'"
-                            if calls[0]["id"] in self.chunkid_to_msgids:
-                                waiting_for.append(pop_preload_msgid(calls.pop(0)["id"]))
-                        else:
-                            args = calls.pop(0)
-                            if cmd == "get" and args["id"] in self.chunkid_to_msgids:
-                                waiting_for.append(pop_preload_msgid(args["id"]))
-                            else:
-                                self.msgid += 1
-                                waiting_for.append(self.msgid)
-                                self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))
+                        args = calls[0]
+                        if cmd == "get" and args["id"] in self.chunkid_to_msgids:
+                            # we have a get command and have already sent a request for this chunkid when
+                            # doing preloading, so we know the msgid of the response we are waiting for:
+                            waiting_for.append(pop_preload_msgid(args["id"]))
+                            del calls[0]
+                        elif not is_preloaded:
+                            # make and send a request (already done if we are using preloading)
+                            self.msgid += 1
+                            waiting_for.append(self.msgid)
+                            del calls[0]
+                            self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))
                     if not self.to_send and self.preload_ids:
                         chunk_id = self.preload_ids.pop(0)
-                        args = {"id": chunk_id}
+                        # for preloading chunks, the raise_missing behaviour is defined HERE,
+                        # not in the get_many / fetch_many call that later fetches the preloaded chunks.
+                        args = {"id": chunk_id, "raise_missing": False}
                         self.msgid += 1
                         self.chunkid_to_msgids.setdefault(chunk_id, []).append(self.msgid)
                         self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: "get", ARGS: args}))
@@ -935,14 +931,8 @@ class RemoteRepository:
                 send_buffer()
         self.ignore_responses |= set(waiting_for)  # we lose order here
 
-    @api(
-        since=parse_version("1.0.0"),
-        append_only={"since": parse_version("1.0.7"), "previously": False},
-        make_parent_dirs={"since": parse_version("1.1.9"), "previously": False},
-    )
-    def open(
-        self, path, create=False, lock_wait=None, lock=True, exclusive=False, append_only=False, make_parent_dirs=False
-    ):
+    @api(since=parse_version("1.0.0"), v1_or_v2={"since": parse_version("2.0.0b9"), "previously": True})
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, v1_or_v2=False):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("2.0.0a3"))
@@ -973,32 +963,20 @@ class RemoteRepository:
     def __len__(self):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(
-        since=parse_version("1.0.0"),
-        mask={"since": parse_version("2.0.0b2"), "previously": 0},
-        value={"since": parse_version("2.0.0b2"), "previously": 0},
-    )
-    def list(self, limit=None, marker=None, mask=0, value=0):
+    @api(since=parse_version("1.0.0"))
+    def list(self, limit=None, marker=None):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version("2.0.0b3"))
-    def scan(self, limit=None, state=None):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b2"))
-    def flags(self, id, mask=0xFFFFFFFF, value=None):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b2"))
-    def flags_many(self, ids, mask=0xFFFFFFFF, value=None):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    def get(self, id, read_data=True):
-        for resp in self.get_many([id], read_data=read_data):
+    def get(self, id, read_data=True, raise_missing=True):
+        for resp in self.get_many([id], read_data=read_data, raise_missing=raise_missing):
             return resp
 
-    def get_many(self, ids, read_data=True, is_preloaded=False):
-        yield from self.call_many("get", [{"id": id, "read_data": read_data} for id in ids], is_preloaded=is_preloaded)
+    def get_many(self, ids, read_data=True, is_preloaded=False, raise_missing=True):
+        yield from self.call_many(
+            "get",
+            [{"id": id, "read_data": read_data, "raise_missing": raise_missing} for id in ids],
+            is_preloaded=is_preloaded,
+        )
 
     @api(since=parse_version("1.0.0"))
     def put(self, id, data, wait=True):
@@ -1044,6 +1022,34 @@ class RemoteRepository:
     def preload(self, ids):
         self.preload_ids += ids
 
+    @api(since=parse_version("2.0.0b8"))
+    def get_manifest(self):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"))
+    def put_manifest(self, data):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b14"), "previously": False})
+    def store_list(self, name, *, deleted=False):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"))
+    def store_load(self, name):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"))
+    def store_store(self, name, value):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b14"), "previously": False})
+    def store_delete(self, name, *, deleted=False):
+        """actual remoting is done via self.call in the @api decorator"""
+
+    @api(since=parse_version("2.0.0b14"))
+    def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
+        """actual remoting is done via self.call in the @api decorator"""
+
 
 class RepositoryNoCache:
     """A not caching Repository wrapper, passes through to repository.
@@ -1068,11 +1074,11 @@ class RepositoryNoCache:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def get(self, key, read_data=True):
-        return next(self.get_many([key], read_data=read_data, cache=False))
+    def get(self, key, read_data=True, raise_missing=True):
+        return next(self.get_many([key], read_data=read_data, raise_missing=raise_missing, cache=False))
 
-    def get_many(self, keys, read_data=True, cache=True):
-        for key, data in zip(keys, self.repository.get_many(keys, read_data=read_data)):
+    def get_many(self, keys, read_data=True, raise_missing=True, cache=True):
+        for key, data in zip(keys, self.repository.get_many(keys, read_data=read_data, raise_missing=raise_missing)):
             yield self.transform(key, data)
 
     def log_instrumentation(self):
@@ -1177,10 +1183,12 @@ class RepositoryCache(RepositoryNoCache):
         self.cache.clear()
         shutil.rmtree(self.basedir)
 
-    def get_many(self, keys, read_data=True, cache=True):
+    def get_many(self, keys, read_data=True, raise_missing=True, cache=True):
         # It could use different cache keys depending on read_data and cache full vs. meta-only chunks.
         unknown_keys = [key for key in keys if self.prefixed_key(key, complete=read_data) not in self.cache]
-        repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys, read_data=read_data))
+        repository_iterator = zip(
+            unknown_keys, self.repository.get_many(unknown_keys, read_data=read_data, raise_missing=raise_missing)
+        )
         for key in keys:
             pkey = self.prefixed_key(key, complete=read_data)
             if pkey in self.cache:
@@ -1198,7 +1206,7 @@ class RepositoryCache(RepositoryNoCache):
                 else:
                     # slow path: eviction during this get_many removed this key from the cache
                     t0 = time.perf_counter()
-                    data = self.repository.get(key, read_data=read_data)
+                    data = self.repository.get(key, read_data=read_data, raise_missing=raise_missing)
                     self.slow_lat += time.perf_counter() - t0
                     transformed = self.add_entry(key, data, cache, complete=read_data)
                     self.slow_misses += 1

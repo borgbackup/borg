@@ -68,13 +68,13 @@ class HelpMixIn:
             always normalized to a forward slash '/' before applying a pattern.
 
         Path prefix, selector ``pp:``
-            This pattern style is useful to match whole sub-directories. The pattern
+            This pattern style is useful to match whole subdirectories. The pattern
             ``pp:root/somedir`` matches ``root/somedir`` and everything therein.
             A leading path separator is always removed.
 
         Path full-match, selector ``pf:``
             This pattern style is (only) useful to match full paths.
-            This is kind of a pseudo pattern as it can not have any variable or
+            This is kind of a pseudo pattern as it cannot have any variable or
             unspecified parts - the full path must be given. ``pf:root/file.ext``
             matches ``root/file.ext`` only. A leading path separator is always
             removed.
@@ -100,6 +100,15 @@ class HelpMixIn:
         Exclusions can be passed via the command line option ``--exclude``. When used
         from within a shell, the patterns should be quoted to protect them from
         expansion.
+
+        Patterns matching special characters, e.g. whitespace, within a shell may
+        require adjustments, such as putting quotation marks around the arguments.
+        Example:
+        Using bash, the following command line option would match and exclude "item name":
+        ``--pattern='-path/item name'``
+        Note that when patterns are used within a pattern file directly read by borg,
+        e.g. when using ``--exclude-from`` or ``--patterns-from``, there is no shell
+        involved and thus no quotation marks are required.
 
         The ``--exclude-from`` option permits loading exclusion patterns from a text
         file with one pattern per line. Lines empty or starting with the hash sign
@@ -207,7 +216,7 @@ class HelpMixIn:
 
         .. note::
 
-            It's possible that a sub-directory/file is matched while parent
+            It is possible that a subdirectory or file is matched while its parent
             directories are not. In that case, parent directories are not backed
             up and thus their user, group, permission, etc. cannot be restored.
 
@@ -264,10 +273,19 @@ class HelpMixIn:
     )
     helptext["match-archives"] = textwrap.dedent(
         """
-        The ``--match-archives`` option matches a given pattern against the list of all archive
-        names in the repository.
+        The ``--match-archives`` option matches a given pattern against the list of all archives
+        in the repository. It can be given multiple times.
 
-        It uses pattern styles similar to the ones described by ``borg help patterns``:
+        The patterns can have a prefix of:
+
+        - name: pattern match on the archive name (default)
+        - aid: prefix match on the archive id (only one result allowed)
+        - user: exact match on the username who created the archive
+        - host: exact match on the hostname where the archive was created
+        - tags: match on the archive tags
+
+        In case of a name pattern match,
+        it uses pattern styles similar to the ones described by ``borg help patterns``:
 
         Identical match pattern, selector ``id:`` (default)
             Simple string match, must fully match exactly as given.
@@ -281,16 +299,26 @@ class HelpMixIn:
 
         Examples::
 
-            # id: style
+            # name match, id: style
             borg delete --match-archives 'id:archive-with-crap'
             borg delete -a 'id:archive-with-crap'  # same, using short option
             borg delete -a 'archive-with-crap'  # same, because 'id:' is the default
 
-            # sh: style
+            # name match, sh: style
             borg delete -a 'sh:home-kenny-*'
 
-            # re: style
-            borg delete -a 're:pc[123]-home-(user1|user2)-2022-09-.*'\n\n"""
+            # name match, re: style
+            borg delete -a 're:pc[123]-home-(user1|user2)-2022-09-.*'
+
+            # archive id prefix match:
+            borg delete -a 'aid:d34db33f'
+
+            # host or user match
+            borg delete -a 'user:kenny'
+            borg delete -a 'host:kenny-pc'
+
+            # tags match
+            borg delete -a 'tags:TAG1' -a 'tags:TAG2'\n\n"""
     )
     helptext["placeholders"] = textwrap.dedent(
         """
@@ -334,12 +362,12 @@ class HelpMixIn:
 
         If literal curly braces need to be used, double them for escaping::
 
-            borg create /path/to/repo::{{literal_text}}
+            borg create --repo /path/to/repo {{literal_text}}
 
         Examples::
 
-            borg create /path/to/repo::{hostname}-{user}-{utcnow} ...
-            borg create /path/to/repo::{hostname}-{now:%Y-%m-%d_%H:%M:%S%z} ...
+            borg create --repo /path/to/repo {hostname}-{user}-{utcnow} ...
+            borg create --repo /path/to/repo {hostname}-{now:%Y-%m-%d_%H:%M:%S%z} ...
             borg prune -a 'sh:{hostname}-*' ...
 
         .. note::
@@ -354,14 +382,14 @@ class HelpMixIn:
     )
     helptext["compression"] = textwrap.dedent(
         """
-        It is no problem to mix different compression methods in one repo,
+        It is no problem to mix different compression methods in one repository,
         deduplication is done on the source data chunks (not on the compressed
         or encrypted data).
 
-        If some specific chunk was once compressed and stored into the repo, creating
+        If some specific chunk was once compressed and stored into the repository, creating
         another backup that also uses this chunk will not change the stored chunk.
         So if you use different compression specs for the backups, whichever stores a
-        chunk first determines its compression. See also borg recreate.
+        chunk first determines its compression. See also ``borg recreate``.
 
         Compression is lz4 by default. If you want something else, you have to specify what you want.
 
@@ -398,7 +426,8 @@ class HelpMixIn:
             The heuristic tries with lz4 whether the data is compressible.
             For incompressible data, it will not use compression (uses "none").
             For compressible data, it uses the given C[,L] compression - with C[,L]
-            being any valid compression specifier.
+            being any valid compression specifier. This can be helpful for media files
+            which often cannot be compressed much more.
 
         obfuscate,SPEC,C[,L]
             Use compressed-size obfuscation to make fingerprinting attacks based on
@@ -441,18 +470,28 @@ class HelpMixIn:
               ...
               123: 8MiB (max.)
 
+            *Padmé padding* (deterministic)
+
+            ::
+
+              250: pads to sums of powers of 2, max 12% overhead
+
+            Uses the Padmé algorithm to deterministically pad the compressed size to a sum of
+            powers of 2, limiting overhead to 12%. See https://lbarman.ch/blog/padme/ for details.
+
         Examples::
 
-            borg create --compression lz4 REPO::ARCHIVE data
-            borg create --compression zstd REPO::ARCHIVE data
-            borg create --compression zstd,10 REPO::ARCHIVE data
-            borg create --compression zlib REPO::ARCHIVE data
-            borg create --compression zlib,1 REPO::ARCHIVE data
-            borg create --compression auto,lzma,6 REPO::ARCHIVE data
+            borg create --compression lz4 --repo REPO ARCHIVE data
+            borg create --compression zstd --repo REPO ARCHIVE data
+            borg create --compression zstd,10 --repo REPO ARCHIVE data
+            borg create --compression zlib --repo REPO ARCHIVE data
+            borg create --compression zlib,1 --repo REPO ARCHIVE data
+            borg create --compression auto,lzma,6 --repo REPO ARCHIVE data
             borg create --compression auto,lzma ...
             borg create --compression obfuscate,110,none ...
             borg create --compression obfuscate,3,auto,zstd,10 ...
-            borg create --compression obfuscate,2,zstd,6 ...\n\n"""
+            borg create --compression obfuscate,2,zstd,6 ...
+            borg create --compression obfuscate,250,zstd,3 ...\n\n"""
     )
 
     def do_help(self, parser, commands, args):

@@ -41,7 +41,7 @@ def group2gid(group, default=None):
 
 
 def getosusername():
-    """Return the os user name."""
+    """Return the OS username."""
     return os.getlogin()
 
 
@@ -50,7 +50,7 @@ def process_alive(host, pid, thread):
     Check whether the (host, pid, thread_id) combination corresponds to a process potentially alive.
     """
     if host.split('@')[0].lower() != platform.node().lower():
-        # Not running on the same node, assume running.
+        # If not running on the same node, assume the process is running.
         return True
 
     # If the process can be opened, the process is alive.

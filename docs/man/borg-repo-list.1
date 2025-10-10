@@ -1,0 +1,179 @@
+.\" Man page generated from reStructuredText.
+.
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.TH "BORG-REPO-LIST" "1" "2025-08-02" "" "borg backup tool"
+.SH NAME
+borg-repo-list \- List the archives contained in a repository
+.SH SYNOPSIS
+.sp
+borg [common options] repo\-list [options]
+.SH DESCRIPTION
+.sp
+This command lists the archives contained in a repository.
+.SH OPTIONS
+.sp
+See \fIborg\-common(1)\fP for common options of Borg commands.
+.SS options
+.INDENT 0.0
+.TP
+.B  \-\-short
+only print the archive IDs, nothing else
+.TP
+.BI \-\-format \ FORMAT
+specify format for archive listing (default: \(dq{archive:<36} {time} [{id}]{NL}\(dq)
+.TP
+.B  \-\-json
+Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in it are added to the JSON output. Some keys are always present. Note: JSON can only represent text.
+.UNINDENT
+.SS Archive filters
+.INDENT 0.0
+.TP
+.BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
+only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+.TP
+.BI \-\-sort\-by \ KEYS
+Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
+.TP
+.BI \-\-first \ N
+consider first N archives after other filters were applied
+.TP
+.BI \-\-last \ N
+consider last N archives after other filters were applied
+.TP
+.BI \-\-oldest \ TIMESPAN
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+.TP
+.BI \-\-newest \ TIMESPAN
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+.TP
+.BI \-\-older \ TIMESPAN
+consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+.TP
+.BI \-\-newer \ TIMESPAN
+consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+.TP
+.B  \-\-deleted
+consider only soft\-deleted archives.
+.UNINDENT
+.SH EXAMPLES
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+$ borg repo\-list
+151b1a57  Mon, 2024\-09\-23 22:57:11 +0200  docs             tw          MacBook\-Pro  this is a comment
+3387a079  Thu, 2024\-09\-26 09:07:07 +0200  scripts          tw          MacBook\-Pro
+ca774425  Thu, 2024\-09\-26 10:05:23 +0200  scripts          tw          MacBook\-Pro
+ba56c4a5  Thu, 2024\-09\-26 10:12:45 +0200  src              tw          MacBook\-Pro
+7567b79a  Thu, 2024\-09\-26 10:15:07 +0200  scripts          tw          MacBook\-Pro
+21ab3600  Thu, 2024\-09\-26 10:15:17 +0200  docs             tw          MacBook\-Pro
+\&...
+.EE
+.UNINDENT
+.UNINDENT
+.SH NOTES
+.SS The FORMAT specifier syntax
+.sp
+The \fB\-\-format\fP option uses python\(aqs format string syntax <https://docs.python.org/3.9/library/string.html#formatstrings>
+\&.
+.sp
+Examples:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+$ borg repo\-list \-\-format \(aq{archive}{NL}\(aq
+ArchiveFoo
+ArchiveBar
+\&...
+
+# {VAR:NUMBER} \- pad to NUMBER columns.
+# Strings are left\-aligned, numbers are right\-aligned.
+# Note: time columns except \(ga\(gaisomtime\(ga\(ga, \(ga\(gaisoctime\(ga\(ga and \(ga\(gaisoatime\(ga\(ga cannot be padded.
+$ borg repo\-list \-\-format \(aq{archive:36} {time} [{id}]{NL}\(aq /path/to/repo
+ArchiveFoo                           Thu, 2021\-12\-09 10:22:28 [0b8e9...3b274]
+\&...
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+The following keys are always available:
+.INDENT 0.0
+.IP \(bu 2
+NEWLINE: OS dependent line separator
+.IP \(bu 2
+NL: alias of NEWLINE
+.IP \(bu 2
+NUL: NUL character for creating print0 / xargs \-0 like output
+.IP \(bu 2
+SPACE: space character
+.IP \(bu 2
+TAB: tab character
+.IP \(bu 2
+CR: carriage return character
+.IP \(bu 2
+LF: line feed character
+.UNINDENT
+.sp
+Keys available only when listing archives in a repository:
+.INDENT 0.0
+.IP \(bu 2
+archive: archive name
+.IP \(bu 2
+name: alias of \(dqarchive\(dq
+.IP \(bu 2
+comment: archive comment
+.IP \(bu 2
+id: internal ID of the archive
+.IP \(bu 2
+tags: archive tags
+.IP \(bu 2
+start: time (start) of creation of the archive
+.IP \(bu 2
+time: alias of \(dqstart\(dq
+.IP \(bu 2
+end: time (end) of creation of the archive
+.IP \(bu 2
+command_line: command line which was used to create the archive
+.IP \(bu 2
+hostname: hostname of host on which this archive was created
+.IP \(bu 2
+username: username of user who created this archive
+.IP \(bu 2
+size: size of this archive (data plus metadata, not considering compression and deduplication)
+.IP \(bu 2
+nfiles: count of files in this archive
+.UNINDENT
+.SH SEE ALSO
+.sp
+\fIborg\-common(1)\fP
+.SH AUTHOR
+The Borg Collective
+.\" Generated by docutils manpage writer.
+.

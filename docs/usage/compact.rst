@@ -4,6 +4,6 @@ Examples
 ~~~~~~~~
 ::
 
-    # compact segments and free repo disk space
+    # Compact segments and free repository disk space
     $ borg compact
 

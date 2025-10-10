@@ -8,7 +8,7 @@ Development
 This chapter will get you started with Borg development.
 
 Borg is written in Python (with a little bit of Cython and C for
-the performance critical parts).
+the performance-critical parts).
 
 Contributions
 -------------
@@ -19,7 +19,7 @@ Some guidance for contributors:
 
 - Discuss changes on the GitHub issue tracker, on IRC or on the mailing list.
 
-- Make your PRs on the ``master`` branch (see `Branching Model`_ for details).
+- Make your PRs on the ``master`` branch (see `Branching Model`_ for details and exceptions).
 
 - Do clean changesets:
 
@@ -52,14 +52,14 @@ Borg development happens on the ``master`` branch and uses GitHub pull
 requests (if you don't have GitHub or don't want to use it you can
 send smaller patches via the borgbackup mailing list to the maintainers).
 
-Stable releases are maintained on maintenance branches named ``x.y-maint``, eg.
-the maintenance branch of the 1.2.x series is ``1.2-maint``.
+Stable releases are maintained on maintenance branches named ``x.y-maint``, e.g.,
+the maintenance branch of the 1.4.x series is ``1.4-maint``.
 
 Most PRs should be filed against the ``master`` branch. Only if an
 issue affects **only** a particular maintenance branch a PR should be
 filed against it directly.
 
-While discussing / reviewing a PR it will be decided whether the
+While discussing/reviewing a PR it will be decided whether the
 change should be applied to maintenance branches. Each maintenance
 branch has a corresponding *backport/x.y-maint* label, which will then
 be applied.
@@ -105,8 +105,8 @@ were collected:
 
 Previously (until release 1.0.10) Borg used a `"merge upwards"
 <https://git-scm.com/docs/gitworkflows#_merging_upwards>`_ model where
-most minor changes and fixes where committed to a maintenance branch
-(eg. 1.0-maint), and the maintenance branch(es) were regularly merged
+most minor changes and fixes were committed to a maintenance branch
+(e.g. 1.0-maint), and the maintenance branch(es) were regularly merged
 back into the main development branch. This became more and more
 troublesome due to merges growing more conflict-heavy and error-prone.
 
@@ -118,6 +118,11 @@ main repository to your own Github repository. Then clone your Github repository
 to your local machine. The instructions for forking and cloning a repository
 can be found there:
 `<https://docs.github.com/en/get-started/quickstart/fork-a-repo>`_ .
+
+Make sure you also fetched the git tags, because without them, ``setuptools-scm``
+will run into issues determining the correct borg version. Check if ``git tag``
+shows a lot of release tags (version numbers).
+If it does not, use ``git fetch --tags`` to fetch them.
 
 To work on your contribution, you first need to decide which branch your pull
 request should be against. Often, this might be master branch (esp. for big /
@@ -221,7 +226,6 @@ We use `black`_ for automatically formatting the code.
 If you work on the code, it is recommended that you run black **before each commit**
 (so that new code is always using the desired formatting and no additional commits
 are required to fix the formatting).
-
 ::
 
     pip install -r requirements.d/codestyle.txt     # everybody use same black version
@@ -276,7 +280,6 @@ will have to be installed separately. Run this command to install the pre-commit
 
   pre-commit install
 
-
 Running the tests
 -----------------
 
@@ -284,7 +287,7 @@ The tests are in the borg/testsuite package.
 
 To run all the tests, you need to have fakeroot installed. If you do not have
 fakeroot, you still will be able to run most tests, just leave away the
-`fakeroot -u` from the given command lines.
+``fakeroot -u`` from the given command lines.
 
 To run the test suite use the following command::
 
@@ -295,7 +298,7 @@ Some more advanced examples::
   # verify a changed tox.ini (run this after any change to tox.ini):
   fakeroot -u tox --recreate
 
-  fakeroot -u tox -e py39  # run all tests, but only on python 3.9
+  fakeroot -u tox -e py313  # run all tests, but only on python 3.13
 
   fakeroot -u tox borg.testsuite.locking  # only run 1 test module
 
@@ -307,13 +310,13 @@ Important notes:
 
 - When using ``--`` to give options to py.test, you MUST also give ``borg.testsuite[.module]``.
 
-
 Running the tests (using the pypi package)
 ------------------------------------------
 
 Since borg 1.4, it is also possible to run the tests without a development
 environment, using the borgbackup dist package (downloaded from pypi.org or
-github releases page)::
+github releases page):
+::
 
     # optional: create and use a virtual env:
     python3 -m venv env
@@ -323,21 +326,8 @@ github releases page)::
     pip install borgbackup
     pip install pytest pytest-benchmark
 
-    # method A: use a pytest.ini
-
-    cat >pytest.ini <<<EOF
-    [pytest]
-    python_files = testsuite/*.py
-    markers = allow_cache_wipe
-    addopts = -rs --benchmark-skip
-    EOF
-
-    pytest --pyargs borg.testsuite
-
-    # method B: give the options via the cmdline (each time you invoke the tests):
-
-    pytest -rs --benchmark-skip -o 'python_files=testsuite/*.py' -o 'markers=allow_cache_wipe' --pyargs borg.testsuite
-
+    # run the tests
+    pytest -v -rs --benchmark-skip --pyargs borg.testsuite
 
 Adding a compression algorithm
 ------------------------------
@@ -415,7 +405,6 @@ Usage::
    # To copy files from the VM (in this case, the generated binary):
    vagrant scp OS:/vagrant/borg/borg.exe .
 
-
 Creating standalone binaries
 ----------------------------
 
@@ -433,7 +422,6 @@ If you encounter issues, see also our `Vagrantfile` for details.
 .. note:: Standalone binaries built with pyinstaller are supposed to
           work on same OS, same architecture (x86 32bit, amd64 64bit)
           without external dependencies.
-
 
 .. _releasing:
 
@@ -492,16 +480,16 @@ Checklist:
   new version number and release date.
 - Announce on:
 
- - Mailing list.
- - Twitter.
- - IRC channel (change ``/topic``).
+  - Mailing list.
+  - Mastodon / BlueSky / X (aka Twitter).
+  - IRC channel (change ``/topic``).
 
 - Create a GitHub release, include:
 
-  * pypi dist package and signature
-  * Standalone binaries (see above for how to create them).
+  - pypi dist package and signature
+  - Standalone binaries (see above for how to create them).
 
-    + For macOS, document the macFUSE version in the README of the binaries.
+    - For macOS, document the macFUSE version in the README of the binaries.
       macFUSE uses a kernel extension that needs to be compatible with the
       code contained in the binary.
-  * A link to ``CHANGES.rst``.
+  - A link to ``CHANGES.rst``.

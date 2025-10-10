@@ -1,6 +1,6 @@
-# this scripts uses borg 1.2 to generate test data for "borg transfer --upgrader=From12To20"
+# This script uses Borg 1.2 to generate test data for "borg transfer --upgrader=From12To20".
 BORG=./borg-1.2.2
-# on macOS, gnu tar is available as gtar
+# On macOS, GNU tar is available as gtar.
 TAR=gtar
 SRC=/tmp/borgtest
 ARCHIVE=`pwd`/src/borg/testsuite/archiver/repo12.tar.gz
@@ -55,7 +55,7 @@ pushd $SRC >/dev/null
 sudo mkdir root_stuff
 sudo mknod root_stuff/bdev_12_34 b 12 34
 sudo mknod root_stuff/cdev_34_56 c 34 56
-sudo touch root_stuff/strange_uid_gid  # no user name, no group name for this uid/gid!
+sudo touch root_stuff/strange_uid_gid  # No user name or group name exists for this UID/GID!
 sudo chown 54321:54321 root_stuff/strange_uid_gid
 
 popd >/dev/null

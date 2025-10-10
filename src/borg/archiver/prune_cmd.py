@@ -4,13 +4,13 @@ from datetime import datetime, timezone, timedelta
 import logging
 from operator import attrgetter
 import os
-import re
 
 from ._common import with_repository, Highlander
-from ..archive import Archive, Statistics
+from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import ArchiveFormatter, interval, sig_int, log_multi, ProgressIndicatorPercent, CommandError, Error
+from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
+from ..helpers import archivename_validator
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -18,8 +18,8 @@ from ..logger import create_logger
 logger = create_logger()
 
 
-def prune_within(archives, hours, kept_because):
-    target = datetime.now(timezone.utc) - timedelta(seconds=hours * 3600)
+def prune_within(archives, seconds, kept_because):
+    target = datetime.now(timezone.utc) - timedelta(seconds=seconds)
     kept_counter = 0
     result = []
     for a in archives:
@@ -30,15 +30,62 @@ def prune_within(archives, hours, kept_because):
     return result
 
 
+def default_period_func(pattern):
+    def inner(a):
+        # compute in local timezone
+        return a.ts.astimezone().strftime(pattern)
+
+    return inner
+
+
+def quarterly_13weekly_period_func(a):
+    (year, week, _) = a.ts.astimezone().isocalendar()  # local time
+    if week <= 13:
+        # Weeks containing Jan 4th to Mar 28th (leap year) or 29th- 91 (13*7)
+        # days later.
+        return (year, 1)
+    elif 14 <= week <= 26:
+        # Weeks containing Apr 4th (leap year) or 5th to Jun 27th or 28th- 91
+        # days later.
+        return (year, 2)
+    elif 27 <= week <= 39:
+        # Weeks containing Jul 4th (leap year) or 5th to Sep 26th or 27th-
+        # at least 91 days later.
+        return (year, 3)
+    else:
+        # Everything else, Oct 3rd (leap year) or 4th onward, will always
+        # include week of Dec 26th (leap year) or Dec 27th, may also include
+        # up to possibly Jan 3rd of next year.
+        return (year, 4)
+
+
+def quarterly_3monthly_period_func(a):
+    lt = a.ts.astimezone()  # local time
+    if lt.month <= 3:
+        # 1-1 to 3-31
+        return (lt.year, 1)
+    elif 4 <= lt.month <= 6:
+        # 4-1 to 6-30
+        return (lt.year, 2)
+    elif 7 <= lt.month <= 9:
+        # 7-1 to 9-30
+        return (lt.year, 3)
+    else:
+        # 10-1 to 12-31
+        return (lt.year, 4)
+
+
 PRUNING_PATTERNS = OrderedDict(
     [
-        ("secondly", "%Y-%m-%d %H:%M:%S"),
-        ("minutely", "%Y-%m-%d %H:%M"),
-        ("hourly", "%Y-%m-%d %H"),
-        ("daily", "%Y-%m-%d"),
-        ("weekly", "%G-%V"),
-        ("monthly", "%Y-%m"),
-        ("yearly", "%Y"),
+        ("secondly", default_period_func("%Y-%m-%d %H:%M:%S")),
+        ("minutely", default_period_func("%Y-%m-%d %H:%M")),
+        ("hourly", default_period_func("%Y-%m-%d %H")),
+        ("daily", default_period_func("%Y-%m-%d")),
+        ("weekly", default_period_func("%G-%V")),
+        ("monthly", default_period_func("%Y-%m")),
+        ("quarterly_13weekly", quarterly_13weekly_period_func),
+        ("quarterly_3monthly", quarterly_3monthly_period_func),
+        ("yearly", default_period_func("%Y")),
     ]
 )
 
@@ -46,7 +93,7 @@ PRUNING_PATTERNS = OrderedDict(
 def prune_split(archives, rule, n, kept_because=None):
     last = None
     keep = []
-    pattern = PRUNING_PATTERNS[rule]
+    period_func = PRUNING_PATTERNS[rule]
     if kept_because is None:
         kept_because = {}
     if n == 0:
@@ -54,8 +101,7 @@ def prune_split(archives, rule, n, kept_because=None):
 
     a = None
     for a in sorted(archives, key=attrgetter("ts"), reverse=True):
-        # we compute the pruning in local time zone
-        period = a.ts.astimezone().strftime(pattern)
+        period = period_func(a)
         if period != last:
             last = period
             if a.id not in kept_because:
@@ -71,16 +117,28 @@ def prune_split(archives, rule, n, kept_because=None):
 
 
 class PruneMixIn:
-    @with_repository(exclusive=True, compatibility=(Manifest.Operation.DELETE,))
+    @with_repository(compatibility=(Manifest.Operation.DELETE,))
     def do_prune(self, args, repository, manifest):
-        """Prune repository archives according to specified rules"""
+        """Prune archives according to specified rules."""
         if not any(
-            (args.secondly, args.minutely, args.hourly, args.daily, args.weekly, args.monthly, args.yearly, args.within)
+            (
+                args.secondly,
+                args.minutely,
+                args.hourly,
+                args.daily,
+                args.weekly,
+                args.monthly,
+                args.quarterly_13weekly,
+                args.quarterly_3monthly,
+                args.yearly,
+                args.within,
+            )
         ):
             raise CommandError(
                 'At least one of the "keep-within", "keep-last", '
                 '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
-                '"keep-weekly", "keep-monthly" or "keep-yearly" settings must be specified.'
+                '"keep-weekly", "keep-monthly", "keep-13weekly", "keep-3monthly", '
+                'or "keep-yearly" settings must be specified.'
             )
 
         if args.format is not None:
@@ -91,25 +149,10 @@ class PruneMixIn:
             format = os.environ.get("BORG_PRUNE_FORMAT", "{archive:<36} {time} [{id}]")
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
-        checkpoint_re = r"\.checkpoint(\.\d+)?"
-        archives_checkpoints = manifest.archives.list(
-            match=args.match_archives,
-            consider_checkpoints=True,
-            match_end=r"(%s)?\Z" % checkpoint_re,
-            sort_by=["ts"],
-            reverse=True,
-        )
-        is_checkpoint = re.compile(r"(%s)\Z" % checkpoint_re).search
-        checkpoints = [arch for arch in archives_checkpoints if is_checkpoint(arch.name)]
-        # keep the latest checkpoint, if there is no later non-checkpoint archive
-        if archives_checkpoints and checkpoints and archives_checkpoints[0] is checkpoints[0]:
-            keep_checkpoints = checkpoints[:1]
-        else:
-            keep_checkpoints = []
-        checkpoints = set(checkpoints)
-        # ignore all checkpoint archives to avoid keeping one (which is an incomplete backup)
-        # that is newer than a successfully completed backup - and killing the successful backup.
-        archives = [arch for arch in archives_checkpoints if arch not in checkpoints]
+        match = [args.name] if args.name else args.match_archives
+        archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
+        archives = [ai for ai in archives if "@PROT" not in ai.tags]
+
         keep = []
         # collect the rule responsible for the keeping of each archive in this dict
         # keys are archive ids, values are a tuple
@@ -126,22 +169,15 @@ class PruneMixIn:
             if num is not None:
                 keep += prune_split(archives, rule, num, kept_because)
 
-        to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
-        stats = Statistics(iec=args.iec)
-        with Cache(repository, manifest, lock_wait=self.lock_wait, iec=args.iec) as cache:
-
-            def checkpoint_func():
-                manifest.write()
-                repository.commit(compact=False)
-                cache.commit()
-
+        to_delete = set(archives) - set(keep)
+        with Cache(repository, manifest, iec=args.iec) as cache:
             list_logger = logging.getLogger("borg.output.list")
             # set up counters for the progress display
             to_delete_len = len(to_delete)
             archives_deleted = 0
             uncommitted_deletes = 0
             pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
-            for archive in archives_checkpoints:
+            for archive in archives:
                 if sig_int and sig_int.action_done():
                     break
                 if archive in to_delete:
@@ -151,19 +187,13 @@ class PruneMixIn:
                     else:
                         archives_deleted += 1
                         log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
-                        archive = Archive(manifest, archive.name, cache)
-                        archive.delete(stats, forced=args.forced)
-                        checkpointed = self.maybe_checkpoint(
-                            checkpoint_func=checkpoint_func, checkpoint_interval=args.checkpoint_interval
-                        )
-                        uncommitted_deletes = 0 if checkpointed else (uncommitted_deletes + 1)
+                        archive = Archive(manifest, archive.id, cache=cache)
+                        archive.delete()
+                        uncommitted_deletes += 1
                 else:
-                    if is_checkpoint(archive.name):
-                        log_message = "Keeping checkpoint archive:"
-                    else:
-                        log_message = "Keeping archive (rule: {rule} #{num}):".format(
-                            rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
-                        )
+                    log_message = "Keeping archive (rule: {rule} #{num}):".format(
+                        rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
+                    )
                 if (
                     args.output_list
                     or (args.list_pruned and archive in to_delete)
@@ -172,12 +202,9 @@ class PruneMixIn:
                     list_logger.info(f"{log_message:<44} {formatter.format_item(archive, jsonline=False)}")
             pi.finish()
             if sig_int:
-                # Ctrl-C / SIGINT: do not checkpoint (commit) again, we already have a checkpoint in this case.
                 raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
-                checkpoint_func()
-            if args.stats:
-                log_multi(str(stats), logger=logging.getLogger("borg.output.stats"))
+                manifest.write()
 
     def build_parser_prune(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -185,38 +212,39 @@ class PruneMixIn:
 
         prune_epilog = process_epilog(
             """
-        The prune command prunes a repository by deleting all archives not matching
-        any of the specified retention options.
+        The prune command prunes a repository by soft-deleting all archives not
+        matching any of the specified retention options.
 
-        Important: Repository disk space is **not** freed until you run ``borg compact``.
+        Important:
+
+        - The prune command will only mark archives for deletion ("soft-deletion"),
+          repository disk space is **not** freed until you run ``borg compact``.
+        - You can use ``borg undelete`` to undelete archives, but only until
+          you run ``borg compact``.
 
         This command is normally used by automated backup scripts wanting to keep a
         certain number of historic backups. This retention policy is commonly referred to as
         `GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>`_
         (Grandfather-father-son) backup rotation scheme.
 
-        Also, prune automatically removes checkpoint archives (incomplete archives left
-        behind by interrupted backup runs) except if the checkpoint is the latest
-        archive (and thus still needed). Checkpoint archives are not considered when
-        comparing archive counts against the retention limits (``--keep-X``).
-
-        If you use --match-archives (-a), then only archives that match the pattern are
-        considered for deletion and only those archives count towards the totals
-        specified by the rules.
+        The recommended way to use prune is to give the archive series name to it via the
+        NAME argument (assuming you have the same name for all archives in a series).
+        Alternatively, you can also use --match-archives (-a), then only archives that
+        match the pattern are considered for deletion and only those archives count
+        towards the totals specified by the rules.
         Otherwise, *all* archives in the repository are candidates for deletion!
         There is no automatic distinction between archives representing different
         contents. These need to be distinguished by specifying matching globs.
 
-        If you have multiple sequences of archives with different data sets (e.g.
+        If you have multiple series of archives with different data sets (e.g.
         from different machines) in one shared repository, use one prune call per
-        data set that matches only the respective archives using the --match-archives
-        (-a) option.
+        series.
 
         The ``--keep-within`` option takes an argument of the form "<int><char>",
-        where char is "H", "d", "w", "m", "y". For example, ``--keep-within 2d`` means
-        to keep all archives that were created within the past 48 hours.
-        "1m" is taken to mean "31d". The archives kept with this option do not
-        count towards the totals specified by any other options.
+        where char is "y", "m", "w", "d", "H", "M", or "S".  For example,
+        ``--keep-within 2d`` means to keep all archives that were created within
+        the past 2 days.  "1m" is taken to mean "31d". The archives kept with
+        this option do not count towards the totals specified by any other options.
 
         A good procedure is to thin out more and more the older your backups get.
         As an example, ``--keep-daily 7`` means to keep the latest backup on each day,
@@ -226,23 +254,23 @@ class PruneMixIn:
         starts is used for pruning purposes. Dates and times are interpreted in the local
         timezone of the system where borg prune runs, and weeks go from Monday to Sunday.
         Specifying a negative number of archives to keep means that there is no limit.
-        As of borg 1.2.0, borg will retain the oldest archive if any of the secondly,
-        minutely, hourly, daily, weekly, monthly, or yearly rules was not otherwise able to
-        meet its retention target. This enables the first chronological archive to continue
-        aging until it is replaced by a newer archive that meets the retention criteria.
+
+        Borg will retain the oldest archive if any of the secondly, minutely, hourly,
+        daily, weekly, monthly, quarterly, or yearly rules was not otherwise able to
+        meet its retention target. This enables the first chronological archive to
+        continue aging until it is replaced by a newer archive that meets the retention
+        criteria.
+
+        The ``--keep-13weekly`` and ``--keep-3monthly`` rules are two different
+        strategies for keeping archives every quarter year.
 
         The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
         keep the last N archives under the assumption that you do not create more than one
         backup archive in the same second).
 
-        When using ``--stats``, you will get some statistics about how much data was
-        deleted - the "Deleted data" deduplicated size there is most interesting as
-        that is how much your repository will shrink.
-        Please note that the "All archives" stats refer to the state after pruning.
-
         You can influence how the ``--list`` output is formatted by using the ``--short``
         option (less wide output) or by giving a custom format using ``--format`` (see
-        the ``borg rlist`` description for more details about the format string).
+        the ``borg repo-list`` description for more details about the format string).
         """
         )
         subparser = subparsers.add_parser(
@@ -255,18 +283,11 @@ class PruneMixIn:
             help="prune archives",
         )
         subparser.set_defaults(func=self.do_prune)
-        subparser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository")
         subparser.add_argument(
-            "--force",
-            dest="forced",
-            action="store_true",
-            help="force pruning of corrupted archives, " "use ``--force --force`` in case ``--force`` does not work.",
+            "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
         )
         subparser.add_argument(
-            "-s", "--stats", dest="stats", action="store_true", help="print statistics for the deleted archive"
-        )
-        subparser.add_argument(
-            "--list", dest="output_list", action="store_true", help="output verbose list of archives it keeps/prunes"
+            "--list", dest="output_list", action="store_true", help="output a verbose list of archives it keeps/prunes"
         )
         subparser.add_argument("--short", dest="short", action="store_true", help="use a less wide archive part format")
         subparser.add_argument(
@@ -343,6 +364,21 @@ class PruneMixIn:
             action=Highlander,
             help="number of monthly archives to keep",
         )
+        quarterly_group = subparser.add_mutually_exclusive_group()
+        quarterly_group.add_argument(
+            "--keep-13weekly",
+            dest="quarterly_13weekly",
+            type=int,
+            default=0,
+            help="number of quarterly archives to keep (13 week strategy)",
+        )
+        quarterly_group.add_argument(
+            "--keep-3monthly",
+            dest="quarterly_3monthly",
+            type=int,
+            default=0,
+            help="number of quarterly archives to keep (3 month strategy)",
+        )
         subparser.add_argument(
             "-y",
             "--keep-yearly",
@@ -354,12 +390,5 @@ class PruneMixIn:
         )
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
         subparser.add_argument(
-            "-c",
-            "--checkpoint-interval",
-            metavar="SECONDS",
-            dest="checkpoint_interval",
-            type=int,
-            default=1800,
-            action=Highlander,
-            help="write checkpoint every SECONDS seconds (Default: 1800)",
+            "name", metavar="NAME", nargs="?", type=archivename_validator, help="specify the archive name"
         )

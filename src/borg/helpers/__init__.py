@@ -1,10 +1,10 @@
 """
-This package contains all sorts of small helper / utility functionality,
-that did not fit better elsewhere.
+This package contains helper and utility functionality that did not fit elsewhere.
 
-Code used to be in borg/helpers.py but was split into the modules in this
-package, which are imported into here for compatibility.
+Code used to be in borg/helpers.py but was split into modules in this
+package, which are imported here for compatibility.
 """
+
 import os
 from typing import List
 from collections import namedtuple
@@ -15,7 +15,7 @@ from .datastruct import StableDict, Buffer, EfficientCollectionQueue
 from .errors import Error, ErrorWithTraceback, IntegrityError, DecompressionError, CancelledByUser, CommandError
 from .errors import RTError, modern_ec
 from .errors import BorgWarning, FileChangedWarning, BackupWarning, IncludePatternNeverMatchedWarning
-from .errors import BackupError, BackupOSError, BackupRaceConditionError
+from .errors import BackupError, BackupOSError, BackupRaceConditionError, BackupItemExcluded
 from .errors import BackupPermissionError, BackupIOError, BackupFileNotFoundError
 from .fs import ensure_dir, join_base_dir, get_socket_filename
 from .fs import get_security_dir, get_keys_dir, get_base_dir, get_cache_dir, get_config_dir, get_runtime_dir
@@ -29,16 +29,16 @@ from .parseformat import bin_to_hex, hex_to_bin, safe_encode, safe_decode
 from .parseformat import text_to_json, binary_to_json, remove_surrogates, join_cmd
 from .parseformat import eval_escapes, decode_dict, positive_int_validator, interval
 from .parseformat import PathSpec, SortBySpec, ChunkerParams, FilesCacheMode, partial_format, DatetimeWrapper
-from .parseformat import format_file_size, parse_file_size, FileSize, parse_storage_quota
+from .parseformat import format_file_size, parse_file_size, FileSize
 from .parseformat import sizeof_fmt, sizeof_fmt_iec, sizeof_fmt_decimal, Location, text_validator
 from .parseformat import format_line, replace_placeholders, PlaceholderError, relative_time_marker_validator
 from .parseformat import format_archive, parse_stringified_list, clean_lines
-from .parseformat import location_validator, archivename_validator, comment_validator
+from .parseformat import location_validator, archivename_validator, comment_validator, tag_validator
 from .parseformat import BaseFormatter, ArchiveFormatter, ItemFormatter, DiffFormatter, file_status
 from .parseformat import swidth_slice, ellipsis_truncate
 from .parseformat import BorgJsonEncoder, basic_json_data, json_print, json_dump, prepare_dump_dict
 from .parseformat import Highlander, MakePathSafeAction
-from .process import daemonize, daemonizing
+from .process import daemonize, daemonizing, ThreadRunner
 from .process import signal_handler, raising_signal_handler, sig_int, ignore_sigint, SigHup, SigTerm
 from .process import popen_with_error_handling, is_terminal, prepare_subprocess_env, create_filter_process
 from .progress import ProgressIndicatorPercent, ProgressIndicatorMessage
@@ -64,9 +64,9 @@ workarounds = tuple(os.environ.get("BORG_WORKAROUNDS", "").split(","))
 warning_info = namedtuple("warning_info", "wc,msg,args,wt")
 
 """
-The global warnings_list variable is used to collect warning_info elements while borg is running.
+The global warnings_list variable is used to collect warning_info elements while Borg is running.
 """
-_warnings_list: List[warning_info] = []
+_warnings_list: list[warning_info] = []
 
 
 def add_warning(msg, *args, **kwargs):
@@ -79,8 +79,8 @@ def add_warning(msg, *args, **kwargs):
 
 
 """
-The global exit_code variable is used so that modules other than archiver can increase the program exit code if a
-warning or error occurred during their operation.
+The global exit_code variable allows modules other than archiver to increase the program's exit code if a
+warning or error occurs during their operation.
 """
 _exit_code = EXIT_SUCCESS
 
@@ -101,7 +101,7 @@ def classify_ec(ec):
 
 
 def max_ec(ec1, ec2):
-    """return the more severe error code of ec1 and ec2"""
+    """Return the more severe error code of ec1 and ec2."""
     # note: usually, there can be only 1 error-class ec, the other ec is then either success or warning.
     ec1_class = classify_ec(ec1)
     ec2_class = classify_ec(ec2)
@@ -123,7 +123,7 @@ def max_ec(ec1, ec2):
 
 def set_ec(ec):
     """
-    Sets the exit code of the program to ec IF ec is more severe than the current exit code.
+    Set the exit code of the program to ec if ec is more severe than the current exit code.
     """
     global _exit_code
     _exit_code = max_ec(_exit_code, ec)
@@ -131,7 +131,7 @@ def set_ec(ec):
 
 def init_ec_warnings(ec=EXIT_SUCCESS, warnings=None):
     """
-    (Re-)Init the globals for the exit code and the warnings list.
+    (Re-)initialize the globals for the exit code and the warnings list.
     """
     global _exit_code, _warnings_list
     _exit_code = ec
@@ -142,7 +142,7 @@ def init_ec_warnings(ec=EXIT_SUCCESS, warnings=None):
 
 def get_ec(ec=None):
     """
-    compute the final return code of the borg process
+    Compute the final return code of the Borg process.
     """
     if ec is not None:
         set_ec(ec)
@@ -158,7 +158,7 @@ def get_ec(ec=None):
         # we do not have any warnings in warnings list, return success exit code
         return _exit_code
     # looks like we have some warning(s)
-    rcs = sorted(set(w_info.wc for w_info in _warnings_list))
+    rcs = sorted({w_info.wc for w_info in _warnings_list})
     logger.debug(f"rcs: {rcs!r}")
     if len(rcs) == 1:
         # easy: there was only one kind of warning, so we can be specific
@@ -168,7 +168,7 @@ def get_ec(ec=None):
 
 
 def get_reset_ec(ec=None):
-    """Like get_ec, but re-initialize ec/warnings afterwards."""
+    """Like get_ec, but reinitialize ec/warnings afterwards."""
     rc = get_ec(ec)
     init_ec_warnings()
     return rc

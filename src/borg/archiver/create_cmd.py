@@ -11,7 +11,7 @@ from io import TextIOWrapper
 from ._common import with_repository, Highlander
 from .. import helpers
 from ..archive import Archive, is_special
-from ..archive import BackupError, BackupOSError, backup_io, OsOpen, stat_update_check
+from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io, OsOpen, stat_update_check
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -33,7 +33,6 @@ from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
-from ..platform import get_flags
 
 from ..logger import create_logger
 
@@ -41,9 +40,9 @@ logger = create_logger()
 
 
 class CreateMixIn:
-    @with_repository(exclusive=True, compatibility=(Manifest.Operation.WRITE,))
+    @with_repository(compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest):
-        """Create new archive"""
+        """Creates a new archive."""
         key = manifest.key
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
@@ -73,7 +72,7 @@ class CreateMixIn:
                     try:
                         try:
                             env = prepare_subprocess_env(system=True)
-                            proc = subprocess.Popen(
+                            proc = subprocess.Popen(  # nosec B603
                                 args.paths,
                                 stdout=subprocess.PIPE,
                                 env=env,
@@ -97,7 +96,7 @@ class CreateMixIn:
                 if args.paths_from_command:
                     try:
                         env = prepare_subprocess_env(system=True)
-                        proc = subprocess.Popen(
+                        proc = subprocess.Popen(  # nosec B603
                             args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=None if is_win32 else ignore_sigint
                         )
                     except (FileNotFoundError, PermissionError) as e:
@@ -196,8 +195,7 @@ class CreateMixIn:
                 archive.stats.rx_bytes = getattr(repository, "rx_bytes", 0)
                 archive.stats.tx_bytes = getattr(repository, "tx_bytes", 0)
                 if sig_int:
-                    # do not save the archive if the user ctrl-c-ed - it is valid, but incomplete.
-                    # we already have a checkpoint archive in this case.
+                    # do not save the archive if the user ctrl-c-ed.
                     raise Error("Got Ctrl-C / SIGINT.")
                 else:
                     archive.save(comment=args.comment, timestamp=args.timestamp)
@@ -213,8 +211,8 @@ class CreateMixIn:
         self.noflags = args.noflags
         self.noacls = args.noacls
         self.noxattrs = args.noxattrs
-        self.exclude_nodump = args.exclude_nodump
         dry_run = args.dry_run
+        self.start_backup = time.time_ns()
         t0 = archive_ts_now()
         t0_monotonic = time.monotonic()
         logger.info('Creating archive at "%s"' % args.location.processed)
@@ -223,12 +221,9 @@ class CreateMixIn:
                 repository,
                 manifest,
                 progress=args.progress,
-                lock_wait=self.lock_wait,
-                no_cache_sync_permitted=args.no_cache_sync,
-                no_cache_sync_forced=args.no_cache_sync_forced,
-                prefer_adhoc_cache=args.prefer_adhoc_cache,
                 cache_mode=args.files_cache_mode,
                 iec=args.iec,
+                archive_name=args.name,
             ) as cache:
                 archive = Archive(
                     manifest,
@@ -254,16 +249,7 @@ class CreateMixIn:
                     numeric_ids=args.numeric_ids,
                     nobirthtime=args.nobirthtime,
                 )
-                cp = ChunksProcessor(
-                    cache=cache,
-                    key=key,
-                    add_item=archive.add_item,
-                    prepare_checkpoint=archive.prepare_checkpoint,
-                    write_checkpoint=archive.write_checkpoint,
-                    checkpoint_interval=args.checkpoint_interval,
-                    checkpoint_volume=args.checkpoint_volume,
-                    rechunkify=False,
-                )
+                cp = ChunksProcessor(cache=cache, key=key, add_item=archive.add_item, rechunkify=False)
                 fso = FilesystemObjectProcessors(
                     metadata_collector=metadata_collector,
                     cache=cache,
@@ -276,6 +262,7 @@ class CreateMixIn:
                     log_json=args.log_json,
                     iec=args.iec,
                     file_status_printer=self.print_file_status,
+                    files_changed=args.files_changed,
                 )
                 create_inner(archive, cache, fso)
         else:
@@ -391,6 +378,8 @@ class CreateMixIn:
                 else:
                     self.print_warning("Unknown file type: %s", path)
                     return
+            except BackupItemExcluded:
+                return "-"
             except BackupError as err:
                 if isinstance(err, BackupOSError):
                     if err.errno in (errno.EPERM, errno.EACCES):
@@ -466,13 +455,6 @@ class CreateMixIn:
             # directory of the mounted filesystem that shadows the mountpoint dir).
             recurse = restrict_dev is None or st.st_dev == restrict_dev
 
-            if self.exclude_nodump:
-                # Ignore if nodump flag is set
-                with backup_io("flags"):
-                    if get_flags(path=path, st=st) & stat.UF_NODUMP:
-                        self.print_file_status("-", path)  # excluded
-                        return
-
             if not stat.S_ISDIR(st.st_mode):
                 # directories cannot go in this branch because they can be excluded based on tag
                 # files they might contain
@@ -496,7 +478,7 @@ class CreateMixIn:
                         with backup_io("fstat"):
                             st = stat_update_check(st, os.fstat(child_fd))
                     if recurse:
-                        tag_names = dir_is_tagged(path, exclude_caches, exclude_if_present)
+                        tag_names = dir_is_tagged(path, exclude_caches, exclude_if_present, dir_fd=child_fd)
                         if tag_names:
                             # if we are already recursing in an excluded dir, we do not need to do anything else than
                             # returning (we do not need to archive or recurse into tagged directories), see #3991:
@@ -528,7 +510,13 @@ class CreateMixIn:
                             return
                     if not recurse_excluded_dir:
                         if not dry_run:
-                            status = fso.process_dir_with_fd(path=path, fd=child_fd, st=st, strip_prefix=strip_prefix)
+                            try:
+                                status = fso.process_dir_with_fd(
+                                    path=path, fd=child_fd, st=st, strip_prefix=strip_prefix
+                                )
+                            except BackupItemExcluded:
+                                status = "-"  # excluded (dir)
+                                recurse = False
                         else:
                             status = "+"  # included (dir)
                     if recurse:
@@ -570,8 +558,8 @@ class CreateMixIn:
         create_epilog = process_epilog(
             """
         This command creates a backup archive containing all files found while recursively
-        traversing all paths specified. Paths are added to the archive as they are given,
-        that means if relative paths are desired, the command has to be run from the correct
+        traversing all specified paths. Paths are added to the archive as they are given,
+        which means that if relative paths are desired, the command must be run from the correct
         directory.
 
         The slashdot hack in paths (recursion roots) is triggered by using ``/./``:
@@ -579,23 +567,23 @@ class CreateMixIn:
         strip the prefix on the left side of ``./`` from the archived items (in this case,
         ``this/gets/archived`` will be the path in the archived item).
 
-        When giving '-' as path, borg will read data from standard input and create a
-        file 'stdin' in the created archive from that data. In some cases it's more
-        appropriate to use --content-from-command, however. See section *Reading from
-        stdin* below for details.
+        When specifying '-' as a path, borg will read data from standard input and create a
+        file named 'stdin' in the created archive from that data. In some cases, it is more
+        appropriate to use --content-from-command. See the section *Reading from stdin*
+        below for details.
 
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
 
-        The archive name needs to be unique. It must not end in '.checkpoint' or
-        '.checkpoint.N' (with N being a number), because these names are used for
-        checkpoints and treated in special ways.
+        The archive name does not need to be unique; you can and should use the same
+        name for a series of archives. The unique archive identifier is its ID (hash),
+        and you can abbreviate the ID as long as it is unique.
 
         In the archive name, you may use the following placeholders:
         {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
         Backup speed is increased by not reprocessing files that are already part of
-        existing archives and weren't modified. The detection of unmodified files is
+        existing archives and were not modified. The detection of unmodified files is
         done by comparing multiple file metadata values with previous values kept in
         the files cache.
 
@@ -621,14 +609,21 @@ class CreateMixIn:
         ctime vs. mtime: safety vs. speed
 
         - ctime is a rather safe way to detect changes to a file (metadata and contents)
-          as it can not be set from userspace. But, a metadata-only change will already
+          as it cannot be set from userspace. But a metadata-only change will already
           update the ctime, so there might be some unnecessary chunking/hashing even
           without content changes. Some filesystems do not support ctime (change time).
           E.g. doing a chown or chmod to a file will change its ctime.
         - mtime usually works and only updates if file contents were changed. But mtime
-          can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+          can be arbitrarily set from userspace, e.g., to set mtime back to the same value
           it had before a content change happened. This can be used maliciously as well as
-          well-meant, but in both cases mtime based cache modes can be problematic.
+          well-meant, but in both cases mtime-based cache modes can be problematic.
+
+        The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
+         - ctime (default): Use ctime to detect changes. This is the safest option.
+         - mtime: Use mtime to detect changes.
+         - disabled: Disable the "file has changed while we backed it up" detection completely.
+           This is not recommended unless you know what you're doing, as it could lead to
+           inconsistent backups if files change during the backup process.
 
         The mount points of filesystems or filesystem snapshots should be the same for every
         creation of a new archive to ensure fast operation. This is because the file cache that
@@ -707,7 +702,7 @@ class CreateMixIn:
         - 'd' = directory
         - 'b' = block device
         - 'c' = char device
-        - 'h' = regular file, hardlink (to already seen inodes)
+        - 'h' = regular file, hard link (to already seen inodes)
         - 's' = symlink
         - 'f' = fifo
 
@@ -724,14 +719,14 @@ class CreateMixIn:
         There are two methods to read from stdin. Either specify ``-`` as path and
         pipe directly to borg::
 
-            backup-vm --id myvm --stdout | borg create REPO::ARCHIVE -
+            backup-vm --id myvm --stdout | borg create --repo REPO ARCHIVE -
 
         Or use ``--content-from-command`` to have Borg manage the execution of the
         command and piping. If you do so, the first PATH argument is interpreted
         as command to execute and any further arguments are treated as arguments
         to the command::
 
-            borg create --content-from-command REPO::ARCHIVE -- backup-vm --id myvm --stdout
+            borg create --content-from-command --repo REPO ARCHIVE -- backup-vm --id myvm --stdout
 
         ``--`` is used to ensure ``--id`` and ``--stdout`` are **not** considered
         arguments to ``borg`` but rather ``backup-vm``.
@@ -775,7 +770,7 @@ class CreateMixIn:
             description=self.do_create.__doc__,
             epilog=create_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="create backup",
+            help="create a backup",
         )
         subparser.set_defaults(func=self.do_create)
 
@@ -789,7 +784,7 @@ class CreateMixIn:
         )
 
         subparser.add_argument(
-            "--list", dest="output_list", action="store_true", help="output verbose list of items (files, dirs, ...)"
+            "--list", dest="output_list", action="store_true", help="output a verbose list of items (files, dirs, ...)"
         )
         subparser.add_argument(
             "--filter",
@@ -799,24 +794,6 @@ class CreateMixIn:
             help="only display items with the given status characters (see description)",
         )
         subparser.add_argument("--json", action="store_true", help="output stats as JSON. Implies ``--stats``.")
-        subparser.add_argument(
-            "--no-cache-sync",
-            dest="no_cache_sync",
-            action="store_true",
-            help="experimental: do not synchronize the chunks cache.",
-        )
-        subparser.add_argument(
-            "--no-cache-sync-forced",
-            dest="no_cache_sync_forced",
-            action="store_true",
-            help="experimental: do not synchronize the chunks cache (forced).",
-        )
-        subparser.add_argument(
-            "--prefer-adhoc-cache",
-            dest="prefer_adhoc_cache",
-            action="store_true",
-            help="experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).",
-        )
         subparser.add_argument(
             "--stdin-name",
             metavar="NAME",
@@ -853,7 +830,7 @@ class CreateMixIn:
         subparser.add_argument(
             "--content-from-command",
             action="store_true",
-            help="interpret PATH as command and store its stdout. See also section Reading from" " stdin below.",
+            help="interpret PATH as a command and store its stdout. See also the section 'Reading from stdin' below.",
         )
         subparser.add_argument(
             "--paths-from-stdin",
@@ -873,10 +850,7 @@ class CreateMixIn:
             help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\\n``) ",
         )
 
-        exclude_group = define_exclusion_group(subparser, tag_files=True)
-        exclude_group.add_argument(
-            "--exclude-nodump", dest="exclude_nodump", action="store_true", help="exclude files flagged NODUMP"
-        )
+        define_exclusion_group(subparser, tag_files=True)
 
         fs_group = subparser.add_argument_group("Filesystem options")
         fs_group.add_argument(
@@ -929,6 +903,15 @@ class CreateMixIn:
             help="operate files cache in MODE. default: %s" % FILES_CACHE_MODE_UI_DEFAULT,
         )
         fs_group.add_argument(
+            "--files-changed",
+            metavar="MODE",
+            dest="files_changed",
+            action=Highlander,
+            choices=["ctime", "mtime", "disabled"],
+            default="ctime",
+            help="specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime",
+        )
+        fs_group.add_argument(
             "--read-special",
             dest="read_special",
             action="store_true",
@@ -955,25 +938,6 @@ class CreateMixIn:
             action=Highlander,
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
             "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
-        )
-        archive_group.add_argument(
-            "-c",
-            "--checkpoint-interval",
-            metavar="SECONDS",
-            dest="checkpoint_interval",
-            type=int,
-            default=1800,
-            action=Highlander,
-            help="write checkpoint every SECONDS seconds (Default: 1800)",
-        )
-        archive_group.add_argument(
-            "--checkpoint-volume",
-            metavar="BYTES",
-            dest="checkpoint_volume",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)",
         )
         archive_group.add_argument(
             "--chunker-params",

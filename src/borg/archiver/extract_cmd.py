@@ -24,15 +24,14 @@ class ExtractMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     @with_archive
     def do_extract(self, args, repository, manifest, archive):
-        """Extract archive contents"""
+        """Extracts archive contents."""
         # be restrictive when restoring files, restore permissions later
         if sys.getfilesystemencoding() == "ascii":
-            logger.warning(
-                'Warning: File system encoding is "ascii", extracting non-ascii filenames will not be supported.'
-            )
+            logger.warning('Warning: Filesystem encoding is "ascii"; extracting non-ASCII filenames is not supported.')
             if sys.platform.startswith(("linux", "freebsd", "netbsd", "openbsd", "darwin")):
                 logger.warning(
-                    "Hint: You likely need to fix your locale setup. E.g. install locales and use: LANG=en_US.UTF-8"
+                    "Hint: You likely need to fix your locale setup. "
+                    "For example, install locales and use: LANG=en_US.UTF-8"
                 )
 
         matcher = build_matcher(args.patterns, args.paths)
@@ -50,38 +49,58 @@ class ExtractMixIn:
         filter = build_filter(matcher, strip_components)
         if progress:
             pi = ProgressIndicatorPercent(msg="%5.1f%% Extracting: %s", step=0.1, msgid="extract")
-            pi.output("Calculating total archive size for the progress indicator (might take long for large archives)")
+            pi.output(
+                "Calculating total archive size for the progress indicator (might take a long time for large archives)"
+            )
             extracted_size = sum(item.get_size() for item in archive.iter_items(filter))
             pi.total = extracted_size
         else:
             pi = None
 
-        for item in archive.iter_items(filter, preload=True):
+        for item in archive.iter_items():
             orig_path = item.path
             if strip_components:
-                item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])
-            if not args.dry_run:
-                while dirs and not item.path.startswith(dirs[-1].path):
-                    dir_item = dirs.pop(-1)
-                    try:
-                        archive.extract_item(dir_item, stdout=stdout)
-                    except BackupError as e:
-                        self.print_warning_instance(BackupWarning(remove_surrogates(dir_item.path), e))
+                stripped_path = os.sep.join(orig_path.split(os.sep)[strip_components:])
+                if not stripped_path:
+                    continue
+                item.path = stripped_path
+
+            is_matched = matcher.match(orig_path)
+
             if output_list:
-                logging.getLogger("borg.output.list").info(remove_surrogates(item.path))
-            try:
-                if dry_run:
-                    archive.extract_item(item, dry_run=True, hlm=hlm, pi=pi)
-                else:
-                    if stat.S_ISDIR(item.mode):
-                        dirs.append(item)
-                        archive.extract_item(item, stdout=stdout, restore_attrs=False)
+                log_prefix = "+" if is_matched else "-"
+                logging.getLogger("borg.output.list").info(f"{log_prefix} {remove_surrogates(item.path)}")
+
+            if is_matched:
+                archive.preload_item_chunks(item, optimize_hardlinks=True)
+
+                if not dry_run:
+                    while dirs and not item.path.startswith(dirs[-1].path):
+                        dir_item = dirs.pop(-1)
+                        try:
+                            archive.extract_item(dir_item, stdout=stdout)
+                        except BackupError as e:
+                            self.print_warning_instance(BackupWarning(remove_surrogates(dir_item.path), e))
+
+                try:
+                    if dry_run:
+                        archive.extract_item(item, dry_run=True, hlm=hlm, pi=pi)
                     else:
-                        archive.extract_item(
-                            item, stdout=stdout, sparse=sparse, hlm=hlm, pi=pi, continue_extraction=continue_extraction
-                        )
-            except BackupError as e:
-                self.print_warning_instance(BackupWarning(remove_surrogates(orig_path), e))
+                        if stat.S_ISDIR(item.mode):
+                            dirs.append(item)
+                            archive.extract_item(item, stdout=stdout, restore_attrs=False)
+                        else:
+                            archive.extract_item(
+                                item,
+                                stdout=stdout,
+                                sparse=sparse,
+                                hlm=hlm,
+                                pi=pi,
+                                continue_extraction=continue_extraction,
+                            )
+                except BackupError as e:
+                    self.print_warning_instance(BackupWarning(remove_surrogates(orig_path), e))
+
         if pi:
             pi.finish()
 
@@ -108,16 +127,16 @@ class ExtractMixIn:
 
         extract_epilog = process_epilog(
             """
-        This command extracts the contents of an archive. By default the entire
-        archive is extracted but a subset of files and directories can be selected
-        by passing a list of ``PATHs`` as arguments. The file selection can further
-        be restricted by using the ``--exclude`` option.
+        This command extracts the contents of an archive. By default, the entire
+        archive is extracted, but a subset of files and directories can be selected
+        by passing a list of ``PATH`` arguments. The file selection can be further
+        restricted by using the ``--exclude`` option.
 
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
         By using ``--dry-run``, you can do all extraction steps except actually writing the
-        output data: reading metadata and data chunks from the repo, checking the hash/hmac,
-        decrypting, decompressing.
+        output data: reading metadata and data chunks from the repository, checking the hash/HMAC,
+        decrypting, and decompressing.
 
         ``--progress`` can be slower than no progress display, since it makes one additional
         pass over the archive metadata.
@@ -128,8 +147,8 @@ class ExtractMixIn:
             so make sure you ``cd`` to the right place before calling ``borg extract``.
 
             When parent directories are not extracted (because of using file/directory selection
-            or any other reason), borg can not restore parent directories' metadata, e.g. owner,
-            group, permission, etc.
+            or any other reason), Borg cannot restore parent directories' metadata, e.g., owner,
+            group, permissions, etc.
         """
         )
         subparser = subparsers.add_parser(
@@ -143,16 +162,13 @@ class ExtractMixIn:
         )
         subparser.set_defaults(func=self.do_extract)
         subparser.add_argument(
-            "--list", dest="output_list", action="store_true", help="output verbose list of items (files, dirs, ...)"
+            "--list", dest="output_list", action="store_true", help="output a verbose list of items (files, dirs, ...)"
         )
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not actually change any files"
         )
         subparser.add_argument(
-            "--numeric-ids",
-            dest="numeric_ids",
-            action="store_true",
-            help="only obey numeric user and group identifiers",
+            "--numeric-ids", dest="numeric_ids", action="store_true", help="only use numeric user and group identifiers"
         )
         subparser.add_argument(
             "--noflags", dest="noflags", action="store_true", help="do not extract/set flags (e.g. NODUMP, IMMUTABLE)"
@@ -166,13 +182,13 @@ class ExtractMixIn:
             "--sparse",
             dest="sparse",
             action="store_true",
-            help="create holes in output sparse file from all-zero chunks",
+            help="create holes in the output sparse file from all-zero chunks",
         )
         subparser.add_argument(
             "--continue",
             dest="continue_extraction",
             action="store_true",
-            help="continue a previously interrupted extraction of same archive",
+            help="continue a previously interrupted extraction of the same archive",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(

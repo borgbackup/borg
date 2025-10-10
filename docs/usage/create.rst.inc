@@ -19,7 +19,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``PATH``                                          | paths to archive                                                                                                                                                                                  |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                                                                                                                        |
+    | **options**                                                                                                                                                                                                                                                                                                   |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-n``, ``--dry-run``                             | do not create a backup archive                                                                                                                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -30,12 +30,6 @@ borg create
     |                                                       | ``--filter STATUSCHARS``                          | only display items with the given status characters (see description)                                                                                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--json``                                        | output stats as JSON. Implies ``--stats``.                                                                                                                                                        |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--no-cache-sync``                               | experimental: do not synchronize the chunks cache.                                                                                                                                                |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--no-cache-sync-forced``                        | experimental: do not synchronize the chunks cache (forced).                                                                                                                                       |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--prefer-adhoc-cache``                          | experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).                                                                                                    |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdin-name NAME``                             | use NAME in archive for stdin data (default: 'stdin')                                                                                                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -73,8 +67,6 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--keep-exclude-tags``                           | if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive                                                                         |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--exclude-nodump``                              | exclude files flagged NODUMP                                                                                                                                                                      |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Filesystem options**                                                                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-x``, ``--one-file-system``                     | stay in the same file system and do not store mount points of other file systems - this might behave different from your expectations, see the description below.                                 |
@@ -97,6 +89,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--files-cache MODE``                            | operate files cache in MODE. default: ctime,size,inode                                                                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--files-changed MODE``                          | specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime                                                                                                |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--read-special``                                | open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.                                                 |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Archive options**                                                                                                                                                                                                                                                                                           |
@@ -104,10 +98,6 @@ borg create
     |                                                       | ``--comment COMMENT``                             | add a comment text to the archive                                                                                                                                                                 |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--timestamp TIMESTAMP``                         | manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory. |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``-c SECONDS``, ``--checkpoint-interval SECONDS`` | write checkpoint every SECONDS seconds (Default: 1800)                                                                                                                                            |
-    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--checkpoint-volume BYTES``                     | write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)                                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--chunker-params PARAMS``                       | specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -130,15 +120,12 @@ borg create
         paths to archive
 
 
-    optional arguments
+    options
         -n, --dry-run    do not create a backup archive
         -s, --stats     print statistics for the created archive
         --list          output verbose list of items (files, dirs, ...)
         --filter STATUSCHARS    only display items with the given status characters (see description)
         --json          output stats as JSON. Implies ``--stats``.
-        --no-cache-sync    experimental: do not synchronize the chunks cache.
-        --no-cache-sync-forced    experimental: do not synchronize the chunks cache (forced).
-        --prefer-adhoc-cache    experimental: prefer AdHocCache (w/o files cache) over AdHocWithFilesCache (with files cache).
         --stdin-name NAME    use NAME in archive for stdin data (default: 'stdin')
         --stdin-user USER    set user USER in archive for stdin data (default: do not store user/uid)
         --stdin-group GROUP    set group GROUP in archive for stdin data (default: do not store group/gid)
@@ -160,7 +147,6 @@ borg create
         --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.bford.info/cachedir/spec.html)
         --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
         --keep-exclude-tags               if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive
-        --exclude-nodump                  exclude files flagged NODUMP
 
 
     Filesystem options
@@ -174,14 +160,13 @@ borg create
         --noxattrs                do not read and store xattrs into archive
         --sparse                  detect sparse holes in input (supported only by fixed chunker)
         --files-cache MODE        operate files cache in MODE. default: ctime,size,inode
+        --files-changed MODE      specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 
 
     Archive options
         --comment COMMENT                             add a comment text to the archive
         --timestamp TIMESTAMP                         manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
-        -c SECONDS, --checkpoint-interval SECONDS     write checkpoint every SECONDS seconds (Default: 1800)
-        --checkpoint-volume BYTES                     write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)
         --chunker-params PARAMS                       specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
         -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
 
@@ -207,9 +192,9 @@ stdin* below for details.
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
 
-The archive name needs to be unique. It must not end in '.checkpoint' or
-'.checkpoint.N' (with N being a number), because these names are used for
-checkpoints and treated in special ways.
+The archive name does NOT need to be unique, you can and should use the same
+name for a series of archives. The unique archive identifier is its ID (hash)
+and you can abbreviate the ID as long as it is unique.
 
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
@@ -249,6 +234,13 @@ ctime vs. mtime: safety vs. speed
   can be arbitrarily set from userspace, e.g. to set mtime back to the same value
   it had before a content change happened. This can be used maliciously as well as
   well-meant, but in both cases mtime based cache modes can be problematic.
+
+The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
+ - ctime (default): Use ctime to detect changes. This is the safest option.
+ - mtime: Use mtime to detect changes.
+ - disabled: Disable the "file has changed while we backed it up" detection completely.
+   This is not recommended unless you know what you're doing, as it could lead to
+   inconsistent backups if files change during the backup process.
 
 The mount points of filesystems or filesystem snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that
@@ -344,14 +336,14 @@ Reading backup data from stdin
 There are two methods to read from stdin. Either specify ``-`` as path and
 pipe directly to borg::
 
-    backup-vm --id myvm --stdout | borg create REPO::ARCHIVE -
+    backup-vm --id myvm --stdout | borg create --repo REPO ARCHIVE -
 
 Or use ``--content-from-command`` to have Borg manage the execution of the
 command and piping. If you do so, the first PATH argument is interpreted
 as command to execute and any further arguments are treated as arguments
 to the command::
 
-    borg create --content-from-command REPO::ARCHIVE -- backup-vm --id myvm --stdout
+    borg create --content-from-command --repo REPO ARCHIVE -- backup-vm --id myvm --stdout
 
 ``--`` is used to ensure ``--id`` and ``--stdout`` are **not** considered
 arguments to ``borg`` but rather ``backup-vm``.

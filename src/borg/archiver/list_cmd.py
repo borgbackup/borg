@@ -18,7 +18,7 @@ logger = create_logger()
 class ListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest):
-        """List archive contents"""
+        """List archive contents."""
         matcher = build_matcher(args.patterns, args.paths)
         if args.format is not None:
             format = args.format
@@ -27,15 +27,31 @@ class ListMixIn:
         else:
             format = os.environ.get("BORG_LIST_FORMAT", "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")
 
+        archive_info = manifest.archives.get_one([args.name])
+
         def _list_inner(cache):
-            archive = Archive(manifest, args.name, cache=cache)
+            archive = Archive(manifest, archive_info.id, cache=cache)
             formatter = ItemFormatter(archive, format)
-            for item in archive.iter_items(lambda item: matcher.match(item.path)):
+
+            def item_filter(item):
+                # Check if the item matches the patterns/paths.
+                if not matcher.match(item.path):
+                    return False
+                # If depth is specified, also check the depth of the path.
+                if args.depth is not None:
+                    # Count path separators to determine depth.
+                    # For paths like "dir/subdir/file.txt", the depth is 2.
+                    path_depth = item.path.count("/")
+                    if path_depth > args.depth:
+                        return False
+                return True
+
+            for item in archive.iter_items(item_filter):
                 sys.stdout.write(formatter.format_item(item, args.json_lines, sort=True))
 
         # Only load the cache if it will be used
         if ItemFormatter.format_needs_cache(format):
-            with Cache(repository, manifest, lock_wait=self.lock_wait) as cache:
+            with Cache(repository, manifest) as cache:
                 _list_inner(cache)
         else:
             _list_inner(cache=None)
@@ -48,14 +64,14 @@ class ListMixIn:
                 """
         This command lists the contents of an archive.
 
-        For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
+        For more help on include/exclude patterns, see the output of :ref:`borg_patterns`.
 
         .. man NOTES
 
         The FORMAT specifier syntax
         +++++++++++++++++++++++++++
 
-        The ``--format`` option uses python's `format string syntax
+        The ``--format`` option uses Python's `format string syntax
         <https://docs.python.org/3.9/library/string.html#formatstrings>`_.
 
         Examples:
@@ -114,6 +130,9 @@ class ListMixIn:
             "The form of ``--format`` is ignored, "
             "but keys used in it are added to the JSON output. "
             "Some keys are always present. Note: JSON can only represent text.",
+        )
+        subparser.add_argument(
+            "--depth", metavar="N", dest="depth", type=int, help="only list files up to the specified directory depth"
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# this script automatically generates the error list for the docs by
+# This script automatically generates the error list for the documentation by
 # looking at the "Error" class and its subclasses.
 
 from textwrap import indent
@@ -11,7 +11,7 @@ from borg.helpers import Error, BackupError, BorgWarning
 
 def subclasses(cls):
     direct_subclasses = cls.__subclasses__()
-    return set(direct_subclasses) | set(s for c in direct_subclasses for s in subclasses(c))
+    return set(direct_subclasses) | {s for c in direct_subclasses for s in subclasses(c)}
 
 
 # 0, 1, 2 are used for success, generic warning, generic error

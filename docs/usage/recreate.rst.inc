@@ -17,7 +17,7 @@ borg recreate
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``PATH``                                          | paths to recreate; patterns are supported                                                                                                                                                         |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    | **optional arguments**                                                                                                                                                                                                                                                                                                              |
+    | **options**                                                                                                                                                                                                                                                                                                                         |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--list``                                        | output verbose list of items (files, dirs, ...)                                                                                                                                                   |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -49,9 +49,9 @@ borg recreate
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                                                                                                         |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN``      | only consider archive names matching the pattern. see "borg help match-archives".                                                                                                                 |
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN``      | only consider archives matching all patterns. see "borg help match-archives".                                                                                                                     |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--sort-by KEYS``                                | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp                                                                                         |
+    |                                                                             | ``--sort-by KEYS``                                | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp                                                                       |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--first N``                                     | consider first N archives after other filters were applied                                                                                                                                        |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -65,11 +65,7 @@ borg recreate
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--newer TIMESPAN``                              | consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.                                                                                                                                    |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--target TARGET``                               | create a new archive with the name ARCHIVE, do not replace existing archive (only applies for a single archive)                                                                                   |
-    +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-c SECONDS``, ``--checkpoint-interval SECONDS`` | write checkpoint every SECONDS seconds (Default: 1800)                                                                                                                                            |
-    +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--checkpoint-volume BYTES``                     | write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)                                                                                                            |
+    |                                                                             | ``--target TARGET``                               | create a new archive with the name ARCHIVE, do not replace existing archive                                                                                                                       |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--comment COMMENT``                             | add a comment text to the archive                                                                                                                                                                 |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -94,7 +90,7 @@ borg recreate
         paths to recreate; patterns are supported
 
 
-    optional arguments
+    options
         --list          output verbose list of items (files, dirs, ...)
         --filter STATUSCHARS    only display items with the given status characters (listed in borg create --help)
         -n, --dry-run    do not change anything
@@ -115,21 +111,19 @@ borg recreate
 
 
     Archive filters
-        -a PATTERN, --match-archives PATTERN          only consider archive names matching the pattern. see "borg help match-archives".
-        --sort-by KEYS                                Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id; default is: timestamp
-        --first N                                     consider first N archives after other filters were applied
-        --last N                                      consider last N archives after other filters were applied
-        --oldest TIMESPAN                             consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
-        --newest TIMESPAN                             consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.
-        --older TIMESPAN                              consider archives older than (now - TIMESPAN), e.g. 7d or 12m.
-        --newer TIMESPAN                              consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.
-        --target TARGET                               create a new archive with the name ARCHIVE, do not replace existing archive (only applies for a single archive)
-        -c SECONDS, --checkpoint-interval SECONDS     write checkpoint every SECONDS seconds (Default: 1800)
-        --checkpoint-volume BYTES                     write checkpoint every BYTES bytes (Default: 0, meaning no volume based checkpointing)
-        --comment COMMENT                             add a comment text to the archive
-        --timestamp TIMESTAMP                         manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
-        -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
-        --chunker-params PARAMS                       rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. default: do not rechunk
+        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. see "borg help match-archives".
+        --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
+        --first N                                consider first N archives after other filters were applied
+        --last N                                 consider last N archives after other filters were applied
+        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.
+        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g. 7d or 12m.
+        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.
+        --target TARGET                          create a new archive with the name ARCHIVE, do not replace existing archive
+        --comment COMMENT                        add a comment text to the archive
+        --timestamp TIMESTAMP                    manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
+        -C COMPRESSION, --compression COMPRESSION    select compression algorithm, see the output of the "borg help compression" command for details.
+        --chunker-params PARAMS                  rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. default: do not rechunk
 
 
 Description
@@ -169,13 +163,7 @@ When rechunking, space usage can be substantial - expect
 at least the entire deduplicated size of the archives using the previous
 chunker params.
 
-If you recently ran borg check --repair and it had to fix lost chunks with all-zero
-replacement chunks, please first run another backup for the same data and re-run
-borg check --repair afterwards to heal any archives that had lost chunks which are
-still generated from the input data.
-
-Important: running borg recreate to re-chunk will remove the chunks_healthy
-metadata of all items with replacement chunks, so healing will not be possible
-any more after re-chunking (it is also unlikely it would ever work: due to the
-change of chunking parameters, the missing chunk likely will never be seen again
-even if you still have the data that produced it).
+If your most recent borg check found missing chunks, please first run another
+backup for the same data, before doing any rechunking. If you are lucky, that
+will re-create the missing chunks. Optionally, do another borg check, to see
+if the chunks are still missing).

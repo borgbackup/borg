@@ -40,31 +40,53 @@ jobs:
     - uses: actions/checkout@v4
     - uses: chartboost/ruff-action@v1
 
+  security:
+
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit[toml]
+    - name: Run Bandit
+      run: |
+        bandit -r src/borg -c pyproject.toml
+
   linux:
 
-    needs: lint
+    needs: [lint, security]
     strategy:
       fail-fast: true
       matrix:
         include:
             - os: ubuntu-22.04
-              python-version: '3.9'
+              python-version: '3.10'
               toxenv: mypy
             - os: ubuntu-22.04
               python-version: '3.11'
               toxenv: docs
             - os: ubuntu-22.04
-              python-version: '3.9'
-              toxenv: py39-fuse2
-            - os: ubuntu-22.04
               python-version: '3.10'
-              toxenv: py310-fuse3
+              toxenv: py310-fuse2
             - os: ubuntu-22.04
               python-version: '3.11'
               toxenv: py311-fuse3
-            - os: ubuntu-22.04
+            - os: ubuntu-24.04
               python-version: '3.12'
               toxenv: py312-fuse3
+            - os: ubuntu-24.04
+              python-version: '3.13'
+              toxenv: py313-fuse3
+            - os: ubuntu-24.04
+              python-version: '3.14'
+              toxenv: py314-fuse3
 
     env:
       TOXENV: ${{ matrix.toxenv }}
@@ -75,7 +97,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        # just fetching 1 commit is not enough for setuptools-scm, so we fetch all
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -97,15 +119,68 @@ jobs:
         sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
         sudo apt-get install -y libfuse-dev fuse || true  # Required for Python llfuse module
         sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
-
+        sudo apt-get install -y bash zsh fish  # for shell completion tests
+        sudo apt-get install -y rclone openssh-server curl
+    - name: Configure OpenSSH SFTP server (test only)
+      run: |
+        sudo mkdir -p /run/sshd
+        sudo useradd -m -s /bin/bash sftpuser || true
+        # Create SSH key for the CI user and authorize it for sftpuser
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
+        sudo mkdir -p /home/sftpuser/.ssh
+        sudo chmod 700 /home/sftpuser/.ssh
+        sudo cp ~/.ssh/id_ed25519.pub /home/sftpuser/.ssh/authorized_keys
+        sudo chown -R sftpuser:sftpuser /home/sftpuser/.ssh
+        sudo chmod 600 /home/sftpuser/.ssh/authorized_keys
+        # Allow publickey auth and enable Subsystem sftp
+        sudo sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+        sudo sed -i 's/^#\?PubkeyAuthentication .*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+        if ! grep -q '^Subsystem sftp' /etc/ssh/sshd_config; then echo 'Subsystem sftp /usr/lib/openssh/sftp-server' | sudo tee -a /etc/ssh/sshd_config; fi
+        # Ensure host keys exist to avoid slow generation on first sshd start
+        sudo ssh-keygen -A
+        # Start sshd (listen on default 22 inside runner)
+        sudo /usr/sbin/sshd -D &
+        # Add host key to known_hosts so paramiko trusts it
+        ssh-keyscan -H localhost 127.0.0.1 | tee -a ~/.ssh/known_hosts
+        # Start ssh-agent and add our key so paramiko can use the agent
+        eval "$(ssh-agent -s)"
+        ssh-add ~/.ssh/id_ed25519
+        # Export SFTP test URL for tox via GITHUB_ENV
+        echo "BORG_TEST_SFTP_REPO=sftp://sftpuser@localhost:22/borg/sftp-repo" >> $GITHUB_ENV
+    - name: Install and configure MinIO S3 server (test only)
+      run: |
+        set -e
+        arch=$(uname -m)
+        case "$arch" in
+          x86_64|amd64) srv_url=https://dl.min.io/server/minio/release/linux-amd64/minio; cli_url=https://dl.min.io/client/mc/release/linux-amd64/mc ;;
+          aarch64|arm64) srv_url=https://dl.min.io/server/minio/release/linux-arm64/minio; cli_url=https://dl.min.io/client/mc/release/linux-arm64/mc ;;
+          *) echo "Unsupported arch: $arch"; exit 1 ;;
+        esac
+        curl -fsSL -o /usr/local/bin/minio "$srv_url"
+        curl -fsSL -o /usr/local/bin/mc "$cli_url"
+        sudo chmod +x /usr/local/bin/minio /usr/local/bin/mc
+        export PATH=/usr/local/bin:$PATH
+        # Start MinIO on :9000 with default credentials (minioadmin/minioadmin)
+        MINIO_DIR="$GITHUB_WORKSPACE/.minio-data"
+        MINIO_LOG="$GITHUB_WORKSPACE/.minio.log"
+        mkdir -p "$MINIO_DIR"
+        nohup minio server "$MINIO_DIR" --address ":9000" >"$MINIO_LOG" 2>&1 &
+        # Wait for MinIO port to be ready
+        for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/9000) >/dev/null 2>&1 && break; sleep 1; done
+        # Configure client and create bucket
+        mc alias set local http://127.0.0.1:9000 minioadmin minioadmin
+        mc mb --ignore-existing local/borg
+        # Export S3 test URL for tox via GITHUB_ENV
+        echo "BORG_TEST_S3_REPO=s3:minioadmin:minioadmin@http://127.0.0.1:9000/borg/s3-repo" >> $GITHUB_ENV
     - name: Install Python requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.d/development.txt
     - name: Install borgbackup
       run: |
-        # pip install -e .
-        python setup.py -v develop
+        pip install -e .
     - name: run tox env
       env:
         XDISTN: "4"
@@ -131,7 +206,7 @@ jobs:
         include:
             - os: macos-14
               python-version: '3.11'
-              toxenv: py311-none  # note: no fuse testing, due to #6099, see also #6196.
+              toxenv: py311-none  # Note: no FUSE testing due to #6099; see also #6196.
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew
@@ -144,7 +219,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        # just fetching 1 commit is not enough for setuptools-scm, so we fetch all
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all
         fetch-depth: 0
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -160,27 +235,29 @@ jobs:
             ${{ runner.os }}-
 
     - name: Install macOS packages
-      run: brew bundle install
+      run: |
+        brew unlink pkg-config@0.29.2 || true
+        brew bundle install
 
     - name: Install Python requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.d/development.txt
-    - name: Install borgbackup
+    - name: Install BorgBackup
       env:
-        # we already have that in the global env, but something is broken and overwrites that.
-        # so, set it here, again.
+        # We already have this in the global environment, but something overrides it.
+        # So set it here again.
         PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
       run: |
         pip install -ve .
-    - name: run tox env
+    - name: Run pytest via tox
       env:
-        # we already have that in the global env, but something is broken and overwrites that.
-        # so, set it here, again.
+        # We already have this in the global environment, but something overrides it.
+        # So set it here again.
         PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
         XDISTN: "6"
       run: |
-        # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
+        # Do not use fakeroot; run as root. Avoids the dreaded sporadic EISDIR failures; see #2482.
         #sudo -E bash -c "tox -e py"
         tox --skip-missing-interpreters
     - name: Upload coverage to Codecov
@@ -194,13 +271,12 @@ jobs:
 
   windows:
 
-    if: false  # build is broken, thus disabled, see #8264
+    if: false  # can be used to temporarily disable the build
     runs-on: windows-latest
     timeout-minutes: 120
     needs: linux
 
     env:
-      SETUPTOOLS_USE_DISTUTILS: stdlib # Needed for pip to work - https://www.msys2.org/docs/python/#known-issues
       PY_COLORS: 1
 
     defaults:
@@ -215,15 +291,24 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-      - name: Install dependencies
+      - name: Install system packages
         run: ./scripts/msys2-install-deps development
+      - name: Build python venv
+        run: |
+          # building cffi / argon2-cffi in the venv fails, so we try to use the system packages
+          python -m venv --system-site-packages env
+          . env/bin/activate
+          # python -m pip install --upgrade pip
+          # pip install --upgrade setuptools build wheel
+          pip install pyinstaller==6.11.1
       - name: Build
         run: |
           # build borg.exe
-          SETUPTOOLS_USE_DISTUTILS=stdlib pip install -e .
+          . env/bin/activate
+          pip install -e .
           pyinstaller -y scripts/borg.exe.spec
           # build sdist and wheel in dist/...
-          SETUPTOOLS_USE_DISTUTILS=stdlib python -m build
+          python -m build
       - uses: actions/upload-artifact@v4
         with:
           name: borg-windows
@@ -231,4 +316,14 @@ jobs:
       - name: Run tests
         run: |
           ./dist/borg.exe -V
-          pytest -n4 --benchmark-skip -vv -rs -k "not remote"
+          . env/bin/activate
+          borg -V
+          python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote"
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        env:
+          OS: ${{ runner.os }}
+          python: '3.11'
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          env_vars: OS, python

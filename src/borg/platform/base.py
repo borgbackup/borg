@@ -2,6 +2,7 @@ import errno
 import os
 import socket
 import uuid
+from pathlib import Path
 
 from ..helpers import safe_unlink
 from ..platformflags import is_win32
@@ -13,14 +14,15 @@ platform base module
 Contains platform API implementations based on what Python itself provides. More specific
 APIs are stubs in this module.
 
-When functions in this module use platform APIs themselves they access the public
-platform API: that way platform APIs provided by the platform-specific support module
+When functions in this module use platform APIs themselves, they access the public
+platform API; in this way, platform APIs provided by the platform-specific support module
 are correctly composed into the base functionality.
 """
 
 API_VERSION = "1.2_05"
 
 fdatasync = getattr(os, "fdatasync", os.fsync)
+has_posix_fadvise = hasattr(os, "posix_fadvise")
 
 from .xattr import ENOATTR
 
@@ -45,17 +47,17 @@ def getxattr(path, name, *, follow_symlinks=False):
     *follow_symlinks* indicates whether symlinks should be followed
     and only applies when *path* is not an open file descriptor.
     """
-    # as this base dummy implementation returns [] from listxattr,
+    # As this base dummy implementation returns [] from listxattr,
     # it must raise here for any given name:
     raise OSError(ENOATTR, os.strerror(ENOATTR), path)
 
 
 def setxattr(path, name, value, *, follow_symlinks=False):
     """
-    Write xattr on *path*.
+    Write an xattr on *path*.
 
     *path* can either be a path (bytes) or an open file descriptor (int).
-    *name* is the name of the xattr to read (bytes).
+    *name* is the name of the xattr to write (bytes).
     *value* is the value to write (bytes).
     *follow_symlinks* indicates whether symlinks should be followed
     and only applies when *path* is not an open file descriptor.
@@ -64,18 +66,17 @@ def setxattr(path, name, value, *, follow_symlinks=False):
 
 def acl_get(path, item, st, numeric_ids=False, fd=None):
     """
-    Saves ACL Entries
+    Save ACL entries.
 
-    If `numeric_ids` is True the user/group field is not preserved only uid/gid
+    If `numeric_ids` is True, the user/group field is not preserved; only uid/gid are stored.
     """
 
 
 def acl_set(path, item, numeric_ids=False, fd=None):
     """
-    Restore ACL Entries
+    Restore ACL entries.
 
-    If `numeric_ids` is True the stored uid/gid is used instead
-    of the user/group names
+    If `numeric_ids` is True, the stored uid/gid is used instead of the user/group names.
     """
 
 
@@ -98,10 +99,10 @@ def get_flags(path, st, fd=None):
 
 def sync_dir(path):
     if is_win32:
-        # Opening directories is not supported on windows.
-        # TODO: do we need to handle this in some other way?
+        # Opening directories is not supported on Windows.
+        # TODO: Do we need to handle this in some other way?
         return
-    fd = os.open(path, os.O_RDONLY)
+    fd = os.open(str(path), os.O_RDONLY)
     try:
         os.fsync(fd)
     except OSError as os_error:
@@ -114,18 +115,19 @@ def sync_dir(path):
 
 
 def safe_fadvise(fd, offset, len, advice):
-    if hasattr(os, "posix_fadvise"):
+    if has_posix_fadvise:
         advice = getattr(os, "POSIX_FADV_" + advice)
         try:
+            # UNIX only; and, in the case of block sizes that are not a multiple of the system's page size,
+            # this is better used with a bug-fixed Linux kernel > 4.6.0; see Borg issue #907.
             os.posix_fadvise(fd, offset, len, advice)
         except OSError:
-            # usually, posix_fadvise can't fail for us, but there seem to
-            # be failures when running borg under docker on ARM, likely due
-            # to a bug outside of borg.
-            # also, there is a python wrapper bug, always giving errno = 0.
+            # Usually, posix_fadvise does not fail for us, but there seem to be failures
+            # when running Borg under Docker on ARM, likely due to a bug outside of Borg.
+            # Also, there is a Python wrapper bug always giving errno = 0.
             # https://github.com/borgbackup/borg/issues/2095
-            # as this call is not critical for correct function (just to
-            # optimize cache usage), we ignore these errors.
+            # As this call is not critical for correct function (it just helps optimize cache usage),
+            # we ignore these errors.
             pass
 
 
@@ -133,19 +135,19 @@ class SyncFile:
     """
     A file class that is supposed to enable write ordering (one way or another) and data durability after close().
 
-    The degree to which either is possible varies with operating system, file system and hardware.
+    The degree to which either is possible varies with operating system, filesystem, and hardware.
 
     This fallback implements a naive and slow way of doing this. On some operating systems it can't actually
     guarantee any of the above, since fsync() doesn't guarantee it. Furthermore it may not be possible at all
     to satisfy the above guarantees on some hardware or operating systems. In these cases we hope that the thorough
     checksumming implemented catches any corrupted data due to misordered, delayed or partial writes.
 
-    Note that POSIX doesn't specify *anything* about power failures (or similar failures). A system that
-    routinely loses files or corrupts file on power loss is POSIX compliant.
+    Note that POSIX doesn't specify anything about power failures (or similar failures). A system that
+    routinely loses files or corrupts files on power loss is POSIX-compliant.
 
-    Calling SyncFile(path) for an existing path will raise FileExistsError, see comment in __init__.
+    Calling SyncFile(path) for an existing path will raise FileExistsError. See the comment in __init__.
 
-    TODO: Use F_FULLSYNC on OSX.
+    TODO: Use F_FULLSYNC on macOS.
     TODO: A Windows implementation should use CreateFile with FILE_FLAG_WRITE_THROUGH.
     """
 
@@ -161,7 +163,7 @@ class SyncFile:
         mode = "xb" if binary else "x"  # x -> raise FileExists exception in open() if file exists already
         self.path = path
         if fd is None:
-            self.f = open(path, mode=mode)  # python file object
+            self.f = open(str(path), mode=mode)  # Python file object
         else:
             self.f = os.fdopen(fd, mode=mode)
         self.fd = self.f.fileno()  # OS-level fd
@@ -194,7 +196,7 @@ class SyncFile:
 
         dirname = None
         try:
-            dirname = os.path.dirname(self.path)
+            dirname = Path(self.path).parent
             self.sync()
         finally:
             self.f.close()
@@ -208,11 +210,11 @@ class SaveFile:
 
     Must be used as a context manager (defining the scope of the transaction).
 
-    On a journaling file system the file contents are always updated
+    On a journaling filesystem the file contents are always updated
     atomically and won't become corrupted, even on power failures or
     crashes (for caveats see SyncFile).
 
-    SaveFile can safely by used in parallel (e.g. by multiple processes) to write
+    SaveFile can safely be used in parallel (e.g., by multiple processes) to write
     to the same target path. Whatever writer finishes last (executes the os.replace
     last) "wins" and has successfully written its content to the target path.
     Internally used temporary files are created in the target directory and are
@@ -222,11 +224,12 @@ class SaveFile:
     def __init__(self, path, binary=False):
         self.binary = binary
         self.path = path
-        self.dir = os.path.dirname(path)
-        self.tmp_prefix = os.path.basename(path) + "-"
+        path_obj = Path(path)
+        self.dir = str(path_obj.parent)
+        self.tmp_prefix = path_obj.name + "-"
         self.tmp_fd = None  # OS-level fd
         self.tmp_fname = None  # full path/filename corresponding to self.tmp_fd
-        self.f = None  # python-file-like SyncFile
+        self.f = None  # Python file-like SyncFile
 
     def __enter__(self):
         from .. import platform
@@ -269,7 +272,7 @@ def getfqdn(name=""):
     An empty argument is interpreted as meaning the local host.
     """
     name = name.strip()
-    if not name or name == "0.0.0.0":
+    if not name or name == "0.0.0.0":  # nosec B104:hardcoded_bind_all_interfaces
         name = socket.gethostname()
     try:
         addrs = socket.getaddrinfo(name, None, 0, socket.SOCK_DGRAM, 0, socket.AI_CANONNAME)

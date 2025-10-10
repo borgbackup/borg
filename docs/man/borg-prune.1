@@ -27,46 +27,51 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" 1 "2024-07-19" "" "borg backup tool"
+.TH "BORG-PRUNE" "1" "2025-08-02" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
 .sp
-borg [common options] prune [options]
+borg [common options] prune [options] [NAME]
 .SH DESCRIPTION
 .sp
-The prune command prunes a repository by deleting all archives not matching
-any of the specified retention options.
+The prune command prunes a repository by soft\-deleting all archives not
+matching any of the specified retention options.
 .sp
-Important: Repository disk space is \fBnot\fP freed until you run \fBborg compact\fP\&.
+Important:
+.INDENT 0.0
+.IP \(bu 2
+The prune command will only mark archives for deletion (\(dqsoft\-deletion\(dq),
+repository disk space is \fBnot\fP freed until you run \fBborg compact\fP\&.
+.IP \(bu 2
+You can use \fBborg undelete\fP to undelete archives, but only until
+you run \fBborg compact\fP\&.
+.UNINDENT
 .sp
 This command is normally used by automated backup scripts wanting to keep a
 certain number of historic backups. This retention policy is commonly referred to as
-\fI\%GFS\fP
+GFS <https://en.wikipedia.org/wiki/Backup_rotation_scheme#Grandfather-father-son>
+
 (Grandfather\-father\-son) backup rotation scheme.
 .sp
-Also, prune automatically removes checkpoint archives (incomplete archives left
-behind by interrupted backup runs) except if the checkpoint is the latest
-archive (and thus still needed). Checkpoint archives are not considered when
-comparing archive counts against the retention limits (\fB\-\-keep\-X\fP).
-.sp
-If you use \-\-match\-archives (\-a), then only archives that match the pattern are
-considered for deletion and only those archives count towards the totals
-specified by the rules.
+The recommended way to use prune is to give the archive series name to it via the
+NAME argument (assuming you have the same name for all archives in a series).
+Alternatively, you can also use \-\-match\-archives (\-a), then only archives that
+match the pattern are considered for deletion and only those archives count
+towards the totals specified by the rules.
 Otherwise, \fIall\fP archives in the repository are candidates for deletion!
 There is no automatic distinction between archives representing different
 contents. These need to be distinguished by specifying matching globs.
 .sp
-If you have multiple sequences of archives with different data sets (e.g.
+If you have multiple series of archives with different data sets (e.g.
 from different machines) in one shared repository, use one prune call per
-data set that matches only the respective archives using the \-\-match\-archives
-(\-a) option.
+series.
 .sp
 The \fB\-\-keep\-within\fP option takes an argument of the form \(dq<int><char>\(dq,
-where char is \(dqH\(dq, \(dqd\(dq, \(dqw\(dq, \(dqm\(dq, \(dqy\(dq. For example, \fB\-\-keep\-within 2d\fP means
-to keep all archives that were created within the past 48 hours.
-\(dq1m\(dq is taken to mean \(dq31d\(dq. The archives kept with this option do not
-count towards the totals specified by any other options.
+where char is \(dqy\(dq, \(dqm\(dq, \(dqw\(dq, \(dqd\(dq, \(dqH\(dq, \(dqM\(dq, or \(dqS\(dq.  For example,
+\fB\-\-keep\-within 2d\fP means to keep all archives that were created within
+the past 2 days.  \(dq1m\(dq is taken to mean \(dq31d\(dq. The archives kept with
+this option do not count towards the totals specified by any other options.
 .sp
 A good procedure is to thin out more and more the older your backups get.
 As an example, \fB\-\-keep\-daily 7\fP means to keep the latest backup on each day,
@@ -76,37 +81,37 @@ rules do not count towards those of later rules. The time that each backup
 starts is used for pruning purposes. Dates and times are interpreted in the local
 timezone of the system where borg prune runs, and weeks go from Monday to Sunday.
 Specifying a negative number of archives to keep means that there is no limit.
-As of borg 1.2.0, borg will retain the oldest archive if any of the secondly,
-minutely, hourly, daily, weekly, monthly, or yearly rules was not otherwise able to
-meet its retention target. This enables the first chronological archive to continue
-aging until it is replaced by a newer archive that meets the retention criteria.
+.sp
+Borg will retain the oldest archive if any of the secondly, minutely, hourly,
+daily, weekly, monthly, quarterly, or yearly rules was not otherwise able to
+meet its retention target. This enables the first chronological archive to
+continue aging until it is replaced by a newer archive that meets the retention
+criteria.
+.sp
+The \fB\-\-keep\-13weekly\fP and \fB\-\-keep\-3monthly\fP rules are two different
+strategies for keeping archives every quarter year.
 .sp
 The \fB\-\-keep\-last N\fP option is doing the same as \fB\-\-keep\-secondly N\fP (and it will
 keep the last N archives under the assumption that you do not create more than one
 backup archive in the same second).
 .sp
-When using \fB\-\-stats\fP, you will get some statistics about how much data was
-deleted \- the \(dqDeleted data\(dq deduplicated size there is most interesting as
-that is how much your repository will shrink.
-Please note that the \(dqAll archives\(dq stats refer to the state after pruning.
-.sp
 You can influence how the \fB\-\-list\fP output is formatted by using the \fB\-\-short\fP
 option (less wide output) or by giving a custom format using \fB\-\-format\fP (see
-the \fBborg rlist\fP description for more details about the format string).
+the \fBborg repo\-list\fP description for more details about the format string).
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
-.SS optional arguments
+.SS arguments
+.INDENT 0.0
+.TP
+.B NAME
+specify the archive name
+.UNINDENT
+.SS options
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
 do not change repository
-.TP
-.B  \-\-force
-force pruning of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-\-force\fP does not work.
-.TP
-.B  \-s\fP,\fB  \-\-stats
-print statistics for the deleted archive
 .TP
 .B  \-\-list
 output verbose list of archives it keeps/prunes
@@ -144,17 +149,20 @@ number of weekly archives to keep
 .B  \-m\fP,\fB  \-\-keep\-monthly
 number of monthly archives to keep
 .TP
+.B  \-\-keep\-13weekly
+number of quarterly archives to keep (13 week strategy)
+.TP
+.B  \-\-keep\-3monthly
+number of quarterly archives to keep (3 month strategy)
+.TP
 .B  \-y\fP,\fB  \-\-keep\-yearly
 number of yearly archives to keep
-.TP
-.BI \-c \ SECONDS\fR,\fB \ \-\-checkpoint\-interval \ SECONDS
-write checkpoint every SECONDS seconds (Default: 1800)
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archive names matching the pattern. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-oldest \ TIMESPAN
 consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
@@ -174,26 +182,35 @@ Be careful, prune is a potentially dangerous command, it will remove backup
 archives.
 .sp
 The default of prune is to apply to \fBall archives in the repository\fP unless
-you restrict its operation to a subset of the archives using \fB\-a\fP / \fB\-\-match\-archives\fP\&.
+you restrict its operation to a subset of the archives.
+.sp
+The recommended way to name archives (with \fBborg create\fP) is to use the
+identical archive name within a series of archives. Then you can simply give
+that name to prune also, so it operates just on that series of archives.
+.sp
+Alternatively, you can use \fB\-a\fP / \fB\-\-match\-archives\fP to do a match on the
+archive names to select some of them.
 When using \fB\-a\fP, be careful to choose a good pattern \- e.g. do not use a
 prefix \(dqfoo\(dq if you do not also want to match \(dqfoobar\(dq.
 .sp
 It is strongly recommended to always run \fBprune \-v \-\-list \-\-dry\-run ...\fP
 first so you will see what it would do without it actually doing anything.
+.sp
+Don\(aqt forget to run \fBborg compact \-v\fP after prune to actually free disk space.
 .INDENT 0.0
 .INDENT 3.5
 .sp
-.nf
-.ft C
+.EX
 # Keep 7 end of day and 4 additional end of week archives.
 # Do a dry\-run without actually deleting anything.
 $ borg prune \-v \-\-list \-\-dry\-run \-\-keep\-daily=7 \-\-keep\-weekly=4
 
-# Same as above but only apply to archive names starting with the hostname
+# Similar as above but only apply to the archive series named \(aq{hostname}\(aq:
+$ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \(aq{hostname}\(aq
+
+# Similar as above but apply to archive names starting with the hostname
 # of the machine followed by a \(dq\-\(dq character:
 $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-a \(aqsh:{hostname}\-*\(aq
-# actually free disk space:
-$ borg compact
 
 # Keep 7 end of day, 4 additional end of week archives,
 # and an end of month archive for every month:
@@ -202,8 +219,7 @@ $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-\-keep\-monthly
 # Keep all backups in the last 10 days, 4 additional end of week archives,
 # and an end of month archive for every month:
 $ borg prune \-v \-\-list \-\-keep\-within=10d \-\-keep\-weekly=4 \-\-keep\-monthly=\-1
-.ft P
-.fi
+.EE
 .UNINDENT
 .UNINDENT
 .sp

@@ -6,11 +6,11 @@ Backing up entire disk images
 
 Backing up disk images can still be efficient with Borg because its `deduplication`_
 technique makes sure only the modified parts of the file are stored. Borg also has
-optional simple sparse file support for extract.
+optional simple sparse file support for extraction.
 
-It is of utmost importancy to pin down the disk you want to backup.
-You need to use the SERIAL for that. 
-Use: 
+It is of utmost importance to pin down the disk you want to back up.
+Use the disk's SERIAL for that.
+Use:
 
 .. code-block:: bash
 
@@ -25,11 +25,11 @@ Use:
     echo "${PARTITIONS[@]}"
     echo "Disk Identifier: $DISK_ID"
 
-    # Use the following line to perform a borg backup for the full disk:
-    # borg create --read-special {now} "$DISK_ID"
+    # Use the following line to perform a Borg backup for the full disk:
+    # borg create --read-special disk-backup "$DISK_ID"
 
-    # Use the following to perform a borg backup for all partitions of the disk
-    # borg create --read-special {now} "${PARTITIONS[@]}"
+    # Use the following to perform a Borg backup for all partitions of the disk
+    # borg create --read-special partitions-backup "${PARTITIONS[@]}"
 
     # Example output:
     # Partitions of /dev/nvme1n1:
@@ -37,8 +37,8 @@ Use:
     # /dev/nvme1n1p2
     # /dev/nvme1n1p3
     # Disk Identifier: /dev/nvme1n1
-    # borg create --read-special {now} /dev/nvme1n1
-    # borg create --read-special {now} /dev/nvme1n1p1 /dev/nvme1n1p2 /dev/nvme1n1p3
+    # borg create --read-special disk-backup /dev/nvme1n1
+    # borg create --read-special partitions-backup /dev/nvme1n1p1 /dev/nvme1n1p2 /dev/nvme1n1p3
 
 
 
@@ -47,7 +47,7 @@ Decreasing the size of image backups
 ------------------------------------
 
 Disk images are as large as the full disk when uncompressed and might not get much
-smaller post-deduplication after heavy use because virtually all file systems don't
+smaller post-deduplication after heavy use because virtually all filesystems do not
 actually delete file data on disk but instead delete the filesystem entries referencing
 the data. Therefore, if a disk nears capacity and files are deleted again, the change
 will barely decrease the space it takes up when compressed and deduplicated. Depending
@@ -63,28 +63,28 @@ deduplicating. For backup, save the disk header and the contents of each partiti
 
     HEADER_SIZE=$(sfdisk -lo Start $DISK | grep -A1 -P 'Start$' | tail -n1 | xargs echo)
     PARTITIONS=$(sfdisk -lo Device,Type $DISK | sed -e '1,/Device\s*Type/d')
-    dd if=$DISK count=$HEADER_SIZE | borg create repo::hostname-partinfo -
+    dd if=$DISK count=$HEADER_SIZE | borg create --repo repo hostname-partinfo -
     echo "$PARTITIONS" | grep NTFS | cut -d' ' -f1 | while read x; do
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
-        ntfsclone -so - $x | borg create repo::hostname-part$PARTNUM -
+        ntfsclone -so - $x | borg create --repo repo hostname-part$PARTNUM -
     done
     # to back up non-NTFS partitions as well:
     echo "$PARTITIONS" | grep -v NTFS | cut -d' ' -f1 | while read x; do
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
-        borg create --read-special repo::hostname-part$PARTNUM $x
+        borg create --read-special --repo repo hostname-part$PARTNUM $x
     done
 
 Restoration is a similar process::
 
-    borg extract --stdout repo::hostname-partinfo | dd of=$DISK && partprobe
+    borg extract --stdout --repo repo hostname-partinfo | dd of=$DISK && partprobe
     PARTITIONS=$(sfdisk -lo Device,Type $DISK | sed -e '1,/Device\s*Type/d')
     borg list --format {archive}{NL} repo | grep 'part[0-9]*$' | while read x; do
         PARTNUM=$(echo $x | grep -Eo "[0-9]+$")
         PARTITION=$(echo "$PARTITIONS" | grep -E "$DISKp?$PARTNUM" | head -n1)
         if echo "$PARTITION" | cut -d' ' -f2- | grep -q NTFS; then
-            borg extract --stdout repo::$x | ntfsclone -rO $(echo "$PARTITION" | cut -d' ' -f1) -
+            borg extract --stdout --repo repo $x | ntfsclone -rO $(echo "$PARTITION" | cut -d' ' -f1) -
         else
-            borg extract --stdout repo::$x | dd of=$(echo "$PARTITION" | cut -d' ' -f1)
+            borg extract --stdout --repo repo $x | dd of=$(echo "$PARTITION" | cut -d' ' -f1)
         fi
     done
 
@@ -105,18 +105,18 @@ except it works in place, zeroing the original partition. This makes the backup 
 a bit simpler::
 
     sfdisk -lo Device,Type $DISK | sed -e '1,/Device\s*Type/d' | grep Linux | cut -d' ' -f1 | xargs -n1 zerofree
-    borg create --read-special repo::hostname-disk $DISK
+    borg create --read-special --repo repo hostname-disk $DISK
 
 Because the partitions were zeroed in place, restoration is only one command::
 
-    borg extract --stdout repo::hostname-disk | dd of=$DISK
+    borg extract --stdout --repo repo hostname-disk | dd of=$DISK
 
 .. note:: The "traditional" way to zero out space on a partition, especially one already
           mounted, is simply to ``dd`` from ``/dev/zero`` to a temporary file and delete
           it. This is ill-advised for the reasons mentioned in the ``zerofree`` man page:
 
-          - it is slow
-          - it makes the disk image (temporarily) grow to its maximal extent
+          - it is slow.
+          - it makes the disk image (temporarily) grow to its maximal extent.
           - it (temporarily) uses all free space on the disk, so other concurrent write actions may fail.
 
 Virtual machines
@@ -129,7 +129,7 @@ regular file to Borg with the same issues as regular files when it comes to conc
 reading and writing from the same file.
 
 For backing up live VMs use filesystem snapshots on the VM host, which establishes
-crash-consistency for the VM images. This means that with most file systems (that
+crash-consistency for the VM images. This means that with most filesystems (that
 are journaling) the FS will always be fine in the backup (but may need a journal
 replay to become accessible).
 
@@ -145,10 +145,10 @@ to reach application-consistency; it's a broad and complex issue that cannot be 
 in entirety here.
 
 Hypervisor snapshots capturing most of the VM's state can also be used for backups and
-can be a better alternative to pure file system based snapshots of the VM's disk, since
+can be a better alternative to pure filesystem-based snapshots of the VM's disk, since
 no state is lost. Depending on the application this can be the easiest and most reliable
 way to create application-consistent backups.
 
-Borg doesn't intend to address these issues due to their huge complexity and
+Borg does not intend to address these issues due to their huge complexity and
 platform/software dependency. Combining Borg with the mechanisms provided by the platform
 (snapshots, hypervisor features) will be the best approach to start tackling them.

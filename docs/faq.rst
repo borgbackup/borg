@@ -496,8 +496,8 @@ Another option is to not consider inode numbers in the files cache by passing
 Why are backups slow on a Linux server that is a member of a Windows domain?
 ----------------------------------------------------------------------------
 
-If a Linux server is a member of a Windows domain, username to userid resolution might be 
-performed via ``winbind`` without caching, which can slow down backups significantly. 
+If a Linux server is a member of a Windows domain, username to userid resolution might be
+performed via ``winbind`` without caching, which can slow down backups significantly.
 You can use e.g. ``nscd`` to add caching and improve the speed.
 
 Security
@@ -553,6 +553,26 @@ The Borg config directory has content that you should take care of:
   the corresponding keyfile (and the key passphrase) can extract it.
 
 Make sure that only you have access to the Borg config directory.
+
+
+Note about creating multiple keyfile repositories at the same path
+------------------------------------------------------------------
+
+If you create a new keyfile-encrypted repository at the same filesystem
+path multiple times (for example, when a previous repository at that path
+was moved away or unmounted), Borg will not overwrite or reuse the existing
+key file in your keys directory. Instead, it creates a new key file by
+appending a numeric suffix to the base name (e.g., .2, .3, ...).
+
+This means you may see multiple key files like:
+
+- ~/.config/borg/keys/home_user_backup
+- ~/.config/borg/keys/home_user_backup.2
+- ~/.config/borg/keys/home_user_backup.3
+
+Each of these corresponds to a distinct repository created at the same
+path at different times. This behavior avoids accidental key reuse or
+overwrite.
 
 .. _cache_security:
 

@@ -12,9 +12,10 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Literal, Optional, Self
+from typing import Any, List, Literal, Optional
 
 import pydantic
+from typing_extensions import Self
 
 _log = logging.getLogger(__name__)
 

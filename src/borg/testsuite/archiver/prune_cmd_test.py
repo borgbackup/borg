@@ -6,7 +6,7 @@ import pytest
 from ...constants import *  # NOQA
 from ...archiver.prune_cmd import prune_split, prune_within
 from . import cmd, RK_ENCRYPTION, src_dir, generate_archiver_tests
-from ...helpers import interval
+from ...helpers import interval, CommandError
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -296,6 +296,24 @@ def test_prune_keep_all(archivers, request):
     output = cmd(archiver, "repo-list", "--format", "{name}{NL}")
     names = set(output.splitlines())
     assert names == {"a1", "a2", "a3"}
+
+
+def test_prune_keep_all_mutually_exclusive_with_others(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    # create a single archive
+    _create_archive_ts(archiver, "x1", 2025, 1, 1, 0, 0, 0)
+    # Using --keep-all together with any other keep option must error out
+    output = cmd(archiver, "prune", "--keep-all", "--keep-daily=1", exit_code=CommandError().exit_code, fork=True)
+    assert "--keep-all cannot be combined" in output
+
+
+def test_prune_keep_all_mutually_exclusive_with_within(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    _create_archive_ts(archiver, "x1", 2025, 1, 1, 0, 0, 0)
+    output = cmd(archiver, "prune", "--keep-all", "--keep-within", "1d", exit_code=CommandError().exit_code, fork=True)
+    assert "--keep-all cannot be combined" in output
 
 
 # This is the local timezone of the system running the tests.

@@ -141,6 +141,26 @@ class PruneMixIn:
                 '"keep-yearly", or "keep-all" settings must be specified.'
             )
 
+        # --keep-all is an alias for --keep-last=<infinite> and must not be
+        # used together with any other --keep-... option, because that would be
+        # misleading. Enforce this at argument parsing/validation time.
+        keep_all = args.secondly == float("inf")
+        if keep_all:
+            if any(
+                (
+                    args.minutely,
+                    args.hourly,
+                    args.daily,
+                    args.weekly,
+                    args.monthly,
+                    args.quarterly_13weekly,
+                    args.quarterly_3monthly,
+                    args.yearly,
+                    args.within,
+                )
+            ):
+                raise CommandError("--keep-all cannot be combined with other --keep-... options.")
+
         if args.format is not None:
             format = args.format
         elif args.short:

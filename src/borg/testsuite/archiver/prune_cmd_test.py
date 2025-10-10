@@ -316,6 +316,32 @@ def test_prune_keep_all_mutually_exclusive_with_within(archivers, request):
     assert "--keep-all cannot be combined" in output
 
 
+def test_prune_keep_all_and_keep_last_2(archivers, request):
+    # Problem: --keep-all, --keep-secondly and --keep-last=X use the same variable
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    # Create three archives with distinct seconds
+    _create_archive_ts(archiver, "c1", 2025, 1, 1, 0, 0, 0)
+    _create_archive_ts(archiver, "c2", 2025, 1, 1, 0, 0, 1)
+    _create_archive_ts(archiver, "c3", 2025, 1, 1, 0, 0, 2)
+
+    # Dry-run prune: with conflicting options, keep-all dominates
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-all", "--keep-last=2")
+    # Expect all kept under 'secondly' rule, nothing would be pruned
+    assert re.search(r"Keeping archive \(rule: secondly(?:\[oldest\])? #\d+\):\s+c1", output)
+    assert re.search(r"Keeping archive \(rule: secondly(?:\[oldest\])? #\d+\):\s+c2", output)
+    assert re.search(r"Keeping archive \(rule: secondly(?:\[oldest\])? #\d+\):\s+c3", output)
+    assert "Would prune:" not in output
+
+    # Dry-run prune: with conflicting options, keep-all dominates
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-last=2", "--keep-all")
+    # Expect all kept under 'secondly' rule, nothing would be pruned
+    assert re.search(r"Keeping archive \(rule: secondly(?:\[oldest\])? #\d+\):\s+c1", output)
+    assert re.search(r"Keeping archive \(rule: secondly(?:\[oldest\])? #\d+\):\s+c2", output)
+    assert re.search(r"Keeping archive \(rule: secondly(?:\[oldest\])? #\d+\):\s+c3", output)
+    assert "Would prune:" not in output
+
+
 # This is the local timezone of the system running the tests.
 # We need this e.g. to construct archive timestamps for the prune tests,
 # because borg prune operates in the local timezone (it first converts the

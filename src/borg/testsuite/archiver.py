@@ -3116,6 +3116,50 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 after = file.read()
             assert before == after
 
+    def test_init_keyfile_same_path_creates_new_keys(self):
+        """Regression test for GH issue #6230.
+
+        When creating a new keyfile-encrypted repository at the same filesystem path
+        multiple times (e.g., after moving/unmounting the previous one), Borg must not
+        overwrite or reuse the existing key file. Instead, it should create a new key
+        file in the keys directory, appending a numeric suffix like .2, .3, ...
+        """
+        # First init at path A
+        self.cmd('init', '--encryption=keyfile', self.repository_location)
+        keys = sorted(os.listdir(self.keys_path))
+        assert len(keys) == 1
+        base_key = keys[0]
+        base_path = os.path.join(self.keys_path, base_key)
+        with open(base_path, 'rb') as f:
+            base_contents = f.read()
+
+        # Simulate moving/unmounting the repo by changing the path and initializing again at the same path
+        # We remove the repo to allow re-init at the same path
+        shutil.rmtree(self.repository_path)
+        self.cmd('init', '--encryption=keyfile', self.repository_location)
+        keys = sorted(os.listdir(self.keys_path))
+        assert len(keys) == 2
+        assert base_key in keys
+        # The new file should be base_key suffixed with .2
+        assert any(k == base_key + '.2' for k in keys)
+        second_path = os.path.join(self.keys_path, base_key + '.2')
+        with open(second_path, 'rb') as f:
+            second_contents = f.read()
+        assert second_contents != base_contents
+
+        # Remove repo again and init a third time at same path
+        shutil.rmtree(self.repository_path)
+        self.cmd('init', '--encryption=keyfile', self.repository_location)
+        keys = sorted(os.listdir(self.keys_path))
+        assert len(keys) == 3
+        assert any(k == base_key + '.3' for k in keys)
+        third_path = os.path.join(self.keys_path, base_key + '.3')
+        with open(third_path, 'rb') as f:
+            third_contents = f.read()
+        # Ensure all keys are distinct
+        assert third_contents != base_contents
+        assert third_contents != second_contents
+
     def check_cache(self):
         # First run a regular borg check
         self.cmd('check', self.repository_location)

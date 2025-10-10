@@ -391,6 +391,26 @@ The Borg config directory has content that you should take care of:
 
 Make sure that only you have access to the Borg config directory.
 
+
+Note about creating multiple keyfile repositories at the same path
+------------------------------------------------------------------
+
+If you create a new keyfile-encrypted repository at the same filesystem
+path multiple times (for example, when a previous repository at that path
+was moved away or unmounted), Borg will not overwrite or reuse the existing
+key file in your keys directory. Instead, it creates a new key file by
+appending a numeric suffix to the base name (e.g., .2, .3, ...).
+
+This means you may see multiple key files like:
+
+- ~/.config/borg/keys/home_user_backup
+- ~/.config/borg/keys/home_user_backup.2
+- ~/.config/borg/keys/home_user_backup.3
+
+Each of these corresponds to a distinct repository created at the same
+path at different times. This behavior avoids accidental key reuse or
+overwrite.
+
 .. _home_data_borg:
 
 How important is the $HOME/.local/share/borg directory?

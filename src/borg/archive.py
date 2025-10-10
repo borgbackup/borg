@@ -681,13 +681,14 @@ Utilization of max. archive size: {csize_max:.0%}
         if have_borg12_meta and not want_unique:
             unique_csize = 0
         else:
-            def add(id):
-                entry = cache.chunks[id]
-                archive_index.add(id, 1, entry.size, entry.csize)
 
             archive_index = ChunkIndex()
             sync = CacheSynchronizer(archive_index)
-            add(self.id)
+            # do NOT add the archive metadata chunk (self.id) here.
+            # The metadata chunk is accounted via meta_stats during creation and must not
+            # contribute to the "This archive" deduplicated size computed by borg info.
+            # See issue #9003: make info's deduplicated size match create-time stats.
+
             # we must escape any % char in the archive name, because we use it in a format string, see #6500
             arch_name_escd = self.name.replace('%', '%%')
             pi = ProgressIndicatorPercent(total=len(self.metadata.items),
@@ -695,7 +696,8 @@ Utilization of max. archive size: {csize_max:.0%}
                                           msgid='archive.calc_stats')
             for id, chunk in zip(self.metadata.items, self.repository.get_many(self.metadata.items)):
                 pi.show(increase=1)
-                add(id)
+                # do NOT add(id) here, this is a metadata stream chunk and should not
+                # be accounted for in stats, see comment above.
                 data = self.key.decrypt(id, chunk)
                 sync.feed(data)
             unique_csize = archive_index.stats_against(cache.chunks)[3]

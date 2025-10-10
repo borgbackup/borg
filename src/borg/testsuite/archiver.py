@@ -1617,6 +1617,27 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         info_archive = self.cmd('info', '--first', '1', self.repository_location)
         assert 'Archive name: test\n' in info_archive
 
+    def test_info_matches_create_deduplicated_size(self):
+        # Create two identical files to ensure intra-archive deduplication happens,
+        # so the deduplicated size is visibly different from compressed size.
+        data = b'X' * (1024 * 80)
+        self.create_regular_file('file1', contents=data)
+        self.create_regular_file('file2', contents=data)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        create_out = self.cmd('create', '--stats', self.repository_location + '::test', 'input')
+        info_out = self.cmd('info', self.repository_location + '::test')
+
+        import re
+
+        def get_dedup(s):
+            m = re.search(r'^This archive:\s+(.*?)\s+(.*?)\s+(.+)$', s, re.M)
+            assert m is not None, s
+            return m.group(3).strip()
+
+        dedup_create = get_dedup(create_out)
+        dedup_info = get_dedup(info_out)
+        assert dedup_create == dedup_info
+
     def test_info_json(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)

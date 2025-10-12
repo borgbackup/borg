@@ -11,13 +11,6 @@ permissions:
   pull-requests: write # so it can create pull requests
 
 jobs:
-  debug:
-    name: Debug
-    runs-on: ubuntu-24.04
-    if: github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/backport')
-    steps:
-      - name: Dump event
-        run: echo '${{ toJSON(github.event) }}'
   backport:
     name: Backport pull request
     runs-on: ubuntu-24.04

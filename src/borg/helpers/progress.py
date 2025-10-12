@@ -1,6 +1,7 @@
 import logging
 import json
 import time
+import typing
 
 from ..logger import create_logger
 
@@ -24,9 +25,15 @@ class ProgressIndicatorBase:
         self.id = self.operation_id()
         self.msgid = msgid
 
-    def make_json(self, *, finished=False, **kwargs):
+    def make_json(self, *, finished=False, override_time: typing.Optional[float] = None, **kwargs):
         kwargs.update(
-            dict(operation=self.id, msgid=self.msgid, type=self.JSON_TYPE, finished=finished, time=time.time())
+            dict(
+                operation=self.id,
+                msgid=self.msgid,
+                type=self.JSON_TYPE,
+                finished=finished,
+                time=override_time or time.time(),
+            )
         )
         return json.dumps(kwargs)
 

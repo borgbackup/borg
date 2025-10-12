@@ -141,9 +141,12 @@ class Statistics:
     def csize_fmt(self):
         return format_file_size(self.csize, iec=self.iec)
 
+    PROGRESS_FMT = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '
+
     def show_progress(self, item=None, final=False, stream=None, dt=None):
         now = time.monotonic()
         if dt is None or now - self.last_progress > dt:
+            stream = stream or sys.stderr
             self.last_progress = now
             if self.output_json:
                 if not final:
@@ -158,10 +161,18 @@ class Statistics:
                 })
                 msg = json.dumps(data)
                 end = '\n'
+            elif not stream.isatty():
+                # if we don't output to a terminal, use normal linefeeds and assume line length is unlimited
+                if not final:
+                    msg = self.PROGRESS_FMT.format(self)
+                    msg += remove_surrogates(item.path) if item else ''
+                else:
+                    msg = ''
+                end = '\n'
             else:
                 columns, lines = get_terminal_size()
                 if not final:
-                    msg = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '.format(self)
+                    msg = self.PROGRESS_FMT.format(self)
                     path = remove_surrogates(item.path) if item else ''
                     space = columns - swidth(msg)
                     if space < 12:
@@ -172,7 +183,7 @@ class Statistics:
                 else:
                     msg = ' ' * columns
                 end = '\r'
-            print(msg, end=end, file=stream or sys.stderr, flush=True)
+            print(msg, end=end, file=stream, flush=True)
 
 
 def is_special(mode):

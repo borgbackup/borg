@@ -32,25 +32,48 @@ def test_stats_basic(stats):
     assert stats.usize == 10
 
 
-def tests_stats_progress(stats, monkeypatch, columns=80):
+def tests_stats_progress_tty(stats, monkeypatch, columns=80):
+    class TTYStringIO(StringIO):
+        def isatty(self):
+            return True
+
     monkeypatch.setenv('COLUMNS', str(columns))
-    out = StringIO()
+    out = TTYStringIO()
     stats.show_progress(stream=out)
     s = '20 B O 10 B C 10 B D 0 N '
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
 
-    out = StringIO()
+    out = TTYStringIO()
     stats.update(10**3, 0, unique=False)
     stats.show_progress(item=Item(path='foo'), final=False, stream=out)
     s = '1.02 kB O 10 B C 10 B D 0 N foo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
-    out = StringIO()
+    out = TTYStringIO()
     stats.show_progress(item=Item(path='foo'*40), final=False, stream=out)
     s = '1.02 kB O 10 B C 10 B D 0 N foofoofoofoofoofoofoofo...oofoofoofoofoofoofoofoofoo'
     buf = ' ' * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
+
+
+def tests_stats_progress_file(stats, monkeypatch):
+    out = StringIO()
+    stats.show_progress(stream=out)
+    s = '20 B O 10 B C 10 B D 0 N '
+    assert out.getvalue() == s + "\n"
+
+    out = StringIO()
+    stats.update(10**3, 0, unique=False)
+    path = 'foo'
+    stats.show_progress(item=Item(path=path), final=False, stream=out)
+    s = f'1.02 kB O 10 B C 10 B D 0 N {path}'
+    assert out.getvalue() == s + "\n"
+    out = StringIO()
+    path = 'foo' * 40
+    stats.show_progress(item=Item(path=path), final=False, stream=out)
+    s = f'1.02 kB O 10 B C 10 B D 0 N {path}'
+    assert out.getvalue() == s + "\n"
 
 
 def test_stats_format(stats):

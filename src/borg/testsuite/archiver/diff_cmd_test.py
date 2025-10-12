@@ -293,7 +293,7 @@ def test_time_diffs(archivers, request):
         assert "ctime" not in output
 
 
-def test_sort_option(archivers, request):
+def test_sort_by_option(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
@@ -313,12 +313,56 @@ def test_sort_option(archivers, request):
     create_regular_file(archiver.input_path, "d_file_added", size=256)
     cmd(archiver, "create", "test1", "input")
 
-    output = cmd(archiver, "diff", "test0", "test1", "--sort", "--content-only")
+    output = cmd(archiver, "diff", "test0", "test1", "--sort-by=path", "--content-only")
     expected = ["a_file_removed", "b_file_added", "c_file_changed", "d_file_added", "e_file_changed", "f_file_removed"]
     assert isinstance(output, str)
     outputs = output.splitlines()
     assert len(outputs) == len(expected)
     assert all(x in line for x, line in zip(expected, outputs))
+
+
+def test_sort_by_invalid_field_is_rejected(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    create_regular_file(archiver.input_path, "file", size=1)
+    cmd(archiver, "create", "a1", "input")
+    create_regular_file(archiver.input_path, "file", size=2)
+    cmd(archiver, "create", "a2", "input")
+
+    # Unsupported field should cause argument parsing error
+    cmd(archiver, "diff", "a1", "a2", "--sort-by=not_a_field", exit_code=EXIT_ERROR)
+
+
+def test_sort_by_size_added_then_path(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # Base archive with two files that will be removed later
+    create_regular_file(archiver.input_path, "r_big_removed", size=50)
+    create_regular_file(archiver.input_path, "r_small_removed", size=5)
+    cmd(archiver, "create", "base", "input")
+
+    # Second archive: remove both above and add two new files of different sizes
+    os.unlink("input/r_big_removed")
+    os.unlink("input/r_small_removed")
+    create_regular_file(archiver.input_path, "a_small_added", size=10)
+    create_regular_file(archiver.input_path, "b_large_added", size=30)
+    cmd(archiver, "create", "next", "input")
+
+    # Sort by size added (ascending), then path to break ties deterministically
+    output = cmd(archiver, "diff", "base", "next", "--sort-by=size_added,path", "--content-only")
+    lines = output.splitlines()
+    # Expect removed entries first (size_added=0), ordered by path, then added entries by increasing size
+    expected_order = [
+        "removed:.*input/r_big_removed",  # size_added=0
+        "removed:.*input/r_small_removed",  # size_added=0
+        "added:.*10 B.*input/a_small_added",
+        "added:.*30 B.*input/b_large_added",
+    ]
+    assert len(lines) == len(expected_order)
+    for pattern, line in zip(expected_order, lines):
+        assert_line_exists([line], pattern)
 
 
 @pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")

@@ -2563,11 +2563,13 @@ class Archiver:
             (a plain path, not a file pattern). Use this prefix to have the root
             paths in the patterns file rather than as command line arguments.
 
-        Pattern style prefix ``P``
+        Pattern style prefix ``P`` (only useful within patterns files)
             To change the default pattern style, use the ``P`` prefix, followed by
             the pattern style abbreviation (``fm``, ``pf``, ``pp``, ``re``, ``sh``).
-            All patterns following this line will use this style until another style
-            is specified.
+            All patterns following this line in the same patterns file will use this
+            style until another style is specified or the end of the file is reached.
+            When the current patterns file is finished, the default pattern style will
+            reset.
 
         Exclude pattern prefix ``-``
             Use the prefix ``-``, followed by a pattern, to define an exclusion.

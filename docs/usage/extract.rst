@@ -19,5 +19,8 @@ Examples
     # Extract the "src" directory but exclude object files
     $ borg extract /path/to/repo::my-files home/USERNAME/src --exclude '*.o'
 
+    # Extract only the C files
+    $ borg extract /path/to/repo::my-files 'sh:home/USERNAME/src/*.c'
+
     # Restore a raw device (must not be active/in use/mounted at that time)
     $ borg extract --stdout /path/to/repo::my-sdx | dd of=/dev/sdx bs=10M

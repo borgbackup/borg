@@ -348,22 +348,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("bullseye", ".*none.*")
   end
 
-  config.vm.define "buster" do |b|
-    b.vm.box = "debian/buster64"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 1024 + $wmem
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages debianoid", :type => :shell, :inline => packages_debianoid("vagrant")
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("buster")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("buster")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("buster")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("buster")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("buster", ".*none.*")
-  end
-
   config.vm.define "freebsd13" do |b|
     b.vm.box = "generic/freebsd13"
     b.vm.provider :virtualbox do |v|

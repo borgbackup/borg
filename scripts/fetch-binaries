@@ -12,7 +12,6 @@ check_and_copy () {
     echo ""
 }
 
-check_and_copy buster    borg-linux-glibc228
 check_and_copy bullseye  borg-linux-glibc231
 check_and_copy bookworm  borg-linux-glibc236
 check_and_copy trixie    borg-linux-glibc241

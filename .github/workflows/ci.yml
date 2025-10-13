@@ -56,6 +56,11 @@ jobs:
             - os: ubuntu-22.04
               python-version: '3.11'
               toxenv: py311-fuse2
+              arch: X64
+            - os: ubuntu-22.04-arm
+              python-version: '3.11'
+              toxenv: py311-fuse2
+              arch: ARM64
             - os: ubuntu-24.04
               python-version: '3.12'
               toxenv: py312-fuse3
@@ -65,13 +70,16 @@ jobs:
             - os: ubuntu-24.04
               python-version: '3.14'
               toxenv: py314-fuse3
+            - os: macos-13
+              python-version: '3.11'
+              toxenv: py311-none  # Note: no FUSE testing due to #6099; see also #6196.
+              arch: X64
             - os: macos-14
               python-version: '3.11'
               toxenv: py311-none  # Note: no FUSE testing due to #6099; see also #6196.
+              arch: ARM64
 
     env:
-      # Configure pkg-config to use OpenSSL from Homebrew
-      PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
@@ -82,10 +90,12 @@ jobs:
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all
         fetch-depth: 0
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+
     - name: Cache pip
       uses: actions/cache@v4
       with:
@@ -112,22 +122,17 @@ jobs:
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.d/development.txt
+
     - name: Install BorgBackup
-      env:
-        # We already have this in the global environment, but something overrides it.
-        # So set it here again.
-        PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
       run: |
         pip install -ve .
+
     - name: Run pytest via tox
-      env:
-        # We already have this in the global environment, but something overrides it.
-        # So set it here again.
-        PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
       run: |
         # Do not use fakeroot; run as root. Avoids the dreaded sporadic EISDIR failures; see #2482.
         #sudo -E bash -c "tox -e py"
         tox --skip-missing-interpreters
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       env:
@@ -136,3 +141,44 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         env_vars: OS, python
+
+    - name: Build Borg fat binaries (${{ matrix.os }}-${{ matrix.arch }})
+      if: ${{ matrix.arch }}
+      run: |
+        pip install 'pyinstaller==6.14.2'
+        mkdir -p dist/binary
+        pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
+
+    - name: Smoke-test the built binary (${{ matrix.os }}-${{ matrix.arch }})
+      if: ${{ matrix.arch }}
+      run: |
+        pushd dist/binary
+        echo "single-file binary"
+        chmod +x borg.exe
+        ./borg.exe -V
+        echo "single-directory binary"
+        chmod +x borg-dir/borg.exe
+        ./borg-dir/borg.exe -V
+        tar czf borg.tgz borg-dir
+        popd
+
+    - name: Prepare artifacts (${{ matrix.os }}-${{ matrix.arch }})
+      if: ${{ matrix.arch }}
+      run: |
+        mkdir -p artifacts
+        if [ -f dist/binary/borg.exe ]; then
+          cp dist/binary/borg.exe artifacts/borg-${{ matrix.os }}-${{ matrix.arch }}.exe
+        fi
+        if [ -f dist/binary/borg.tgz ]; then
+          cp dist/binary/borg.tgz artifacts/borg-${{ matrix.os }}-${{ matrix.arch }}.tgz
+        fi
+        echo "artifact files"
+        ls -l artifacts/
+
+    - name: Upload artifacts (${{ matrix.os }}-${{ matrix.arch }})
+      if: ${{ matrix.arch }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: borg-${{ matrix.os }}-${{ matrix.arch }}
+        path: artifacts/*
+        if-no-files-found: error

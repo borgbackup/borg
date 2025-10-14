@@ -92,6 +92,14 @@ jobs:
         echo "Found tag: ${tag}"
         echo "tagged=$tag" >> "$GITHUB_OUTPUT"
 
+    - name: Check out exact tag
+      if: ${{ steps.detect_tag.outputs.tagged }}
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.detect_tag.outputs.tagged }}
+        fetch-depth: 0
+        fetch-tags: true
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:

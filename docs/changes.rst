@@ -422,9 +422,14 @@ above.
 
 New features:
 
+- fat binary building on GitHub (see assets on GitHub releases page):
+
+  - for Linux glibc 2.35+ (Intel/AMD and ARM64)
+  - for macOS 14+ (Apple Silicon/ARM64) and macOS 13+ (Intel)
 - diff --sort-by: enhanced sorting, #8998
 - create: --files-changed=MODE option (control how borg detects whether
   a file has changed while it was backed up)
+- improved tty-less progress reporting (--progress)
 
 Fixes:
 
@@ -432,6 +437,7 @@ Fixes:
 - import-tar: when printing the path, use the already normalized item.path.
 - preprocess_args: fix option name matching
 - fix ChunkerParams validation
+- mount --show-rc: display main process rc, #8308
 
 Other changes:
 
@@ -458,6 +464,13 @@ Other changes:
   - add Arch Linux to "installing from source" docs
   - adds systemd-inhibit and examples, #8989
   - fix typos / grammar in docs and code
+  - how to debug borg mount, #5461
+  - what happens when a new keyfile repo is created at the same path? #6230
+  - borg serve: recommend using a simple shell, #8318
+  - update README for the binaries
+  - extract: document how to use wildcards in PATHs, #8589
+  - improve borg help patterns, #7144
+  - clarify scope of default pattern style, #9004
 - tests:
 
   - save temp space
@@ -465,11 +478,15 @@ Other changes:
   - fix diff cmd test on macOS HFS+, #8860
   - fuzzing test for default chunker
   - read_only CM: skip test if cmd_immutable is unsuccessful, #9021
-  - vagrant: add debian trixie box
-  - vagrant: use Python 3.11.13
+  - vagrant:
+
+    - use Python 3.11.13
+    - add debian trixie box
+    - drop broken/EOL debian buster VM / borg-linux-glibc228
+    - drop outdated/slow/unsupported macOS 10.12 VM / borg-macos1012 (Intel)
   - pyproject.toml: correctly define test envs for fuse testing
-  - coverage: use pyproject.toml
-  - tox: use native pyproject.toml configuration
+  - coverage / tox: use pyproject.toml
+  - ci: speed up pull requests
 
 
 Version 1.4.1 (2025-04-19)

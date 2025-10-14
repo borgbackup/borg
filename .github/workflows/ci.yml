@@ -57,13 +57,13 @@ jobs:
             "include": [
               {"os": "ubuntu-22.04", "python-version": "3.9", "toxenv": "py39-fuse2"},
               {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse3"},
-              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-fuse2", "arch": "X64"},
-              {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-fuse2", "arch": "ARM64"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-fuse2", "binary": "borg-linux-glibc235-x86_64-gh"},
+              {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-fuse2", "binary": "borg-linux-glibc235-arm64-gh"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-fuse3"},
               {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-fuse3"},
               {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"},
-              {"os": "macos-13", "python-version": "3.11", "toxenv": "py311-none", "arch": "X64"},
-              {"os": "macos-14", "python-version": "3.11", "toxenv": "py311-none", "arch": "ARM64"}
+              {"os": "macos-13", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-13-x86_64-gh"},
+              {"os": "macos-14", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-14-arm64-gh"}
             ]
           }'
         ) }}
@@ -131,15 +131,15 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         env_vars: OS, python
 
-    - name: Build Borg fat binaries (${{ matrix.os }}-${{ matrix.arch }})
-      if: ${{ matrix.arch }}
+    - name: Build Borg fat binaries (${{ matrix.binary }})
+      if: ${{ matrix.binary }}
       run: |
         pip install 'pyinstaller==6.14.2'
         mkdir -p dist/binary
         pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
 
-    - name: Smoke-test the built binary (${{ matrix.os }}-${{ matrix.arch }})
-      if: ${{ matrix.arch }}
+    - name: Smoke-test the built binary (${{ matrix.binary }})
+      if: ${{ matrix.binary }}
       run: |
         pushd dist/binary
         echo "single-file binary"
@@ -151,23 +151,23 @@ jobs:
         tar czf borg.tgz borg-dir
         popd
 
-    - name: Prepare artifacts (${{ matrix.os }}-${{ matrix.arch }})
-      if: ${{ matrix.arch }}
+    - name: Prepare binaries (${{ matrix.binary }})
+      if: ${{ matrix.binary }}
       run: |
         mkdir -p artifacts
         if [ -f dist/binary/borg.exe ]; then
-          cp dist/binary/borg.exe artifacts/borg-${{ matrix.os }}-${{ matrix.arch }}.exe
+          cp dist/binary/borg.exe artifacts/${{ matrix.binary }}.exe
         fi
         if [ -f dist/binary/borg.tgz ]; then
-          cp dist/binary/borg.tgz artifacts/borg-${{ matrix.os }}-${{ matrix.arch }}.tgz
+          cp dist/binary/borg.tgz artifacts/${{ matrix.binary }}.tgz
         fi
-        echo "artifact files"
+        echo "binary files"
         ls -l artifacts/
 
-    - name: Upload artifacts (${{ matrix.os }}-${{ matrix.arch }})
-      if: ${{ matrix.arch }}
+    - name: Upload binaries (${{ matrix.binary }})
+      if: ${{ matrix.binary }}
       uses: actions/upload-artifact@v4
       with:
-        name: borg-${{ matrix.os }}-${{ matrix.arch }}
+        name: ${{ matrix.binary }}
         path: artifacts/*
         if-no-files-found: error

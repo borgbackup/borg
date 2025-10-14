@@ -79,6 +79,16 @@ jobs:
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all
         fetch-depth: 0
+        fetch-tags: true
+
+    - name: Detect if commit is tagged
+      id: detect_tag
+      run: |
+        if git describe --exact-match --tags HEAD >/dev/null 2>&1; then
+          echo "tagged=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "tagged=false" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -132,14 +142,14 @@ jobs:
         env_vars: OS, python
 
     - name: Build Borg fat binaries (${{ matrix.binary }})
-      if: ${{ matrix.binary }}
+      if: ${{ matrix.binary && steps.detect_tag.outputs.tagged == 'true' }}
       run: |
         pip install 'pyinstaller==6.14.2'
         mkdir -p dist/binary
         pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
 
     - name: Smoke-test the built binary (${{ matrix.binary }})
-      if: ${{ matrix.binary }}
+      if: ${{ matrix.binary && steps.detect_tag.outputs.tagged == 'true' }}
       run: |
         pushd dist/binary
         echo "single-file binary"
@@ -152,7 +162,7 @@ jobs:
         popd
 
     - name: Prepare binaries (${{ matrix.binary }})
-      if: ${{ matrix.binary }}
+      if: ${{ matrix.binary && steps.detect_tag.outputs.tagged == 'true' }}
       run: |
         mkdir -p artifacts
         if [ -f dist/binary/borg.exe ]; then
@@ -165,7 +175,7 @@ jobs:
         ls -l artifacts/
 
     - name: Upload binaries (${{ matrix.binary }})
-      if: ${{ matrix.binary }}
+      if: ${{ matrix.binary && steps.detect_tag.outputs.tagged == 'true' }}
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.binary }}

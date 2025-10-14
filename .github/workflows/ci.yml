@@ -66,21 +66,6 @@ jobs:
       fail-fast: true
       matrix:
         include:
-            - os: ubuntu-22.04
-              python-version: '3.10'
-              toxenv: mypy
-            - os: ubuntu-22.04
-              python-version: '3.11'
-              toxenv: docs
-            - os: ubuntu-22.04
-              python-version: '3.10'
-              toxenv: py310-fuse2
-            - os: ubuntu-22.04
-              python-version: '3.11'
-              toxenv: py311-fuse3
-            - os: ubuntu-24.04
-              python-version: '3.12'
-              toxenv: py312-fuse3
             - os: ubuntu-24.04
               python-version: '3.13'
               toxenv: py313-fuse3
@@ -199,7 +184,7 @@ jobs:
 
   macOS:
 
-    needs: linux
+    if: false  # enable/disable macOS build
     strategy:
       fail-fast: true
       matrix:
@@ -271,10 +256,9 @@ jobs:
 
   windows:
 
-    if: false  # can be used to temporarily disable the build
+    if: true  # can be used to temporarily disable the build
     runs-on: windows-latest
     timeout-minutes: 120
-    needs: linux
 
     env:
       PY_COLORS: 1

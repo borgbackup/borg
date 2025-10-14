@@ -1,36 +1,52 @@
 Binary BorgBackup builds
 ========================
 
-The binaries are supposed to work on the specified platform without installing
-any dependencies.
+General notes
+-------------
+
+The binaries are supposed to work on the specified platform without installing anything else.
+
+There are some limitations, though:
+- for Linux, your system must have the same or newer glibc version as the one used for building
+- for macOS, you need to have the same or newer macOS version as the one used for building
+- for other OSes, there are likely similar limitations
+
+If you don't find something working on your system, check the older borg releases.
+
+*.asc are GnuPG signatures - only provided for locally built binaries.
+*.exe (or no extension) is the single-file fat binary.
+*.tgz is the single-directory fat binary (extract it once with tar -xzf).
+
+Using the single-directory build is faster and does not require as much space
+in the temporary directory as the self-extracting single-file build.
+
+macOS: to avoid issues, download the file via the command line OR remove the
+       "quarantine" attribute after downloading:
+       $ xattr -dr com.apple.quarantine borg-macos1012.tgz
 
 
 Download the correct files
 --------------------------
 
-AMD64/x86_64 architecture
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Binaries built on GitHub servers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-borg-linux-glibc241 Linux (built on Debian 13 "Trixie" with glibc 2.41)
-borg-linux-glibc236 Linux (built on Debian 12 "Bookworm" with glibc 2.36)
-borg-linux-glibc231 Linux (built on Debian 11 "Bullseye" with glibc 2.31)
-                    Note: You can also try them on other Linux distributions with different glibc
-                    versions - as long as glibc is compatible, they will work.
-                    If it doesn't work, try a Borg 1.2.x binary.
+borg-linux-glibc235-x86_64-gh Linux AMD/Intel (built on Ubuntu 22.04 LTS with glibc 2.35)
+borg-linux-glibc235-arm64-gh  Linux ARM (built on Ubuntu 22.04 LTS with glibc 2.35)
 
-borg-macos1012      macOS (built on macOS Sierra 10.12 with the latest macFUSE from Homebrew)
-                    To avoid signing issues, download the file via the command line OR
-                    remove the "quarantine" attribute after downloading:
-                    $ xattr -dr com.apple.quarantine borg-macos1012.tgz
+borg-macos-14-arm64-gh        macOS Apple Silicon (built on macOS 14 w/o FUSE support)
+borg-macos-13-x86_64-gh       macOS Intel (built on macOS 13 w/o FUSE support)
 
-borg-freebsd13      FreeBSD (built on FreeBSD 13)
-borg-freebsd14      FreeBSD (built on FreeBSD 14)
 
-*.tgz               Similar to the above, but built as a directory with files,
-                    not as a single self-extracting binary. Using the directory
-                    build is faster and does not require as much space in the temporary
-                    directory as the one-file build.
-*.asc               GnuPG signatures for *
+Binaries built locally
+~~~~~~~~~~~~~~~~~~~~~~
+
+borg-linux-glibc241-x86_64 Linux (built on Debian 13 "Trixie" with glibc 2.41)
+borg-linux-glibc236-x86_64 Linux (built on Debian 12 "Bookworm" with glibc 2.36)
+borg-linux-glibc231-x86_64 Linux (built on Debian 11 "Bullseye" with glibc 2.31)
+
+borg-freebsd-13-x86_64     FreeBSD (built on FreeBSD 13)
+borg-freebsd-14-x86_64     FreeBSD (built on FreeBSD 14)
 
 
 Verifying your download
@@ -84,4 +100,3 @@ There, please give:
 - a traceback with system info (if you have one)
 - your precise platform (CPU, 32/64-bit?), OS, distribution, release
 - your Python and (g)libc versions
-

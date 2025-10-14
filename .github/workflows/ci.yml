@@ -45,39 +45,28 @@ jobs:
     needs: lint
     strategy:
       fail-fast: false
-      matrix:
-        include:
-            - os: ubuntu-22.04
-              python-version: '3.9'
-              toxenv: py39-fuse2
-            - os: ubuntu-22.04
-              python-version: '3.10'
-              toxenv: py310-fuse3
-            - os: ubuntu-22.04
-              python-version: '3.11'
-              toxenv: py311-fuse2
-              arch: X64
-            - os: ubuntu-22.04-arm
-              python-version: '3.11'
-              toxenv: py311-fuse2
-              arch: ARM64
-            - os: ubuntu-24.04
-              python-version: '3.12'
-              toxenv: py312-fuse3
-            - os: ubuntu-24.04
-              python-version: '3.13'
-              toxenv: py313-fuse3
-            - os: ubuntu-24.04
-              python-version: '3.14'
-              toxenv: py314-fuse3
-            - os: macos-13
-              python-version: '3.11'
-              toxenv: py311-none  # Note: no FUSE testing due to #6099; see also #6196.
-              arch: X64
-            - os: macos-14
-              python-version: '3.11'
-              toxenv: py311-none  # Note: no FUSE testing due to #6099; see also #6196.
-              arch: ARM64
+      # noinspection YAMLSchemaValidation
+      matrix: >-
+        ${{ fromJSON(
+          github.event_name == 'pull_request' && '{
+            "include": [
+              {"os": "ubuntu-22.04", "python-version": "3.9", "toxenv": "py39-fuse2"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"}
+            ]
+          }' || '{
+            "include": [
+              {"os": "ubuntu-22.04", "python-version": "3.9", "toxenv": "py39-fuse2"},
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse3"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-fuse2", "arch": "X64"},
+              {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-fuse2", "arch": "ARM64"},
+              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-fuse3"},
+              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-fuse3"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"},
+              {"os": "macos-13", "python-version": "3.11", "toxenv": "py311-none", "arch": "X64"},
+              {"os": "macos-14", "python-version": "3.11", "toxenv": "py311-none", "arch": "ARM64"}
+            ]
+          }'
+        ) }}
 
     env:
       TOXENV: ${{ matrix.toxenv }}

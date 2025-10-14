@@ -14,7 +14,6 @@ AMD64/x86_64 architecture
 borg-linux-glibc241 Linux (built on Debian 13 "Trixie" with glibc 2.41)
 borg-linux-glibc236 Linux (built on Debian 12 "Bookworm" with glibc 2.36)
 borg-linux-glibc231 Linux (built on Debian 11 "Bullseye" with glibc 2.31)
-borg-linux-glibc228 Linux (built on Debian 10 "Buster" with glibc 2.28)
                     Note: You can also try them on other Linux distributions with different glibc
                     versions - as long as glibc is compatible, they will work.
                     If it doesn't work, try a Borg 1.2.x binary.

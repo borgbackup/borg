@@ -62,7 +62,7 @@ jobs:
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-fuse3"},
               {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-fuse3"},
               {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"},
-              {"os": "macos-13", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-13-x86_64-gh"},
+              {"os": "macos-14-intel", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-14-x86_64-gh"},
               {"os": "macos-14", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-14-arm64-gh"}
             ]
           }'

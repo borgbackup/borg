@@ -156,7 +156,7 @@ jobs:
       run: |
         mkdir -p artifacts
         if [ -f dist/binary/borg.exe ]; then
-          cp dist/binary/borg.exe artifacts/${{ matrix.binary }}.exe
+          cp dist/binary/borg.exe artifacts/${{ matrix.binary }}
         fi
         if [ -f dist/binary/borg.tgz ]; then
           cp dist/binary/borg.tgz artifacts/${{ matrix.binary }}.tgz

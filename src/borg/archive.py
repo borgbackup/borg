@@ -149,6 +149,7 @@ Bytes sent to remote: {stats.tx_bytes}
     def show_progress(self, item=None, final=False, stream=None, dt=None):
         now = time.monotonic()
         if dt is None or now - self.last_progress > dt:
+            stream = stream or sys.stderr
             self.last_progress = now
             if self.output_json:
                 if not final:
@@ -159,6 +160,14 @@ Bytes sent to remote: {stats.tx_bytes}
                     data = {}
                 data.update({"time": time.time(), "type": "archive_progress", "finished": final})
                 msg = json.dumps(data)
+                end = "\n"
+            elif not stream.isatty():
+                # Non-TTY output: use normal linefeeds and do not truncate the path.
+                if not final:
+                    msg = "{0.osize_fmt} O {0.usize_fmt} U {0.nfiles} N ".format(self)
+                    msg += remove_surrogates(item.path) if item else ""
+                else:
+                    msg = ""
                 end = "\n"
             else:
                 columns, lines = get_terminal_size()
@@ -174,7 +183,7 @@ Bytes sent to remote: {stats.tx_bytes}
                 else:
                     msg = " " * columns
                 end = "\r"
-            print(msg, end=end, file=stream or sys.stderr, flush=True)
+            print(msg, end=end, file=stream, flush=True)
 
 
 def is_special(mode):

@@ -3,8 +3,8 @@ on: [push, pull_request]
 
 jobs:
   msys2-ucrt64:
-      if: false  # build is broken, thus disabled, see #8264
-      runs-on: windows-latest
+    if: false  # build is broken, thus disabled, see #8264
+    runs-on: windows-latest
     defaults:
       run:
         shell: msys2 {0}

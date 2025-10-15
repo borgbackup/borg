@@ -109,26 +109,6 @@ def packages_netbsd
   EOF
 end
 
-def packages_macos
-  return <<-EOF
-    # install all the (security and other) updates
-    sudo softwareupdate --ignore iTunesX
-    sudo softwareupdate --ignore iTunes
-    sudo softwareupdate --ignore Safari
-    sudo softwareupdate --ignore "Install macOS High Sierra"
-    sudo softwareupdate --install --all
-    which brew || CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-    brew update > /dev/null
-    brew install pkg-config readline openssl@3.0 zstd lz4 xz xxhash
-    brew install --cask macfuse
-    # brew upgrade  # upgrade everything (takes rather long)
-    echo 'export LDFLAGS=-L/usr/local/opt/openssl@3.0/lib' >> ~vagrant/.bash_profile
-    echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3.0/include' >> ~vagrant/.bash_profile
-    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3.0/lib/pkgconfig' >> ~vagrant/.bash_profile
-    echo 'export PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@3.0' >> ~vagrant/.bash_profile
-  EOF
-end
-
 def packages_openindiana
   return <<-EOF
     # needs separate provisioning step + reboot:
@@ -155,12 +135,6 @@ def install_pyenv(boxname)
     echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
     echo 'eval "$(pyenv init -)"' >> ~/.bashrc
     echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
-  EOF
-end
-
-def fix_pyenv_macos(boxname)
-  return <<-EOF
-    echo 'export PYTHON_CONFIGURE_OPTS="--enable-framework"' >> ~/.bash_profile
   EOF
 end
 
@@ -404,32 +378,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd9")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd9", ".*fuse.*")
-  end
-
-  config.vm.define "macos1012" do |b|
-    b.vm.box = "macos-sierra"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 8192 + $wmem
-      v.customize ['modifyvm', :id, '--ostype', 'MacOS_64']
-      v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
-      v.customize ['modifyvm', :id, '--nested-hw-virt', 'on']
-      # Adjust CPU settings according to
-      # https://github.com/geerlingguy/macos-virtualbox-vm
-      v.customize ['modifyvm', :id, '--cpuidset',
-                   '00000001', '000306a9', '00020800', '80000201', '178bfbff']
-      # Disable USB variant requiring Virtualbox proprietary extension pack
-      v.customize ["modifyvm", :id, '--usbehci', 'off', '--usbxhci', 'off']
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages macos", :type => :shell, :privileged => false, :inline => packages_macos
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("macos1012")
-    b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_macos("macos1012")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("macos1012")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("macos1012")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("macos1012")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("macos1012", ".*(fuse3|none).*")
   end
 
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of

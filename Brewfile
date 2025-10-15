@@ -2,7 +2,7 @@ brew 'pkg-config'
 brew 'zstd'
 brew 'lz4'
 brew 'xxhash'
-brew 'openssl@3.0'
+brew 'openssl@3'
 
 # osxfuse (aka macFUSE) is only required for "borg mount",
 # but won't work on GitHub Actions' workers.

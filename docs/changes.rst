@@ -417,24 +417,24 @@ Change Log
 Version 1.4.2 (not released yet)
 --------------------------------
 
-For upgrade and compatibility hints, please also read the section "Upgrade Notes"
+For upgrade and compatibility hints, please also read the "Upgrade Notes" section
 above.
 
 New features:
 
-- fat binary building on GitHub (see assets on GitHub releases page):
+- fat binary builds on GitHub (see assets on the GitHub releases page):
 
-  - for Linux glibc 2.35+ (Intel/AMD and ARM64)
+  - for Linux with glibc 2.35+ (Intel/AMD and ARM64)
   - for macOS 14+ (Apple Silicon/ARM64) and macOS 13+ (Intel)
 - diff --sort-by: enhanced sorting, #8998
-- create: --files-changed=MODE option (control how borg detects whether
-  a file has changed while it was backed up)
+- create: --files-changed=MODE option (controls how borg detects whether
+  a file has changed while it is being backed up)
 - improved tty-less progress reporting (--progress)
 
 Fixes:
 
-- import-tar: fix the dotslash issue, add test, #8947
-- import-tar: when printing the path, use the already normalized item.path.
+- import-tar: fix the dot-slash issue, add test, #8947
+- import-tar: when printing the path, use the already-normalized item.path
 - preprocess_args: fix option name matching
 - fix ChunkerParams validation
 - mount --show-rc: display main process rc, #8308
@@ -443,15 +443,14 @@ Other changes:
 
 - support Python 3.14
 - msgpack: allow 1.1.2
-- msgpack version check: ignore "rc" or other version elements
-- pyproject.toml: SPDX expression for license, add license-files, #8771.
-  Also: raise setuptools version requirement appropriately.
+- msgpack version check: ignore "rc" and other version elements
+- pyproject.toml: use SPDX expression for license, add license-files, #8771.
+  Also raise the setuptools version requirement appropriately.
 
-  In case the setuptools requirement turns out to be a problem when
-  packaging borg for some OS distribution and an older setuptools must
-  be used, just do a reverse patch when packaging borg - there should
-  be no problem if you use some older setuptools.
-- Chunker params: warn for even window size for buzhash, #8868
+  If the setuptools requirement is problematic when packaging borg for an
+  OS distribution that must use an older setuptools, apply a reverse patch
+  when packaging borg; using an older setuptools should not be a problem.
+- Chunker params: warn about an even window size for buzhash, #8868
 - suppress compiler warning about CYTHON_FALLTHROUGH
 - remove unnecessary check that Padmé overhead is at most 12%
 - pyinstaller spec: avoid pkg_resources warning
@@ -459,23 +458,23 @@ Other changes:
 - docs:
 
   - borg-serve: simplify example of env in authorized_keys, #8318
-  - unify `master` and `1.4-maint` install docs
+  - unify `master` and `1.4-maint` installation docs
   - update install docs to include `SETUPTOOLS_SCM_PRETEND_VERSION`
-  - add Arch Linux to "installing from source" docs
-  - adds systemd-inhibit and examples, #8989
+  - add Arch Linux to the "Installing from source" docs
+  - add systemd-inhibit and examples, #8989
   - fix typos / grammar in docs and code
-  - how to debug borg mount, #5461
-  - what happens when a new keyfile repo is created at the same path? #6230
+  - document how to debug borg mount, #5461
+  - document what happens when a new keyfile repo is created at the same path, #6230
   - borg serve: recommend using a simple shell, #8318
-  - update README for the binaries
+  - update the README for the binaries
   - extract: document how to use wildcards in PATHs, #8589
   - improve borg help patterns, #7144
-  - clarify scope of default pattern style, #9004
+  - clarify the scope of the default pattern style, #9004
 - tests:
 
-  - save temp space
+  - save temporary space
   - test_chunkpoints_unchanged: do not use blake2b_256
-  - fix diff cmd test on macOS HFS+, #8860
+  - fix diff command test on macOS HFS+, #8860
   - fuzzing test for default chunker
   - read_only CM: skip test if cmd_immutable is unsuccessful, #9021
   - vagrant:
@@ -484,9 +483,9 @@ Other changes:
     - add debian trixie box
     - drop broken/EOL debian buster VM / borg-linux-glibc228
     - drop outdated/slow/unsupported macOS 10.12 VM / borg-macos1012 (Intel)
-  - pyproject.toml: correctly define test envs for fuse testing
-  - coverage / tox: use pyproject.toml
-  - ci: speed up pull requests
+  - pyproject.toml: correctly define test environments for FUSE testing
+  - coverage/tox: use pyproject.toml
+  - CI: speed up pull requests
 
 
 Version 1.4.1 (2025-04-19)

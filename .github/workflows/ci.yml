@@ -59,35 +59,36 @@ jobs:
       run: |
         bandit -r src/borg -c pyproject.toml
 
-  linux:
+  posix_tests:
 
     needs: [lint, security]
     strategy:
       fail-fast: true
-      matrix:
-        include:
-            - os: ubuntu-22.04
-              python-version: '3.10'
-              toxenv: mypy
-            - os: ubuntu-22.04
-              python-version: '3.11'
-              toxenv: docs
-            - os: ubuntu-22.04
-              python-version: '3.10'
-              toxenv: py310-fuse2
-            - os: ubuntu-22.04
-              python-version: '3.11'
-              toxenv: py311-fuse3
-            - os: ubuntu-24.04
-              python-version: '3.12'
-              toxenv: py312-fuse3
-            - os: ubuntu-24.04
-              python-version: '3.13'
-              toxenv: py313-fuse3
-            - os: ubuntu-24.04
-              python-version: '3.14'
-              toxenv: py314-fuse3
-
+      # noinspection YAMLSchemaValidation
+      matrix: >-
+        ${{ fromJSON(
+          github.event_name == 'pull_request' && '{
+            "include": [
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "mypy"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse2"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"}
+            ]
+          }' || '{
+            "include": [
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "mypy"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse2"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-fuse2", "binary": "borg-linux-glibc235-x86_64-gh"},
+              {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-fuse2", "binary": "borg-linux-glibc235-arm64-gh"},
+              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-fuse3"},
+              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-fuse3"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"},
+              {"os": "macos-13", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-13-x86_64-gh"},
+              {"os": "macos-14", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-14-arm64-gh"}
+            ]
+          }'
+        ) }}
     env:
       TOXENV: ${{ matrix.toxenv }}
 
@@ -99,10 +100,32 @@ jobs:
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
+        fetch-tags: true
+
+    - name: Detect if commit is tagged
+      id: detect_tag
+      run: |
+        tag="$(git describe --exact-match --tags HEAD 2>/dev/null || true)"
+        # If HEAD is a merge commit, the PR head is usually the second parent (HEAD^2).
+        if [ -z "$tag" ] && git rev-parse -q --verify HEAD^2 >/dev/null 2>&1; then
+          tag="$(git describe --exact-match --tags HEAD^2 2>/dev/null || true)"
+        fi
+        echo "Found tag: ${tag}"
+        echo "tagged=$tag" >> "$GITHUB_OUTPUT"
+
+    - name: Check out exact tag
+      if: ${{ steps.detect_tag.outputs.tagged }}
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.detect_tag.outputs.tagged }}
+        fetch-depth: 0
+        fetch-tags: true
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+
     - name: Cache pip
       uses: actions/cache@v4
       with:
@@ -113,6 +136,7 @@ jobs:
             ${{ runner.os }}-
 
     - name: Install Linux packages
+      if: ${{ runner.os == 'Linux' }}
       run: |
         sudo apt-get update
         sudo apt-get install -y pkg-config build-essential
@@ -121,7 +145,15 @@ jobs:
         sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
         sudo apt-get install -y bash zsh fish  # for shell completion tests
         sudo apt-get install -y rclone openssh-server curl
+
+    - name: Install macOS packages
+      if: ${{ runner.os == 'macOS' }}
+      run: |
+        brew unlink pkg-config@0.29.2 || true
+        brew bundle install
+
     - name: Configure OpenSSH SFTP server (test only)
+      if: ${{ runner.os == 'Linux' }}
       run: |
         sudo mkdir -p /run/sshd
         sudo useradd -m -s /bin/bash sftpuser || true
@@ -149,7 +181,9 @@ jobs:
         ssh-add ~/.ssh/id_ed25519
         # Export SFTP test URL for tox via GITHUB_ENV
         echo "BORG_TEST_SFTP_REPO=sftp://sftpuser@localhost:22/borg/sftp-repo" >> $GITHUB_ENV
+
     - name: Install and configure MinIO S3 server (test only)
+      if: ${{ runner.os == 'Linux' }}
       run: |
         set -e
         arch=$(uname -m)
@@ -174,13 +208,16 @@ jobs:
         mc mb --ignore-existing local/borg
         # Export S3 test URL for tox via GITHUB_ENV
         echo "BORG_TEST_S3_REPO=s3:minioadmin:minioadmin@http://127.0.0.1:9000/borg/s3-repo" >> $GITHUB_ENV
+
     - name: Install Python requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.d/development.txt
+
     - name: Install borgbackup
       run: |
         pip install -e .
+
     - name: run tox env
       env:
         XDISTN: "4"
@@ -188,6 +225,7 @@ jobs:
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
         tox --skip-missing-interpreters
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       env:
@@ -197,84 +235,53 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         env_vars: OS, python
 
-  macOS:
-
-    needs: linux
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-            - os: macos-14
-              python-version: '3.11'
-              toxenv: py311-none  # Note: no FUSE testing due to #6099; see also #6196.
-
-    env:
-      # Configure pkg-config to use OpenSSL from Homebrew
-      PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
-      TOXENV: ${{ matrix.toxenv }}
-
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 180
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        # Just fetching one commit is not enough for setuptools-scm, so we fetch all
-        fetch-depth: 0
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Cache pip
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
-        restore-keys: |
-            ${{ runner.os }}-pip-
-            ${{ runner.os }}-
-
-    - name: Install macOS packages
+    - name: Build Borg fat binaries (${{ matrix.binary }})
+      if: ${{ matrix.binary && steps.detect_tag.outputs.tagged }}
       run: |
-        brew unlink pkg-config@0.29.2 || true
-        brew bundle install
+        pip install 'pyinstaller==6.14.2'
+        mkdir -p dist/binary
+        pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
 
-    - name: Install Python requirements
+    - name: Smoke-test the built binary (${{ matrix.binary }})
+      if: ${{ matrix.binary && steps.detect_tag.outputs.tagged }}
       run: |
-        python -m pip install --upgrade pip setuptools wheel
-        pip install -r requirements.d/development.txt
-    - name: Install BorgBackup
-      env:
-        # We already have this in the global environment, but something overrides it.
-        # So set it here again.
-        PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
+        pushd dist/binary
+        echo "single-file binary"
+        chmod +x borg.exe
+        ./borg.exe -V
+        echo "single-directory binary"
+        chmod +x borg-dir/borg.exe
+        ./borg-dir/borg.exe -V
+        tar czf borg.tgz borg-dir
+        popd
+
+    - name: Prepare binaries (${{ matrix.binary }})
+      if: ${{ matrix.binary && steps.detect_tag.outputs.tagged }}
       run: |
-        pip install -ve .
-    - name: Run pytest via tox
-      env:
-        # We already have this in the global environment, but something overrides it.
-        # So set it here again.
-        PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
-        XDISTN: "6"
-      run: |
-        # Do not use fakeroot; run as root. Avoids the dreaded sporadic EISDIR failures; see #2482.
-        #sudo -E bash -c "tox -e py"
-        tox --skip-missing-interpreters
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      env:
-        OS: ${{ runner.os }}
-        python: ${{ matrix.python-version }}
+        mkdir -p artifacts
+        if [ -f dist/binary/borg.exe ]; then
+          cp dist/binary/borg.exe artifacts/${{ matrix.binary }}
+        fi
+        if [ -f dist/binary/borg.tgz ]; then
+          cp dist/binary/borg.tgz artifacts/${{ matrix.binary }}.tgz
+        fi
+        echo "binary files"
+        ls -l artifacts/
+
+    - name: Upload binaries (${{ matrix.binary }})
+      if: ${{ matrix.binary && steps.detect_tag.outputs.tagged }}
+      uses: actions/upload-artifact@v4
       with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        env_vars: OS, python
+        name: ${{ matrix.binary }}
+        path: artifacts/*
+        if-no-files-found: error
 
-  windows:
+  windows_tests:
 
     if: false  # can be used to temporarily disable the build
     runs-on: windows-latest
     timeout-minutes: 120
-    needs: linux
+    needs: posix_tests
 
     env:
       PY_COLORS: 1
@@ -287,12 +294,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
           update: true
+
       - name: Install system packages
         run: ./scripts/msys2-install-deps development
+
       - name: Build python venv
         run: |
           # building cffi / argon2-cffi in the venv fails, so we try to use the system packages
@@ -300,7 +310,8 @@ jobs:
           . env/bin/activate
           # python -m pip install --upgrade pip
           # pip install --upgrade setuptools build wheel
-          pip install pyinstaller==6.11.1
+          pip install pyinstaller==6.14.2
+
       - name: Build
         run: |
           # build borg.exe
@@ -309,16 +320,19 @@ jobs:
           pyinstaller -y scripts/borg.exe.spec
           # build sdist and wheel in dist/...
           python -m build
+
       - uses: actions/upload-artifact@v4
         with:
           name: borg-windows
           path: dist/borg.exe
+
       - name: Run tests
         run: |
           ./dist/borg.exe -V
           . env/bin/activate
           borg -V
           python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote"
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         env:

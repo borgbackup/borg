@@ -74,7 +74,7 @@ jobs:
               toxenv: docs
             - os: ubuntu-22.04
               python-version: '3.10'
-              toxenv: py310-fuse2
+              toxenv: py310-fuse3
             - os: ubuntu-22.04
               python-version: '3.11'
               toxenv: py311-fuse3

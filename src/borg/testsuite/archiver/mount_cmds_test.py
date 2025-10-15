@@ -12,7 +12,7 @@ from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, llfuse
 from .. import changedir, no_selinux, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
-from ..platform.platform_test import fakeroot_detected
+from ..platform.platform_test import fakeroot_detected, skipif_not_linux, skipif_acls_not_working
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
 from . import requires_hardlinks, _extract_hardlinks_setup, fuse_mount, create_test_files, generate_archiver_tests
 
@@ -269,6 +269,56 @@ def test_fuse_mount_options(archivers, request):
         assert sorted(os.listdir(os.path.join(mountpoint))) == ["arch11", "arch12", "arch21", "arch22"]
     with fuse_mount(archiver, mountpoint, "--match-archives=nope"):
         assert sorted(os.listdir(os.path.join(mountpoint))) == []
+
+
+@pytest.mark.skipif(not llfuse, reason="llfuse not installed")
+@skipif_not_linux
+@skipif_acls_not_working
+def test_fuse_acl_support(archivers, request):
+    """Test that ACLs are correctly exposed through the FUSE interface."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # Create a file with access ACL
+    file_path = os.path.join(archiver.input_path, "aclfile")
+    with open(file_path, "w") as f:
+        f.write("test content")
+    access_acl = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:rw-:0\ngroup:root:r--:0\n"
+    platform.acl_set(file_path, {"acl_access": access_acl})
+
+    # Create a directory with default ACL
+    dir_path = os.path.join(archiver.input_path, "acldir")
+    os.mkdir(dir_path)
+    default_acl = b"user::rw-\ngroup::r--\nmask::rw-\nother::---\nuser:root:r--:0\ngroup:root:r--:0\n"
+    platform.acl_set(dir_path, {"acl_access": access_acl, "acl_default": default_acl})
+
+    # Create an archive
+    cmd(archiver, "create", "test", "input")
+
+    # Mount the archive
+    mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
+    with fuse_mount(archiver, mountpoint, "-a", "test"):
+        # Verify file ACLs are preserved
+        mounted_file = os.path.join(mountpoint, "test", "input", "aclfile")
+        assert os.path.exists(mounted_file)
+        assert os.path.isfile(mounted_file)
+        file_acl = {}
+        platform.acl_get(mounted_file, file_acl, os.stat(mounted_file))
+        assert "acl_access" in file_acl
+        assert b"user::rw-" in file_acl["acl_access"]
+        assert b"user:root:rw-" in file_acl["acl_access"]
+        # Verify directory ACLs are preserved
+        mounted_dir = os.path.join(mountpoint, "test", "input", "acldir")
+        assert os.path.exists(mounted_dir)
+        assert os.path.isdir(mounted_dir)
+        dir_acl = {}
+        platform.acl_get(mounted_dir, dir_acl, os.stat(mounted_dir))
+        assert "acl_access" in dir_acl
+        assert "acl_default" in dir_acl
+        assert b"user::rw-" in dir_acl["acl_access"]
+        assert b"user:root:rw-" in dir_acl["acl_access"]
+        assert b"user::rw-" in dir_acl["acl_default"]
+        assert b"user:root:r--" in dir_acl["acl_default"]
 
 
 @pytest.mark.skipif(not llfuse, reason="llfuse not installed")

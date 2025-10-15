@@ -1,8 +1,11 @@
 from hashlib import sha256
 from io import BytesIO
 import os
+import random
 
-from . import cf
+import pytest
+
+from . import cf, cf_expand
 from ...chunkers import Chunker
 from ...constants import *  # NOQA
 from ...helpers import hex_to_bin
@@ -67,3 +70,43 @@ def test_buzhash_chunksize_distribution():
     # most chunks should be cut due to buzhash triggering, not due to clipping at min/max size:
     assert min_count < 10
     assert max_count < 10
+
+
+@pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+@pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
+def test_fuzz_buzhash(worker):
+    # Fuzz the default chunker (buzhash) with random and uniform data of misc. sizes and seeds 0 or random int32 values.
+    def rnd_int32():
+        uint = random.getrandbits(32)
+        return uint if uint < 2**31 else uint - 2**32
+
+    # decompose CHUNKER_PARAMS = (algo, min_exp, max_exp, mask_bits, window_size)
+    algo, min_exp, max_exp, mask_bits, win_size = CHUNKER_PARAMS
+    assert algo == CH_BUZHASH  # default chunker must be buzhash here
+
+    seeds = [0] + [rnd_int32() for _ in range(50)]
+    sizes = [random.randint(1, 4 * 1024 * 1024) for _ in range(50)]
+
+    for seed in seeds:
+        chunker = Chunker(seed, min_exp, max_exp, mask_bits, win_size)
+        for size in sizes:
+            # Random data
+            data = os.urandom(size)
+            with BytesIO(data) as bio:
+                parts = cf_expand(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            assert reconstructed == data
+
+            # All-same data (non-zero)
+            data = b"\x42" * size
+            with BytesIO(data) as bio:
+                parts = cf_expand(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            assert reconstructed == data
+
+            # All-zero data
+            data = b"\x00" * size
+            with BytesIO(data) as bio:
+                parts = cf_expand(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            assert reconstructed == data

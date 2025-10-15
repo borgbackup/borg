@@ -22,6 +22,11 @@ def cf(chunks):
     return [_cf(chunk) for chunk in chunks]
 
 
+def cf_expand(chunks):
+    """same as cf, but do not return ints for HOLE and ALLOC, but all-zero bytestrings"""
+    return [ch if isinstance(ch, bytes) else b"\0" * ch for ch in cf(chunks)]
+
+
 def make_sparsefile(fname, sparsemap, header_size=0):
     with open(fname, "wb") as fd:
         total = 0

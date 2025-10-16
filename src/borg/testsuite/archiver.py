@@ -1617,6 +1617,90 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         info_archive = self.cmd('info', '--first', '1', self.repository_location)
         assert 'Archive name: test\n' in info_archive
 
+    def test_info_matches_create_deduplicated_size(self):
+        # Create two identical files to ensure intra-archive deduplication happens,
+        # so the deduplicated size is visibly different from compressed size.
+        data = b'X' * (1024 * 80)
+        self.create_regular_file('file1', contents=data)
+        self.create_regular_file('file2', contents=data)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        create_out = self.cmd('create', '--stats', self.repository_location + '::test', 'input')
+        info_out = self.cmd('info', self.repository_location + '::test')
+
+        import re
+
+        def get_dedup(s):
+            m = re.search(r'^This archive:\s+(.*?)\s+(.*?)\s+(.+)$', s, re.M)
+            assert m is not None, s
+            return m.group(3).strip()
+
+        dedup_create = get_dedup(create_out)
+        dedup_info = get_dedup(info_out)
+        assert dedup_create == dedup_info
+
+    def test_info_matches_create_all_archives_deduplicated_size(self):
+        # Verify that the "All archives" deduplicated size reported by `borg create --stats`
+        # matches the one reported by `borg info <repo>`.
+        data = b'Y' * (1024 * 80)
+        self.create_regular_file('file1', contents=data)
+        self.create_regular_file('file2', contents=data)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        # Create two archives so that the "All archives" section is meaningful and stable.
+        self.cmd('create', '--stats', self.repository_location + '::a1', 'input')
+        create_out2 = self.cmd('create', '--stats', self.repository_location + '::a2', 'input')
+        info_repo = self.cmd('info', self.repository_location)
+
+        import re
+
+        def get_all_dedup(s):
+            m = re.search(r'^All archives:\s+(.*?)\s+(.*?)\s+(.+)$', s, re.M)
+            assert m is not None, s
+            return m.group(3).strip()
+
+        dedup_create_all = get_all_dedup(create_out2)
+        dedup_info_all = get_all_dedup(info_repo)
+        assert dedup_create_all == dedup_info_all
+
+    def test_single_archive_all_equals_this_info_and_create(self):
+        # With a single archive in the repository, the deduplicated size for
+        # "This archive" and "All archives" should be identical, both in
+        # `borg create --stats` and in `borg info` (repo and archive views).
+        data = b'Z' * (1024 * 80)
+        self.create_regular_file('file1', contents=data)
+        self.create_regular_file('file2', contents=data)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        create_out = self.cmd('create', '--stats', self.repository_location + '::only', 'input')
+
+        import re
+
+        def get_this_dedup(s):
+            m = re.search(r'^This archive:\s+(.*?)\s+(.*?)\s+(.+)$', s, re.M)
+            assert m is not None, s
+            return m.group(3).strip()
+
+        def get_all_dedup(s):
+            m = re.search(r'^All archives:\s+(.*?)\s+(.*?)\s+(.+)$', s, re.M)
+            assert m is not None, s
+            return m.group(3).strip()
+
+        # From create --stats
+        dedup_this_create = get_this_dedup(create_out)
+        dedup_all_create = get_all_dedup(create_out)
+
+        # From info (archive and repository views)
+        info_archive = self.cmd('info', self.repository_location + '::only')
+        info_repo = self.cmd('info', self.repository_location)
+        dedup_this_info = get_this_dedup(info_archive)
+        dedup_all_info = get_all_dedup(info_repo)
+
+        # create and info shall give the same numbers
+        assert dedup_this_create == dedup_this_info
+        assert dedup_all_create == dedup_all_info
+        # accounting for "all archives" includes metadata chunks, for "this archive" it does not,
+        # thus a mismatch is expected.
+        assert dedup_this_create != dedup_all_create
+        assert dedup_this_info != dedup_all_info
+
     def test_info_json(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
@@ -4020,6 +4104,25 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with environment_variable(BORG_EXIT_CODES='modern'):
             self.cmd('create', self.repository_location + '::archive', 'input', fork=True,
                      exit_code=Repository.InvalidRepository.exit_mcode)
+
+    def test_original_size_stable_across_recreate(self):
+        # Test that changes in archive metadata (like number of chunks) do not influence the original size.
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+
+        def original_size(archive_name):
+            info = json.loads(self.cmd('info', '--json', f"{self.repository_location}::{archive_name}"))
+            return info['archives'][0]['stats']['original_size']
+
+        sizes = [12345, 67890]
+        self.create_regular_file('file1', size=sizes[0])
+        self.create_regular_file('file2', size=sizes[1])
+
+        self.cmd('create', '--compression=none', self.repository_location + '::archive', 'input')
+        assert original_size('archive') == sum(sizes)
+
+        # Recreate with different chunker params to try to reproduce #8898.
+        self.cmd('recreate', '--chunker-params=10,12,11,63', self.repository_location + '::archive')
+        assert original_size('archive') == sum(sizes)
 
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')

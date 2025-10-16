@@ -489,7 +489,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         )
         self.decrypted_repository.log_instrumentation()
 
-    def mount(self, mountpoint, mount_options, foreground=False):
+    def mount(self, mountpoint, mount_options, foreground=False, show_rc=False):
         """Mount filesystem on *mountpoint* with *mount_options*."""
 
         def pop_option(options, key, present, not_present, wanted_type, int_base=0):
@@ -562,7 +562,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             if isinstance(self.repository_uncached, RemoteRepository):
                 daemonize()
             else:
-                with daemonizing() as (old_id, new_id):
+                with daemonizing(show_rc=show_rc) as (old_id, new_id):
                     # local repo: the locking process' PID is changing, migrate it:
                     logger.debug("fuse: mount local repo, going to background: migrating lock.")
                     self.repository_uncached.migrate_lock(old_id, new_id)

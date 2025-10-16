@@ -197,6 +197,6 @@ def do_show_rc(exit_code):
                 rc_logger.warning(exit_msg % (ec_class, exit_code))
             elif ec_class in ("error", "signal"):
                 rc_logger.error(exit_msg % (ec_class, exit_code))
-    except Exception:
+    except Exception:  # nosec B110
         # Never let logging issues interfere with exit behaviour
         pass

@@ -634,7 +634,7 @@ def test_progress_on(archivers, request):
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = cmd(archiver, "create", "test4", "input", "--progress")
-    assert "\r" in output
+    assert "0 B O 0 B U 0 N" in output
 
 
 def test_progress_off(archivers, request):
@@ -642,7 +642,7 @@ def test_progress_off(archivers, request):
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = cmd(archiver, "create", "test5", "input")
-    assert "\r" not in output
+    assert "0 B O 0 B U 0 N" not in output
 
 
 def test_file_status(archivers, request):

@@ -144,8 +144,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b19 (2025-07-02)
------------------------------
+Version 2.0.0b20 (not released yet)
+-----------------------------------
 
 Please note:
 
@@ -153,6 +153,64 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- fat binary builds on GitHub (see assets on the GitHub releases page):
+
+  - for Linux with glibc 2.35+ (Intel/AMD and ARM64)
+  - for macOS 14+ (Apple Silicon/ARM64) and macOS 13+ (Intel)
+- export-tar/import-tar: support for POSIX ACLs (PAX format)
+- list --format: add "inode" placeholder
+- improved tty-less progress reporting (--progress), #9055
+
+Fixes:
+
+- transfer: fix borg transfer corrupting the source repo index, #9022
+- legacyrepository: remove auto_recover, #9022
+- fix reading borg 1.x repo index, #9022
+- enable S3 support of borgstore
+- mount --show-rc: display main process return code (rc), #8308
+- create: add exception handler for NODUMP-excluded directories, #9032
+
+Other changes:
+
+- support Python 3.14, msgpack 1.1.2, use Cython 3.1.4
+- require setuptools>=78.1.1, #9042
+- Brewfile: use openssl@3
+- GitHub Actions: use korthout/backport-action
+- tests:
+
+  - add fuzzing tests for chunkers
+  - add tests for diff output of archives with hard links
+  - read_only CM: skip test if cmd_immutable is unsuccessful, fixes #9021
+  - save space in test_create_* tests
+  - CI/tests: add SFTP/rclone/S3 repo testing
+  - CI: add local servers for S3 and SFTP testing
+  - transfer: add test for unexpected src repo index change, #9022
+  - pyproject.toml: correctly define test environments for FUSE testing
+- Vagrant:
+
+  - add Debian testing/Trixie box
+  - drop macOS 10.12 box
+  - use Python 3.13.8 for binary building and tests
+  - use PyInstaller 6.14.2 for binary building
+- docs:
+
+  - update README for binaries
+  - improve borg help patterns, #7144
+  - patterns: clarify scope of default pattern style, #9004
+  - extract: document how to use wildcards in PATHs, #8589
+  - how to debug borg mount, #5461
+  - document what happens when a new keyfile repo is created at the same path, #6230
+  - update install docs to include `SETUPTOOLS_SCM_PRETEND_VERSION`
+  - add Arch Linux to the 'Installing from source' docs
+  - add systemd-inhibit and examples, #8989
+  - code/docs: fix typos and grammar
+
+
+Version 2.0.0b19 (2025-07-02)
+-----------------------------
 
 Fixes:
 

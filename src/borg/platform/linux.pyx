@@ -149,9 +149,12 @@ def set_flags(path, bsd_flags, fd=None):
     if open_fd:
         fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
     try:
-        # Get current flags. If this fails, fall back to 0 so we can still attempt to set.
+        # Get current flags.
         if ioctl(fd, FS_IOC_GETFLAGS, &flags) == -1:
-            flags = 0
+            # If this fails, give up because it is either not supported by the fs
+            # or maybe not permitted? If we can't determine the current flags,
+            # we better not risk corrupting them by setflags, see the comment below.
+            return  # give up silently
 
         # Replace only the bits we actually want to influence, keep others.
         # We can't just set all flags to the archived value, because we might

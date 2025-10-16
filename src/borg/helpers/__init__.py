@@ -6,6 +6,7 @@ package, which are imported here for compatibility.
 """
 
 import os
+import logging
 from typing import List
 from collections import namedtuple
 
@@ -172,3 +173,30 @@ def get_reset_ec(ec=None):
     rc = get_ec(ec)
     init_ec_warnings()
     return rc
+
+
+def do_show_rc(exit_code):
+    """Log the program return code using the dedicated 'borg.output.show-rc' logger.
+
+    Uses INFO/WARNING/ERROR levels depending on the classified exit code.
+
+    This helper is robust: it swallows any exceptions to avoid interfering with
+    program exit behavior. Callers do not need to guard it with try/except.
+    """
+    try:
+        exit_msg = "terminating with %s status, rc %d"
+        rc_logger = logging.getLogger("borg.output.show-rc")
+        try:
+            ec_class = classify_ec(exit_code)
+        except ValueError:
+            rc_logger.error(exit_msg % ("abnormal", exit_code or 666))
+        else:
+            if ec_class == "success":
+                rc_logger.info(exit_msg % (ec_class, exit_code))
+            elif ec_class == "warning":
+                rc_logger.warning(exit_msg % (ec_class, exit_code))
+            elif ec_class in ("error", "signal"):
+                rc_logger.error(exit_msg % (ec_class, exit_code))
+    except Exception:
+        # Never let logging issues interfere with exit behaviour
+        pass

@@ -34,7 +34,7 @@ try:
     from ._common import Highlander
     from .. import __version__
     from ..constants import *  # NOQA
-    from ..helpers import EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE, classify_ec
+    from ..helpers import EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from ..helpers import Error, CommandError, get_ec, modern_ec
     from ..helpers import add_warning, BorgWarning, BackupWarning
     from ..helpers import format_file_size
@@ -686,21 +686,9 @@ def main():  # pragma: no cover
         if tb:
             logger.log(tb_log_level, tb)
         if args.show_rc:
-            rc_logger = logging.getLogger("borg.output.show-rc")
-            exit_msg = "terminating with %s status, rc %d"
-            try:
-                ec_class = classify_ec(exit_code)
-            except ValueError:
-                rc_logger.error(exit_msg % ("abnormal", exit_code or 666))
-            else:
-                if ec_class == "success":
-                    rc_logger.info(exit_msg % (ec_class, exit_code))
-                elif ec_class == "warning":
-                    rc_logger.warning(exit_msg % (ec_class, exit_code))
-                elif ec_class == "error":
-                    rc_logger.error(exit_msg % (ec_class, exit_code))
-                elif ec_class == "signal":
-                    rc_logger.error(exit_msg % (ec_class, exit_code))
+            from ..helpers import do_show_rc
+
+            do_show_rc(exit_code)
         sys.exit(exit_code)
 
 

@@ -40,7 +40,7 @@ class MountMixIn:
             operations = FuseOperations(manifest, args, cached_repo)
             logger.info("Mounting filesystem")
             try:
-                operations.mount(args.mountpoint, args.options, args.foreground)
+                operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
             except RuntimeError:
                 # Relevant error message already printed to stderr by FUSE
                 raise RTError("FUSE mount failed")

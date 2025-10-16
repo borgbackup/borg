@@ -63,7 +63,7 @@ def daemonize():
 
 
 @contextlib.contextmanager
-def daemonizing(*, timeout=5):
+def daemonizing(*, timeout=5, show_rc=False):
     """Like daemonize(), but as a context manager.
 
     The with-body is executed in the background process,
@@ -112,6 +112,13 @@ def daemonizing(*, timeout=5):
                     logger.warning("Daemonizing: Background process did not respond (timeout). Is it alive?")
                     exit_code = EXIT_WARNING
                 finally:
+                    # Before terminating the foreground process, honor --show-rc by logging the rc here as well.
+                    # This is mostly a consistency fix and not very useful considering that the main action
+                    # happens in the daemon process.
+                    if show_rc:
+                        from ..helpers import do_show_rc
+
+                        do_show_rc(exit_code)
                     # Don't call with-body, but die immediately!
                     # return would be sufficient, but we want to pass the exit code.
                     raise _ExitCodeException(exit_code)

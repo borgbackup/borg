@@ -126,10 +126,9 @@ BSD_TO_LINUX_FLAGS = {
     stat.UF_NODUMP: FS_NODUMP_FL,
     stat.UF_IMMUTABLE: FS_IMMUTABLE_FL,
     stat.UF_APPEND: FS_APPEND_FL,
-    stat.UF_COMPRESSED: FS_COMPR_FL,
 }
 # must be a bitwise OR of all values in BSD_TO_LINUX_FLAGS.
-LINUX_MASK = FS_NODUMP_FL | FS_IMMUTABLE_FL | FS_APPEND_FL | FS_COMPR_FL
+LINUX_MASK = FS_NODUMP_FL | FS_IMMUTABLE_FL | FS_APPEND_FL
 
 
 def set_flags(path, bsd_flags, fd=None):

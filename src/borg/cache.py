@@ -31,7 +31,7 @@ from .helpers import ProgressIndicatorMessage
 from .helpers import msgpack
 from .helpers.msgpack import int_to_timestamp, timestamp_to_int
 from .item import ChunkListEntry
-from .crypto.key import PlaintextKey
+from .crypto.key import PlaintextKey, KeyBase
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from .manifest import Manifest
 from .platform import SaveFile
@@ -39,7 +39,7 @@ from .remote import RemoteRepository
 from .repository import LIST_SCAN_LIMIT, Repository, StoreObjectNotFound, repo_lister
 
 
-def files_cache_name(archive_name, files_cache_name="files"):
+def files_cache_name(archive_name: str, files_cache_name: str = "files") -> str:
     """
     Return the name of the files cache file for the given archive name.
 
@@ -56,7 +56,7 @@ def files_cache_name(archive_name, files_cache_name="files"):
     return files_cache_name + "." + suffix
 
 
-def discover_files_cache_names(path, files_cache_name="files"):
+def discover_files_cache_names(path: Path, files_cache_name: str = "files") -> list[str]:
     """
     Return a list of all files cache file names in the given directory.
 
@@ -91,7 +91,7 @@ class SecurityManager:
     be reconciled, and also with no cache existing but a security database entry.
     """
 
-    def __init__(self, repository):
+    def __init__(self, repository: Repository | RemoteRepository) -> None:
         self.repository = repository
         self.dir = Path(get_security_dir(repository.id_str, legacy=(repository.version == 1)))
         self.key_type_file = self.dir / "key-type"
@@ -99,16 +99,16 @@ class SecurityManager:
         self.manifest_ts_file = self.dir / "manifest-timestamp"
 
     @staticmethod
-    def destroy(repository, path=None):
+    def destroy(repository: Repository | RemoteRepository, path: str | None = None) -> None:
         """Destroys the security directory for ``repository`` or at ``path``."""
         path = path or get_security_dir(repository.id_str, legacy=(repository.version == 1))
         if Path(path).exists():
             shutil.rmtree(path)
 
-    def known(self):
+    def known(self) -> bool:
         return all(f.exists() for f in (self.key_type_file, self.location_file, self.manifest_ts_file))
 
-    def key_matches(self, key):
+    def key_matches(self, key: KeyBase) -> bool:
         if not self.known():
             return False
         try:
@@ -117,8 +117,9 @@ class SecurityManager:
                 return type == str(key.TYPE)
         except OSError as exc:
             logger.warning("Could not read/parse key type file: %s", exc)
+            return False
 
-    def save(self, manifest, key):
+    def save(self, manifest: Manifest, key: KeyBase) -> None:
         logger.debug("security: saving state for %s to %s", self.repository.id_str, str(self.dir))
         current_location = self.repository._location.canonical_path()
         logger.debug("security: current location   %s", current_location)
@@ -131,7 +132,7 @@ class SecurityManager:
         with SaveFile(self.manifest_ts_file) as fd:
             fd.write(manifest.timestamp)
 
-    def assert_location_matches(self):
+    def assert_location_matches(self) -> None:
         # Warn user before sending data to a relocated repository
         try:
             with self.location_file.open() as fd:
@@ -165,7 +166,7 @@ class SecurityManager:
             with SaveFile(self.location_file) as fd:
                 fd.write(repository_location)
 
-    def assert_no_manifest_replay(self, manifest, key):
+    def assert_no_manifest_replay(self, manifest: Manifest, key: KeyBase) -> None:
         try:
             with self.manifest_ts_file.open() as fd:
                 timestamp = fd.read()
@@ -184,19 +185,19 @@ class SecurityManager:
             else:
                 raise Cache.RepositoryReplay()
 
-    def assert_key_type(self, key):
+    def assert_key_type(self, key: KeyBase) -> None:
         # Make sure an encrypted repository has not been swapped for an unencrypted repository
         if self.known() and not self.key_matches(key):
             raise Cache.EncryptionMethodMismatch()
 
-    def assert_secure(self, manifest, key, *, warn_if_unencrypted=True):
+    def assert_secure(self, manifest: Manifest, key: KeyBase, *, warn_if_unencrypted=True) -> None:
         # warn_if_unencrypted=False is only used for initializing a new repository.
         # Thus, avoiding asking about a repository that's currently initializing.
         self.assert_access_unknown(warn_if_unencrypted, manifest, key)
         self._assert_secure(manifest, key)
         logger.debug("security: repository checks ok, allowing access")
 
-    def _assert_secure(self, manifest, key):
+    def _assert_secure(self, manifest: Manifest, key: KeyBase) -> None:
         self.assert_location_matches()
         self.assert_key_type(key)
         self.assert_no_manifest_replay(manifest, key)
@@ -204,7 +205,7 @@ class SecurityManager:
             logger.debug("security: remembering previously unknown repository")
             self.save(manifest, key)
 
-    def assert_access_unknown(self, warn_if_unencrypted, manifest, key):
+    def assert_access_unknown(self, warn_if_unencrypted: bool, manifest: Manifest, key: KeyBase) -> None:
         # warn_if_unencrypted=False is only used for initializing a new repository.
         # Thus, avoiding asking about a repository that's currently initializing.
         if not key.logically_encrypted and not self.known():
@@ -229,33 +230,33 @@ class SecurityManager:
                 raise Cache.CacheInitAbortedError()
 
 
-def assert_secure(repository, manifest):
+def assert_secure(repository: Repository | RemoteRepository, manifest: Manifest) -> None:
     sm = SecurityManager(repository)
     sm.assert_secure(manifest, manifest.key)
 
 
-def cache_dir(repository, path=None):
+def cache_dir(repository: Repository | RemoteRepository, path: Path | str | None = None) -> Path:
     return Path(path) if path else Path(get_cache_dir()) / repository.id_str
 
 
 class CacheConfig:
-    def __init__(self, repository, path=None):
+    def __init__(self, repository: Repository | RemoteRepository, path: Path | str | None = None) -> None:
         self.repository = repository
         self.path = cache_dir(repository, path)
         logger.debug("Using %s as cache", self.path)
         self.config_path = self.path / "config"
 
-    def __enter__(self):
+    def __enter__(self) -> "CacheConfig":
         self.open()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
 
-    def exists(self):
+    def exists(self) -> bool:
         return self.config_path.exists()
 
-    def create(self):
+    def create(self) -> None:
         assert not self.exists()
         config = configparser.ConfigParser(interpolation=None)
         config.add_section("cache")
@@ -267,10 +268,10 @@ class CacheConfig:
         with SaveFile(self.config_path) as fd:
             config.write(fd)
 
-    def open(self):
+    def open(self) -> None:
         self.load()
 
-    def load(self):
+    def load(self) -> None:
         self._config = configparser.ConfigParser(interpolation=None)
         with self.config_path.open() as fd:
             self._config.read_file(fd)
@@ -296,7 +297,7 @@ class CacheConfig:
             logger.debug("Cache integrity: No integrity data found (files, chunks). Cache is from old version.")
             self.integrity = {}
 
-    def save(self, manifest=None):
+    def save(self, manifest: Manifest | None = None) -> None:
         if manifest:
             self._config.set("cache", "manifest", manifest.id_str)
             self._config.set("cache", "ignored_features", ",".join(self.ignored_features))
@@ -309,10 +310,10 @@ class CacheConfig:
         with SaveFile(self.config_path) as fd:
             self._config.write(fd)
 
-    def close(self):
+    def close(self) -> None:
         pass
 
-    def _check_upgrade(self, config_path):
+    def _check_upgrade(self, config_path: Path) -> None:
         try:
             cache_version = self._config.getint("cache", "version")
             wanted_version = 1
@@ -359,7 +360,7 @@ class Cache:
         pass
 
     @staticmethod
-    def destroy(repository, path=None):
+    def destroy(repository: Repository | RemoteRepository, path: Path | None = None) -> None:
         """destroy the cache for ``repository`` or at ``path``"""
         path = cache_dir(repository, path)
         config = path / "config"
@@ -370,15 +371,15 @@ class Cache:
     def __new__(
         cls,
         repository,
-        manifest,
-        path=None,
+        manifest: Manifest,
+        path: Path | str | None = None,
         sync=True,
         warn_if_unencrypted=True,
         progress=False,
-        cache_mode=FILES_CACHE_MODE_DISABLED,
+        cache_mode: str = FILES_CACHE_MODE_DISABLED,
         iec=False,
-        archive_name=None,
-        start_backup=None,
+        archive_name: str | None = None,
+        start_backup: int | None = None,
     ):
         return AdHocWithFilesCache(
             manifest=manifest,
@@ -403,18 +404,23 @@ class FilesCacheMixin:
     """
 
     FILES_CACHE_NAME = "files"
+    chunks: ChunkIndex
+    manifest: Manifest
+    key: KeyBase
+    path: Path
+    cache_config: CacheConfig
 
-    def __init__(self, cache_mode, archive_name=None, start_backup=None):
+    def __init__(self, cache_mode: str, archive_name: str | None = None, start_backup: int | None = None) -> None:
         self.archive_name = archive_name  # ideally a SERIES name
         assert not ("c" in cache_mode and "m" in cache_mode)
         assert "d" in cache_mode or "c" in cache_mode or "m" in cache_mode
         self.cache_mode = cache_mode
-        self._files = None
+        self._files: dict | None = None
         self._newest_cmtime = 0
-        self._newest_path_hashes = set()
+        self._newest_path_hashes: set[bytes] = set()
         self.start_backup = start_backup
 
-    def compress_entry(self, entry):
+    def compress_entry(self, entry: FileCacheEntry) -> bytes:
         """
         compress a files cache entry:
 
@@ -437,7 +443,7 @@ class FilesCacheMixin:
         entry = entry._replace(chunks=compressed_chunks)
         return msgpack.packb(entry)
 
-    def decompress_entry(self, entry_packed):
+    def decompress_entry(self, entry_packed: bytes) -> FileCacheEntry:
         """reverse operation of compress_entry"""
         assert isinstance(self.chunks, ChunkIndex), f"{self.chunks} is not a ChunkIndex"
         assert isinstance(entry_packed, bytes)
@@ -454,7 +460,7 @@ class FilesCacheMixin:
         return entry
 
     @property
-    def files(self):
+    def files(self) -> dict:
         if self._files is None:
             self._files = self._read_files_cache()  # try loading from cache dir
         if self._files is None:
@@ -463,13 +469,13 @@ class FilesCacheMixin:
             self._files = {}  # start from scratch
         return self._files
 
-    def _build_files_cache(self):
+    def _build_files_cache(self) -> dict | None:
         """rebuild the files cache by reading previous archive from repository"""
         if "d" in self.cache_mode:  # d(isabled)
-            return
+            return None
 
         if not self.archive_name:
-            return
+            return None
 
         from .archive import Archive
 
@@ -480,7 +486,7 @@ class FilesCacheMixin:
             archives = None
         if not archives:
             # nothing found
-            return
+            return None
         prev_archive = archives[0]
 
         files = {}
@@ -523,16 +529,16 @@ class FilesCacheMixin:
         files_cache_logger.debug("FILES-CACHE-BUILD: finished, %d entries loaded.", len(files))
         return files
 
-    def files_cache_name(self):
+    def files_cache_name(self) -> str:
         return files_cache_name(self.archive_name, self.FILES_CACHE_NAME)
 
-    def discover_files_cache_names(self, path):
+    def discover_files_cache_names(self, path: Path) -> list[str]:
         return discover_files_cache_names(path, self.FILES_CACHE_NAME)
 
-    def _read_files_cache(self):
+    def _read_files_cache(self) -> dict | None:
         """read files cache from cache directory"""
         if "d" in self.cache_mode:  # d(isabled)
-            return
+            return None
 
         files = {}
         logger.debug("Reading files cache ...")
@@ -572,7 +578,7 @@ class FilesCacheMixin:
         files_cache_logger.debug("FILES-CACHE-LOAD: finished, %d entries loaded.", len(files or {}))
         return files
 
-    def _write_files_cache(self, files):
+    def _write_files_cache(self, files: dict) -> str:
         """write files cache to cache directory"""
         max_time_ns = 2**63 - 1  # nanoseconds, good until y2262
         # _self._newest_cmtime might be None if it was never set because no files were modified/added.
@@ -613,7 +619,7 @@ class FilesCacheMixin:
         files_cache_logger.debug(f"FILES-CACHE-SAVE: finished, {entries} remaining entries saved.")
         return fd.integrity_data
 
-    def file_known_and_unchanged(self, hashed_path, path_hash, st):
+    def file_known_and_unchanged(self, hashed_path: bytes, path_hash: bytes, st: os.stat_result):
         """
         Check if we know the file that has this path_hash (know == it is in our files cache) and
         whether it is unchanged (the size/inode number/cmtime is same for stuff we check in this cache_mode).
@@ -705,7 +711,7 @@ def try_upgrade_to_b14(repository):
             pass  # likely already upgraded
 
 
-def list_chunkindex_hashes(repository):
+def list_chunkindex_hashes(repository: Repository | RemoteRepository) -> list[str]:
     hashes = []
     for info in repository.store_list("cache"):
         info = ItemInfo(*info)  # RPC does not give namedtuple
@@ -717,7 +723,7 @@ def list_chunkindex_hashes(repository):
     return hashes
 
 
-def delete_chunkindex_cache(repository):
+def delete_chunkindex_cache(repository: Repository | RemoteRepository) -> None:
     hashes = list_chunkindex_hashes(repository)
     for hash in hashes:
         cache_name = f"cache/chunks.{hash}"
@@ -733,8 +739,15 @@ CHUNKINDEX_HASH_SEED = 3
 
 
 def write_chunkindex_to_repo_cache(
-    repository, chunks, *, incremental=True, clear=False, force_write=False, delete_other=False, delete_these=None
-):
+    repository: Repository | RemoteRepository,
+    chunks: ChunkIndex,
+    *,
+    incremental=True,
+    clear=False,
+    force_write=False,
+    delete_other=False,
+    delete_these=None,
+) -> str:
     # for now, we don't want to serialize the flags or the size, just the keys (chunk IDs):
     cleaned_value = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=0)
     chunks_to_write = ChunkIndex()
@@ -788,7 +801,7 @@ def write_chunkindex_to_repo_cache(
     return new_hash
 
 
-def read_chunkindex_from_repo_cache(repository, hash):
+def read_chunkindex_from_repo_cache(repository: Repository | RemoteRepository, hash: str) -> ChunkIndex | None:
     cache_name = f"cache/chunks.{hash}"
     logger.debug(f"trying to load {cache_name} from the repo...")
     try:
@@ -804,9 +817,12 @@ def read_chunkindex_from_repo_cache(repository, hash):
             return chunks
         else:
             logger.debug(f"{cache_name} is invalid.")
+    return None
 
 
-def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immediately=False):
+def build_chunkindex_from_repo(
+    repository: Repository | RemoteRepository, *, disable_caches=False, cache_immediately=False
+):
     try_upgrade_to_b14(repository)
     # first, try to build a fresh, mostly complete chunk index from centrally cached chunk indexes:
     if not disable_caches:
@@ -861,20 +877,22 @@ class ChunksMixin:
     Chunks index related code for misc. Cache implementations.
     """
 
-    def __init__(self):
-        self._chunks = None
+    repository: Repository | RemoteRepository
+
+    def __init__(self) -> None:
+        self._chunks: ChunkIndex | None = None
         self.last_refresh_dt = datetime.now(timezone.utc)
         self.refresh_td = timedelta(seconds=60)
         self.chunks_cache_last_write = datetime.now(timezone.utc)
         self.chunks_cache_write_td = timedelta(seconds=600)
 
     @property
-    def chunks(self):
+    def chunks(self) -> ChunkIndex:
         if self._chunks is None:
             self._chunks = build_chunkindex_from_repo(self.repository, cache_immediately=True)
         return self._chunks
 
-    def seen_chunk(self, id, size=None):
+    def seen_chunk(self, id: bytes, size: int | None = None) -> bool:
         entry = self.chunks.get(id)
         entry_exists = entry is not None
         if entry_exists and size is not None:
@@ -956,15 +974,15 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
 
     def __init__(
         self,
-        manifest,
-        path=None,
+        manifest: Manifest,
+        path: Path | str | None = None,
         warn_if_unencrypted=True,
         progress=False,
-        cache_mode=FILES_CACHE_MODE_DISABLED,
+        cache_mode: str = FILES_CACHE_MODE_DISABLED,
         iec=False,
-        archive_name=None,
-        start_backup=None,
-    ):
+        archive_name: str | None = None,
+        start_backup: int | None = None,
+    ) -> None:
         """
         :param warn_if_unencrypted: print warning if accessing unknown unencrypted repository
         :param cache_mode: what shall be compared in the file stat infos vs. cached stat infos comparison
@@ -999,28 +1017,28 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
             self.close()
             raise
 
-    def __enter__(self):
+    def __enter__(self) -> "AdHocWithFilesCache":
         self._chunks = None
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
         self._chunks = None
 
-    def create(self):
+    def create(self) -> None:
         """Create a new empty cache at `self.path`"""
         self.path.mkdir(parents=True, exist_ok=True)
         with open(self.path / "README", "w") as fd:
             fd.write(CACHE_README)
         self.cache_config.create()
 
-    def open(self):
+    def open(self) -> None:
         if not self.path.is_dir():
             raise Exception("%s Does not look like a Borg cache" % self.path)
         self.cache_config.open()
         self.cache_config.load()
 
-    def close(self):
+    def close(self) -> None:
         self.security_manager.save(self.manifest, self.key)
         pi = ProgressIndicatorMessage(msgid="cache.close")
         if self._files is not None:
@@ -1041,7 +1059,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         pi.finish()
         self.cache_config = None
 
-    def check_cache_compatibility(self):
+    def check_cache_compatibility(self) -> bool:
         my_features = Manifest.SUPPORTED_REPO_FEATURES
         if self.cache_config.ignored_features & my_features:
             # The cache might not contain references of chunks that need a feature that is mandatory for some operation
@@ -1053,7 +1071,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
             return False
         return True
 
-    def wipe_cache(self):
+    def wipe_cache(self) -> None:
         logger.warning("Discarding incompatible cache and forcing a cache rebuild")
         self._chunks = ChunkIndex()
         self.cache_config.manifest_id = ""
@@ -1062,7 +1080,7 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
         self.cache_config.ignored_features = set()
         self.cache_config.mandatory_features = set()
 
-    def update_compatibility(self):
+    def update_compatibility(self) -> None:
         operation_to_features_map = self.manifest.get_all_mandatory_features()
         my_features = Manifest.SUPPORTED_REPO_FEATURES
         repo_features = set()

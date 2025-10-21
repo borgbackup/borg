@@ -898,6 +898,7 @@ class ItemFormatter(BaseFormatter):
         super().__init__(format, static_data)
         self.xxh64 = StreamingXXH64
         self.archive = archive
+        # track which keys were requested in the format string
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             "size": self.calculate_size,
@@ -942,6 +943,14 @@ class ItemFormatter(BaseFormatter):
         item_data["inode"] = item.get("inode")
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
+        # When producing JSON lines, include selected static archive-level keys if they were
+        # requested via --format. This mirrors text output behavior and fixes #9095.
+        if jsonline:
+            # Include selected static archive-level keys when requested via --format.
+            # Keep implementation style aligned with 1.4-maint.
+            for k in ("archivename", "archiveid"):
+                if k in self.format_keys:
+                    item_data[k] = self.static_data[k]
         return item_data
 
     def calculate_num_chunks(self, item):

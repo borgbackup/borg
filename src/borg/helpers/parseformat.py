@@ -798,13 +798,18 @@ class ItemFormatter(BaseFormatter):
             'archiveid': archive.fpr,
         }
         static_keys.update(self.FIXED_KEYS)
+        self.format = partial_format(format, static_keys)
+        self.format_keys = {f[1] for f in Formatter().parse(format)}
         if self.json_lines:
             self.item_data = {}
+            # Include selected static archive-level keys when requested in format for JSON lines
+            # This aligns JSON output with text output where these placeholders are available.
+            for k in ('archivename', 'archiveid'):
+                if k in self.format_keys:
+                    self.item_data[k] = static_keys[k]
             self.format_item = self.format_item_json
         else:
             self.item_data = static_keys
-        self.format = partial_format(format, static_keys)
-        self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             'size': self.calculate_size,
             'csize': self.calculate_csize,

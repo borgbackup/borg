@@ -559,6 +559,8 @@ class FilesCacheMixin:
                             except KeyError:
                                 # repo is missing a chunk referenced from entry
                                 logger.debug(f"compress_entry failed for {entry}, skipping.")
+                            else:
+                                self._newest_cmtime = max(self._newest_cmtime, timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime))
                     except (TypeError, ValueError) as exc:
                         msg = "The files cache seems invalid. [%s]" % str(exc)
                         break

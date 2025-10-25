@@ -126,8 +126,9 @@ BSD_TO_LINUX_FLAGS = {
     stat.UF_NODUMP: FS_NODUMP_FL,
     stat.UF_IMMUTABLE: FS_IMMUTABLE_FL,
     stat.UF_APPEND: FS_APPEND_FL,
-    stat.UF_COMPRESSED: FS_COMPR_FL,
 }
+# must be a bitwise OR of all values in BSD_TO_LINUX_FLAGS.
+LINUX_MASK = FS_NODUMP_FL | FS_IMMUTABLE_FL | FS_APPEND_FL
 
 
 def set_flags(path, bsd_flags, fd=None):
@@ -136,17 +137,34 @@ def set_flags(path, bsd_flags, fd=None):
         if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) or stat.S_ISLNK(st.st_mode):
             # See comment in get_flags().
             return
-    cdef int flags = 0
+    cdef int flags
+    cdef int mask = LINUX_MASK  # 1 at positions we want to influence
+    cdef int new_flags = 0
     for bsd_flag, linux_flag in BSD_TO_LINUX_FLAGS.items():
         if bsd_flags & bsd_flag:
-            flags |= linux_flag
+            new_flags |= linux_flag
+
     open_fd = fd is None
     if open_fd:
         fd = os.open(path, os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
     try:
+        # Get current flags.
+        if ioctl(fd, FS_IOC_GETFLAGS, &flags) == -1:
+            # If this fails, give up because it is either not supported by the fs
+            # or maybe not permitted? If we can't determine the current flags,
+            # we better not risk corrupting them by setflags, see the comment below.
+            return  # give up silently
+
+        # Replace only the bits we actually want to influence, keep others.
+        # We can't just set all flags to the archived value, because we might
+        # reset flags that are not controllable from userspace, see #9039.
+        flags = (flags & ~mask) | (new_flags & mask)
+
         if ioctl(fd, FS_IOC_SETFLAGS, &flags) == -1:
             error_number = errno.errno
-            if error_number != errno.EOPNOTSUPP:
+            # Usually we would only catch EOPNOTSUPP here, but Linux Kernel 6.17
+            # has a bug where it returns ENOTTY instead of EOPNOTSUPP.
+            if error_number not in (errno.EOPNOTSUPP, errno.ENOTTY):
                 raise OSError(error_number, strerror(error_number).decode(), path)
     finally:
         if open_fd:

@@ -590,7 +590,7 @@ class FilesCacheMixin:
             for path_hash, entry in files.items():
                 entry = self.decompress_entry(entry)
                 if entry.age == 0:  # current entries
-                    if max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < discard_after:
+                    if max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) <= discard_after:
                         # Only keep files seen in this backup that old enough not to suffer race conditions relating
                         # to filesystem snapshots and ctime/mtime granularity or being modified while we read them.
                         keep = True

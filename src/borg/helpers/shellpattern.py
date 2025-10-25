@@ -3,7 +3,7 @@ import re
 from queue import LifoQueue
 
 
-def translate(pat, match_end=r"\Z"):
+def translate(pat: str, match_end: str = r"\Z") -> str:
     """Translate a shell-style pattern to a regular expression.
 
     The pattern may include ``**<sep>`` (<sep> stands for the platform-specific path separator; "/" on POSIX systems)
@@ -68,7 +68,7 @@ def translate(pat, match_end=r"\Z"):
     return "(?ms)" + res + match_end
 
 
-def _parse_braces(pat):
+def _parse_braces(pat: str) -> list[tuple[int, int]]:
     """Return the index pairs of matched braces in `pat` as a list of tuples.
 
     The dictionary's keys are the indices corresponding to opening braces. Initially,
@@ -84,7 +84,7 @@ def _parse_braces(pat):
     queue: pushing opening braces on and popping them off when finding a closing
     brace.
     """
-    curly_q = LifoQueue()
+    curly_q: LifoQueue = LifoQueue()
     pairs: dict[int, int] = dict()
 
     for idx, c in enumerate(pat):
@@ -105,7 +105,7 @@ def _parse_braces(pat):
     return [(opening, closing) for opening, closing in pairs.items() if closing is not None]
 
 
-def _translate_alternatives(pat):
+def _translate_alternatives(pat: str) -> str:
     """Translates the shell-style alternative portions of the pattern to regular expression groups.
 
     For example: {alt1,alt2} -> (alt1|alt2)

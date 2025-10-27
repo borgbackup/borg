@@ -567,9 +567,10 @@ class Repository:
         self._lock_refresh()
         return self.store.move(name, new_name, delete=delete, undelete=undelete, deleted=deleted)
 
+
 def _local_abspath_to_file_url(path: str) -> str:
     """Create a file URL from a local, absolute path.
-    
+
     Expects `path` to be an absolute path on the local filesystem, e.g.:
     - POSIX: `/foo/bar`
     - Windows: `c:/foo/bar` (or `c:\foo\bar`)

@@ -578,7 +578,13 @@ class RemoteRepository:
             logger.debug("SSH command line: %s", borg_cmd)
             # we do not want the ssh getting killed by Ctrl-C/SIGINT because it is needed for clean shutdown of borg.
             self.p = Popen(
-                borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, preexec_fn=None if is_win32 else ignore_sigint
+                borg_cmd,
+                bufsize=0,
+                stdin=PIPE,
+                stdout=PIPE,
+                stderr=PIPE,
+                env=env,
+                preexec_fn=None if is_win32 else ignore_sigint,
             )  # nosec B603
             self.stdin_fd = self.p.stdin.fileno()
             self.stdout_fd = self.p.stdout.fileno()

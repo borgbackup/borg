@@ -433,7 +433,12 @@ New features:
 
 Fixes:
 
-- import-tar: fix the dot-slash issue, add test, #8947
+- extract: fs flags: use get/set to influence only specific flags, #9039,
+  Linux only.
+- extract: fs flags: remove support for the compression flag; this wasn't
+  working correctly anyway.
+- create/info: fix discrepancies in archive stats, #8898, #9003
+- import-tar: fix the dot-slash issue; add a test, #8947
 - import-tar: when printing the path, use the already-normalized item.path
 - preprocess_args: fix option name matching
 - fix ChunkerParams validation
@@ -443,6 +448,7 @@ Other changes:
 
 - support Python 3.14
 - msgpack: allow 1.1.2
+- Brewfile: use openssl@3 rather than openssl@3.0, to have a more recent OpenSSL.
 - msgpack version check: ignore "rc" and other version elements
 - pyproject.toml: use SPDX expression for license, add license-files, #8771.
   Also raise the setuptools version requirement appropriately.
@@ -453,11 +459,11 @@ Other changes:
 - Chunker params: warn about an even window size for buzhash, #8868
 - suppress compiler warning about CYTHON_FALLTHROUGH
 - remove unnecessary check that Padmé overhead is at most 12%
-- pyinstaller spec: avoid pkg_resources warning
+- PyInstaller spec: avoid pkg_resources warning
 - update requirements.lock.txt to current versions
 - docs:
 
-  - borg-serve: simplify example of env in authorized_keys, #8318
+  - borg-serve: simplify example of environment variables in authorized_keys, #8318
   - unify `master` and `1.4-maint` installation docs
   - update install docs to include `SETUPTOOLS_SCM_PRETEND_VERSION`
   - add Arch Linux to the "Installing from source" docs

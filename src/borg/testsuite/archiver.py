@@ -2614,6 +2614,26 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert file1['path'] == 'input/file1'
         assert file1['sha256'] == 'b2915eb69f260d8d3c25249195f2c8f4f716ea82ec760ae929732c0262442b2b'
 
+    def test_list_json_lines_includes_archive_keys_in_format(self):
+        # Issue #9095: archivename/archiveid should be available in JSON lines when requested via --format
+        self.create_regular_file('file1', size=1024)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        archive = self.repository_location + '::test'
+        self.cmd('create', archive, 'input')
+        info_archive = json.loads(self.cmd('info', '--json', archive))
+        assert len(info_archive['archives']) == 1
+        archive_info = info_archive['archives'][0]
+        expected_name = archive_info['name']
+        expected_id = archive_info['id']
+        # request both keys explicitly in format
+        out = self.cmd('list', '--json-lines', '--format={archivename} {archiveid}', archive)
+        rows = [json.loads(s) for s in out.splitlines() if s]
+        # ensure we have at least the directory and the file1 item, pick the last as a file
+        assert len(rows) >= 2
+        row = rows[-1]
+        assert row['archivename'] == expected_name
+        assert row['archiveid'] == expected_id
+
     def test_list_json_args(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         if self.FORK_DEFAULT:

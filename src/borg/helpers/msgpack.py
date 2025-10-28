@@ -1,3 +1,5 @@
+import os
+
 from .datastruct import StableDict
 from ..constants import *  # NOQA
 
@@ -136,9 +138,16 @@ def is_slow_msgpack():
 
 def is_supported_msgpack():
     # DO NOT CHANGE OR REMOVE! See also requirements and comments in pyproject.toml.
+    # This function now also respects the env var BORG_MSGPACK_VERSION_CHECK.
+    # Set BORG_MSGPACK_VERSION_CHECK=no to disable the version check on your own risk.
     import msgpack
-    return (1, 0, 3) <= msgpack.version[:3] <= (1, 1, 2) and \
-           msgpack.version not in []  # < add bad releases here to deny list
+
+    version_check = os.environ.get('BORG_MSGPACK_VERSION_CHECK', 'yes').strip().lower()
+
+    return version_check == 'no' or (
+        (1, 0, 3) <= msgpack.version[:3] <= (1, 1, 2) and
+        msgpack.version not in []
+    )
 
 
 def get_limited_unpacker(kind):

@@ -51,7 +51,7 @@ class ProgressMessage(BaseBorgLogLine):
     operation: int
     msgid: typing.Optional[str]
     finished: bool
-    message: typing.Optional[str]
+    message: typing.Optional[str] = pydantic.Field(None)
     time: float
 
 
@@ -89,7 +89,7 @@ class LogMessage(BaseBorgLogLine):
     levelname: typing.Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
     name: str
     message: str
-    msgid: typing.Optional[str]
+    msgid: typing.Optional[str] = pydantic.Field(None)
 
     def get_level(self) -> int:
         try:

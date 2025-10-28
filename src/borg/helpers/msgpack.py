@@ -46,6 +46,8 @@ Current behavior in msgpack terms
 - unpacks bin to bytes and raw to str (thus we need to convert to desired type if we want bytes from "raw")
 """
 
+import os
+
 from .datastruct import StableDict
 from ..constants import *  # NOQA
 
@@ -206,7 +208,13 @@ def is_slow_msgpack():
 
 def is_supported_msgpack():
     # DO NOT CHANGE OR REMOVE! See also requirements and comments in pyproject.toml.
+    # This function now also respects the env var BORG_MSGPACK_VERSION_CHECK.
+    # Set BORG_MSGPACK_VERSION_CHECK=no to disable the version check at your own risk.
     import msgpack
+
+    version_check = os.environ.get("BORG_MSGPACK_VERSION_CHECK", "yes").strip().lower()
+    if version_check == "no":
+        return True
 
     if msgpack.version in []:  # < add bad releases here to deny list
         return False

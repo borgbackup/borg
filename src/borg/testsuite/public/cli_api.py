@@ -13,7 +13,7 @@ from borg.archive import Statistics
 from borg.archiver import Archiver
 from borg.helpers.parseformat import BorgJsonEncoder
 from borg.helpers.progress import ProgressIndicatorBase, ProgressIndicatorMessage
-from borg.helpers.time import OutputTimestamp
+from borg.helpers.time import OutputTimestamp, to_localtime
 from borg.logger import JsonFormatter
 
 
@@ -64,10 +64,11 @@ def test_parse_archive_progress_log_line():
     stats = Statistics()
     stats.update(20, 10, unique=True)
     stats.output_json = True
+    override_time = 1234.56
 
     item = Item(path="foo/bar.txt")
     out = StringIO()
-    stats.show_progress(item=item, stream=out)
+    stats.show_progress(item=item, stream=out, override_time=override_time)
 
     json_output = out.getvalue()
     parsed = v1.ArchiveProgressLogLine.model_validate_json(json_output)
@@ -79,7 +80,7 @@ def test_parse_archive_progress_log_line():
         deduplicated_size=10,
         nfiles=0,
         path=Path("foo/bar.txt"),
-        time=parsed.time,  # Use parsed value instead of injecting
+        time=override_time,
     )
 
 
@@ -87,9 +88,10 @@ def test_parse_finished_archive_progress():
     """Test parsing FinishedArchiveProgress from Statistics.show_progress(final=True)."""
     stats = Statistics()
     stats.output_json = True
+    override_time = 5678.90
 
     out = StringIO()
-    stats.show_progress(stream=out, final=True)
+    stats.show_progress(stream=out, final=True, override_time=override_time)
 
     json_output = out.getvalue()
     parsed = v1.FinishedArchiveProgress.model_validate_json(json_output)
@@ -98,7 +100,7 @@ def test_parse_finished_archive_progress():
     assert parsed == v1.FinishedArchiveProgress(
         type="archive_progress",
         finished=True,
-        time=parsed.time,  # Use parsed value instead of injecting
+        time=override_time,
     )
 
 
@@ -168,6 +170,7 @@ def test_parse_file_status():
 def test_parse_log_message():
     """Test parsing LogMessage from JsonFormatter."""
     formatter = JsonFormatter()
+    test_time = 1234567890.123
 
     # Create a LogRecord with all required fields
     record = logging.LogRecord(
@@ -180,6 +183,7 @@ def test_parse_log_message():
         exc_info=None,
     )
     record.msgid = "test.msgid"
+    record.created = test_time
 
     json_output = formatter.format(record)
     parsed = v1.LogMessage.model_validate_json(json_output)
@@ -190,13 +194,14 @@ def test_parse_log_message():
         name="borg.test",
         message="Test message",
         msgid="test.msgid",
-        time=parsed.time,  # Use parsed value instead of injecting
+        time=test_time,
     )
 
 
 def test_parse_log_message_all_levels():
     """Test parsing LogMessage for all log levels."""
     formatter = JsonFormatter()
+    test_time = 1234567890.456
 
     levels = [
         (logging.DEBUG, "DEBUG"),
@@ -216,6 +221,7 @@ def test_parse_log_message_all_levels():
             args=(),
             exc_info=None,
         )
+        record.created = test_time
 
         json_output = formatter.format(record)
         parsed = v1.LogMessage.model_validate_json(json_output)
@@ -226,13 +232,14 @@ def test_parse_log_message_all_levels():
             name="borg.test",
             message=f"{level_name} message",
             msgid=None,
-            time=parsed.time,  # Use parsed value instead of injecting
+            time=test_time,
         )
 
 
 def test_parse_log_message_without_msgid():
     """Test parsing LogMessage without msgid field."""
     formatter = JsonFormatter()
+    test_time = 1234567890.789
 
     record = logging.LogRecord(
         name="borg.test",
@@ -244,6 +251,7 @@ def test_parse_log_message_without_msgid():
         exc_info=None,
     )
     # Don't set msgid - it should be None or absent
+    record.created = test_time
 
     json_output = formatter.format(record)
     parsed = v1.LogMessage.model_validate_json(json_output)
@@ -254,13 +262,13 @@ def test_parse_log_message_without_msgid():
         name="borg.test",
         message="Warning without msgid",
         msgid=None,
-        time=parsed.time,  # Use parsed value instead of injecting
+        time=test_time,
     )
 
 
 def test_parse_borg_create_result():
     """Test parsing BorgCreateResult from Archive.info() output."""
-    # Create a mock archive that produces the same output as the production code
+    # Create timestamps in UTC
     start_time = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
     end_time = datetime(2024, 1, 15, 10, 35, 0, tzinfo=timezone.utc)
 
@@ -287,12 +295,17 @@ def test_parse_borg_create_result():
     json_output = json.dumps({"archive": archive_info}, cls=BorgJsonEncoder)
     parsed = v1.BorgCreateResult.model_validate_json(json_output)
 
+    # OutputTimestamp converts UTC to localtime (naive datetime)
+    # When Pydantic parses the ISO string back, it creates a naive datetime
+    expected_start = to_localtime(start_time)
+    expected_end = to_localtime(end_time)
+
     assert parsed == v1.BorgCreateResult(
         archive=v1._BorgDetailedArchive(
             name="test-archive",
             id="1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-            start=parsed.archive.start,  # Use actual parsed datetime (may lose timezone info)
-            end=parsed.archive.end,  # Use actual parsed datetime (may lose timezone info)
+            start=expected_start,
+            end=expected_end,
             duration=300.0,
             stats=v1._BorgArchiveStatistics(
                 original_size=1000000,
@@ -330,17 +343,21 @@ def test_parse_borg_list_result():
     json_output = json.dumps({"archives": archives_list}, cls=BorgJsonEncoder)
     parsed = v1.BorgListResult.model_validate_json(json_output)
 
+    # OutputTimestamp converts UTC to localtime (naive datetime)
+    expected_start1 = to_localtime(start_time1)
+    expected_start2 = to_localtime(start_time2)
+
     assert parsed == v1.BorgListResult(
         archives=[
             v1._BorgArchive(
                 name="archive-2024-01-15",
                 id="aaaa1111bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa7777bbbb8888",
-                start=parsed.archives[0].start,  # Use actual parsed datetime (may lose timezone info)
+                start=expected_start1,
             ),
             v1._BorgArchive(
                 name="archive-2024-01-16",
                 id="bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa7777bbbb8888cccc9999",
-                start=parsed.archives[1].start,  # Use actual parsed datetime (may lose timezone info)
+                start=expected_start2,
             ),
         ]
     )

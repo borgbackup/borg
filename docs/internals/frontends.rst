@@ -28,6 +28,11 @@ On POSIX systems, you can usually set environment variables to choose a UTF-8 lo
     export LANG=en_US.UTF-8
     export LC_CTYPE=en_US.UTF-8
 
+.. note::
+
+   `Pydantic <https://docs.pydantic.dev/>`_ models are available in
+   ``src/borg/public/cli_api/v1.py``
+   that can parse Borg's JSON log lines and stdout objects to make the job easier for frontends.
 
 Logging
 -------

@@ -3043,6 +3043,8 @@ class Archiver:
             'borg_placeholders': '"borg help placeholders"',
             'key_files': 'Internals -> Data structures and file formats -> Key files',
             'borg_key_export': 'borg key export --help',
+            'borg_key_change-passphrase': 'borg key change-passphrase',
+            'environment-variables': 'Environment Variables',
         }
 
         def process_epilog(epilog):
@@ -4642,7 +4644,7 @@ class Archiver:
         ``authenticated-blake2`` modes. These modes require a passphrase in
         normal operation, but in emergency situations you can access the repo
         without the passphrase with ``BORG_WORKAROUNDS=authenticated_no_key``
-        (see :ref:`Environment_Variables`).
+        (see :ref:`environment-variables`).
 
         If you just don't want to choose a passphrase, use ``keyfile`` or
         ``keyfile-blake2`` modes with an empty passphrase. These modes are

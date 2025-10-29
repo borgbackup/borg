@@ -122,8 +122,24 @@ table.docutils.borg-options-table tr td:first-child:not([colspan="3"]) {
     margin: 0;
 }
 
-.borg-options-table {
+.borg-options-table,
+.borg-encryption-table {
     width: 100%;
+}
+
+.borg-encryption-table th {
+    text-align: center;
+}
+
+.borg-encryption-table th,
+.borg-encryption-table td {
+    vertical-align: top;
+}
+
+.borg-encryption-table .literal {
+    display: block;
+    margin: 0;
+    white-space: normal;
 }
 
 kbd, /* used in usage pages for options */

@@ -4544,7 +4544,7 @@ class Archiver:
            know the passphrase.
         6. Use the Borg key to decrypt and thus access the data stored in your
            repository, e.g. when extracting files. The contents can also be
-           verified to detect accidental or malicious tampering.
+           verified to detect accidental corruption or malicious tampering.
 
         As you can see, you always need *both* the Borg key and passphrase
         to access your data. Thus it's crucial to keep a backup of your key
@@ -4582,8 +4582,8 @@ class Archiver:
 
         Make sure you use a good passphrase. Not too short, not too simple. The real
         encryption / decryption key is encrypted with / locked by your passphrase.
-        If an attacker gets your key, they can't unlock and use it without knowing the
-        passphrase.
+        If an attacker gets your borg key, they can't unlock and use it without knowing
+        the passphrase.
 
         Be careful with special or non-ASCII characters in your passphrase:
 
@@ -4634,7 +4634,7 @@ class Archiver:
 
         Avoid using ``none`` mode. If you think about using ``none`` mode,
         please reconsider and be absolutely sure. Using any mode other than
-        ``none`` allows Borg to detect accidental or malicious tampering with
+        ``none`` allows Borg to detect accidental corruption or malicious tampering with
         the repo. It also prevents denial-of-service attacks against clients.
         Instead of ``none`` mode, you likely want to use ``authenticated``
         mode, or ``repokey`` or ``keyfile`` modes with an empty passphrase
@@ -4649,14 +4649,14 @@ class Archiver:
         If you just don't want to choose a passphrase, use ``keyfile`` or
         ``keyfile-blake2`` modes with an empty passphrase. These modes are
         generally safe even without a passphrase, but keeping an offsite
-        backup of the Borg key is especially important then. See below for
+        backup of the Borg key is also important then. See below for
         details.
 
         If you can assure that an attacker can't gain access to your repo,
-        e.g. when independently encrypting your repo with LUKS/dm-crypt, you
+        e.g. when independently encrypting your repository disk or filesystem, you
         can think about using ``repokey`` or ``repokey-blake2`` modes with an
         empty passphrase. However, keep in mind that if an attacker still
-        somehow manages to gain access, he has full access to your repo. In
+        somehow manages to gain access, they have full access to your repo. In
         such situations choosing ``repokey`` over ``authenticated`` mode has
         the advantage of allowing you to add a passphrase later using
         :ref:`borg_key_change-passphrase`.
@@ -4677,15 +4677,15 @@ class Archiver:
         With ``keyfile`` and ``keyfile-blake2`` modes the key is stored on
         your local machine (in ``~/.config/borg/keys``) instead. An attacker
         gaining access to your repo then needs both the Borg key, and your
-        passphrase to access and tamper with the repo. However, if you loose
-        the key, you loose access to the repo, too. You **must** create an
+        passphrase to access and tamper with the repo. However, if you lose
+        the key, you lose access to the repo, too. You **must** create an
         offsite backup of your Borg key, e.g. by printing it on paper. Storing
         a copy of the Borg key on the system you're creating backups of is
         **NOT** sufficient. Use :ref:`borg_key_export` to create the backup.
 
         The ``keyfile`` and ``keyfile-blake2`` modes allow for "passphrase and
         having-the-key" security when using a strong passphrase, but can also
-        be used with an empty passphrase. Storing a passphrase on the disk of
+        be used with an empty passphrase. Storing a (easily readable) passphrase on the disk of
         the system you're backing up with ``keyfile`` and ``keyfile-blake2``
         modes adds no security over using an empty passphrase.
 
@@ -4693,7 +4693,7 @@ class Archiver:
 
         ``repokey`` and ``keyfile`` use AES-CTR-256 for encryption and
         HMAC-SHA256 for authentication in an encrypt-then-MAC (EtM)
-        construction. The chunk ID hash is HMAC-SHA256 as well (with a
+        construction. The chunk ID hash is HMAC-SHA256 (with a
         separate key). These modes are compatible with all Borg versions.
 
         ``repokey-blake2`` and ``keyfile-blake2`` are also authenticated

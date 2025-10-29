@@ -4509,8 +4509,9 @@ class Archiver:
 
         # borg init
         init_epilog = process_epilog("""
-        This command initializes an empty repository. A repository is a filesystem
-        directory containing the deduplicated data from zero or more archives.
+        This command initializes an empty repository. A repository is a
+        filesystem directory containing the deduplicated data from zero or more
+        archives.
 
         Encryption mode TL;DR
         +++++++++++++++++++++
@@ -4518,8 +4519,8 @@ class Archiver:
         The encryption mode can only be configured when creating a new
         repository. You can neither configure encryption on a per-archive
         basis, nor change the encryption mode of an existing repository. You
-        should thus take possible future use into account when deciding on
-        an encryption mode.
+        should thus take possible future use into account when deciding on an
+        encryption mode.
 
         As a general rule of thumb, use ``repokey`` with a strong passphrase:
 
@@ -4546,12 +4547,12 @@ class Archiver:
            repository, e.g. when extracting files. The contents can also be
            verified to detect accidental corruption or malicious tampering.
 
-        As you can see, you always need *both* the Borg key and passphrase
-        to access your data. Thus it's crucial to keep a backup of your key
+        As you can see, you always need *both* the Borg key and passphrase to
+        access your data. Thus it's crucial to keep a backup of your key
         *outside* both the repository and the system you create backups of.
-        You can easily run into a "leaving your keys inside your car"
-        situation otherwise. See :ref:`borg_key_export` to create a backup
-        of your key (e.g., by printing it on paper).
+        You can easily run into a "leaving your keys inside your car" situation
+        otherwise. See :ref:`borg_key_export` to create a backup of your key
+        (e.g., by printing it on paper).
 
         Encryption is done locally - i.e., if you back up to a remote machine,
         the remote machine neither sees your passphrase, nor your unencrypted
@@ -4564,11 +4565,11 @@ class Archiver:
         acceleration on basically all modern Intel, AMD, and ARM CPUs since
         around the early 2010s (very cheap models since the mid-2010s).
 
-        As the hashing algorithm, Borg can use either SHA256 or BLAKE2b. ARM CPUs
-        support hardware-accelerated SHA256 hashing since ARMv7 with NEON
+        As the hashing algorithm, Borg can use either SHA256 or BLAKE2b. ARM
+        CPUs support hardware-accelerated SHA256 hashing since ARMv7 with NEON
         (around 2011), or ARMv8 (around 2013). AMD CPUs support it since Zen 1
-        (around 2017), i.e. all AMD Ryzen CPUs. Intel CPUs support it since
-        Ice Lake on mobile (10th gen, around 2021), and Rocket Lake on desktop
+        (around 2017), i.e. all AMD Ryzen CPUs. Intel CPUs support it since Ice
+        Lake on mobile (10th gen, around 2021), and Rocket Lake on desktop
         (11th gen, around 2021). Very cheap models have received support a few
         years later. If your CPU doesn't support hardware-accelerated SHA256
         hashing, you might want to give BLAKE2b hashing a try - it's likely
@@ -4580,23 +4581,25 @@ class Archiver:
         Picking a passphrase
         ++++++++++++++++++++
 
-        Make sure you use a good passphrase. Not too short, not too simple. The real
-        encryption / decryption key is encrypted with / locked by your passphrase.
-        If an attacker gets your borg key, they can't unlock and use it without knowing
-        the passphrase.
+        Make sure you use a good passphrase. Not too short, not too simple. The
+        real encryption / decryption key is encrypted with / locked by your
+        passphrase. If an attacker gets your borg key, they can't unlock and use
+        it without knowing the passphrase.
 
         Be careful with special or non-ASCII characters in your passphrase:
 
-        - Borg processes the passphrase as Unicode (and encodes it as UTF-8),
-          so it does not have problems dealing with even the strangest characters.
-        - BUT: that does not necessarily apply to your OS / VM / keyboard configuration.
+        - Borg processes the passphrase as Unicode (and encodes it as UTF-8), so
+          it does not have problems dealing with even the strangest characters.
+        - BUT: that does not necessarily apply to your OS / VM / keyboard
+          configuration.
 
-        So it is better to use a long passphrase made from simple ASCII characters than one that
-        includes non-ASCII characters or characters that are hard or impossible to enter on
-        a different keyboard layout.
+        So it is better to use a long passphrase made from simple ASCII
+        characters than one that includes non-ASCII characters or characters
+        that are hard or impossible to enter on a different keyboard layout.
 
-        You can change your passphrase for existing repositories at any time; it won't affect
-        the encryption/decryption key or other secrets. See :ref:`borg_key_change-passphrase`.
+        You can change your passphrase for existing repositories at any time; it
+        won't affect the encryption/decryption key or other secrets. See
+        :ref:`borg_key_change-passphrase`.
 
         More about encryption modes
         +++++++++++++++++++++++++++
@@ -4634,11 +4637,11 @@ class Archiver:
 
         Avoid using ``none`` mode. If you think about using ``none`` mode,
         please reconsider and be absolutely sure. Using any mode other than
-        ``none`` allows Borg to detect accidental corruption or malicious tampering with
-        the repo. It also prevents denial-of-service attacks against clients.
-        Instead of ``none`` mode, you likely want to use ``authenticated``
-        mode, or ``repokey`` or ``keyfile`` modes with an empty passphrase
-        instead (see below).
+        ``none`` allows Borg to detect accidental corruption or malicious
+        tampering with the repo. It also prevents denial-of-service attacks
+        against clients. Instead of ``none`` mode, you likely want to use
+        ``authenticated`` mode, or ``repokey`` or ``keyfile`` modes with an
+        empty passphrase instead (see below).
 
         If you don't want to encrypt your data, use ``authenticated`` or
         ``authenticated-blake2`` modes. These modes require a passphrase in
@@ -4649,11 +4652,10 @@ class Archiver:
         If you just don't want to choose a passphrase, use ``keyfile`` or
         ``keyfile-blake2`` modes with an empty passphrase. These modes are
         generally safe even without a passphrase, but keeping an offsite
-        backup of the Borg key is also important then. See below for
-        details.
+        backup of the Borg key is also important then. See below for details.
 
-        If you can assure that an attacker can't gain access to your repo,
-        e.g. when independently encrypting your repository disk or filesystem, you
+        If you can assure that an attacker can't gain access to your repo, e.g.
+        when independently encrypting your repository disk or filesystem, you
         can think about using ``repokey`` or ``repokey-blake2`` modes with an
         empty passphrase. However, keep in mind that if an attacker still
         somehow manages to gain access, they have full access to your repo. In
@@ -4674,27 +4676,28 @@ class Archiver:
         system you're backing up, consider using the ``keyfile`` method
         instead. It generally provides the same or better security then.
 
-        With ``keyfile`` and ``keyfile-blake2`` modes the key is stored on
-        your local machine (in ``~/.config/borg/keys``) instead. An attacker
-        gaining access to your repo then needs both the Borg key, and your
-        passphrase to access and tamper with the repo. However, if you lose
-        the key, you lose access to the repo, too. You **must** create an
-        offsite backup of your Borg key, e.g. by printing it on paper. Storing
-        a copy of the Borg key on the system you're creating backups of is
-        **NOT** sufficient. Use :ref:`borg_key_export` to create the backup.
+        With ``keyfile`` and ``keyfile-blake2`` modes the key is stored on your
+        local machine (in ``~/.config/borg/keys``) instead. An attacker gaining
+        access to your repo then needs both the Borg key, and your passphrase to
+        access and tamper with the repo. However, if you lose the key, you lose
+        access to the repo, too. You **must** create an offsite backup of your
+        Borg key, e.g. by printing it on paper. Storing a copy of the Borg key
+        on the system you're creating backups of is **NOT** sufficient. Use
+        :ref:`borg_key_export` to create the backup.
 
         The ``keyfile`` and ``keyfile-blake2`` modes allow for "passphrase and
         having-the-key" security when using a strong passphrase, but can also
-        be used with an empty passphrase. Storing a (easily readable) passphrase on the disk of
-        the system you're backing up with ``keyfile`` and ``keyfile-blake2``
-        modes adds no security over using an empty passphrase.
+        be used with an empty passphrase. Storing a (easily readable)
+        passphrase on the disk of the system you're backing up with
+        ``keyfile`` and ``keyfile-blake2`` modes adds no security over using an
+        empty passphrase.
 
         **Technical details:**
 
         ``repokey`` and ``keyfile`` use AES-CTR-256 for encryption and
         HMAC-SHA256 for authentication in an encrypt-then-MAC (EtM)
-        construction. The chunk ID hash is HMAC-SHA256 (with a
-        separate key). These modes are compatible with all Borg versions.
+        construction. The chunk ID hash is HMAC-SHA256 (with a separate key).
+        These modes are compatible with all Borg versions.
 
         ``repokey-blake2`` and ``keyfile-blake2`` are also authenticated
         encryption modes, but use BLAKE2b-256 instead of HMAC-SHA256 for

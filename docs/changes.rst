@@ -430,6 +430,8 @@ New features:
 - create: --files-changed=MODE option (controls how borg detects whether
   a file has changed while it is being backed up)
 - improved tty-less progress reporting (--progress)
+- BORG_MSGPACK_VERSION_CHECK=no to optionally disable the msgpack version
+  check; default is "yes", use at your own risk, #9109.
 
 Fixes:
 

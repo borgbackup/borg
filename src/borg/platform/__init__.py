@@ -35,7 +35,8 @@ elif is_darwin:  # pragma: darwin only
     from .darwin import listxattr, getxattr, setxattr
     from .darwin import acl_get, acl_set
     from .darwin import is_darwin_feature_64_bit_inode, _get_birthtime_ns
-    from .base import set_flags, get_flags
+    from .darwin import set_flags
+    from .base import get_flags
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import swidth

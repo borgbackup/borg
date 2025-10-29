@@ -1534,6 +1534,29 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert same_ts_ns(mtime_extracted, mtime_expected)
         # assert same_ts_ns(atime_extracted, atime_expected)  # still broken, but not really important.
 
+    @pytest.mark.skipif(not is_darwin, reason='only for macOS')
+    def test_extract_restores_append_flag(self):
+        if not has_lchflags or not hasattr(stat, 'UF_APPEND'):
+            pytest.skip('BSD flags or UF_APPEND not supported on this platform')
+        # create a file and set the append flag on it
+        self.create_regular_file('appendflag', size=1)
+        src_path = os.path.join(self.input_path, 'appendflag')
+        platform.set_flags(src_path, stat.UF_APPEND)
+        # Verify the flag actually got set; otherwise skip (filesystem may not support it)
+        st = os.lstat(src_path)
+        if (platform.get_flags(src_path, st) & stat.UF_APPEND) == 0:
+            pytest.skip('UF_APPEND not settable on this filesystem')
+        # archive and extract
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        archive = self.repository_location + '::test'
+        self.cmd('create', archive, 'input')
+        with changedir('output'):
+            self.cmd('extract', archive)
+            out_path = os.path.join('input', 'appendflag')
+            st2 = os.lstat(out_path)
+            flags = platform.get_flags(out_path, st2)
+            assert (flags & stat.UF_APPEND) == stat.UF_APPEND
+
     def test_path_normalization(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file('dir1/dir2/file', size=1024 * 80)

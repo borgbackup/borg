@@ -4512,13 +4512,13 @@ class Archiver:
         This command initializes an empty repository. A repository is a filesystem
         directory containing the deduplicated data from zero or more archives.
 
-        Encryption mode tl;dr
+        Encryption mode TL;DR
         +++++++++++++++++++++
 
         The encryption mode can only be configured when creating a new
         repository. You can neither configure encryption on a per-archive
         basis, nor change the encryption mode of an existing repository. You
-        should thus take possible future use into account when deciding for
+        should thus take possible future use into account when deciding on
         an encryption mode.
 
         As a general rule of thumb, use ``repokey`` with a strong passphrase:
@@ -4553,18 +4553,18 @@ class Archiver:
         situation otherwise. See :ref:`borg_key_export` to create a backup
         of your key (e.g., by printing it on paper).
 
-        Encryption is done locally - i.e., if you backup to a remote machine,
+        Encryption is done locally - i.e., if you back up to a remote machine,
         the remote machine neither sees your passphrase, nor your unencrypted
-        Borg key, nor your unencrypted files. Chunking and ID generation is
+        Borg key, nor your unencrypted files. Chunking and ID generation are
         based on your key to improve privacy.
 
         **About hardware acceleration:**
 
         Borg encrypts data with AES, which is pretty fast thanks to hardware
         acceleration on basically all modern Intel, AMD, and ARM CPUs since
-        around the early 2010's (very cheap models since the mid 2010's).
+        around the early 2010s (very cheap models since the mid-2010s).
 
-        As hashing algorithm Borg can either use SHA256, or BLAKE2b. ARM CPUs
+        As the hashing algorithm, Borg can use either SHA256 or BLAKE2b. ARM CPUs
         support hardware-accelerated SHA256 hashing since ARMv7 with NEON
         (around 2011), or ARMv8 (around 2013). AMD CPUs support it since Zen 1
         (around 2017), i.e. all AMD Ryzen CPUs. Intel CPUs support it since
@@ -4712,7 +4712,7 @@ class Archiver:
         compatible with Borg 1.1 and later.
 
         ``none`` mode uses no encryption and no authentication. It uses SHA256
-        as chunk ID hash. This mode is not recommended. You should rather
+        as chunk ID hash. This mode is not recommended. You should instead
         consider using an authenticated or authenticated/encrypted mode. This
         mode has possible denial-of-service issues when running ``borg create``
         on contents controlled by an attacker. See above for alternatives.

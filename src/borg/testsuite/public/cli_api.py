@@ -369,7 +369,7 @@ def test_parse_borg_list_result_empty():
     json_output = json.dumps({"archives": []}, cls=BorgJsonEncoder)
     parsed = v1.BorgListResult.model_validate_json(json_output)
 
-    assert len(parsed.archives) == 0
+    assert parsed == v1.BorgListResult(archives=[])
 
 
 def test_parse_chunker_params_empty_string():
@@ -430,12 +430,33 @@ def test_parse_chunker_params_with_values():
     json_output = json.dumps({"archive": archive_info}, cls=BorgJsonEncoder)
     parsed = v1.BorgCreateResult.model_validate_json(json_output)
 
-    assert parsed.archive.chunker_params is not None
-    assert parsed.archive.chunker_params.algorithm == "buzhash"
-    assert parsed.archive.chunker_params.min_exp == 19
-    assert parsed.archive.chunker_params.max_exp == 23
-    assert parsed.archive.chunker_params.mask_bits == 21
-    assert parsed.archive.chunker_params.window_size == 4095
+    expected_start = to_localtime(start_time)
+    expected_end = to_localtime(end_time)
+
+    assert parsed == v1.BorgCreateResult(
+        archive=v1._BorgDetailedArchive(
+            name="new-archive",
+            id="1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            start=expected_start,
+            end=expected_end,
+            duration=300.0,
+            stats=v1._BorgArchiveStatistics(
+                original_size=1000000,
+                compressed_size=500000,
+                deduplicated_size=250000,
+                nfiles=42,
+            ),
+            limits=v1._BorgLimitUsage(max_archive_size=0.05),
+            command_line=["borg", "create", "::new-archive", "/data"],
+            chunker_params=v1._BorgChunkerParams(
+                algorithm="buzhash",
+                min_exp=19,
+                max_exp=23,
+                mask_bits=21,
+                window_size=4095,
+            ),
+        )
+    )
 
 
 def test_parse_chunker_params_fixed_algorithm():
@@ -465,9 +486,30 @@ def test_parse_chunker_params_fixed_algorithm():
     json_output = json.dumps({"archive": archive_info}, cls=BorgJsonEncoder)
     parsed = v1.BorgCreateResult.model_validate_json(json_output)
 
-    assert parsed.archive.chunker_params is not None
-    assert parsed.archive.chunker_params.algorithm == "fixed"
-    assert parsed.archive.chunker_params.min_exp == 16
-    assert parsed.archive.chunker_params.max_exp == 20
-    assert parsed.archive.chunker_params.mask_bits == 18
-    assert parsed.archive.chunker_params.window_size == 2048
+    expected_start = to_localtime(start_time)
+    expected_end = to_localtime(end_time)
+
+    assert parsed == v1.BorgCreateResult(
+        archive=v1._BorgDetailedArchive(
+            name="fixed-archive",
+            id="1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            start=expected_start,
+            end=expected_end,
+            duration=300.0,
+            stats=v1._BorgArchiveStatistics(
+                original_size=1000000,
+                compressed_size=500000,
+                deduplicated_size=250000,
+                nfiles=42,
+            ),
+            limits=v1._BorgLimitUsage(max_archive_size=0.05),
+            command_line=["borg", "create", "::fixed-archive", "/data"],
+            chunker_params=v1._BorgChunkerParams(
+                algorithm="fixed",
+                min_exp=16,
+                max_exp=20,
+                mask_bits=18,
+                window_size=2048,
+            ),
+        )
+    )

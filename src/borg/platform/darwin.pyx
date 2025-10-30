@@ -195,3 +195,67 @@ def _get_birthtime_ns(path, follow_symlinks=False):
     if result != 0:
         raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
     return stat_info.st_birthtimespec.tv_sec * 1_000_000_000 + stat_info.st_birthtimespec.tv_nsec
+
+
+# macOS flags handling: only modify flags documented as settable; preserve all others, see #9090.
+# The man page states UF_COMPRESSED and SF_DATALESS are internal flags and must not be modified
+# from user space. We therefore only modify flags that are documented to be settable by owner or
+# super-user and preserve everything else (including unknown or future flags).
+
+cdef extern from "sys/stat.h":
+    int chflags(const char *path, uint32_t flags)
+    int lchflags(const char *path, uint32_t flags)
+    int fchflags(int fd, uint32_t flags)
+
+
+# Known-good settable flags from macOS chflags(2). We intentionally do NOT include
+# internal flags like UF_COMPRESSED and SF_DATALESS. Resolved once at import time.
+# getattr(..., 0) keeps this importable on non-Darwin platforms or Python versions
+# missing some constants.
+import stat as stat_mod
+
+SETTABLE_FLAG_NAMES = (
+    # Owner-settable (UF_*)
+    'UF_NODUMP',
+    'UF_IMMUTABLE',
+    'UF_APPEND',
+    'UF_OPAQUE',
+    'UF_NOUNLINK',
+    'UF_HIDDEN',
+    # Super-user-settable (SF_*)
+    'SF_ARCHIVED',
+    'SF_IMMUTABLE',
+    'SF_APPEND',
+    # SF_NOUNLINK exists on some BSDs; include defensively
+    'SF_NOUNLINK',
+)
+
+cdef uint32_t SETTABLE_FLAGS_MASK = 0
+for _name in SETTABLE_FLAG_NAMES:
+    SETTABLE_FLAGS_MASK |= <uint32_t> getattr(stat_mod, _name, 0)
+
+
+def set_flags(path, bsd_flags, fd=None):
+    """Set BSD-style flags on macOS, preserving system-managed read-only flags."""
+    # Determine current flags.
+    try:
+        if fd is not None:
+            st = os.fstat(fd)
+        else:
+            st = os.lstat(path)
+        current = st.st_flags
+    except (OSError, AttributeError):
+        # We can't determine the current flags, so better give up than corrupting anything.
+        return
+
+    new_flags = (current & ~SETTABLE_FLAGS_MASK) | (bsd_flags & SETTABLE_FLAGS_MASK)
+
+    # Apply flags.
+    cdef uint32_t c_flags = <uint32_t> new_flags
+    if fd is not None:
+        if fchflags(fd, c_flags) == -1:
+            raise OSError(errno.errno, os.strerror(errno.errno), path)
+    else:
+        path_bytes = os.fsencode(path)
+        if lchflags(path_bytes, c_flags) == -1:
+            raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path_bytes))

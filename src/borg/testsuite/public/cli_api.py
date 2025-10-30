@@ -369,3 +369,104 @@ def test_parse_borg_list_result_empty():
     parsed = v1.BorgListResult.model_validate_json(json_output)
 
     assert len(parsed.archives) == 0
+
+
+def test_parse_chunker_params_empty_string():
+    """Test parsing when chunker_params is an empty string (old archives without chunker_params)."""
+    start_time = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+    end_time = datetime(2024, 1, 15, 10, 35, 0, tzinfo=timezone.utc)
+
+    archive_info = {
+        "name": "old-archive",
+        "id": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+        "start": OutputTimestamp(start_time),
+        "end": OutputTimestamp(end_time),
+        "duration": (end_time - start_time).total_seconds(),
+        "stats": {
+            "original_size": 1000000,
+            "compressed_size": 500000,
+            "deduplicated_size": 250000,
+            "nfiles": 42,
+        },
+        "limits": {
+            "max_archive_size": 0.05,
+        },
+        "command_line": ["borg", "create", "::old-archive", "/data"],
+        "chunker_params": "",  # Empty string as set in archive.py line 555
+    }
+
+    json_output = json.dumps({"archive": archive_info}, cls=BorgJsonEncoder)
+    parsed = v1.BorgCreateResult.model_validate_json(json_output)
+
+    # Empty string should be treated as None
+    assert parsed.archive.chunker_params is None
+
+
+def test_parse_chunker_params_with_values():
+    """Test parsing when chunker_params has actual values."""
+    start_time = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+    end_time = datetime(2024, 1, 15, 10, 35, 0, tzinfo=timezone.utc)
+
+    archive_info = {
+        "name": "new-archive",
+        "id": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+        "start": OutputTimestamp(start_time),
+        "end": OutputTimestamp(end_time),
+        "duration": (end_time - start_time).total_seconds(),
+        "stats": {
+            "original_size": 1000000,
+            "compressed_size": 500000,
+            "deduplicated_size": 250000,
+            "nfiles": 42,
+        },
+        "limits": {
+            "max_archive_size": 0.05,
+        },
+        "command_line": ["borg", "create", "::new-archive", "/data"],
+        "chunker_params": ["buzhash", 19, 23, 21, 4095],  # As a list (JSON serialized tuple)
+    }
+
+    json_output = json.dumps({"archive": archive_info}, cls=BorgJsonEncoder)
+    parsed = v1.BorgCreateResult.model_validate_json(json_output)
+
+    assert parsed.archive.chunker_params is not None
+    assert parsed.archive.chunker_params.algorithm == "buzhash"
+    assert parsed.archive.chunker_params.min_exp == 19
+    assert parsed.archive.chunker_params.max_exp == 23
+    assert parsed.archive.chunker_params.mask_bits == 21
+    assert parsed.archive.chunker_params.window_size == 4095
+
+
+def test_parse_chunker_params_fixed_algorithm():
+    """Test parsing chunker_params with 'fixed' algorithm."""
+    start_time = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+    end_time = datetime(2024, 1, 15, 10, 35, 0, tzinfo=timezone.utc)
+
+    archive_info = {
+        "name": "fixed-archive",
+        "id": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+        "start": OutputTimestamp(start_time),
+        "end": OutputTimestamp(end_time),
+        "duration": (end_time - start_time).total_seconds(),
+        "stats": {
+            "original_size": 1000000,
+            "compressed_size": 500000,
+            "deduplicated_size": 250000,
+            "nfiles": 42,
+        },
+        "limits": {
+            "max_archive_size": 0.05,
+        },
+        "command_line": ["borg", "create", "::fixed-archive", "/data"],
+        "chunker_params": ["fixed", 16, 20, 18, 2048],
+    }
+
+    json_output = json.dumps({"archive": archive_info}, cls=BorgJsonEncoder)
+    parsed = v1.BorgCreateResult.model_validate_json(json_output)
+
+    assert parsed.archive.chunker_params is not None
+    assert parsed.archive.chunker_params.algorithm == "fixed"
+    assert parsed.archive.chunker_params.min_exp == 16
+    assert parsed.archive.chunker_params.max_exp == 20
+    assert parsed.archive.chunker_params.mask_bits == 18
+    assert parsed.archive.chunker_params.window_size == 2048

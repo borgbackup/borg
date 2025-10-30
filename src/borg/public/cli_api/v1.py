@@ -138,6 +138,33 @@ class _BorgLimitUsage(pydantic.BaseModel):
     max_archive_size: float
 
 
+class _BorgChunkerParams(pydantic.BaseModel):
+    """Chunker parameters tuple.
+
+    Format: (algorithm, min_exp, max_exp, mask_bits, window_size)
+    """
+
+    algorithm: typing.Literal["buzhash", "fixed"]
+    min_exp: int
+    max_exp: int
+    mask_bits: int
+    window_size: int
+
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def parse_list(cls, data: typing.Any) -> typing.Any:
+        """Parse from list format [algorithm, min_exp, max_exp, mask_bits, window_size]."""
+        if isinstance(data, list) and len(data) == 5:
+            return {
+                "algorithm": data[0],
+                "min_exp": data[1],
+                "max_exp": data[2],
+                "mask_bits": data[3],
+                "window_size": data[4],
+            }
+        return data
+
+
 class _BorgDetailedArchive(_BorgArchive):
     """Archive attributes, as printed by `json info` or `json create`."""
 
@@ -146,7 +173,15 @@ class _BorgDetailedArchive(_BorgArchive):
     stats: _BorgArchiveStatistics
     limits: _BorgLimitUsage
     command_line: typing.List[str]
-    chunker_params: typing.Optional[typing.Any] = None
+    chunker_params: typing.Optional[_BorgChunkerParams] = None
+
+    @pydantic.field_validator("chunker_params", mode="before")
+    @classmethod
+    def empty_string_to_none(cls, v: typing.Any) -> typing.Any:
+        """Convert empty string to None (for old archives without chunker_params)."""
+        if v == "":
+            return None
+        return v
 
 
 class BorgCreateResult(pydantic.BaseModel):

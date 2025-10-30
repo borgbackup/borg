@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
+from typing import Literal
 from unittest.mock import patch
 
 import pytest
@@ -203,7 +204,7 @@ def test_parse_log_message_all_levels():
     formatter = JsonFormatter()
     test_time = 1234567890.456
 
-    levels = [
+    levels: list[tuple[int, Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]]] = [
         (logging.DEBUG, "DEBUG"),
         (logging.INFO, "INFO"),
         (logging.WARNING, "WARNING"),

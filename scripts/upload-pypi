@@ -8,9 +8,9 @@ if [ "$R" = "" ]; then
 fi
 
 if [ "$2" = "test" ]; then
-    export TWINE_REPOSITORY=testpypi
+    export TWINE_REPOSITORY=testborgbackup
 else
-    export TWINE_REPOSITORY=pypi
+    export TWINE_REPOSITORY=borgbackup
 fi
 
 D=dist/borgbackup-$R.tar.gz

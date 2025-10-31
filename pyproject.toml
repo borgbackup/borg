@@ -264,7 +264,7 @@ labels = ["lint"]
 
 [tool.coverage.run]
 branch = true
-disable_warnings = ["module-not-measured"]
+disable_warnings = ["module-not-measured", "no-ctracer"]
 source = ["src/borg"]
 omit = [
     "*/borg/__init__.py",

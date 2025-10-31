@@ -156,7 +156,7 @@ end
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
-    pyenv install 3.11.13  # tests, binary build
+    pyenv install 3.11.14  # tests, binary build
     pyenv rehash
   EOF
 end
@@ -174,8 +174,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.11 release
-    pyenv global 3.11.13
-    pyenv virtualenv 3.11.13 borg-env
+    pyenv global 3.11.14
+    pyenv virtualenv 3.11.14 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -221,8 +221,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.11.13
-      pyenv local 3.11.13
+      pyenv global 3.11.14
+      pyenv local 3.11.14
     fi
     # otherwise: just use the system python
     # avoid that git complains about dubious ownership if we use fakeroot:

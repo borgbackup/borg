@@ -126,7 +126,7 @@ archive checks, nor enable repair mode. Consequently, if you want to use
 **Warning:** Please note that partial repository checks (i.e. running it with
 ``--max-duration``) can only perform non-cryptographic checksum checks on the
 segment files. A full repository check (i.e. without ``--max-duration``) can
-also do a repository index check. Enabling partial repository checks excepts
+also do a repository index check. Enabling partial repository checks excludes
 archive checks for the same reason. Therefore partial checks may be useful with
 very large repositories only where a full check would take too long.
 
@@ -135,13 +135,13 @@ opposed to checking the CRC32 of the segment) of data, which means reading the
 data from the repository, decrypting and decompressing it. It is a complete
 cryptographic verification and hence very time consuming, but will detect any
 accidental and malicious corruption. Tamper-resistance is only guaranteed for
-encrypted repositories against attackers without access to the keys. You can
-not use ``--verify-data`` with ``--repository-only``.
+encrypted repositories against attackers without access to the keys. You cannot
+use ``--verify-data`` with ``--repository-only``.
 
 About repair mode
 +++++++++++++++++
 
-The check command is a readonly task by default. If any corruption is found,
+The check command is a read-only task by default. If any corruption is found,
 Borg will report the issue and proceed with checking. To actually repair the
 issues found, pass ``--repair``.
 

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-INFO" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-INFO" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-info \- Show archive details such as disk space used
 .SH SYNOPSIS
@@ -39,11 +39,11 @@ This command displays detailed information about the specified archive or reposi
 .sp
 Please note that the deduplicated sizes of the individual archives do not add
 up to the deduplicated size of the repository (\(dqall archives\(dq), because the two
-are meaning different things:
+mean different things:
 .sp
 This archive / deduplicated size = amount of data stored ONLY for this archive
 = unique chunks of this archive.
-All archives / deduplicated size = amount of data stored in the repo
+All archives / deduplicated size = amount of data stored in the repository
 = all chunks in the repository.
 .sp
 Borg archives can only contain a limited amount of file metadata.

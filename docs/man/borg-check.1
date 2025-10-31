@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CHECK" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-CHECK" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-check \- Check repository consistency
 .SH SYNOPSIS
@@ -78,7 +78,7 @@ archive checks, nor enable repair mode. Consequently, if you want to use
 \fBWarning:\fP Please note that partial repository checks (i.e. running it with
 \fB\-\-max\-duration\fP) can only perform non\-cryptographic checksum checks on the
 segment files. A full repository check (i.e. without \fB\-\-max\-duration\fP) can
-also do a repository index check. Enabling partial repository checks excepts
+also do a repository index check. Enabling partial repository checks excludes
 archive checks for the same reason. Therefore partial checks may be useful with
 very large repositories only where a full check would take too long.
 .sp
@@ -87,11 +87,11 @@ opposed to checking the CRC32 of the segment) of data, which means reading the
 data from the repository, decrypting and decompressing it. It is a complete
 cryptographic verification and hence very time consuming, but will detect any
 accidental and malicious corruption. Tamper\-resistance is only guaranteed for
-encrypted repositories against attackers without access to the keys. You can
-not use \fB\-\-verify\-data\fP with \fB\-\-repository\-only\fP\&.
+encrypted repositories against attackers without access to the keys. You cannot
+use \fB\-\-verify\-data\fP with \fB\-\-repository\-only\fP\&.
 .SS About repair mode
 .sp
-The check command is a readonly task by default. If any corruption is found,
+The check command is a read\-only task by default. If any corruption is found,
 Borg will report the issue and proceed with checking. To actually repair the
 issues found, pass \fB\-\-repair\fP\&.
 .sp

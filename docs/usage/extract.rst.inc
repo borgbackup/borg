@@ -101,16 +101,20 @@ borg extract
 Description
 ~~~~~~~~~~~
 
-This command extracts the contents of an archive. By default the entire
-archive is extracted but a subset of files and directories can be selected
-by passing a list of ``PATHs`` as arguments. The file selection can further
-be restricted by using the ``--exclude`` option.
+This command extracts the contents of an archive.
 
+By default, the entire archive is extracted, but a subset of files and directories
+can be selected by passing a list of ``PATH`` arguments. The default interpretation
+for the paths to extract is `pp:` which is a literal path-prefix match. If you want
+to use e.g. a wildcard, you must select a different pattern style such as `sh:` or
+`fm:`. See :ref:`borg_patterns` for more information.
+
+The file selection can be further restricted by using the ``--exclude`` option.
 For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
 By using ``--dry-run``, you can do all extraction steps except actually writing the
-output data: reading metadata and data chunks from the repo, checking the hash/hmac,
-decrypting, decompressing.
+output data: reading metadata and data chunks from the repository, checking the hash/HMAC,
+decrypting, and decompressing.
 
 ``--progress`` can be slower than no progress display, since it makes one additional
 pass over the archive metadata.
@@ -121,5 +125,5 @@ pass over the archive metadata.
     so make sure you ``cd`` to the right place before calling ``borg extract``.
 
     When parent directories are not extracted (because of using file/directory selection
-    or any other reason), borg can not restore parent directories' metadata, e.g. owner,
-    group, permission, etc.
+    or any other reason), Borg cannot restore parent directories' metadata, e.g., owner,
+    group, permissions, etc.

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-DELETE" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-delete \- Delete an existing repository or archives
 .SH SYNOPSIS
@@ -132,7 +132,7 @@ $ borg delete \-\-glob\-archives \(aq{hostname}\-*\(aq /path/to/repo
 # delete all archives whose names contain \(dq\-2012\-\(dq
 $ borg delete \-\-glob\-archives \(aq*\-2012\-*\(aq /path/to/repo
 
-# see what would be deleted if delete was run without \-\-dry\-run
+# see what would be deleted if delete were run without \-\-dry\-run
 $ borg delete \-\-list \-\-dry\-run \-a \(aq*\-May\-*\(aq /path/to/repo
 
 # delete the whole repository and the related local cache:

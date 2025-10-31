@@ -99,6 +99,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--files-cache MODE``                            | operate files cache in MODE. default: ctime,size,inode                                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--files-changed MODE``                          | specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime                                                                |
+    +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--read-special``                                | open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.                 |
     +-------------------------------------------------------+---------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Archive options**                                                                                                                                                                                                                                                           |
@@ -175,6 +177,7 @@ borg create
         --noxattrs                do not read and store xattrs into archive
         --sparse                  detect sparse holes in input (supported only by fixed chunker)
         --files-cache MODE        operate files cache in MODE. default: ctime,size,inode
+        --files-changed MODE      specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 
 
@@ -191,18 +194,18 @@ Description
 
 This command creates a backup archive containing all files found while recursively
 traversing all paths specified. Paths are added to the archive as they are given,
-that means if relative paths are desired, the command has to be run from the correct
+which means that if relative paths are desired, the command has to be run from the correct
 directory.
 
 The slashdot hack in paths (recursion roots) is triggered by using ``/./``:
-``/this/gets/stripped/./this/gets/archived`` means to process that fs object, but
+``/this/gets/stripped/./this/gets/archived`` means to process that filesystem object, but
 strip the prefix on the left side of ``./`` from the archived items (in this case,
 ``this/gets/archived`` will be the path in the archived item).
 
-When giving '-' as path, borg will read data from standard input and create a
-file 'stdin' in the created archive from that data. In some cases it's more
-appropriate to use --content-from-command, however. See section *Reading from
-stdin* below for details.
+When giving '-' as a path, Borg will read data from standard input and create a
+file 'stdin' in the created archive from that data. In some cases, it is more
+appropriate to use ``--content-from-command``. See section "Reading from stdin"
+below for details.
 
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
@@ -222,41 +225,49 @@ the files cache.
 This comparison can operate in different modes as given by ``--files-cache``:
 
 - ctime,size,inode (default)
-- mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+- mtime,size,inode (default behavior of borg versions older than 1.1.0rc4)
 - ctime,size (ignore the inode number)
 - mtime,size (ignore the inode number)
 - rechunk,ctime (all files are considered modified - rechunk, cache ctime)
 - rechunk,mtime (all files are considered modified - rechunk, cache mtime)
 - disabled (disable the files cache, all files considered modified - rechunk)
 
-inode number: better safety, but often unstable on network filesystems
+inode number: better safety, but often unstable on network file systems
 
 Normally, detecting file modifications will take inode information into
 consideration to improve the reliability of file change detection.
-This is problematic for files located on sshfs and similar network file
-systems which do not provide stable inode numbers, such files will always
+This is problematic for files located on SSHFS and similar network file
+systems which do not provide stable inode numbers; such files will always
 be considered modified. You can use modes without `inode` in this case to
-improve performance, but reliability of change detection might be reduced.
+improve performance, but the reliability of change detection might be reduced.
 
 ctime vs. mtime: safety vs. speed
 
 - ctime is a rather safe way to detect changes to a file (metadata and contents)
-  as it can not be set from userspace. But, a metadata-only change will already
+  as it cannot be set from user space. However, a metadata-only change will already
   update the ctime, so there might be some unnecessary chunking/hashing even
-  without content changes. Some filesystems do not support ctime (change time).
-  E.g. doing a chown or chmod to a file will change its ctime.
+  without content changes. Some file systems do not support ctime (change time).
+  For example, doing a chown or chmod to a file will change its ctime.
 - mtime usually works and only updates if file contents were changed. But mtime
-  can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+  can be arbitrarily set from user space, e.g., to set mtime back to the same value
   it had before a content change happened. This can be used maliciously as well as
-  well-meant, but in both cases mtime based cache modes can be problematic.
+  well-meant, but in both cases mtime-based cache modes can be problematic.
 
-The mount points of filesystems or filesystem snapshots should be the same for every
+The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
+
+- ctime (default): Use ctime to detect changes. This is the safest option.
+- mtime: Use mtime to detect changes.
+- disabled: Disable the "file has changed while we backed it up" detection completely.
+  This is not recommended unless you know what you're doing, as it could lead to
+  inconsistent backups if files change during the backup process.
+
+The mount points of file systems or file system snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that
-is used to determine changed files quickly uses absolute filenames.
+is used to determine changed files quickly uses absolute file names.
 If this is not possible, consider creating a bind mount to a stable location.
 
 The ``--progress`` option shows (from left to right) Original, Compressed and Deduplicated
-(O, C and D, respectively), then the Number of files (N) processed so far, followed by
+(O, C and D, respectively), then the number of files (N) processed so far, followed by
 the currently processed path.
 
 When using ``--stats``, you will get some statistics about how much data was
@@ -284,15 +295,15 @@ only include the objects specified by ``--exclude-if-present`` in your backup,
 and not include any other contents of the containing folder, this can be enabled
 through using the ``--keep-exclude-tags`` option.
 
-The ``-x`` or ``--one-file-system`` option excludes directories, that are mountpoints (and everything in them).
-It detects mountpoints by comparing the device number from the output of ``stat()`` of the directory and its
+The ``-x`` or ``--one-file-system`` option excludes directories that are mount points (and everything in them).
+It detects mount points by comparing the device number from the output of ``stat()`` of the directory and its
 parent directory. Specifically, it excludes directories for which ``stat()`` reports a device number different
 from the device number of their parent.
-In general: be aware that there are directories with device number different from their parent, which the kernel
-does not consider a mountpoint and also the other way around.
-Linux examples for this are bind mounts (possibly same device number, but always a mountpoint) and ALL
-subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint).
-macOS examples are the apfs mounts of a typical macOS installation.
+In general: be aware that there are directories with device numbers different from their parent, which the kernel
+does not consider mount points, and vice versa.
+Linux examples for this are bind mounts (possibly same device number, but always a mount point) and all
+subvolumes of a Btrfs file system (different device numbers from the parent but not necessarily mount points).
+macOS examples are the APFS mounts of a typical macOS installation.
 Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
 
 

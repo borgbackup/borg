@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UPGRADE" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-UPGRADE" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-upgrade \- upgrade a repository from a previous version
 .SH SYNOPSIS
@@ -60,8 +60,8 @@ archives that are not TAM authenticated yet.
 This is a convenient method to just trust all archives present \- if
 an archive does not have TAM authentication yet, a TAM will be added.
 Archives created by old borg versions < 1.0.9 do not have TAMs.
-Archives created by newer borg version should have TAMs already.
-If you have a high risk environment, you should not just run this,
+Archives created by newer borg versions should have TAMs already.
+If you have a high\-risk environment, you should not just run this,
 but first verify that the archives are authentic and not malicious
 (== have good content, have a good timestamp).
 Borg 1.2.5+ needs all archives to be TAM authenticated for safety reasons.
@@ -101,7 +101,7 @@ with the old chunks in the upgraded repository.
 See \fB\-\-chunker\-params\fP option of \fBborg create\fP and \fBborg recreate\fP\&.
 .sp
 \fBborg upgrade\fP will change the magic strings in the repository\(aqs
-segments to match the new Borg magic strings. The keyfiles found in
+segments to match the new Borg magic strings. The key files found in
 $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
 copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
 .sp
@@ -109,11 +109,11 @@ The cache files are converted, from $ATTIC_CACHE_DIR or
 ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the
 cache layout between Borg and Attic changed, so it is possible
 the first backup after the conversion takes longer than expected
-due to the cache resync.
+due to the cache re\-sync.
 .sp
 Upgrade should be able to resume if interrupted, although it
 will still iterate over all segments. If you want to start
-from scratch, use \fIborg delete\fP over the copied repository to
+from scratch, use \fBborg delete\fP over the copied repository to
 make sure the cache files are also removed:
 .INDENT 0.0
 .INDENT 3.5
@@ -190,13 +190,13 @@ no key file found for repository
 .EE
 .UNINDENT
 .UNINDENT
-.SS Upgrading a passphrase encrypted attic repo
+.SS Upgrading a passphrase\-encrypted Attic repo
 .sp
-attic offered a \(dqpassphrase\(dq encryption mode, but this was removed in borg 1.0
+Attic offered a \(dqpassphrase\(dq encryption mode, but this was removed in Borg 1.0
 and replaced by the \(dqrepokey\(dq mode (which stores the passphrase\-protected
-encryption key into the repository config).
+encryption key in the repository config).
 .sp
-Thus, to upgrade a \(dqpassphrase\(dq attic repo to a \(dqrepokey\(dq borg repo, 2 steps
+Thus, to upgrade a \(dqpassphrase\(dq Attic repo to a \(dqrepokey\(dq Borg repo, two steps
 are needed, in this order:
 .INDENT 0.0
 .IP \(bu 2

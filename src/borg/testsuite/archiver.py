@@ -59,7 +59,7 @@ from ..repository import Repository
 from . import has_lchflags, llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux, same_ts_ns
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from .platform import fakeroot_detected, is_darwin, is_win32
+from .platform import fakeroot_detected, is_darwin, is_freebsd, is_win32
 from .upgrader import make_attic_repo
 from . import key
 
@@ -1534,7 +1534,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert same_ts_ns(mtime_extracted, mtime_expected)
         # assert same_ts_ns(atime_extracted, atime_expected)  # still broken, but not really important.
 
-    @pytest.mark.skipif(not is_darwin, reason='only for macOS')
+    @pytest.mark.skipif(not (is_darwin or is_freebsd), reason='only for macOS')
     def test_extract_restores_append_flag(self):
         if not has_lchflags or not hasattr(stat, 'UF_APPEND'):
             pytest.skip('BSD flags or UF_APPEND not supported on this platform')

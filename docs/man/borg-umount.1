@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UMOUNT" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-UMOUNT" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-umount \- un-mount the FUSE filesystem
 .SH SYNOPSIS
@@ -35,7 +35,7 @@ borg-umount \- un-mount the FUSE filesystem
 borg [common options] umount [options] MOUNTPOINT
 .SH DESCRIPTION
 .sp
-This command un\-mounts a FUSE filesystem that was mounted with \fBborg mount\fP\&.
+This command unmounts a FUSE filesystem that was mounted with \fBborg mount\fP\&.
 .sp
 This is a convenience wrapper that just calls the platform\-specific shell
 command \- usually this is either umount or fusermount \-u.
@@ -106,7 +106,7 @@ $ echo \(aq/mnt/backup::root\-2016\-02\-15 /tmp/myarchive fuse.borgfs defaults,n
 $ mount /tmp/myrepo
 $ mount /tmp/myarchive
 $ ls /tmp/myrepo
-root\-2016\-02\-01 root\-2016\-02\-2015
+root\-2016\-02\-01 root\-2016\-02\-15
 $ ls /tmp/myarchive
 bin  boot  etc      home  lib  lib64  lost+found  media  mnt  opt  root  sbin  srv  tmp  usr  var
 .EE

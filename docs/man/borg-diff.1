@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DIFF" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-DIFF" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-diff \- Diff contents of two archives
 .SH SYNOPSIS
@@ -38,17 +38,84 @@ borg [common options] diff [options] REPO::ARCHIVE1 ARCHIVE2 [PATH...]
 This command finds differences (file contents, user/group/mode) between archives.
 .sp
 A repository location and an archive name must be specified for REPO::ARCHIVE1.
-ARCHIVE2 is just another archive name in same repository (no repository location
+ARCHIVE2 is just another archive name in the same repository (no repository location
 allowed).
+.SS What is compared
 .sp
-For archives created with Borg 1.1 or newer diff automatically detects whether
-the archives are created with the same chunker params. If so, only chunk IDs
+For each matching item in both archives, Borg reports:
+.INDENT 0.0
+.IP \(bu 2
+Content changes: total added/removed bytes within files. If chunker parameters are comparable,
+Borg compares chunk IDs quickly; otherwise, it compares the content.
+.IP \(bu 2
+Metadata changes: user, group, mode, and other metadata shown inline like
+\(dq[old_mode \-> new_mode]\(dq for mode changes. Use \fB\-\-content\-only\fP to suppress metadata changes.
+.IP \(bu 2
+Added/removed items: printed as \(dqadded SIZE path\(dq or \(dqremoved SIZE path\(dq.
+.UNINDENT
+.SS Output formats
+.sp
+The default (text) output shows one line per changed path, e.g.:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
++135 B    \-252 B [ \-rw\-r\-\-r\-\- \-> \-rwxr\-xr\-x ] path/to/file
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+JSON Lines output (\fB\-\-json\-lines\fP) prints one JSON object per changed path, e.g.:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+{\(dqpath\(dq: \(dqPATH\(dq, \(dqchanges\(dq: [
+    {\(dqtype\(dq: \(dqmodified\(dq, \(dqadded\(dq: BYTES, \(dqremoved\(dq: BYTES},
+    {\(dqtype\(dq: \(dqmode\(dq, \(dqold_mode\(dq: \(dq\-rw\-r\-\-r\-\-\(dq, \(dqnew_mode\(dq: \(dq\-rwxr\-xr\-x\(dq},
+    {\(dqtype\(dq: \(dqadded\(dq, \(dqsize\(dq: SIZE},
+    {\(dqtype\(dq: \(dqremoved\(dq, \(dqsize\(dq: SIZE}
+]}
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+Only actual changes are included in the \(dqchanges\(dq list. For example, a modified entry with
+added=0 and removed=0 is omitted.
+.SS Sorting
+.sp
+Use \fB\-\-sort\-by FIELDS\fP where FIELDS is a comma\-separated list of fields.
+Sorts are applied stably from last to first in the given list. Prepend \(dq>\(dq for
+descending, \(dq<\(dq (or no prefix) for ascending, for example \fB\-\-sort\-by=\(dq>size_added,path\(dq\fP\&.
+Supported fields include:
+.INDENT 0.0
+.IP \(bu 2
+path: the item path
+.IP \(bu 2
+size_added: total bytes added for the item content
+.IP \(bu 2
+size_removed: total bytes removed for the item content
+.IP \(bu 2
+size_diff: size_added \- size_removed (net content change)
+.IP \(bu 2
+size: size of the item as stored in ARCHIVE2 (0 for removed items)
+.IP \(bu 2
+user, group, uid, gid, ctime, mtime: taken from the item state in ARCHIVE2 when present
+.IP \(bu 2
+ctime_diff, mtime_diff: timestamp difference (archive2 \- archive1)
+.UNINDENT
+.sp
+The \fB\-\-sort\fP option is deprecated and only sorts by path.
+.SS Performance considerations
+.sp
+For archives created with Borg 1.1 or newer, diff automatically detects whether
+the archives were created with the same chunker parameters. If so, only chunk IDs
 are compared, which is very fast.
 .sp
-For archives prior to Borg 1.1 chunk contents are compared by default.
-If you did not create the archives with different chunker params,
+For archives prior to Borg 1.1, chunk contents are compared by default.
+If you did not create the archives with different chunker parameters,
 pass \fB\-\-same\-chunker\-params\fP\&.
-Note that the chunker params changed from Borg 0.xx to 1.0.
+Note that the chunker parameters changed from Borg 0.xx to 1.0.
 .sp
 For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
 .SH OPTIONS
@@ -79,14 +146,14 @@ only consider numeric user and group identifiers
 Override check of chunker parameters.
 .TP
 .B  \-\-sort
-Sort the output lines by file path.
-.TP
-.B  \-\-content\-only
-Only compare differences in content (exclude metadata differences)
-.TP
-.B  \-\-json\-lines
-Format output as JSON Lines.
+Sort the output by path (deprecated, use \-\-sort\-by=path).
 .UNINDENT
+.IP "System Message: WARNING/2 (docs/borg-diff.rst:, line 119)"
+Option list ends without a blank line; unexpected unindent.
+.sp
+\-\-sort\-by FIELD[,FIELD...]      Advanced sorting: specify field(s) to sort by. Accepts a comma\-separated list. Prefix with > for descending or < for ascending (default).
+\-\-content\-only                  Only compare differences in content (exclude metadata differences)
+\-\-json\-lines                    Format output as JSON Lines.
 .SS Include/Exclude options
 .INDENT 0.0
 .TP
@@ -144,7 +211,15 @@ $ borg diff \-\-json\-lines testrepo::archive1 archive3
 {\(dqpath\(dq: \(dqfile1\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqmodified\(dq, \(dqadded\(dq: 17, \(dqremoved\(dq: 5}, {\(dqtype\(dq: \(dqmode\(dq, \(dqold_mode\(dq: \(dq\-rw\-r\-\-r\-\-\(dq, \(dqnew_mode\(dq: \(dq\-rwxr\-xr\-x\(dq}]}
 {\(dqpath\(dq: \(dqfile2\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqmodified\(dq, \(dqadded\(dq: 135, \(dqremoved\(dq: 252}]}
 {\(dqpath\(dq: \(dqfile4\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqadded\(dq, \(dqsize\(dq: 0}]}
-{\(dqpath\(dq: \(dqfile3\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqremoved\(dq, \(dqsize\(dq: 0}]
+{\(dqpath\(dq: \(dqfile3\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqremoved\(dq, \(dqsize\(dq: 0}]}
+
+# Use \-\-sort\-by with a comma\-separated list; sorts apply stably from last to first.
+# Here: primary by net size change descending, tie\-breaker by path ascending
+$ borg diff \-\-sort\-by=\(dq>size_diff,path\(dq testrepo::archive1 archive3
+    +17 B      \-5 B [\-rw\-r\-\-r\-\- \-> \-rwxr\-xr\-x] file1
+removed         0 B file3
+added           0 B file4
+   +135 B    \-252 B file2
 .EE
 .UNINDENT
 .UNINDENT

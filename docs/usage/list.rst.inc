@@ -112,7 +112,7 @@ For more help on include/exclude patterns, see the :ref:`borg_patterns` command 
 The FORMAT specifier syntax
 +++++++++++++++++++++++++++
 
-The ``--format`` option uses python's `format string syntax
+The ``--format`` option uses Python's `format string syntax
 <https://docs.python.org/3.9/library/string.html#formatstrings>`_.
 
 Examples:

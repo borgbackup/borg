@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-EXPORT-TAR" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-EXPORT-TAR" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-export-tar \- Export archive contents as a tarball
 .SH SYNOPSIS
@@ -66,7 +66,7 @@ BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
 Timestamp resolution is limited to whole seconds, not the nanosecond resolution
 otherwise supported by Borg.
 .sp
-A \fB\-\-sparse\fP option (as found in borg extract) is not supported.
+A \fB\-\-sparse\fP option (as found in \fBborg extract\fP) is not supported.
 .sp
 By default the entire archive is extracted but a subset of files and directories
 can be selected by passing a list of \fBPATHs\fP as arguments.
@@ -123,20 +123,20 @@ Remove the specified number of leading path elements. Paths with fewer elements 
 .INDENT 3.5
 .sp
 .EX
-# export as uncompressed tar
+# Export as an uncompressed tar.
 $ borg export\-tar /path/to/repo::Monday Monday.tar
 
-# exclude some types, compress using gzip
+# Exclude some types; compress using gzip.
 $ borg export\-tar /path/to/repo::Monday Monday.tar.gz \-\-exclude \(aq*.so\(aq
 
-# use higher compression level with gzip
+# Use a higher compression level with gzip.
 $ borg export\-tar \-\-tar\-filter=\(dqgzip \-9\(dq testrepo::linux Monday.tar.gz
 
-# export a tar, but instead of storing it on disk,
+# Export a tar, but instead of storing it on disk,
 # upload it to a remote site using curl.
 $ borg export\-tar /path/to/repo::Monday \- | curl \-\-data\-binary @\- https://somewhere/to/POST
 
-# remote extraction via \(dqtarpipe\(dq
+# Remote extraction via \(dqtarpipe\(dq.
 $ borg export\-tar /path/to/repo::Monday \- | ssh somewhere \(dqcd extracted; tar x\(dq
 .EE
 .UNINDENT

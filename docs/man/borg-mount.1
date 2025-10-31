@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-MOUNT" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-MOUNT" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-mount \- Mount archive or an entire repository as a FUSE filesystem
 .SH SYNOPSIS
@@ -39,20 +39,20 @@ This command mounts a repository or an archive as a FUSE filesystem.
 This can be useful for browsing or restoring individual files.
 .sp
 When restoring, take into account that the current FUSE implementation does
-not support special fs flags and ACLs.
+not support special filesystem flags and ACLs.
 .sp
 When mounting a repository, the top directories will be named like the
 archives and the directory structure below these will be loaded on\-demand from
 the repository when entering these directories, so expect some delay.
 .sp
 Unless the \fB\-\-foreground\fP option is given the command will run in the
-background until the filesystem is \fBumounted\fP\&.
+background until the filesystem is \fBunmounted\fP\&.
 .sp
 Performance tips:
 .INDENT 0.0
 .IP \(bu 2
 when doing a \(dqwhole repository\(dq mount:
-do not enter archive dirs if not needed, this avoids on\-demand loading.
+do not enter archive directories if not needed; this avoids on\-demand loading.
 .IP \(bu 2
 only mount a specific archive, not the whole repository.
 .IP \(bu 2
@@ -78,7 +78,7 @@ override the user and group ids of all files (i.e., \fBborg mount \-o
 uid=1000,gid=1000\fP).
 .sp
 The man page references \fBuser_id\fP and \fBgroup_id\fP mount options
-(implemented by fuse) which specify the user and group id of the mount owner
+(implemented by FUSE) which specify the user and group id of the mount owner
 (aka, the user who does the mounting). It is set automatically by libfuse (or
 the filesystem if libfuse is not used). However, you should not specify these
 manually. Unlike the \fBuid\fP and \fBgid\fP mount options which affect all files,
@@ -89,7 +89,7 @@ Additional mount options supported by borg:
 .INDENT 0.0
 .IP \(bu 2
 \fBversions\fP: when used with a repository mount, this gives a merged, versioned
-view of the files in the archives. EXPERIMENTAL, layout may change in future.
+view of the files in the archives. EXPERIMENTAL; the layout may change in the future.
 .IP \(bu 2
 \fBallow_damaged_files\fP: by default damaged files (where missing chunks were
 replaced with runs of zeros by \fBborg check \-\-repair\fP) are not readable and
@@ -111,6 +111,13 @@ to unintentionally delete data.
 .sp
 When running in the foreground, ^C/SIGINT cleanly unmounts the filesystem,
 but other signals or crashes do not.
+.sp
+Debugging:
+.sp
+\fBborg mount\fP usually daemonizes and the daemon process sends stdout/stderr
+to /dev/null. Thus, you need to either use \fB\-f / \-\-foreground\fP to make it stay
+in the foreground and not daemonize, or use \fBBORG_LOGGING_CONF\fP to reconfigure
+the logger to output to a file.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

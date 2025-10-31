@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-SERVE" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-SERVE" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-serve \- Start in server mode. This command is usually not used manually.
 .SH SYNOPSIS
@@ -56,7 +56,7 @@ Override storage quota of the repository (e.g. 5G, 1.5T). When a new repository 
 .UNINDENT
 .SH EXAMPLES
 .sp
-\fBborg serve\fP has special support for ssh forced commands (see \fBauthorized_keys\fP
+\fBborg serve\fP has special support for SSH forced commands (see \fBauthorized_keys\fP
 example below): if the environment variable SSH_ORIGINAL_COMMAND is set it will
 ignore some options given on the command line and use the values from the
 variable instead. This only applies to a carefully controlled allowlist of safe
@@ -71,22 +71,22 @@ giving up and aborting the operation when another process is holding a lock.
 .UNINDENT
 .sp
 Environment variables (such as BORG_XXX) contained in the original
-command sent by the client are \fInot\fP interpreted, but ignored. If BORG_XXX environment
-variables should be set on the \fBborg serve\fP side, then these must be set in system\-specific
+command sent by the client are \fInot\fP interpreted; they are ignored. If BORG_XXX environment
+variables need to be set on the \fBborg serve\fP side, then these must be set in system\-specific
 locations like \fB/etc/environment\fP or in the forced command itself (example below).
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .EX
-# Allow an SSH keypair to only run borg, and only have access to /path/to/repo.
+# Allow an SSH key pair to only run borg, and only have access to /path/to/repo.
 # Use key options to disable unneeded and potentially dangerous SSH functionality.
-# This will help to secure an automated remote backup system.
+# This helps secure an automated remote backup system.
 $ cat ~/.ssh/authorized_keys
 command=\(dqborg serve \-\-restrict\-to\-path /path/to/repo\(dq,restrict ssh\-rsa AAAAB3[...]
 
-# Set a BORG_XXX environment variable on the \(dqborg serve\(dq side
+# Set a BORG_XXX environment variable on the \(ga\(gaborg serve\(ga\(ga side.
 $ cat ~/.ssh/authorized_keys
-command=\(dqexport BORG_XXX=value; borg serve [...]\(dq,restrict ssh\-rsa [...]
+command=\(dqBORG_XXX=value borg serve [...]\(dq,restrict ssh\-rsa [...]
 .EE
 .UNINDENT
 .UNINDENT
@@ -94,13 +94,14 @@ command=\(dqexport BORG_XXX=value; borg serve [...]\(dq,restrict ssh\-rsa [...]
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
-The examples above use the \fBrestrict\fP directive. This does automatically
-block potential dangerous ssh features, even when they are added in a future
-update. Thus, this option should be preferred.
+The examples above use the \fBrestrict\fP directive and assume a POSIX\-compliant
+shell set as the user\(aqs login shell.
+This automatically blocks potentially dangerous SSH features, even when
+they are added in a future update. Thus, this option should be preferred.
 .sp
-If you\(aqre using openssh\-server < 7.2, however, you have to explicitly specify
-the ssh features to restrict and cannot simply use the restrict option as it
-has been introduced in v7.2. We recommend to use
+If you\(aqre using OpenSSH server < 7.2, however, you have to explicitly specify
+the SSH features to restrict and cannot simply use the \fBrestrict\fP option as it
+was introduced in v7.2. We recommend using
 \fBno\-port\-forwarding,no\-X11\-forwarding,no\-pty,no\-agent\-forwarding,no\-user\-rc\fP
 in this case.
 .UNINDENT
@@ -126,9 +127,9 @@ Host backupserver
 .UNINDENT
 .UNINDENT
 .sp
-Replacing \fBbackupserver\fP with the hostname, FQDN or IP address of the borg server.
+Replace \fBbackupserver\fP with the hostname, FQDN, or IP address of the Borg server.
 .sp
-This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the ssh client process will be terminated, causing the borg process to terminate gracefully.
+This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the SSH client process will be terminated, causing the Borg process to terminate gracefully.
 .sp
 On the server side\(aqs \fBsshd\fP configuration file (typically \fB/etc/ssh/sshd_config\fP):
 .INDENT 0.0
@@ -141,11 +142,31 @@ ClientAliveCountMax 30
 .UNINDENT
 .UNINDENT
 .sp
-This will cause the server to send a keep alive to the client every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the server\(aqs sshd process will be terminated, causing the \fBborg serve\fP process to terminate gracefully and release the lock on the repository.
+This will cause the server to send a keepalive to the client every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the server\(aqs sshd process will be terminated, causing the \fBborg serve\fP process to terminate gracefully and release the lock on the repository.
 .sp
-If you then run borg commands with \fB\-\-lock\-wait 600\fP, this gives sufficient time for the borg serve processes to terminate after the SSH connection is torn down after the 300 second wait for the keepalives to fail.
+If you then run Borg commands with \fB\-\-lock\-wait 600\fP, this gives sufficient time for the \fBborg serve\fP processes to terminate after the SSH connection is torn down following the 300\-second wait for the keepalives to fail.
 .sp
 You may, of course, modify the timeout values demonstrated above to values that suit your environment and use case.
+.sp
+When the client is untrusted, it is a good idea to set the backup
+user\(aqs shell to a simple implementation (\fB/bin/sh\fP is only an example and may or may
+not be such a simple implementation):
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+chsh \-s /bin/sh BORGUSER
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+Because the configured shell is used by openssh <https://www.openssh.com/>
+
+to execute the command configured through the \fBauthorized_keys\fP file
+using \fB\(dq$SHELL\(dq \-c \(dq$COMMAND\(dq\fP,
+setting a minimal shell implementation reduces the attack surface
+compared to when a feature\-rich and complex shell implementation is
+used.
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP

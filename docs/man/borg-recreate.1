@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RECREATE" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-RECREATE" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-recreate \- Re-create archives
 .SH SYNOPSIS
@@ -37,7 +37,7 @@ borg [common options] recreate [options] [REPOSITORY_OR_ARCHIVE] [PATH...]
 .sp
 Recreate the contents of existing archives.
 .sp
-recreate is a potentially dangerous function and might lead to data loss
+Recreate is a potentially dangerous operation and might lead to data loss
 (if used wrongly). BE VERY CAREFUL!
 .sp
 Important: Repository disk space is \fBnot\fP freed until you run \fBborg compact\fP\&.
@@ -55,34 +55,34 @@ Due to how Borg stores compressed size information this might display
 incorrect information for archives that were not recreated at the same time.
 There is no risk of data loss by this.
 .sp
-\fB\-\-chunker\-params\fP will re\-chunk all files in the archive, this can be
+\fB\-\-chunker\-params\fP will re\-chunk all files in the archive; this can be
 used to have upgraded Borg 0.xx or Attic archives deduplicate with
 Borg 1.x archives.
 .sp
 \fBUSE WITH CAUTION.\fP
 Depending on the PATHs and patterns given, recreate can be used to permanently
 delete files from archives.
-When in doubt, use \fB\-\-dry\-run \-\-verbose \-\-list\fP to see how patterns/PATHS are
+When in doubt, use \fB\-\-dry\-run \-\-verbose \-\-list\fP to see how patterns/PATHs are
 interpreted. See \fIlist_item_flags\fP in \fBborg create\fP for details.
 .sp
 The archive being recreated is only removed after the operation completes. The
 archive that is built during the operation exists at the same time at
 \(dq<ARCHIVE>.recreate\(dq. The new archive will have a different archive ID.
 .sp
-With \fB\-\-target\fP the original archive is not replaced, instead a new archive is created.
+With \fB\-\-target\fP the original archive is not replaced; instead, a new archive is created.
 .sp
 When rechunking (or recompressing), space usage can be substantial \- expect
 at least the entire deduplicated size of the archives using the previous
-chunker (or compression) params.
+chunker (or compression) parameters.
 .sp
-If you recently ran borg check \-\-repair and it had to fix lost chunks with all\-zero
+If you recently ran \fBborg check \-\-repair\fP and it had to fix lost chunks with all\-zero
 replacement chunks, please first run another backup for the same data and re\-run
-borg check \-\-repair afterwards to heal any archives that had lost chunks which are
+\fBborg check \-\-repair\fP afterwards to heal any archives that had lost chunks which are
 still generated from the input data.
 .sp
-Important: running borg recreate to re\-chunk will remove the chunks_healthy
+Important: running \fBborg recreate\fP to re\-chunk will remove the \fBchunks_healthy\fP
 metadata of all items with replacement chunks, so healing will not be possible
-any more after re\-chunking (it is also unlikely it would ever work: due to the
+anymore after re\-chunking (it is also unlikely it would ever work: due to the
 change of chunking parameters, the missing chunk likely will never be seen again
 even if you still have the data that produced it).
 .SH OPTIONS
@@ -165,22 +165,22 @@ rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH
 .INDENT 3.5
 .sp
 .EX
-# Make old (Attic / Borg 0.xx) archives deduplicate with Borg 1.x archives.
+# Make old (Attic/Borg 0.xx) archives deduplicate with Borg 1.x archives.
 # Archives created with Borg 1.1+ and the default chunker params are skipped
 # (archive ID stays the same).
 $ borg recreate /mnt/backup \-\-chunker\-params default \-\-progress
 
-# Create a backup with little but fast compression
+# Create a backup with low but fast compression.
 $ borg create /mnt/backup::archive /some/files \-\-compression lz4
-# Then compress it \- this might take longer, but the backup has already completed,
+# Then compress it — this might take longer, but the backup has already completed,
 # so no inconsistencies from a long\-running backup job.
 $ borg recreate /mnt/backup::archive \-\-recompress \-\-compression zlib,9
 
 # Remove unwanted files from all archives in a repository.
-# Note the relative path for the \-\-exclude option \- archives only contain relative paths.
+# Note the relative path for the \-\-exclude option — archives only contain relative paths.
 $ borg recreate /mnt/backup \-\-exclude home/icke/Pictures/drunk_photos
 
-# Change archive comment
+# Change the archive comment.
 $ borg create \-\-comment \(dqThis is a comment\(dq /mnt/backup::archivename ~
 $ borg info /mnt/backup::archivename
 Name: archivename

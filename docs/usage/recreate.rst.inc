@@ -117,7 +117,7 @@ Description
 
 Recreate the contents of existing archives.
 
-recreate is a potentially dangerous function and might lead to data loss
+Recreate is a potentially dangerous operation and might lead to data loss
 (if used wrongly). BE VERY CAREFUL!
 
 Important: Repository disk space is **not** freed until you run ``borg compact``.
@@ -135,33 +135,33 @@ Due to how Borg stores compressed size information this might display
 incorrect information for archives that were not recreated at the same time.
 There is no risk of data loss by this.
 
-``--chunker-params`` will re-chunk all files in the archive, this can be
+``--chunker-params`` will re-chunk all files in the archive; this can be
 used to have upgraded Borg 0.xx or Attic archives deduplicate with
 Borg 1.x archives.
 
 **USE WITH CAUTION.**
 Depending on the PATHs and patterns given, recreate can be used to permanently
 delete files from archives.
-When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHS are
+When in doubt, use ``--dry-run --verbose --list`` to see how patterns/PATHs are
 interpreted. See :ref:`list_item_flags` in ``borg create`` for details.
 
 The archive being recreated is only removed after the operation completes. The
 archive that is built during the operation exists at the same time at
 "<ARCHIVE>.recreate". The new archive will have a different archive ID.
 
-With ``--target`` the original archive is not replaced, instead a new archive is created.
+With ``--target`` the original archive is not replaced; instead, a new archive is created.
 
 When rechunking (or recompressing), space usage can be substantial - expect
 at least the entire deduplicated size of the archives using the previous
-chunker (or compression) params.
+chunker (or compression) parameters.
 
-If you recently ran borg check --repair and it had to fix lost chunks with all-zero
+If you recently ran ``borg check --repair`` and it had to fix lost chunks with all-zero
 replacement chunks, please first run another backup for the same data and re-run
-borg check --repair afterwards to heal any archives that had lost chunks which are
+``borg check --repair`` afterwards to heal any archives that had lost chunks which are
 still generated from the input data.
 
-Important: running borg recreate to re-chunk will remove the chunks_healthy
+Important: running ``borg recreate`` to re-chunk will remove the ``chunks_healthy``
 metadata of all items with replacement chunks, so healing will not be possible
-any more after re-chunking (it is also unlikely it would ever work: due to the
+anymore after re-chunking (it is also unlikely it would ever work: due to the
 change of chunking parameters, the missing chunk likely will never be seen again
 even if you still have the data that produced it).

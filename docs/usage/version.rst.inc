@@ -42,12 +42,12 @@ borg version
 Description
 ~~~~~~~~~~~
 
-This command displays the borg client version / borg server version.
+This command displays the Borg client version / Borg server version.
 
-If a local repo is given, the client code directly accesses the repository,
+If a local repository is given, the client code directly accesses the repository,
 thus we show the client version also as the server version.
 
-If a remote repo is given (e.g. ssh:), the remote borg is queried and
+If a remote repository is given (e.g., ssh:), the remote Borg is queried and
 its version is displayed as the server version.
 
 Examples::
@@ -60,7 +60,7 @@ Examples::
     $ borg version ssh://borg@borgbackup:repo
     1.4.0a / 1.2.7
 
-Due to the version tuple format used in borg client/server negotiation, only
-a simplified version is displayed (as provided by borg.version.format_version).
+Due to the version tuple format used in Borg client/server negotiation, only
+a simplified version is displayed (as provided by ``borg.version.format_version``).
 
-There is also borg --version to display a potentially more precise client version.
+There is also ``borg --version`` to display a potentially more precise client version.

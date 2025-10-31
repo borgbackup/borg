@@ -17,7 +17,7 @@ borg benchmark crud
     +-------------------------------------------------------+----------------+----------------------------------------------+
     |                                                       | ``REPOSITORY`` | repository to use for benchmark (must exist) |
     +-------------------------------------------------------+----------------+----------------------------------------------+
-    |                                                       | ``PATH``       | path were to create benchmark input data     |
+    |                                                       | ``PATH``       | path where to create benchmark input data    |
     +-------------------------------------------------------+----------------+----------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                        |
     |                                                                                                                       |
@@ -37,7 +37,7 @@ borg benchmark crud
     REPOSITORY
         repository to use for benchmark (must exist)
     PATH
-        path were to create benchmark input data
+        path where to create benchmark input data
 
 
     :ref:`common_options`
@@ -48,7 +48,7 @@ Description
 
 This command benchmarks borg CRUD (create, read, update, delete) operations.
 
-It creates input data below the given PATH and backups this data into the given REPO.
+It creates input data below the given PATH and backs up this data into the given REPO.
 The REPO must already exist (it could be a fresh empty repo or an existing repo, the
 command will create / read / update / delete some archives named borg-benchmark-crud\* there.
 
@@ -64,17 +64,17 @@ thus the measurement results do not necessarily reflect performance with real da
 Also, due to the kind of content used, no compression is used in these benchmarks.
 
 C- == borg create (1st archive creation, no compression, do not use files cache)
-      C-Z- == all-zero files. full dedup, this is primarily measuring reader/chunker/hasher.
-      C-R- == random files. no dedup, measuring throughput through all processing stages.
+      C-Z- == all-zero files. full deduplication; this primarily measures reader/chunker/hasher.
+      C-R- == random files. no deduplication, measuring throughput through all processing stages.
 
 R- == borg extract (extract archive, dry-run, do everything, but do not write files to disk)
-      R-Z- == all zero files. Measuring heavily duplicated files.
+      R-Z- == all-zero files. Measuring heavily duplicated files.
       R-R- == random files. No duplication here, measuring throughput through all processing
       stages, except writing to disk.
 
 U- == borg create (2nd archive creation of unchanged input files, measure files cache speed)
       The throughput value is kind of virtual here, it does not actually read the file.
-      U-Z- == needs to check the 2 all-zero chunks' existence in the repo.
+      U-Z- == needs to check the two all-zero chunks' existence in the repo.
       U-R- == needs to check existence of a lot of different chunks in the repo.
 
 D- == borg delete archive (delete last remaining archive, measure deletion + compaction)
@@ -82,4 +82,4 @@ D- == borg delete archive (delete last remaining archive, measure deletion + com
       D-R- == many chunks to delete / many segments to compact/remove.
 
 Please note that there might be quite some variance in these measurements.
-Try multiple measurements and having a otherwise idle machine (and network, if you use it).
+Try multiple measurements and have an otherwise idle machine (and network, if you use it).

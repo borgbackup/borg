@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-EXTRACT" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-EXTRACT" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-extract \- Extract archive contents
 .SH SYNOPSIS
@@ -35,16 +35,20 @@ borg-extract \- Extract archive contents
 borg [common options] extract [options] ARCHIVE [PATH...]
 .SH DESCRIPTION
 .sp
-This command extracts the contents of an archive. By default the entire
-archive is extracted but a subset of files and directories can be selected
-by passing a list of \fBPATHs\fP as arguments. The file selection can further
-be restricted by using the \fB\-\-exclude\fP option.
+This command extracts the contents of an archive.
 .sp
+By default, the entire archive is extracted, but a subset of files and directories
+can be selected by passing a list of \fBPATH\fP arguments. The default interpretation
+for the paths to extract is \fIpp:\fP which is a literal path\-prefix match. If you want
+to use e.g. a wildcard, you must select a different pattern style such as \fIsh:\fP or
+\fIfm:\fP\&. See \fIborg_patterns\fP for more information.
+.sp
+The file selection can be further restricted by using the \fB\-\-exclude\fP option.
 For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
 .sp
 By using \fB\-\-dry\-run\fP, you can do all extraction steps except actually writing the
-output data: reading metadata and data chunks from the repo, checking the hash/hmac,
-decrypting, decompressing.
+output data: reading metadata and data chunks from the repository, checking the hash/HMAC,
+decrypting, and decompressing.
 .sp
 \fB\-\-progress\fP can be slower than no progress display, since it makes one additional
 pass over the archive metadata.
@@ -56,8 +60,8 @@ Currently, extract always writes into the current working directory (\(dq.\(dq),
 so make sure you \fBcd\fP to the right place before calling \fBborg extract\fP\&.
 .sp
 When parent directories are not extracted (because of using file/directory selection
-or any other reason), borg can not restore parent directories\(aq metadata, e.g. owner,
-group, permission, etc.
+or any other reason), Borg cannot restore parent directories\(aq metadata, e.g., owner,
+group, permissions, etc.
 .UNINDENT
 .UNINDENT
 .SH OPTIONS
@@ -142,6 +146,9 @@ $ borg extract /path/to/repo::my\-files home/USERNAME/src
 
 # Extract the \(dqsrc\(dq directory but exclude object files
 $ borg extract /path/to/repo::my\-files home/USERNAME/src \-\-exclude \(aq*.o\(aq
+
+# Extract only the C files
+$ borg extract /path/to/repo::my\-files \(aqsh:home/USERNAME/src/*.c\(aq
 
 # Restore a raw device (must not be active/in use/mounted at that time)
 $ borg extract \-\-stdout /path/to/repo::my\-sdx | dd of=/dev/sdx bs=10M

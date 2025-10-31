@@ -338,7 +338,7 @@ Checklist:
 - Check version number of upcoming release in ``CHANGES.rst``.
 - Render ``CHANGES.rst`` via ``make html`` and check for markup errors.
 - Verify that ``MANIFEST.in``, ``pyproject.toml`` and ``setup.py`` are complete.
-- Run these commands and commit::
+- Run these commands, check git status for files that might need to be added, and commit::
 
     python scripts/make.py build_usage
     python scripts/make.py build_man
@@ -347,6 +347,8 @@ Checklist:
 
     git tag -s -m "tagged/signed release X.Y.Z" X.Y.Z
 
+- Push the release PR branch to GitHub, make a pull request.
+- Also push the release tag.
 - Create a clean repo and use it for the following steps::
 
     git clone borg borg-clean
@@ -355,8 +357,9 @@ Checklist:
   It will also reveal uncommitted required files.
   Moreover, it makes sure the vagrant machines only get committed files and
   do a fresh start based on that.
-- Run tox and/or binary builds on all supported platforms via vagrant,
-  check for test failures.
+- Optional: run tox and/or binary builds on all supported platforms via vagrant,
+  check for test failures. This is now optional as we do platform testing and
+  binary building on GitHub.
 - Create sdist, sign it, upload release to (test) PyPi:
 
   ::
@@ -367,12 +370,13 @@ Checklist:
 
   Note: the signature is not uploaded to PyPi any more, but we upload it to
   github releases.
-- Put binaries into dist/borg-OSNAME and sign them:
 
-  ::
-
-    scripts/sign-binaries 201912312359
-
+- When GitHub CI looks good on the release PR, merge it and then check "Actions":
+  GitHub will create binary assets after the release PR is merged within the
+  CI testing of the merge. Check the "Upload binaries" step on Ubuntu (AMD/Intel
+  and ARM64) and macOS (Intel and ARM64), fetch the ZIPs with the binaries.
+- Unpack the ZIPs and test the binaries, upload the binaries to the GitHub
+  release page (borg-OS-SPEC-ARCH-gh and borg-OS-SPEC-ARCH-gh.tgz).
 - Close the release milestone on GitHub.
 - `Update borgbackup.org
   <https://github.com/borgbackup/borgbackup.github.io/pull/53/files>`_ with the
@@ -388,7 +392,7 @@ Checklist:
   - pypi dist package and signature
   - Standalone binaries (see above for how to create them).
 
-    - For macOS, document the macFUSE version in the README of the binaries.
-      macFUSE uses a kernel extension that needs to be compatible with the
-      code contained in the binary.
+    - For macOS binaries **with** FUSE support, document the macFUSE version
+      in the README of the binaries. macFUSE uses a kernel extension that needs
+      to be compatible with the code contained in the binary.
   - A link to ``CHANGES.rst``.

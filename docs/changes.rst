@@ -414,29 +414,29 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.2 (not released yet)
---------------------------------
+Version 1.4.2 (2025-10-31)
+--------------------------
 
 For upgrade and compatibility hints, please also read the "Upgrade Notes" section
 above.
 
 New features:
 
+- BORG_MSGPACK_VERSION_CHECK=no to optionally disable the msgpack version
+  check; default is "yes"; use at your own risk, #9109.
 - fat binary builds on GitHub (see assets on the GitHub releases page):
 
   - for Linux with glibc 2.35+ (Intel/AMD and ARM64)
   - for macOS 14+ (Apple Silicon/ARM64) and macOS 13+ (Intel)
 - diff --sort-by: enhanced sorting, #8998
-- create: --files-changed=MODE option (controls how borg detects whether
+- create: add --files-changed=MODE option (controls how borg detects whether
   a file has changed while it is being backed up)
-- improved tty-less progress reporting (--progress)
-- BORG_MSGPACK_VERSION_CHECK=no to optionally disable the msgpack version
-  check; default is "yes", use at your own risk, #9109.
+- improve tty-less progress reporting (--progress)
 
 Fixes:
 
 - extract: fs flags: use get/set to influence only specific flags, #9039,
-  Linux only.
+  Linux/macOS/FreeBSD only.
 - extract: fs flags: remove support for the compression flag; this wasn't
   working correctly anyway.
 - create/info: fix discrepancies in archive stats, #8898, #9003
@@ -445,6 +445,7 @@ Fixes:
 - preprocess_args: fix option name matching
 - fix ChunkerParams validation
 - mount --show-rc: display main process rc, #8308
+- json: include archive keys in JSON lines when requested via --format, #9095
 
 Other changes:
 
@@ -478,6 +479,8 @@ Other changes:
   - extract: document how to use wildcards in PATHs, #8589
   - improve borg help patterns, #7144
   - clarify the scope of the default pattern style, #9004
+  - explain how to get maximum compaction with --threshold 0 and trade-offs, #9112, #8716
+  - rewrite `borg init --encryption` docs
 - tests:
 
   - save temporary space
@@ -485,15 +488,17 @@ Other changes:
   - fix diff command test on macOS HFS+, #8860
   - fuzzing test for default chunker
   - read_only CM: skip test if cmd_immutable is unsuccessful, #9021
+  - pyproject.toml: correctly define test environments for FUSE testing
+  - coverage/tox: use pyproject.toml, disable no-ctracer warning
+  - CI: speed up pull requests
   - vagrant:
 
-    - use Python 3.11.13
+    - use Python 3.11.14
     - add debian trixie box
     - drop broken/EOL debian buster VM / borg-linux-glibc228
     - drop outdated/slow/unsupported macOS 10.12 VM / borg-macos1012 (Intel)
-  - pyproject.toml: correctly define test environments for FUSE testing
-  - coverage/tox: use pyproject.toml
-  - CI: speed up pull requests
+    - add an OpenBSD 7.7 box
+    - try to fix OpenIndiana box, please see #9118
 
 
 Version 1.4.1 (2025-04-19)

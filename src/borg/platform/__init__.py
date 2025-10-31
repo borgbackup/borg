@@ -36,6 +36,7 @@ elif is_freebsd:  # pragma: freebsd only
     from .freebsd import API_VERSION as OS_API_VERSION
     from .freebsd import listxattr, getxattr, setxattr
     from .freebsd import acl_get, acl_set
+    from .freebsd import set_flags
 elif is_darwin:  # pragma: darwin only
     from .darwin import API_VERSION as OS_API_VERSION
     from .darwin import listxattr, getxattr, setxattr

@@ -119,13 +119,24 @@ def packages_netbsd
   EOF
 end
 
+def package_update_openindiana
+  return <<-EOF
+    echo "nameserver 1.1.1.1" > /etc/resolv.conf
+    # needs separate provisioning step + reboot to become effective:
+    pkg update
+  EOF
+end
+
 def packages_openindiana
   return <<-EOF
-    # needs separate provisioning step + reboot:
-    #pkg update
-    pkg install gcc-13 git pkg-config libxxhash pip virtualenv
+    pkg install gcc-13 git
+    pkg install pkg-config libxxhash
+    ln -sf /usr/bin/python3.9 /usr/bin/python3
+    python3 -m ensurepip
+    ln -sf /usr/bin/pip3.9 /usr/bin/pip3
+    pip3 install virtualenv
     # let borg's pkg-config find openssl:
-    pfexec pkg set-mediator -V 3.1 openssl
+    pfexec pkg set-mediator -V 3 openssl
   EOF
 end
 
@@ -412,6 +423,7 @@ Vagrant.configure(2) do |config|
       v.memory = 2048 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "package update openindiana", :type => :shell, :inline => package_update_openindiana, :reboot => true
     b.vm.provision "packages openindiana", :type => :shell, :inline => packages_openindiana
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openindiana")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")

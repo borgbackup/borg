@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-IMPORT-TAR" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-IMPORT-TAR" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -37,9 +37,9 @@ borg [common options] import\-tar [options] ARCHIVE TARFILE
 .sp
 This command creates a backup archive from a tarball.
 .sp
-When giving \(aq\-\(aq as path, Borg will read a tar stream from standard input.
+When giving \(aq\-\(aq as a path, Borg will read a tar stream from standard input.
 .sp
-By default (\-\-tar\-filter=auto) Borg will detect whether the file is compressed
+By default (\fB\-\-tar\-filter=auto\fP) Borg will detect whether the file is compressed
 based on its file extension and pipe the file through an appropriate filter:
 .INDENT 0.0
 .IP \(bu 2
@@ -54,11 +54,11 @@ based on its file extension and pipe the file through an appropriate filter:
 \&.tar.lz4: lz4 \-d
 .UNINDENT
 .sp
-Alternatively, a \-\-tar\-filter program may be explicitly specified. It should
+Alternatively, a \fB\-\-tar\-filter\fP program may be explicitly specified. It should
 read compressed data from stdin and output an uncompressed tar stream on
 stdout.
 .sp
-Most documentation of borg create applies. Note that this command does not
+Most documentation of \fBborg create\fP applies. Note that this command does not
 support excluding files.
 .sp
 import\-tar is a lossy conversion:

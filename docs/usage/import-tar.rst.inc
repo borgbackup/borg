@@ -91,9 +91,9 @@ Description
 
 This command creates a backup archive from a tarball.
 
-When giving '-' as path, Borg will read a tar stream from standard input.
+When giving '-' as a path, Borg will read a tar stream from standard input.
 
-By default (--tar-filter=auto) Borg will detect whether the file is compressed
+By default (``--tar-filter=auto``) Borg will detect whether the file is compressed
 based on its file extension and pipe the file through an appropriate filter:
 
 - .tar.gz or .tgz: gzip -d
@@ -102,11 +102,11 @@ based on its file extension and pipe the file through an appropriate filter:
 - .tar.zstd or .tar.zst: zstd -d
 - .tar.lz4: lz4 -d
 
-Alternatively, a --tar-filter program may be explicitly specified. It should
+Alternatively, a ``--tar-filter`` program may be explicitly specified. It should
 read compressed data from stdin and output an uncompressed tar stream on
 stdout.
 
-Most documentation of borg create applies. Note that this command does not
+Most documentation of ``borg create`` applies. Note that this command does not
 support excluding files.
 
 import-tar is a lossy conversion:

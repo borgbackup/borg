@@ -43,5 +43,5 @@ Description
 ~~~~~~~~~~~
 
 This command breaks the repository and cache locks.
-Please use carefully and only while no borg process (on any machine) is
-trying to access the Cache or the Repository.
+Please use with care and only when no borg process (on any machine) is
+trying to access the cache or the repository.

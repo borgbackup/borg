@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-CREATE" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-create \- Create new archive
 .SH SYNOPSIS
@@ -37,18 +37,18 @@ borg [common options] create [options] ARCHIVE [PATH...]
 .sp
 This command creates a backup archive containing all files found while recursively
 traversing all paths specified. Paths are added to the archive as they are given,
-that means if relative paths are desired, the command has to be run from the correct
+which means that if relative paths are desired, the command has to be run from the correct
 directory.
 .sp
 The slashdot hack in paths (recursion roots) is triggered by using \fB/./\fP:
-\fB/this/gets/stripped/./this/gets/archived\fP means to process that fs object, but
+\fB/this/gets/stripped/./this/gets/archived\fP means to process that filesystem object, but
 strip the prefix on the left side of \fB\&./\fP from the archived items (in this case,
 \fBthis/gets/archived\fP will be the path in the archived item).
 .sp
-When giving \(aq\-\(aq as path, borg will read data from standard input and create a
-file \(aqstdin\(aq in the created archive from that data. In some cases it\(aqs more
-appropriate to use \-\-content\-from\-command, however. See section \fIReading from
-stdin\fP below for details.
+When giving \(aq\-\(aq as a path, Borg will read data from standard input and create a
+file \(aqstdin\(aq in the created archive from that data. In some cases, it is more
+appropriate to use \fB\-\-content\-from\-command\fP\&. See section \(dqReading from stdin\(dq
+below for details.
 .sp
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
@@ -70,7 +70,7 @@ This comparison can operate in different modes as given by \fB\-\-files\-cache\f
 .IP \(bu 2
 ctime,size,inode (default)
 .IP \(bu 2
-mtime,size,inode (default behaviour of borg versions older than 1.1.0rc4)
+mtime,size,inode (default behavior of borg versions older than 1.1.0rc4)
 .IP \(bu 2
 ctime,size (ignore the inode number)
 .IP \(bu 2
@@ -83,37 +83,49 @@ rechunk,mtime (all files are considered modified \- rechunk, cache mtime)
 disabled (disable the files cache, all files considered modified \- rechunk)
 .UNINDENT
 .sp
-inode number: better safety, but often unstable on network filesystems
+inode number: better safety, but often unstable on network file systems
 .sp
 Normally, detecting file modifications will take inode information into
 consideration to improve the reliability of file change detection.
-This is problematic for files located on sshfs and similar network file
-systems which do not provide stable inode numbers, such files will always
+This is problematic for files located on SSHFS and similar network file
+systems which do not provide stable inode numbers; such files will always
 be considered modified. You can use modes without \fIinode\fP in this case to
-improve performance, but reliability of change detection might be reduced.
+improve performance, but the reliability of change detection might be reduced.
 .sp
 ctime vs. mtime: safety vs. speed
 .INDENT 0.0
 .IP \(bu 2
 ctime is a rather safe way to detect changes to a file (metadata and contents)
-as it can not be set from userspace. But, a metadata\-only change will already
+as it cannot be set from user space. However, a metadata\-only change will already
 update the ctime, so there might be some unnecessary chunking/hashing even
-without content changes. Some filesystems do not support ctime (change time).
-E.g. doing a chown or chmod to a file will change its ctime.
+without content changes. Some file systems do not support ctime (change time).
+For example, doing a chown or chmod to a file will change its ctime.
 .IP \(bu 2
 mtime usually works and only updates if file contents were changed. But mtime
-can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+can be arbitrarily set from user space, e.g., to set mtime back to the same value
 it had before a content change happened. This can be used maliciously as well as
-well\-meant, but in both cases mtime based cache modes can be problematic.
+well\-meant, but in both cases mtime\-based cache modes can be problematic.
 .UNINDENT
 .sp
-The mount points of filesystems or filesystem snapshots should be the same for every
+The \fB\-\-files\-changed\fP option controls how Borg detects if a file has changed during backup:
+.INDENT 0.0
+.IP \(bu 2
+ctime (default): Use ctime to detect changes. This is the safest option.
+.IP \(bu 2
+mtime: Use mtime to detect changes.
+.IP \(bu 2
+disabled: Disable the \(dqfile has changed while we backed it up\(dq detection completely.
+This is not recommended unless you know what you\(aqre doing, as it could lead to
+inconsistent backups if files change during the backup process.
+.UNINDENT
+.sp
+The mount points of file systems or file system snapshots should be the same for every
 creation of a new archive to ensure fast operation. This is because the file cache that
-is used to determine changed files quickly uses absolute filenames.
+is used to determine changed files quickly uses absolute file names.
 If this is not possible, consider creating a bind mount to a stable location.
 .sp
 The \fB\-\-progress\fP option shows (from left to right) Original, Compressed and Deduplicated
-(O, C and D, respectively), then the Number of files (N) processed so far, followed by
+(O, C and D, respectively), then the number of files (N) processed so far, followed by
 the currently processed path.
 .sp
 When using \fB\-\-stats\fP, you will get some statistics about how much data was
@@ -251,6 +263,9 @@ detect sparse holes in input (supported only by fixed chunker)
 .BI \-\-files\-cache \ MODE
 operate files cache in MODE. default: ctime,size,inode
 .TP
+.BI \-\-files\-changed \ MODE
+specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime
+.TP
 .B  \-\-read\-special
 open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 .UNINDENT
@@ -379,15 +394,15 @@ only include the objects specified by \fB\-\-exclude\-if\-present\fP in your bac
 and not include any other contents of the containing folder, this can be enabled
 through using the \fB\-\-keep\-exclude\-tags\fP option.
 .sp
-The \fB\-x\fP or \fB\-\-one\-file\-system\fP option excludes directories, that are mountpoints (and everything in them).
-It detects mountpoints by comparing the device number from the output of \fBstat()\fP of the directory and its
+The \fB\-x\fP or \fB\-\-one\-file\-system\fP option excludes directories that are mount points (and everything in them).
+It detects mount points by comparing the device number from the output of \fBstat()\fP of the directory and its
 parent directory. Specifically, it excludes directories for which \fBstat()\fP reports a device number different
 from the device number of their parent.
-In general: be aware that there are directories with device number different from their parent, which the kernel
-does not consider a mountpoint and also the other way around.
-Linux examples for this are bind mounts (possibly same device number, but always a mountpoint) and ALL
-subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint).
-macOS examples are the apfs mounts of a typical macOS installation.
+In general: be aware that there are directories with device numbers different from their parent, which the kernel
+does not consider mount points, and vice versa.
+Linux examples for this are bind mounts (possibly same device number, but always a mount point) and all
+subvolumes of a Btrfs file system (different device numbers from the parent but not necessarily mount points).
+macOS examples are the APFS mounts of a typical macOS installation.
 Therefore, when using \fB\-\-one\-file\-system\fP, you should double\-check that the backup works as intended.
 .SS Item flags
 .sp

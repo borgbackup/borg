@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-PRUNE" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-prune \- Prune repository archives according to specified rules
 .SH SYNOPSIS
@@ -74,9 +74,9 @@ up to 7 most recent days with backups (days without backups do not count).
 The rules are applied from secondly to yearly, and backups selected by previous
 rules do not count towards those of later rules. The time that each backup
 starts is used for pruning purposes. Dates and times are interpreted in
-the local timezone, and weeks go from Monday to Sunday. Specifying a
-negative number of archives to keep means that there is no limit. As of borg
-1.2.0, borg will retain the oldest archive if any of the secondly, minutely,
+the local time zone, and weeks go from Monday to Sunday. Specifying a
+negative number of archives to keep means that there is no limit. As of Borg
+1.2.0, Borg will retain the oldest archive if any of the secondly, minutely,
 hourly, daily, weekly, monthly, quarterly, or yearly rules was not otherwise
 able to meet its retention target. This enables the first chronological archive
 to continue aging until it is replaced by a newer archive that meets the
@@ -164,42 +164,42 @@ only consider archive names matching the glob. sh: rules apply (without actually
 .UNINDENT
 .SH EXAMPLES
 .sp
-Be careful, prune is a potentially dangerous command, it will remove backup
+Be careful: prune is a potentially dangerous command; it will remove backup
 archives.
 .sp
-The default of prune is to apply to \fBall archives in the repository\fP unless
-you restrict its operation to a subset of the archives using \fB\-\-glob\-archives\fP\&.
-When using \fB\-\-glob\-archives\fP, be careful to choose a good matching pattern \-
-e.g. do not use \(dqfoo*\(dq if you do not also want to match \(dqfoobar\(dq.
+By default, prune applies to \fBall archives in the repository\fP unless you
+restrict its operation to a subset of the archives using \fB\-\-glob\-archives\fP\&.
+When using \fB\-\-glob\-archives\fP, be careful to choose a good matching pattern —
+for example, do not use \(dqfoo*\(dq if you do not also want to match \(dqfoobar\(dq.
 .sp
 It is strongly recommended to always run \fBprune \-v \-\-list \-\-dry\-run ...\fP
-first so you will see what it would do without it actually doing anything.
+first, so you can see what it would do without actually doing anything.
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .EX
-# Keep 7 end of day and 4 additional end of week archives.
+# Keep 7 end\-of\-day and 4 additional end\-of\-week archives.
 # Do a dry\-run without actually deleting anything.
 $ borg prune \-v \-\-list \-\-dry\-run \-\-keep\-daily=7 \-\-keep\-weekly=4 /path/to/repo
 
 # Same as above but only apply to archive names starting with the hostname
 # of the machine followed by a \(dq\-\(dq character:
 $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-\-glob\-archives=\(aq{hostname}\-*\(aq /path/to/repo
-# actually free disk space:
+# Actually free disk space:
 $ borg compact /path/to/repo
 
-# Keep 7 end of day, 4 additional end of week archives,
-# and an end of month archive for every month:
+# Keep 7 end\-of\-day, 4 additional end\-of\-week archives,
+# and an end\-of\-month archive for every month:
 $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-\-keep\-monthly=\-1 /path/to/repo
 
-# Keep all backups in the last 10 days, 4 additional end of week archives,
-# and an end of month archive for every month:
+# Keep all backups in the last 10 days, 4 additional end\-of\-week archives,
+# and an end\-of\-month archive for every month:
 $ borg prune \-v \-\-list \-\-keep\-within=10d \-\-keep\-weekly=4 \-\-keep\-monthly=\-1 /path/to/repo
 .EE
 .UNINDENT
 .UNINDENT
 .sp
-There is also a visualized prune example in \fBdocs/misc/prune\-example.txt\fP\&.
+There is also a visual example of pruning in \fBdocs/misc/prune\-example.txt\fP\&.
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP, \fIborg\-compact(1)\fP

@@ -59,135 +59,214 @@ borg init
 Description
 ~~~~~~~~~~~
 
-This command initializes an empty repository. A repository is a filesystem
-directory containing the deduplicated data from zero or more archives.
+This command initializes an empty repository. A repository is a
+filesystem directory containing the deduplicated data from zero or more
+archives.
 
-Encryption mode TLDR
-++++++++++++++++++++
+Encryption mode TL;DR
++++++++++++++++++++++
 
-The encryption mode can only be configured when creating a new repository -
-you can neither configure it on a per-archive basis nor change the
-encryption mode of an existing repository.
+The encryption mode can only be configured when creating a new
+repository. You can neither configure encryption on a per-archive
+basis, nor change the encryption mode of an existing repository. You
+should thus take possible future use into account when deciding on an
+encryption mode.
 
-Use ``repokey``::
+As a general rule of thumb, use ``repokey`` with a strong passphrase:
 
     borg init --encryption repokey /path/to/repo
 
-Or ``repokey-blake2`` depending on which is faster on your client machines (see below)::
+However, there are many reasons to choose differently. See the section
+below for details. In any case, Borg will:
 
-    borg init --encryption repokey-blake2 /path/to/repo
+1. Ask you to enter a unique and strong passphrase.
+2. Create a random Borg key (which actually consists of three random
+   secrets, see :ref:`key_files` for details).
+3. Encrypt the Borg key with your passphrase.
+4. Store the encrypted Borg key inside the repository directory (with
+   ``repokey`` and ``repokey-blake2`` modes; with ``keyfile`` and
+   ``keyfile-blake2`` modes the Borg key is stored in your home
+   directory instead, see below). Since we usually have to assume that
+   an attacker could gain access to the repository (that's why we
+   encrypt the data in the first place), choosing a strong and unique
+   passphrase is absolutely crucial.
+5. Encrypt and sign your backups with the Borg key to prevent anyone
+   from reading or forging them unless they have the Borg key *and*
+   know the passphrase.
+6. Use the Borg key to decrypt and thus access the data stored in your
+   repository, e.g. when extracting files. The contents can also be
+   verified to detect accidental corruption or malicious tampering.
 
-Borg will:
+As you can see, you always need *both* the Borg key and passphrase to
+access your data. Thus it's crucial to keep a backup of your key
+*outside* both the repository and the system you create backups of.
+You can easily run into a "leaving your keys inside your car" situation
+otherwise. See :ref:`borg_key_export` to create a backup of your key
+(e.g., by printing it on paper).
 
-1. Ask you to come up with a passphrase.
-2. Create a borg key (which contains 3 random secrets. See :ref:`key_files`).
-3. Encrypt the key with your passphrase.
-4. Store the encrypted borg key inside the repository directory (in the repo config).
-   This is why it is essential to use a secure passphrase.
-5. Encrypt and sign your backups to prevent anyone from reading or forging them unless they
-   have the key and know the passphrase. Make sure to keep a backup of
-   your key **outside** the repository - do not lock yourself out by
-   "leaving your keys inside your car" (see :ref:`borg_key_export`).
-   For remote backups the encryption is done locally - the remote machine
-   never sees your passphrase, your unencrypted key or your unencrypted files.
-   Chunking and id generation are also based on your key to improve
-   your privacy.
-6. Use the key when extracting files to decrypt them and to verify that the contents of
-   the backups have not been accidentally or maliciously altered.
+Encryption is done locally - i.e., if you back up to a remote machine,
+the remote machine neither sees your passphrase, nor your unencrypted
+Borg key, nor your unencrypted files. Chunking and ID generation are
+based on your key to improve privacy.
+
+**About hardware acceleration:**
+
+Borg encrypts data with AES, which is pretty fast thanks to hardware
+acceleration on basically all modern Intel, AMD, and ARM CPUs since
+around the early 2010s (very cheap models since the mid-2010s).
+
+As the hashing algorithm, Borg can use either SHA256 or BLAKE2b. ARM
+CPUs support hardware-accelerated SHA256 hashing since ARMv7 with NEON
+(around 2011), or ARMv8 (around 2013). AMD CPUs support it since Zen 1
+(around 2017), i.e. all AMD Ryzen CPUs. Intel CPUs support it since Ice
+Lake on mobile (10th gen, around 2021), and Rocket Lake on desktop
+(11th gen, around 2021). Very cheap models have received support a few
+years later. If your CPU doesn't support hardware-accelerated SHA256
+hashing, you might want to give BLAKE2b hashing a try - it's likely
+faster then. So, instead of ``repokey`` mode, use ``repokey-blake2``
+(or any of the other ``-blake2`` modes for that matter).
+
+Hardware acceleration is always used automatically when available.
 
 Picking a passphrase
 ++++++++++++++++++++
 
-Make sure you use a good passphrase. Not too short, not too simple. The real
-encryption / decryption key is encrypted with / locked by your passphrase.
-If an attacker gets your key, he can't unlock and use it without knowing the
-passphrase.
+Make sure you use a good passphrase. Not too short, not too simple. The
+real encryption / decryption key is encrypted with / locked by your
+passphrase. If an attacker gets your borg key, they can't unlock and use
+it without knowing the passphrase.
 
-Be careful with special or non-ascii characters in your passphrase:
+Be careful with special or non-ASCII characters in your passphrase:
 
-- Borg processes the passphrase as unicode (and encodes it as utf-8),
-  so it does not have problems dealing with even the strangest characters.
-- BUT: that does not necessarily apply to your OS / VM / keyboard configuration.
+- Borg processes the passphrase as Unicode (and encodes it as UTF-8), so
+  it does not have problems dealing with even the strangest characters.
+- BUT: that does not necessarily apply to your OS / VM / keyboard
+  configuration.
 
-So better use a long passphrase made from simple ascii chars than one that
-includes non-ascii stuff or characters that are hard/impossible to enter on
-a different keyboard layout.
+So it is better to use a long passphrase made from simple ASCII
+characters than one that includes non-ASCII characters or characters
+that are hard or impossible to enter on a different keyboard layout.
 
-You can change your passphrase for existing repos at any time, it won't affect
-the encryption/decryption key or other secrets.
+You can change your passphrase for existing repositories at any time; it
+won't affect the encryption/decryption key or other secrets. See
+:ref:`borg_key_change-passphrase`.
 
-More encryption modes
-+++++++++++++++++++++
+More about encryption modes
++++++++++++++++++++++++++++
 
-Only use ``--encryption none`` if you are OK with anyone who has access to
-your repository being able to read your backups and tamper with their
-contents without you noticing.
+Choosing the right encryption mode isn't always easy and many factors
+can change which mode is best for you. However, note that you can't
+really do anything *wrong* if you choose ``repokey`` with a strong
+passphrase. So, if you're not sure, choose ``repokey`` (or
+``repokey-blake2``, depending on your hardware, see above).
 
-If you want "passphrase and having-the-key" security, use ``--encryption keyfile``.
-The key will be stored in your home directory (in ``~/.config/borg/keys``).
-
-If you do **not** want to encrypt the contents of your backups, but still
-want to detect malicious tampering use ``--encryption authenticated``.
-To normally work with ``authenticated`` repos, you will need the passphrase, but
-there is an emergency workaround, see ``BORG_WORKAROUNDS=authenticated_no_key`` docs.
-
-If ``BLAKE2b`` is faster than ``SHA-256`` on your hardware, use ``--encryption authenticated-blake2``,
-``--encryption repokey-blake2`` or ``--encryption keyfile-blake2``. Note: for remote backups
-the hashing is done on your local machine.
+Borg supports the following encryption modes:
 
 .. nanorst: inline-fill
+.. class:: borg-encryption-table
 
-+----------+---------------+------------------------+--------------------------+
-| Hash/MAC | Not encrypted | Not encrypted,         | Encrypted (AEAD w/ AES)  |
-|          | no auth       | but authenticated      | and authenticated        |
-+----------+---------------+------------------------+--------------------------+
-| SHA-256  | none          | `authenticated`        | repokey                  |
-|          |               |                        | keyfile                  |
-+----------+---------------+------------------------+--------------------------+
-| BLAKE2b  | n/a           | `authenticated-blake2` | `repokey-blake2`         |
-|          |               |                        | `keyfile-blake2`         |
-+----------+---------------+------------------------+--------------------------+
++----------+-------------------+--------------------------+-------------------------+
+| Hash/MAC | Not Encrypted                                | Encrypted (AEAD w/ AES) |
++          +-------------------+--------------------------+-------------------------+
+|          | Not Authenticated | Authenticated                                      |
++==========+===================+==========================+=========================+
+| SHA-256  | ``none``          | ``authenticated``        | ``repokey``             |
+|          |                   |                          | ``keyfile``             |
++----------+-------------------+--------------------------+-------------------------+
+| BLAKE2b  | n/a               | ``authenticated-blake2`` | ``repokey-blake2``      |
+|          |                   |                          | ``keyfile-blake2``      |
++----------+-------------------+--------------------------+-------------------------+
 
 .. nanorst: inline-replace
 
-Modes `marked like this` in the above table are new in Borg 1.1 and are not
-backwards-compatible with Borg 1.0.x.
+Borg 1.0 and older support ``none``, ``repokey``, and ``keyfile``
+modes only. If you need such old clients to be able to access your
+repo, you can't use any of the other modes.
 
-On modern Intel/AMD CPUs (except very cheap ones), AES is usually
-hardware-accelerated.
-BLAKE2b is faster than SHA256 on Intel/AMD 64-bit CPUs
-(except AMD Ryzen and future CPUs with SHA extensions),
-which makes `authenticated-blake2` faster than `none` and `authenticated`.
+**About modes without encryption:**
 
-On modern ARM CPUs, NEON provides hardware acceleration for SHA256 making it faster
-than BLAKE2b-256 there. NEON accelerates AES as well.
+Avoid using ``none`` mode. If you think about using ``none`` mode,
+please reconsider and be absolutely sure. Using any mode other than
+``none`` allows Borg to detect accidental corruption or malicious
+tampering with the repo. It also prevents denial-of-service attacks
+against clients. Instead of ``none`` mode, you likely want to use
+``authenticated`` mode, or ``repokey`` or ``keyfile`` modes with an
+empty passphrase instead (see below).
 
-Hardware acceleration is always used automatically when available.
+If you don't want to encrypt your data, use ``authenticated`` or
+``authenticated-blake2`` modes. These modes require a passphrase in
+normal operation, but in emergency situations you can access the repo
+without the passphrase with ``BORG_WORKAROUNDS=authenticated_no_key``
+(see :ref:`environment-variables`).
 
-`repokey` and `keyfile` use AES-CTR-256 for encryption and HMAC-SHA256 for
-authentication in an encrypt-then-MAC (EtM) construction. The chunk ID hash
-is HMAC-SHA256 as well (with a separate key).
-These modes are compatible with Borg 1.0.x.
+If you just don't want to choose a passphrase, use ``keyfile`` or
+``keyfile-blake2`` modes with an empty passphrase. These modes are
+generally safe even without a passphrase, but keeping an offsite
+backup of the Borg key is also important then. See below for details.
 
-`repokey-blake2` and `keyfile-blake2` are also authenticated encryption modes,
-but use BLAKE2b-256 instead of HMAC-SHA256 for authentication. The chunk ID
-hash is a keyed BLAKE2b-256 hash.
-These modes are new and *not* compatible with Borg 1.0.x.
+If you can assure that an attacker can't gain access to your repo, e.g.
+when independently encrypting your repository disk or filesystem, you
+can think about using ``repokey`` or ``repokey-blake2`` modes with an
+empty passphrase. However, keep in mind that if an attacker still
+somehow manages to gain access, they have full access to your repo. In
+such situations choosing ``repokey`` over ``authenticated`` mode has
+the advantage of allowing you to add a passphrase later using
+:ref:`borg_key_change-passphrase`.
 
-`authenticated` mode uses no encryption, but authenticates repository contents
-through the same HMAC-SHA256 hash as the `repokey` and `keyfile` modes (it uses it
-as the chunk ID hash). The key is stored like `repokey`.
-This mode is new and *not* compatible with Borg 1.0.x.
+**About modes with encryption:**
 
-`authenticated-blake2` is like `authenticated`, but uses the keyed BLAKE2b-256 hash
-from the other blake2 modes.
-This mode is new and *not* compatible with Borg 1.0.x.
+With ``repokey`` and ``repokey-blake2`` modes the key is stored with
+the repo and encrypted with your passphrase. If an attacker gains
+access to your repo and knows the passphrase, he can access and tamper
+with the repo. The repo's security thus relies on the strength of your
+passphrase. Creating an offsite backup of your Borg key (e.g., by
+printing it on paper) is recommended, see :ref:`borg_key_export`.
 
-`none` mode uses no encryption and no authentication. It uses SHA256 as chunk
-ID hash. This mode is not recommended, you should rather consider using an authenticated
-or authenticated/encrypted mode. This mode has possible denial-of-service issues
-when running ``borg create`` on contents controlled by an attacker.
-Use it only for new repositories where no encryption is wanted **and** when compatibility
-with 1.0.x is important. If compatibility with 1.0.x is not important, use
-`authenticated-blake2` or `authenticated` instead.
-This mode is compatible with Borg 1.0.x.
+If you're thinking about storing the passphrase on the disk of the
+system you're backing up, consider using the ``keyfile`` method
+instead. It generally provides the same or better security then.
+
+With ``keyfile`` and ``keyfile-blake2`` modes the key is stored on your
+local machine (in ``~/.config/borg/keys``) instead. An attacker gaining
+access to your repo then needs both the Borg key, and your passphrase to
+access and tamper with the repo. However, if you lose the key, you lose
+access to the repo, too. You **must** create an offsite backup of your
+Borg key, e.g. by printing it on paper. Storing a copy of the Borg key
+on the system you're creating backups of is **NOT** sufficient. Use
+:ref:`borg_key_export` to create the backup.
+
+The ``keyfile`` and ``keyfile-blake2`` modes allow for "passphrase and
+having-the-key" security when using a strong passphrase, but can also
+be used with an empty passphrase. Storing a (easily readable)
+passphrase on the disk of the system you're backing up with
+``keyfile`` and ``keyfile-blake2`` modes adds no security over using an
+empty passphrase.
+
+**Technical details:**
+
+``repokey`` and ``keyfile`` use AES-CTR-256 for encryption and
+HMAC-SHA256 for authentication in an encrypt-then-MAC (EtM)
+construction. The chunk ID hash is HMAC-SHA256 (with a separate key).
+These modes are compatible with all Borg versions.
+
+``repokey-blake2`` and ``keyfile-blake2`` are also authenticated
+encryption modes, but use BLAKE2b-256 instead of HMAC-SHA256 for
+authentication. The chunk ID hash is a keyed BLAKE2b-256 hash. These
+modes are only compatible with Borg 1.1 and later.
+
+``authenticated`` mode uses no encryption, but authenticates repo
+contents through the same HMAC-SHA256 hash as the ``repokey`` and
+``keyfile`` modes (it uses it as the chunk ID hash). The key is stored
+like ``repokey`` within the repo. This mode is only compatible with
+Borg 1.1 and later.
+
+``authenticated-blake2`` is like ``authenticated``, but uses the keyed
+BLAKE2b-256 hash from the other BLAKE2b modes. This mode is only
+compatible with Borg 1.1 and later.
+
+``none`` mode uses no encryption and no authentication. It uses SHA256
+as chunk ID hash. This mode is not recommended. You should instead
+consider using an authenticated or authenticated/encrypted mode. This
+mode has possible denial-of-service issues when running ``borg create``
+on contents controlled by an attacker. See above for alternatives.
+This mode is compatible with all Borg versions.

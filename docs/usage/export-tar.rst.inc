@@ -106,7 +106,7 @@ BSD flags, ACLs, extended attributes (xattrs), atime and ctime are not exported.
 Timestamp resolution is limited to whole seconds, not the nanosecond resolution
 otherwise supported by Borg.
 
-A ``--sparse`` option (as found in borg extract) is not supported.
+A ``--sparse`` option (as found in ``borg extract``) is not supported.
 
 By default the entire archive is extracted but a subset of files and directories
 can be selected by passing a list of ``PATHs`` as arguments.

@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-KEY-CHANGE-PASSPHRASE" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-KEY-CHANGE-PASSPHRASE" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-key-change-passphrase \- Change repository key file passphrase
 .SH SYNOPSIS
@@ -35,12 +35,12 @@ borg-key-change-passphrase \- Change repository key file passphrase
 borg [common options] key change\-passphrase [options] [REPOSITORY]
 .SH DESCRIPTION
 .sp
-The key files used for repository encryption are optionally passphrase
+The key files used for repository encryption are optionally passphrase\-
 protected. This command can be used to change this passphrase.
 .sp
 Please note that this command only changes the passphrase, but not any
-secret protected by it (like e.g. encryption/MAC keys or chunker seed).
-Thus, changing the passphrase after passphrase and borg key got compromised
+secret protected by it (e.g., encryption/MAC keys or the chunker seed).
+Thus, changing the passphrase after the passphrase and Borg key were compromised
 does not protect future (nor past) backups to the same repository.
 .SH OPTIONS
 .sp

@@ -28,7 +28,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
@@ -460,6 +460,12 @@ disk space usage but slows down cache resyncs.
 When set to no (default: yes), system information (like OS, Python version, ...) in
 exceptions is not shown.
 Please only use for good reasons as it makes issues harder to analyze.
+.TP
+.B BORG_MSGPACK_VERSION_CHECK
+Controls whether Borg checks the \fBmsgpack\fP version.
+The default is \fByes\fP (strict check). Set to \fBno\fP to disable the version check and
+allow any installed \fBmsgpack\fP version. Use this at your own risk; malfunctioning or
+incompatible \fBmsgpack\fP versions may cause subtle bugs or repository data corruption.
 .TP
 .B BORG_FUSE_IMPL
 Choose the lowlevel FUSE implementation borg shall use for \fBborg mount\fP\&.
@@ -957,7 +963,7 @@ aka \fIBSD flags\fP\&. The Linux set of flags [1] is portable across platforms.
 The BSDs define additional flags.
 .SH SEE ALSO
 .sp
-\fIborg\-common(1)\fP for common command line options
+\fIborg\-common(1)\fP for common command\-line options
 .sp
 \fIborg\-init(1)\fP,
 \fIborg\-create(1)\fP, \fIborg\-mount(1)\fP, \fIborg\-extract(1)\fP,

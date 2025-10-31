@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-KEY-EXPORT" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-KEY-EXPORT" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-key-export \- Export the repository key for backup
 .SH SYNOPSIS
@@ -36,15 +36,15 @@ borg [common options] key export [options] [REPOSITORY] [PATH]
 .SH DESCRIPTION
 .sp
 If repository encryption is used, the repository is inaccessible
-without the key. This command allows one to backup this essential key.
+without the key. This command allows one to back up this essential key.
 Note that the backup produced does not include the passphrase itself
-(i.e. the exported key stays encrypted). In order to regain access to a
+(i.e., the exported key stays encrypted). In order to regain access to a
 repository, one needs both the exported key and the original passphrase.
 .sp
 There are three backup formats. The normal backup format is suitable for
 digital storage as a file. The \fB\-\-paper\fP backup format is optimized
-for printing and typing in while importing, with per line checks to
-reduce problems with manual input. The \fB\-\-qr\-html\fP creates a printable
+for printing and typing in while importing, with per\-line checks to
+reduce problems with manual input. The \fB\-\-qr\-html\fP option creates a printable
 HTML template with a QR code and a copy of the \fB\-\-paper\fP\-formatted key.
 .sp
 For repositories using keyfile encryption the key is saved locally
@@ -52,9 +52,9 @@ on the system that is capable of doing backups. To guard against loss
 of this key, the key needs to be backed up independently of the main
 data backup.
 .sp
-For repositories using the repokey encryption the key is saved in the
+For repositories using repokey encryption, the key is saved in the
 repository in the config file. A backup is thus not strictly needed,
-but guards against the repository becoming inaccessible if the file
+but it guards against the repository becoming inaccessible if the file
 is damaged for some reason.
 .sp
 Examples:

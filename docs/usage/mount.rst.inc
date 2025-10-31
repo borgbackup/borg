@@ -114,19 +114,19 @@ This command mounts a repository or an archive as a FUSE filesystem.
 This can be useful for browsing or restoring individual files.
 
 When restoring, take into account that the current FUSE implementation does
-not support special fs flags and ACLs.
+not support special filesystem flags and ACLs.
 
 When mounting a repository, the top directories will be named like the
 archives and the directory structure below these will be loaded on-demand from
 the repository when entering these directories, so expect some delay.
 
 Unless the ``--foreground`` option is given the command will run in the
-background until the filesystem is ``umounted``.
+background until the filesystem is ``unmounted``.
 
 Performance tips:
 
 - when doing a "whole repository" mount:
-  do not enter archive dirs if not needed, this avoids on-demand loading.
+  do not enter archive directories if not needed; this avoids on-demand loading.
 - only mount a specific archive, not the whole repository.
 - only mount specific paths in a specific archive, not the complete archive.
 
@@ -149,7 +149,7 @@ override the user and group ids of all files (i.e., ``borg mount -o
 uid=1000,gid=1000``).
 
 The man page references ``user_id`` and ``group_id`` mount options
-(implemented by fuse) which specify the user and group id of the mount owner
+(implemented by FUSE) which specify the user and group id of the mount owner
 (aka, the user who does the mounting). It is set automatically by libfuse (or
 the filesystem if libfuse is not used). However, you should not specify these
 manually. Unlike the ``uid`` and ``gid`` mount options which affect all files,
@@ -159,7 +159,7 @@ manually. Unlike the ``uid`` and ``gid`` mount options which affect all files,
 Additional mount options supported by borg:
 
 - ``versions``: when used with a repository mount, this gives a merged, versioned
-  view of the files in the archives. EXPERIMENTAL, layout may change in future.
+  view of the files in the archives. EXPERIMENTAL; the layout may change in the future.
 - ``allow_damaged_files``: by default damaged files (where missing chunks were
   replaced with runs of zeros by ``borg check --repair``) are not readable and
   return EIO (I/O error). Set this option to read such files.
@@ -178,3 +178,10 @@ to unintentionally delete data.
 
 When running in the foreground, ^C/SIGINT cleanly unmounts the filesystem,
 but other signals or crashes do not.
+
+Debugging:
+
+``borg mount`` usually daemonizes and the daemon process sends stdout/stderr
+to /dev/null. Thus, you need to either use ``-f / --foreground`` to make it stay
+in the foreground and not daemonize, or use ``BORG_LOGGING_CONF`` to reconfigure
+the logger to output to a file.

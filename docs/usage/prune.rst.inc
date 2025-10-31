@@ -144,9 +144,9 @@ up to 7 most recent days with backups (days without backups do not count).
 The rules are applied from secondly to yearly, and backups selected by previous
 rules do not count towards those of later rules. The time that each backup
 starts is used for pruning purposes. Dates and times are interpreted in
-the local timezone, and weeks go from Monday to Sunday. Specifying a
-negative number of archives to keep means that there is no limit. As of borg
-1.2.0, borg will retain the oldest archive if any of the secondly, minutely,
+the local time zone, and weeks go from Monday to Sunday. Specifying a
+negative number of archives to keep means that there is no limit. As of Borg
+1.2.0, Borg will retain the oldest archive if any of the secondly, minutely,
 hourly, daily, weekly, monthly, quarterly, or yearly rules was not otherwise
 able to meet its retention target. This enables the first chronological archive
 to continue aging until it is replaced by a newer archive that meets the

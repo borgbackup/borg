@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-VERSION" "1" "2025-04-18" "" "borg backup tool"
+.TH "BORG-VERSION" "1" "2025-10-31" "" "borg backup tool"
 .SH NAME
 borg-version \- Display the borg client / borg server version
 .SH SYNOPSIS
@@ -35,12 +35,12 @@ borg-version \- Display the borg client / borg server version
 borg [common options] version [options] [REPOSITORY]
 .SH DESCRIPTION
 .sp
-This command displays the borg client version / borg server version.
+This command displays the Borg client version / Borg server version.
 .sp
-If a local repo is given, the client code directly accesses the repository,
+If a local repository is given, the client code directly accesses the repository,
 thus we show the client version also as the server version.
 .sp
-If a remote repo is given (e.g. ssh:), the remote borg is queried and
+If a remote repository is given (e.g., ssh:), the remote Borg is queried and
 its version is displayed as the server version.
 .sp
 Examples:
@@ -59,10 +59,10 @@ $ borg version ssh://borg@borgbackup:repo
 .UNINDENT
 .UNINDENT
 .sp
-Due to the version tuple format used in borg client/server negotiation, only
-a simplified version is displayed (as provided by borg.version.format_version).
+Due to the version tuple format used in Borg client/server negotiation, only
+a simplified version is displayed (as provided by \fBborg.version.format_version\fP).
 .sp
-There is also borg \-\-version to display a potentially more precise client version.
+There is also \fBborg \-\-version\fP to display a potentially more precise client version.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

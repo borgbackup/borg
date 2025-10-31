@@ -96,8 +96,8 @@ archives that are not TAM authenticated yet.
 This is a convenient method to just trust all archives present - if
 an archive does not have TAM authentication yet, a TAM will be added.
 Archives created by old borg versions < 1.0.9 do not have TAMs.
-Archives created by newer borg version should have TAMs already.
-If you have a high risk environment, you should not just run this,
+Archives created by newer borg versions should have TAMs already.
+If you have a high-risk environment, you should not just run this,
 but first verify that the archives are authentic and not malicious
 (== have good content, have a good timestamp).
 Borg 1.2.5+ needs all archives to be TAM authenticated for safety reasons.
@@ -139,7 +139,7 @@ with the old chunks in the upgraded repository.
 See ``--chunker-params`` option of ``borg create`` and ``borg recreate``.
 
 ``borg upgrade`` will change the magic strings in the repository's
-segments to match the new Borg magic strings. The keyfiles found in
+segments to match the new Borg magic strings. The key files found in
 $ATTIC_KEYS_DIR or ~/.attic/keys/ will also be converted and
 copied to $BORG_KEYS_DIR or ~/.config/borg/keys.
 
@@ -147,11 +147,11 @@ The cache files are converted, from $ATTIC_CACHE_DIR or
 ~/.cache/attic to $BORG_CACHE_DIR or ~/.cache/borg, but the
 cache layout between Borg and Attic changed, so it is possible
 the first backup after the conversion takes longer than expected
-due to the cache resync.
+due to the cache re-sync.
 
 Upgrade should be able to resume if interrupted, although it
 will still iterate over all segments. If you want to start
-from scratch, use `borg delete` over the copied repository to
+from scratch, use ``borg delete`` over the copied repository to
 make sure the cache files are also removed::
 
     borg delete borg

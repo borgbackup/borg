@@ -163,6 +163,8 @@ New features:
 - export-tar/import-tar: support for POSIX ACLs (PAX format)
 - list --format: add "inode" placeholder
 - improved tty-less progress reporting (--progress), #9055
+- BORG_MSGPACK_VERSION_CHECK=no to optionally disable the msgpack version
+  check; default is "yes", use at your own risk, #9109.
 
 Fixes:
 
@@ -888,6 +890,7 @@ New features:
 
       borg serve --socket  # server side (not started automatically!)
       borg -r socket:///path/to/repo ...  # client side
+
 - add get_runtime_dir / BORG_RUNTIME_DIR (contains e.g. .sock and .pid file)
 - support shell-style alternatives, like: sh:image.{png,jpg}, #7602
 

@@ -185,7 +185,7 @@ Some more advanced examples::
   # verify a changed tox.ini (run this after any change to tox.ini):
   fakeroot -u tox --recreate
 
-  fakeroot -u tox -e py39  # run all tests, but only on python 3.9
+  fakeroot -u tox -e py310  # run all tests, but only on python 3.10
 
   fakeroot -u tox borg.testsuite.locking  # only run 1 test module
 

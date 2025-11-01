@@ -129,9 +129,11 @@ def packages_openindiana
   return <<-EOF
     pkg install gcc-13 git
     pkg install pkg-config libxxhash
-    ln -sf /usr/bin/python3.9 /usr/bin/python3
+    pkg install python-313
+    ln -sf /usr/bin/python3.13 /usr/bin/python3
+    ln -sf /usr/bin/python3.13-config /usr/bin/python3-config
     python3 -m ensurepip
-    ln -sf /usr/bin/pip3.9 /usr/bin/pip3
+    ln -sf /usr/bin/pip3.13 /usr/bin/pip3
     pip3 install virtualenv
     # let borg's pkg-config find openssl:
     pfexec pkg set-mediator -V 3 openssl

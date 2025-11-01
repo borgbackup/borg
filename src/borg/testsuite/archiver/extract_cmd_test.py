@@ -16,7 +16,7 @@ from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from ...platform import get_birthtime_ns
-from ...platformflags import is_darwin, is_win32
+from ...platformflags import is_darwin, is_freebsd, is_win32
 from . import (
     RK_ENCRYPTION,
     requires_hardlinks,
@@ -608,7 +608,7 @@ def test_extract_xattrs_resourcefork(archivers, request):
     # assert atime_extracted == atime_expected  # still broken, but not really important.
 
 
-@pytest.mark.skipif(not is_darwin, reason="only for macOS")
+@pytest.mark.skipif(not (is_darwin or is_freebsd), reason="only for macOS or FreeBSD")
 def test_extract_restores_append_flag(archivers, request):
     archiver = request.getfixturevalue(archivers)
     # create a file and set the append flag on it

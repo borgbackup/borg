@@ -24,7 +24,8 @@ elif is_freebsd:  # pragma: freebsd only
     from .freebsd import API_VERSION as OS_API_VERSION
     from .freebsd import listxattr, getxattr, setxattr
     from .freebsd import acl_get, acl_set
-    from .base import set_flags, get_flags
+    from .freebsd import set_flags
+    from .base import get_flags
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import swidth

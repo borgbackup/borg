@@ -40,3 +40,4 @@ elif is_darwin:  # pragma: darwin only
     from .darwin import API_VERSION as OS_API_VERSION
     from .darwin import listxattr, getxattr, setxattr
     from .darwin import acl_get, acl_set
+    from .darwin import set_flags

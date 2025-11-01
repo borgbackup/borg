@@ -50,13 +50,12 @@ jobs:
         ${{ fromJSON(
           github.event_name == 'pull_request' && '{
             "include": [
-              {"os": "ubuntu-22.04", "python-version": "3.9", "toxenv": "py39-fuse2"},
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse2"},
               {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"}
             ]
           }' || '{
             "include": [
-              {"os": "ubuntu-22.04", "python-version": "3.9", "toxenv": "py39-fuse2"},
-              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse3"},
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse2"},
               {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-fuse2", "binary": "borg-linux-glibc235-x86_64-gh"},
               {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-fuse2", "binary": "borg-linux-glibc235-arm64-gh"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-fuse3"},

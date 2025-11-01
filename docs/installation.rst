@@ -158,7 +158,7 @@ To install Borg from a source package (including pip), you have to install the
 following dependencies first. For the libraries you will also need their
 development header files (sometimes in a separate `-dev` or `-devel` package).
 
-* `Python 3`_ >= 3.9.0
+* `Python 3`_ >= 3.10.0
 * OpenSSL_ >= 1.0.0
 * libacl_ (which depends on libattr_)
 * libxxhash_ >= 0.8.1
@@ -424,9 +424,9 @@ If you need to use a different version of Python you can install this using ``py
 
     ...
     # create a virtual environment
-    pyenv install 3.9.0  # minimum, preferably use something more recent!
-    pyenv global 3.9.0
-    pyenv local 3.9.0
+    pyenv install 3.10.0  # minimum, preferably use something more recent!
+    pyenv global 3.10.0
+    pyenv local 3.10.0
     virtualenv --python=${pyenv which python} borg-env
     source borg-env/bin/activate   # always before using!
     ...

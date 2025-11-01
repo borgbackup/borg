@@ -6,7 +6,7 @@ maintainers = [
     {name="Thomas Waldmann", email="tw@waldmann-edv.de"},
 ]
 description = "Deduplicated, encrypted, authenticated and compressed backups"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = ["backup", "borgbackup"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -19,7 +19,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -85,7 +84,7 @@ write_to_template = "__version__ = version = {version!r}\n"
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py310"
 
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
 select = ["E", "F"]
@@ -175,7 +174,7 @@ min_version = "4.19"
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
 # Important: when adding/removing Python versions here,
 #            also update the section "Test environments with different FUSE implementations" accordingly.
-env_list = ["py{39,310,311,312,313,314}-{none,fuse2,fuse3}", "ruff"]
+env_list = ["py{310,311,312,313,314}-{none,fuse2,fuse3}", "ruff"]
 
 # Base configuration for test environments
 [tool.tox.env_run_base]
@@ -193,16 +192,6 @@ labels = ["test"]
 pass_env = ["*"]  # needed by tox4, so env vars are visible for building borg
 
 # Test environments with different FUSE implementations
-[tool.tox.env.py39-none]
-
-[tool.tox.env.py39-fuse2]
-set_env = {BORG_FUSE_IMPL = "llfuse"}
-extras = ["llfuse"]
-
-[tool.tox.env.py39-fuse3]
-set_env = {BORG_FUSE_IMPL = "pyfuse3"}
-extras = ["pyfuse3"]
-
 [tool.tox.env.py310-none]
 
 [tool.tox.env.py310-fuse2]

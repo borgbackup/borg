@@ -47,18 +47,18 @@ borg-linux-glibc231-x86_64 Linux (built on Debian 11 "Bullseye" with glibc 2.31)
 
 borg-freebsd-14-x86_64     FreeBSD (built on FreeBSD 14)
 
+Note: if you don't find a specific binary here, check release 1.4.1 or 1.2.9.
 
 Verifying your download
 -----------------------
 
-Please check the GPG signature to make sure you received the binary as I have
-built it.
+I provide GPG signatures for files which I have built locally on my machines.
 
-To check the GPG signature, download both the binary and the corresponding
-*.asc file and then (on the shell) type, for example:
+To check the GPG signature, download both the file and the corresponding
+signature (*.asc file) and then (on the shell) type, for example:
 
     gpg --recv-keys 9F88FB52FAF7B393
-    gpg --verify borg-freebsd14.asc borg-freebsd14
+    gpg --verify borgbackup.tar.gz.asc borgbackup.tar.gz
 
 The files are signed by:
 

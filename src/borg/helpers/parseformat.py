@@ -451,7 +451,7 @@ class Location:
     # path may contain any chars. to avoid ambiguities with other regexes,
     # it must not start with "//" nor with "scheme://" nor with "rclone:".
     local_path_re = r"""
-        (?!(//|(ssh|socket|sftp|file)://|rclone:))
+        (?!(//|(ssh|socket|sftp|file)://|(rclone|s3|b2):))
         (?P<path>.+)
     """
 

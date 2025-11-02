@@ -80,7 +80,7 @@ use a recent version that supports "gh attestation".
 Practical example (Linux, 2.0.0b20 tag):
 
     curl -LO https://github.com/borgbackup/borg/releases/download/2.0.0b20/borg-linux-glibc235-x86_64-gh
-    gh attestation verify --repo borgbackup/borg --ref 2.0.0b20 ./borg-linux-glibc235-x86_64-gh
+    gh attestation verify --repo borgbackup/borg --source-ref refs/tags/2.0.0b20 borg-linux-glibc235-x86_64-gh
 
 If verification succeeds, gh prints a summary stating the subject (your file),
 that it was attested by GitHub Actions, and the job/workflow reference.

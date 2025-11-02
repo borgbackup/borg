@@ -68,6 +68,24 @@ GPG key fingerprint: 6D5B EF9A DD20 7580 5747 B70F 9F88 FB52 FAF7 B393
 My fingerprint is also in the footer of all my BorgBackup mailing list posts.
 
 
+Provenance attestations for GitHub-built binaries
+-------------------------------------------------
+
+For binaries built on GitHub (files with a "-gh" suffix in the name), we publish
+an artifact provenance attestation that proves the binary was built by our
+GitHub Actions workflow from a specific commit or tag. You can verify this using
+the GitHub CLI (gh). Install it from https://cli.github.com/ and make sure you
+use a recent version that supports "gh attestation".
+
+Practical example (Linux, 2.0.0b20 tag):
+
+    curl -LO https://github.com/borgbackup/borg/releases/download/2.0.0b20/borg-linux-glibc235-x86_64-gh
+    gh attestation verify --repo borgbackup/borg --ref 2.0.0b20 ./borg-linux-glibc235-x86_64-gh
+
+If verification succeeds, gh prints a summary stating the subject (your file),
+that it was attested by GitHub Actions, and the job/workflow reference.
+
+
 Installing
 ----------
 

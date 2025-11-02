@@ -62,6 +62,10 @@ jobs:
   posix_tests:
 
     needs: [lint, security]
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: true
       # noinspection YAMLSchemaValidation
@@ -267,6 +271,12 @@ jobs:
         fi
         echo "binary files"
         ls -l artifacts/
+
+    - name: Attest binaries provenance (${{ matrix.binary }})
+      if: ${{ matrix.binary && steps.detect_tag.outputs.tagged }}
+      uses: actions/attest-build-provenance@v3
+      with:
+        subject-path: 'artifacts/*'
 
     - name: Upload binaries (${{ matrix.binary }})
       if: ${{ matrix.binary && steps.detect_tag.outputs.tagged }}

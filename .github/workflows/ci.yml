@@ -43,6 +43,76 @@ jobs:
     - uses: chartboost/ruff-action@v1
 
 
+  asan_ubsan:
+
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: [lint]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install system packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config build-essential
+        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.d/development.txt
+
+    - name: Build Borg with ASan/UBSan
+      # Build the C/Cython extensions with AddressSanitizer and UndefinedBehaviorSanitizer enabled.
+      # How this works:
+      # - The -fsanitize=address,undefined flags inject runtime checks into our native code. If a bug is hit
+      #   (e.g., buffer overflow, use-after-free, out-of-bounds, or undefined behavior), the sanitizer prints
+      #   a detailed error report to stderr, including a stack trace, and forces the process to exit with
+      #   non-zero status. In CI, this will fail the step/job so you will notice.
+      # - ASAN_OPTIONS/UBSAN_OPTIONS configure the sanitizers' runtime behavior (see below for meanings).
+      env:
+        CFLAGS: "-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined"
+        CXXFLAGS: "-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined"
+        LDFLAGS: "-fsanitize=address,undefined"
+        # ASAN_OPTIONS controls AddressSanitizer runtime tweaks:
+        # - detect_leaks=0: Disable LeakSanitizer to avoid false positives with CPython/pymalloc in short-lived tests.
+        # - strict_string_checks=1: Make invalid string operations (e.g., over-reads) more likely to be detected.
+        # - check_initialization_order=1: Catch uses that depend on static initialization order (C++).
+        # - detect_stack_use_after_return=1: Detect stack-use-after-return via stack poisoning (may increase overhead).
+        ASAN_OPTIONS: "detect_leaks=0:strict_string_checks=1:check_initialization_order=1:detect_stack_use_after_return=1"
+        # UBSAN_OPTIONS controls UndefinedBehaviorSanitizer runtime:
+        # - print_stacktrace=1: Include a stack trace for UB reports to ease debugging.
+        #   Note: UBSan is recoverable by default (process may continue after reporting). If you want CI to
+        #   abort immediately and fail on the first UB, add `halt_on_error=1` (e.g., UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1").
+        UBSAN_OPTIONS: "print_stacktrace=1"
+        # PYTHONDEVMODE enables additional Python runtime checks and warnings.
+        PYTHONDEVMODE: "1"
+      run: pip install -e .
+
+    - name: Run tests under sanitizers
+      env:
+        ASAN_OPTIONS: "detect_leaks=0:strict_string_checks=1:check_initialization_order=1:detect_stack_use_after_return=1"
+        UBSAN_OPTIONS: "print_stacktrace=1"
+        PYTHONDEVMODE: "1"
+      # Ensure the ASan runtime is loaded first to avoid "ASan runtime does not come first" warnings.
+      # We discover libasan/libubsan paths via gcc and preload them for the Python test process.
+      # the remote tests are slow and likely won't find anything useful
+      run: |
+        set -euo pipefail
+        export LD_PRELOAD="$(gcc -print-file-name=libasan.so):$(gcc -print-file-name=libubsan.so)"
+        echo "Using LD_PRELOAD=$LD_PRELOAD"
+        pytest -v --benchmark-skip -k "not remote"
+
   posix_tests:
 
     needs: [lint]

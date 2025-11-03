@@ -160,6 +160,7 @@ New features:
 
   - for Linux with glibc 2.35+ (Intel/AMD and ARM64)
   - for macOS 14+ (Apple Silicon/ARM64) and macOS 13+ (Intel)
+  - using GitHub artifact attestations for release binaries, #9134
 - export-tar/import-tar: support for POSIX ACLs (PAX format)
 - list --format: add "inode" placeholder
 - improved tty-less progress reporting (--progress), #9055
@@ -168,17 +169,22 @@ New features:
 
 Fixes:
 
+- extract: fs flags: use get/set to influence only specific flags, #9039, Linux, FreeBSD, macOS
 - transfer: fix borg transfer corrupting the source repo index, #9022
 - legacyrepository: remove auto_recover, #9022
 - fix reading borg 1.x repo index, #9022
-- enable S3 support of borgstore
+- enable S3/B2 support of borgstore
 - mount --show-rc: display main process return code (rc), #8308
 - create: add exception handler for NODUMP-excluded directories, #9032
+- json: include archive keys in JSON lines when requested via --format, #9095
+- ensure valid file URLs are created from Windows paths
+- Windows: add missing guards around `preexec_fn=ignore_sigint`
 
 Other changes:
 
 - support Python 3.14, msgpack 1.1.2, use Cython 3.1.4
 - require setuptools>=78.1.1, #9042
+- set_flags: remove compression flag support (did not work anyway)
 - Brewfile: use openssl@3
 - GitHub Actions: use korthout/backport-action
 - tests:
@@ -194,7 +200,9 @@ Other changes:
 - Vagrant:
 
   - add Debian testing/Trixie box
-  - drop macOS 10.12 box
+  - add an OpenBSD 7.7 box
+  - fix OpenIndiana box
+  - drop macOS 10.12 box (binaries are built on GitHub now)
   - use Python 3.13.8 for binary building and tests
   - use PyInstaller 6.14.2 for binary building
 - docs:

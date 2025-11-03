@@ -179,7 +179,7 @@ def unpackb(packed, *, raw=RAW, unicode_errors=UNICODE_ERRORS, strict_map_key=Fa
     assert unicode_errors == UNICODE_ERRORS
     try:
         kw = dict(raw=raw, unicode_errors=unicode_errors, strict_map_key=strict_map_key)
-        kw.update(kwargs)
+        kw |= kwargs
         return mp_unpackb(packed, **kw)
     except Exception as e:
         raise UnpackException(e)
@@ -190,7 +190,7 @@ def unpack(stream, *, raw=RAW, unicode_errors=UNICODE_ERRORS, strict_map_key=Fal
     assert unicode_errors == UNICODE_ERRORS
     try:
         kw = dict(raw=raw, unicode_errors=unicode_errors, strict_map_key=strict_map_key)
-        kw.update(kwargs)
+        kw |= kwargs
         return mp_unpack(stream, **kw)
     except Exception as e:
         raise UnpackException(e)
@@ -227,9 +227,9 @@ def get_limited_unpacker(kind):
     #       unpack(data) or from max_buffer_size for Unpacker(max_buffer_size=N).
     args = dict(use_list=False, max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE))  # return tuples, not lists
     if kind in ("server", "client"):
-        args.update(dict(max_buffer_size=0))  # 0 means "maximum" here, ~4GiB - needed for store_load/save
+        args |= dict(max_buffer_size=0)  # 0 means "maximum" here, ~4GiB - needed for store_load/save
     elif kind in ("manifest", "archive", "key"):
-        args.update(dict(use_list=True, object_hook=StableDict))  # default value
+        args |= dict(use_list=True, object_hook=StableDict)  # default value
     else:
         raise ValueError('kind must be "server", "client", "manifest", "archive" or "key"')
     return Unpacker(**args)

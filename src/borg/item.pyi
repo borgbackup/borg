@@ -263,6 +263,12 @@ class DiffChange:
 
 class ItemDiff:
     path: str
+    _item1: Item
+    _item2: Item
+    _chunk_1: Iterator
+    _chunk_2: Iterator
+    _numeric_ids: bool
+    _can_compare_chunk_ids: bool
     def __init__(
         self,
         path: str,

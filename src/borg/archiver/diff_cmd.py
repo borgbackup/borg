@@ -8,6 +8,8 @@ from ._common import with_repository, build_matcher, Highlander
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
+from ..helpers import IncludePatternNeverMatchedWarning, remove_surrogates
+from ..item import ItemDiff
 from ..manifest import Manifest
 from ..logger import create_logger
 
@@ -87,11 +89,75 @@ class DiffMixIn:
         diffs_iter = Archive.compare_archives_iter(
             archive1, archive2, matcher, can_compare_chunk_ids=can_compare_chunk_ids
         )
-        # Conversion to string and filtering for diff.equal to save memory if sorting
+        # Filter out equal items early (keep as generator; listify only if sorting)
         diffs = (diff for diff in diffs_iter if not diff.equal(args.content_only))
 
-        if args.sort:
-            diffs = sorted(diffs, key=lambda diff: diff.path)
+        sort_specs = []
+        if args.sort_by:
+            for spec in args.sort_by.split(","):
+                spec = spec.strip()
+                if spec:
+                    sort_specs.append(spec)
+
+        def key_for(field: str, d: "ItemDiff"):
+            # strip direction markers if present
+            if field and field[0] in ("<", ">"):
+                field = field[1:]
+            # path
+            if field in (None, "", "path"):
+                return remove_surrogates(d.path)
+            # compute size_* from changes
+            if field in ("size_diff", "size_added", "size_removed"):
+                added = removed = 0
+                ch = d.changes().get("content")
+                if ch is not None:
+                    info = ch.to_dict()
+                    t = info.get("type")
+                    if t == "modified":
+                        added = info.get("added", 0)
+                        removed = info.get("removed", 0)
+                    elif t and t.startswith("added"):
+                        added = info.get("added", info.get("size", 0))
+                        removed = 0
+                    elif t and t.startswith("removed"):
+                        added = 0
+                        removed = info.get("removed", info.get("size", 0))
+                if field == "size_diff":
+                    return added - removed
+                if field == "size_added":
+                    return added
+                if field == "size_removed":
+                    return removed
+            # timestamp diffs
+            if field in ("ctime_diff", "mtime_diff"):
+                ts = field.split("_")[0]
+                t1 = d._item1.get(ts, 0)
+                t2 = d._item2.get(ts, 0)
+                return t2 - t1
+            # size of item in archive2
+            if field == "size":
+                it = d._item2
+                if it is None or it.get("deleted"):
+                    return 0
+                return it.get_size()
+            # direct attributes from current item (prefer item2)
+            it = d._item2 or d._item1
+            attr_defaults = {"user": "", "group": "", "uid": -1, "gid": -1, "ctime": 0, "mtime": 0}
+            if field in attr_defaults:
+                if it is None:
+                    return attr_defaults[field]
+                return it.get(field, attr_defaults[field])
+            raise ValueError(f"Invalid field name: {field}")
+
+        if sort_specs:
+            diffs = list(diffs)
+            # Apply stable sorts from last to first
+            for spec in reversed(sort_specs):
+                desc = False
+                field = spec
+                if field and field[0] in ("<", ">"):
+                    desc = field[0] == ">"
+                diffs.sort(key=lambda di: key_for(field, di), reverse=desc)
 
         formatter = DiffFormatter(format, args.content_only)
         for diff in diffs:
@@ -112,7 +178,7 @@ class DiffMixIn:
                 """
         This command finds differences (file contents, metadata) between ARCHIVE1 and ARCHIVE2.
 
-        For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
+        For more help on include/exclude patterns, see the output of the :ref:`borg_patterns` command.
 
         .. man NOTES
 
@@ -149,7 +215,84 @@ class DiffMixIn:
         """
             )
             + DiffFormatter.keys_help()
+            + textwrap.dedent(
+                """
+
+        What is compared
+        +++++++++++++++++
+        For each matching item in both archives, Borg reports:
+
+        - Content changes: total added/removed bytes within files. If chunker parameters are comparable,
+          Borg compares chunk IDs quickly; otherwise, it compares the content.
+        - Metadata changes: user, group, mode, and other metadata shown inline, like
+          "[old_mode -> new_mode]" for mode changes. Use ``--content-only`` to suppress metadata changes.
+        - Added/removed items: printed as "added SIZE path" or "removed SIZE path".
+
+        Output formats
+        ++++++++++++++
+        The default (text) output shows one line per changed path, e.g.::
+
+            +135 B    -252 B [ -rw-r--r-- -> -rwxr-xr-x ] path/to/file
+
+        JSON Lines output (``--json-lines``) prints one JSON object per changed path, e.g.::
+
+            {"path": "PATH", "changes": [
+                {"type": "modified", "added": BYTES, "removed": BYTES},
+                {"type": "mode", "old_mode": "-rw-r--r--", "new_mode": "-rwxr-xr-x"},
+                {"type": "added", "size": SIZE},
+                {"type": "removed", "size": SIZE}
+            ]}
+
+        Sorting
+        ++++++++
+        Use ``--sort-by FIELDS`` where FIELDS is a comma-separated list of fields.
+        Sorts are applied stably from last to first in the given list. Prepend ">" for
+        descending, "<" (or no prefix) for ascending, for example ``--sort-by=">size_added,path"``.
+        Supported fields include:
+
+        - path: the item path
+        - size_added: total bytes added for the item content
+        - size_removed: total bytes removed for the item content
+        - size_diff: size_added - size_removed (net content change)
+        - size: size of the item as stored in ARCHIVE2 (0 for removed items)
+        - user, group, uid, gid, ctime, mtime: taken from the item state in ARCHIVE2 when present
+        - ctime_diff, mtime_diff: timestamp difference (ARCHIVE2 - ARCHIVE1)
+
+        Performance considerations
+        ++++++++++++++++++++++++++
+        diff automatically detects whether the archives were created with the same chunker
+        parameters. If so, only chunk IDs are compared, which is very fast.
+        """
+            )
         )
+
+        def diff_sort_spec_validator(s):
+            if not isinstance(s, str):
+                raise argparse.ArgumentTypeError("unsupported sort field (not a string)")
+            allowed = {
+                "path",
+                "size_added",
+                "size_removed",
+                "size_diff",
+                "size",
+                "user",
+                "group",
+                "uid",
+                "gid",
+                "ctime",
+                "mtime",
+                "ctime_diff",
+                "mtime_diff",
+            }
+            parts = [p.strip() for p in s.split(",") if p.strip()]
+            if not parts:
+                raise argparse.ArgumentTypeError("unsupported sort field: empty spec")
+            for spec in parts:
+                field = spec[1:] if spec and spec[0] in (">", "<") else spec
+                if field not in allowed:
+                    raise argparse.ArgumentTypeError(f"unsupported sort field: {field}")
+            return ",".join(parts)
+
         subparser = subparsers.add_parser(
             "diff",
             parents=[common_parser],
@@ -172,7 +315,6 @@ class DiffMixIn:
             action="store_true",
             help="override the check of chunker parameters",
         )
-        subparser.add_argument("--sort", dest="sort", action="store_true", help="Sort the output lines by file path.")
         subparser.add_argument(
             "--format",
             metavar="FORMAT",
@@ -181,6 +323,12 @@ class DiffMixIn:
             help='specify format for differences between archives (default: "{change} {path}{NL}")',
         )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines.")
+        subparser.add_argument(
+            "--sort-by",
+            dest="sort_by",
+            type=diff_sort_spec_validator,
+            help="Sort output by comma-separated fields (e.g., '>size_added,path').",
+        )
         subparser.add_argument(
             "--content-only",
             action="store_true",

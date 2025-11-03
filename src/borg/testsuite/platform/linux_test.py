@@ -122,3 +122,70 @@ def test_utils():
     assert acl_use_local_uid_gid(b"group:nonexistent1234:rw-:1234") == b"group:1234:rw-"
     assert acl_use_local_uid_gid(b"user:root:rw-:0") == b"user:0:rw-"
     assert acl_use_local_uid_gid(b"group:root:rw-:0") == b"group:0:rw-"
+
+
+def test_numeric_to_named_with_id_simple(monkeypatch):
+    # Import here to ensure skip marker is applied before any platform-specific import side effects.
+    from ...platform.linux import _acl_from_numeric_to_named_with_id
+
+    # Pretend uid 1000 -> 'alice', gid 100 -> 'staff'
+    from ...platform import posix
+
+    def _uid2user(uid, default=None):
+        if uid == 1000:
+            return "alice"
+        return default
+
+    def _gid2group(gid, default=None):
+        if gid == 100:
+            return "staff"
+        return default
+
+    monkeypatch.setattr(posix, "uid2user", _uid2user)
+    monkeypatch.setattr(posix, "gid2group", _gid2group)
+
+    src = b"\n".join([b"user::rwx", b"user:1000:r-x", b"group::r--", b"group:100:r--", b"mask::r-x", b"other::r--"])
+    out = _acl_from_numeric_to_named_with_id(src)
+    lines = set(out.split(b"\n"))
+    assert b"user::rwx" in lines
+    assert b"user:alice:r-x:1000" in lines
+    assert b"group::r--" in lines
+    assert b"group:staff:r--:100" in lines
+    assert b"mask::r-x" in lines
+    assert b"other::r--" in lines
+
+
+def test_numeric_to_named_with_id_nonexistent_ids(monkeypatch):
+    from ...platform.linux import _acl_from_numeric_to_named_with_id
+
+    # Map functions return default (the given fallback), so names stay numeric but still append the fourth field
+    from ...platform import posix
+
+    def _uid2user(uid, default=None):
+        return default
+
+    def _gid2group(gid, default=None):
+        return default
+
+    monkeypatch.setattr(posix, "uid2user", _uid2user)
+    monkeypatch.setattr(posix, "gid2group", _gid2group)
+
+    src = b"user:9999:r--\ngroup:8888:r--\n"
+    out = _acl_from_numeric_to_named_with_id(src)
+    lines = out.split(b"\n")
+    assert lines[0] == b"user:9999:r--:9999"
+    assert lines[1] == b"group:8888:r--:8888"
+
+
+def test_numeric_to_numeric_with_id_simple():
+    from ...platform.linux import _acl_from_numeric_to_numeric_with_id
+
+    src = b"\n".join([b"user::rwx", b"user:1000:r-x", b"group::r--", b"group:100:r--", b"mask::r-x", b"other::r--"])
+    out = _acl_from_numeric_to_numeric_with_id(src)
+    lines = set(out.split(b"\n"))
+    assert b"user::rwx" in lines
+    assert b"user:1000:r-x:1000" in lines
+    assert b"group::r--" in lines
+    assert b"group:100:r--:100" in lines
+    assert b"mask::r-x" in lines
+    assert b"other::r--" in lines

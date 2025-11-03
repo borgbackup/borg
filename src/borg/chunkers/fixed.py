@@ -1,4 +1,4 @@
-from typing import List, Iterator, BinaryIO
+from typing import Iterator, BinaryIO
 
 API_VERSION = "1.2_01"
 
@@ -33,10 +33,10 @@ class ChunkerFixed:
         self.header_size = header_size
         self.chunking_time = 0.0  # likely will stay close to zero - not much to do here.
         self.reader_block_size = 1024 * 1024
-        self.reader: FileReader = None
+        self.reader: FileReader | None = None
         self.sparse = sparse
 
-    def chunkify(self, fd: BinaryIO = None, fh: int = -1, fmap: List = None) -> Iterator:
+    def chunkify(self, fd: BinaryIO | None = None, fh: int = -1, fmap: list | None = None) -> Iterator:
         """
         Cut a file into chunks.
 

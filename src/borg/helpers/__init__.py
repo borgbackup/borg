@@ -7,7 +7,6 @@ package, which are imported here for compatibility.
 
 import os
 import logging
-from typing import List
 from collections import namedtuple
 
 from ..constants import *  # NOQA

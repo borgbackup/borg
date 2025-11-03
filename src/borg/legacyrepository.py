@@ -9,7 +9,6 @@ from collections import defaultdict
 from configparser import ConfigParser
 from functools import partial
 from itertools import islice
-from typing import DefaultDict
 from collections.abc import Callable
 
 from .constants import *  # NOQA
@@ -48,7 +47,7 @@ TAG_PUT2 = 3
 # may not be able to handle the new tags.
 MAX_TAG_ID = 15
 
-FreeSpace: Callable[[], DefaultDict] = partial(defaultdict, int)
+FreeSpace: Callable[[], defaultdict] = partial(defaultdict, int)
 
 
 def header_size(tag):

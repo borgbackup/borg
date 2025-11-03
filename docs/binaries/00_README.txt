@@ -47,18 +47,18 @@ borg-linux-glibc231-x86_64 Linux (built on Debian 11 "Bullseye" with glibc 2.31)
 
 borg-freebsd-14-x86_64     FreeBSD (built on FreeBSD 14)
 
+Note: if you don't find a specific binary here, check release 1.4.1 or 1.2.9.
 
 Verifying your download
 -----------------------
 
-Please check the GPG signature to make sure you received the binary as I have
-built it.
+I provide GPG signatures for files which I have built locally on my machines.
 
-To check the GPG signature, download both the binary and the corresponding
-*.asc file and then (on the shell) type, for example:
+To check the GPG signature, download both the file and the corresponding
+signature (*.asc file) and then (on the shell) type, for example:
 
     gpg --recv-keys 9F88FB52FAF7B393
-    gpg --verify borg-freebsd14.asc borg-freebsd14
+    gpg --verify borgbackup.tar.gz.asc borgbackup.tar.gz
 
 The files are signed by:
 
@@ -66,6 +66,24 @@ Thomas Waldmann <tw@waldmann-edv.de>
 GPG key fingerprint: 6D5B EF9A DD20 7580 5747 B70F 9F88 FB52 FAF7 B393
 
 My fingerprint is also in the footer of all my BorgBackup mailing list posts.
+
+
+Provenance attestations for GitHub-built binaries
+-------------------------------------------------
+
+For binaries built on GitHub (files with a "-gh" suffix in the name), we publish
+an artifact provenance attestation that proves the binary was built by our
+GitHub Actions workflow from a specific commit or tag. You can verify this using
+the GitHub CLI (gh). Install it from https://cli.github.com/ and make sure you
+use a recent version that supports "gh attestation".
+
+Practical example (Linux, 2.0.0b20 tag):
+
+    curl -LO https://github.com/borgbackup/borg/releases/download/2.0.0b20/borg-linux-glibc235-x86_64-gh
+    gh attestation verify --repo borgbackup/borg --source-ref refs/tags/2.0.0b20 borg-linux-glibc235-x86_64-gh
+
+If verification succeeds, gh prints a summary stating the subject (your file),
+that it was attested by GitHub Actions, and the job/workflow reference.
 
 
 Installing

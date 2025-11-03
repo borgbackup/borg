@@ -412,7 +412,8 @@ def test_exclude_patterns_from_file(tmpdir, lines, expected):
 
     def evaluate(filename):
         patterns = []
-        load_exclude_file(open(filename), patterns)
+        with open(filename) as f:
+            load_exclude_file(f, patterns)
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(patterns)
         return [path for path in files if matcher.match(path)]
@@ -442,7 +443,8 @@ def test_load_patterns_from_file(tmpdir, lines, expected_roots, expected_numpatt
     def evaluate(filename):
         roots = []
         inclexclpatterns = []
-        load_pattern_file(open(filename), roots, inclexclpatterns)
+        with open(filename) as f:
+            load_pattern_file(f, roots, inclexclpatterns)
         return roots, len(inclexclpatterns)
 
     patternfile = tmpdir.join("patterns.txt")
@@ -492,7 +494,8 @@ def test_load_invalid_patterns_from_file(tmpdir, lines):
     with pytest.raises(argparse.ArgumentTypeError):
         roots = []
         inclexclpatterns = []
-        load_pattern_file(open(filename), roots, inclexclpatterns)
+        with open(filename) as f:
+            load_pattern_file(f, roots, inclexclpatterns)
 
 
 @pytest.mark.parametrize(
@@ -542,7 +545,8 @@ def test_inclexcl_patterns_from_file(tmpdir, lines, expected):
         matcher = PatternMatcher(fallback=True)
         roots = []
         inclexclpatterns = []
-        load_pattern_file(open(filename), roots, inclexclpatterns)
+        with open(filename) as f:
+            load_pattern_file(f, roots, inclexclpatterns)
         matcher.add_inclexcl(inclexclpatterns)
         return [path for path in files if matcher.match(path)]
 

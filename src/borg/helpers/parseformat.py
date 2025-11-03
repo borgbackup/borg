@@ -93,7 +93,7 @@ def text_to_json(key, value):
         # value has surrogate escape sequences
         data[key] = remove_surrogates(value)
         value_bytes = value.encode(coding, errors="surrogateescape")
-        data.update(binary_to_json(key, value_bytes))
+        data |= binary_to_json(key, value_bytes)
     else:
         # value is pure unicode
         data[key] = value
@@ -321,9 +321,7 @@ class PlaceholderReplacer:
         self.overrides = {}
 
     def __call__(self, text, overrides=None):
-        ovr = {}
-        ovr.update(self.overrides)
-        ovr.update(overrides or {})
+        ovr = self.overrides | (overrides or {})
         return _replace_placeholders(text, overrides=ovr)
 
 
@@ -451,7 +449,7 @@ class Location:
     # path may contain any chars. to avoid ambiguities with other regexes,
     # it must not start with "//" nor with "scheme://" nor with "rclone:".
     local_path_re = r"""
-        (?!(//|(ssh|socket|sftp|file)://|rclone:))
+        (?!(//|(ssh|socket|sftp|file)://|(rclone|s3|b2):))
         (?P<path>.+)
     """
 
@@ -776,8 +774,7 @@ class ArchiveFormatter(BaseFormatter):
     )
 
     def __init__(self, format, repository, manifest, key, *, iec=False, deleted=False):
-        static_data = {}  # here could be stuff on repo level, above archive level
-        static_data.update(self.FIXED_KEYS)
+        static_data = {} | self.FIXED_KEYS  # here could be stuff on repo level, above archive level
         super().__init__(format, static_data)
         self.repository = repository
         self.manifest = manifest
@@ -804,16 +801,14 @@ class ArchiveFormatter(BaseFormatter):
         self.name = archive_info.name
         self.id = archive_info.id
         item_data = {}
-        item_data.update({} if jsonline else self.static_data)
-        item_data.update(
-            {
-                "name": archive_info.name,
-                "archive": archive_info.name,
-                "id": bin_to_hex(archive_info.id),
-                "time": self.format_time(archive_info.ts),
-                "start": self.format_time(archive_info.ts),
-            }
-        )
+        item_data |= {} if jsonline else self.static_data
+        item_data |= {
+            "name": archive_info.name,
+            "archive": archive_info.name,
+            "id": bin_to_hex(archive_info.id),
+            "time": self.format_time(archive_info.ts),
+            "start": self.format_time(archive_info.ts),
+        }
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key]()
 
@@ -821,7 +816,7 @@ class ArchiveFormatter(BaseFormatter):
         # But unsure whether hostname, username, command_line could contain surrogate escapes, play safe:
         for key in "hostname", "username", "command_line":
             if key in item_data:
-                item_data.update(text_to_json(key, item_data[key]))
+                item_data |= text_to_json(key, item_data[key])
         return item_data
 
     @property
@@ -893,11 +888,11 @@ class ItemFormatter(BaseFormatter):
     def __init__(self, archive, format):
         from ..checksums import StreamingXXH64
 
-        static_data = {"archivename": archive.name, "archiveid": archive.fpr}
-        static_data.update(self.FIXED_KEYS)
+        static_data = {"archivename": archive.name, "archiveid": archive.fpr} | self.FIXED_KEYS
         super().__init__(format, static_data)
         self.xxh64 = StreamingXXH64
         self.archive = archive
+        # track which keys were requested in the format string
         self.format_keys = {f[1] for f in Formatter().parse(format)}
         self.call_keys = {
             "size": self.calculate_size,
@@ -915,11 +910,11 @@ class ItemFormatter(BaseFormatter):
 
     def get_item_data(self, item, jsonline=False):
         item_data = {}
-        item_data.update({} if jsonline else self.static_data)
+        item_data |= {} if jsonline else self.static_data
 
-        item_data.update(text_to_json("path", item.path))
+        item_data |= text_to_json("path", item.path)
         target = item.get("target", "")
-        item_data.update(text_to_json("target", target))
+        item_data |= text_to_json("target", target)
         if not jsonline:
             item_data["extra"] = "" if not target else f" -> {item_data['target']}"
 
@@ -934,14 +929,22 @@ class ItemFormatter(BaseFormatter):
 
         item_data["uid"] = item.get("uid")  # int or None
         item_data["gid"] = item.get("gid")  # int or None
-        item_data.update(text_to_json("user", item.get("user", str(item_data["uid"]))))
-        item_data.update(text_to_json("group", item.get("group", str(item_data["gid"]))))
+        item_data |= text_to_json("user", item.get("user", str(item_data["uid"])))
+        item_data |= text_to_json("group", item.get("group", str(item_data["gid"])))
 
         item_data["flags"] = item.get("bsdflags")  # int if flags known, else (if flags unknown) None
         # inode number from source filesystem (may be absent on some platforms)
         item_data["inode"] = item.get("inode")
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key](item)
+        # When producing JSON lines, include selected static archive-level keys if they were
+        # requested via --format. This mirrors text output behavior and fixes #9095.
+        if jsonline:
+            # Include selected static archive-level keys when requested via --format.
+            # Keep implementation style aligned with 1.4-maint.
+            for k in ("archivename", "archiveid"):
+                if k in self.format_keys:
+                    item_data[k] = self.static_data[k]
         return item_data
 
     def calculate_num_chunks(self, item):
@@ -998,8 +1001,7 @@ class DiffFormatter(BaseFormatter):
     METADATA = ("mode", "type", "owner", "group", "user", "mtime", "ctime")
 
     def __init__(self, format, content_only=False):
-        static_data = {}
-        static_data.update(self.FIXED_KEYS)
+        static_data = {} | self.FIXED_KEYS
         super().__init__(format or "{content}{link}{directory}{blkdev}{chrdev}{fifo} {path}{NL}", static_data)
         self.content_only = content_only
         self.format_keys = {f[1] for f in Formatter().parse(format)}
@@ -1038,7 +1040,7 @@ class DiffFormatter(BaseFormatter):
             change.append(self.call_keys[key](item))
         diff_data["change"] = " ".join([v for v in change if v])
         diff_data["path"] = item.path
-        diff_data.update({} if jsonline else self.static_data)
+        diff_data |= {} if jsonline else self.static_data
         return diff_data
 
     def format_other(self, key, diff: "ItemDiff"):
@@ -1209,7 +1211,7 @@ class BorgJsonEncoder(json.JSONEncoder):
 def basic_json_data(manifest, *, cache=None, extra=None):
     key = manifest.key
     data = extra or {}
-    data.update({"repository": BorgJsonEncoder().default(manifest.repository), "encryption": {"mode": key.ARG_NAME}})
+    data |= {"repository": BorgJsonEncoder().default(manifest.repository), "encryption": {"mode": key.ARG_NAME}}
     data["repository"]["last_modified"] = OutputTimestamp(manifest.last_timestamp)
     if key.NAME.startswith("key file"):
         data["encryption"]["keyfile"] = key.find_key()

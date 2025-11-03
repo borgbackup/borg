@@ -72,7 +72,15 @@ end
 
 def packages_openbsd
   return <<-EOF
+    hostname "openbsd77.localdomain"
+    echo "$(hostname)" > /etc/myname
+    echo "127.0.0.1	localhost" > /etc/hosts
+    echo "::1 localhost" >> /etc/hosts
+    echo "127.0.0.1	$(hostname) $(hostname -s)" >> /etc/hosts
     echo "https://ftp.eu.openbsd.org/pub/OpenBSD" > /etc/installurl
+    ftp https://cdn.openbsd.org/pub/OpenBSD/$(uname -r)/$(uname -m)/comp$(uname -r | tr -d .).tgz
+    tar -C / -xzphf comp$(uname -r | tr -d .).tgz
+    rm comp$(uname -r | tr -d .).tgz
     pkg_add bash
     chsh -s bash vagrant
     pkg_add xxhash
@@ -80,7 +88,7 @@ def packages_openbsd
     pkg_add zstd
     pkg_add git  # no fakeroot
     pkg_add rust
-    pkg_add openssl%3.0
+    pkg_add openssl%3.4
     pkg_add py3-pip
     pkg_add py3-virtualenv
     echo 'export BORG_OPENSSL_NAME=eopenssl30' >> ~vagrant/.bash_profile
@@ -111,13 +119,26 @@ def packages_netbsd
   EOF
 end
 
+def package_update_openindiana
+  return <<-EOF
+    echo "nameserver 1.1.1.1" > /etc/resolv.conf
+    # needs separate provisioning step + reboot to become effective:
+    pkg update
+  EOF
+end
+
 def packages_openindiana
   return <<-EOF
-    # needs separate provisioning step + reboot:
-    #pkg update
-    pkg install gcc-13 git pkg-config libxxhash pip virtualenv
+    pkg install gcc-13 git
+    pkg install pkg-config libxxhash
+    pkg install python-313
+    ln -sf /usr/bin/python3.13 /usr/bin/python3
+    ln -sf /usr/bin/python3.13-config /usr/bin/python3-config
+    python3 -m ensurepip
+    ln -sf /usr/bin/pip3.13 /usr/bin/pip3
+    pip3 install virtualenv
     # let borg's pkg-config find openssl:
-    pfexec pkg set-mediator -V 3.1 openssl
+    pfexec pkg set-mediator -V 3 openssl
   EOF
 end
 
@@ -373,7 +394,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd7" do |b|
-    b.vm.box = "generic/openbsd7"
+    b.vm.box = "l3system/openbsd77-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -404,6 +425,7 @@ Vagrant.configure(2) do |config|
       v.memory = 2048 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "package update openindiana", :type => :shell, :inline => package_update_openindiana, :reboot => true
     b.vm.provision "packages openindiana", :type => :shell, :inline => packages_openindiana
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openindiana")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")

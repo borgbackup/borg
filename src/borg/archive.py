@@ -155,10 +155,10 @@ Bytes sent to remote: {stats.tx_bytes}
                 if not final:
                     data = self.as_dict()
                     if item:
-                        data.update(text_to_json("path", item.path))
+                        data |= text_to_json("path", item.path)
                 else:
                     data = {}
-                data.update({"time": time.time(), "type": "archive_progress", "finished": final})
+                data |= {"time": time.time(), "type": "archive_progress", "finished": final}
                 msg = json.dumps(data)
                 end = "\n"
             elif not stream.isatty():
@@ -620,16 +620,14 @@ class Archive:
         if self.create:
             info["command_line"] = join_cmd(sys.argv)
         else:
-            info.update(
-                {
-                    "command_line": self.metadata.command_line,
-                    "hostname": self.metadata.hostname,
-                    "username": self.metadata.username,
-                    "comment": self.metadata.get("comment", ""),
-                    "tags": sorted(self.tags),
-                    "chunker_params": self.metadata.get("chunker_params", ""),
-                }
-            )
+            info |= {
+                "command_line": self.metadata.command_line,
+                "hostname": self.metadata.hostname,
+                "username": self.metadata.username,
+                "comment": self.metadata.get("comment", ""),
+                "tags": sorted(self.tags),
+                "chunker_params": self.metadata.get("chunker_params", ""),
+            }
         return info
 
     def __str__(self):
@@ -704,8 +702,8 @@ Duration: {0.duration}
         # because borg info relies on them. so, either use the given stats (from args)
         # or fall back to self.stats if it was not given.
         stats = stats or self.stats
-        metadata.update({"size": stats.osize, "nfiles": stats.nfiles})
-        metadata.update(additional_metadata or {})
+        metadata |= {"size": stats.osize, "nfiles": stats.nfiles}
+        metadata |= additional_metadata or {}
         metadata = ArchiveItem(metadata)
         data = self.key.pack_metadata(metadata.as_dict())
         self.id = self.repo_objs.id_hash(data)
@@ -1136,7 +1134,7 @@ class MetadataCollector:
 
     def stat_attrs(self, st, path, fd=None):
         attrs = self.stat_simple_attrs(st, path, fd=fd)
-        attrs.update(self.stat_ext_attrs(st, path, fd=fd))
+        attrs |= self.stat_ext_attrs(st, path, fd=fd)
         return attrs
 
 

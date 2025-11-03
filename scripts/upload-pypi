@@ -8,7 +8,7 @@ if [ "$R" = "" ]; then
 fi
 
 if [ "$2" = "test" ]; then
-    export TWINE_REPOSITORY=borgbackuptest
+    export TWINE_REPOSITORY=testborgbackup
 else
     export TWINE_REPOSITORY=borgbackup
 fi

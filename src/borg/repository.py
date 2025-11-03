@@ -1,5 +1,6 @@
 import builtins
 import os
+import sys
 import time
 from typing import Callable, Iterable, Iterator
 
@@ -107,11 +108,11 @@ class Repository:
         if isinstance(path_or_location, Location):
             location = path_or_location
             if location.proto == "file":
-                url = f"file://{location.path}"  # frequently users give without file:// prefix
+                url = _local_abspath_to_file_url(location.path)  # frequently users give without file:// prefix
             else:
                 url = location.processed  # location as given by user, processed placeholders
         else:
-            url = "file://%s" % os.path.abspath(path_or_location)
+            url = _local_abspath_to_file_url(os.path.abspath(path_or_location))
             location = Location(url)
         self._location = location
         self.url = url
@@ -574,3 +575,16 @@ class Repository:
     ) -> None:
         self._lock_refresh()
         self.store.move(name, new_name, delete=delete, undelete=undelete, deleted=deleted)
+
+
+def _local_abspath_to_file_url(path: str) -> str:
+    """Create a file URL from a local, absolute path.
+
+    Expects `path` to be an absolute path on the local filesystem, e.g.:
+    - POSIX: `/foo/bar`
+    - Windows: `c:/foo/bar` (or `c:\foo\bar`)
+    The easiest way to ensure this is for the caller to pass `path` through `os.path.abspath` first.
+    """
+    if sys.platform in ("win32", "msys", "cygwin"):
+        path = "/" + path.replace("\\", "/")
+    return "file://%s" % path

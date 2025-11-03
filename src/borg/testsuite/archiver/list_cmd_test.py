@@ -79,6 +79,29 @@ def test_list_json(archivers, request):
     assert file1["sha256"] == "b2915eb69f260d8d3c25249195f2c8f4f716ea82ec760ae929732c0262442b2b"
 
 
+def test_list_json_lines_includes_archive_keys_in_format(archivers, request):
+    # Issue #9095 / PR #9096: archivename/archiveid should be available in JSON lines when
+    # requested via --format.
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+
+    # Query archive info to obtain expected name and id
+    info_archive = json.loads(cmd(archiver, "info", "--json", "-a", "test"))
+    assert len(info_archive["archives"]) == 1
+    archive_info = info_archive["archives"][0]
+    expected_name = archive_info["name"]
+    expected_id = archive_info["id"]
+
+    out = cmd(archiver, "list", "test", "--json-lines", "--format={archivename} {archiveid}")
+    rows = [json.loads(s) for s in out.splitlines() if s]
+    assert len(rows) >= 2  # directory + file
+    row = rows[-1]
+    assert row["archivename"] == expected_name
+    assert row["archiveid"] == expected_id
+
+
 def test_list_depth(archivers, request):
     """Test the --depth option for the list command."""
     archiver = request.getfixturevalue(archivers)

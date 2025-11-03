@@ -25,9 +25,7 @@ class ProgressIndicatorBase:
         self.msgid = msgid
 
     def make_json(self, *, finished=False, **kwargs):
-        kwargs.update(
-            dict(operation=self.id, msgid=self.msgid, type=self.JSON_TYPE, finished=finished, time=time.time())
-        )
+        kwargs |= dict(operation=self.id, msgid=self.msgid, type=self.JSON_TYPE, finished=finished, time=time.time())
         return json.dumps(kwargs)
 
     def finish(self):

@@ -169,7 +169,7 @@ class Archiver(
         if self.output_list and status is not None and (self.output_filter is None or status in self.output_filter):
             if self.log_json:
                 json_data = {"type": "file_status", "status": status}
-                json_data.update(text_to_json("path", path))
+                json_data |= text_to_json("path", path)
                 print(json.dumps(json_data), file=sys.stderr)
             else:
                 logging.getLogger("borg.output.list").info("%1s %s", status, remove_surrogates(path))

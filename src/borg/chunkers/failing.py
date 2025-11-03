@@ -26,7 +26,7 @@ class ChunkerFailing:
         self.count = 0
         self.chunking_time = 0.0  # not updated, just provided so that caller does not crash
 
-    def chunkify(self, fd: BinaryIO = None, fh: int = -1) -> Iterator:
+    def chunkify(self, fd: BinaryIO | None = None, fh: int = -1) -> Iterator:
         """
         Cut a file into chunks.
 

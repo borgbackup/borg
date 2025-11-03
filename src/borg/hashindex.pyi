@@ -1,14 +1,14 @@
-from typing import NamedTuple, Tuple, Type, Union, IO, Iterator, Any
+from typing import NamedTuple, Tuple, Type, IO, Iterator, Any
 
 API_VERSION: str
 
-PATH_OR_FILE = Union[str, IO]
+PATH_OR_FILE = str | IO
 
 class ChunkIndexEntry(NamedTuple):
     flags: int
     size: int
 
-CIE = Union[Tuple[int, int], Type[ChunkIndexEntry]]
+CIE = Tuple[int, int] | Type[ChunkIndexEntry]
 
 class ChunkIndex:
     F_NONE: int

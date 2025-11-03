@@ -3,7 +3,7 @@ import re
 import stat
 
 from .posix import posix_acl_use_stored_uid_gid
-from .posix import user2uid, group2gid
+from .posix import user2uid, group2gid, uid2user, gid2group
 from ..helpers import workarounds
 from ..helpers import safe_decode, safe_encode
 from .base import SyncFile as BaseSyncFile
@@ -52,6 +52,8 @@ cdef extern from "sys/acl.h":
 cdef extern from "acl/libacl.h":
     int acl_extended_file_nofollow(const char *path)
     int acl_extended_fd(int fd)
+    char *acl_to_any_text(acl_t acl, const char *prefix, char separator, int options)
+    int TEXT_NUMERIC_IDS
 
 cdef extern from "linux/fs.h":
     # ioctls
@@ -75,6 +77,62 @@ cdef extern from "string.h":
     char *strerror(int errnum)
 
 _comment_re = re.compile(' *#.*', re.M)
+
+
+def _acl_from_numeric_to_named_with_id(acl):
+    """Convert numeric-id ACL entries to name entries and append numeric id as 4th field.
+
+    Input format (Linux libacl): lines like 'user:1000:rwx' or 'group:100:r-x' or 'user::rwx'.
+    Output format: for entries with a name/id field, become 'user:name:rwx:uid' or 'group:name:r-x:gid'.
+    """
+    assert isinstance(acl, bytes)
+    entries = []
+    for entry in _comment_re.sub('', safe_decode(acl)).split('\n'):
+        if not entry:
+            continue
+        fields = entry.split(':')
+        # Expected 3 fields: type, name_or_empty, perms
+        if len(fields) >= 3:
+            typ, name, perm = fields[0], fields[1], fields[2]
+            if name and typ == 'user':
+                try:
+                    uid = int(name)
+                except ValueError:
+                    uid = None
+                uname = uid2user(uid, name) if uid is not None else name
+                entries.append(':'.join([typ, uname, perm, str(uid if uid is not None else name)]))
+            elif name and typ == 'group':
+                try:
+                    gid = int(name)
+                except ValueError:
+                    gid = None
+                gname = gid2group(gid, name) if gid is not None else name
+                entries.append(':'.join([typ, gname, perm, str(gid if gid is not None else name)]))
+            else:
+                # owner, group_obj, mask, other (empty name field) stay as-is
+                entries.append(':'.join([typ, '', perm]))
+        else:
+            entries.append(entry)
+    return safe_encode('\n'.join(entries))
+
+
+def _acl_from_numeric_to_numeric_with_id(acl):
+    """Keep numeric ids in name field and append the same id as 4th field where applicable."""
+    assert isinstance(acl, bytes)
+    entries = []
+    for entry in _comment_re.sub('', safe_decode(acl)).split('\n'):
+        if not entry:
+            continue
+        fields = entry.split(':')
+        if len(fields) >= 3:
+            typ, name, perm = fields[0], fields[1], fields[2]
+            if name and (typ == 'user' or typ == 'group'):
+                entries.append(':'.join([typ, name, perm, name]))
+            else:
+                entries.append(':'.join([typ, '', perm]))
+        else:
+            entries.append(entry)
+    return safe_encode('\n'.join(entries))
 
 
 def listxattr(path, *, follow_symlinks=False):
@@ -266,9 +324,9 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
         # note: this should also be the case for symlink fs objects, as they can not have ACLs.
         return
     if numeric_ids:
-        converter = acl_numeric_ids
+        converter = _acl_from_numeric_to_numeric_with_id
     else:
-        converter = acl_append_numeric_ids
+        converter = _acl_from_numeric_to_named_with_id
     try:
         if fd is not None:
             access_acl = acl_get_fd(fd)
@@ -276,7 +334,7 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
             access_acl = acl_get_file(path, ACL_TYPE_ACCESS)
         if access_acl == NULL:
             raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-        access_text = acl_to_text(access_acl, NULL)
+        access_text = acl_to_any_text(access_acl, NULL, '\n', TEXT_NUMERIC_IDS)
         if access_text == NULL:
             raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
         item['acl_access'] = converter(access_text)
@@ -289,7 +347,7 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
             default_acl = acl_get_file(path, ACL_TYPE_DEFAULT)
             if default_acl == NULL:
                 raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
-            default_text = acl_to_text(default_acl, NULL)
+            default_text = acl_to_any_text(default_acl, NULL, '\n', TEXT_NUMERIC_IDS)
             if default_text == NULL:
                 raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path))
             item['acl_default'] = converter(default_text)

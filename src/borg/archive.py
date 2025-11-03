@@ -754,16 +754,16 @@ Duration: {0.duration}
 
     def extract_item(
         self,
-        item,
+        item: Item,
         *,
         restore_attrs=True,
         dry_run=False,
         stdout=False,
         sparse=False,
-        hlm=None,
-        pi=None,
+        hlm: HardLinkManager | None = None,
+        pi: ProgressIndicatorPercent | None = None,
         continue_extraction=False,
-    ):
+    ) -> None:
         """
         Extract archive item.
 
@@ -777,7 +777,7 @@ Duration: {0.duration}
         :param continue_extraction: continue a previously interrupted extraction of the same archive
         """
 
-        def same_item(item, st):
+        def same_item(item: Item, st: os.stat_result) -> bool:
             """Is the archived item the same as the filesystem item at the same path with stat st?"""
             if not stat.S_ISREG(st.st_mode):
                 # we only "optimize" for regular files.

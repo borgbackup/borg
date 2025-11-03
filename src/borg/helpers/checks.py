@@ -1,10 +1,12 @@
 import os
+from typing import Any, Callable
 
 from .errors import RTError
 from ..platformflags import is_win32
 
 
-def check_python():
+def check_python() -> None:
+    required_funcs: set[Callable[..., Any]]
     if is_win32:
         required_funcs = {os.stat}
     else:
@@ -13,7 +15,7 @@ def check_python():
         raise RTError("""FATAL: This Python was compiled for a too old (g)libc and lacks required functionality.""")
 
 
-def check_extension_modules():
+def check_extension_modules() -> None:
     from .. import platform, compress, crypto, item, hashindex, chunkers
 
     msg = """The Borg binary extension modules do not seem to be properly installed."""

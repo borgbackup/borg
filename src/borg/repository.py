@@ -1,8 +1,10 @@
+import builtins
 import os
 import sys
 import time
+from typing import Callable, Iterable, Iterator
 
-from borgstore.store import Store
+from borgstore.store import ItemInfo, Store
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
 from borgstore.backends.errors import BackendError as StoreBackendError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
@@ -22,7 +24,7 @@ from .repoobj import RepoObj
 logger = create_logger(__name__)
 
 
-def repo_lister(repository, *, limit=None):
+def repo_lister(repository, *, limit: int | None = None) -> Iterator[tuple[bytes, int]]:
     marker = None
     finished = False
     while not finished:
@@ -95,14 +97,14 @@ class Repository:
 
     def __init__(
         self,
-        path_or_location,
+        path_or_location: str | Location,
         create=False,
         exclusive=False,
         lock_wait=1.0,
         lock=True,
-        send_log_cb=None,
-        permissions=None,
-    ):
+        send_log_cb: Callable[[], None] | None = None,
+        permissions: str | None = None,
+    ) -> None:
         if isinstance(path_or_location, Location):
             location = path_or_location
             if location.proto == "file":
@@ -127,10 +129,11 @@ class Repository:
         # Get permissions from parameter or environment variable
         permissions = permissions if permissions is not None else os.environ.get("BORG_REPO_PERMISSIONS", "all")
 
+        permissions_dict: dict[str, str] | None
         if permissions == "all":
-            permissions = None  # permissions system will not be used
+            permissions_dict = None  # permissions system will not be used
         elif permissions == "no-delete":  # mostly no delete, no overwrite
-            permissions = {
+            permissions_dict = {
                 "": "lr",
                 "archives": "lrw",
                 "cache": "lrwWD",  # WD for chunks.<HASH>, last-key-checked, ...
@@ -140,7 +143,7 @@ class Repository:
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
             }
         elif permissions == "write-only":  # mostly no reading
-            permissions = {
+            permissions_dict = {
                 "": "l",
                 "archives": "lw",
                 "cache": "lrwWD",  # read allowed, e.g. for chunks.<HASH> cache
@@ -150,7 +153,7 @@ class Repository:
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
             }
         elif permissions == "read-only":  # mostly r/o
-            permissions = {"": "lr", "locks": "lrwD"}
+            permissions_dict = {"": "lr", "locks": "lrwD"}
         else:
             raise Error(
                 f"Invalid BORG_REPO_PERMISSIONS value: {permissions}, should be one of: "
@@ -158,11 +161,11 @@ class Repository:
             )
 
         try:
-            self.store = Store(url, levels=levels_config, permissions=permissions)
+            self.store = Store(url, levels=levels_config, permissions=permissions_dict)
         except StoreBackendError as e:
             raise Error(str(e))
         self.store_opened = False
-        self.version = None
+        self.version: int | None = None
         # long-running repository methods which emit log or progress output are responsible for calling
         # the ._send_log method periodically to get log and progress output transferred to the borg client
         # in a timely manner, in case we have a RemoteRepository.
@@ -177,10 +180,10 @@ class Repository:
         self.lock_wait = lock_wait
         self.exclusive = exclusive
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self._location}>"
 
-    def __enter__(self):
+    def __enter__(self) -> "Repository":
         if self.do_create:
             self.do_create = False
             self.create()
@@ -192,14 +195,14 @@ class Repository:
             raise
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
 
     @property
-    def id_str(self):
+    def id_str(self) -> str:
         return bin_to_hex(self.id)
 
-    def create(self):
+    def create(self) -> None:
         """Create a new empty repository"""
         try:
             self.store.create()
@@ -222,32 +225,32 @@ class Repository:
         finally:
             self.store.close()
 
-    def _set_id(self, id):
+    def _set_id(self, id: bytes) -> None:
         # for testing: change the id of an existing repository
         assert self.opened
         assert isinstance(id, bytes) and len(id) == 32
         self.id = id
         self.store.store("config/id", bin_to_hex(id).encode())
 
-    def _lock_refresh(self):
+    def _lock_refresh(self) -> None:
         if self.lock is not None:
             self.lock.refresh()
 
-    def save_key(self, keydata):
+    def save_key(self, keydata: bytes) -> None:
         # note: saving an empty key means that there is no repokey anymore
         self.store.store("keys/repokey", keydata)
 
-    def load_key(self):
+    def load_key(self) -> bytes:
         keydata = self.store.load("keys/repokey")
         # note: if we return an empty string, it means there is no repo key
         return keydata
 
-    def destroy(self):
+    def destroy(self) -> None:
         """Destroy the repository"""
         self.close()
         self.store.destroy()
 
-    def open(self, *, exclusive, lock_wait=None, lock=True):
+    def open(self, *, exclusive: bool, lock_wait: float, lock=True) -> None:
         assert lock_wait is not None
         try:
             self.store.open()
@@ -273,7 +276,7 @@ class Repository:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
         self.opened = True
 
-    def close(self):
+    def close(self) -> None:
         if self.lock:
             self.lock.release()
             self.lock = None
@@ -282,22 +285,24 @@ class Repository:
             self.store_opened = False
         self.opened = False
 
-    def info(self):
+    def info(self) -> dict:
         """return some infos about the repo (must be opened first)"""
         # note: don't do anything expensive here or separate the lock refresh into a separate method.
         self._lock_refresh()  # do not remove, see do_with_lock()
         info = dict(id=self.id, version=self.version)
         return info
 
-    def check(self, repair=False, max_duration=0):
+    def check(self, repair=False, max_duration=0) -> bool:
         """Check repository consistency"""
 
-        def log_error(msg):
+        obj_corrupted = False
+
+        def log_error(msg: str) -> None:
             nonlocal obj_corrupted
             obj_corrupted = True
             logger.error(f"Repo object {info.name} is corrupted: {msg}")
 
-        def check_object(obj):
+        def check_object(obj: bytes) -> None:
             """Check if obj looks valid."""
             hdr_size = RepoObj.obj_header.size
             obj_size = len(obj)
@@ -421,13 +426,13 @@ class Repository:
                 logger.error(f"Finished {mode} repository check, errors found.")
         return objs_errors == 0 or repair
 
-    def list(self, limit=None, marker=None):
+    def list(self, limit: int | None = None, marker: bytes | None = None) -> builtins.list[tuple[bytes, int]]:
         """
         list <limit> infos starting from after id <marker>.
         each info is a tuple (id, storage_size).
         """
         collect = True if marker is None else False
-        result = []
+        result: builtins.list[tuple[bytes, int]] = []
         infos = self.store.list("data")  # generator yielding ItemInfos
         while True:
             self._lock_refresh()
@@ -448,7 +453,7 @@ class Repository:
                     # note: do not collect the marker id
         return result
 
-    def get(self, id, read_data=True, raise_missing=True):
+    def get(self, id: bytes, read_data=True, raise_missing=True) -> bytes | None:
         self._lock_refresh()
         id_hex = bin_to_hex(id)
         key = "data/" + id_hex
@@ -480,11 +485,13 @@ class Repository:
             else:
                 return None
 
-    def get_many(self, ids, read_data=True, is_preloaded=False, raise_missing=True):
+    def get_many(
+        self, ids: Iterable[bytes], read_data=True, is_preloaded=False, raise_missing=True
+    ) -> Iterator[bytes | None]:
         for id_ in ids:
             yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
 
-    def put(self, id, data, wait=True):
+    def put(self, id: bytes, data: bytes, wait=True) -> None:
         """put a repo object
 
         Note: when doing calls with wait=False this gets async and caller must
@@ -498,7 +505,7 @@ class Repository:
         key = "data/" + bin_to_hex(id)
         self.store.store(key, data)
 
-    def delete(self, id, wait=True):
+    def delete(self, id: bytes, wait=True) -> None:
         """delete a repo object
 
         Note: when doing calls with wait=False this gets async and caller must
@@ -525,7 +532,7 @@ class Repository:
     def preload(self, ids):
         """Preload objects (only applies to remote repositories)"""
 
-    def break_lock(self):
+    def break_lock(self) -> None:
         Lock(self.store).break_lock()
 
     def migrate_lock(self, old_id, new_id):
@@ -533,39 +540,41 @@ class Repository:
         if self.lock is not None:
             self.lock.migrate_lock(old_id, new_id)
 
-    def get_manifest(self):
+    def get_manifest(self) -> bytes:
         self._lock_refresh()
         try:
             return self.store.load("config/manifest")
         except StoreObjectNotFound:
             raise NoManifestError
 
-    def put_manifest(self, data):
+    def put_manifest(self, data: bytes) -> None:
         self._lock_refresh()
-        return self.store.store("config/manifest", data)
+        self.store.store("config/manifest", data)
 
-    def store_list(self, name, *, deleted=False):
+    def store_list(self, name: str, *, deleted=False) -> builtins.list[ItemInfo]:
         self._lock_refresh()
         try:
             return list(self.store.list(name, deleted=deleted))
         except StoreObjectNotFound:
             return []
 
-    def store_load(self, name):
+    def store_load(self, name: str) -> bytes:
         self._lock_refresh()
         return self.store.load(name)
 
-    def store_store(self, name, value):
+    def store_store(self, name: str, value: bytes) -> None:
         self._lock_refresh()
-        return self.store.store(name, value)
+        self.store.store(name, value)
 
-    def store_delete(self, name, *, deleted=False):
+    def store_delete(self, name: str, *, deleted=False) -> None:
         self._lock_refresh()
-        return self.store.delete(name, deleted=deleted)
+        self.store.delete(name, deleted=deleted)
 
-    def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
+    def store_move(
+        self, name: str, new_name: str | None = None, *, delete=False, undelete=False, deleted=False
+    ) -> None:
         self._lock_refresh()
-        return self.store.move(name, new_name, delete=delete, undelete=undelete, deleted=deleted)
+        self.store.move(name, new_name, delete=delete, undelete=undelete, deleted=deleted)
 
 
 def _local_abspath_to_file_url(path: str) -> str:

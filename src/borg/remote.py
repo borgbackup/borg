@@ -311,10 +311,7 @@ class RepositoryServer:  # pragma: no cover
                     raise
             sock_dir = os.path.dirname(self.socket_path)
             os.makedirs(sock_dir, exist_ok=True)
-            if self.socket_path.endswith(".sock"):
-                pid_file = self.socket_path.replace(".sock", ".pid")
-            else:
-                pid_file = self.socket_path + ".pid"
+            pid_file = self.socket_path.removesuffix(".sock") + ".pid"
             pid = os.getpid()
             with open(pid_file, "w") as f:
                 f.write(str(pid))

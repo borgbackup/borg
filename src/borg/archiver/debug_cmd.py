@@ -152,9 +152,9 @@ class DebugMixIn:
         wanted = args.wanted
         try:
             if wanted.startswith("hex:"):
-                wanted = hex_to_bin(wanted[4:])
+                wanted = hex_to_bin(wanted.removeprefix("hex:"))
             elif wanted.startswith("str:"):
-                wanted = wanted[4:].encode()
+                wanted = wanted.removeprefix("str:").encode()
             else:
                 raise ValueError("unsupported search term")
         except (ValueError, UnicodeEncodeError):

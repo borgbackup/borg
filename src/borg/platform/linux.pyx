@@ -3,7 +3,7 @@ import re
 import stat
 
 from .posix import posix_acl_use_stored_uid_gid
-from .posix import user2uid, group2gid, uid2user, gid2group
+from . import posix_ug
 from ..helpers import workarounds
 from ..helpers import safe_decode, safe_encode
 from .base import SyncFile as BaseSyncFile
@@ -99,14 +99,14 @@ def _acl_from_numeric_to_named_with_id(acl):
                     uid = int(name)
                 except ValueError:
                     uid = None
-                uname = uid2user(uid, name) if uid is not None else name
+                uname = posix_ug._uid2user(uid, name) if uid is not None else name
                 entries.append(':'.join([typ, uname, perm, str(uid if uid is not None else name)]))
             elif name and typ == 'group':
                 try:
                     gid = int(name)
                 except ValueError:
                     gid = None
-                gname = gid2group(gid, name) if gid is not None else name
+                gname = posix_ug._gid2group(gid, name) if gid is not None else name
                 entries.append(':'.join([typ, gname, perm, str(gid if gid is not None else name)]))
             else:
                 # owner, group_obj, mask, other (empty name field) stay as-is
@@ -261,9 +261,9 @@ def acl_use_local_uid_gid(acl):
         if entry:
             fields = entry.split(':')
             if fields[0] == 'user' and fields[1]:
-                fields[1] = str(user2uid(fields[1], fields[3]))
+                fields[1] = str(posix_ug._user2uid(fields[1], fields[3]))
             elif fields[0] == 'group' and fields[1]:
-                fields[1] = str(group2gid(fields[1], fields[3]))
+                fields[1] = str(posix_ug._group2gid(fields[1], fields[3]))
             entries.append(':'.join(fields[:3]))
     return safe_encode('\n'.join(entries))
 
@@ -277,9 +277,9 @@ cdef acl_append_numeric_ids(acl):
         if entry:
             type, name, permission = entry.split(':')
             if name and type == 'user':
-                entries.append(':'.join([type, name, permission, str(user2uid(name, name))]))
+                entries.append(':'.join([type, name, permission, str(posix_ug._user2uid(name, name))]))
             elif name and type == 'group':
-                entries.append(':'.join([type, name, permission, str(group2gid(name, name))]))
+                entries.append(':'.join([type, name, permission, str(posix_ug._group2gid(name, name))]))
             else:
                 entries.append(entry)
     return safe_encode('\n'.join(entries))
@@ -294,10 +294,10 @@ cdef acl_numeric_ids(acl):
         if entry:
             type, name, permission = entry.split(':')
             if name and type == 'user':
-                uid = str(user2uid(name, name))
+                uid = str(posix_ug._user2uid(name, name))
                 entries.append(':'.join([type, uid, permission, uid]))
             elif name and type == 'group':
-                gid = str(group2gid(name, name))
+                gid = str(posix_ug._group2gid(name, name))
                 entries.append(':'.join([type, gid, permission, gid]))
             else:
                 entries.append(entry)

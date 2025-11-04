@@ -129,7 +129,7 @@ def test_numeric_to_named_with_id_simple(monkeypatch):
     from ...platform.linux import _acl_from_numeric_to_named_with_id
 
     # Pretend uid 1000 -> 'alice', gid 100 -> 'staff'
-    from ...platform import posix
+    from ...platform import platform_ug
 
     def _uid2user(uid, default=None):
         if uid == 1000:
@@ -141,8 +141,8 @@ def test_numeric_to_named_with_id_simple(monkeypatch):
             return "staff"
         return default
 
-    monkeypatch.setattr(posix, "uid2user", _uid2user)
-    monkeypatch.setattr(posix, "gid2group", _gid2group)
+    monkeypatch.setattr(platform_ug, "_uid2user", _uid2user)
+    monkeypatch.setattr(platform_ug, "_gid2group", _gid2group)
 
     src = b"\n".join([b"user::rwx", b"user:1000:r-x", b"group::r--", b"group:100:r--", b"mask::r-x", b"other::r--"])
     out = _acl_from_numeric_to_named_with_id(src)
@@ -159,7 +159,7 @@ def test_numeric_to_named_with_id_nonexistent_ids(monkeypatch):
     from ...platform.linux import _acl_from_numeric_to_named_with_id
 
     # Map functions return default (the given fallback), so names stay numeric but still append the fourth field
-    from ...platform import posix
+    from ...platform import platform_ug
 
     def _uid2user(uid, default=None):
         return default
@@ -167,8 +167,8 @@ def test_numeric_to_named_with_id_nonexistent_ids(monkeypatch):
     def _gid2group(gid, default=None):
         return default
 
-    monkeypatch.setattr(posix, "uid2user", _uid2user)
-    monkeypatch.setattr(posix, "gid2group", _gid2group)
+    monkeypatch.setattr(platform_ug, "_uid2user", _uid2user)
+    monkeypatch.setattr(platform_ug, "_gid2group", _gid2group)
 
     src = b"user:9999:r--\ngroup:8888:r--\n"
     out = _acl_from_numeric_to_named_with_id(src)

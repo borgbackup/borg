@@ -4,7 +4,7 @@ from libc.stdint cimport uint32_t
 from libc cimport errno
 from posix.time cimport timespec
 
-from .posix import user2uid, group2gid
+from . import posix_ug
 from ..helpers import safe_decode, safe_encode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
 
@@ -108,10 +108,10 @@ def _remove_numeric_id_if_possible(acl):
         if entry:
             fields = entry.split(':')
             if fields[0] == 'user':
-                if user2uid(fields[2]) is not None:
+                if posix_ug._user2uid(fields[2]) is not None:
                     fields[1] = fields[3] = ''
             elif fields[0] == 'group':
-                if group2gid(fields[2]) is not None:
+                if posix_ug._group2gid(fields[2]) is not None:
                     fields[1] = fields[3] = ''
             entries.append(':'.join(fields))
     return safe_encode('\n'.join(entries))

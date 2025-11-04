@@ -47,7 +47,6 @@ cdef extern from "sys/acl.h":
     int acl_set_file(const char *path, int type, acl_t acl)
     int acl_set_fd(int fd, acl_t acl)
     acl_t acl_from_text(const char *buf)
-    char *acl_to_text(acl_t acl, ssize_t *len)
 
 cdef extern from "acl/libacl.h":
     int acl_extended_file_nofollow(const char *path)
@@ -268,40 +267,8 @@ def acl_use_local_uid_gid(acl):
     return safe_encode('\n'.join(entries))
 
 
-cdef acl_append_numeric_ids(acl):
-    """Extend the "POSIX 1003.1e draft standard 17" format with an additional uid/gid field
-    """
-    assert isinstance(acl, bytes)
-    entries = []
-    for entry in _comment_re.sub('', safe_decode(acl)).split('\n'):
-        if entry:
-            type, name, permission = entry.split(':')
-            if name and type == 'user':
-                entries.append(':'.join([type, name, permission, str(posix_ug._user2uid(name, name))]))
-            elif name and type == 'group':
-                entries.append(':'.join([type, name, permission, str(posix_ug._group2gid(name, name))]))
-            else:
-                entries.append(entry)
-    return safe_encode('\n'.join(entries))
 
 
-cdef acl_numeric_ids(acl):
-    """Replace the "POSIX 1003.1e draft standard 17" user/group field with uid/gid
-    """
-    assert isinstance(acl, bytes)
-    entries = []
-    for entry in _comment_re.sub('', safe_decode(acl)).split('\n'):
-        if entry:
-            type, name, permission = entry.split(':')
-            if name and type == 'user':
-                uid = str(posix_ug._user2uid(name, name))
-                entries.append(':'.join([type, uid, permission, uid]))
-            elif name and type == 'group':
-                gid = str(posix_ug._group2gid(name, name))
-                entries.append(':'.join([type, gid, permission, gid]))
-            else:
-                entries.append(entry)
-    return safe_encode('\n'.join(entries))
 
 
 def acl_get(path, item, st, numeric_ids=False, fd=None):

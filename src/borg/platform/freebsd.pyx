@@ -147,6 +147,10 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     If `numeric_ids` is True the user/group field is not preserved only uid/gid
     """
     cdef int flags = ACL_TEXT_APPEND_ID
+    # Note: likely this could be faster if we always used ACL_TEXT_NUMERIC_IDS,
+    # and then used uid2user() and gid2group() to translate the numeric ids to names
+    # inside borg (borg has a LRUcache for these lookups).
+    # See how the Linux implementation does it.
     flags |= ACL_TEXT_NUMERIC_IDS if numeric_ids else 0
     if isinstance(path, str):
         path = os.fsencode(path)

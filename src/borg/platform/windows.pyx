@@ -1,6 +1,5 @@
 import os
 import platform
-from functools import lru_cache
 
 
 cdef extern from 'windows.h':
@@ -12,32 +11,6 @@ cdef extern from 'windows.h':
     HANDLE OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle, DWORD dbProcessId)
 
     cdef extern int PROCESS_QUERY_INFORMATION
-
-
-@lru_cache(maxsize=None)
-def uid2user(uid, default=None):
-    return "root"
-
-
-@lru_cache(maxsize=None)
-def user2uid(user, default=None):
-    if not user:
-        # user is either None or the empty string
-        return default
-    return 0
-
-
-@lru_cache(maxsize=None)
-def gid2group(gid, default=None):
-    return "root"
-
-
-@lru_cache(maxsize=None)
-def group2gid(group, default=None):
-    if not group:
-        # group is either None or the empty string
-        return default
-    return 0
 
 
 def getosusername():

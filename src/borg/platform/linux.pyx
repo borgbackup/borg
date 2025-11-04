@@ -82,7 +82,7 @@ def _acl_from_numeric_to_named_with_id(acl):
     """Convert numeric-id ACL entries to name entries and append numeric id as 4th field.
 
     Input format (Linux libacl): lines like 'user:1000:rwx' or 'group:100:r-x' or 'user::rwx'.
-    Output format: for entries with a name/id field, become 'user:name:rwx:uid' or 'group:name:r-x:gid'.
+    Output format: for entries with a name/id field, become 'user:uname:rwx:uid' or 'group:gname:r-x:gid'.
     """
     assert isinstance(acl, bytes)
     entries = []
@@ -90,25 +90,25 @@ def _acl_from_numeric_to_named_with_id(acl):
         if not entry:
             continue
         fields = entry.split(':')
-        # Expected 3 fields: type, name_or_empty, perms
+        # Expected 3 fields: type, ugid_or_empty, perms
         if len(fields) >= 3:
-            typ, name, perm = fields[0], fields[1], fields[2]
-            if name and typ == 'user':
+            typ, ugid_str, perm = fields[0], fields[1], fields[2]
+            if ugid_str and typ == 'user':
                 try:
-                    uid = int(name)
+                    uid = int(ugid_str)
                 except ValueError:
                     uid = None
-                uname = posix_ug._uid2user(uid, name) if uid is not None else name
-                entries.append(':'.join([typ, uname, perm, str(uid if uid is not None else name)]))
-            elif name and typ == 'group':
+                uname = posix_ug._uid2user(uid, ugid_str) if uid is not None else ugid_str
+                entries.append(':'.join([typ, uname, perm, str(uid if uid is not None else ugid_str)]))
+            elif ugid_str and typ == 'group':
                 try:
-                    gid = int(name)
+                    gid = int(ugid_str)
                 except ValueError:
                     gid = None
-                gname = posix_ug._gid2group(gid, name) if gid is not None else name
-                entries.append(':'.join([typ, gname, perm, str(gid if gid is not None else name)]))
+                gname = posix_ug._gid2group(gid, ugid_str) if gid is not None else ugid_str
+                entries.append(':'.join([typ, gname, perm, str(gid if gid is not None else ugid_str)]))
             else:
-                # owner, group_obj, mask, other (empty name field) stay as-is
+                # owner, group_obj, mask, other (empty ugid_str field) stay as-is
                 entries.append(':'.join([typ, '', perm]))
         else:
             entries.append(entry)
@@ -124,9 +124,9 @@ def _acl_from_numeric_to_numeric_with_id(acl):
             continue
         fields = entry.split(':')
         if len(fields) >= 3:
-            typ, name, perm = fields[0], fields[1], fields[2]
-            if name and (typ == 'user' or typ == 'group'):
-                entries.append(':'.join([typ, name, perm, name]))
+            typ, ugid, perm = fields[0], fields[1], fields[2]
+            if ugid and (typ == 'user' or typ == 'group'):
+                entries.append(':'.join([typ, ugid, perm, ugid]))
             else:
                 entries.append(':'.join([typ, '', perm]))
         else:

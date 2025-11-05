@@ -48,8 +48,9 @@ jobs:
           run: |
             set -euxo pipefail
             # Update package catalog and install dependencies
-            sudo pkg update -f
-            sudo pkg install -y \
+            export IGNORE_OSVERSION=yes
+            sudo -E pkg update -f
+            sudo -E pkg install -y \
               git \
               bash \
               gmake \

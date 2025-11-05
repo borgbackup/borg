@@ -50,20 +50,13 @@ jobs:
             # Update package catalog and install dependencies
             export IGNORE_OSVERSION=yes
             sudo -E pkg update -f
-            sudo -E pkg install -y \
-              git \
-              bash \
-              gmake \
-              pkgconf \
-              openssl \
-              lz4 \
-              zstd \
-              xxhash \
-              py311-python \
-              py311-pip \
-              py311-setuptools \
-              py311-virtualenv \
-              py311-cython
+            sudo -E pkg install -y xxhash liblz4 zstd pkgconf
+            sudo -E pkg install -y fusefs-libs || true
+            sudo -E pkg install -y fusefs-libs3 || true
+            sudo -E pkg install -y rust
+            sudo -E pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
+            sudo -E pkg install -y python310 py310-sqlite3
+            sudo -E pkg install -y python311 py311-sqlite3 py311-pip py311-virtualenv
 
             # Ensure python3 and pip point to the chosen version
             sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python3 || true

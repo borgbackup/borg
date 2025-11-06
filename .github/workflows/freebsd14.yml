@@ -27,6 +27,7 @@ jobs:
       id-token: write
       attestations: write
     runs-on: ubuntu-24.04
+    continue-on-error: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

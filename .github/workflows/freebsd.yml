@@ -40,7 +40,7 @@ jobs:
         uses: cross-platform-actions/action@v0.29.0
         with:
           operating_system: freebsd
-          version: '14.2'
+          version: '14.3'
           # Use bash for consistent scripting
           shell: bash
           # Increase resources a bit for building Cython extensions

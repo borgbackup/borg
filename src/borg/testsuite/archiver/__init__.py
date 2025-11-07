@@ -28,7 +28,7 @@ from ...remote import RemoteRepository
 from ...repository import Repository
 from .. import has_lchflags, has_mknod, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, no_selinux
 from .. import changedir
-from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
+from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, granularity_sleep
 from ..platform.platform_test import is_win32
 from ...xattr import get_all
 
@@ -249,7 +249,7 @@ def create_test_files(input_path, create_hardlinks=True):
             if e.errno not in (errno.EINVAL, errno.ENOSYS):
                 raise
             have_root = False
-    time.sleep(1)  # "empty" must have newer timestamp than other files
+    granularity_sleep()  # "empty" must have newer timestamp than other files
     create_regular_file(input_path, "empty", size=0)
     return have_root
 

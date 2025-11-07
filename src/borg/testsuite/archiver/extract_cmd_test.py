@@ -703,6 +703,7 @@ def test_do_not_fail_when_percent_is_in_file_name(archivers, request):
             cmd(archiver, "extract", "test", exit_code=EXIT_WARNING)
 
 
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
 def test_extract_continue(archivers, request):
     archiver = request.getfixturevalue(archivers)
     CONTENTS1, CONTENTS2, CONTENTS3 = b"contents1" * 100, b"contents2" * 200, b"contents3" * 300

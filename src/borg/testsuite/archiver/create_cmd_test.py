@@ -17,7 +17,7 @@ from ...manifest import Manifest
 from ...platform import is_win32, is_darwin
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError
-from .. import has_lchflags
+from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
     are_symlinks_supported,
@@ -84,7 +84,7 @@ def test_basic_functionality(archivers, request):
         expected.append("input/link1")
     if are_hardlinks_supported():
         expected.append("input/hardlink")
-    if not have_root:
+    if not have_root or not has_mknod:
         # We could not create these device files without (fake)root.
         expected.remove("input/bdev")
         expected.remove("input/cdev")

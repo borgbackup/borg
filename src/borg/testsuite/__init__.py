@@ -11,6 +11,7 @@ import stat
 import sys
 import sysconfig
 import tempfile
+import time
 import unittest
 
 # Note: this is used by borg.selftest, do not *require* pytest functionality here.
@@ -21,7 +22,7 @@ except:  # noqa
 
 from ..fuse_impl import llfuse, has_llfuse, has_pyfuse3  # NOQA
 from .. import platform
-from ..platformflags import is_win32
+from ..platformflags import is_win32, is_darwin
 
 # Does this version of llfuse support ns precision?
 have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, "st_mtime_ns") if llfuse else False
@@ -52,6 +53,46 @@ def same_ts_ns(ts_ns1, ts_ns2):
     diff_ts = int(abs(ts_ns1 - ts_ns2))
     diff_max = 10 ** (-st_mtime_ns_round)
     return diff_ts <= diff_max
+
+
+def granularity_sleep(*, ctime_quirk=False):
+    """Sleep long enough to overcome filesystem timestamp granularity and related platform quirks.
+
+    Purpose
+    - Ensure that successive file operations land on different timestamp "ticks" across filesystems
+      and operating systems, so tests that compare mtime/ctime are reliable.
+
+    Default rationale (ctime_quirk=False)
+    - macOS: Some volumes may still be HFS+ (1 s timestamp granularity). To be safe across APFS and HFS+,
+      sleep 1.0 s on Darwin.
+    - Windows/NTFS: Although NTFS stores timestamps with 100 ns units, actual updates can be delayed by
+      scheduling/metadata behavior. Sleep a short but noticeable amount (0.2 s).
+    - Linux/BSD and others: Modern filesystems (ext4, XFS, Btrfs, ZFS, UFS2, etc.) typically have
+      sub-second granularity; a small delay (0.02 s) is sufficient in practice.
+
+    Windows ctime quirk (ctime_quirk=True)
+    - On Windows, ``stat().st_ctime`` is the file creation time, not "metadata change time" as on Unix.
+    - NTFS implements a feature called "file system tunneling" that preserves certain metadata — including
+      creation time — for short intervals when a file is deleted and a new file with the same name is
+      created in the same directory. The default tunneling window is about 15 seconds.
+    - Consequence: If a test deletes a file and quickly recreates it with the same name, the creation time
+      (st_ctime) may remain unchanged for up to ~15 s, causing flakiness when tests expect a changed ctime.
+    - When ``ctime_quirk=True`` this helper sleeps long enough on Windows (15.0 s) to exceed the tunneling
+      window so the new file receives a fresh creation time. On non-Windows platforms this flag has no
+      special effect beyond the normal, short sleep.
+
+    Parameters
+    - ctime_quirk: bool (default False)
+      If True, apply the Windows NTFS tunneling workaround (15 s sleep on Windows). Ignored elsewhere.
+    """
+    if is_darwin:
+        duration = 1.0
+    elif is_win32:
+        duration = 0.2 if not ctime_quirk else 15.0
+    else:
+        # Default for Linux/BSD and others with fine-grained timestamps
+        duration = 0.02
+    time.sleep(duration)
 
 
 rejected_dotdot_paths = (

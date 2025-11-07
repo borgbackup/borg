@@ -6,7 +6,6 @@ import shutil
 import socket
 import stat
 import subprocess
-import time
 
 import pytest
 
@@ -14,7 +13,7 @@ from ... import platform
 from ...constants import *  # NOQA
 from ...constants import zeros
 from ...manifest import Manifest
-from ...platform import is_win32, is_darwin
+from ...platform import is_win32
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError
 from .. import has_lchflags, has_mknod
@@ -27,6 +26,7 @@ from .. import (
     is_birthtime_fully_supported,
     same_ts_ns,
     is_root,
+    granularity_sleep,
 )
 from . import (
     cmd,
@@ -650,7 +650,7 @@ def test_file_status(archivers, request):
     clearly incomplete: only tests for the weird "unchanged" status for now"""
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
-    time.sleep(1)  # file2 must have newer timestamps than file1
+    granularity_sleep()  # file2 must have newer timestamps than file1
     create_regular_file(archiver.input_path, "file2", size=1024 * 80)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = cmd(archiver, "create", "--list", "test", "input")
@@ -671,7 +671,7 @@ def test_file_status_cs_cache_mode(archivers, request):
     archiver = request.getfixturevalue(archivers)
     """test that a changed file with faked "previous" mtime still gets backed up in ctime,size cache_mode"""
     create_regular_file(archiver.input_path, "file1", contents=b"123")
-    time.sleep(1)  # file2 must have newer timestamps than file1
+    granularity_sleep()  # file2 must have newer timestamps than file1
     create_regular_file(archiver.input_path, "file2", size=10)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input", "--list", "--files-cache=ctime,size")
@@ -688,7 +688,7 @@ def test_file_status_ms_cache_mode(archivers, request):
     """test that a chmod'ed file with no content changes does not get chunked again in mtime,size cache_mode"""
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=10)
-    time.sleep(1)  # file2 must have newer timestamps than file1
+    granularity_sleep()  # file2 must have newer timestamps than file1
     create_regular_file(archiver.input_path, "file2", size=10)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "--list", "--files-cache=mtime,size", "test", "input")
@@ -704,7 +704,7 @@ def test_file_status_rc_cache_mode(archivers, request):
     """test that files get rechunked unconditionally in rechunk,ctime cache mode"""
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=10)
-    time.sleep(1)  # file2 must have newer timestamps than file1
+    granularity_sleep()  # file2 must have newer timestamps than file1
     create_regular_file(archiver.input_path, "file2", size=10)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "--list", "--files-cache=rechunk,ctime", "test", "input")
@@ -717,7 +717,7 @@ def test_file_status_excluded(archivers, request):
     """test that excluded paths are listed"""
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
-    time.sleep(1)  # file2 must have newer timestamps than file1
+    granularity_sleep()  # file2 must have newer timestamps than file1
     create_regular_file(archiver.input_path, "file2", size=1024 * 80)
     if has_lchflags:
         create_regular_file(archiver.input_path, "file3", size=1024 * 80)
@@ -760,7 +760,7 @@ def test_file_status_counters(archivers, request):
     assert result["Modified files"] == 0
     # Archive a dir with two added files
     create_regular_file(archiver.input_path, "testfile1", contents=b"test1")
-    time.sleep(1.0 if is_darwin else 0.01)  # testfile2 must have newer timestamps than testfile1
+    granularity_sleep()  # testfile2 must have newer timestamps than testfile1
     create_regular_file(archiver.input_path, "testfile2", contents=b"test2")
     result = cmd(archiver, "create", "--stats", "test_archive", archiver.input_path)
     result = to_dict(result)
@@ -800,7 +800,7 @@ def test_create_json(archivers, request):
 def test_create_topical(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)
-    time.sleep(1)  # file2 must have newer timestamps than file1
+    granularity_sleep()  # file2 must have newer timestamps than file1
     create_regular_file(archiver.input_path, "file2", size=1024 * 80)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     # no listing by default

@@ -6,8 +6,8 @@ import time
 import pytest
 
 from ...constants import *  # NOQA
-from .. import are_symlinks_supported, are_hardlinks_supported
-from ...platformflags import is_win32, is_darwin
+from .. import are_symlinks_supported, are_hardlinks_supported, granularity_sleep
+from ...platformflags import is_win32
 from . import (
     cmd,
     create_regular_file,
@@ -54,7 +54,7 @@ def test_basic_functionality(archivers, request):
     create_regular_file(archiver.input_path, "file_replaced", contents=b"0" * 4096)
     os.unlink("input/file_removed")
     os.unlink("input/file_removed2")
-    time.sleep(1)  # macOS HFS+ has a 1s timestamp granularity
+    granularity_sleep()
     Path("input/file_touched").touch()
     os.rmdir("input/dir_replaced_with_file")
     create_regular_file(archiver.input_path, "dir_replaced_with_file", size=8192)
@@ -269,19 +269,14 @@ def test_time_diffs(archivers, request):
     cmd(archiver, "create", "archive1", "input")
     time.sleep(0.1)
     os.unlink("input/test_file")
-    if is_win32:
-        # Sleeping for 15s because Windows doesn't refresh ctime if file is deleted and recreated within 15 seconds.
-        time.sleep(15)
-    elif is_darwin:
-        time.sleep(1)  # HFS has a 1s timestamp granularity
+    granularity_sleep(ctime_quirk=True)
     create_regular_file(archiver.input_path, "test_file", size=15)
     cmd(archiver, "create", "archive2", "input")
     output = cmd(archiver, "diff", "archive1", "archive2", "--format", "'{mtime}{ctime} {path}{NL}'")
     assert "mtime" in output
     assert "ctime" in output  # Should show up on Windows as well since it is a new file.
 
-    if is_darwin:
-        time.sleep(1)  # HFS has a 1s timestamp granularity
+    granularity_sleep()
     os.chmod("input/test_file", 0o777)
     cmd(archiver, "create", "archive3", "input")
     output = cmd(archiver, "diff", "archive2", "archive3", "--format", "'{mtime}{ctime} {path}{NL}'")
@@ -395,7 +390,7 @@ def test_sort_by_all_keys_with_directions(archivers, request, sort_key):
     cmd(archiver, "create", "s0", "input")
 
     # Ensure that subsequent modifications happen on a later timestamp tick than s0
-    time.sleep(1.0 if is_darwin else 0.1)  # HFS+ has ~1s timestamp granularity on macOS
+    granularity_sleep()
 
     # Create differences for second archive
     os.unlink("input/a_removed")

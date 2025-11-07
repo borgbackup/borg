@@ -1,7 +1,6 @@
 import errno
 import os
 import shutil
-import time
 import stat
 from unittest.mock import patch
 
@@ -13,7 +12,7 @@ from ...chunkers import has_seek_hole
 from ...constants import *  # NOQA
 from ...helpers import EXIT_WARNING, BackupPermissionError, bin_to_hex
 from ...helpers import flags_noatime, flags_normal
-from .. import changedir, same_ts_ns
+from .. import changedir, same_ts_ns, granularity_sleep
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from ...platform import get_birthtime_ns
 from ...platformflags import is_darwin, is_freebsd, is_win32
@@ -728,7 +727,7 @@ def test_extract_continue(archivers, request):
         # make a hard link, so it does not free the inode when unlinking input/file3
         os.link("input/file3", "hardlink-to-keep-inode-f3")
         os.remove("input/file3")
-    time.sleep(1)  # needed due to timestamp granularity of apple hfs+
+    granularity_sleep()
 
     with changedir("output"):
         # now try to continue extracting, using the same archive, same output dir:

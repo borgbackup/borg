@@ -265,8 +265,6 @@ jobs:
         pip install -e .
 
     - name: run tox env
-      env:
-        XDISTN: "4"
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
@@ -406,9 +404,9 @@ jobs:
                 python -m pip install --upgrade pip wheel
                 pip install -r requirements.d/development.txt
                 pip install -e .
-                pytest -v -n auto --benchmark-skip
+                tox -e py311-none
 
-                if [[ "${DO_BINARIES}" == "true" && "${GITHUB_REF:-}" == refs/tags/* ]]; then
+                if [[ "${{ matrix.do_binaries }}" == "true" && "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
                   python -m pip install 'pyinstaller==6.14.2'
                   mkdir -p dist/binary
                   pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
@@ -440,37 +438,24 @@ jobs:
                 sudo -E pkgin -y install zstd lz4 xxhash git || true
                 sudo -E pkgin -y install rust || true
                 sudo -E pkgin -y install pkg-config || true
-                sudo -E pkgin -y install py311-pip py311-virtualenv || true
+                sudo -E pkgin -y install py311-pip py311-virtualenv py311-tox || true
                 sudo -E ln -sf /usr/pkg/bin/python3.11 /usr/pkg/bin/python3 || true
                 sudo -E ln -sf /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3 || true
                 sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3 || true
+                sudo -E ln -sf /usr/pkg/bin/tox-3.11 /usr/pkg/bin/tox3 || true
 
-                python3 -m virtualenv .venv
-                . .venv/bin/activate
-                python -m pip install --upgrade pip
-                pip install -r requirements.d/development.txt
-                pip install -e .
-                pytest -v -n auto --benchmark-skip
+                tox3 -e py311-none
                 ;;
 
               openbsd)
                 # echo "https://ftp.eu.openbsd.org/pub/OpenBSD" | sudo tee /etc/installurl > /dev/null || true
-                sudo -E pkg_add xxhash || true
-                sudo -E pkg_add lz4 || true
-                sudo -E pkg_add zstd || true
-                sudo -E pkg_add git || true
+                sudo -E pkg_add xxhash lz4 zstd git || true
                 sudo -E pkg_add rust || true
                 sudo -E pkg_add openssl%3.4 || true
-                sudo -E pkg_add py3-pip || true
-                sudo -E pkg_add py3-virtualenv || true
+                sudo -E pkg_add py3-pip py3-virtualenv py3-tox || true
 
                 export BORG_OPENSSL_NAME=eopenssl34
-                python3 -m virtualenv .venv
-                . .venv/bin/activate
-                python -m pip install --upgrade pip
-                pip install -r requirements.d/development.txt
-                pip install -e .
-                pytest -v -n auto --benchmark-skip
+                tox -e py312-none
                 ;;
 
               haiku)
@@ -480,22 +465,24 @@ jobs:
                 pkgman install -y rust_bin || true
                 pkgman install -y python3.10 || true
                 pkgman install -y cffi || true
-                python3 -V || true
                 pkgman install -y lz4_devel zstd_devel xxhash_devel openssl3_devel libffi_devel || true
+
+                # there is no pkgman package for tox, so we install it into a venv
+                python3 -m ensurepip --upgrade || true
+                python3 -m pip install --upgrade pip wheel
+                python3 -m venv .venv
+                . .venv/bin/activate
+
                 export PKG_CONFIG_PATH="/system/develop/lib/pkgconfig:/system/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
                 export BORG_LIBLZ4_PREFIX=/system/develop
                 export BORG_LIBZSTD_PREFIX=/system/develop
                 export BORG_LIBXXHASH_PREFIX=/system/develop
                 export BORG_OPENSSL_PREFIX=/system/develop
-
-                python3 -m ensurepip --upgrade || true
-                python3 -m pip install --upgrade pip wheel
-                python3 -m venv .venv
-                . .venv/bin/activate
-                python -V
                 pip install -r requirements.d/development.txt
                 pip install -e .
-                pytest -v --benchmark-skip -k "not remote and not socket"
+
+                # troubles with either tox or pytest xdist, so we run pytest manually:
+                pytest -v -rs --benchmark-skip -k "not remote and not socket"
                 ;;
             esac
 

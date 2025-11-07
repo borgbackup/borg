@@ -26,7 +26,7 @@ from ...manifest import Manifest
 from ...platform import get_flags
 from ...remote import RemoteRepository
 from ...repository import Repository
-from .. import has_lchflags, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, no_selinux
+from .. import has_lchflags, has_mknod, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, no_selinux
 from .. import changedir
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform.platform_test import is_win32
@@ -232,10 +232,11 @@ def create_test_files(input_path, create_hardlinks=True):
         have_root = False
     else:
         try:
-            # Block device
-            os.mknod("input/bdev", 0o600 | stat.S_IFBLK, os.makedev(10, 20))
-            # Char device
-            os.mknod("input/cdev", 0o600 | stat.S_IFCHR, os.makedev(30, 40))
+            if has_mknod:
+                # Block device
+                os.mknod("input/bdev", 0o600 | stat.S_IFBLK, os.makedev(10, 20))
+                # Char device
+                os.mknod("input/cdev", 0o600 | stat.S_IFCHR, os.makedev(30, 40))
             # File owner
             os.chown("input/file1", 100, 200)  # raises OSError invalid argument on cygwin
             # File mode

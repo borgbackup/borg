@@ -1,0 +1,76 @@
+name: CI NetBSD
+
+on:
+  push:
+    branches: [ master ]
+    tags:
+    - '2.*'
+  pull_request:
+    branches: [ master ]
+    paths:
+    - '**.py'
+    - '**.pyx'
+    - '**.c'
+    - '**.h'
+    - '**.yml'
+    - '**.toml'
+    - '**.cfg'
+    - '**.ini'
+    - 'requirements.d/*'
+    - '!docs/**'
+
+jobs:
+  netbsd_tests:
+    name: NetBSD tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    continue-on-error: true
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
+      with:
+        # setuptools-scm needs full history for versioning
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Run on NetBSD
+      id: netbsd
+      uses: cross-platform-actions/action@v0.29.0
+      with:
+        operating_system: netbsd
+        version: '10.1'
+        shell: bash
+        cpu_count: 3
+        memory: 6G
+        run: |
+          set -euxo pipefail
+          # Configure pkgin repository based on architecture.
+          arch="$(uname -m)"
+          sudo -E mkdir -p /usr/pkg/etc/pkgin
+          echo "http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
+          sudo -E pkgin update || true
+          sudo -E pkgin -y upgrade || true
+
+          # Base tools and libraries
+          sudo -E pkgin -y install zstd lz4 xxhash git || true
+          sudo -E pkgin -y install rust || true
+          # Work around NetBSD 9.3 bug with .bash_profile in screen sessions
+          # echo "export PROMPT_COMMAND=" >> ~/.bash_profile || true
+          sudo -E pkgin -y install pkg-config || true
+          # Python 3.11 and tools
+          sudo -E pkgin -y install py311-pip py311-virtualenv || true
+          sudo -E ln -sf /usr/pkg/bin/python3.11 /usr/pkg/bin/python3 || true
+          sudo -E ln -sf /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3 || true
+          sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3 || true
+
+          # Create and activate a virtualenv
+          python3 -m virtualenv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          # Install development/test dependencies
+          pip install -r requirements.d/development.txt
+          # Build Borg (editable)
+          pip install -e .
+          # Run tests; skip benchmarks
+          pytest -v -n auto --benchmark-skip

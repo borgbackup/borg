@@ -26,6 +26,8 @@ from ..platformflags import is_win32
 # Does this version of llfuse support ns precision?
 have_fuse_mtime_ns = hasattr(llfuse.EntryAttributes, "st_mtime_ns") if llfuse else False
 
+has_mknod = hasattr(os, "mknod")
+
 has_lchflags = hasattr(os, "lchflags") or sys.platform.startswith("linux")
 try:
     with tempfile.NamedTemporaryFile() as file:

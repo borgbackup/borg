@@ -433,42 +433,41 @@ jobs:
                 arch="$(uname -m)"
                 sudo -E mkdir -p /usr/pkg/etc/pkgin
                 echo "http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
-                sudo -E pkgin update || true
-                sudo -E pkgin -y upgrade || true
-                sudo -E pkgin -y install zstd lz4 xxhash git || true
-                sudo -E pkgin -y install rust || true
-                sudo -E pkgin -y install pkg-config || true
-                sudo -E pkgin -y install py311-pip py311-virtualenv py311-tox || true
-                sudo -E ln -sf /usr/pkg/bin/python3.11 /usr/pkg/bin/python3 || true
-                sudo -E ln -sf /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3 || true
-                sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3 || true
-                sudo -E ln -sf /usr/pkg/bin/tox-3.11 /usr/pkg/bin/tox3 || true
+                sudo -E pkgin update
+                sudo -E pkgin -y upgrade
+                sudo -E pkgin -y install zstd lz4 xxhash git
+                sudo -E pkgin -y install rust
+                sudo -E pkgin -y install pkg-config
+                sudo -E pkgin -y install py311-pip py311-virtualenv py311-tox
+                sudo -E ln -sf /usr/pkg/bin/python3.11 /usr/pkg/bin/python3
+                sudo -E ln -sf /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3
+                sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3
+                sudo -E ln -sf /usr/pkg/bin/tox-3.11 /usr/pkg/bin/tox3
 
                 tox3 -e py311-none
                 ;;
 
               openbsd)
-                # echo "https://ftp.eu.openbsd.org/pub/OpenBSD" | sudo tee /etc/installurl > /dev/null || true
-                sudo -E pkg_add xxhash lz4 zstd git || true
-                sudo -E pkg_add rust || true
-                sudo -E pkg_add openssl%3.4 || true
-                sudo -E pkg_add py3-pip py3-virtualenv py3-tox || true
+                sudo -E pkg_add xxhash lz4 zstd git
+                sudo -E pkg_add rust
+                sudo -E pkg_add openssl%3.4
+                sudo -E pkg_add py3-pip py3-virtualenv py3-tox
 
                 export BORG_OPENSSL_NAME=eopenssl34
                 tox -e py312-none
                 ;;
 
               haiku)
-                pkgman refresh || true
-                pkgman install -y git pkgconfig zstd lz4 xxhash || true
-                pkgman install -y openssl3 || true
-                pkgman install -y rust_bin || true
-                pkgman install -y python3.10 || true
-                pkgman install -y cffi || true
-                pkgman install -y lz4_devel zstd_devel xxhash_devel openssl3_devel libffi_devel || true
+                pkgman refresh
+                pkgman install -y git pkgconfig zstd lz4 xxhash
+                pkgman install -y openssl3
+                pkgman install -y rust_bin
+                pkgman install -y python3.10
+                pkgman install -y cffi
+                pkgman install -y lz4_devel zstd_devel xxhash_devel openssl3_devel libffi_devel
 
                 # there is no pkgman package for tox, so we install it into a venv
-                python3 -m ensurepip --upgrade || true
+                python3 -m ensurepip --upgrade
                 python3 -m pip install --upgrade pip wheel
                 python3 -m venv .venv
                 . .venv/bin/activate

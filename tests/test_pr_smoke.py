@@ -1,3 +1,3 @@
 def test_smoke():
-    # Simple smoke test to ensure the PR workflow can pass
+    """Basic CI smoke test to ensure PR workflow runs successfully."""
     assert True

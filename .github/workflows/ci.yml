@@ -578,3 +578,53 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           env_vars: OS, python
+  pr_smoke_auto:
+    name: PR Smoke Test + Auto Create PR
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/heads/pr/')
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip pytest
+
+      - name: Run smoke test
+        run: |
+          pytest -q tests/test_pr_smoke.py
+
+      - name: Auto-create Pull Request to master
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const branch = process.env.GITHUB_REF.replace('refs/heads/', '');
+            const title = `Auto PR: ${branch} → master`;
+            const body = `This pull request was opened automatically for branch \`${branch}\` after passing the smoke test.`;
+            try {
+              await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                head: branch,
+                base: 'master',
+                body
+              });
+              core.info(`✅ Created PR from ${branch} to master`);
+            } catch (err) {
+              if (err.status === 422) {
+                core.info('ℹ️ A pull request already exists or cannot be merged.');
+              } else {
+                throw err;
+              }
+            }

@@ -176,7 +176,8 @@ def test_basic_functionality(archivers, request):
         assert unexpected not in get_changes("input/file_touched", joutput)
         if not content_only:
             # on win32, ctime is the file creation time and does not change.
-            expected = {"mtime"} if is_win32 else {"mtime", "ctime"}
+            # not sure why netbsd only has mtime, but it does, #8703.
+            expected = {"mtime"} if (is_win32 or is_netbsd) else {"mtime", "ctime"}
             assert expected.issubset({c["type"] for c in get_changes("input/file_touched", joutput)})
         else:
             # And if we're doing content-only, don't show the file at all.

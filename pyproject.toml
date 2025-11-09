@@ -169,7 +169,7 @@ env_list = ["py{310,311,312,313,314}-{none,fuse2,fuse3}", "docs", "ruff", "mypy"
 [tool.tox.env_run_base]
 package = "editable-legacy"  # without this it does not find setup_docs when running under fakeroot
 deps = ["-rrequirements.d/development.txt"]
-commands = [["pytest", "-v", "-n", "{env:XDISTN:1}", "-rs", "--cov=borg", "--cov-config=pyproject.toml", "--benchmark-skip", "--pyargs", "{posargs:borg.testsuite}"]]
+commands = [["python", "-m", "pytest", "-v", "-n", "{env:XDISTN:auto}", "-rs", "--cov=borg", "--cov-config=pyproject.toml", "--benchmark-skip", "--pyargs", "{posargs:borg.testsuite}"]]
 pass_env = ["*"]  # fakeroot -u needs some env vars
 
 [tool.tox.env_pkg_base]

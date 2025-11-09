@@ -59,7 +59,7 @@ from ..repository import Repository
 from . import has_lchflags, has_mknod, llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux, same_ts_ns, granularity_sleep
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from .platform import fakeroot_detected, is_darwin, is_freebsd, is_win32
+from .platform import fakeroot_detected, is_darwin, is_freebsd, is_netbsd, is_win32
 from .upgrader import make_attic_repo
 from . import key
 
@@ -4880,7 +4880,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
             unexpected = {'type': 'modified', 'added': 0, 'removed': 0}
             assert unexpected not in get_changes('input/file_touched', joutput)
             if not content_only:
-                assert {"ctime", "mtime"}.issubset({c["type"] for c in get_changes('input/file_touched', joutput)})
+                # On Windows, ctime is the creation time and does not change on touch.
+                # NetBSD also only reports mtime here, see #8703 (backport of #9161 intent).
+                expected = {"mtime"} if (is_win32 or is_netbsd) else {"ctime", "mtime"}
+                assert expected.issubset({c["type"] for c in get_changes('input/file_touched', joutput)})
             else:
                 # And if we're doing content-only, don't show the file at all.
                 assert not any(get_changes('input/file_touched', joutput))
@@ -5075,6 +5078,10 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
 
 
     @requires_hardlinks
+    @pytest.mark.skipif(
+        (not are_hardlinks_supported()) or is_freebsd or is_netbsd,
+        reason='Skip when hardlinks unsupported or on FreeBSD/NetBSD due to differing ctime/link handling; see #9147, #9153.',
+    )
     def test_multiple_link_exclusion(self):
         path_a = os.path.join(self.input_path, 'a')
         path_b = os.path.join(self.input_path, 'b')

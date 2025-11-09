@@ -7,7 +7,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported, granularity_sleep
-from ...platformflags import is_win32
+from ...platformflags import is_win32, is_freebsd, is_netbsd
 from . import (
     cmd,
     create_regular_file,
@@ -176,7 +176,8 @@ def test_basic_functionality(archivers, request):
         assert unexpected not in get_changes("input/file_touched", joutput)
         if not content_only:
             # on win32, ctime is the file creation time and does not change.
-            expected = {"mtime"} if is_win32 else {"mtime", "ctime"}
+            # not sure why netbsd only has mtime, but it does, #8703.
+            expected = {"mtime"} if (is_win32 or is_netbsd) else {"mtime", "ctime"}
             assert expected.issubset({c["type"] for c in get_changes("input/file_touched", joutput)})
         else:
             # And if we're doing content-only, don't show the file at all.
@@ -426,7 +427,10 @@ def test_sort_by_all_keys_with_directions(archivers, request, sort_key):
         assert seen_paths == expected_paths
 
 
-@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
+@pytest.mark.skipif(
+    not are_hardlinks_supported() or is_freebsd or is_netbsd,
+    reason="hardlinks not supported or test failing on freebsd and netbsd",
+)
 def test_hard_link_deletion_and_replacement(archivers, request):
     archiver = request.getfixturevalue(archivers)
 

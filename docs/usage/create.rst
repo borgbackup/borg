@@ -1,5 +1,18 @@
 .. include:: create.rst.inc
 
+.. note::
+
+   Archive series and performance: In Borg 2, archives that share the same NAME form an "archive series".
+   The files cache is maintained per series. For best performance on repeated backups, reuse the same
+   NAME every time you run ``borg create`` for the same dataset (e.g. always use ``my-documents``).
+   Frequently changing the NAME (for example by embedding date/time like ``my-documents-2025-11-10``)
+   prevents cache reuse and forces Borg to re-scan and re-chunk files, which can make incremental
+   backups vastly slower. Only vary the NAME if you intentionally want to start a new series.
+
+   If you must vary the archive name but still want cache reuse across names, see the advanced
+   knobs described in :ref:`upgradenotes2` (``BORG_FILES_CACHE_SUFFIX`` and ``BORG_FILES_CACHE_TTL``),
+   but the recommended approach is to keep a stable NAME per series.
+
 Examples
 ~~~~~~~~
 ::

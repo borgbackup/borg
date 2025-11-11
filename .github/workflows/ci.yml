@@ -444,6 +444,27 @@ jobs:
                 sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3
                 sudo -E ln -sf /usr/pkg/bin/tox-3.11 /usr/pkg/bin/tox3
 
+                # Ensure base system admin tools are on PATH for the non-root shell
+                export PATH="/sbin:/usr/sbin:$PATH"
+
+                echo "--- Preparing an extattr-enabled filesystem ---"
+                # On many NetBSD setups /tmp is tmpfs without extended attributes.
+                # Create a FFS image with extended attributes enabled and use it for TMPDIR.
+                VNDDEV="vnd0"
+                IMGFILE="/tmp/fs.img"
+                sudo -E dd if=/dev/zero of=${IMGFILE} bs=1m count=1024
+                sudo -E vndconfig -c "${VNDDEV}" "${IMGFILE}"
+                sudo -E newfs -O 2ea /dev/r${VNDDEV}a
+                MNT="/mnt/eafs"
+                sudo -E mkdir -p ${MNT}
+                sudo -E mount -t ffs -o extattr /dev/${VNDDEV}a $MNT
+                export TMPDIR="${MNT}/tmp"
+                sudo -E mkdir -p ${TMPDIR}
+                sudo -E chmod 1777 ${TMPDIR}
+
+                touch ${TMPDIR}/testfile
+                lsextattr user ${TMPDIR}/testfile && echo "[xattr] *** xattrs SUPPORTED on ${TMPDIR}! ***"
+
                 tox3 -e py311-none
                 ;;
 

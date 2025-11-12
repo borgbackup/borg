@@ -86,7 +86,7 @@ def get_all(path, follow_symlinks=False):
                     # EINVAL: maybe xattr name is invalid or other issue, #6988
                     logger.warning("When getting extended attribute %s: %s", name.decode(errors="replace"), str(e))
     except OSError as e:
-        if e.errno in (errno.ENOTSUP, errno.EPERM):
+        if e.errno in (errno.ENOTSUP, errno.EOPNOTSUPP, errno.EPERM):
             # if xattrs are not supported on the filesystem, we give up.
             # EPERM might be raised by listxattr.
             pass

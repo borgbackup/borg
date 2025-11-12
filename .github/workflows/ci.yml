@@ -501,7 +501,7 @@ jobs:
 
   windows_tests:
 
-    if: false  # can be used to temporarily disable the build
+    if: true  # can be used to temporarily disable the build
     runs-on: windows-latest
     timeout-minutes: 120
     needs: native_tests

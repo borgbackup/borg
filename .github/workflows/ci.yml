@@ -504,7 +504,7 @@ jobs:
     if: true  # can be used to temporarily disable the build
     runs-on: windows-latest
     timeout-minutes: 120
-    needs: native_tests
+    #needs: native_tests
 
     env:
       PY_COLORS: 1

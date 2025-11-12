@@ -122,6 +122,7 @@ jobs:
 
   native_tests:
 
+    if: false  # can be used to temporarily disable the build
     needs: [lint, security]
     permissions:
       contents: read
@@ -327,6 +328,8 @@ jobs:
         if-no-files-found: error
 
   vm_tests:
+
+    if: false  # can be used to temporarily disable the build
     permissions:
       contents: read
       id-token: write

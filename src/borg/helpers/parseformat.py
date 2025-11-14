@@ -5,6 +5,7 @@ import binascii
 import hashlib
 import json
 import os
+import posixpath
 import os.path
 import re
 import shlex
@@ -573,7 +574,9 @@ class Location:
             # If a POSIX-like absolute path was given (starts with '/'), keep it verbatim.
             # This avoids injecting a Windows drive prefix and keeps forward slashes.
             if p.startswith("/"):
-                self.path = p
+                # Normalize POSIX paths to collapse .. and . components while preserving
+                # forward slashes and avoiding any platform-specific path conversions.
+                self.path = posixpath.normpath(p)
             else:
                 # For relative or platform-native paths, resolve to an absolute path
                 # using the local platform rules.

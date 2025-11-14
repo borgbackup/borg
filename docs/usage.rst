@@ -68,5 +68,6 @@ Usage
    usage/benchmark
 
    usage/help
+   usage/completion
    usage/debug
    usage/notes

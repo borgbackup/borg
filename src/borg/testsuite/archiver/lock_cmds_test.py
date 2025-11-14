@@ -1,6 +1,7 @@
 import os
 import subprocess
 import time
+from pathlib import Path
 
 from ...constants import *  # NOQA
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
@@ -18,7 +19,7 @@ def test_break_lock(archivers, request):
 def test_with_lock(tmp_path):
     repo_path = tmp_path / "repo"
     env = os.environ.copy()
-    env["BORG_REPO"] = "file://" + str(repo_path)
+    env["BORG_REPO"] = Path(repo_path).as_uri()
     command0 = "python3", "-m", "borg", "repo-create", "--encryption=none"
     # Timings must be adjusted so that command1 keeps running while command2 tries to get the lock,
     # so that lock acquisition for command2 fails as the test expects it.

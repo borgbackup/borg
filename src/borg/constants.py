@@ -179,7 +179,7 @@ class KeyType:
     REPO = 0x03
     BLAKE2KEYFILE = 0x04
     BLAKE2REPO = 0x05
-    BLAKE2AUTHENTICATED = 0x06
+    BLAKE2AUTHENTICATEDLEGACY = 0x06
     AUTHENTICATED = 0x07
     # new crypto
     # upper 4 bits are ciphersuite, lower 4 bits are keytype
@@ -191,6 +191,7 @@ class KeyType:
     BLAKE2AESOCBREPO = 0x31
     BLAKE2CHPOKEYFILE = 0x40
     BLAKE2CHPOREPO = 0x41
+    BLAKE2AUTHENTICATED = 0x51
 
 
 CACHE_TAG_NAME = "CACHEDIR.TAG"

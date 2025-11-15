@@ -180,7 +180,7 @@ class BenchmarkMixIn:
         ]:
             print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
 
-        from ..crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
+        from ..crypto.low_level import AES256_CTR_BLAKE2b_legacy, AES256_CTR_HMAC_SHA256
         from ..crypto.low_level import AES256_OCB, CHACHA20_POLY1305
 
         print("Encryption =====================================================")
@@ -195,7 +195,7 @@ class BenchmarkMixIn:
             ),
             (
                 "aes-256-ctr-blake2b",
-                lambda: AES256_CTR_BLAKE2b(key_256 * 4, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(
+                lambda: AES256_CTR_BLAKE2b_legacy(key_256 * 4, key_256, iv=key_128, header_len=1, aad_offset=1).encrypt(
                     random_10M, header=b"X"
                 ),
             ),

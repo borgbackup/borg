@@ -1088,7 +1088,7 @@ class MetadataCollector:
         self.noxattrs = noxattrs
         self.nobirthtime = nobirthtime
 
-    def stat_simple_attrs(self, st, path, fd=None):
+    def stat_simple_attrs(self, st, path, fd=None, *, st_before_open=None):
         attrs = {}
         attrs["mode"] = st.st_mode
         # borg can work with archives only having mtime (very old borg archives do not have
@@ -1096,7 +1096,13 @@ class MetadataCollector:
         # file content changing - e.g. to get better metadata deduplication.
         attrs["mtime"] = safe_ns(st.st_mtime_ns)
         if not self.noatime:
-            attrs["atime"] = safe_ns(st.st_atime_ns)
+            # If a pre-open stat result was provided and it refers to same fs object,
+            # then preserve the original atime. Avoid race conditions.
+            if st_before_open is not None and st_before_open.st_ino == st.st_ino:
+                atime = min(st_before_open.st_atime_ns, st.st_atime_ns)
+            else:
+                atime = st.st_atime_ns
+            attrs["atime"] = safe_ns(atime)
         if not self.noctime:
             attrs["ctime"] = safe_ns(st.st_ctime_ns)
         if not self.nobirthtime:
@@ -1391,10 +1397,14 @@ class FilesystemObjectProcessors:
         ):  # no status yet
             if item is None:
                 return status
+            # Remember the filename-based stat result we obtained before opening the file.
+            # On platforms without O_NOATIME, merely opening a file for reading can update
+            # the atime. We want to store the original atime as seen before opening.
+            st_before_open = st
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
                 with backup_io("fstat"):
                     st = stat_update_check(st, os.fstat(fd))
-                item.update(self.metadata_collector.stat_simple_attrs(st, path, fd=fd))
+                item.update(self.metadata_collector.stat_simple_attrs(st, path, fd=fd, st_before_open=st_before_open))
                 item.update(self.metadata_collector.stat_ext_attrs(st, path, fd=fd))
                 maybe_exclude_by_attr(item)  # check early, before processing all the file content
                 is_special_file = is_special(st.st_mode)

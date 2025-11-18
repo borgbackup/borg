@@ -5,6 +5,7 @@ import shtab
 from ._common import process_epilog
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator, SortBySpec, FilesCacheMode
+from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
 
 # Dynamic completion for archive IDs (aid:...)
@@ -119,7 +120,7 @@ _borg_complete_sortby() {
   fi
 
   # Valid keys (embedded at generation time)
-  local keys=(___SORT_KEYS___)
+  local keys=({SORT_KEYS})
 
   local k
   for k in "${keys[@]}"; do
@@ -164,7 +165,7 @@ _borg_complete_filescachemode() {
   fi
 
   # Valid tokens (embedded at generation time)
-  local keys=(___FCM_KEYS___)
+  local keys=({FCM_KEYS})
 
   # If 'disabled' is already selected, there is nothing else to suggest.
   if [[ "$headlist" == *",disabled,"* ]]; then
@@ -282,7 +283,7 @@ _borg_complete_sortby() {
   fi
 
   # Valid keys (embedded at generation time)
-  local -a keys=(___SORT_KEYS___)
+  local -a keys=({SORT_KEYS})
 
   local -a candidates=()
   local k
@@ -326,7 +327,7 @@ _borg_complete_filescachemode() {
   fi
 
   # Valid tokens (embedded at generation time)
-  local -a keys=(___FCM_KEYS___)
+  local -a keys=({FCM_KEYS})
 
   # If 'disabled' is already selected, there is nothing else to suggest.
   if [[ "$headlist" == *",disabled,"* ]]; then
@@ -414,11 +415,12 @@ class CompletionMixIn:
         _attach_sortby_completion(parser)
         _attach_filescachemode_completion(parser)
 
-        # Build preambles with embedded SortBy keys
+        # Build preambles using partial_format to avoid escaping braces etc.
         sort_keys = " ".join(AI_HUMAN_SORT_KEYS)
         fcm_keys = " ".join(["ctime", "mtime", "size", "inode", "rechunk", "disabled"])  # keep in sync with parser
-        bash_preamble = BASH_PREAMBLE_TMPL.replace("___SORT_KEYS___", sort_keys).replace("___FCM_KEYS___", fcm_keys)
-        zsh_preamble = ZSH_PREAMBLE_TMPL.replace("___SORT_KEYS___", sort_keys).replace("___FCM_KEYS___", fcm_keys)
+        mapping = {"SORT_KEYS": sort_keys, "FCM_KEYS": fcm_keys}
+        bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)
+        zsh_preamble = partial_format(ZSH_PREAMBLE_TMPL, mapping)
         preamble = {"bash": bash_preamble, "zsh": zsh_preamble}
         script = shtab.complete(parser, shell=args.shell, preamble=preamble)  # nosec B604
         print(script)

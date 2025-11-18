@@ -166,6 +166,9 @@ New features:
 - improved tty-less progress reporting (--progress), #9055
 - BORG_MSGPACK_VERSION_CHECK=no to optionally disable the msgpack version
   check; default is "yes", use at your own risk, #9109.
+- diff: --sort-by=field[,field,...], #8998
+- completion: generate completion scripts for supported shells, #9172,
+  uses shtab, supports bash, tcsh, zsh (zsh needs shtab > 1.7.2).
 
 Fixes:
 
@@ -179,6 +182,7 @@ Fixes:
 - json: include archive keys in JSON lines when requested via --format, #9095
 - ensure valid file URLs are created from Windows paths
 - Windows: add missing guards around `preexec_fn=ignore_sigint`
+- preprocess_args: fix option name matching
 
 Other changes:
 
@@ -195,8 +199,12 @@ Other changes:
   - save space in test_create_* tests
   - CI/tests: add SFTP/rclone/S3 repo testing
   - CI: add local servers for S3 and SFTP testing
+  - CI: add *BSD and Haiku OS (on GitHub Actions)
+  - CI: do dynamic code analysis, #6819
   - transfer: add test for unexpected src repo index change, #9022
   - pyproject.toml: correctly define test environments for FUSE testing
+  - add granularity_sleep, #9150
+  - use context manager when opening files in patterns_test
 - Vagrant:
 
   - add Debian testing/Trixie box

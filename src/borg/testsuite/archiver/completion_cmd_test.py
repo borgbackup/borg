@@ -8,6 +8,7 @@ def test_bash_completion(archivers, request):
     archiver = request.getfixturevalue(archivers)
     output = cmd(archiver, "completion", "bash")
     assert "_borg_complete_aid() {" in output
+    assert "_borg_complete_sortby() {" in output
 
 
 def test_zsh_completion(archivers, request):
@@ -15,3 +16,4 @@ def test_zsh_completion(archivers, request):
     archiver = request.getfixturevalue(archivers)
     output = cmd(archiver, "completion", "zsh")
     assert "_borg_complete_aid() {" in output
+    assert "_borg_complete_sortby() {" in output

@@ -4,7 +4,7 @@ import shtab
 
 from ._common import process_epilog
 from ..constants import *  # NOQA
-from ..helpers import archivename_validator, SortBySpec  # used to detect ARCHIVE args for dynamic completion
+from ..helpers import archivename_validator, SortBySpec, FilesCacheMode
 from ..manifest import AI_HUMAN_SORT_KEYS
 
 # Dynamic completion for archive IDs (aid:...)
@@ -27,6 +27,10 @@ AID_ZSH_FN_NAME = "_borg_complete_aid"
 # Name of the helper function inserted for completing SortBySpec options
 SORTBY_BASH_FN_NAME = "_borg_complete_sortby"
 SORTBY_ZSH_FN_NAME = "_borg_complete_sortby"
+
+# Name of the helper function inserted for completing FilesCacheMode options
+FCM_BASH_FN_NAME = "_borg_complete_filescachemode"
+FCM_ZSH_FN_NAME = "_borg_complete_filescachemode"
 
 # Global bash preamble that is prepended to the generated completion script.
 # It aggregates only what we need:
@@ -121,6 +125,67 @@ _borg_complete_sortby() {
   for k in "${keys[@]}"; do
     # skip already-selected keys
     [[ "$headlist" == *",${k},"* ]] && continue
+    # match prefix of last fragment
+    [[ -n "$frag" && "$k" != "$frag"* ]] && continue
+    printf '%s\n' "${prefix_eq}${head}${k}"
+  done
+}
+
+# Complete comma-separated files cache mode tokens for options with type=FilesCacheMode.
+_borg_complete_filescachemode() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+
+  # Extract value part for --opt=value forms; otherwise the value is the word itself
+  local val prefix_eq
+  if [[ "$cur" == *=* ]]; then
+    prefix_eq="${cur%%=*}="
+    val="${cur#*=}"
+  else
+    prefix_eq=""
+    val="$cur"
+  fi
+
+  # Split into head (selected keys + trailing comma if any) and fragment (last token being typed)
+  local head frag
+  if [[ "$val" == *,* ]]; then
+    head="${val%,*},"
+    frag="${val##*,}"
+  else
+    head=""
+    frag="$val"
+  fi
+
+  # Build a comma-delimited list for cheap membership testing
+  local headlist
+  if [[ -n "$head" ]]; then
+    headlist=",${head%,},"
+  else
+    headlist=","  # nothing selected yet
+  fi
+
+  # Valid tokens (embedded at generation time)
+  local keys=(___FCM_KEYS___)
+
+  # If 'disabled' is already selected, there is nothing else to suggest.
+  if [[ "$headlist" == *",disabled,"* ]]; then
+    return 0
+  fi
+
+  local k
+  for k in "${keys[@]}"; do
+    # skip duplicates
+    [[ "$headlist" == *",${k},"* ]] && continue
+    # do not suggest 'disabled' if any other token is already selected
+    if [[ -n "$head" && "$k" == "disabled" ]]; then
+      continue
+    fi
+    # ctime/mtime are mutually exclusive: don't suggest the other if one is present
+    if [[ "$k" == "ctime" && "$headlist" == *",mtime,"* ]]; then
+      continue
+    fi
+    if [[ "$k" == "mtime" && "$headlist" == *",ctime,"* ]]; then
+      continue
+    fi
     # match prefix of last fragment
     [[ -n "$frag" && "$k" != "$frag"* ]] && continue
     printf '%s\n' "${prefix_eq}${head}${k}"
@@ -229,6 +294,64 @@ _borg_complete_sortby() {
   compadd -Q -- $candidates
   return 0
 }
+
+# Complete comma-separated files cache mode tokens for options with type=FilesCacheMode.
+_borg_complete_filescachemode() {
+  local cur
+  cur="${words[$CURRENT]}"
+
+  local val prefix_eq
+  if [[ "$cur" == *"="* ]]; then
+    prefix_eq="${cur%%\=*}="
+    val="${cur#*=}"
+  else
+    prefix_eq=""
+    val="$cur"
+  fi
+
+  local head frag
+  if [[ "$val" == *","* ]]; then
+    head="${val%,*},"
+    frag="${val##*,}"
+  else
+    head=""
+    frag="$val"
+  fi
+
+  local headlist
+  if [[ -n "$head" ]]; then
+    headlist=",${head%,},"
+  else
+    headlist=","  # nothing selected yet
+  fi
+
+  # Valid tokens (embedded at generation time)
+  local -a keys=(___FCM_KEYS___)
+
+  # If 'disabled' is already selected, there is nothing else to suggest.
+  if [[ "$headlist" == *",disabled,"* ]]; then
+    return 0
+  fi
+
+  local -a candidates=()
+  local k
+  for k in ${keys[@]}; do
+    [[ "$headlist" == *",${k},"* ]] && continue
+    if [[ -n "$head" && "$k" == "disabled" ]]; then
+      continue
+    fi
+    if [[ "$k" == "ctime" && "$headlist" == *",mtime,"* ]]; then
+      continue
+    fi
+    if [[ "$k" == "mtime" && "$headlist" == *",ctime,"* ]]; then
+      continue
+    fi
+    [[ -n "$frag" && "$k" != "$frag"* ]] && continue
+    candidates+=( "${prefix_eq}${head}${k}" )
+  done
+  compadd -Q -- $candidates
+  return 0
+}
 """
 
 
@@ -265,6 +388,20 @@ def _attach_sortby_completion(parser: argparse.ArgumentParser):
             action.complete = {"bash": SORTBY_BASH_FN_NAME, "zsh": SORTBY_ZSH_FN_NAME}  # type: ignore[attr-defined]
 
 
+def _attach_filescachemode_completion(parser: argparse.ArgumentParser):
+    """Tag all arguments with type FilesCacheMode with files-cache-mode completion."""
+
+    for action in parser._actions:
+        # Recurse into subparsers
+        if isinstance(action, argparse._SubParsersAction):
+            for sub in action.choices.values():
+                _attach_filescachemode_completion(sub)
+            continue
+
+        if action.type is FilesCacheMode:
+            action.complete = {"bash": FCM_BASH_FN_NAME, "zsh": FCM_ZSH_FN_NAME}  # type: ignore[attr-defined]
+
+
 class CompletionMixIn:
     def do_completion(self, args):
         """Output shell completion script for the given shell."""
@@ -275,11 +412,13 @@ class CompletionMixIn:
         parser = self.build_parser()
         _attach_aid_completion(parser)
         _attach_sortby_completion(parser)
+        _attach_filescachemode_completion(parser)
 
         # Build preambles with embedded SortBy keys
         sort_keys = " ".join(AI_HUMAN_SORT_KEYS)
-        bash_preamble = BASH_PREAMBLE_TMPL.replace("___SORT_KEYS___", sort_keys)
-        zsh_preamble = ZSH_PREAMBLE_TMPL.replace("___SORT_KEYS___", sort_keys)
+        fcm_keys = " ".join(["ctime", "mtime", "size", "inode", "rechunk", "disabled"])  # keep in sync with parser
+        bash_preamble = BASH_PREAMBLE_TMPL.replace("___SORT_KEYS___", sort_keys).replace("___FCM_KEYS___", fcm_keys)
+        zsh_preamble = ZSH_PREAMBLE_TMPL.replace("___SORT_KEYS___", sort_keys).replace("___FCM_KEYS___", fcm_keys)
         preamble = {"bash": bash_preamble, "zsh": zsh_preamble}
         script = shtab.complete(parser, shell=args.shell, preamble=preamble)  # nosec B604
         print(script)

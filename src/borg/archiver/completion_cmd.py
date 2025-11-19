@@ -22,21 +22,7 @@ from ..manifest import AI_HUMAN_SORT_KEYS
 # - Non-interactive only. We rely on Borg to fail fast without prompting in non-interactive contexts.
 #   If it cannot, we simply return no suggestions.
 
-# Name of the helper function inserted into the generated completion script(s)
-AID_BASH_FN_NAME = "_borg_complete_aid"
-AID_ZSH_FN_NAME = "_borg_complete_aid"
 
-# Name of the helper function inserted for completing SortBySpec options
-SORTBY_BASH_FN_NAME = "_borg_complete_sortby"
-SORTBY_ZSH_FN_NAME = "_borg_complete_sortby"
-
-# Name of the helper function inserted for completing FilesCacheMode options
-FCM_BASH_FN_NAME = "_borg_complete_filescachemode"
-FCM_ZSH_FN_NAME = "_borg_complete_filescachemode"
-
-# Name of the helper function inserted for completing CompressionSpec options
-COMP_SPEC_BASH_FN_NAME = "_borg_complete_compression_spec"
-COMP_SPEC_ZSH_FN_NAME = "_borg_complete_compression_spec"
 
 # Global bash preamble that is prepended to the generated completion script.
 # It aggregates only what we need:
@@ -420,11 +406,17 @@ class CompletionMixIn:
         # arguments (identified by archivename_validator). It reuses `borg repo-list`
         # to enumerate archives and does not introduce any new commands or caching.
         parser = self.build_parser()
-        _attach_completion(parser, archivename_validator, {"bash": AID_BASH_FN_NAME, "zsh": AID_ZSH_FN_NAME})
-        _attach_completion(parser, SortBySpec, {"bash": SORTBY_BASH_FN_NAME, "zsh": SORTBY_ZSH_FN_NAME})
-        _attach_completion(parser, FilesCacheMode, {"bash": FCM_BASH_FN_NAME, "zsh": FCM_ZSH_FN_NAME})
         _attach_completion(
-            parser, CompressionSpec, {"bash": COMP_SPEC_BASH_FN_NAME, "zsh": COMP_SPEC_ZSH_FN_NAME}
+            parser, archivename_validator, {"bash": "_borg_complete_aid", "zsh": "_borg_complete_aid"}
+        )
+        _attach_completion(parser, SortBySpec, {"bash": "_borg_complete_sortby", "zsh": "_borg_complete_sortby"})
+        _attach_completion(
+            parser, FilesCacheMode, {"bash": "_borg_complete_filescachemode", "zsh": "_borg_complete_filescachemode"}
+        )
+        _attach_completion(
+            parser,
+            CompressionSpec,
+            {"bash": "_borg_complete_compression_spec", "zsh": "_borg_complete_compression_spec"},
         )
 
         # Collect all commands and help topics for "borg help" completion

@@ -386,65 +386,18 @@ _borg_help_topics() {
 """
 
 
-def _attach_aid_completion(parser: argparse.ArgumentParser):
-    """Tag all arguments that accept an ARCHIVE with aid:-completion.
-
-    We detect ARCHIVE arguments by their type being archivename_validator.
-    This function mutates the parser actions to add a .complete mapping used by shtab.
-    """
+def _attach_completion(parser: argparse.ArgumentParser, type_class, completion_dict: dict):
+    """Tag all arguments with type `type_class` with completion choices from `completion_dict`."""
 
     for action in parser._actions:
         # Recurse into subparsers
         if isinstance(action, argparse._SubParsersAction):
             for sub in action.choices.values():
-                _attach_aid_completion(sub)
+                _attach_completion(sub, type_class, completion_dict)
             continue
 
-        # Assign dynamic completion only for arguments that take an archive name.
-        if action.type is archivename_validator:
-            action.complete = {"bash": AID_BASH_FN_NAME, "zsh": AID_ZSH_FN_NAME}  # type: ignore[attr-defined]
-
-
-def _attach_sortby_completion(parser: argparse.ArgumentParser):
-    """Tag all arguments with type SortBySpec with sort-key completion."""
-
-    for action in parser._actions:
-        # Recurse into subparsers
-        if isinstance(action, argparse._SubParsersAction):
-            for sub in action.choices.values():
-                _attach_sortby_completion(sub)
-            continue
-
-        if action.type is SortBySpec:
-            action.complete = {"bash": SORTBY_BASH_FN_NAME, "zsh": SORTBY_ZSH_FN_NAME}  # type: ignore[attr-defined]
-
-
-def _attach_filescachemode_completion(parser: argparse.ArgumentParser):
-    """Tag all arguments with type FilesCacheMode with files-cache-mode completion."""
-
-    for action in parser._actions:
-        # Recurse into subparsers
-        if isinstance(action, argparse._SubParsersAction):
-            for sub in action.choices.values():
-                _attach_filescachemode_completion(sub)
-            continue
-
-        if action.type is FilesCacheMode:
-            action.complete = {"bash": FCM_BASH_FN_NAME, "zsh": FCM_ZSH_FN_NAME}  # type: ignore[attr-defined]
-
-
-def _attach_compression_spec_completion(parser: argparse.ArgumentParser):
-    """Tag all arguments with type CompressionSpec with compression-spec completion."""
-
-    for action in parser._actions:
-        # Recurse into subparsers
-        if isinstance(action, argparse._SubParsersAction):
-            for sub in action.choices.values():
-                _attach_compression_spec_completion(sub)
-            continue
-
-        if action.type is CompressionSpec:
-            action.complete = {"bash": COMP_SPEC_BASH_FN_NAME, "zsh": COMP_SPEC_ZSH_FN_NAME}  # type: ignore[attr-defined]
+        if action.type is type_class:
+            action.complete = completion_dict  # type: ignore[attr-defined]
 
 
 def _attach_help_completion(parser: argparse.ArgumentParser, completion_dict: dict):
@@ -467,10 +420,12 @@ class CompletionMixIn:
         # arguments (identified by archivename_validator). It reuses `borg repo-list`
         # to enumerate archives and does not introduce any new commands or caching.
         parser = self.build_parser()
-        _attach_aid_completion(parser)
-        _attach_sortby_completion(parser)
-        _attach_filescachemode_completion(parser)
-        _attach_compression_spec_completion(parser)
+        _attach_completion(parser, archivename_validator, {"bash": AID_BASH_FN_NAME, "zsh": AID_ZSH_FN_NAME})
+        _attach_completion(parser, SortBySpec, {"bash": SORTBY_BASH_FN_NAME, "zsh": SORTBY_ZSH_FN_NAME})
+        _attach_completion(parser, FilesCacheMode, {"bash": FCM_BASH_FN_NAME, "zsh": FCM_ZSH_FN_NAME})
+        _attach_completion(
+            parser, CompressionSpec, {"bash": COMP_SPEC_BASH_FN_NAME, "zsh": COMP_SPEC_ZSH_FN_NAME}
+        )
 
         # Collect all commands and help topics for "borg help" completion
         help_choices = list(self.helptext.keys())

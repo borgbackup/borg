@@ -5,6 +5,7 @@ import shtab
 from ._common import process_epilog
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator, SortBySpec, FilesCacheMode
+from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
 
@@ -32,6 +33,10 @@ SORTBY_ZSH_FN_NAME = "_borg_complete_sortby"
 # Name of the helper function inserted for completing FilesCacheMode options
 FCM_BASH_FN_NAME = "_borg_complete_filescachemode"
 FCM_ZSH_FN_NAME = "_borg_complete_filescachemode"
+
+# Name of the helper function inserted for completing CompressionSpec options
+COMP_SPEC_BASH_FN_NAME = "_borg_complete_compression_spec"
+COMP_SPEC_ZSH_FN_NAME = "_borg_complete_compression_spec"
 
 # Global bash preamble that is prepended to the generated completion script.
 # It aggregates only what we need:
@@ -84,6 +89,13 @@ _borg_complete_aid() {
     [[ "$idlower" == "$prelower"* ]] && printf 'aid:%s\n' "${id:0:8}"
   done <<< "$out"
   return 0
+}
+
+# Complete compression spec options
+_borg_complete_compression_spec() {
+  local choices="{COMP_SPEC_CHOICES}"
+  local IFS=$' \t\n'
+  compgen -W "${choices}" -- "$1"
 }
 
 # Complete comma-separated sort keys for any option with type=SortBySpec.
@@ -258,6 +270,13 @@ _borg_complete_aid() {
   return 0
 }
 
+# Complete compression spec options
+_borg_complete_compression_spec() {
+  local choices=({COMP_SPEC_CHOICES})
+  # use compadd -V to preserve order (do not sort)
+  compadd -V 'compression algorithms' -Q -a choices
+}
+
 # Complete comma-separated sort keys for any option with type=SortBySpec.
 _borg_complete_sortby() {
   local cur
@@ -414,6 +433,20 @@ def _attach_filescachemode_completion(parser: argparse.ArgumentParser):
             action.complete = {"bash": FCM_BASH_FN_NAME, "zsh": FCM_ZSH_FN_NAME}  # type: ignore[attr-defined]
 
 
+def _attach_compression_spec_completion(parser: argparse.ArgumentParser):
+    """Tag all arguments with type CompressionSpec with compression-spec completion."""
+
+    for action in parser._actions:
+        # Recurse into subparsers
+        if isinstance(action, argparse._SubParsersAction):
+            for sub in action.choices.values():
+                _attach_compression_spec_completion(sub)
+            continue
+
+        if action.type is CompressionSpec:
+            action.complete = {"bash": COMP_SPEC_BASH_FN_NAME, "zsh": COMP_SPEC_ZSH_FN_NAME}  # type: ignore[attr-defined]
+
+
 def _attach_help_completion(parser: argparse.ArgumentParser, completion_dict: dict):
     """Tag the 'topic' argument of the 'help' command with static completion choices."""
     for action in parser._actions:
@@ -437,6 +470,7 @@ class CompletionMixIn:
         _attach_aid_completion(parser)
         _attach_sortby_completion(parser)
         _attach_filescachemode_completion(parser)
+        _attach_compression_spec_completion(parser)
 
         # Collect all commands and help topics for "borg help" completion
         help_choices = list(self.helptext.keys())
@@ -454,9 +488,22 @@ class CompletionMixIn:
         # Help completion templates
         help_choices = " ".join(sorted(help_choices))
 
+        # Compression spec choices (static list)
+        comp_spec_choices = [
+            "lz4",
+            "zstd,3",
+            "auto,zstd,10",
+            "zlib,6",
+            "lzma,6",
+            "obfuscate,250,lz4",
+            "none",
+        ]
+        comp_spec_choices_str = " ".join(comp_spec_choices)
+
         mapping = {
             "SORT_KEYS": sort_keys,
             "FCM_KEYS": fcm_keys,
+            "COMP_SPEC_CHOICES": comp_spec_choices_str,
             "HELP_CHOICES": help_choices,
         }
         bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)

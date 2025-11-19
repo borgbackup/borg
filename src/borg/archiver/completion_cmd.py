@@ -9,18 +9,50 @@ from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
 
-# Dynamic completion for archive IDs (aid:...)
-#
-# This integrates with shtab by:
-# - tagging argparse actions that accept an ARCHIVE (identified by type == archivename_validator)
-#   with a .complete mapping pointing to our helper function.
-# - using shtab.complete's 'preamble' parameter to inject the helper into the
-#   generated completion script for supported shells.
-#
-# Notes / constraints (per plan):
-# - Calls `borg repo-list --format ...` and filters results by the typed prefix (archive name or aid: hex).
-# - Non-interactive only. We rely on Borg to fail fast without prompting in non-interactive contexts.
-#   If it cannot, we simply return no suggestions.
+"""
+Shell completion support for Borg commands.
+
+This module implements the `borg completion` command, which generates shell completion
+scripts for bash and zsh. It uses the shtab library for basic completion generation
+and extends it with custom dynamic completions for Borg-specific argument types.
+
+Dynamic Completions
+-------------------
+The following argument types have intelligent, context-aware completion:
+
+1. Archive names/IDs (archivename_validator):
+   - Completes archive names by default (e.g., "my-backup-2024")
+   - Completes archive IDs when prefixed with "aid:" (e.g., "aid:12345678")
+   - In zsh, shows archive metadata (name, timestamp, user@host) as descriptions
+   - Respects --repo/-r flags to query the correct repository
+
+2. Sort keys (SortBySpec):
+   - Completes comma-separated sort keys (timestamp, archive, name, id, tags, host, user)
+   - Prevents duplicate keys in the same option
+
+3. Files cache mode (FilesCacheMode):
+   - Completes comma-separated cache mode tokens (ctime, mtime, size, inode, rechunk, disabled)
+   - Enforces mutual exclusivity (e.g., ctime vs mtime, disabled vs others)
+
+4. Compression algorithms (CompressionSpec):
+   - Suggests compression specs with examples (lz4, zstd,3, auto,zstd,10, etc.)
+
+5. Chunker parameters (ChunkerParams):
+   - Suggests chunker param examples (default, fixed,4194304, buzhash,19,23,21,4095, etc.)
+
+6. Paths (PathSpec):
+   - Completes directories using standard shell directory completion
+
+7. Help topics:
+   - Completes help command topics and subcommand names
+
+Implementation Details
+----------------------
+- Custom shell functions are injected via shtab's preamble mechanism
+- Archive completion calls `borg repo-list --format ...` to fetch data dynamically
+- All dynamic completions are non-interactive and suppress prompts/errors
+- Bash and zsh have separate preamble templates with shell-specific syntax
+"""
 
 
 

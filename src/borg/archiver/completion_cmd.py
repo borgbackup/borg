@@ -4,7 +4,7 @@ import shtab
 
 from ._common import process_epilog
 from ..constants import *  # NOQA
-from ..helpers import archivename_validator, SortBySpec, FilesCacheMode, PathSpec
+from ..helpers import archivename_validator, SortBySpec, FilesCacheMode, PathSpec, ChunkerParams
 from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
@@ -80,6 +80,13 @@ _borg_complete_aid() {
 # Complete compression spec options
 _borg_complete_compression_spec() {
   local choices="{COMP_SPEC_CHOICES}"
+  local IFS=$' \t\n'
+  compgen -W "${choices}" -- "$1"
+}
+
+# Complete chunker params options
+_borg_complete_chunker_params() {
+  local choices="{CHUNKER_PARAMS_CHOICES}"
   local IFS=$' \t\n'
   compgen -W "${choices}" -- "$1"
 }
@@ -263,6 +270,13 @@ _borg_complete_compression_spec() {
   compadd -V 'compression algorithms' -Q -a choices
 }
 
+# Complete chunker params options
+_borg_complete_chunker_params() {
+  local choices=({CHUNKER_PARAMS_CHOICES})
+  # use compadd -V to preserve order (do not sort)
+  compadd -V 'chunker params' -Q -a choices
+}
+
 # Complete comma-separated sort keys for any option with type=SortBySpec.
 _borg_complete_sortby() {
   local cur
@@ -419,6 +433,11 @@ class CompletionMixIn:
             {"bash": "_borg_complete_compression_spec", "zsh": "_borg_complete_compression_spec"},
         )
         _attach_completion(parser, PathSpec, shtab.DIRECTORY)
+        _attach_completion(
+            parser,
+            ChunkerParams,
+            {"bash": "_borg_complete_chunker_params", "zsh": "_borg_complete_chunker_params"},
+        )
 
         # Collect all commands and help topics for "borg help" completion
         help_choices = list(self.helptext.keys())
@@ -448,10 +467,20 @@ class CompletionMixIn:
         ]
         comp_spec_choices_str = " ".join(comp_spec_choices)
 
+        # Chunker params choices (static list)
+        chunker_params_choices = [
+            "default",
+            "fixed,4194304",
+            "buzhash,19,23,21,4095",
+            "buzhash64,19,23,21,4095",
+        ]
+        chunker_params_choices_str = " ".join(chunker_params_choices)
+
         mapping = {
             "SORT_KEYS": sort_keys,
             "FCM_KEYS": fcm_keys,
             "COMP_SPEC_CHOICES": comp_spec_choices_str,
+            "CHUNKER_PARAMS_CHOICES": chunker_params_choices_str,
             "HELP_CHOICES": help_choices,
         }
         bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)

@@ -38,6 +38,9 @@ The following argument types have intelligent, context-aware completion:
 
 8. Tags (tag_validator):
    - Completes existing tags from the repository
+
+9. Relative time markers (relative_time_marker_validator):
+   - Suggests common time intervals (60S, 60M, 24H, 7d, 4w, 12m, 1000y)
 """
 
 import argparse
@@ -46,7 +49,7 @@ import shtab
 
 from ._common import process_epilog
 from ..constants import *  # NOQA
-from ..helpers import archivename_validator, SortBySpec, FilesCacheMode, PathSpec, ChunkerParams, tag_validator
+from ..helpers import archivename_validator, SortBySpec, FilesCacheMode, PathSpec, ChunkerParams, tag_validator, relative_time_marker_validator
 from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
@@ -178,6 +181,13 @@ _borg_complete_tags() {
     done
   done <<< "$out"
   return 0
+}
+
+# Complete relative time markers
+_borg_complete_relative_time() {
+  local choices="{RELATIVE_TIME_CHOICES}"
+  local IFS=$' \t\n'
+  compgen -W "${choices}" -- "$1"
 }
 
 # Complete comma-separated sort keys for any option with type=SortBySpec.
@@ -440,6 +450,13 @@ _borg_complete_tags() {
   return 0
 }
 
+# Complete relative time markers
+_borg_complete_relative_time() {
+  local choices=({RELATIVE_TIME_CHOICES})
+  # use compadd -V to preserve order (do not sort)
+  compadd -V 'relative time' -Q -a choices
+}
+
 # Complete comma-separated sort keys for any option with type=SortBySpec.
 _borg_complete_sortby() {
   local cur
@@ -604,6 +621,11 @@ class CompletionMixIn:
         _attach_completion(
             parser, tag_validator, {"bash": "_borg_complete_tags", "zsh": "_borg_complete_tags"}
         )
+        _attach_completion(
+            parser,
+            relative_time_marker_validator,
+            {"bash": "_borg_complete_relative_time", "zsh": "_borg_complete_relative_time"},
+        )
 
         # Collect all commands and help topics for "borg help" completion
         help_choices = list(self.helptext.keys())
@@ -642,11 +664,24 @@ class CompletionMixIn:
         ]
         chunker_params_choices_str = " ".join(chunker_params_choices)
 
+        # Relative time marker choices (static list)
+        relative_time_choices = [
+            "60S",
+            "60M",
+            "24H",
+            "7d",
+            "4w",
+            "12m",
+            "1000y",
+        ]
+        relative_time_choices_str = " ".join(relative_time_choices)
+
         mapping = {
             "SORT_KEYS": sort_keys,
             "FCM_KEYS": fcm_keys,
             "COMP_SPEC_CHOICES": comp_spec_choices_str,
             "CHUNKER_PARAMS_CHOICES": chunker_params_choices_str,
+            "RELATIVE_TIME_CHOICES": relative_time_choices_str,
             "HELP_CHOICES": help_choices,
         }
         bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)

@@ -45,6 +45,9 @@ The following argument types have intelligent, context-aware completion:
 10. Timestamps (timestamp):
    - Completes file paths when starting with / or .
    - Otherwise suggests current timestamp in ISO format
+
+11. File sizes (parse_file_size):
+   - Suggests common file size values (500M, 1G, 10G, 100G, 1T, etc.)
 """
 
 import argparse
@@ -53,7 +56,7 @@ import shtab
 
 from ._common import process_epilog
 from ..constants import *  # NOQA
-from ..helpers import archivename_validator, SortBySpec, FilesCacheMode, PathSpec, ChunkerParams, tag_validator, relative_time_marker_validator
+from ..helpers import archivename_validator, SortBySpec, FilesCacheMode, PathSpec, ChunkerParams, tag_validator, relative_time_marker_validator, parse_file_size
 from ..helpers.time import timestamp
 from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format
@@ -206,6 +209,13 @@ _borg_complete_timestamp() {
     # Suggest current timestamp in ISO format
     date +"%Y-%m-%dT%H:%M:%S%z" | sed 's/\([0-9]\{2\}\)$/:\1/'
   fi
+}
+
+# Complete file size values
+_borg_complete_file_size() {
+  local choices="{FILE_SIZE_CHOICES}"
+  local IFS=$' \t\n'
+  compgen -W "${choices}" -- "$1"
 }
 
 # Complete comma-separated sort keys for any option with type=SortBySpec.
@@ -491,6 +501,13 @@ _borg_complete_timestamp() {
   fi
 }
 
+# Complete file size values
+_borg_complete_file_size() {
+  local choices=({FILE_SIZE_CHOICES})
+  # use compadd -V to preserve order (do not sort)
+  compadd -V 'file size' -Q -a choices
+}
+
 # Complete comma-separated sort keys for any option with type=SortBySpec.
 _borg_complete_sortby() {
   local cur
@@ -663,6 +680,9 @@ class CompletionMixIn:
         _attach_completion(
             parser, timestamp, {"bash": "_borg_complete_timestamp", "zsh": "_borg_complete_timestamp"}
         )
+        _attach_completion(
+            parser, parse_file_size, {"bash": "_borg_complete_file_size", "zsh": "_borg_complete_file_size"}
+        )
 
         # Collect all commands and help topics for "borg help" completion
         help_choices = list(self.helptext.keys())
@@ -713,12 +733,23 @@ class CompletionMixIn:
         ]
         relative_time_choices_str = " ".join(relative_time_choices)
 
+        # File size choices (static list)
+        file_size_choices = [
+            "500M",
+            "1G",
+            "10G",
+            "100G",
+            "1T",
+        ]
+        file_size_choices_str = " ".join(file_size_choices)
+
         mapping = {
             "SORT_KEYS": sort_keys,
             "FCM_KEYS": fcm_keys,
             "COMP_SPEC_CHOICES": comp_spec_choices_str,
             "CHUNKER_PARAMS_CHOICES": chunker_params_choices_str,
             "RELATIVE_TIME_CHOICES": relative_time_choices_str,
+            "FILE_SIZE_CHOICES": file_size_choices_str,
             "HELP_CHOICES": help_choices,
         }
         bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)

@@ -1,14 +1,3 @@
-import argparse
-
-import shtab
-
-from ._common import process_epilog
-from ..constants import *  # NOQA
-from ..helpers import archivename_validator, SortBySpec, FilesCacheMode, PathSpec, ChunkerParams
-from ..compress import CompressionSpec
-from ..helpers.parseformat import partial_format
-from ..manifest import AI_HUMAN_SORT_KEYS
-
 """
 Shell completion support for Borg commands.
 
@@ -18,6 +7,7 @@ and extends it with custom dynamic completions for Borg-specific argument types.
 
 Dynamic Completions
 -------------------
+
 The following argument types have intelligent, context-aware completion:
 
 1. Archive names/IDs (archivename_validator):
@@ -46,15 +36,20 @@ The following argument types have intelligent, context-aware completion:
 7. Help topics:
    - Completes help command topics and subcommand names
 
-Implementation Details
-----------------------
-- Custom shell functions are injected via shtab's preamble mechanism
-- Archive completion calls `borg repo-list --format ...` to fetch data dynamically
-- All dynamic completions are non-interactive and suppress prompts/errors
-- Bash and zsh have separate preamble templates with shell-specific syntax
+8. Tags (tag_validator):
+   - Completes existing tags from the repository
 """
 
+import argparse
 
+import shtab
+
+from ._common import process_epilog
+from ..constants import *  # NOQA
+from ..helpers import archivename_validator, SortBySpec, FilesCacheMode, PathSpec, ChunkerParams, tag_validator
+from ..compress import CompressionSpec
+from ..helpers.parseformat import partial_format
+from ..manifest import AI_HUMAN_SORT_KEYS
 
 # Global bash preamble that is prepended to the generated completion script.
 # It aggregates only what we need:
@@ -137,6 +132,52 @@ _borg_complete_chunker_params() {
   local choices="{CHUNKER_PARAMS_CHOICES}"
   local IFS=$' \t\n'
   compgen -W "${choices}" -- "$1"
+}
+
+# Complete tags from repository
+_borg_complete_tags() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+
+  # derive repo context from words: --repo=V, --repo V, -r=V, -rV, or -r V
+  local repo_arg=()
+  local i w
+  for (( i=0; i<${#COMP_WORDS[@]}; i++ )); do
+    w="${COMP_WORDS[i]}"
+    if [[ "$w" == --repo=* ]]; then repo_arg=( --repo "${w#--repo=}" ); break
+    elif [[ "$w" == -r=* ]]; then repo_arg=( -r "${w#-r=}" ); break
+    elif [[ "$w" == -r* && "$w" != "-r" ]]; then repo_arg=( -r "${w#-r}" ); break
+    elif [[ "$w" == "--repo" || "$w" == "-r" ]]; then
+      if (( i+1 < ${#COMP_WORDS[@]} )); then repo_arg=( "$w" "${COMP_WORDS[i+1]}" ); fi
+      break
+    fi
+  done
+
+  # ask borg for tags; avoid prompts and suppress stderr
+  local out
+  if [[ -n "${repo_arg[*]}" ]]; then
+    out=$( borg repo-list "${repo_arg[@]}" --format '{tags}{NL}' 2>/dev/null </dev/null )
+  else
+    out=$( borg repo-list --format '{tags}{NL}' 2>/dev/null </dev/null )
+  fi
+  [[ -z "$out" ]] && return 0
+
+  # extract unique tags and filter by prefix
+  local IFS=$'\n' line tag
+  local -A seen
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    # tags are comma-separated, split and deduplicate
+    IFS=',' read -ra tags <<< "$line"
+    for tag in "${tags[@]}"; do
+      tag="${tag# }"
+      tag="${tag% }"
+      [[ -z "$tag" ]] && continue
+      [[ -n "${seen[$tag]}" ]] && continue
+      seen[$tag]=1
+      [[ -z "$cur" || "$tag" == "$cur"* ]] && printf '%s\n' "$tag"
+    done
+  done <<< "$out"
+  return 0
 }
 
 # Complete comma-separated sort keys for any option with type=SortBySpec.
@@ -349,6 +390,56 @@ _borg_complete_chunker_params() {
   compadd -V 'chunker params' -Q -a choices
 }
 
+# Complete tags from repository
+_borg_complete_tags() {
+  local cur
+  cur="${words[$CURRENT]}"
+
+  # derive repo context from words: --repo=V, --repo V, -r=V, -rV, or -r V
+  local -a repo_arg=()
+  local i w
+  for i in {1..$#words}; do
+    w="$words[$i]"
+    if [[ "$w" == --repo=* ]]; then repo_arg=( --repo "${w#--repo=}" ); break
+    elif [[ "$w" == -r=* ]]; then repo_arg=( -r "${w#-r=}" ); break
+    elif [[ "$w" == -r* && "$w" != "-r" ]]; then repo_arg=( -r "${w#-r}" ); break
+    elif [[ "$w" == "--repo" || "$w" == "-r" ]]; then
+      if (( i+1 <= $#words )); then repo_arg=( "$w" "${words[$((i+1))]}" ); fi
+      break
+    fi
+  done
+
+  # ask borg for tags; avoid prompts and suppress stderr
+  local out
+  if (( ${#repo_arg[@]} > 0 )); then
+    out=$( borg repo-list "${repo_arg[@]}" --format '{tags}{NL}' 2>/dev/null </dev/null )
+  else
+    out=$( borg repo-list --format '{tags}{NL}' 2>/dev/null </dev/null )
+  fi
+  [[ -z "$out" ]] && return 0
+
+  # extract unique tags and filter by prefix
+  local line tag
+  local -A seen
+  local -a candidates=()
+  for line in ${(f)out}; do
+    [[ -z "$line" ]] && continue
+    # tags are comma-separated, split and deduplicate
+    for tag in ${(s:,:)line}; do
+      tag="${tag## }"
+      tag="${tag%% }"
+      [[ -z "$tag" ]] && continue
+      [[ -n "${seen[$tag]}" ]] && continue
+      seen[$tag]=1
+      if [[ -z "$cur" || "$tag" == "$cur"* ]]; then
+        candidates+=( "$tag" )
+      fi
+    done
+  done
+  compadd -Q -- $candidates
+  return 0
+}
+
 # Complete comma-separated sort keys for any option with type=SortBySpec.
 _borg_complete_sortby() {
   local cur
@@ -509,6 +600,9 @@ class CompletionMixIn:
             parser,
             ChunkerParams,
             {"bash": "_borg_complete_chunker_params", "zsh": "_borg_complete_chunker_params"},
+        )
+        _attach_completion(
+            parser, tag_validator, {"bash": "_borg_complete_tags", "zsh": "_borg_complete_tags"}
         )
 
         # Collect all commands and help topics for "borg help" completion

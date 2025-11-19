@@ -4,7 +4,7 @@ import shtab
 
 from ._common import process_epilog
 from ..constants import *  # NOQA
-from ..helpers import archivename_validator, SortBySpec, FilesCacheMode
+from ..helpers import archivename_validator, SortBySpec, FilesCacheMode, PathSpec
 from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
@@ -418,6 +418,7 @@ class CompletionMixIn:
             CompressionSpec,
             {"bash": "_borg_complete_compression_spec", "zsh": "_borg_complete_compression_spec"},
         )
+        _attach_completion(parser, PathSpec, shtab.DIRECTORY)
 
         # Collect all commands and help topics for "borg help" completion
         help_choices = list(self.helptext.keys())

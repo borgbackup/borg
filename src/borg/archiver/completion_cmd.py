@@ -41,6 +41,10 @@ The following argument types have intelligent, context-aware completion:
 
 9. Relative time markers (relative_time_marker_validator):
    - Suggests common time intervals (60S, 60M, 24H, 7d, 4w, 12m, 1000y)
+
+10. Timestamps (timestamp):
+   - Completes file paths when starting with / or .
+   - Otherwise suggests current timestamp in ISO format
 """
 
 import argparse
@@ -50,6 +54,7 @@ import shtab
 from ._common import process_epilog
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator, SortBySpec, FilesCacheMode, PathSpec, ChunkerParams, tag_validator, relative_time_marker_validator
+from ..helpers.time import timestamp
 from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
@@ -188,6 +193,19 @@ _borg_complete_relative_time() {
   local choices="{RELATIVE_TIME_CHOICES}"
   local IFS=$' \t\n'
   compgen -W "${choices}" -- "$1"
+}
+
+# Complete timestamp (file path or ISO timestamp)
+_borg_complete_timestamp() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+
+  # If starts with / or ., complete as file path
+  if [[ "$cur" == /* || "$cur" == ./* || "$cur" == ../* || "$cur" == . || "$cur" == .. ]]; then
+    compgen -f -- "$cur"
+  else
+    # Suggest current timestamp in ISO format
+    date +"%Y-%m-%dT%H:%M:%S%z" | sed 's/\([0-9]\{2\}\)$/:\1/'
+  fi
 }
 
 # Complete comma-separated sort keys for any option with type=SortBySpec.
@@ -457,6 +475,22 @@ _borg_complete_relative_time() {
   compadd -V 'relative time' -Q -a choices
 }
 
+# Complete timestamp (file path or ISO timestamp)
+_borg_complete_timestamp() {
+  local cur
+  cur="${words[$CURRENT]}"
+
+  # If starts with / or ., complete as file path
+  if [[ "$cur" == /* || "$cur" == ./* || "$cur" == ../* || "$cur" == . || "$cur" == .. ]]; then
+    _files
+  else
+    # Suggest current timestamp in ISO format
+    local timestamp
+    timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z" | sed 's/\([0-9]\{2\}\)$/:\1/')
+    compadd -Q -- "$timestamp"
+  fi
+}
+
 # Complete comma-separated sort keys for any option with type=SortBySpec.
 _borg_complete_sortby() {
   local cur
@@ -625,6 +659,9 @@ class CompletionMixIn:
             parser,
             relative_time_marker_validator,
             {"bash": "_borg_complete_relative_time", "zsh": "_borg_complete_relative_time"},
+        )
+        _attach_completion(
+            parser, timestamp, {"bash": "_borg_complete_timestamp", "zsh": "_borg_complete_timestamp"}
         )
 
         # Collect all commands and help topics for "borg help" completion

@@ -253,28 +253,32 @@ _borg_complete_archive() {
     # allow only hex digits as prefix; empty prefix also allowed (list all)
     [[ -n "$prefix" && ! "$prefix" == [0-9a-fA-F]# ]] && return 0
 
-    # ask borg for raw IDs; avoid prompts and suppress stderr
+    # ask borg for IDs with metadata; avoid prompts and suppress stderr
+    # Use tab as delimiter to avoid issues with spaces in archive names
     local out
     if (( ${#repo_arg[@]} > 0 )); then
-      out=$( borg repo-list "${repo_arg[@]}" --format '{id}{NL}' 2>/dev/null </dev/null )
+      out=$( borg repo-list "${repo_arg[@]}" --format '{id}{TAB}{archive}{TAB}{time}{TAB}{username}@{hostname}{NL}' 2>/dev/null </dev/null )
     else
-      out=$( borg repo-list --format '{id}{NL}' 2>/dev/null </dev/null )
+      out=$( borg repo-list --format '{id}{TAB}{archive}{TAB}{time}{TAB}{username}@{hostname}{NL}' 2>/dev/null </dev/null )
     fi
     [[ -z "$out" ]] && return 0
 
-    # filter by (case-insensitive) hex prefix and emit candidates
-    local prelower id idlower
+    # filter by (case-insensitive) hex prefix and build candidates with descriptions
+    local prelower id idlower line
     prelower="${prefix:l}"
     local -a candidates=()
-    for id in ${(f)out}; do
+    local -a descriptions=()
+    while IFS=$'\t' read -r id archive time userhost; do
       [[ -z "$id" ]] && continue
       idlower="${id:l}"
       if [[ "$idlower" == "$prelower"* ]]; then
         candidates+=( "aid:${id[1,8]}" )
+        # Description: show full ID, archive name, time, user@host
+        descriptions+=( "${id[1,8]}: ${archive} (${time} ${userhost})" )
       fi
-    done
-    # -Q: do not escape special chars, so ':' remains as-is
-    compadd -Q -- $candidates
+    done <<< "$out"
+    # -Q: do not escape special chars, -d: provide descriptions, -l: one per line
+    compadd -Q -l -d descriptions -- $candidates
   else
     # Complete archive names
     local out

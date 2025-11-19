@@ -18,7 +18,7 @@ from ..manifest import AI_HUMAN_SORT_KEYS
 #   generated completion script for supported shells.
 #
 # Notes / constraints (per plan):
-# - Calls `borg repo-list --format ...` and filters results by the typed aid: hex prefix.
+# - Calls `borg repo-list --format ...` and filters results by the typed prefix (archive name or aid: hex).
 # - Non-interactive only. We rely on Borg to fail fast without prompting in non-interactive contexts.
 #   If it cannot, we simply return no suggestions.
 
@@ -33,14 +33,8 @@ BASH_PREAMBLE_TMPL = r"""
 if [[ ${COMP_WORDBREAKS-} == *:* ]]; then COMP_WORDBREAKS=${COMP_WORDBREAKS//:}; fi
 if [[ ${COMP_WORDBREAKS-} == *=* ]]; then COMP_WORDBREAKS=${COMP_WORDBREAKS//=}; fi
 
-# Complete aid:<hex-prefix> archive IDs by querying "borg repo-list --short"
-# Note: we only suggest the first 8 hex digits (short ID) for completion.
-_borg_complete_aid() {
+_borg_complete_archive() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
-  [[ "$cur" == aid:* ]] || return 0
-
-  local prefix="${cur#aid:}"
-  [[ -n "$prefix" && ! "$prefix" =~ ^[0-9a-fA-F]*$ ]] && return 0
 
   # derive repo context from words: --repo=V, --repo V, -r=V, -rV, or -r V
   local repo_arg=()
@@ -56,24 +50,46 @@ _borg_complete_aid() {
     fi
   done
 
-  # ask borg for raw IDs; avoid prompts and suppress stderr
-  local out
-  if [[ -n "${repo_arg[*]}" ]]; then
-    out=$( borg repo-list "${repo_arg[@]}" --short 2>/dev/null </dev/null )
-  else
-    out=$( borg repo-list --short 2>/dev/null </dev/null )
-  fi
-  [[ -z "$out" ]] && return 0
+  # Check if completing aid: prefix
+  if [[ "$cur" == aid:* ]]; then
+    local prefix="${cur#aid:}"
+    [[ -n "$prefix" && ! "$prefix" =~ ^[0-9a-fA-F]*$ ]] && return 0
 
-  # filter by (case-insensitive) hex prefix and emit candidates
-  local IFS=$'\n' id prelower idlower
-  prelower="$(printf '%s' "$prefix" | tr '[:upper:]' '[:lower:]')"
-  while IFS= read -r id; do
-    [[ -z "$id" ]] && continue
-    idlower="$(printf '%s' "$id" | tr '[:upper:]' '[:lower:]')"
-    # Print only the first 8 hex digits of the ID for completion suggestions.
-    [[ "$idlower" == "$prelower"* ]] && printf 'aid:%s\n' "${id:0:8}"
-  done <<< "$out"
+    # ask borg for raw IDs; avoid prompts and suppress stderr
+    local out
+    if [[ -n "${repo_arg[*]}" ]]; then
+      out=$( borg repo-list "${repo_arg[@]}" --format '{id}{NL}' 2>/dev/null </dev/null )
+    else
+      out=$( borg repo-list --format '{id}{NL}' 2>/dev/null </dev/null )
+    fi
+    [[ -z "$out" ]] && return 0
+
+    # filter by (case-insensitive) hex prefix and emit candidates
+    local IFS=$'\n' id prelower idlower
+    prelower="$(printf '%s' "$prefix" | tr '[:upper:]' '[:lower:]')"
+    while IFS= read -r id; do
+      [[ -z "$id" ]] && continue
+      idlower="$(printf '%s' "$id" | tr '[:upper:]' '[:lower:]')"
+      # Print only the first 8 hex digits of the ID for completion suggestions.
+      [[ "$idlower" == "$prelower"* ]] && printf 'aid:%s\n' "${id:0:8}"
+    done <<< "$out"
+  else
+    # Complete archive names
+    local out
+    if [[ -n "${repo_arg[*]}" ]]; then
+      out=$( borg repo-list "${repo_arg[@]}" --format '{archive}{NL}' 2>/dev/null </dev/null )
+    else
+      out=$( borg repo-list --format '{archive}{NL}' 2>/dev/null </dev/null )
+    fi
+    [[ -z "$out" ]] && return 0
+
+    # filter by prefix and emit candidates
+    local IFS=$'\n' name
+    while IFS= read -r name; do
+      [[ -z "$name" ]] && continue
+      [[ -z "$cur" || "$name" == "$cur"* ]] && printf '%s\n' "$name"
+    done <<< "$out"
+  fi
   return 0
 }
 
@@ -213,16 +229,9 @@ _borg_help_topics() {
 # - Candidates are returned via `compadd`.
 # - We try to detect repo context from --repo=V, --repo V, -r=V, -rV, -r V.
 ZSH_PREAMBLE_TMPL = r"""
-# Complete aid:<hex-prefix> archive IDs by querying "borg repo-list --short"
-# Note: we only suggest the first 8 hex digits (short ID) for completion.
-_borg_complete_aid() {
+_borg_complete_archive() {
   local cur
   cur="${words[$CURRENT]}"
-  [[ "$cur" == aid:* ]] || return 0
-
-  local prefix="${cur#aid:}"
-  # allow only hex digits as prefix; empty prefix also allowed (list all)
-  [[ -n "$prefix" && ! "$prefix" == [0-9a-fA-F]# ]] && return 0
 
   # derive repo context from words: --repo=V, --repo V, -r=V, -rV, or -r V
   local -a repo_arg=()
@@ -238,28 +247,55 @@ _borg_complete_aid() {
     fi
   done
 
-  # ask borg for raw IDs; avoid prompts and suppress stderr
-  local out
-  if (( ${#repo_arg[@]} > 0 )); then
-    out=$( borg repo-list "${repo_arg[@]}" --short 2>/dev/null </dev/null )
-  else
-    out=$( borg repo-list --short 2>/dev/null </dev/null )
-  fi
-  [[ -z "$out" ]] && return 0
+  # Check if completing aid: prefix
+  if [[ "$cur" == aid:* ]]; then
+    local prefix="${cur#aid:}"
+    # allow only hex digits as prefix; empty prefix also allowed (list all)
+    [[ -n "$prefix" && ! "$prefix" == [0-9a-fA-F]# ]] && return 0
 
-  # filter by (case-insensitive) hex prefix and emit candidates
-  local prelower id idlower
-  prelower="${prefix:l}"
-  local -a candidates=()
-  for id in ${(f)out}; do
-    [[ -z "$id" ]] && continue
-    idlower="${id:l}"
-    if [[ "$idlower" == "$prelower"* ]]; then
-      candidates+=( "aid:${id[1,8]}" )
+    # ask borg for raw IDs; avoid prompts and suppress stderr
+    local out
+    if (( ${#repo_arg[@]} > 0 )); then
+      out=$( borg repo-list "${repo_arg[@]}" --format '{id}{NL}' 2>/dev/null </dev/null )
+    else
+      out=$( borg repo-list --format '{id}{NL}' 2>/dev/null </dev/null )
     fi
-  done
-  # -Q: do not escape special chars, so ':' remains as-is
-  compadd -Q -- $candidates
+    [[ -z "$out" ]] && return 0
+
+    # filter by (case-insensitive) hex prefix and emit candidates
+    local prelower id idlower
+    prelower="${prefix:l}"
+    local -a candidates=()
+    for id in ${(f)out}; do
+      [[ -z "$id" ]] && continue
+      idlower="${id:l}"
+      if [[ "$idlower" == "$prelower"* ]]; then
+        candidates+=( "aid:${id[1,8]}" )
+      fi
+    done
+    # -Q: do not escape special chars, so ':' remains as-is
+    compadd -Q -- $candidates
+  else
+    # Complete archive names
+    local out
+    if (( ${#repo_arg[@]} > 0 )); then
+      out=$( borg repo-list "${repo_arg[@]}" --format '{archive}{NL}' 2>/dev/null </dev/null )
+    else
+      out=$( borg repo-list --format '{archive}{NL}' 2>/dev/null </dev/null )
+    fi
+    [[ -z "$out" ]] && return 0
+
+    # filter by prefix and emit candidates
+    local -a candidates=()
+    local name
+    for name in ${(f)out}; do
+      [[ -z "$name" ]] && continue
+      if [[ -z "$cur" || "$name" == "$cur"* ]]; then
+        candidates+=( "$name" )
+      fi
+    done
+    compadd -Q -- $candidates
+  fi
   return 0
 }
 
@@ -421,7 +457,7 @@ class CompletionMixIn:
         # to enumerate archives and does not introduce any new commands or caching.
         parser = self.build_parser()
         _attach_completion(
-            parser, archivename_validator, {"bash": "_borg_complete_aid", "zsh": "_borg_complete_aid"}
+            parser, archivename_validator, {"bash": "_borg_complete_archive", "zsh": "_borg_complete_archive"}
         )
         _attach_completion(parser, SortBySpec, {"bash": "_borg_complete_sortby", "zsh": "_borg_complete_sortby"})
         _attach_completion(

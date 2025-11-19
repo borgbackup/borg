@@ -536,7 +536,9 @@ class HelpMixIn:
     do_maincommand_help = do_subcommand_help
 
     def build_parser_help(self, subparsers, common_parser, mid_common_parser, parser):
-        subparser = subparsers.add_parser("help", parents=[common_parser], add_help=False, description="Extra help")
+        subparser = subparsers.add_parser(
+            "help", parents=[common_parser], add_help=False, description="Extra help", help="Extra help"
+        )
         subparser.add_argument("--epilog-only", dest="epilog_only", action="store_true")
         subparser.add_argument("--usage-only", dest="usage_only", action="store_true")
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))

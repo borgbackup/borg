@@ -192,6 +192,12 @@ _borg_complete_filescachemode() {
     printf '%s\n' "${prefix_eq}${head}${k}"
   done
 }
+
+_borg_help_topics() {
+    local choices="{HELP_CHOICES}"
+    local IFS=$' \t\n'
+    compgen -W "${choices}" -- "$1"
+}
 """
 
 
@@ -353,6 +359,11 @@ _borg_complete_filescachemode() {
   compadd -Q -- $candidates
   return 0
 }
+
+_borg_help_topics() {
+    local choices=({HELP_CHOICES})
+    _describe 'help topics' choices
+}
 """
 
 
@@ -403,6 +414,18 @@ def _attach_filescachemode_completion(parser: argparse.ArgumentParser):
             action.complete = {"bash": FCM_BASH_FN_NAME, "zsh": FCM_ZSH_FN_NAME}  # type: ignore[attr-defined]
 
 
+def _attach_help_completion(parser: argparse.ArgumentParser, completion_dict: dict):
+    """Tag the 'topic' argument of the 'help' command with static completion choices."""
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for sub in action.choices.values():
+                _attach_help_completion(sub, completion_dict)
+            continue
+
+        if action.dest == "topic":
+            action.complete = completion_dict  # type: ignore[attr-defined]
+
+
 class CompletionMixIn:
     def do_completion(self, args):
         """Output shell completion script for the given shell."""
@@ -415,10 +438,27 @@ class CompletionMixIn:
         _attach_sortby_completion(parser)
         _attach_filescachemode_completion(parser)
 
+        # Collect all commands and help topics for "borg help" completion
+        help_choices = list(self.helptext.keys())
+        for action in parser._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                help_choices.extend(action.choices.keys())
+
+        help_completion_fn = "_borg_help_topics"
+        _attach_help_completion(parser, {"bash": help_completion_fn, "zsh": help_completion_fn})
+
         # Build preambles using partial_format to avoid escaping braces etc.
         sort_keys = " ".join(AI_HUMAN_SORT_KEYS)
         fcm_keys = " ".join(["ctime", "mtime", "size", "inode", "rechunk", "disabled"])  # keep in sync with parser
-        mapping = {"SORT_KEYS": sort_keys, "FCM_KEYS": fcm_keys}
+
+        # Help completion templates
+        help_choices = " ".join(sorted(help_choices))
+
+        mapping = {
+            "SORT_KEYS": sort_keys,
+            "FCM_KEYS": fcm_keys,
+            "HELP_CHOICES": help_choices,
+        }
         bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)
         zsh_preamble = partial_format(ZSH_PREAMBLE_TMPL, mapping)
         preamble = {"bash": bash_preamble, "zsh": zsh_preamble}

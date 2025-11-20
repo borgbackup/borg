@@ -12,7 +12,9 @@ class ChunkerFailing:
     """
     This is a very simple chunker for testing purposes.
 
-    Reads block_size chunks, starts failing at block <fail_start>, <fail_count> failures, then succeeds.
+    Reads block_size chunks. The map parameter controls behavior per block:
+    'R' = successful read, 'E' = I/O Error. Blocks beyond the map length
+    will have the same behavior as the last map character.
     """
 
     def __init__(self, block_size: int, map: str) -> None:

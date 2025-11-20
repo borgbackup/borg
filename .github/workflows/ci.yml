@@ -107,8 +107,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libssl-dev libacl1-dev liblz4-dev libzstd-dev pkg-config build-essential
         sudo apt-get install -y libxxhash-dev || true
-        sudo apt-get install -y libfuse-dev fuse || true  # Required for Python llfuse module
-        sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
+        if [[ "$TOXENV" == *"fuse2"* ]]; then
+          sudo apt-get install -y libfuse-dev fuse || true  # Required for Python llfuse module
+        elif [[ "$TOXENV" == *"fuse3"* ]]; then
+          sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
+        fi
 
     - name: Install macOS packages
       if: ${{ runner.os == 'macOS' }}

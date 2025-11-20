@@ -8,7 +8,7 @@ import time
 from cpython.bytes cimport PyBytes_AsString
 from libc.stdint cimport uint8_t, uint64_t
 from libc.stdlib cimport malloc, free
-from libc.string cimport memcpy, memmove
+from libc.string cimport memcpy, memmove, memset
 
 from ..crypto.low_level import CSPRNG
 
@@ -176,8 +176,8 @@ cdef class ChunkerBuzHash64:
                 # Copy data from chunk to our buffer
                 memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(chunk.data), n)
             else:
-                # For holes, fill with zeros
-                memcpy(self.data + self.position + self.remaining, <const unsigned char*>PyBytes_AsString(zeros[:n]), n)
+                # For holes, fill with zeros using memset
+                memset(self.data + self.position + self.remaining, 0, n)
 
             self.remaining += n
             self.bytes_read += n

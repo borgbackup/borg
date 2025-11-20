@@ -5,10 +5,10 @@ API_VERSION: str
 has_seek_hole: bool
 
 class _Chunk(NamedTuple):
-    data: bytes
+    data: bytes | None
     meta: Dict[str, Any]
 
-def Chunk(data: bytes, **meta) -> Type[_Chunk]: ...
+def Chunk(data: bytes | None, **meta) -> Type[_Chunk]: ...
 
 fmap_entry = Tuple[int, int, bool]
 

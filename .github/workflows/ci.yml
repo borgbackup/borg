@@ -121,7 +121,13 @@ jobs:
 
     - name: Install BorgBackup
       run: |
-        pip install -ve ".[llfuse,pyfuse3]"
+        if [[ "$TOXENV" == *"fuse2"* ]]; then
+          pip install -ve ".[llfuse]"
+        elif [[ "$TOXENV" == *"fuse3"* ]]; then
+          pip install -ve ".[pyfuse3]"
+        else
+          pip install -ve .
+        fi
 
     - name: Run pytest via tox
       run: |

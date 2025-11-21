@@ -57,7 +57,7 @@ from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, llfuse
-from . import BaseTestCase, changedir, environment_variable, no_selinux, same_ts_ns
+from . import BaseTestCase, changedir, environment_variable, no_selinux, same_ts_ns, granularity_sleep
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected, is_darwin, is_freebsd, is_win32
 from .upgrader import make_attic_repo
@@ -383,7 +383,7 @@ class ArchiverTestCaseBase(BaseTestCase):
             if e.errno not in (errno.EINVAL, errno.ENOSYS):
                 raise
             have_root = False
-        time.sleep(1)  # "empty" must have newer timestamp than other files
+        granularity_sleep()  # ensure "empty" has a newer timestamp than other files across filesystems
         self.create_regular_file('empty', size=0)
         return have_root
 
@@ -2074,7 +2074,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
 
         clearly incomplete: only tests for the weird "unchanged" status for now"""
         self.create_regular_file('file1', size=1024 * 80)
-        time.sleep(1)  # file2 must have newer timestamps than file1
+        granularity_sleep()  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         output = self.cmd('create', '--list', self.repository_location + '::test', 'input')
@@ -2090,7 +2090,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_file_status_cs_cache_mode(self):
         """test that a changed file with faked "previous" mtime still gets backed up in ctime,size cache_mode"""
         self.create_regular_file('file1', contents=b'123')
-        time.sleep(1)  # file2 must have newer timestamps than file1
+        granularity_sleep()  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=10)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         output = self.cmd('create', '--list', '--files-cache=ctime,size', self.repository_location + '::test1', 'input')
@@ -2105,7 +2105,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_file_status_ms_cache_mode(self):
         """test that a chmod'ed file with no content changes does not get chunked again in mtime,size cache_mode"""
         self.create_regular_file('file1', size=10)
-        time.sleep(1)  # file2 must have newer timestamps than file1
+        granularity_sleep()  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=10)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         output = self.cmd('create', '--list', '--files-cache=mtime,size', self.repository_location + '::test1', 'input')
@@ -2119,7 +2119,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
     def test_file_status_rc_cache_mode(self):
         """test that files get rechunked unconditionally in rechunk,ctime cache mode"""
         self.create_regular_file('file1', size=10)
-        time.sleep(1)  # file2 must have newer timestamps than file1
+        granularity_sleep()  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=10)
         self.cmd('init', '--encryption=repokey', self.repository_location)
         output = self.cmd('create', '--list', '--files-cache=rechunk,ctime', self.repository_location + '::test1', 'input')
@@ -2131,7 +2131,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         """test that excluded paths are listed"""
 
         self.create_regular_file('file1', size=1024 * 80)
-        time.sleep(1)  # file2 must have newer timestamps than file1
+        granularity_sleep()  # file2 must have newer timestamps than file1
         self.create_regular_file('file2', size=1024 * 80)
         if has_lchflags:
             self.create_regular_file('file3', size=1024 * 80)
@@ -4753,7 +4753,7 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.create_regular_file('file_replaced', contents=b'0' * 4096)
         os.unlink('input/file_removed')
         os.unlink('input/file_removed2')
-        time.sleep(1)  # macOS HFS+ has a 1s timestamp granularity
+        granularity_sleep()  # cover FS timestamp granularity differences (e.g. HFS+ 1s)
         Path('input/file_touched').touch()
         os.rmdir('input/dir_replaced_with_file')
         self.create_regular_file('dir_replaced_with_file', size=8192)
@@ -5053,20 +5053,15 @@ class DiffArchiverTestCase(ArchiverTestCaseBase):
         self.cmd('init', '--encryption=repokey', self.repository_location)
         self.create_regular_file("test_file", size=10)
         self.cmd('create', self.repository_location + '::archive1', 'input')
-        time.sleep(0.1)
+        granularity_sleep()
         os.unlink("input/test_file")
-        if is_win32:
-            # Sleeping for 15s because Windows doesn't refresh ctime if file is deleted and recreated within 15 seconds.
-            time.sleep(15)
-        elif is_darwin:
-            time.sleep(1)  # HFS has a 1s timestamp granularity
+        granularity_sleep(ctime_quirk=True)
         self.create_regular_file("test_file", size=15)
         self.cmd('create', self.repository_location + '::archive2', 'input')
         output = self.cmd("diff", self.repository_location + "::archive1", "archive2")
         self.assert_in("mtime", output)
         self.assert_in("ctime", output)  # Should show up on windows as well since it is a new file.
-        if is_darwin:
-            time.sleep(1)  # HFS has a 1s timestamp granularity
+        granularity_sleep()
         os.chmod("input/test_file", 0o777)
         self.cmd('create', self.repository_location + '::archive3', 'input')
         output = self.cmd("diff", self.repository_location + "::archive2", "archive3")

@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import pytest
 
@@ -24,10 +25,13 @@ def clean_env(tmpdir_factory, monkeypatch):
     for key in keys:
         monkeypatch.delenv(key, raising=False)
     # avoid that we access / modify the user's normal .config / .cache directory:
-    monkeypatch.setenv("BORG_BASE_DIR", str(tmpdir_factory.mktemp("borg-base-dir")))
+    base_dir = tmpdir_factory.mktemp("borg-base-dir")
+    monkeypatch.setenv("BORG_BASE_DIR", str(base_dir))
     # Speed up tests
     monkeypatch.setenv("BORG_TESTONLY_WEAKEN_KDF", "1")
     monkeypatch.setenv("BORG_STORE_DATA_LEVELS", "0")  # flat storage for few objects
+    yield
+    shutil.rmtree(str(base_dir), ignore_errors=True)  # clean up
 
 
 def pytest_report_header(config, start_path):
@@ -116,6 +120,7 @@ def archiver(tmp_path, set_env_variables):
     os.chdir(archiver.tmpdir)
     yield archiver
     os.chdir(old_wd)
+    shutil.rmtree(archiver.tmpdir, ignore_errors=True)  # clean up
 
 
 @pytest.fixture()

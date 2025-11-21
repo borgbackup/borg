@@ -72,11 +72,11 @@ def test_access_acl():
 
 @skipif_acls_not_working
 def test_default_acl():
-    tmpdir = tempfile.mkdtemp()
-    assert get_acl(tmpdir) == {}
-    set_acl(tmpdir, access=ACCESS_ACL, default=DEFAULT_ACL)
-    assert get_acl(tmpdir)["acl_access"] == ACCESS_ACL
-    assert get_acl(tmpdir)["acl_default"] == DEFAULT_ACL
+    with tempfile.TemporaryDirectory() as tmpdir:
+        assert get_acl(tmpdir) == {}
+        set_acl(tmpdir, access=ACCESS_ACL, default=DEFAULT_ACL)
+        assert get_acl(tmpdir)["acl_access"] == ACCESS_ACL
+        assert get_acl(tmpdir)["acl_default"] == DEFAULT_ACL
 
 
 @skipif_acls_not_working

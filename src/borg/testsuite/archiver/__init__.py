@@ -514,10 +514,12 @@ def fuse_mount(archiver, mountpoint=None, *options, fork=True, os_fork=False, **
             # with the call to `cmd`, above.
             yield
             return
-    wait_for_mountstate(mountpoint, mounted=True)
-    yield
-    umount(mountpoint)
-    wait_for_mountstate(mountpoint, mounted=False)
-    os.rmdir(mountpoint)
+    try:
+        wait_for_mountstate(mountpoint, mounted=True)
+        yield
+    finally:
+        umount(mountpoint)
+        wait_for_mountstate(mountpoint, mounted=False)
+        os.rmdir(mountpoint)
     # Give the daemon some time to exit
     time.sleep(0.2)

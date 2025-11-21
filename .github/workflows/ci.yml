@@ -113,7 +113,7 @@ jobs:
         echo "Using LD_PRELOAD=$LD_PRELOAD"
         pytest -v --benchmark-skip -k "not remote"
 
-  posix_tests:
+  native_tests:
 
     needs: [lint]
     permissions:

@@ -199,7 +199,7 @@ Other changes:
   - save space in test_create_* tests
   - CI/tests: add SFTP/rclone/S3 repo testing
   - CI: add local servers for S3 and SFTP testing
-  - CI: add *BSD and Haiku OS (on GitHub Actions)
+  - CI: add misc. BSDs and Haiku OS (on GitHub Actions)
   - CI: do dynamic code analysis, #6819
   - transfer: add test for unexpected src repo index change, #9022
   - pyproject.toml: correctly define test environments for FUSE testing

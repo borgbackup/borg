@@ -254,3 +254,182 @@ jobs:
         name: ${{ matrix.binary }}
         path: artifacts/*
         if-no-files-found: error
+
+  vm_tests:
+
+    # Cross-OS tests running inside VMs, aligned with master branch structure.
+    # Uses cross-platform-actions/action to run on FreeBSD, NetBSD, OpenBSD, Haiku.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    needs: [lint]
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: freebsd
+            version: '14.3'
+            display_name: FreeBSD
+            # Controls binary build and provenance attestation on tags
+            do_binaries: true
+            artifact_prefix: borg-freebsd-14-x86_64-gh
+          - os: netbsd
+            version: '10.1'
+            display_name: NetBSD
+            do_binaries: false
+          - os: openbsd
+            version: '7.7'
+            display_name: OpenBSD
+            do_binaries: false
+          - os: haiku
+            version: 'r1beta5'
+            display_name: Haiku
+            do_binaries: false
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Test on ${{ matrix.display_name }}
+      id: cross_os
+      uses: cross-platform-actions/action@v0.29.0
+      env:
+        DO_BINARIES: ${{ matrix.do_binaries }}
+      with:
+        operating_system: ${{ matrix.os }}
+        version: ${{ matrix.version }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          case "${{ matrix.os }}" in
+            freebsd)
+              export IGNORE_OSVERSION=yes
+              sudo -E pkg update -f
+              sudo -E pkg install -y xxhash liblz4 zstd pkgconf
+              # Install one of the FUSE libraries; fail if neither is available
+              sudo -E pkg install -y fusefs-libs || sudo -E pkg install -y fusefs-libs3
+              sudo -E pkg install -y rust
+              sudo -E pkg install -y git
+              sudo -E pkg install -y python310 py310-sqlite3
+              sudo -E pkg install -y python311 py311-sqlite3 py311-pip py311-virtualenv
+              sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python3
+              sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python
+              sudo ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip3
+              sudo ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip
+              python -m venv .venv
+              . .venv/bin/activate
+              python -V
+              pip -V
+              python -m pip install --upgrade pip wheel
+              pip install -r requirements.d/development.txt
+              pip install -e .
+              tox -e py311-none
+              if [[ "${{ matrix.do_binaries }}" == "true" && "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
+                python -m pip install 'pyinstaller==6.14.2'
+                mkdir -p dist/binary
+                pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
+                pushd dist/binary
+                echo "single-file binary"
+                chmod +x borg.exe
+                ./borg.exe -V
+                echo "single-directory binary"
+                chmod +x borg-dir/borg.exe
+                ./borg-dir/borg.exe -V
+                tar czf borg.tgz borg-dir
+                popd
+                mkdir -p artifacts
+                if [ -f dist/binary/borg.exe ]; then
+                  cp -v dist/binary/borg.exe artifacts/${{ matrix.artifact_prefix }}
+                fi
+                if [ -f dist/binary/borg.tgz ]; then
+                  cp -v dist/binary/borg.tgz artifacts/${{ matrix.artifact_prefix }}.tgz
+                fi
+              fi
+              ;;
+            netbsd)
+              arch="$(uname -m)"
+              sudo -E mkdir -p /usr/pkg/etc/pkgin
+              echo "http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
+              sudo -E pkgin update
+              sudo -E pkgin -y upgrade
+              sudo -E pkgin -y install zstd lz4 xxhash git
+              sudo -E pkgin -y install rust
+              sudo -E pkgin -y install pkg-config
+              sudo -E pkgin -y install py311-pip py311-virtualenv py311-tox
+              sudo -E ln -sf /usr/pkg/bin/python3.11 /usr/pkg/bin/python3
+              sudo -E ln -sf /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3
+              sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3
+              sudo -E ln -sf /usr/pkg/bin/tox-3.11 /usr/pkg/bin/tox3
+              # Ensure base system admin tools are on PATH for the non-root shell
+              export PATH="/sbin:/usr/sbin:$PATH"
+              echo "--- Preparing an extattr-enabled filesystem ---"
+              # On many NetBSD setups /tmp is tmpfs without extended attributes.
+              # Create a FFS image with extended attributes enabled and use it for TMPDIR.
+              VNDDEV="vnd0"
+              IMGFILE="/tmp/fs.img"
+              sudo -E dd if=/dev/zero of=${IMGFILE} bs=1m count=1024
+              sudo -E vndconfig -c "${VNDDEV}" "${IMGFILE}"
+              sudo -E newfs -O 2ea /dev/r${VNDDEV}a
+              MNT="/mnt/eafs"
+              sudo -E mkdir -p ${MNT}
+              sudo -E mount -t ffs -o extattr /dev/${VNDDEV}a $MNT
+              export TMPDIR="${MNT}/tmp"
+              sudo -E mkdir -p ${TMPDIR}
+              sudo -E chmod 1777 ${TMPDIR}
+              touch ${TMPDIR}/testfile
+              lsextattr user ${TMPDIR}/testfile && echo "[xattr] *** xattrs SUPPORTED on ${TMPDIR}! ***"
+              tox3 -e py311-none
+              ;;
+            openbsd)
+              sudo -E pkg_add xxhash lz4 zstd git
+              sudo -E pkg_add rust
+              sudo -E pkg_add openssl%3.4
+              sudo -E pkg_add py3-pip py3-virtualenv py3-tox
+              export BORG_OPENSSL_NAME=eopenssl34
+              tox -e py312-none
+              ;;
+            haiku)
+              pkgman refresh
+              pkgman install -y git pkgconfig zstd lz4 xxhash
+              pkgman install -y openssl3
+              pkgman install -y rust_bin
+              pkgman install -y python3.10
+              pkgman install -y cffi
+              pkgman install -y lz4_devel zstd_devel xxhash_devel openssl3_devel libffi_devel
+              # there is no pkgman package for tox, so we install it into a venv
+              python3 -m ensurepip --upgrade
+              python3 -m pip install --upgrade pip wheel
+              python3 -m venv .venv
+              . .venv/bin/activate
+              export PKG_CONFIG_PATH="/system/develop/lib/pkgconfig:/system/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+              export BORG_LIBLZ4_PREFIX=/system/develop
+              export BORG_LIBZSTD_PREFIX=/system/develop
+              export BORG_LIBXXHASH_PREFIX=/system/develop
+              export BORG_OPENSSL_PREFIX=/system/develop
+              pip install -r requirements.d/development.txt
+              pip install -e .
+              # troubles with either tox or pytest xdist, so we run pytest manually:
+              pytest -v -rs --benchmark-skip -k "not remote and not socket"
+              ;;
+          esac
+
+    - name: Upload artifacts
+      if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.os }}-${{ matrix.version }}-dist
+        path: artifacts/*
+        if-no-files-found: ignore
+
+    - name: Attest provenance
+      if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
+      uses: actions/attest-build-provenance@v3
+      with:
+        subject-path: 'artifacts/*'

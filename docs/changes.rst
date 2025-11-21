@@ -168,7 +168,7 @@ New features:
   check; default is "yes", use at your own risk, #9109.
 - diff: --sort-by=field[,field,...], #8998
 - completion: generate completion scripts for supported shells, #9172,
-  uses shtab, supports bash, tcsh, zsh (zsh needs shtab > 1.7.2).
+  uses shtab, supports bash and zsh.
 
 Fixes:
 
@@ -199,7 +199,7 @@ Other changes:
   - save space in test_create_* tests
   - CI/tests: add SFTP/rclone/S3 repo testing
   - CI: add local servers for S3 and SFTP testing
-  - CI: add *BSD and Haiku OS (on GitHub Actions)
+  - CI: add misc. BSDs and Haiku OS (on GitHub Actions)
   - CI: do dynamic code analysis, #6819
   - transfer: add test for unexpected src repo index change, #9022
   - pyproject.toml: correctly define test environments for FUSE testing
@@ -222,6 +222,7 @@ Other changes:
   - how to debug borg mount, #5461
   - document what happens when a new keyfile repo is created at the same path, #6230
   - update install docs to include `SETUPTOOLS_SCM_PRETEND_VERSION`
+  - highlight archive series naming for fast incrementals, #8955
   - add Arch Linux to the 'Installing from source' docs
   - add systemd-inhibit and examples, #8989
   - code/docs: fix typos and grammar

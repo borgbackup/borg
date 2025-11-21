@@ -349,6 +349,7 @@ class TransferMixIn:
             metavar="UPGRADER",
             dest="upgrader",
             type=str,
+            choices=("NoOp", "From12To20"),
             default="NoOp",
             action=Highlander,
             help="use the upgrader to convert transferred data (default: no conversion)",

@@ -56,7 +56,7 @@ from ..locking import LockFailed
 from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
-from . import has_lchflags, llfuse
+from . import has_lchflags, has_mknod, llfuse
 from . import BaseTestCase, changedir, environment_variable, no_selinux, same_ts_ns, granularity_sleep
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected, is_darwin, is_freebsd, is_win32
@@ -367,10 +367,11 @@ class ArchiverTestCaseBase(BaseTestCase):
         if has_lchflags:
             platform.set_flags(os.path.join(self.input_path, 'flagfile'), stat.UF_NODUMP)
         try:
-            # Block device
-            os.mknod('input/bdev', 0o600 | stat.S_IFBLK, os.makedev(10, 20))
-            # Char device
-            os.mknod('input/cdev', 0o600 | stat.S_IFCHR, os.makedev(30, 40))
+            if has_mknod:
+                # Block device
+                os.mknod('input/bdev', 0o600 | stat.S_IFBLK, os.makedev(10, 20))
+                # Char device
+                os.mknod('input/cdev', 0o600 | stat.S_IFCHR, os.makedev(30, 40))
             # File mode
             os.chmod('input/dir2', 0o555)  # if we take away write perms, we need root to remove contents
             # File owner
@@ -426,8 +427,8 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             expected.append('input/link1')
         if are_hardlinks_supported():
             expected.append('input/hardlink')
-        if not have_root:
-            # we could not create these device files without (fake)root
+        if not have_root or not has_mknod:
+            # we could not create these device files without (fake)root or without os.mknod
             expected.remove('input/bdev')
             expected.remove('input/cdev')
         if has_lchflags:

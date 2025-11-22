@@ -126,6 +126,7 @@ class FileFMAPReader:
         assert 0 < read_size <= len(zeros)
         self.read_size = read_size  # how much data we want to read at once
         self.reading_time = 0.0  # time spent in reading/seeking
+        self.sparse = sparse
         # should borg try to do sparse input processing?
         # whether it actually can be done depends on the input file being seekable.
         self.try_sparse = sparse and has_seek_hole
@@ -137,7 +138,7 @@ class FileFMAPReader:
         if self.try_sparse:
             try:
                 fmap = list(sparsemap(self.fd, self.fh))
-            except OSError as err:
+            except (OSError, ValueError) as err:
                 # seeking did not work
                 pass
 
@@ -170,7 +171,7 @@ class FileFMAPReader:
                     # read block from the range
                     data = dread(offset, wanted, self.fd, self.fh)
                     got = len(data)
-                    if zeros.startswith(data):
+                    if self.sparse and zeros.startswith(data):
                         data = None
                         allocation = CH_ALLOC
                     else:

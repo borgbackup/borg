@@ -39,10 +39,6 @@ def debug_log(msg):
             f.write(f"{timestamp} {msg}\n")
 
 
-def fuse_main():
-    return mfuse.main(workers=1)
-
-
 class Node:
     def __init__(self, id, item=None, parent=None):
         self.id = id

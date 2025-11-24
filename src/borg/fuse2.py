@@ -45,7 +45,31 @@ class DirEntry:
     def __init__(self, ino, parent=None):
         self.ino = ino  # inode number
         self.parent = parent
-        self.children = {}  # name (bytes) -> DirEntry
+        self.children = None  # name (bytes) -> DirEntry, lazily allocated
+
+    def add_child(self, name, child):
+        """Add a child entry, lazily allocating the children dict if needed."""
+        if self.children is None:
+            self.children = {}
+        self.children[name] = child
+
+    def get_child(self, name):
+        """Get a child entry by name, returns None if not found."""
+        if self.children is None:
+            return None
+        return self.children.get(name)
+
+    def has_child(self, name):
+        """Check if a child with the given name exists."""
+        if self.children is None:
+            return False
+        return name in self.children
+
+    def iter_children(self):
+        """Iterate over (name, child) pairs."""
+        if self.children is None:
+            return iter([])
+        return self.children.items()
 
 
 class FuseBackend:
@@ -135,7 +159,7 @@ class FuseBackend:
                 item.mtime = int(archive.ts.timestamp() * 1e9)
                 self.set_inode(archive_node.ino, item)
 
-                self.root.children[name_bytes] = archive_node
+                self.root.add_child(name_bytes, archive_node)
                 self.pending_archives[archive_node] = archive
 
     def check_pending_archive(self, node):
@@ -183,23 +207,23 @@ class FuseBackend:
                 node = root_node
                 # Traverse/Create directories
                 for segment in segments[:-1]:
-                    if segment not in node.children:
+                    if not node.has_child(segment):
                         new_node = self._create_node(parent=node)
                         # We might need a default directory item if it's an implicit directory
                         self.set_inode(new_node.ino, Item(internal_dict=self.default_dir.as_dict()))
-                        node.children[segment] = new_node
-                    node = node.children[segment]
+                        node.add_child(segment, new_node)
+                    node = node.get_child(segment)
 
                 # Leaf (file or explicit directory)
                 leaf_name = segments[-1]
-                if leaf_name in node.children:
+                if node.has_child(leaf_name):
                     # Already exists (e.g. implicit dir became explicit)
-                    child = node.children[leaf_name]
+                    child = node.get_child(leaf_name)
                     self.set_inode(child.ino, item)  # Update item
                     node = child
                 else:
                     new_node = self._create_node(item, parent=node)
-                    node.children[leaf_name] = new_node
+                    node.add_child(leaf_name, new_node)
                     node = new_node
 
                 # Handle hardlinks (non-versions mode)
@@ -251,20 +275,20 @@ class FuseBackend:
         # Navigate to parent directory
         node = root_node
         for segment in segments[:-1]:
-            if segment not in node.children:
+            if not node.has_child(segment):
                 new_node = self._create_node(parent=node)
                 self.set_inode(new_node.ino, Item(internal_dict=self.default_dir.as_dict()))
-                node.children[segment] = new_node
-            node = node.children[segment]
+                node.add_child(segment, new_node)
+            node = node.get_child(segment)
 
         # Create intermediate directory with the filename
         leaf_name = segments[-1]
-        if leaf_name not in node.children:
+        if not node.has_child(leaf_name):
             intermediate_node = self._create_node(parent=node)
             self.set_inode(intermediate_node.ino, Item(internal_dict=self.default_dir.as_dict()))
-            node.children[leaf_name] = intermediate_node
+            node.add_child(leaf_name, intermediate_node)
         else:
-            intermediate_node = node.children[leaf_name]
+            intermediate_node = node.get_child(leaf_name)
 
         # Create versioned filename
         if version is not None:
@@ -279,18 +303,18 @@ class FuseBackend:
                     # Navigate to the link target
                     target_node = root_node
                     for seg in link_segments[:-1]:
-                        if seg in target_node.children:
-                            target_node = target_node.children[seg]
+                        if target_node.has_child(seg):
+                            target_node = target_node.get_child(seg)
                         else:
                             break
                     else:
                         # Get intermediate dir
                         link_leaf = link_segments[-1]
-                        if link_leaf in target_node.children:
-                            target_intermediate = target_node.children[link_leaf]
+                        if target_node.has_child(link_leaf):
+                            target_intermediate = target_node.get_child(link_leaf)
                             target_versioned = self._make_versioned_name(link_leaf, link_version)
-                            if target_versioned in target_intermediate.children:
-                                original_node = target_intermediate.children[target_versioned]
+                            if target_intermediate.has_child(target_versioned):
+                                original_node = target_intermediate.get_child(target_versioned)
                                 # Create new node but reuse the ID and item from original
                                 item = self.get_inode(original_node.ino)
                                 file_node = self._create_node(item, parent=intermediate_node)
@@ -301,12 +325,12 @@ class FuseBackend:
                                     item.nlink = 1
                                 item.nlink += 1
                                 self.set_inode(file_node.ino, item)
-                                intermediate_node.children[versioned_name] = file_node
+                                intermediate_node.add_child(versioned_name, file_node)
                                 return
 
             # Not a hardlink or first occurrence - create new node
             file_node = self._create_node(item, parent=intermediate_node)
-            intermediate_node.children[versioned_name] = file_node
+            intermediate_node.add_child(versioned_name, file_node)
 
     def _file_version(self, item, path):
         """Calculate version number for a file based on its contents"""
@@ -339,8 +363,9 @@ class FuseBackend:
         segments = path.split(b"/")
         node = root
         for segment in segments:
-            if segment in node.children:
-                node = node.children[segment]
+            child = node.get_child(segment)
+            if child is not None:
+                node = child
             else:
                 return None
         return node
@@ -358,8 +383,9 @@ class FuseBackend:
         for segment in segments:
             if node in self.pending_archives:
                 self.check_pending_archive(node)
-            if segment in node.children:
-                node = node.children[segment]
+            child = node.get_child(segment)
+            if child is not None:
+                node = child
             else:
                 return None
 
@@ -639,7 +665,7 @@ class borgfs(mfuse.Operations, FuseBackend):
         yield ("..", self._make_stat_dict(parent), offset)
         offset += 1
 
-        for name, child_node in node.children.items():
+        for name, child_node in node.iter_children():
             name_str = name.decode("utf-8", "surrogateescape")
             st = self._make_stat_dict(child_node)
             debug_log(f"readdir yielding {name_str} {offset} {st}")

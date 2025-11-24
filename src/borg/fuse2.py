@@ -1,3 +1,4 @@
+import datetime
 import errno
 import hashlib
 import os
@@ -27,14 +28,15 @@ from .platformflags import is_darwin
 from .repository import Repository
 from .remote import RemoteRepository
 
+DEBUG_LOG = None  # os.path.join(os.getcwd(), "fuse_debug.log")
+
 
 def debug_log(msg):
     """Append debug message to fuse_debug.log"""
-    import datetime
-
-    timestamp = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-    with open("/Users/tw/w/borg_ag/fuse_debug.log", "a") as f:
-        f.write(f"{timestamp} {msg}\n")
+    if DEBUG_LOG:
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        with open(DEBUG_LOG, "a") as f:
+            f.write(f"{timestamp} {msg}\n")
 
 
 def fuse_main():

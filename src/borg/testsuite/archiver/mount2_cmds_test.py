@@ -119,7 +119,7 @@ def fuse_mount2(archiver, mountpoint, *args, **kwargs):
     # For debugging, let's inherit stderr
     # p = subprocess.Popen(full_cmd, env=env, stdout=subprocess.PIPE, stderr=None)
 
-    log_file_path = "/Users/tw/w/borg_ag/mount2.log"
+    log_file_path = os.path.join(os.getcwd(), "mount2.log")
     log_file = open(log_file_path, "w")
     p = subprocess.Popen(full_cmd, env=env, stdout=log_file, stderr=log_file)
 

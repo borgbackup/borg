@@ -97,7 +97,11 @@ class FuseBackend:
         if item is None:
             self.inodes.pop(ino, None)
         else:
-            self.inodes[ino] = msgpack.packb(item.as_dict())
+            # Remove path from the item dict before packing to save memory.
+            # The path is already encoded in the DirEntry tree structure
+            item_dict = item.as_dict()
+            item_dict.pop("path", None)
+            self.inodes[ino] = msgpack.packb(item_dict)
 
     def _create_filesystem(self):
         self.set_inode(self.root.ino, self.default_dir)

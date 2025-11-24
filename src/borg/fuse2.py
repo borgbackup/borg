@@ -40,8 +40,10 @@ def debug_log(msg):
 
 
 class DirEntry:
+    __slots__ = ("ino", "parent", "children")
+
     def __init__(self, ino, parent=None):
-        self.ino = ino
+        self.ino = ino  # inode number
         self.parent = parent
         self.children = {}  # name (bytes) -> DirEntry
 

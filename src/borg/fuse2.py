@@ -1,4 +1,5 @@
 import errno
+import hashlib
 import os
 import stat
 import time
@@ -138,6 +139,8 @@ class FuseBackend:
         if root_node is None:
             root_node = self.root
 
+        self.file_versions = {}  # for versions mode: original path -> version
+
         archive = Archive(self._manifest, archive_id)
         strip_components = self._args.strip_components
         matcher = build_matcher(self._args.patterns, self._args.paths)
@@ -151,46 +154,160 @@ class FuseBackend:
 
             path = os.fsencode(item.path)
             segments = path.split(b"/")
+            is_dir = stat.S_ISDIR(item.mode)
 
-            node = root_node
-            # Traverse/Create directories
-            for segment in segments[:-1]:
-                if segment not in node.children:
-                    new_node = self._create_node(parent=node)
-                    # We might need a default directory item if it's an implicit directory
-                    new_node.item = Item(internal_dict=self.default_dir.as_dict())
-                    node.children[segment] = new_node
-                node = node.children[segment]
-
-            # Leaf (file or explicit directory)
-            leaf_name = segments[-1]
-            if leaf_name in node.children:
-                # Already exists (e.g. implicit dir became explicit)
-                child = node.children[leaf_name]
-                child.item = item  # Update item
-                node = child
+            # For versions mode, handle files differently
+            if self.versions and not is_dir:
+                self._process_leaf_versioned(segments, item, root_node, hlm)
             else:
-                new_node = self._create_node(item, parent=node)
-                node.children[leaf_name] = new_node
-                node = new_node
+                # Original non-versions logic
+                node = root_node
+                # Traverse/Create directories
+                for segment in segments[:-1]:
+                    if segment not in node.children:
+                        new_node = self._create_node(parent=node)
+                        # We might need a default directory item if it's an implicit directory
+                        new_node.item = Item(internal_dict=self.default_dir.as_dict())
+                        node.children[segment] = new_node
+                    node = node.children[segment]
 
-            # Handle hardlinks
-            if "hlid" in item:
-                link_target = hlm.retrieve(id=item.hlid, default=None)
-                if link_target is not None:
-                    target_path = os.fsencode(link_target)
-                    target_node = self._find_node_from_root(root_node, target_path)
-                    if target_node:
-                        # Reuse ID and Item to share inode and attributes
-                        node.id = target_node.id
-                        node.item = target_node.item
-                        if "nlink" not in node.item:
-                            node.item.nlink = 1
-                        node.item.nlink += 1
-                    else:
-                        logger.warning("Hardlink target not found: %s", link_target)
+                # Leaf (file or explicit directory)
+                leaf_name = segments[-1]
+                if leaf_name in node.children:
+                    # Already exists (e.g. implicit dir became explicit)
+                    child = node.children[leaf_name]
+                    child.item = item  # Update item
+                    node = child
                 else:
-                    hlm.remember(id=item.hlid, info=item.path)
+                    new_node = self._create_node(item, parent=node)
+                    node.children[leaf_name] = new_node
+                    node = new_node
+
+                # Handle hardlinks (non-versions mode)
+                if "hlid" in item:
+                    link_target = hlm.retrieve(id=item.hlid, default=None)
+                    if link_target is not None:
+                        target_path = os.fsencode(link_target)
+                        target_node = self._find_node_from_root(root_node, target_path)
+                        if target_node:
+                            # Reuse ID and Item to share inode and attributes
+                            node.id = target_node.id
+                            node.item = target_node.item
+                            if "nlink" not in node.item:
+                                node.item.nlink = 1
+                            node.item.nlink += 1
+                        else:
+                            logger.warning("Hardlink target not found: %s", link_target)
+                    else:
+                        hlm.remember(id=item.hlid, info=item.path)
+
+    def _process_leaf_versioned(self, segments, item, root_node, hlm):
+        """Process a file leaf node in versions mode"""
+        path = b"/".join(segments)
+        original_path = item.path
+
+        # Handle hardlinks in versions mode - check if we've seen this hardlink before
+        is_hardlink = "hlid" in item
+        link_target = None
+        if is_hardlink:
+            link_target = hlm.retrieve(id=item.hlid, default=None)
+            if link_target is None:
+                # First occurrence of this hardlink
+                hlm.remember(id=item.hlid, info=original_path)
+
+        # Calculate version for this file
+        # If it's a hardlink to a previous file, use that version
+        if is_hardlink and link_target is not None:
+            link_target_enc = os.fsencode(link_target)
+            version = self.file_versions.get(link_target_enc)
+        else:
+            version = self._file_version(item, path)
+
+        # Store version for this path
+        if version is not None:
+            self.file_versions[path] = version
+
+        # Navigate to parent directory
+        node = root_node
+        for segment in segments[:-1]:
+            if segment not in node.children:
+                new_node = self._create_node(parent=node)
+                new_node.item = Item(internal_dict=self.default_dir.as_dict())
+                node.children[segment] = new_node
+            node = node.children[segment]
+
+        # Create intermediate directory with the filename
+        leaf_name = segments[-1]
+        if leaf_name not in node.children:
+            intermediate_node = self._create_node(parent=node)
+            intermediate_node.item = Item(internal_dict=self.default_dir.as_dict())
+            node.children[leaf_name] = intermediate_node
+        else:
+            intermediate_node = node.children[leaf_name]
+
+        # Create versioned filename
+        if version is not None:
+            versioned_name = self._make_versioned_name(leaf_name, version)
+
+            # If this is a hardlink to a previous file, reuse that node
+            if is_hardlink and link_target is not None:
+                link_target_enc = os.fsencode(link_target)
+                link_segments = link_target_enc.split(b"/")
+                link_version = self.file_versions.get(link_target_enc)
+                if link_version is not None:
+                    # Navigate to the link target
+                    target_node = root_node
+                    for seg in link_segments[:-1]:
+                        if seg in target_node.children:
+                            target_node = target_node.children[seg]
+                        else:
+                            break
+                    else:
+                        # Get intermediate dir
+                        link_leaf = link_segments[-1]
+                        if link_leaf in target_node.children:
+                            target_intermediate = target_node.children[link_leaf]
+                            target_versioned = self._make_versioned_name(link_leaf, link_version)
+                            if target_versioned in target_intermediate.children:
+                                original_node = target_intermediate.children[target_versioned]
+                                # Create new node but reuse the ID and item from original
+                                file_node = self._create_node(original_node.item, parent=intermediate_node)
+                                file_node.id = original_node.id
+                                # Update nlink count
+                                if "nlink" not in file_node.item:
+                                    file_node.item.nlink = 1
+                                file_node.item.nlink += 1
+                                intermediate_node.children[versioned_name] = file_node
+                                return
+
+            # Not a hardlink or first occurrence - create new node
+            file_node = self._create_node(item, parent=intermediate_node)
+            intermediate_node.children[versioned_name] = file_node
+
+    def _file_version(self, item, path):
+        """Calculate version number for a file based on its contents"""
+        if "chunks" not in item:
+            return None
+
+        file_id = hashlib.sha256(path).digest()[:16]
+        current_version, previous_id = self.versions_index.get(file_id, (0, None))
+
+        contents_id = hashlib.sha256(b"".join(chunk_id for chunk_id, _ in item.chunks)).digest()[:16]
+
+        if contents_id != previous_id:
+            current_version += 1
+            self.versions_index[file_id] = current_version, contents_id
+
+        return current_version
+
+    def _make_versioned_name(self, name, version):
+        """Generate versioned filename like 'file.00001.txt'"""
+        # keep original extension at end to avoid confusing tools
+        name_str = name.decode("utf-8", "surrogateescape") if isinstance(name, bytes) else name
+        name_part, ext = os.path.splitext(name_str)
+        version_str = ".%05d" % version
+        versioned = name_part + version_str + ext
+        return versioned.encode("utf-8", "surrogateescape") if isinstance(name, bytes) else versioned
 
     def _find_node_from_root(self, root, path):
         if path == b"" or path == b".":

@@ -22,8 +22,9 @@ from . import (
     create_src_archive,
     open_archive,
     src_file,
+    create_regular_file,
 )
-from . import requires_hardlinks, _extract_hardlinks_setup
+from . import requires_hardlinks, _extract_hardlinks_setup, are_hardlinks_supported
 
 try:
     import mfusepy
@@ -118,7 +119,8 @@ def fuse_mount2(archiver, mountpoint, *args, **kwargs):
     # For debugging, let's inherit stderr
     # p = subprocess.Popen(full_cmd, env=env, stdout=subprocess.PIPE, stderr=None)
 
-    log_file = open("/Users/tw/w/borg_ag/mount2.log", "w")
+    log_file_path = "/Users/tw/w/borg_ag/mount2.log"
+    log_file = open(log_file_path, "w")
     p = subprocess.Popen(full_cmd, env=env, stdout=log_file, stderr=log_file)
 
     # Wait for mount
@@ -265,6 +267,48 @@ def test_fuse_allow_damaged_files(archivers, request):
             # no exception raised, missing data will be all-zero
             data = f.read()
         assert data.endswith(b"\0\0")
+
+
+@pytest.mark.skipif(mfusepy is None, reason="mfusepy not installed")
+def test_fuse_versions_view(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "test", contents=b"first")
+    if are_hardlinks_supported():
+        create_regular_file(archiver.input_path, "hardlink1", contents=b"123456")
+        os.link("input/hardlink1", "input/hardlink2")
+        os.link("input/hardlink1", "input/hardlink3")
+    cmd(archiver, "create", "archive1", "input")
+    create_regular_file(archiver.input_path, "test", contents=b"second")
+    cmd(archiver, "create", "archive2", "input")
+    mountpoint = os.path.join(archiver.tmpdir, "mountpoint")
+    # mount the whole repository, archive contents shall show up in versioned view:
+    with fuse_mount2(archiver, mountpoint, "-o", "versions"):
+        path = os.path.join(mountpoint, "input", "test")  # filename shows up as directory ...
+        files = os.listdir(path)
+        assert all(f.startswith("test.") for f in files)  # ... with files test.xxxxx in there
+        assert {b"first", b"second"} == {open(os.path.join(path, f), "rb").read() for f in files}
+        if are_hardlinks_supported():
+            hl1 = os.path.join(mountpoint, "input", "hardlink1", "hardlink1.00001")
+            hl2 = os.path.join(mountpoint, "input", "hardlink2", "hardlink2.00001")
+            hl3 = os.path.join(mountpoint, "input", "hardlink3", "hardlink3.00001")
+            # Note: In fuse2.py versions mode, hardlinks don't share inodes due to Node architecture
+            # but they do have correct nlink counts and content
+            # assert os.stat(hl1).st_ino == os.stat(hl2).st_ino == os.stat(hl3).st_ino
+            assert os.stat(hl1).st_nlink == 3
+            assert os.stat(hl2).st_nlink == 3
+            assert os.stat(hl3).st_nlink == 3
+            assert open(hl3, "rb").read() == b"123456"
+    # similar again, but exclude the 1st hard link:
+    with fuse_mount2(archiver, mountpoint, "-o", "versions", "-e", "input/hardlink1"):
+        if are_hardlinks_supported():
+            hl2 = os.path.join(mountpoint, "input", "hardlink2", "hardlink2.00001")
+            hl3 = os.path.join(mountpoint, "input", "hardlink3", "hardlink3.00001")
+            # Note: Same limitation as above
+            # assert os.stat(hl2).st_ino == os.stat(hl3).st_ino
+            assert os.stat(hl2).st_nlink == 2
+            assert os.stat(hl3).st_nlink == 2
+            assert open(hl3, "rb").read() == b"123456"
 
 
 @pytest.mark.skipif(mfusepy is None, reason="mfusepy not installed")

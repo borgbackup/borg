@@ -39,11 +39,11 @@ def debug_log(msg):
             f.write(f"{timestamp} {msg}\n")
 
 
-class Node:
-    def __init__(self, id, parent=None):
-        self.id = id
+class DirEntry:
+    def __init__(self, ino, parent=None):
+        self.ino = ino
         self.parent = parent
-        self.children = {}  # name (bytes) -> Node
+        self.children = {}  # name (bytes) -> DirEntry
 
 
 class FuseBackend:
@@ -60,10 +60,10 @@ class FuseBackend:
         self.default_gid = os.getgid()
         self.default_dir = None
 
-        self.node_count = 0
-        self.items = {}  # node.id -> packed item
+        self.current_ino = 0
+        self.inodes = {}  # node.ino -> packed item
         self.root = self._create_node()
-        self.pending_archives = {}  # Node -> Archive
+        self.pending_archives = {}  # DirEntry -> Archive
 
         self.allow_damaged_files = False
         self.versions = False
@@ -80,25 +80,25 @@ class FuseBackend:
         self.chunks_cache = LRUCache(capacity=10)
 
     def _create_node(self, item=None, parent=None):
-        self.node_count += 1
+        self.current_ino += 1
         if item is not None:
-            self.set_item(self.node_count, item)
-        return Node(self.node_count, parent)
+            self.set_inode(self.current_ino, item)
+        return DirEntry(self.current_ino, parent)
 
-    def get_item(self, id):
-        packed = self.items.get(id)
+    def get_inode(self, ino):
+        packed = self.inodes.get(ino)
         if packed is None:
             return None
         return Item(internal_dict=msgpack.unpackb(packed))
 
-    def set_item(self, id, item):
+    def set_inode(self, ino, item):
         if item is None:
-            self.items.pop(id, None)
+            self.inodes.pop(ino, None)
         else:
-            self.items[id] = msgpack.packb(item.as_dict())
+            self.inodes[ino] = msgpack.packb(item.as_dict())
 
     def _create_filesystem(self):
-        self.set_item(self.root.id, self.default_dir)
+        self.set_inode(self.root.ino, self.default_dir)
         self.versions_index = FuseVersionsIndex()
 
         if getattr(self._args, "name", None):
@@ -127,7 +127,7 @@ class FuseBackend:
                 # Create a directory item for the archive
                 item = Item(internal_dict=self.default_dir.as_dict())
                 item.mtime = int(archive.ts.timestamp() * 1e9)
-                self.set_item(archive_node.id, item)
+                self.set_inode(archive_node.ino, item)
 
                 self.root.children[name_bytes] = archive_node
                 self.pending_archives[archive_node] = archive
@@ -180,7 +180,7 @@ class FuseBackend:
                     if segment not in node.children:
                         new_node = self._create_node(parent=node)
                         # We might need a default directory item if it's an implicit directory
-                        self.set_item(new_node.id, Item(internal_dict=self.default_dir.as_dict()))
+                        self.set_inode(new_node.ino, Item(internal_dict=self.default_dir.as_dict()))
                         node.children[segment] = new_node
                     node = node.children[segment]
 
@@ -189,7 +189,7 @@ class FuseBackend:
                 if leaf_name in node.children:
                     # Already exists (e.g. implicit dir became explicit)
                     child = node.children[leaf_name]
-                    self.set_item(child.id, item)  # Update item
+                    self.set_inode(child.ino, item)  # Update item
                     node = child
                 else:
                     new_node = self._create_node(item, parent=node)
@@ -204,13 +204,13 @@ class FuseBackend:
                         target_node = self._find_node_from_root(root_node, target_path)
                         if target_node:
                             # Reuse ID and Item to share inode and attributes
-                            node.id = target_node.id
+                            node.ino = target_node.ino
                             # node.item = target_node.item  # implicitly shared via ID
-                            item = self.get_item(node.id)
+                            item = self.get_inode(node.ino)
                             if "nlink" not in item:
                                 item.nlink = 1
                             item.nlink += 1
-                            self.set_item(node.id, item)
+                            self.set_inode(node.ino, item)
                         else:
                             logger.warning("Hardlink target not found: %s", link_target)
                     else:
@@ -247,7 +247,7 @@ class FuseBackend:
         for segment in segments[:-1]:
             if segment not in node.children:
                 new_node = self._create_node(parent=node)
-                self.set_item(new_node.id, Item(internal_dict=self.default_dir.as_dict()))
+                self.set_inode(new_node.ino, Item(internal_dict=self.default_dir.as_dict()))
                 node.children[segment] = new_node
             node = node.children[segment]
 
@@ -255,7 +255,7 @@ class FuseBackend:
         leaf_name = segments[-1]
         if leaf_name not in node.children:
             intermediate_node = self._create_node(parent=node)
-            self.set_item(intermediate_node.id, Item(internal_dict=self.default_dir.as_dict()))
+            self.set_inode(intermediate_node.ino, Item(internal_dict=self.default_dir.as_dict()))
             node.children[leaf_name] = intermediate_node
         else:
             intermediate_node = node.children[leaf_name]
@@ -286,15 +286,15 @@ class FuseBackend:
                             if target_versioned in target_intermediate.children:
                                 original_node = target_intermediate.children[target_versioned]
                                 # Create new node but reuse the ID and item from original
-                                item = self.get_item(original_node.id)
+                                item = self.get_inode(original_node.ino)
                                 file_node = self._create_node(item, parent=intermediate_node)
-                                file_node.id = original_node.id
+                                file_node.ino = original_node.ino
                                 # Update nlink count
-                                item = self.get_item(file_node.id)
+                                item = self.get_inode(file_node.ino)
                                 if "nlink" not in item:
                                     item.nlink = 1
                                 item.nlink += 1
-                                self.set_item(file_node.id, item)
+                                self.set_inode(file_node.ino, item)
                                 intermediate_node.children[versioned_name] = file_node
                                 return
 
@@ -372,9 +372,9 @@ class FuseBackend:
 
     def _make_stat_dict(self, node):
         """Create a stat dictionary from a node."""
-        item = self.get_item(node.id)
+        item = self.get_inode(node.ino)
         st = {}
-        st["st_ino"] = node.id
+        st["st_ino"] = node.ino
         st["st_mode"] = item.mode & ~self.umask
         st["st_nlink"] = item.get("nlink", 1)
         if stat.S_ISDIR(st["st_mode"]):
@@ -416,7 +416,7 @@ class borgfs(mfuse.Operations, FuseBackend):
 
     def sig_info_handler(self, sig_no, stack):
         # Simplified instrumentation
-        logger.debug("fuse: %d nodes", self.node_count)
+        logger.debug("fuse: %d inodes", self.current_ino)
 
     def mount(self, mountpoint, mount_options, foreground=False, show_rc=False):
         """Mount filesystem on *mountpoint* with *mount_options*."""
@@ -519,7 +519,7 @@ class borgfs(mfuse.Operations, FuseBackend):
         node = self._find_node(path)
         if node is None:
             raise mfuse.FuseOSError(errno.ENOENT)
-        item = self.get_item(node.id)
+        item = self.get_inode(node.ino)
         result = [k.decode("utf-8", "surrogateescape") for k in item.get("xattrs", {}).keys()]
         debug_log(f"listxattr -> {result}")
         return result
@@ -529,7 +529,7 @@ class borgfs(mfuse.Operations, FuseBackend):
         node = self._find_node(path)
         if node is None:
             raise mfuse.FuseOSError(errno.ENOENT)
-        item = self.get_item(node.id)
+        item = self.get_inode(node.ino)
         try:
             if isinstance(name, str):
                 name = name.encode("utf-8", "surrogateescape")
@@ -569,7 +569,7 @@ class borgfs(mfuse.Operations, FuseBackend):
             # But read should be fast.
             raise mfuse.FuseOSError(errno.EBADF)
 
-        item = self.get_item(node.id)
+        item = self.get_inode(node.ino)
         parts = []
 
         # optimize for linear reads:
@@ -645,7 +645,7 @@ class borgfs(mfuse.Operations, FuseBackend):
         node = self._find_node(path)
         if node is None:
             raise mfuse.FuseOSError(errno.ENOENT)
-        item = self.get_item(node.id)
+        item = self.get_inode(node.ino)
         result = item.target
         debug_log(f"readlink -> {result!r}")
         return result

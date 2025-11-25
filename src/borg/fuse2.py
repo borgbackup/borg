@@ -540,9 +540,15 @@ class borgfs(mfuse.Operations, FuseBackend):
 
     def getattr(self, path, fh=None):
         debug_log(f"getattr(path={path!r}, fh={fh})")
-        node = self._find_node(path)
-        if node is None:
-            raise mfuse.FuseOSError(errno.ENOENT)
+        if fh is not None:
+            # use file handle if available to avoid path lookup
+            node = self._get_node_from_handle(fh)
+            if node is None:
+                raise mfuse.FuseOSError(errno.EBADF)
+        else:
+            node = self._find_node(path)
+            if node is None:
+                raise mfuse.FuseOSError(errno.ENOENT)
         st = self._make_stat_dict(node)
         debug_log(f"getattr -> {st}")
         return st

@@ -19,9 +19,9 @@ class MountMixIn:
         """Mounts an archive or an entire repository as a FUSE filesystem."""
         # Perform these checks before opening the repository and asking for a passphrase.
 
-        from ..fuse_impl import llfuse, BORG_FUSE_IMPL
+        from ..fuse_impl import llfuse, has_mfusepy, BORG_FUSE_IMPL
 
-        if llfuse is None:
+        if llfuse is None and not has_mfusepy:
             raise RTError("borg mount not available: no FUSE support, BORG_FUSE_IMPL=%s." % BORG_FUSE_IMPL)
 
         if not os.path.isdir(args.mountpoint):
@@ -34,16 +34,31 @@ class MountMixIn:
 
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def _do_mount(self, args, repository, manifest):
-        from ..fuse import FuseOperations
+        from ..fuse_impl import has_mfusepy
 
-        with cache_if_remote(repository, decrypted_cache=manifest.repo_objs) as cached_repo:
-            operations = FuseOperations(manifest, args, cached_repo)
+        if has_mfusepy:
+            # Use mfusepy implementation
+            from ..fuse2 import borgfs
+
+            operations = borgfs(manifest, args, repository)
             logger.info("Mounting filesystem")
             try:
                 operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
             except RuntimeError:
                 # Relevant error message already printed to stderr by FUSE
                 raise RTError("FUSE mount failed")
+        else:
+            # Use llfuse/pyfuse3 implementation
+            from ..fuse import FuseOperations
+
+            with cache_if_remote(repository, decrypted_cache=manifest.repo_objs) as cached_repo:
+                operations = FuseOperations(manifest, args, cached_repo)
+                logger.info("Mounting filesystem")
+                try:
+                    operations.mount(args.mountpoint, args.options, args.foreground, args.show_rc)
+                except RuntimeError:
+                    # Relevant error message already printed to stderr by FUSE
+                    raise RTError("FUSE mount failed")
 
     def do_umount(self, args):
         """Unmounts the FUSE filesystem."""

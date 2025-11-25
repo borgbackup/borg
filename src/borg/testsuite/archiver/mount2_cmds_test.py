@@ -1,3 +1,5 @@
+# this is testing the mount/umount commands with mfusepy implementation
+
 import errno
 import os
 import sys
@@ -38,70 +40,35 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 def fuse_mount2(archiver, mountpoint, *args, **kwargs):
     os.makedirs(mountpoint, exist_ok=True)
 
-    # We use subprocess to run borg mount2 to ensure it runs in a separate process
+    # We use subprocess to run borg mount to ensure it runs in a separate process
     # and we can control it via signals if needed.
     # We use --foreground to keep it running.
 
-    cmd_args = ["mount2", "--foreground"]
-
-    # If the first arg is a path (not starting with -), it might be a path inside the repo
-    # But mount2 syntax is: borg mount2 [options] repo_or_archive mountpoint [path]
-    # Wait, standard mount is: borg mount repo mountpoint
-    # mount2 is: borg mount2 repo mountpoint
+    cmd_args = ["mount", "--foreground"]
 
     # We need to construct the command line carefully.
     # args might contain options or paths.
 
-    # Let's assume usage: fuse_mount2(archiver, mountpoint, options...)
+    # Usage: fuse_mount2(archiver, mountpoint, options...)
     # The repo path is archiver.repository_path
 
-    # If we want to mount a specific archive: fuse_mount2(archiver, mountpoint, "archive_name")
-    # But mount2 takes "repo::archive" as location.
-
-    # Let's look at how test_fuse uses it.
-    # fuse_mount(archiver, mountpoint, "-a", "test", ...)
-
-    # mount2 supports "repo" or "repo::archive".
+    # If we want to mount a specific archive: fuse_mount2(archiver, mountpoint, "-a", "archive_name", ...)
+    # The mount command uses: borg mount --repo REPO [options] MOUNTPOINT
 
     location = archiver.repository_path
 
     # Check if we have extra args that look like options
     # Just pass all args to the command
     # We put mountpoint first, then --repo location, then all other args
-    # This assumes mount2 supports: borg mount2 mountpoint --repo location [options] [paths]
-    # or: borg mount2 mountpoint --repo location -a archive [paths]
+    # This supports: borg mount [options] MOUNTPOINT --repo LOCATION [more options]
 
     borg_cmd = [sys.executable, "-m", "borg"]
     full_cmd = borg_cmd + cmd_args + [mountpoint, "--repo", location] + list(args)
 
-    # If other_args has something, it might be that we want to mount a specific archive
-    # or a path inside the archive?
-    # mount2 currently supports: borg mount2 repo::archive mountpoint
-    # It does NOT support: borg mount2 repo mountpoint path
-    # It DOES support: borg mount2 repo mountpoint
+    # The mount command supports various options like -a/--match-archives, -o, paths, etc.
+    # All options are passed through in args.
 
-    # If the test passes "-a", "archive", we should handle it.
-    # But mount2 might not support -a yet?
-    # Let's check mount2_cmds.py arguments.
-    # It supports "location" and "mountpoint".
-    # It also supports --options (-o).
-    # It does NOT seem to support -a / --match-archives yet based on my previous read,
-    # OR it does via list_considering?
-    # Re-reading mount2_cmds.py would be good, but I recall it uses `self._args.name`
-    # if provided via `location` parsing.
-
-    # If the test wants to mount a specific archive, it should probably pass it in location.
-    # But `fuse_mount` in `mount_cmds_test.py` takes `*options`.
-
-    # Let's try to be smart.
-    # If "-a" is in options, mount2 probably doesn't support it directly as a flag
-    # if it expects repo::archive.
-    # But wait, `list_considering` was used.
-
-    # Let's just pass all args to the command and see.
-    # But we need to put location and mountpoint in the right place.
-
-    # Command: borg mount2 [options] MOUNTPOINT --repo=LOCATION
+    # Command: borg mount [options] MOUNTPOINT --repo=LOCATION
 
     borg_cmd = [sys.executable, "-m", "borg"]
     # We pass mountpoint as positional arg, and repo as --repo
@@ -109,6 +76,9 @@ def fuse_mount2(archiver, mountpoint, *args, **kwargs):
     # full_cmd constructed above
 
     env = os.environ.copy()
+    # Set BORG_FUSE_IMPL to use mfusepy implementation
+    env["BORG_FUSE_IMPL"] = "mfusepy"
+
     # env["BORG_REPO"] = archiver.repository_location # Not needed if --repo is used, but keeps it safe?
     # Actually, if we use --repo, we don't need BORG_REPO env var for the command,
     # but we might need it for other things?
@@ -173,8 +143,13 @@ def test_mount2_missing_mfuse(archivers, request):
 
         from ...helpers import CommandError
 
+        # Set BORG_FUSE_IMPL to mfusepy, but it won't be available
+        env = os.environ.copy()
+        env["BORG_FUSE_IMPL"] = "mfusepy"
+
         try:
-            cmd(archiver, "mount2", archiver.repository_path + "::archive", mountpoint)
+            # This should fail because mfusepy is not available
+            cmd(archiver, "mount", "--repo", archiver.repository_path, "-a", "archive", mountpoint, fork=True, env=env)
         except CommandError:
             # We expect it to fail because mfuse is missing
             # The error message might vary depending on how it's handled

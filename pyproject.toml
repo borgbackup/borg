@@ -190,7 +190,7 @@ set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3"]
 
 [tool.tox.env.py310-mfuse]
-set_env = {BORG_FUSE_IMPL = "none"}
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
 extras = ["mfusepy", "sftp", "s3"]
 
 [tool.tox.env.py311-none]
@@ -204,7 +204,7 @@ set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3"]
 
 [tool.tox.env.py311-mfuse]
-set_env = {BORG_FUSE_IMPL = "none"}
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
 extras = ["mfusepy", "sftp", "s3"]
 
 [tool.tox.env.py312-none]
@@ -218,7 +218,7 @@ set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3"]
 
 [tool.tox.env.py312-mfuse]
-set_env = {BORG_FUSE_IMPL = "none"}
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
 extras = ["mfusepy", "sftp", "s3"]
 
 [tool.tox.env.py313-none]
@@ -232,7 +232,7 @@ set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3"]
 
 [tool.tox.env.py313-mfuse]
-set_env = {BORG_FUSE_IMPL = "none"}
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
 extras = ["mfusepy", "sftp", "s3"]
 
 [tool.tox.env.py314-none]
@@ -246,7 +246,7 @@ set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3"]
 
 [tool.tox.env.py314-mfuse]
-set_env = {BORG_FUSE_IMPL = "none"}
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
 extras = ["mfusepy", "sftp", "s3"]
 
 [tool.tox.env.ruff]

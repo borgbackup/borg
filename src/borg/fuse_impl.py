@@ -1,10 +1,10 @@
 """
-Loads the library for the low-level FUSE implementation.
+Loads the library for the FUSE implementation.
 """
 
 import os
 
-BORG_FUSE_IMPL = os.environ.get("BORG_FUSE_IMPL", "pyfuse3,llfuse")
+BORG_FUSE_IMPL = os.environ.get("BORG_FUSE_IMPL", "mfusepy,pyfuse3,llfuse")
 
 for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
     FUSE_IMPL = FUSE_IMPL.strip()
@@ -16,6 +16,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
         else:
             has_llfuse = False
             has_pyfuse3 = True
+            has_mfusepy = False
             break
     elif FUSE_IMPL == "llfuse":
         try:
@@ -25,6 +26,18 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
         else:
             has_llfuse = True
             has_pyfuse3 = False
+            has_mfusepy = False
+            break
+    elif FUSE_IMPL == "mfusepy":
+        try:
+            from .fuse2 import mfuse  # noqa
+        except ImportError:
+            pass
+        else:
+            llfuse = None  # noqa
+            has_llfuse = False
+            has_pyfuse3 = False
+            has_mfusepy = True
             break
     elif FUSE_IMPL == "none":
         pass
@@ -34,3 +47,4 @@ else:
     llfuse = None  # noqa
     has_llfuse = False
     has_pyfuse3 = False
+    has_mfusepy = False

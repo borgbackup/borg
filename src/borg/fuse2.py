@@ -122,7 +122,7 @@ class FuseBackend:
             self.inodes.pop(ino, None)
         else:
             # Remove path from the item dict before packing to save memory.
-            # The path is already encoded in the DirEntry tree structure
+            # The path is already encoded in the DirEntry tree structure.
             item_dict = item.as_dict()
             item_dict.pop("path", None)
             self.inodes[ino] = msgpack.packb(item_dict)
@@ -233,7 +233,7 @@ class FuseBackend:
                         target_path = os.fsencode(link_target)
                         target_node = self._find_node_from_root(root_node, target_path)
                         if target_node:
-                            # Reuse ID and Item to share inode and attributes
+                            # Reuse ino and item from target
                             node.ino = target_node.ino
                             # node.item = target_node.item  # implicitly shared via ID
                             item = self.get_inode(node.ino)
@@ -315,7 +315,7 @@ class FuseBackend:
                             target_versioned = self._make_versioned_name(link_leaf, link_version)
                             if target_intermediate.has_child(target_versioned):
                                 original_node = target_intermediate.get_child(target_versioned)
-                                # Create new node but reuse the ID and item from original
+                                # Create new node but reuse the ino and item from original
                                 item = self.get_inode(original_node.ino)
                                 file_node = self._create_node(item, parent=intermediate_node)
                                 file_node.ino = original_node.ino
@@ -337,6 +337,8 @@ class FuseBackend:
         if "chunks" not in item:
             return None
 
+        # note: using sha256 here because nowadays it is often hw accelerated.
+        #       shortening the hashes to 16 bytes to save some memory.
         file_id = hashlib.sha256(path).digest()[:16]
         current_version, previous_id = self.versions_index.get(file_id, (0, None))
 
@@ -421,7 +423,6 @@ class FuseBackend:
         )
         st["st_rdev"] = item.get("rdev", 0)
         st["st_size"] = item.get_size()
-        # Convert nanoseconds to seconds for macOS compatibility
         if getattr(self, "use_ns", False):
             st["st_mtime"] = item.mtime
             st["st_atime"] = item.get("atime", item.mtime)
@@ -597,8 +598,6 @@ class borgfs(mfuse.Operations, FuseBackend):
         debug_log(f"read(path={path!r}, size={size}, offset={offset}, fh={fh})")
         node = self._get_node_from_handle(fh)
         if node is None:
-            # Fallback if fh is invalid or not found, try path?
-            # But read should be fast.
             raise mfuse.FuseOSError(errno.EBADF)
 
         item = self.get_inode(node.ino)

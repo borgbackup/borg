@@ -38,42 +38,11 @@ def test_chunkify_sparse(tmpdir, fname, sparse_map, header_size, sparse):
         with open(fname, "rb") as fd:
             return cf(chunker.chunkify(fd))
 
+    # this only works if sparse map blocks are same size as fixed chunker blocks
     fn = str(tmpdir / fname)
     make_sparsefile(fn, sparse_map, header_size=header_size)
     expected_content = make_content(sparse_map, header_size=header_size)
-
-    # ChunkerFixed splits everything into fixed-size chunks (except maybe the header)
-    # We need to split the expected content similarly.
-    expected = []
-
-    # Handle header if present (it's the first item if header_size > 0)
-    if header_size > 0:
-        header = expected_content.pop(0)
-        expected.append(header)
-
-    # Flatten the rest and split into 4096 chunks
-    current_chunk_size = 4096
-    for item in expected_content:
-        if isinstance(item, int):
-            # Hole
-            count = item
-            while count > 0:
-                size = min(count, current_chunk_size)
-                expected.append(size)
-                count -= size
-        else:
-            # Data
-            data = item
-            while len(data) > 0:
-                size = min(len(data), current_chunk_size)
-                expected.append(data[:size])
-                data = data[size:]
-
-    if not sparse:
-        # if the chunker is not sparse-aware, it will read holes as zeros
-        expected = [b"\0" * x if isinstance(x, int) else x for x in expected]
-
-    assert get_chunks(fn, sparse=sparse, header_size=header_size) == expected
+    assert get_chunks(fn, sparse=sparse, header_size=header_size) == expected_content
 
 
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")

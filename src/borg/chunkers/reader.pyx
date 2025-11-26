@@ -138,7 +138,10 @@ class FileFMAPReader:
             try:
                 fmap = list(sparsemap(self.fd, self.fh))
             except (OSError, ValueError) as err:
-                # seeking did not work
+                # Building a sparse map failed:
+                # - OSError: low-level lseek with SEEK_HOLE/SEEK_DATA not supported by FS/OS.
+                # - ValueError: high-level file objects (e.g. io.BytesIO or some fd wrappers)
+                #   don't accept SEEK_HOLE/SEEK_DATA as a valid "whence" and raise ValueError.
                 pass
 
         if fmap is None:

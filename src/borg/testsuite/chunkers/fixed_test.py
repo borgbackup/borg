@@ -34,7 +34,7 @@ from ...constants import *  # NOQA
 )
 def test_chunkify_sparse(tmpdir, fname, sparse_map, header_size, sparse):
     def get_chunks(fname, sparse, header_size):
-        chunker = ChunkerFixed(4096, header_size=header_size, sparse=sparse)
+        chunker = ChunkerFixed(BS, header_size=header_size, sparse=sparse)
         with open(fname, "rb") as fd:
             return cf(chunker.chunkify(fd))
 

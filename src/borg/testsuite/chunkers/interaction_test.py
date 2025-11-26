@@ -29,7 +29,7 @@ def test_reader_chunker_interaction(chunker_params):
     random_data = os.urandom(data_size // 3) + b"\0" * (data_size // 3) + os.urandom(data_size // 3)
 
     # Chunk the data
-    chunker = get_chunker(*chunker_params, sparse=True)
+    chunker = get_chunker(*chunker_params)
     data_file = BytesIO(random_data)
     chunks = list(chunker.chunkify(data_file))
 

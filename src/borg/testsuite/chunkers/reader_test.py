@@ -170,7 +170,7 @@ def test_filereader_read_with_mock(mock_chunks, read_size, expected_data, expect
 )
 def test_filefmapreader_basic(file_content, read_size, expected_chunks):
     """Test basic functionality of FileFMAPReader with different file contents."""
-    reader = FileFMAPReader(fd=BytesIO(file_content), fh=-1, read_size=read_size, sparse=True, fmap=None)
+    reader = FileFMAPReader(fd=BytesIO(file_content), fh=-1, read_size=read_size, sparse=False, fmap=None)
 
     # Collect all chunks from blockify
     chunks = list(reader.blockify())
@@ -252,7 +252,7 @@ def test_filefmapreader_allocation_types(zeros_length, read_size, expected_alloc
     # Create a file with all zeros
     file_content = b"\0" * zeros_length
 
-    reader = FileFMAPReader(fd=BytesIO(file_content), fh=-1, read_size=read_size, sparse=True, fmap=None)
+    reader = FileFMAPReader(fd=BytesIO(file_content), fh=-1, read_size=read_size, sparse=False, fmap=None)
 
     # Collect all chunks from blockify
     chunks = list(reader.blockify())

@@ -310,6 +310,10 @@ jobs:
           set -euxo pipefail
           case "${{ matrix.os }}" in
             freebsd)
+              # Ensure a proper hostname/FQDN is set (VMs may not have one by default)
+              sudo -E /bin/sh -c 'grep -q "freebsd\.local" /etc/hosts || echo "127.0.0.1 freebsd.local freebsd" >> /etc/hosts'
+              sudo -E hostname freebsd.local
+              hostname
               export IGNORE_OSVERSION=yes
               sudo -E pkg update -f
               sudo -E pkg install -y xxhash liblz4 zstd pkgconf
@@ -354,6 +358,10 @@ jobs:
               fi
               ;;
             netbsd)
+              # Ensure a proper hostname/FQDN is set (VMs may not have one by default)
+              sudo -E /bin/sh -c 'grep -q "netbsd\.local" /etc/hosts || echo "127.0.0.1 netbsd.local netbsd" >> /etc/hosts'
+              sudo -E hostname netbsd.local
+              hostname
               arch="$(uname -m)"
               sudo -E mkdir -p /usr/pkg/etc/pkgin
               echo "http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null

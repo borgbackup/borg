@@ -414,11 +414,45 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.2 (2025-10-31)
---------------------------
+Version 1.4.3 (not released yet)
+--------------------------------
 
 For upgrade and compatibility hints, please also read the "Upgrade Notes" section
 above.
+
+New features:
+
+- None.
+
+Fixes:
+
+- CI: FUSE related fixes/improvements, #9182
+
+  - The Linux and FreeBSD binaries built on GitHub now include working
+    FUSE support (based on llfuse).
+  - We can't include FUSE support in the macOS binaries built on GitHub
+    though (we can't install macFUSE there), use our brew tap for that.
+
+Other changes:
+
+- Drop Python 3.9 support (EOL'ed by python.org)
+- CI:
+
+  - Install correct fuse library depending on the tox env.
+  - PyInstaller binary building: build and upload early, then CI test.
+  - For now, use llfuse, as there is an issue with pyinstaller and pyfuse3.
+  - Backported vm_tests (FreeBSD/NetBSD/OpenBSD/Haiku) from master branch.
+  - Dynamic code analysis (Address and UndefinedBehavior Sanitizer), #6819.
+  - Add tag-based workflows and provenance attestation for GitHub-built
+    binaries, #9135, #9136.
+- Docs:
+
+  - Some fixes/updates to the FAQ, #9188.
+  - Update binary readme, release binaries are built on GitHub now.
+
+
+Version 1.4.2 (2025-10-31)
+--------------------------
 
 New features:
 

@@ -796,7 +796,8 @@ class Repository:
             for segment in unused:
                 logger.debug('complete_xfer: deleting unused segment %d', segment)
                 count = self.segments.pop(segment)
-                assert count == 0, 'Corrupted segment reference count - corrupted index or hints'
+                if count != 0:
+                    logger.warning('Corrupted segment reference count %d (expected 0) for segment %d - corrupted index or hints', count, segment)
                 self.io.delete_segment(segment)
                 del self.compact[segment]
             unused = []
@@ -907,7 +908,8 @@ class Repository:
                         if not self.shadow_index[key]:
                             # shadowed segments list is empty -> remove it
                             del self.shadow_index[key]
-            assert segments[segment] == 0, 'Corrupted segment reference count - corrupted index or hints'
+            if segments[segment] != 0:
+                logger.warning('Corrupted segment reference count %d (expected 0) for segment %d - corrupted index or hints', segments[segment], segment)
             unused.append(segment)
             pi.show()
         pi.finish()

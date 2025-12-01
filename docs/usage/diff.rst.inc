@@ -77,7 +77,7 @@ borg diff
         --sort                         Sort the output by path (deprecated, use --sort-by=path).
         --sort-by FIELD[,FIELD...]     Advanced sorting: specify field(s) to sort by. Accepts a comma-separated list. Prefix with > for descending or < for ascending (default).
         --content-only                 Only compare differences in content (exclude metadata differences)
-        --json-lines                   Format output as JSON Lines. 
+        --json-lines                   Format output as JSON Lines.
 
 
     :ref:`common_options`

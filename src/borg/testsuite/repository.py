@@ -716,10 +716,13 @@ class RepositoryAuxiliaryCorruptionTestCase(RepositoryTestCaseBase):
         with self.repository:
             self.repository.append_only = False
             self.repository.put(H(3), b'1234')
-            # Do a compaction run. Fails, since the corrupted refcount was not detected and leads to an assertion failure.
-            with pytest.raises(AssertionError) as exc_info:
+            # Do a compaction run.
+            # The corrupted refcount is detected and logged as a warning, but compaction proceeds.
+            with self.assertLogs('borg.repository', level='WARNING') as cm:
                 self.repository.commit(compact=True)
-            assert 'Corrupted segment reference count' in str(exc_info.value)
+            assert any('Corrupted segment reference count' in msg for msg in cm.output)
+            # We verify that the repository is still consistent.
+            assert self.repository.check()
 
 
 class RepositoryCheckTestCase(RepositoryTestCaseBase):

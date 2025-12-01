@@ -796,7 +796,8 @@ class Repository:
             for segment in unused:
                 logger.debug('complete_xfer: deleting unused segment %d', segment)
                 count = self.segments.pop(segment)
-                assert count == 0, 'Corrupted segment reference count - corrupted index or hints'
+                if count != 0:
+                    logger.warning('Corrupted segment reference count %d (expected 0) for segment %d - corrupted index or hints', count, segment)
                 self.io.delete_segment(segment)
                 del self.compact[segment]
             unused = []
@@ -807,7 +808,8 @@ class Repository:
         for segment, freeable_space in sorted(self.compact.items()):
             if not self.io.segment_exists(segment):
                 logger.warning('segment %d not found, but listed in compaction data', segment)
-                del self.compact[segment]
+                self.compact.pop(segment, None)
+                self.segments.pop(segment, None)
                 pi.show()
                 continue
             segment_size = self.io.segment_size(segment)
@@ -907,7 +909,8 @@ class Repository:
                         if not self.shadow_index[key]:
                             # shadowed segments list is empty -> remove it
                             del self.shadow_index[key]
-            assert segments[segment] == 0, 'Corrupted segment reference count - corrupted index or hints'
+            if segments[segment] != 0:
+                logger.warning('Corrupted segment reference count %d (expected 0) for segment %d - corrupted index or hints', segments[segment], segment)
             unused.append(segment)
             pi.show()
         pi.finish()

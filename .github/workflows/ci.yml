@@ -148,7 +148,8 @@ jobs:
       TOXENV: ${{ matrix.toxenv }}
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 180
+    # macOS machines can be slow, if overloaded.
+    timeout-minutes: 360
 
     steps:
     - uses: actions/checkout@v4

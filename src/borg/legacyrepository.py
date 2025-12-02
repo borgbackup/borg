@@ -753,7 +753,8 @@ class LegacyRepository:
         for segment, freeable_space in sorted(self.compact.items()):
             if not self.io.segment_exists(segment):
                 logger.warning("Segment %d not found, but listed in compaction data", segment)
-                del self.compact[segment]
+                self.compact.pop(segment, None)
+                self.segments.pop(segment, None)
                 pi.show()
                 self._send_log()
                 continue

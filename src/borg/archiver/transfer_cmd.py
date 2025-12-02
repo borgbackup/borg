@@ -20,7 +20,16 @@ logger = create_logger()
 
 
 def transfer_chunks(
-    upgrader, other_repository, other_manifest, other_chunks, archive, cache, recompress, dry_run, chunker_params=None
+    upgrader,
+    other_repository,
+    other_manifest,
+    other_chunks,
+    archive,
+    cache,
+    manifest,
+    recompress,
+    dry_run,
+    chunker_params=None,
 ):
     """
     Transfer chunks from another repository to the current repository.
@@ -41,7 +50,7 @@ def transfer_chunks(
         file = ChunkIteratorFileWrapper(chunk_iterator)
 
         # Create a chunker with the specified parameters
-        chunker = get_chunker(*chunker_params, key=archive.key, sparse=False)
+        chunker = get_chunker(*chunker_params, key=manifest.key, sparse=False)
         for chunk in chunker.chunkify(file):
             if not dry_run:
                 chunk_id, data = cached_hash(chunk, archive.key.id_hash)
@@ -226,6 +235,7 @@ class TransferMixIn:
                             other_chunks,
                             archive,
                             cache,
+                            manifest,
                             args.recompress,
                             dry_run,
                             args.chunker_params,

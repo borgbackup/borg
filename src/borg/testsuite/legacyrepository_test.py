@@ -654,17 +654,20 @@ def test_subtly_corrupted_hints(repository):
         assert pdchunk(repository.get(H(2))) == b"bazz"
 
 
-def test_subtly_corrupted_hints_without_integrity(repository):
+def test_subtly_corrupted_hints_without_integrity(repository, caplog):
     make_auxiliary(repository)
     _subtly_corrupted_hints_setup(repository)
     integrity_path = os.path.join(repository.path, "integrity.5")
     os.unlink(integrity_path)
     with repository:
         repository.put(H(3), fchunk(b"1234"))
-        # do a compaction run, which fails since the corrupted refcount wasn't detected and causes an assertion failure.
-        with pytest.raises(AssertionError) as exc_info:
-            repository.commit(compact=True)
-        assert "Corrupted segment reference count" in str(exc_info.value)
+        # Do a compaction run.
+        # The corrupted refcount is detected and logged as a warning, but compaction proceeds.
+        caplog.set_level(logging.WARNING, logger="borg.legacyrepository")
+        repository.commit(compact=True)
+        assert "Corrupted segment reference count" in caplog.text
+        # We verify that the repository is still consistent.
+        assert repository.check()
 
 
 def list_indices(repo_path):

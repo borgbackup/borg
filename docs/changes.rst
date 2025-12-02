@@ -414,8 +414,8 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.3 (not released yet)
---------------------------------
+Version 1.4.3 (2025-12-02)
+--------------------------
 
 For upgrade and compatibility hints, please also read the "Upgrade Notes" section
 above.
@@ -426,7 +426,9 @@ New features:
 
 Fixes:
 
-- CI: FUSE-related fixes/improvements, #9182
+- compact: replace AssertionError with a warning, #8535.
+- compact: also fix segment hints data for lost segment files.
+- CI: FUSE-related fixes and improvements, #9182:
 
   - The Linux and FreeBSD binaries built on GitHub now include working
     FUSE support (based on llfuse).
@@ -435,7 +437,7 @@ Fixes:
 
 Other changes:
 
-- Drop Python 3.9 support (reached end of life at python.org)
+- Drop Python 3.9 support (has reached end of life at python.org).
 - CI:
 
   - Install the correct FUSE library depending on the tox environment.
@@ -447,7 +449,7 @@ Other changes:
     binaries, #9135, #9136.
 - Docs:
 
-  - Some fixes/updates to the FAQ, #9188.
+  - Some fixes and updates to the FAQ, #9188.
   - Update binary README; release binaries are built on GitHub now.
 
 

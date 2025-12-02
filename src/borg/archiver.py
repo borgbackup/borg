@@ -4310,7 +4310,7 @@ class Archiver:
             help="Only compare differences in content (exclude metadata differences)",
         )
         subparser.add_argument('--json-lines', action='store_true',
-                               help='Format output as JSON Lines. ')
+                               help='Format output as JSON Lines.')
         subparser.add_argument('location', metavar='REPO::ARCHIVE1',
                                type=location_validator(archive=True),
                                help='repository location and ARCHIVE1 name')

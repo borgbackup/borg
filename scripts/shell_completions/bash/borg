@@ -85,7 +85,7 @@ _borg()
                 local opts="-a --match-archives ${archive_filter_opts} ${common_opts}"
                 ;;
             *' repo-create '*)
-                local opts="--other-repo --from-borg1 -e --encryption --copy-crypt-key ${common_opts}"
+                local opts="--other-repo --from-borg1 -e --encryption --copy-crypt-key --fido2-device ${common_opts}"
                 ;;
             *' repo-list '*)
                 local opts="--short --format --json ${common_opts} -a --match-archives ${archive_filter_opts} --deleted"
@@ -136,8 +136,9 @@ _borg()
                 ;;
             # umount
             #   no specific options
-            # key change-passphrase
-            #   no specific options
+            *' change-passphrase '*)
+                local opts="${common_opts} --fido2-device"
+                ;;
             *' change-location '*)
                 local opts="${common_opts} keyfile repokey --keep"
                 ;;

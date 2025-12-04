@@ -1,4 +1,5 @@
 from struct import Struct
+from types import NoneType
 
 from .constants import REQUIRED_ITEM_KEYS, CH_BUZHASH
 from .compress import ZLIB, ZLIB_legacy, ObfuscateSize
@@ -53,7 +54,8 @@ class UpgraderFrom12To20:
 
     def new_archive(self, *, archive):
         self.archive = archive
-        self.hlm = HardLinkManager(id_type=bytes, info_type=list)  # hlid -> chunks_correct
+        # hlid -> chunks_correct list (or None, for contentless hardlinks)
+        self.hlm = HardLinkManager(id_type=bytes, info_type=(list, NoneType))
 
     def upgrade_item(self, *, item):
         """Upgrades the item as needed and removes legacy data."""

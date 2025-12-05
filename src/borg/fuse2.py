@@ -28,6 +28,7 @@ from .platformflags import is_darwin
 from .repository import Repository
 from .remote import RemoteRepository
 
+BLOCK_SIZE = 512  # Standard filesystem block size for st_blocks and statfs
 DEBUG_LOG = None  # os.path.join(os.getcwd(), "fuse_debug.log")
 
 
@@ -423,6 +424,7 @@ class FuseBackend:
         )
         st["st_rdev"] = item.get("rdev", 0)
         st["st_size"] = item.get_size()
+        st["st_blocks"] = (st["st_size"] + BLOCK_SIZE - 1) // BLOCK_SIZE
         if getattr(self, "use_ns", False):
             st["st_mtime"] = item.mtime
             st["st_atime"] = item.get("atime", item.mtime)
@@ -521,13 +523,13 @@ class borgfs(mfuse.Operations, FuseBackend):
 
         # Run the FUSE main loop in foreground (we might be daemonized already or not)
         with signal_handler("SIGUSR1", self.sig_info_handler), signal_handler("SIGINFO", self.sig_info_handler):
-            mfuse.FUSE(self, mountpoint, options, foreground=True)
+            mfuse.FUSE(self, mountpoint, options, foreground=True, use_ino=True)
 
     def statfs(self, path):
         debug_log(f"statfs(path={path!r})")
         stat_ = {}
-        stat_["f_bsize"] = 512
-        stat_["f_frsize"] = 512
+        stat_["f_bsize"] = BLOCK_SIZE
+        stat_["f_frsize"] = BLOCK_SIZE
         stat_["f_blocks"] = 0
         stat_["f_bfree"] = 0
         stat_["f_bavail"] = 0
@@ -662,20 +664,21 @@ class borgfs(mfuse.Operations, FuseBackend):
         if node is None:
             raise mfuse.FuseOSError(errno.ENOENT)
 
-        debug_log("readdir yielding . and .., offsets 1 and 2")
-        offset = 1
+        offset = 0
+        offset += 0  # += 1
+        debug_log(f"readdir yielding . {offset}")
         yield (".", self._make_stat_dict(node), offset)
-        offset += 1
+        offset += 0  # += 1
+        debug_log(f"readdir yielding .. {offset}")
         parent = node.parent if node.parent else node
         yield ("..", self._make_stat_dict(parent), offset)
-        offset += 1
 
         for name, child_node in node.iter_children():
             name_str = name.decode("utf-8", "surrogateescape")
             st = self._make_stat_dict(child_node)
+            offset += 0  # += 1
             debug_log(f"readdir yielding {name_str} {offset} {st}")
             yield (name_str, st, offset)
-            offset += 1
 
     def readlink(self, path):
         debug_log(f"readlink(path={path!r})")

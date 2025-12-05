@@ -88,8 +88,9 @@ General:
         This is a comma-separated list of implementation names, they are tried in the
         given order, e.g.:
 
-        - ``pyfuse3,llfuse``: default, first try to load pyfuse3, then try to load llfuse.
+        - ``mfusepy,pyfuse3,llfuse``: default, first try to load mfusepy, then pyfuse3, then llfuse.
         - ``llfuse,pyfuse3``: first try to load llfuse, then try to load pyfuse3.
+        - ``mfusepy``: only try to load mfusepy
         - ``pyfuse3``: only try to load pyfuse3
         - ``llfuse``: only try to load llfuse
         - ``none``: do not try to load an implementation

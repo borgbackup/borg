@@ -17,6 +17,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
             has_llfuse = False
             has_pyfuse3 = True
             has_mfusepy = False
+            has_any_fuse = True
             break
     elif FUSE_IMPL == "llfuse":
         try:
@@ -27,6 +28,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
             has_llfuse = True
             has_pyfuse3 = False
             has_mfusepy = False
+            has_any_fuse = True
             break
     elif FUSE_IMPL == "mfusepy":
         try:
@@ -38,6 +40,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
             has_llfuse = False
             has_pyfuse3 = False
             has_mfusepy = True
+            has_any_fuse = True
             break
     elif FUSE_IMPL == "none":
         pass
@@ -48,3 +51,4 @@ else:
     has_llfuse = False
     has_pyfuse3 = False
     has_mfusepy = False
+    has_any_fuse = False

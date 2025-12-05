@@ -11,17 +11,12 @@ import sys
 
 import pytest
 
-try:
-    import mfusepy
-except ImportError:
-    mfusepy = None
-
 from ... import xattr, platform
 from ...constants import *  # NOQA
 from ...platform import ENOATTR
 from ...storelocking import Lock
 from ...helpers import flags_noatime, flags_normal
-from .. import has_lchflags, llfuse
+from .. import has_lchflags, has_any_fuse, llfuse
 from .. import changedir, filter_xattrs, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform.platform_test import fakeroot_detected
@@ -32,7 +27,7 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 
 
 @requires_hardlinks
-@pytest.mark.skipif(not llfuse and not mfusepy, reason="FUSE not available")
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
 def test_fuse_mount_hardlinks(archivers, request):
     archiver = request.getfixturevalue(archivers)
     _extract_hardlinks_setup(archiver)
@@ -70,7 +65,7 @@ def test_fuse_mount_hardlinks(archivers, request):
         assert open("input/dir1/subdir/hardlink", "rb").read() == b"123456"
 
 
-@pytest.mark.skipif(not llfuse and not mfusepy, reason="FUSE not available")
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
 def test_fuse(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.EXE and fakeroot_detected():
@@ -178,7 +173,7 @@ def test_fuse(archivers, request):
                 raise
 
 
-@pytest.mark.skipif(not llfuse and not mfusepy, reason="FUSE not available")
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
 def test_fuse_versions_view(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
@@ -212,7 +207,7 @@ def test_fuse_versions_view(archivers, request):
             assert open(hl3, "rb").read() == b"123456"
 
 
-@pytest.mark.skipif(not llfuse and not mfusepy, reason="FUSE not available")
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
 def test_fuse_duplicate_name(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
@@ -230,7 +225,7 @@ def test_fuse_duplicate_name(archivers, request):
         assert "unique2" in dirs
 
 
-@pytest.mark.skipif(not llfuse and not mfusepy, reason="FUSE not available")
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
 def test_fuse_allow_damaged_files(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
@@ -260,7 +255,7 @@ def test_fuse_allow_damaged_files(archivers, request):
         assert data.endswith(b"\0\0")
 
 
-@pytest.mark.skipif(not llfuse and not mfusepy, reason="FUSE not available")
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
 def test_fuse_mount_options(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
@@ -283,7 +278,7 @@ def test_fuse_mount_options(archivers, request):
         assert sorted(os.listdir(os.path.join(mountpoint))) == []
 
 
-@pytest.mark.skipif(not llfuse and not mfusepy, reason="FUSE not available")
+@pytest.mark.skipif(not has_any_fuse, reason="FUSE not available")
 def test_migrate_lock_alive(archivers, request):
     """Both old_id and new_id must not be stale during lock migration / daemonization."""
     archiver = request.getfixturevalue(archivers)

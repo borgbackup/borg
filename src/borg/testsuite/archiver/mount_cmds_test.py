@@ -10,7 +10,7 @@ from ...constants import *  # NOQA
 from ...storelocking import Lock
 from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, llfuse
-from .. import changedir, no_selinux, same_ts_ns
+from .. import changedir, filter_xattrs, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform.platform_test import fakeroot_detected
 from . import RK_ENCRYPTION, cmd, assert_dirs_equal, create_regular_file, create_src_archive, open_archive, src_file
@@ -147,11 +147,11 @@ def test_fuse(archivers, request):
             in_fn = "input/fusexattr"
             out_fn = os.fsencode(os.path.join(mountpoint, "archive", "input", "fusexattr"))
             if not xattr.XATTR_FAKEROOT and xattr.is_enabled(archiver.input_path):
-                assert sorted(no_selinux(xattr.listxattr(out_fn))) == [b"user.empty", b"user.foo"]
+                assert sorted(filter_xattrs(xattr.listxattr(out_fn))) == [b"user.empty", b"user.foo"]
                 assert xattr.getxattr(out_fn, b"user.foo") == b"bar"
                 assert xattr.getxattr(out_fn, b"user.empty") == b""
             else:
-                assert no_selinux(xattr.listxattr(out_fn)) == []
+                assert filter_xattrs(xattr.listxattr(out_fn)) == []
                 try:
                     xattr.getxattr(out_fn, b"user.foo")
                 except OSError as e:

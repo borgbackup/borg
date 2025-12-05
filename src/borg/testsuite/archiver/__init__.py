@@ -26,7 +26,7 @@ from ...manifest import Manifest
 from ...platform import get_flags
 from ...remote import RemoteRepository
 from ...repository import Repository
-from .. import has_lchflags, has_mknod, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, no_selinux
+from .. import has_lchflags, has_mknod, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, filter_xattrs
 from .. import changedir
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, granularity_sleep
 from ..platform.platform_test import is_win32
@@ -407,8 +407,8 @@ def _assert_dirs_equal_cmp(diff, ignore_flags=False, ignore_xattrs=False, ignore
                 d1.append(round(s1.st_mtime_ns, st_mtime_ns_round))
                 d2.append(round(s2.st_mtime_ns, st_mtime_ns_round))
         if not ignore_xattrs:
-            d1.append(no_selinux(get_all(path1, follow_symlinks=False)))
-            d2.append(no_selinux(get_all(path2, follow_symlinks=False)))
+            d1.append(filter_xattrs(get_all(path1, follow_symlinks=False)))
+            d2.append(filter_xattrs(get_all(path2, follow_symlinks=False)))
         assert d1 == d2
     for sub_diff in diff.subdirs.values():
         _assert_dirs_equal_cmp(sub_diff, ignore_flags=ignore_flags, ignore_xattrs=ignore_xattrs, ignore_ns=ignore_ns)

@@ -225,13 +225,14 @@ def is_birthtime_fully_supported():
         return False
 
 
-def no_selinux(x):
-    # selinux fails our FUSE tests, thus ignore selinux xattrs
-    SELINUX_KEY = b"security.selinux"
+def filter_xattrs(x):
+    # selinux and com.apple.provenance fail our FUSE tests, thus ignore them
+    UNWANTED_KEYS = {b"security.selinux", b"com.apple.provenance"}
     if isinstance(x, dict):
-        return {k: v for k, v in x.items() if k != SELINUX_KEY}
+        return {k: v for k, v in x.items() if k not in UNWANTED_KEYS}
     if isinstance(x, list):
-        return [k for k in x if k != SELINUX_KEY]
+        return [k for k in x if k not in UNWANTED_KEYS]
+    raise ValueError("Unsupported type: %s" % type(x))
 
 
 class BaseTestCase(unittest.TestCase):

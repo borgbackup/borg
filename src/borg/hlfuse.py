@@ -8,8 +8,7 @@ from collections import Counter
 
 from .constants import ROBJ_FILE_STREAM, zeros, ROBJ_DONTCARE
 
-
-import mfusepy as mfuse
+from .fuse_impl import hlfuse
 
 from .logger import create_logger
 
@@ -436,13 +435,13 @@ class FuseBackend:
         return st
 
 
-class borgfs(mfuse.Operations, FuseBackend):
+class borgfs(hlfuse.Operations, FuseBackend):
     """Export archive as a FUSE filesystem"""
 
     use_ns = True
 
     def __init__(self, manifest, args, repository):
-        mfuse.Operations.__init__(self)
+        hlfuse.Operations.__init__(self)
         FuseBackend.__init__(self, manifest, args, repository)
         data_cache_capacity = int(os.environ.get("BORG_MOUNT_DATA_CACHE_ENTRIES", os.cpu_count() or 1))
         logger.debug("mount data cache capacity: %d chunks", data_cache_capacity)
@@ -511,7 +510,7 @@ class borgfs(mfuse.Operations, FuseBackend):
         )
         self._create_filesystem()
 
-        # mfuse.FUSE will block if foreground=True, otherwise it returns immediately
+        # hlfuse.FUSE will block if foreground=True, otherwise it returns immediately
         if not foreground:
             # Background mode: daemonize first, then start FUSE (blocking)
             if isinstance(self.repository, RemoteRepository):
@@ -523,7 +522,7 @@ class borgfs(mfuse.Operations, FuseBackend):
 
         # Run the FUSE main loop in foreground (we might be daemonized already or not)
         with signal_handler("SIGUSR1", self.sig_info_handler), signal_handler("SIGINFO", self.sig_info_handler):
-            mfuse.FUSE(self, mountpoint, options, foreground=True, use_ino=True)
+            hlfuse.FUSE(self, mountpoint, options, foreground=True, use_ino=True)
 
     def statfs(self, path):
         debug_log(f"statfs(path={path!r})")
@@ -546,11 +545,11 @@ class borgfs(mfuse.Operations, FuseBackend):
             # use file handle if available to avoid path lookup
             node = self._get_node_from_handle(fh)
             if node is None:
-                raise mfuse.FuseOSError(errno.EBADF)
+                raise hlfuse.FuseOSError(errno.EBADF)
         else:
             node = self._find_node(path)
             if node is None:
-                raise mfuse.FuseOSError(errno.ENOENT)
+                raise hlfuse.FuseOSError(errno.ENOENT)
         st = self._make_stat_dict(node)
         debug_log(f"getattr -> {st}")
         return st
@@ -559,7 +558,7 @@ class borgfs(mfuse.Operations, FuseBackend):
         debug_log(f"listxattr(path={path!r})")
         node = self._find_node(path)
         if node is None:
-            raise mfuse.FuseOSError(errno.ENOENT)
+            raise hlfuse.FuseOSError(errno.ENOENT)
         item = self.get_inode(node.ino)
         result = [k.decode("utf-8", "surrogateescape") for k in item.get("xattrs", {}).keys()]
         debug_log(f"listxattr -> {result}")
@@ -569,7 +568,7 @@ class borgfs(mfuse.Operations, FuseBackend):
         debug_log(f"getxattr(path={path!r}, name={name!r}, position={position})")
         node = self._find_node(path)
         if node is None:
-            raise mfuse.FuseOSError(errno.ENOENT)
+            raise hlfuse.FuseOSError(errno.ENOENT)
         item = self.get_inode(node.ino)
         try:
             if isinstance(name, str):
@@ -579,13 +578,13 @@ class borgfs(mfuse.Operations, FuseBackend):
             return result
         except KeyError:
             debug_log("getxattr -> ENODATA")
-            raise mfuse.FuseOSError(errno.ENODATA) from None
+            raise hlfuse.FuseOSError(errno.ENODATA) from None
 
     def open(self, path, fi):
         debug_log(f"open(path={path!r}, fi={fi})")
         node = self._find_node(path)
         if node is None:
-            raise mfuse.FuseOSError(errno.ENOENT)
+            raise hlfuse.FuseOSError(errno.ENOENT)
         fh = self._get_handle(node)
         fi.fh = fh
         debug_log(f"open -> fh={fh}")
@@ -599,14 +598,14 @@ class borgfs(mfuse.Operations, FuseBackend):
 
     def create(self, path, mode, fi=None):
         debug_log(f"create(path={path!r}, mode={mode}, fi={fi}) -> EROFS")
-        raise mfuse.FuseOSError(errno.EROFS)
+        raise hlfuse.FuseOSError(errno.EROFS)
 
     def read(self, path, size, offset, fi):
         fh = fi.fh
         debug_log(f"read(path={path!r}, size={size}, offset={offset}, fh={fh})")
         node = self._get_node_from_handle(fh)
         if node is None:
-            raise mfuse.FuseOSError(errno.EBADF)
+            raise hlfuse.FuseOSError(errno.EBADF)
 
         item = self.get_inode(node.ino)
         parts = []
@@ -640,7 +639,7 @@ class borgfs(mfuse.Operations, FuseBackend):
                         data = zeros[:s]
                         assert len(data) == s
                     else:
-                        raise mfuse.FuseOSError(errno.EIO) from None
+                        raise hlfuse.FuseOSError(errno.EIO) from None
                 else:
                     _, data = self.repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
                 if offset + n < len(data):
@@ -662,7 +661,7 @@ class borgfs(mfuse.Operations, FuseBackend):
         debug_log(f"readdir(path={path!r}, fh={fh})")
         node = self._find_node(path)
         if node is None:
-            raise mfuse.FuseOSError(errno.ENOENT)
+            raise hlfuse.FuseOSError(errno.ENOENT)
 
         offset = 0
         offset += 0  # += 1
@@ -684,7 +683,7 @@ class borgfs(mfuse.Operations, FuseBackend):
         debug_log(f"readlink(path={path!r})")
         node = self._find_node(path)
         if node is None:
-            raise mfuse.FuseOSError(errno.ENOENT)
+            raise hlfuse.FuseOSError(errno.ENOENT)
         item = self.get_inode(node.ino)
         result = item.target
         debug_log(f"readlink -> {result!r}")

@@ -151,7 +151,7 @@ class Archives:
                 hostname=archive_item.hostname,
                 size=archive_item.get("size", 0),
                 nfiles=archive_item.get("nfiles", 0),
-                comment=archive_item.comment,  # not always present?
+                comment=archive_item.get("comment", ""),
                 tags=tuple(sorted(getattr(archive_item, "tags", []))),  # must be hashable
             )
         return metadata

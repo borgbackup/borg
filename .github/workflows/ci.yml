@@ -405,7 +405,6 @@ jobs:
                 . .venv/bin/activate
                 python -V
                 pip -V
-                pip install pynacl
                 python -m pip install --upgrade pip wheel
                 pip install -r requirements.d/development.txt
                 pip install -e .

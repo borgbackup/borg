@@ -77,14 +77,38 @@ def fs_supports_sparse():
 BS = 4096  # filesystem block size
 
 # Some sparse files. X = content blocks, _ = sparse blocks.
+# Block size must always be BS.
+
 # X__XXX____
-map_sparse1 = [(0 * BS, 1 * BS, True), (1 * BS, 2 * BS, False), (3 * BS, 3 * BS, True), (6 * BS, 4 * BS, False)]
+map_sparse1 = [
+    (0, BS, True),
+    (1 * BS, BS, False),
+    (2 * BS, BS, False),
+    (3 * BS, BS, True),
+    (4 * BS, BS, True),
+    (5 * BS, BS, True),
+    (6 * BS, BS, False),
+    (7 * BS, BS, False),
+    (8 * BS, BS, False),
+    (9 * BS, BS, False),
+]
 
 # _XX___XXXX
-map_sparse2 = [(0 * BS, 1 * BS, False), (1 * BS, 2 * BS, True), (3 * BS, 3 * BS, False), (6 * BS, 4 * BS, True)]
+map_sparse2 = [
+    (0, BS, False),
+    (1 * BS, BS, True),
+    (2 * BS, BS, True),
+    (3 * BS, BS, False),
+    (4 * BS, BS, False),
+    (5 * BS, BS, False),
+    (6 * BS, BS, True),
+    (7 * BS, BS, True),
+    (8 * BS, BS, True),
+    (9 * BS, BS, True),
+]
 
 # XXX
-map_notsparse = [(0 * BS, 3 * BS, True)]
+map_notsparse = [(0, BS, True), (BS, BS, True), (2 * BS, BS, True)]
 
 # ___
-map_onlysparse = [(0 * BS, 3 * BS, False)]
+map_onlysparse = [(0, BS, False), (BS, BS, False), (2 * BS, BS, False)]

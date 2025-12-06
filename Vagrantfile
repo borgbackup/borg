@@ -373,7 +373,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd13")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd13", ".*(fuse3|none).*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd13", ".*(pyfuse3|none).*")
   end
 
   config.vm.define "freebsd14" do |b|
@@ -390,7 +390,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
     b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
     b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("freebsd14")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd14", ".*(fuse3|none).*")
+    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("freebsd14", ".*(pyfuse3|none).*")
   end
 
   config.vm.define "openbsd7" do |b|
@@ -413,7 +413,7 @@ Vagrant.configure(2) do |config|
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
     b.vm.provision "packages netbsd", :type => :shell, :inline => packages_netbsd
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("netbsd9")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg(false)
+    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd9", ".*fuse.*")
   end
 

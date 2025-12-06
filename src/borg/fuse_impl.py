@@ -2,7 +2,10 @@
 Loads the library for the FUSE implementation.
 """
 
+import errno
 import os
+
+ENOATTR = getattr(errno, "ENOATTR", getattr(errno, "ENODATA", None))
 
 BORG_FUSE_IMPL = os.environ.get("BORG_FUSE_IMPL", "mfusepy,pyfuse3,llfuse")
 
@@ -18,6 +21,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
             has_pyfuse3 = True
             has_mfusepy = False
             has_any_fuse = True
+            ENOATTR = llfuse.ENOATTR
             break
     elif FUSE_IMPL == "llfuse":
         try:
@@ -29,6 +33,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
             has_pyfuse3 = False
             has_mfusepy = False
             has_any_fuse = True
+            ENOATTR = llfuse.ENOATTR
             break
     elif FUSE_IMPL == "mfusepy":
         try:
@@ -41,6 +46,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
             has_pyfuse3 = False
             has_mfusepy = True
             has_any_fuse = True
+            # ENOATTR = mfuse.ENOATTR
             break
     elif FUSE_IMPL == "none":
         pass

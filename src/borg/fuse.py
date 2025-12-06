@@ -11,7 +11,7 @@ from collections import defaultdict, Counter
 from signal import SIGINT
 
 from .constants import ROBJ_FILE_STREAM, zeros
-from .fuse_impl import llfuse, has_pyfuse3
+from .fuse_impl import llfuse, has_pyfuse3, ENOATTR
 
 
 if has_pyfuse3:
@@ -638,7 +638,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         try:
             return item.get("xattrs", {})[name] or b""
         except KeyError:
-            raise llfuse.FUSEError(llfuse.ENOATTR) from None
+            raise llfuse.FUSEError(ENOATTR) from None
 
     @async_wrapper
     def lookup(self, parent_inode, name, ctx=None):

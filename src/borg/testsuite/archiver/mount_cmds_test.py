@@ -15,7 +15,7 @@ from ... import xattr, platform
 from ...constants import *  # NOQA
 from ...storelocking import Lock
 from ...helpers import flags_noatime, flags_normal
-from .. import has_lchflags, has_any_fuse, llfuse
+from .. import has_lchflags, has_any_fuse, ENOATTR
 from .. import changedir, filter_xattrs, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform.platform_test import fakeroot_detected
@@ -161,7 +161,7 @@ def test_fuse(archivers, request):
                 try:
                     xattr.getxattr(out_fn, b"user.foo")
                 except OSError as e:
-                    assert e.errno == llfuse.ENOATTR
+                    assert e.errno == ENOATTR
                 else:
                     assert False, "expected OSError(ENOATTR), but no error was raised"
         except OSError as err:

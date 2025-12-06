@@ -27,7 +27,7 @@ from ...platform import get_flags
 from ...remote import RemoteRepository
 from ...repository import Repository
 from .. import has_lchflags, has_mknod, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, filter_xattrs
-from .. import changedir
+from .. import changedir, ENOATTR  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, granularity_sleep
 from ..platform.platform_test import is_win32
 from ...xattr import get_all

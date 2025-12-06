@@ -5,10 +5,16 @@ import os
 import stat
 import time
 from collections import Counter
+from typing import TYPE_CHECKING
 
 from .constants import ROBJ_FILE_STREAM, zeros, ROBJ_DONTCARE
 
-from .fuse_impl import hlfuse
+if TYPE_CHECKING:
+    # For type checking, assume mfusepy is available
+    # This allows mypy to understand hlfuse.Operations
+    import mfusepy as hlfuse
+else:
+    from .fuse_impl import hlfuse
 
 from .logger import create_logger
 
@@ -28,7 +34,7 @@ from .repository import Repository
 from .remote import RemoteRepository
 
 BLOCK_SIZE = 512  # Standard filesystem block size for st_blocks and statfs
-DEBUG_LOG = None  # os.path.join(os.getcwd(), "fuse_debug.log")
+DEBUG_LOG: str | None = None  # os.path.join(os.getcwd(), "fuse_debug.log")
 
 
 def debug_log(msg):

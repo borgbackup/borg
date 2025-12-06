@@ -9,10 +9,18 @@ import tempfile
 import time
 from collections import defaultdict, Counter
 from signal import SIGINT
+from typing import TYPE_CHECKING
 
 from .constants import ROBJ_FILE_STREAM, zeros
-from .fuse_impl import llfuse, has_pyfuse3
 from .platform import ENOATTR
+
+if TYPE_CHECKING:
+    # For type checking, assume llfuse is available
+    # This allows mypy to understand llfuse.Operations
+    import llfuse
+    from .fuse_impl import has_pyfuse3
+else:
+    from .fuse_impl import llfuse, has_pyfuse3
 
 if has_pyfuse3:
     import trio

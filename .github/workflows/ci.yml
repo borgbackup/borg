@@ -389,6 +389,7 @@ jobs:
                 # Install one of the FUSE libraries; fail if neither is available
                 sudo -E pkg install -y fusefs-libs || sudo -E pkg install -y fusefs-libs3
                 sudo -E pkg install -y rust
+                sudo -E pkg install -y gmake
                 sudo -E pkg install -y git
                 sudo -E pkg install -y python310 py310-sqlite3
                 sudo -E pkg install -y python311 py311-sqlite3 py311-pip py311-virtualenv
@@ -396,6 +397,9 @@ jobs:
                 sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python
                 sudo ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip3
                 sudo ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip
+
+                # required for libsodium/pynacl build
+                export MAKE=gmake
 
                 python -m venv .venv
                 . .venv/bin/activate

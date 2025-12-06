@@ -136,19 +136,19 @@ jobs:
             "include": [
               {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "mypy"},
               {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse2"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"}
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-llfuse"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
             ]
           }' || '{
             "include": [
               {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "mypy"},
               {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse2"},
-              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-fuse2", "binary": "borg-linux-glibc235-x86_64-gh"},
-              {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-fuse2", "binary": "borg-linux-glibc235-arm64-gh"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-fuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-fuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"},
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-llfuse"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-llfuse", "binary": "borg-linux-glibc235-x86_64-gh"},
+              {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-llfuse", "binary": "borg-linux-glibc235-arm64-gh"},
+              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
+              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-pyfuse3"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"},
               {"os": "macos-15-intel", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-15-x86_64-gh"},
               {"os": "macos-15", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-15-arm64-gh"}
             ]
@@ -190,9 +190,9 @@ jobs:
         sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
         sudo apt-get install -y bash zsh fish  # for shell completion tests
         sudo apt-get install -y rclone openssh-server curl
-        if [[ "$TOXENV" == *"fuse2"* ]]; then
+        if [[ "$TOXENV" == *"llfuse"* ]]; then
           sudo apt-get install -y libfuse-dev fuse  # Required for Python llfuse module
-        elif [[ "$TOXENV" == *"fuse3"* ]]; then
+        elif [[ "$TOXENV" == *"pyfuse3"* || "$TOXENV" == *"mfusepy"* ]]; then
           sudo apt-get install -y libfuse3-dev fuse3  # Required for Python pyfuse3 module
         fi
 
@@ -266,10 +266,12 @@ jobs:
 
     - name: Install borgbackup
       run: |
-        if [[ "$TOXENV" == *"fuse2"* ]]; then
+        if [[ "$TOXENV" == *"llfuse"* ]]; then
           pip install -ve ".[llfuse]"
-        elif [[ "$TOXENV" == *"fuse3"* ]]; then
+        elif [[ "$TOXENV" == *"pyfuse3"* ]]; then
           pip install -ve ".[pyfuse3]"
+        elif [[ "$TOXENV" == *"mfusepy"* ]]; then
+          pip install -ve ".[mfusepy]"
         else
           pip install -ve .
         fi
@@ -423,8 +425,8 @@ jobs:
                 pip -V
                 python -m pip install --upgrade pip wheel
                 pip install -r requirements.d/development.txt
-                pip install -e ".[llfuse]"
-                tox -e py311-fuse2
+                pip install -e ".[mfusepy]"
+                tox -e py311-mfusepy
 
                 if [[ "${{ matrix.do_binaries }}" == "true" && "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
                   python -m pip install 'pyinstaller==6.14.2'

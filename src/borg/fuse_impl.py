@@ -22,6 +22,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
             has_mfusepy = False
             has_any_fuse = True
             ENOATTR = llfuse.ENOATTR
+            hlfuse = None  # noqa
             break
     elif FUSE_IMPL == "llfuse":
         try:
@@ -34,10 +35,11 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
             has_mfusepy = False
             has_any_fuse = True
             ENOATTR = llfuse.ENOATTR
+            hlfuse = None  # noqa
             break
     elif FUSE_IMPL == "mfusepy":
         try:
-            from .hlfuse import mfuse  # noqa
+            import mfusepy as hlfuse
         except ImportError:
             pass
         else:
@@ -46,7 +48,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
             has_pyfuse3 = False
             has_mfusepy = True
             has_any_fuse = True
-            # ENOATTR = mfuse.ENOATTR
+            # ENOATTR = hlfuse.ENOATTR
             break
     elif FUSE_IMPL == "none":
         pass
@@ -54,6 +56,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
         raise RuntimeError("Unknown FUSE implementation in BORG_FUSE_IMPL: '%s'." % BORG_FUSE_IMPL)
 else:
     llfuse = None  # noqa
+    hlfuse = None  # noqa
     has_llfuse = False
     has_pyfuse3 = False
     has_mfusepy = False

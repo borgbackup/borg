@@ -4,6 +4,8 @@ Loads the library for the FUSE implementation.
 
 import os
 
+from .platform import ENOATTR  # noqa
+
 BORG_FUSE_IMPL = os.environ.get("BORG_FUSE_IMPL", "mfusepy,pyfuse3,llfuse")
 
 for FUSE_IMPL in BORG_FUSE_IMPL.split(","):

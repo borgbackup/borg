@@ -16,7 +16,7 @@ from ...constants import *  # NOQA
 from ...platform import ENOATTR
 from ...storelocking import Lock
 from ...helpers import flags_noatime, flags_normal
-from .. import has_lchflags, has_any_fuse, llfuse
+from .. import has_lchflags, has_any_fuse, ENOATTR
 from .. import changedir, filter_xattrs, same_ts_ns
 from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
 from ..platform.platform_test import fakeroot_detected

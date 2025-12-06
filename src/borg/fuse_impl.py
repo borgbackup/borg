@@ -34,7 +34,7 @@ for FUSE_IMPL in BORG_FUSE_IMPL.split(","):
             break
     elif FUSE_IMPL == "mfusepy":
         try:
-            from .fuse2 import mfuse  # noqa
+            from .hlfuse import mfuse  # noqa
         except ImportError:
             pass
         else:

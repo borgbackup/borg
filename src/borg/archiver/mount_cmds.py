@@ -38,7 +38,7 @@ class MountMixIn:
 
         if has_mfusepy:
             # Use mfusepy implementation
-            from ..fuse2 import borgfs
+            from ..hlfuse import borgfs
 
             operations = borgfs(manifest, args, repository)
             logger.info("Mounting filesystem")

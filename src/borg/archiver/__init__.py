@@ -337,6 +337,7 @@ class Archiver(
         parser.add_argument(
             "-V", "--version", action="version", version="%(prog)s " + __version__, help="show version number and exit"
         )
+        parser.add_argument("--cockpit", dest="cockpit", action="store_true", help="Start the Borg TUI")
         parser.common_options.add_common_group(parser, "_maincommand", provide_defaults=True)
 
         common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
@@ -646,6 +647,23 @@ def main():  # pragma: no cover
             print(msg, file=sys.stderr)
             print(tb, file=sys.stderr)
             sys.exit(EXIT_ERROR)
+
+        if args.cockpit:
+            # Cockpit TUI operation
+            try:
+                from ..cockpit.app import BorgCockpitApp
+            except ImportError as err:
+                print(f"ImportError: {err}", file=sys.stderr)
+                print("The Borg Cockpit feature has some additional requirements.", file=sys.stderr)
+                print("Please install them using: pip install 'borgbackup[cockpit]'", file=sys.stderr)
+                sys.exit(EXIT_ERROR)
+
+            app = BorgCockpitApp()
+            app.borg_args = [arg for arg in sys.argv[1:] if arg != "--cockpit"]
+            app.run()
+            sys.exit(EXIT_SUCCESS)  # borg subprocess RC was already shown on the TUI
+
+        # normal borg CLI operation
         try:
             with sig_int:
                 exit_code = archiver.run(args)

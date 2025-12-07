@@ -46,6 +46,7 @@ pyfuse3 = ["pyfuse3 >= 3.1.1"]
 nofuse = []
 s3 = ["borgstore[s3] ~= 0.3.0"]
 sftp = ["borgstore[sftp] ~= 0.3.0"]
+cockpit = ["textual>=6.8.0"]  # might also work with older versions, untested
 
 [project.urls]
 "Homepage" = "https://borgbackup.org/"

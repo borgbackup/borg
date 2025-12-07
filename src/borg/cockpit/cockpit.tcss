@@ -1,0 +1,201 @@
+/* Borg Cockpit Stylesheet */
+
+Screen {
+    background: $surface;
+}
+
+Header {
+    dock: top;
+    background: $primary;
+    color: $secondary;
+    text-style: bold;
+}
+
+Header * {
+    background: $primary;
+    color: $secondary;
+    text-style: bold;
+}
+
+.header--clock, .header--title, .header--icon {
+    background: $primary;
+    color: $secondary;
+    text-style: bold;
+}
+
+.header--clock {
+    dock: right;
+}
+
+Footer {
+    background: $background;
+    color: $primary;
+    dock: bottom;
+}
+
+.footer--key {
+    background: $background;
+    color: $primary;
+    text-style: bold;
+}
+
+.footer--description {
+    background: $background;
+    color: $primary;
+    text-style: bold;
+}
+
+.footer--highlight {
+    background: $primary;
+    color: $secondary;
+}
+
+#standard-log-content {
+    scrollbar-background: $background;
+    scrollbar-color: $primary;
+    /* Hide horizontal scrollbar and clip long lines at the right */
+    overflow-x: hidden;
+    text-wrap: nowrap;
+}
+
+#standard-log {
+    border: double $primary;
+}
+
+#main-grid {
+    /* Simple vertical stack: top row content-sized, log fills remaining space */
+    layout: vertical;
+    /* Fill available area between header and footer */
+    height: 1fr;
+    /* Allow shrinking when space is tight */
+    min-height: 0;
+    margin: 0 1;
+}
+
+#top-row {
+    border: double $primary;
+    /* If content grows too large, scroll rather than pushing the log off-screen */
+    overflow-y: auto;
+    /* Adjust this if status or logo panel shall get more/less height. */
+    height: 16;
+}
+
+#logopanel {
+    width: 50%;
+    /* Stretch to the full height of the top row so the separator spans fully */
+    height: 100%;
+    border-right: double $primary;
+    text-align: center;
+    layers: base overlay;
+    /* Make logo panel not influence row height beyond status; clip overflow */
+    overflow: hidden;
+}
+
+Starfield {
+    layer: base;
+    width: 100%;
+    /* Size to content and get clipped by the panel */
+    height: 100%;
+    min-height: 0;
+}
+
+Pulsar {
+    layer: overlay;
+    width: 3;
+    height: 3;
+    content-align: center middle;
+    color: $pulsar-color;
+    transition: color 4s linear;
+}
+
+Slogan {
+    layer: overlay;
+    width: auto;
+    height: 1;
+    content-align: center middle;
+    color: #00ff00;
+    transition: color 1s linear;
+    opacity: 0;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+Logo {
+    layer: overlay;
+    width: auto;
+    /* Size to its intrinsic content, clipped by the panel */
+    height: auto;
+    opacity: 0;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+Slogan.dim {
+    color: #005500;
+}
+
+Pulsar.dim {
+    color: $pulsar-dim-color;
+}
+
+#status {
+    width: 50%;
+    /* Let height be determined by content so the row can size to content */
+    height: auto;
+    /* Prevent internal content from forcing excessive height; allow scrolling */
+    overflow-y: auto;
+}
+
+/* Ensure the log always keeps at least 5 rows visible */
+#standard-log {
+    min-height: 5;
+    /* Explicitly claim the remaining space in the grid */
+    height: 1fr;
+}
+
+/* Within the log panel (a Vertical container), keep the title to 1 line and let content fill the rest */
+#standard-log-title {
+    height: 1;
+}
+
+#standard-log-content {
+    /* Allow the RichLog to expand within the log panel */
+    height: 1fr;
+}
+
+.panel-title {
+    background: $primary;
+    color: $secondary;
+    padding: 0 1;
+    text-style: bold;
+}
+
+#speed-sparkline {
+    width: 100%;
+    height: 4;
+    margin-bottom: 1;
+}
+
+.status {
+    color: $primary;
+}
+
+.errors-ok {
+    color: $success;
+}
+
+.errors-warning {
+    color: $warning;
+}
+
+.rc-ok {
+    color: $success;
+}
+
+.rc-warning {
+    color: $warning;
+}
+
+.rc-error {
+    color: $error;
+}

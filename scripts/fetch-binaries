@@ -12,12 +12,8 @@ check_and_copy () {
     echo ""
 }
 
-check_and_copy buster    borg-linux-glibc228
-check_and_copy bullseye  borg-linux-glibc231
-check_and_copy bookworm  borg-linux-glibc236
-check_and_copy trixie    borg-linux-glibc241
+check_and_copy bullseye  borg-linux-glibc231-x86_64
+check_and_copy bookworm  borg-linux-glibc236-x86_64
+check_and_copy trixie    borg-linux-glibc241-x86_64
 
-check_and_copy freebsd13 borg-freebsd13
-check_and_copy freebsd14 borg-freebsd14
-
-check_and_copy macos1012 borg-macos1012
+check_and_copy freebsd14 borg-freebsd14-x86_64

@@ -9,7 +9,6 @@ from collections import defaultdict
 from configparser import ConfigParser
 from functools import partial
 from itertools import islice
-from typing import DefaultDict
 from collections.abc import Callable
 
 from .constants import *  # NOQA
@@ -48,7 +47,7 @@ TAG_PUT2 = 3
 # may not be able to handle the new tags.
 MAX_TAG_ID = 15
 
-FreeSpace: Callable[[], DefaultDict] = partial(defaultdict, int)
+FreeSpace: Callable[[], defaultdict] = partial(defaultdict, int)
 
 
 def header_size(tag):
@@ -737,7 +736,12 @@ class LegacyRepository:
             for segment in unused:
                 logger.debug("complete_xfer: Deleting unused segment %d", segment)
                 count = self.segments.pop(segment)
-                assert count == 0, "Corrupted segment reference count - corrupted index or hints"
+                if count != 0:
+                    logger.warning(
+                        "Corrupted segment reference count %d (expected 0) for segment %d - corrupted index or hints",
+                        count,
+                        segment,
+                    )
                 self.io.delete_segment(segment)
                 del self.compact[segment]
             unused = []
@@ -749,7 +753,8 @@ class LegacyRepository:
         for segment, freeable_space in sorted(self.compact.items()):
             if not self.io.segment_exists(segment):
                 logger.warning("Segment %d not found, but listed in compaction data", segment)
-                del self.compact[segment]
+                self.compact.pop(segment, None)
+                self.segments.pop(segment, None)
                 pi.show()
                 self._send_log()
                 continue
@@ -868,7 +873,12 @@ class LegacyRepository:
                         if not self.shadow_index[key]:
                             # shadowed segments list is empty -> remove it
                             del self.shadow_index[key]
-            assert segments[segment] == 0, "Corrupted segment reference count - corrupted index or hints"
+            if segments[segment] != 0:
+                logger.warning(
+                    "Corrupted segment reference count %d (expected 0) for segment %d - corrupted index or hints",
+                    segments[segment],
+                    segment,
+                )
             unused.append(segment)
             pi.show()
             self._send_log()

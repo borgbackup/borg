@@ -34,7 +34,7 @@ try:
     from ._common import Highlander
     from .. import __version__
     from ..constants import *  # NOQA
-    from ..helpers import EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE, classify_ec
+    from ..helpers import EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
     from ..helpers import Error, CommandError, get_ec, modern_ec
     from ..helpers import add_warning, BorgWarning, BackupWarning
     from ..helpers import format_file_size
@@ -79,6 +79,7 @@ from .analyze_cmd import AnalyzeMixIn
 from .benchmark_cmd import BenchmarkMixIn
 from .check_cmd import CheckMixIn
 from .compact_cmd import CompactMixIn
+from .completion_cmd import CompletionMixIn
 from .create_cmd import CreateMixIn
 from .debug_cmd import DebugMixIn
 from .delete_cmd import DeleteMixIn
@@ -112,6 +113,7 @@ class Archiver(
     BenchmarkMixIn,
     CheckMixIn,
     CompactMixIn,
+    CompletionMixIn,
     CreateMixIn,
     DebugMixIn,
     DeleteMixIn,
@@ -169,7 +171,7 @@ class Archiver(
         if self.output_list and status is not None and (self.output_filter is None or status in self.output_filter):
             if self.log_json:
                 json_data = {"type": "file_status", "status": status}
-                json_data.update(text_to_json("path", path))
+                json_data |= text_to_json("path", path)
                 print(json.dumps(json_data), file=sys.stderr)
             else:
                 logging.getLogger("borg.output.list").info("%1s %s", status, remove_surrogates(path))
@@ -180,7 +182,8 @@ class Archiver(
         ]
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
-                if arg.startswith(old_name):
+                # either --old_name or --old_name=...
+                if arg == old_name or (arg.startswith(old_name) and arg[len(old_name)] == "="):
                     if new_name is not None:
                         args[i] = arg.replace(old_name, new_name)
                     print(warning, file=sys.stderr)
@@ -353,6 +356,7 @@ class Archiver(
         self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
         self.build_parser_check(subparsers, common_parser, mid_common_parser)
         self.build_parser_compact(subparsers, common_parser, mid_common_parser)
+        self.build_parser_completion(subparsers, common_parser, mid_common_parser)
         self.build_parser_create(subparsers, common_parser, mid_common_parser)
         self.build_parser_debug(subparsers, common_parser, mid_common_parser)
         self.build_parser_delete(subparsers, common_parser, mid_common_parser)
@@ -686,21 +690,9 @@ def main():  # pragma: no cover
         if tb:
             logger.log(tb_log_level, tb)
         if args.show_rc:
-            rc_logger = logging.getLogger("borg.output.show-rc")
-            exit_msg = "terminating with %s status, rc %d"
-            try:
-                ec_class = classify_ec(exit_code)
-            except ValueError:
-                rc_logger.error(exit_msg % ("abnormal", exit_code or 666))
-            else:
-                if ec_class == "success":
-                    rc_logger.info(exit_msg % (ec_class, exit_code))
-                elif ec_class == "warning":
-                    rc_logger.warning(exit_msg % (ec_class, exit_code))
-                elif ec_class == "error":
-                    rc_logger.error(exit_msg % (ec_class, exit_code))
-                elif ec_class == "signal":
-                    rc_logger.error(exit_msg % (ec_class, exit_code))
+            from ..helpers import do_show_rc
+
+            do_show_rc(exit_code)
         sys.exit(exit_code)
 
 

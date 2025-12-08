@@ -78,6 +78,11 @@ General:
         When set to no (default: yes), system information (like OS, Python version, ...) in
         exceptions is not shown.
         Please only use for good reasons as it makes issues harder to analyze.
+    BORG_MSGPACK_VERSION_CHECK
+        Controls whether Borg checks the ``msgpack`` version.
+        The default is ``yes`` (strict check). Set to ``no`` to disable the version check and
+        allow any installed ``msgpack`` version. Use this at your own risk; malfunctioning or
+        incompatible ``msgpack`` versions may cause subtle bugs or repository data corruption.
     BORG_FUSE_IMPL
         Choose the low-level FUSE implementation borg shall use for ``borg mount``.
         This is a comma-separated list of implementation names, they are tried in the

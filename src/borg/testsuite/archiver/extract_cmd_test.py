@@ -1,20 +1,21 @@
 import errno
 import os
 import shutil
-import time
+import stat
 from unittest.mock import patch
 
 import pytest
 
 from ... import xattr
+from ... import platform
 from ...chunkers import has_seek_hole
 from ...constants import *  # NOQA
 from ...helpers import EXIT_WARNING, BackupPermissionError, bin_to_hex
 from ...helpers import flags_noatime, flags_normal
-from .. import changedir, same_ts_ns
+from .. import changedir, same_ts_ns, granularity_sleep
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from ...platform import get_birthtime_ns
-from ...platformflags import is_darwin, is_win32
+from ...platformflags import is_darwin, is_freebsd, is_win32
 from . import (
     RK_ENCRYPTION,
     requires_hardlinks,
@@ -606,6 +607,33 @@ def test_extract_xattrs_resourcefork(archivers, request):
     # assert atime_extracted == atime_expected  # still broken, but not really important.
 
 
+@pytest.mark.skipif(not (is_darwin or is_freebsd), reason="only for macOS or FreeBSD")
+def test_extract_restores_append_flag(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    # create a file and set the append flag on it
+    create_regular_file(archiver.input_path, "appendflag", size=1)
+    src_path = os.path.abspath("input/appendflag")
+    if not hasattr(stat, "UF_APPEND"):
+        pytest.skip("UF_APPEND not available on this platform")
+    try:
+        platform.set_flags(src_path, stat.UF_APPEND)
+    except Exception:
+        pytest.skip("setting UF_APPEND not supported on this filesystem")
+    # Verify the flag actually got set; otherwise skip (filesystem may not support it)
+    st = os.lstat(src_path)
+    if (platform.get_flags(src_path, st) & stat.UF_APPEND) == 0:
+        pytest.skip("UF_APPEND not settable on this filesystem")
+    # archive and extract
+    cmd(archiver, "repo-create", "-e" "none")
+    cmd(archiver, "create", "test", "input")
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        out_path = os.path.abspath("input/appendflag")
+        st2 = os.lstat(out_path)
+        flags = platform.get_flags(out_path, st2)
+        assert (flags & stat.UF_APPEND) == stat.UF_APPEND
+
+
 def test_overwrite(archivers, request):
     archiver = request.getfixturevalue(archivers)
     if archiver.EXE:
@@ -674,6 +702,7 @@ def test_do_not_fail_when_percent_is_in_file_name(archivers, request):
             cmd(archiver, "extract", "test", exit_code=EXIT_WARNING)
 
 
+@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
 def test_extract_continue(archivers, request):
     archiver = request.getfixturevalue(archivers)
     CONTENTS1, CONTENTS2, CONTENTS3 = b"contents1" * 100, b"contents2" * 200, b"contents3" * 300
@@ -698,7 +727,7 @@ def test_extract_continue(archivers, request):
         # make a hard link, so it does not free the inode when unlinking input/file3
         os.link("input/file3", "hardlink-to-keep-inode-f3")
         os.remove("input/file3")
-    time.sleep(1)  # needed due to timestamp granularity of apple hfs+
+    granularity_sleep()
 
     with changedir("output"):
         # now try to continue extracting, using the same archive, same output dir:

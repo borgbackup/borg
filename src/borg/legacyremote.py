@@ -32,6 +32,7 @@ from .legacyrepository import LegacyRepository
 from .version import parse_version, format_version
 from .checksums import xxh64
 from .helpers.datastruct import EfficientCollectionQueue
+from .platform import is_win32
 
 logger = create_logger(__name__)
 
@@ -276,7 +277,13 @@ class LegacyRemoteRepository:
             logger.debug("SSH command line: %s", borg_cmd)
             # we do not want the ssh getting killed by Ctrl-C/SIGINT because it is needed for clean shutdown of borg.
             self.p = Popen(
-                borg_cmd, bufsize=0, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env, preexec_fn=ignore_sigint
+                borg_cmd,
+                bufsize=0,
+                stdin=PIPE,
+                stdout=PIPE,
+                stderr=PIPE,
+                env=env,
+                preexec_fn=None if is_win32 else ignore_sigint,
             )  # nosec B603
             self.stdin_fd = self.p.stdin.fileno()
             self.stdout_fd = self.p.stdout.fileno()
@@ -657,11 +664,12 @@ class LegacyRemoteRepository:
     def list(self, limit=None, marker=None):
         """actual remoting is done via self.call in the @api decorator"""
 
-    def get(self, id, read_data=True):
-        for resp in self.get_many([id], read_data=read_data):
+    def get(self, id, read_data=True, raise_missing=True):
+        for resp in self.get_many([id], read_data=read_data, raise_missing=raise_missing):
             return resp
 
-    def get_many(self, ids, read_data=True, is_preloaded=False):
+    def get_many(self, ids, read_data=True, is_preloaded=False, raise_missing=True):
+        # note: legacy remote protocol does not support raise_missing parameter, so we ignore it here
         yield from self.call_many("get", [{"id": id, "read_data": read_data} for id in ids], is_preloaded=is_preloaded)
 
     @api(since=parse_version("1.0.0"))
@@ -740,11 +748,11 @@ class RepositoryNoCache:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def get(self, key, read_data=True):
-        return next(self.get_many([key], read_data=read_data, cache=False))
+    def get(self, key, read_data=True, raise_missing=True):
+        return next(self.get_many([key], read_data=read_data, raise_missing=raise_missing, cache=False))
 
-    def get_many(self, keys, read_data=True, cache=True):
-        for key, data in zip(keys, self.repository.get_many(keys, read_data=read_data)):
+    def get_many(self, keys, read_data=True, cache=True, raise_missing=True):
+        for key, data in zip(keys, self.repository.get_many(keys, read_data=read_data, raise_missing=raise_missing)):
             yield self.transform(key, data)
 
     def log_instrumentation(self):
@@ -849,10 +857,12 @@ class RepositoryCache(RepositoryNoCache):
         self.cache.clear()
         shutil.rmtree(self.basedir)
 
-    def get_many(self, keys, read_data=True, cache=True):
+    def get_many(self, keys, read_data=True, cache=True, raise_missing=True):
         # It could use different cache keys depending on read_data and cache full vs. meta-only chunks.
         unknown_keys = [key for key in keys if self.prefixed_key(key, complete=read_data) not in self.cache]
-        repository_iterator = zip(unknown_keys, self.repository.get_many(unknown_keys, read_data=read_data))
+        repository_iterator = zip(
+            unknown_keys, self.repository.get_many(unknown_keys, read_data=read_data, raise_missing=raise_missing)
+        )
         for key in keys:
             pkey = self.prefixed_key(key, complete=read_data)
             if pkey in self.cache:
@@ -870,7 +880,7 @@ class RepositoryCache(RepositoryNoCache):
                 else:
                     # slow path: eviction during this get_many removed this key from the cache
                     t0 = time.perf_counter()
-                    data = self.repository.get(key, read_data=read_data)
+                    data = self.repository.get(key, read_data=read_data, raise_missing=raise_missing)
                     self.slow_lat += time.perf_counter() - t0
                     transformed = self.add_entry(key, data, cache, complete=read_data)
                     self.slow_misses += 1

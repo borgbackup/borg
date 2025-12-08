@@ -21,20 +21,26 @@ class HelpMixIn:
         - in the file given with ``--patterns-from`` option and
         - for ``PATH`` arguments that explicitly support them.
 
-        Borg always stores all file paths normalized and relative to the
-        current recursion root. The recursion root is also named ``PATH`` in
-        Borg commands like `borg create` that do a file discovery, so do not
-        confuse the root with the ``PATH`` argument of e.g. `borg extract`.
+        The path/filenames used as input for the pattern matching start with the
+        currently active recursion root. You usually give the recursion root(s)
+        when invoking borg and these can be either relative or absolute paths.
 
-        Starting with Borg 1.2, paths that are matched against patterns always
-        appear relative. If you give ``/absolute/`` as root, the paths going
-        into the matcher will start with ``absolute/``.
-        If you give ``../../relative`` as root, the paths will be normalized
-        as ``relative/``.
+        Be careful, your patterns must match the archived paths:
+
+        - Archived paths never start with a leading slash ('/'), nor with '.', nor with '..'.
+
+          - When you back up absolute paths like ``/home/user``, the archived
+            paths start with ``home/user``.
+          - When you back up relative paths like ``./src``, the archived paths
+            start with ``src``.
+          - When you back up relative paths like ``../../src``, the archived paths
+            start with ``src``.
 
         Borg supports different pattern styles. To define a non-default
         style for a specific pattern, prefix it with two characters followed
         by a colon ':' (i.e. ``fm:path/*``, ``sh:path/**``).
+
+        The default pattern style for ``--exclude`` differs from ``--pattern``, see below.
 
         `Fnmatch <https://docs.python.org/3/library/fnmatch.html>`_, selector ``fm:``
             This is the default style for ``--exclude`` and ``--exclude-from``.
@@ -122,6 +128,17 @@ class HelpMixIn:
 
         Examples::
 
+            # Exclude a directory anywhere in the tree named ``steamapps/common``
+            # (and everything below it), regardless of where it appears:
+            $ borg create -e 'sh:**/steamapps/common/**' archive /
+
+            # Exclude the contents of ``/home/user/.cache``:
+            $ borg create -e 'sh:home/user/.cache/**' archive /home/user
+            $ borg create -e home/user/.cache/ archive /home/user
+
+            # The file '/home/user/.cache/important' is *not* backed up:
+            $ borg create -e home/user/.cache/ archive / /home/user/.cache/important
+
             # Exclude '/home/user/file.o' but not '/home/user/file.odt':
             $ borg create -e '*.o' archive /
 
@@ -129,11 +146,6 @@ class HelpMixIn:
             # not '/home/user/importantjunk' or '/etc/junk':
             $ borg create -e 'home/*/junk' archive /
 
-            # Exclude the contents of '/home/user/cache' but not the directory itself:
-            $ borg create -e home/user/cache/ archive /
-
-            # The file '/home/user/cache/important' is *not* backed up:
-            $ borg create -e home/user/cache/ archive / /home/user/cache/important
 
             # The contents of directories in '/home' are not backed up when their name
             # ends in '.tmp'
@@ -162,11 +174,13 @@ class HelpMixIn:
             (a plain path, not a file pattern). Use this prefix to have the root
             paths in the patterns file rather than as command line arguments.
 
-        Pattern style prefix ``P``
+        Pattern style prefix ``P`` (only useful within patterns files)
             To change the default pattern style, use the ``P`` prefix, followed by
             the pattern style abbreviation (``fm``, ``pf``, ``pp``, ``re``, ``sh``).
-            All patterns following this line will use this style until another style
-            is specified.
+            All patterns following this line in the same patterns file will use this
+            style until another style is specified or the end of the file is reached.
+            When the current patterns file is finished, the default pattern style will
+            reset.
 
         Exclude pattern prefix ``-``
             Use the prefix ``-``, followed by a pattern, to define an exclusion.
@@ -336,11 +350,11 @@ class HelpMixIn:
 
         {now}
             The current local date and time, by default in ISO-8601 format.
-            You can also supply your own `format string <https://docs.python.org/3.9/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
+            You can also supply your own `format string <https://docs.python.org/3.10/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {now:%Y-%m-%d_%H:%M:%S}
 
         {utcnow}
             The current UTC date and time, by default in ISO-8601 format.
-            You can also supply your own `format string <https://docs.python.org/3.9/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
+            You can also supply your own `format string <https://docs.python.org/3.10/library/datetime.html#strftime-and-strptime-behavior>`_, e.g. {utcnow:%Y-%m-%d_%H:%M:%S}
 
         {user}
             The user name (or UID, if no name is available) of the user running borg.
@@ -522,7 +536,9 @@ class HelpMixIn:
     do_maincommand_help = do_subcommand_help
 
     def build_parser_help(self, subparsers, common_parser, mid_common_parser, parser):
-        subparser = subparsers.add_parser("help", parents=[common_parser], add_help=False, description="Extra help")
+        subparser = subparsers.add_parser(
+            "help", parents=[common_parser], add_help=False, description="Extra help", help="Extra help"
+        )
         subparser.add_argument("--epilog-only", dest="epilog_only", action="store_true")
         subparser.add_argument("--usage-only", dest="usage_only", action="store_true")
         subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))

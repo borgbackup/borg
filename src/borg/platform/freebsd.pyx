@@ -147,6 +147,10 @@ def acl_get(path, item, st, numeric_ids=False, fd=None):
     If `numeric_ids` is True the user/group field is not preserved only uid/gid
     """
     cdef int flags = ACL_TEXT_APPEND_ID
+    # Note: likely this could be faster if we always used ACL_TEXT_NUMERIC_IDS,
+    # and then used uid2user() and gid2group() to translate the numeric ids to names
+    # inside borg (borg has a LRUcache for these lookups).
+    # See how the Linux implementation does it.
     flags |= ACL_TEXT_NUMERIC_IDS if numeric_ids else 0
     if isinstance(path, str):
         path = os.fsencode(path)
@@ -225,3 +229,71 @@ def acl_set(path, item, numeric_ids=False, fd=None):
     if ret == 1:
         _set_acl(path, ACL_TYPE_ACCESS, item, 'acl_access', numeric_ids, fd=fd)
         _set_acl(path, ACL_TYPE_DEFAULT, item, 'acl_default', numeric_ids, fd=fd)
+
+
+cdef extern from "sys/stat.h":
+    int chflags(const char *path, unsigned long flags)
+    int lchflags(const char *path, unsigned long flags)
+    int fchflags(int fd, unsigned long flags)
+
+# ----------------------------
+# BSD file flags (FreeBSD)
+# ----------------------------
+# Only influence flags that are known to be settable and leave system-managed/read-only flags untouched.
+# We express the mask in terms of names to avoid hard failures if a constant does
+# not exist on a given FreeBSD version; missing names simply contribute 0.
+import stat as stat_mod
+
+SETTABLE_FLAG_NAMES = (
+    # Owner-settable (UF_*)
+    'UF_NODUMP',
+    'UF_IMMUTABLE',
+    'UF_APPEND',
+    'UF_OPAQUE',
+    'UF_NOUNLINK',
+    'UF_HIDDEN',
+    # Super-user-only (SF_*)
+    'SF_ARCHIVED',
+    'SF_IMMUTABLE',
+    'SF_APPEND',
+    'SF_NOUNLINK',
+)
+
+cdef unsigned long SETTABLE_FLAGS_MASK = 0
+for _name in SETTABLE_FLAG_NAMES:
+    # getattr(..., 0) keeps this importable when flags are missing on some FreeBSD versions
+    SETTABLE_FLAGS_MASK |= <unsigned long> getattr(stat_mod, _name, 0)
+
+
+def set_flags(path, bsd_flags, fd=None):
+    """Set a subset of BSD file flags on FreeBSD without disturbing other bits.
+
+    Only flags that are known to be settable are influenced. All other flag bits are preserved as-is.
+    """
+    # Determine current flags.
+    try:
+        if fd is not None:
+            st = os.fstat(fd)
+        else:
+            st = os.lstat(path)
+        current = st.st_flags
+    except (OSError, AttributeError):
+        # We can't determine the current flags, so better give up than corrupting anything.
+        return
+
+    new_flags = (current & ~SETTABLE_FLAGS_MASK) | (bsd_flags & SETTABLE_FLAGS_MASK)
+
+    cdef unsigned long c_flags = <unsigned long> new_flags
+    if fd is not None:
+        if fchflags(fd, c_flags) == -1:
+            err = errno.errno
+            # Some filesystems may not support flags; ignore EOPNOTSUPP quietly.
+            if err != errno.EOPNOTSUPP:
+                # Keep error signature consistent with other platforms; st may not exist here.
+                raise OSError(err, os.strerror(err), path)
+    else:
+        path_bytes = os.fsencode(path)
+        if lchflags(path_bytes, c_flags) == -1:
+            err = errno.errno
+            if err != errno.EOPNOTSUPP:
+                raise OSError(err, os.strerror(err), os.fsdecode(path_bytes))

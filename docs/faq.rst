@@ -135,8 +135,8 @@ already stored into the repo, so it does not need to get transmitted and stored
 again.
 
 
-How can I back up huge file(s) over a unstable connection?
-----------------------------------------------------------
+How can I back up huge file(s) over an unstable connection?
+-----------------------------------------------------------
 
 Yes. For more details, see :ref:`interrupted_backup`.
 
@@ -255,9 +255,7 @@ Checking processors
   operate hardware outside its specifications for productive use.
 
   Tools to verify correct processor operation include Prime95 (mprime), linpack,
-  and the `Intel Processor Diagnostic Tool
-  <https://downloadcenter.intel.com/download/19792/Intel-Processor-Diagnostic-Tool>`_
-  (applies only to Intel processors).
+  and stress-ng.
 
 .. rubric:: Repairing a damaged repository
 
@@ -390,6 +388,26 @@ The Borg config directory has content that you should take care of:
   the corresponding keyfile (and the key passphrase) can extract it.
 
 Make sure that only you have access to the Borg config directory.
+
+
+Note about creating multiple keyfile repositories at the same path
+------------------------------------------------------------------
+
+If you create a new keyfile-encrypted repository at the same filesystem
+path multiple times (for example, when a previous repository at that path
+was moved away or unmounted), Borg will not overwrite or reuse the existing
+key file in your keys directory. Instead, it creates a new key file by
+appending a numeric suffix to the base name (e.g., .2, .3, ...).
+
+This means you may see multiple key files like:
+
+- ~/.config/borg/keys/home_user_backup
+- ~/.config/borg/keys/home_user_backup.2
+- ~/.config/borg/keys/home_user_backup.3
+
+Each of these corresponds to a distinct repository created at the same
+path at different times. This behavior avoids accidental key reuse or
+overwrite.
 
 .. _home_data_borg:
 
@@ -539,7 +557,7 @@ all your files/dirs data and metadata are stored in their encrypted form
 into the repository.
 
 Yes, as an attacker with access to the remote server could delete (or
-otherwise make unavailable) all your backups.
+otherwise make unavailable) all your backups on that server.
 
 How can I protect against a hacked backup client?
 -------------------------------------------------
@@ -765,7 +783,7 @@ Then you do the backup and look at the log output:
 
 When borg runs inside a virtual machine, there are some more things to look at:
 
-Some hypervisors (e.g. kvm on proxmox) give some broadly compatible CPU type to the
+Some hypervisors (e.g. kvm on older proxmox) give some broadly compatible CPU type to the
 VM (usually to ease migration between VM hosts of potentially different hardware CPUs).
 
 It is broadly compatible because they leave away modern CPU features that could be
@@ -773,8 +791,8 @@ not present in older or other CPUs, e.g. hardware acceleration for AES crypto, f
 sha2 hashes, for (P)CLMUL(QDQ) computations useful for crc32.
 
 So, basically you pay for compatibility with bad performance. If you prefer better
-performance, you should try to expose the host CPU's misc. hw acceleration features
-to the VM which runs borg.
+performance, you should try to use the x86-64-v2-AES VCPU or the "host" VCPU,
+exposing misc. hw acceleration features to the VM which runs borg.
 
 On Linux, check ``/proc/cpuinfo`` for the CPU flags inside the VM.
 For kvm check the docs about "Host model" and "Host passthrough".
@@ -1048,7 +1066,7 @@ Miscellaneous
 macOS: borg mounts not shown in Finder's side bar
 -------------------------------------------------
 
-https://github.com/osxfuse/osxfuse/wiki/Mount-options#local
+https://github.com/macfuse/macfuse/wiki/Mount-options#local
 
 Read the above first and use this on your own risk::
 

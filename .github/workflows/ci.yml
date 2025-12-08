@@ -5,17 +5,8 @@ name: CI
 on:
   push:
     branches: [ master ]
-    paths:
-    - '**.py'
-    - '**.pyx'
-    - '**.c'
-    - '**.h'
-    - '**.yml'
-    - '**.toml'
-    - '**.cfg'
-    - '**.ini'
-    - 'requirements.d/*'
-    - '!docs/**'
+    tags:
+    - '2.*'
   pull_request:
     branches: [ master ]
     paths:
@@ -59,35 +50,110 @@ jobs:
       run: |
         bandit -r src/borg -c pyproject.toml
 
-  linux:
+  asan_ubsan:
+
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: [lint, security]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install system packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config build-essential
+        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.d/development.txt
+
+    - name: Build Borg with ASan/UBSan
+      # Build the C/Cython extensions with AddressSanitizer and UndefinedBehaviorSanitizer enabled.
+      # How this works:
+      # - The -fsanitize=address,undefined flags inject runtime checks into our native code. If a bug is hit
+      #   (e.g., buffer overflow, use-after-free, out-of-bounds, or undefined behavior), the sanitizer prints
+      #   a detailed error report to stderr, including a stack trace, and forces the process to exit with
+      #   non-zero status. In CI, this will fail the step/job so you will notice.
+      # - ASAN_OPTIONS/UBSAN_OPTIONS configure the sanitizers' runtime behavior (see below for meanings).
+      env:
+        CFLAGS: "-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined"
+        CXXFLAGS: "-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined"
+        LDFLAGS: "-fsanitize=address,undefined"
+        # ASAN_OPTIONS controls AddressSanitizer runtime tweaks:
+        # - detect_leaks=0: Disable LeakSanitizer to avoid false positives with CPython/pymalloc in short-lived tests.
+        # - strict_string_checks=1: Make invalid string operations (e.g., over-reads) more likely to be detected.
+        # - check_initialization_order=1: Catch uses that depend on static initialization order (C++).
+        # - detect_stack_use_after_return=1: Detect stack-use-after-return via stack poisoning (may increase overhead).
+        ASAN_OPTIONS: "detect_leaks=0:strict_string_checks=1:check_initialization_order=1:detect_stack_use_after_return=1"
+        # UBSAN_OPTIONS controls UndefinedBehaviorSanitizer runtime:
+        # - print_stacktrace=1: Include a stack trace for UB reports to ease debugging.
+        #   Note: UBSan is recoverable by default (process may continue after reporting). If you want CI to
+        #   abort immediately and fail on the first UB, add `halt_on_error=1` (e.g., UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1").
+        UBSAN_OPTIONS: "print_stacktrace=1"
+        # PYTHONDEVMODE enables additional Python runtime checks and warnings.
+        PYTHONDEVMODE: "1"
+      run: pip install -e .
+
+    - name: Run tests under sanitizers
+      env:
+        ASAN_OPTIONS: "detect_leaks=0:strict_string_checks=1:check_initialization_order=1:detect_stack_use_after_return=1"
+        UBSAN_OPTIONS: "print_stacktrace=1"
+        PYTHONDEVMODE: "1"
+      # Ensure the ASan runtime is loaded first to avoid "ASan runtime does not come first" warnings.
+      # We discover libasan/libubsan paths via gcc and preload them for the Python test process.
+      # the remote tests are slow and likely won't find anything useful
+      run: |
+        set -euo pipefail
+        export LD_PRELOAD="$(gcc -print-file-name=libasan.so):$(gcc -print-file-name=libubsan.so)"
+        echo "Using LD_PRELOAD=$LD_PRELOAD"
+        pytest -v --benchmark-skip -k "not remote"
+
+  native_tests:
 
     needs: [lint, security]
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: true
-      matrix:
-        include:
-            - os: ubuntu-22.04
-              python-version: '3.10'
-              toxenv: mypy
-            - os: ubuntu-22.04
-              python-version: '3.11'
-              toxenv: docs
-            - os: ubuntu-22.04
-              python-version: '3.10'
-              toxenv: py310-fuse2
-            - os: ubuntu-22.04
-              python-version: '3.11'
-              toxenv: py311-fuse3
-            - os: ubuntu-24.04
-              python-version: '3.12'
-              toxenv: py312-fuse3
-            - os: ubuntu-24.04
-              python-version: '3.13'
-              toxenv: py313-fuse3
-            - os: ubuntu-24.04
-              python-version: '3.14-dev'
-              toxenv: py314-fuse3
-
+      # noinspection YAMLSchemaValidation
+      matrix: >-
+        ${{ fromJSON(
+          github.event_name == 'pull_request' && '{
+            "include": [
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "mypy"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse2"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"}
+            ]
+          }' || '{
+            "include": [
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "mypy"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
+              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-fuse2"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-fuse2", "binary": "borg-linux-glibc235-x86_64-gh"},
+              {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-fuse2", "binary": "borg-linux-glibc235-arm64-gh"},
+              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-fuse3"},
+              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-fuse3"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-fuse3"},
+              {"os": "macos-13", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-13-x86_64-gh"},
+              {"os": "macos-14", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-14-arm64-gh"}
+            ]
+          }'
+        ) }}
     env:
       TOXENV: ${{ matrix.toxenv }}
 
@@ -99,10 +165,13 @@ jobs:
       with:
         # Just fetching one commit is not enough for setuptools-scm, so we fetch all.
         fetch-depth: 0
+        fetch-tags: true
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+
     - name: Cache pip
       uses: actions/cache@v4
       with:
@@ -113,6 +182,7 @@ jobs:
             ${{ runner.os }}-
 
     - name: Install Linux packages
+      if: ${{ runner.os == 'Linux' }}
       run: |
         sudo apt-get update
         sudo apt-get install -y pkg-config build-essential
@@ -121,7 +191,15 @@ jobs:
         sudo apt-get install -y libfuse3-dev fuse3 || true  # Required for Python pyfuse3 module
         sudo apt-get install -y bash zsh fish  # for shell completion tests
         sudo apt-get install -y rclone openssh-server curl
+
+    - name: Install macOS packages
+      if: ${{ runner.os == 'macOS' }}
+      run: |
+        brew unlink pkg-config@0.29.2 || true
+        brew bundle install
+
     - name: Configure OpenSSH SFTP server (test only)
+      if: ${{ runner.os == 'Linux' }}
       run: |
         sudo mkdir -p /run/sshd
         sudo useradd -m -s /bin/bash sftpuser || true
@@ -149,7 +227,9 @@ jobs:
         ssh-add ~/.ssh/id_ed25519
         # Export SFTP test URL for tox via GITHUB_ENV
         echo "BORG_TEST_SFTP_REPO=sftp://sftpuser@localhost:22/borg/sftp-repo" >> $GITHUB_ENV
+
     - name: Install and configure MinIO S3 server (test only)
+      if: ${{ runner.os == 'Linux' }}
       run: |
         set -e
         arch=$(uname -m)
@@ -174,20 +254,22 @@ jobs:
         mc mb --ignore-existing local/borg
         # Export S3 test URL for tox via GITHUB_ENV
         echo "BORG_TEST_S3_REPO=s3:minioadmin:minioadmin@http://127.0.0.1:9000/borg/s3-repo" >> $GITHUB_ENV
+
     - name: Install Python requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.d/development.txt
+
     - name: Install borgbackup
       run: |
         pip install -e .
+
     - name: run tox env
-      env:
-        XDISTN: "4"
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
         tox --skip-missing-interpreters
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       env:
@@ -197,84 +279,257 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         env_vars: OS, python
 
-  macOS:
+    - name: Build Borg fat binaries (${{ matrix.binary }})
+      if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
+      run: |
+        pip install 'pyinstaller==6.14.2'
+        mkdir -p dist/binary
+        pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
 
-    needs: linux
+    - name: Smoke-test the built binary (${{ matrix.binary }})
+      if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
+      run: |
+        pushd dist/binary
+        echo "single-file binary"
+        chmod +x borg.exe
+        ./borg.exe -V
+        echo "single-directory binary"
+        chmod +x borg-dir/borg.exe
+        ./borg-dir/borg.exe -V
+        tar czf borg.tgz borg-dir
+        popd
+
+    - name: Prepare binaries (${{ matrix.binary }})
+      if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
+      run: |
+        mkdir -p artifacts
+        if [ -f dist/binary/borg.exe ]; then
+          cp dist/binary/borg.exe artifacts/${{ matrix.binary }}
+        fi
+        if [ -f dist/binary/borg.tgz ]; then
+          cp dist/binary/borg.tgz artifacts/${{ matrix.binary }}.tgz
+        fi
+        echo "binary files"
+        ls -l artifacts/
+
+    - name: Attest binaries provenance (${{ matrix.binary }})
+      if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
+      uses: actions/attest-build-provenance@v3
+      with:
+        subject-path: 'artifacts/*'
+
+    - name: Upload binaries (${{ matrix.binary }})
+      if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.binary }}
+        path: artifacts/*
+        if-no-files-found: error
+
+  vm_tests:
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    needs: [lint, security]
+    continue-on-error: true
+
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
-            - os: macos-14
-              python-version: '3.11'
-              toxenv: py311-none  # Note: no FUSE testing due to #6099; see also #6196.
+          - os: freebsd
+            version: '14.3'
+            display_name: FreeBSD
+            # Controls binary build and provenance attestation on tags
+            do_binaries: true
+            artifact_prefix: borg-freebsd-14-x86_64-gh
 
-    env:
-      # Configure pkg-config to use OpenSSL from Homebrew
-      PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
-      TOXENV: ${{ matrix.toxenv }}
+          - os: netbsd
+            version: '10.1'
+            display_name: NetBSD
+            do_binaries: false
 
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 180
+          - os: openbsd
+            version: '7.7'
+            display_name: OpenBSD
+            do_binaries: false
+
+          - os: haiku
+            version: 'r1beta5'
+            display_name: Haiku
+            do_binaries: false
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        # Just fetching one commit is not enough for setuptools-scm, so we fetch all
-        fetch-depth: 0
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Cache pip
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
-        restore-keys: |
-            ${{ runner.os }}-pip-
-            ${{ runner.os }}-
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-    - name: Install macOS packages
-      run: |
-        brew unlink pkg-config@0.29.2 || true
-        brew bundle install
+      - name: Test on ${{ matrix.display_name }}
+        id: cross_os
+        uses: cross-platform-actions/action@v0.29.0
+        env:
+          DO_BINARIES: ${{ matrix.do_binaries }}
+        with:
+          operating_system: ${{ matrix.os }}
+          version: ${{ matrix.version }}
+          shell: bash
+          run: |
+            set -euxo pipefail
 
-    - name: Install Python requirements
-      run: |
-        python -m pip install --upgrade pip setuptools wheel
-        pip install -r requirements.d/development.txt
-    - name: Install BorgBackup
-      env:
-        # We already have this in the global environment, but something overrides it.
-        # So set it here again.
-        PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
-      run: |
-        pip install -ve .
-    - name: Run pytest via tox
-      env:
-        # We already have this in the global environment, but something overrides it.
-        # So set it here again.
-        PKG_CONFIG_PATH: "/opt/homebrew/opt/openssl@3.0/lib/pkgconfig:$PKG_CONFIG_PATH"
-        XDISTN: "6"
-      run: |
-        # Do not use fakeroot; run as root. Avoids the dreaded sporadic EISDIR failures; see #2482.
-        #sudo -E bash -c "tox -e py"
-        tox --skip-missing-interpreters
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      env:
-        OS: ${{ runner.os }}
-        python: ${{ matrix.python-version }}
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        env_vars: OS, python
+            case "${{ matrix.os }}" in
+              freebsd)
+                export IGNORE_OSVERSION=yes
+                sudo -E pkg update -f
+                sudo -E pkg install -y xxhash liblz4 zstd pkgconf
+                # Install one of the FUSE libraries; fail if neither is available
+                sudo -E pkg install -y fusefs-libs || sudo -E pkg install -y fusefs-libs3
+                sudo -E pkg install -y rust
+                sudo -E pkg install -y gmake
+                sudo -E pkg install -y git
+                sudo -E pkg install -y python310 py310-sqlite3
+                sudo -E pkg install -y python311 py311-sqlite3 py311-pip py311-virtualenv
+                sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python3
+                sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python
+                sudo ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip3
+                sudo ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip
 
-  windows:
+                # required for libsodium/pynacl build
+                export MAKE=gmake
+
+                python -m venv .venv
+                . .venv/bin/activate
+                python -V
+                pip -V
+                python -m pip install --upgrade pip wheel
+                pip install -r requirements.d/development.txt
+                pip install -e .
+                tox -e py311-none
+
+                if [[ "${{ matrix.do_binaries }}" == "true" && "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
+                  python -m pip install 'pyinstaller==6.14.2'
+                  mkdir -p dist/binary
+                  pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
+                  pushd dist/binary
+                  echo "single-file binary"
+                  chmod +x borg.exe
+                  ./borg.exe -V
+                  echo "single-directory binary"
+                  chmod +x borg-dir/borg.exe
+                  ./borg-dir/borg.exe -V
+                  tar czf borg.tgz borg-dir
+                  popd
+                  mkdir -p artifacts
+                  if [ -f dist/binary/borg.exe ]; then
+                    cp -v dist/binary/borg.exe artifacts/${{ matrix.artifact_prefix }}
+                  fi
+                  if [ -f dist/binary/borg.tgz ]; then
+                    cp -v dist/binary/borg.tgz artifacts/${{ matrix.artifact_prefix }}.tgz
+                  fi
+                fi
+                ;;
+
+              netbsd)
+                arch="$(uname -m)"
+                sudo -E mkdir -p /usr/pkg/etc/pkgin
+                echo "http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
+                sudo -E pkgin update
+                sudo -E pkgin -y upgrade
+                sudo -E pkgin -y install zstd lz4 xxhash git
+                sudo -E pkgin -y install rust
+                sudo -E pkgin -y install pkg-config
+                sudo -E pkgin -y install py311-pip py311-virtualenv py311-tox
+                sudo -E ln -sf /usr/pkg/bin/python3.11 /usr/pkg/bin/python3
+                sudo -E ln -sf /usr/pkg/bin/pip3.11 /usr/pkg/bin/pip3
+                sudo -E ln -sf /usr/pkg/bin/virtualenv-3.11 /usr/pkg/bin/virtualenv3
+                sudo -E ln -sf /usr/pkg/bin/tox-3.11 /usr/pkg/bin/tox3
+
+                # Ensure base system admin tools are on PATH for the non-root shell
+                export PATH="/sbin:/usr/sbin:$PATH"
+
+                echo "--- Preparing an extattr-enabled filesystem ---"
+                # On many NetBSD setups /tmp is tmpfs without extended attributes.
+                # Create a FFS image with extended attributes enabled and use it for TMPDIR.
+                VNDDEV="vnd0"
+                IMGFILE="/tmp/fs.img"
+                sudo -E dd if=/dev/zero of=${IMGFILE} bs=1m count=1024
+                sudo -E vndconfig -c "${VNDDEV}" "${IMGFILE}"
+                sudo -E newfs -O 2ea /dev/r${VNDDEV}a
+                MNT="/mnt/eafs"
+                sudo -E mkdir -p ${MNT}
+                sudo -E mount -t ffs -o extattr /dev/${VNDDEV}a $MNT
+                export TMPDIR="${MNT}/tmp"
+                sudo -E mkdir -p ${TMPDIR}
+                sudo -E chmod 1777 ${TMPDIR}
+
+                touch ${TMPDIR}/testfile
+                lsextattr user ${TMPDIR}/testfile && echo "[xattr] *** xattrs SUPPORTED on ${TMPDIR}! ***"
+
+                tox3 -e py311-none
+                ;;
+
+              openbsd)
+                sudo -E pkg_add xxhash lz4 zstd git
+                sudo -E pkg_add rust
+                sudo -E pkg_add openssl%3.4
+                sudo -E pkg_add py3-pip py3-virtualenv py3-tox
+
+                export BORG_OPENSSL_NAME=eopenssl34
+                tox -e py312-none
+                ;;
+
+              haiku)
+                pkgman refresh
+                pkgman install -y git pkgconfig zstd lz4 xxhash
+                pkgman install -y openssl3
+                pkgman install -y rust_bin
+                pkgman install -y python3.10
+                pkgman install -y cffi
+                pkgman install -y lz4_devel zstd_devel xxhash_devel openssl3_devel libffi_devel
+
+                # there is no pkgman package for tox, so we install it into a venv
+                python3 -m ensurepip --upgrade
+                python3 -m pip install --upgrade pip wheel
+                python3 -m venv .venv
+                . .venv/bin/activate
+
+                export PKG_CONFIG_PATH="/system/develop/lib/pkgconfig:/system/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+                export BORG_LIBLZ4_PREFIX=/system/develop
+                export BORG_LIBZSTD_PREFIX=/system/develop
+                export BORG_LIBXXHASH_PREFIX=/system/develop
+                export BORG_OPENSSL_PREFIX=/system/develop
+                pip install -r requirements.d/development.txt
+                pip install -e .
+
+                # troubles with either tox or pytest xdist, so we run pytest manually:
+                pytest -v -rs --benchmark-skip -k "not remote and not socket"
+                ;;
+            esac
+
+      - name: Upload artifacts
+        if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-${{ matrix.version }}-dist
+          path: artifacts/*
+          if-no-files-found: ignore
+
+      - name: Attest provenance
+        if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'artifacts/*'
+
+  windows_tests:
 
     if: false  # can be used to temporarily disable the build
     runs-on: windows-latest
     timeout-minutes: 120
-    needs: linux
+    needs: native_tests
 
     env:
       PY_COLORS: 1
@@ -287,12 +542,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
           update: true
+
       - name: Install system packages
         run: ./scripts/msys2-install-deps development
+
       - name: Build python venv
         run: |
           # building cffi / argon2-cffi in the venv fails, so we try to use the system packages
@@ -300,7 +558,8 @@ jobs:
           . env/bin/activate
           # python -m pip install --upgrade pip
           # pip install --upgrade setuptools build wheel
-          pip install pyinstaller==6.11.1
+          pip install pyinstaller==6.14.2
+
       - name: Build
         run: |
           # build borg.exe
@@ -309,16 +568,19 @@ jobs:
           pyinstaller -y scripts/borg.exe.spec
           # build sdist and wheel in dist/...
           python -m build
+
       - uses: actions/upload-artifact@v4
         with:
           name: borg-windows
           path: dist/borg.exe
+
       - name: Run tests
         run: |
           ./dist/borg.exe -V
           . env/bin/activate
           borg -V
           python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote"
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         env:

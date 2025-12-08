@@ -26,9 +26,9 @@ from ...manifest import Manifest
 from ...platform import get_flags
 from ...remote import RemoteRepository
 from ...repository import Repository
-from .. import has_lchflags, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, no_selinux
+from .. import has_lchflags, has_mknod, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, filter_xattrs
 from .. import changedir
-from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported
+from .. import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, granularity_sleep
 from ..platform.platform_test import is_win32
 from ...xattr import get_all
 
@@ -232,10 +232,11 @@ def create_test_files(input_path, create_hardlinks=True):
         have_root = False
     else:
         try:
-            # Block device
-            os.mknod("input/bdev", 0o600 | stat.S_IFBLK, os.makedev(10, 20))
-            # Char device
-            os.mknod("input/cdev", 0o600 | stat.S_IFCHR, os.makedev(30, 40))
+            if has_mknod:
+                # Block device
+                os.mknod("input/bdev", 0o600 | stat.S_IFBLK, os.makedev(10, 20))
+                # Char device
+                os.mknod("input/cdev", 0o600 | stat.S_IFCHR, os.makedev(30, 40))
             # File owner
             os.chown("input/file1", 100, 200)  # raises OSError invalid argument on cygwin
             # File mode
@@ -248,7 +249,7 @@ def create_test_files(input_path, create_hardlinks=True):
             if e.errno not in (errno.EINVAL, errno.ENOSYS):
                 raise
             have_root = False
-    time.sleep(1)  # "empty" must have newer timestamp than other files
+    granularity_sleep()  # "empty" must have newer timestamp than other files
     create_regular_file(input_path, "empty", size=0)
     return have_root
 
@@ -406,8 +407,8 @@ def _assert_dirs_equal_cmp(diff, ignore_flags=False, ignore_xattrs=False, ignore
                 d1.append(round(s1.st_mtime_ns, st_mtime_ns_round))
                 d2.append(round(s2.st_mtime_ns, st_mtime_ns_round))
         if not ignore_xattrs:
-            d1.append(no_selinux(get_all(path1, follow_symlinks=False)))
-            d2.append(no_selinux(get_all(path2, follow_symlinks=False)))
+            d1.append(filter_xattrs(get_all(path1, follow_symlinks=False)))
+            d2.append(filter_xattrs(get_all(path2, follow_symlinks=False)))
         assert d1 == d2
     for sub_diff in diff.subdirs.values():
         _assert_dirs_equal_cmp(sub_diff, ignore_flags=ignore_flags, ignore_xattrs=ignore_xattrs, ignore_ns=ignore_ns)
@@ -513,10 +514,12 @@ def fuse_mount(archiver, mountpoint=None, *options, fork=True, os_fork=False, **
             # with the call to `cmd`, above.
             yield
             return
-    wait_for_mountstate(mountpoint, mounted=True)
-    yield
-    umount(mountpoint)
-    wait_for_mountstate(mountpoint, mounted=False)
-    os.rmdir(mountpoint)
+    try:
+        wait_for_mountstate(mountpoint, mounted=True)
+        yield
+    finally:
+        umount(mountpoint)
+        wait_for_mountstate(mountpoint, mounted=False)
+        os.rmdir(mountpoint)
     # Give the daemon some time to exit
     time.sleep(0.2)

@@ -51,7 +51,7 @@ class BuildUsage:
                 for cmd, parser in action.choices.items():
                     choices[prefix + cmd] = parser
         if extra_choices is not None:
-            choices.update(extra_choices)
+            choices |= extra_choices
         if prefix and not choices:
             return
         print("found commands: %s" % list(choices.keys()))
@@ -328,7 +328,7 @@ class BuildMan:
                 for cmd, parser in action.choices.items():
                     choices[prefix + cmd] = parser
         if extra_choices is not None:
-            choices.update(extra_choices)
+            choices |= extra_choices
         if prefix and not choices:
             return
 

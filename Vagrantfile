@@ -72,7 +72,15 @@ end
 
 def packages_openbsd
   return <<-EOF
+    hostname "openbsd77.localdomain"
+    echo "$(hostname)" > /etc/myname
+    echo "127.0.0.1	localhost" > /etc/hosts
+    echo "::1 localhost" >> /etc/hosts
+    echo "127.0.0.1	$(hostname) $(hostname -s)" >> /etc/hosts
     echo "https://ftp.eu.openbsd.org/pub/OpenBSD" > /etc/installurl
+    ftp https://cdn.openbsd.org/pub/OpenBSD/$(uname -r)/$(uname -m)/comp$(uname -r | tr -d .).tgz
+    tar -C / -xzphf comp$(uname -r | tr -d .).tgz
+    rm comp$(uname -r | tr -d .).tgz
     pkg_add bash
     chsh -s bash vagrant
     pkg_add xxhash
@@ -80,7 +88,7 @@ def packages_openbsd
     pkg_add zstd
     pkg_add git  # no fakeroot
     pkg_add rust
-    pkg_add openssl%3.0
+    pkg_add openssl%3.4
     pkg_add py3-pip
     pkg_add py3-virtualenv
     echo 'export BORG_OPENSSL_NAME=eopenssl30' >> ~vagrant/.bash_profile
@@ -111,80 +119,26 @@ def packages_netbsd
   EOF
 end
 
-def packages_macos
+def package_update_openindiana
   return <<-EOF
-    # install all the (security and other) updates
-    sudo softwareupdate --ignore iTunesX
-    sudo softwareupdate --ignore iTunes
-    sudo softwareupdate --ignore Safari
-    sudo softwareupdate --ignore "Install macOS High Sierra"
-    sudo softwareupdate --install --all
-
-    # this box has openssl 1.1 installed
-    export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig
-
-    # the box "as is" has troubles downloading ca-certificates, needs a better working curl:
-    # https://curl.se/docs/install.html
-    curl -L https://github.com/curl/curl/releases/download/curl-8_10_1/curl-8.10.1.tar.gz | tar -xz
-    cd curl-8.10.1/
-    export ARCH=x86_64
-    export SDK=macosx
-    export DEPLOYMENT_TARGET=10.12
-    export CFLAGS="-arch $ARCH -isysroot $(xcrun -sdk $SDK --show-sdk-path) -m$SDK-version-min=$DEPLOYMENT_TARGET"
-    ./configure --host=$ARCH-apple-darwin --prefix /usr/local --with-openssl --without-libpsl --disable-ldap
-    make -j8
-    sudo make install
-    unset ARCH
-    unset SDK
-    unset DEPLOYMENT_TARGET
-    unset CFLAGS
-    cd ..
-    export HOMEBREW_DEVELOPER=1
-    export HOMEBREW_CURL_PATH=/usr/local/bin/curl
-    echo "finished building curl from source"
-    echo "----------------------------------"
-
-    # now the self-built curl should work for homebrew:
-    brew update
-    brew install ca-certificates
-    brew install openssl@3
-    export LDFLAGS=-L/usr/local/opt/openssl@3/lib
-    export CPPFLAGS=-I/usr/local/opt/openssl@3/include
-    export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig
-    echo 'export LDFLAGS=-L/usr/local/opt/openssl@3/lib' >> ~vagrant/.bash_profile
-    echo 'export CPPFLAGS=-I/usr/local/opt/openssl@3/include' >> ~vagrant/.bash_profile
-    echo 'export PKG_CONFIG_PATH=/usr/local/opt/openssl@3/lib/pkgconfig' >> ~vagrant/.bash_profile
-    echo "finished building ca-certificates and openssl@3"
-    echo "-----------------------------------------------"
-
-    # install curl from homebrew and use it for homebrew:
-    brew install curl
-    export PATH="/usr/local/opt/curl/bin:$PATH"
-    echo 'export PATH="/usr/local/opt/curl/bin:$PATH"' >> ~vagrant/.bash_profile
-    export HOMEBREW_FORCE_BREWED_CURL=1
-    echo 'export HOMEBREW_FORCE_BREWED_CURL=1' >> ~vagrant/.bash_profile
-    unset HOMEBREW_CURL_PATH
-    unset HOMEBREW_DEVELOPER
-    echo "finished install homebrew curl"
-    echo "------------------------------"
-
-    # now brew, curl, ca-certificates, openssl@3 should be all ok.
-    brew update
-    brew install pkgconf readline xxhash zstd lz4 xz
-    brew install --cask macfuse
-    # brew upgrade  # upgrade everything (takes rather long)
-    # pyenv shall use the openssl@3 from homebrew:
-    echo 'export PYTHON_BUILD_HOMEBREW_OPENSSL_FORMULA=openssl@3' >> ~vagrant/.bash_profile
+    echo "nameserver 1.1.1.1" > /etc/resolv.conf
+    # needs separate provisioning step + reboot to become effective:
+    pkg update
   EOF
 end
 
 def packages_openindiana
   return <<-EOF
-    # needs separate provisioning step + reboot:
-    #pkg update
-    pkg install gcc-13 git pkg-config libxxhash pip virtualenv
+    pkg install gcc-13 git
+    pkg install pkg-config libxxhash
+    pkg install python-313
+    ln -sf /usr/bin/python3.13 /usr/bin/python3
+    ln -sf /usr/bin/python3.13-config /usr/bin/python3-config
+    python3 -m ensurepip
+    ln -sf /usr/bin/pip3.13 /usr/bin/pip3
+    pip3 install virtualenv
     # let borg's pkg-config find openssl:
-    pfexec pkg set-mediator -V 3.1 openssl
+    pfexec pkg set-mediator -V 3 openssl
   EOF
 end
 
@@ -203,17 +157,11 @@ def install_pyenv(boxname)
   EOF
 end
 
-def fix_pyenv_macos(boxname)
-  return <<-EOF
-    echo 'export PYTHON_CONFIGURE_OPTS="--enable-framework"' >> ~/.bash_profile
-  EOF
-end
-
 def install_pythons(boxname)
   return <<-EOF
     . ~/.bash_profile
     echo "PYTHON_CONFIGURE_OPTS: ${PYTHON_CONFIGURE_OPTS}"
-    pyenv install 3.13.5
+    pyenv install 3.13.8
     pyenv rehash
   EOF
 end
@@ -231,8 +179,8 @@ def build_pyenv_venv(boxname)
     . ~/.bash_profile
     cd /vagrant/borg
     # use the latest 3.13 release
-    pyenv global 3.13.5
-    pyenv virtualenv 3.13.5 borg-env
+    pyenv global 3.13.8
+    pyenv virtualenv 3.13.8 borg-env
     ln -s ~/.pyenv/versions/borg-env .
   EOF
 end
@@ -281,8 +229,8 @@ def run_tests(boxname, skip_env)
     . ../borg-env/bin/activate
     if which pyenv 2> /dev/null; then
       # for testing, use the earliest point releases of the supported python versions:
-      pyenv global 3.13.5
-      pyenv local 3.13.5
+      pyenv global 3.13.8
+      pyenv local 3.13.8
     fi
     # otherwise: just use the system python
     # some OSes can only run specific test envs, e.g. because they miss FUSE support:
@@ -446,7 +394,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.define "openbsd7" do |b|
-    b.vm.box = "generic/openbsd7"
+    b.vm.box = "l3system/openbsd77-amd64"
     b.vm.provider :virtualbox do |v|
       v.memory = 1024 + $wmem
     end
@@ -469,32 +417,6 @@ Vagrant.configure(2) do |config|
     b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("netbsd9", ".*fuse.*")
   end
 
-  config.vm.define "macos1012" do |b|
-    b.vm.box = "macos-sierra"
-    b.vm.provider :virtualbox do |v|
-      v.memory = 8192 + $wmem
-      v.customize ['modifyvm', :id, '--ostype', 'MacOS_64']
-      v.customize ['modifyvm', :id, '--paravirtprovider', 'default']
-      v.customize ['modifyvm', :id, '--nested-hw-virt', 'on']
-      # Adjust CPU settings according to
-      # https://github.com/geerlingguy/macos-virtualbox-vm
-      v.customize ['modifyvm', :id, '--cpuidset',
-                   '00000001', '000306a9', '00020800', '80000201', '178bfbff']
-      # Disable USB variant requiring Virtualbox proprietary extension pack
-      v.customize ["modifyvm", :id, '--usbehci', 'off', '--usbxhci', 'off']
-    end
-    b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
-    b.vm.provision "packages macos", :type => :shell, :privileged => false, :inline => packages_macos
-    b.vm.provision "install pyenv", :type => :shell, :privileged => false, :inline => install_pyenv("macos1012")
-    b.vm.provision "fix pyenv", :type => :shell, :privileged => false, :inline => fix_pyenv_macos("macos1012")
-    b.vm.provision "install pythons", :type => :shell, :privileged => false, :inline => install_pythons("macos1012")
-    b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_pyenv_venv("macos1012")
-    b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("llfuse")
-    b.vm.provision "install pyinstaller", :type => :shell, :privileged => false, :inline => install_pyinstaller()
-    b.vm.provision "build binary with pyinstaller", :type => :shell, :privileged => false, :inline => build_binary_with_pyinstaller("macos1012")
-    b.vm.provision "run tests", :type => :shell, :privileged => false, :inline => run_tests("macos1012", ".*(fuse3|none).*")
-  end
-
   # rsync on openindiana has troubles, does not set correct owner for /vagrant/borg and thus gives lots of
   # permission errors. can be manually fixed in the VM by: sudo chown -R vagrant /vagrant/borg ; then rsync again.
   config.vm.define "openindiana" do |b|
@@ -503,6 +425,7 @@ Vagrant.configure(2) do |config|
       v.memory = 2048 + $wmem
     end
     b.vm.provision "fs init", :type => :shell, :inline => fs_init("vagrant")
+    b.vm.provision "package update openindiana", :type => :shell, :inline => package_update_openindiana, :reboot => true
     b.vm.provision "packages openindiana", :type => :shell, :inline => packages_openindiana
     b.vm.provision "build env", :type => :shell, :privileged => false, :inline => build_sys_venv("openindiana")
     b.vm.provision "install borg", :type => :shell, :privileged => false, :inline => install_borg("nofuse")

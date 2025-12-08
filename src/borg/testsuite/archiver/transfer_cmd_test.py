@@ -473,6 +473,33 @@ def test_transfer_rechunk(archivers, request, monkeypatch):
                 assert dest_hash == source_file_hashes[item.path], f"Content hash mismatch for {item.path}"
 
 
+def test_transfer_rechunk_dry_run(archivers, request, monkeypatch):
+    """Ensure --dry-run works together with --chunker-params (re-chunking path).
+
+    This specifically guards against regressions like AttributeError when archive is None
+    during dry-run (see issue #9199).
+    """
+    archiver = request.getfixturevalue(archivers)
+
+    BLKSIZE = 512
+    source_chunker_params = "buzhash,19,23,21,4095"  # default-ish buzhash parameters
+    dest_chunker_params = f"fixed,{BLKSIZE}"  # simple deterministic chunking
+
+    # Prepare source repo and create one archive
+    with setup_repos(archiver, monkeypatch) as other_repo1:
+        contents = random.randbytes(8 * BLKSIZE)
+        create_regular_file(archiver.input_path, "file.bin", contents=contents)
+        cmd(archiver, "create", f"--chunker-params={source_chunker_params}", "arch", "input")
+
+    # Now we are in the destination repo (setup_repos switched us on context exit).
+    # Run transfer in dry-run mode with re-chunking. This must not crash.
+    cmd(archiver, "transfer", other_repo1, "--dry-run", f"--chunker-params={dest_chunker_params}")
+
+    # Dry-run must not have created archives in the destination repo.
+    listing = cmd(archiver, "repo-list")
+    assert "arch" not in listing
+
+
 def test_issue_9022(archivers, request, monkeypatch):
     """
     Regression test for borgbackup/borg#9022: After "borg transfer --from-borg1",

@@ -32,11 +32,12 @@ license-files = ["LICENSE", "AUTHORS"]
 dependencies = [
   "borghash ~= 0.1.0",
   "borgstore ~= 0.3.0",
-  "msgpack >=1.0.3, <=1.1.1",
+  "msgpack >=1.0.3, <=1.1.2",
   "packaging",
   "platformdirs >=3.0.0, <5.0.0; sys_platform == 'darwin'",  # for macOS: breaking changes in 3.0.0.
   "platformdirs >=2.6.0, <5.0.0; sys_platform != 'darwin'",  # for others: 2.6+ works consistently.
   "argon2-cffi",
+  "shtab>=1.8.0",
 ]
 
 [project.optional-dependencies]
@@ -70,7 +71,7 @@ where = ["src"]
 "*" = ["*.c", "*.h", "*.pyx"]
 
 [build-system]
-requires = ["setuptools>=77.0.0", "wheel", "pkgconfig", "Cython>=3.0.3", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=78.1.1", "wheel", "pkgconfig", "Cython>=3.0.3", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
@@ -169,7 +170,7 @@ env_list = ["py{310,311,312,313,314}-{none,fuse2,fuse3}", "docs", "ruff", "mypy"
 [tool.tox.env_run_base]
 package = "editable-legacy"  # without this it does not find setup_docs when running under fakeroot
 deps = ["-rrequirements.d/development.txt"]
-commands = [["pytest", "-v", "-n", "{env:XDISTN:1}", "-rs", "--cov=borg", "--cov-config=pyproject.toml", "--benchmark-skip", "--pyargs", "{posargs:borg.testsuite}"]]
+commands = [["python", "-m", "pytest", "-v", "-n", "{env:XDISTN:auto}", "-rs", "--cov=borg", "--cov-config=pyproject.toml", "--benchmark-skip", "--pyargs", "{posargs:borg.testsuite}"]]
 pass_env = ["*"]  # fakeroot -u needs some env vars
 
 [tool.tox.env_pkg_base]

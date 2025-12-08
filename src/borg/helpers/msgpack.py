@@ -46,6 +46,8 @@ Current behavior in msgpack terms
 - unpacks bin to bytes and raw to str (thus we need to convert to desired type if we want bytes from "raw")
 """
 
+import os
+
 from .datastruct import StableDict
 from ..constants import *  # NOQA
 
@@ -177,7 +179,7 @@ def unpackb(packed, *, raw=RAW, unicode_errors=UNICODE_ERRORS, strict_map_key=Fa
     assert unicode_errors == UNICODE_ERRORS
     try:
         kw = dict(raw=raw, unicode_errors=unicode_errors, strict_map_key=strict_map_key)
-        kw.update(kwargs)
+        kw |= kwargs
         return mp_unpackb(packed, **kw)
     except Exception as e:
         raise UnpackException(e)
@@ -188,7 +190,7 @@ def unpack(stream, *, raw=RAW, unicode_errors=UNICODE_ERRORS, strict_map_key=Fal
     assert unicode_errors == UNICODE_ERRORS
     try:
         kw = dict(raw=raw, unicode_errors=unicode_errors, strict_map_key=strict_map_key)
-        kw.update(kwargs)
+        kw |= kwargs
         return mp_unpack(stream, **kw)
     except Exception as e:
         raise UnpackException(e)
@@ -206,11 +208,17 @@ def is_slow_msgpack():
 
 def is_supported_msgpack():
     # DO NOT CHANGE OR REMOVE! See also requirements and comments in pyproject.toml.
+    # This function now also respects the env var BORG_MSGPACK_VERSION_CHECK.
+    # Set BORG_MSGPACK_VERSION_CHECK=no to disable the version check at your own risk.
     import msgpack
+
+    version_check = os.environ.get("BORG_MSGPACK_VERSION_CHECK", "yes").strip().lower()
+    if version_check == "no":
+        return True
 
     if msgpack.version in []:  # < add bad releases here to deny list
         return False
-    return (1, 0, 3) <= msgpack.version[:3] <= (1, 1, 1)
+    return (1, 0, 3) <= msgpack.version[:3] <= (1, 1, 2)
 
 
 def get_limited_unpacker(kind):
@@ -219,9 +227,9 @@ def get_limited_unpacker(kind):
     #       unpack(data) or from max_buffer_size for Unpacker(max_buffer_size=N).
     args = dict(use_list=False, max_buffer_size=3 * max(BUFSIZE, MAX_OBJECT_SIZE))  # return tuples, not lists
     if kind in ("server", "client"):
-        args.update(dict(max_buffer_size=0))  # 0 means "maximum" here, ~4GiB - needed for store_load/save
+        args |= dict(max_buffer_size=0)  # 0 means "maximum" here, ~4GiB - needed for store_load/save
     elif kind in ("manifest", "archive", "key"):
-        args.update(dict(use_list=True, object_hook=StableDict))  # default value
+        args |= dict(use_list=True, object_hook=StableDict)  # default value
     else:
         raise ValueError('kind must be "server", "client", "manifest", "archive" or "key"')
     return Unpacker(**args)

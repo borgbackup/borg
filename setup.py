@@ -61,6 +61,7 @@ platform_linux_source = "src/borg/platform/linux.pyx"
 platform_syncfilerange_source = "src/borg/platform/syncfilerange.pyx"
 platform_darwin_source = "src/borg/platform/darwin.pyx"
 platform_freebsd_source = "src/borg/platform/freebsd.pyx"
+platform_netbsd_source = "src/borg/platform/netbsd.pyx"
 platform_windows_source = "src/borg/platform/windows.pyx"
 
 cython_sources = [
@@ -76,6 +77,7 @@ cython_sources = [
     platform_linux_source,
     platform_syncfilerange_source,
     platform_freebsd_source,
+    platform_netbsd_source,
     platform_darwin_source,
     platform_windows_source,
 ]
@@ -197,6 +199,7 @@ if not on_rtd:
         "borg.platform.syncfilerange", [platform_syncfilerange_source], extra_compile_args=cflags
     )
     freebsd_ext = Extension("borg.platform.freebsd", [platform_freebsd_source], extra_compile_args=cflags)
+    netbsd_ext = Extension("borg.platform.netbsd", [platform_netbsd_source], extra_compile_args=cflags)
     darwin_ext = Extension("borg.platform.darwin", [platform_darwin_source], extra_compile_args=cflags)
     windows_ext = Extension("borg.platform.windows", [platform_windows_source], extra_compile_args=cflags)
 
@@ -209,6 +212,8 @@ if not on_rtd:
         ext_modules.append(syncfilerange_ext)
     elif sys.platform.startswith("freebsd"):
         ext_modules.append(freebsd_ext)
+    elif sys.platform.startswith("netbsd"):
+        ext_modules.append(netbsd_ext)
     elif sys.platform == "darwin":
         ext_modules.append(darwin_ext)
 
@@ -230,7 +235,9 @@ if not on_rtd:
 
         # generate C code from Cython for ALL supported platforms, so we have them in the sdist.
         # the sdist does not require Cython at install time, so we need all as C.
-        cythonize([posix_ext, linux_ext, syncfilerange_ext, freebsd_ext, darwin_ext, windows_ext], **cython_opts)
+        cythonize(
+            [posix_ext, linux_ext, syncfilerange_ext, freebsd_ext, netbsd_ext, darwin_ext, windows_ext], **cython_opts
+        )
         # generate C code from Cython for THIS platform (and for all platform-independent Cython parts).
         ext_modules = cythonize(ext_modules, **cython_opts)
 

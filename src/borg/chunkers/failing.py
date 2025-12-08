@@ -12,7 +12,9 @@ class ChunkerFailing:
     """
     This is a very simple chunker for testing purposes.
 
-    Reads block_size chunks, starts failing at block <fail_start>, <fail_count> failures, then succeeds.
+    Reads block_size chunks. The map parameter controls behavior per block:
+    'R' = successful read, 'E' = I/O Error. Blocks beyond the map length
+    will have the same behavior as the last map character.
     """
 
     def __init__(self, block_size: int, map: str) -> None:
@@ -26,7 +28,7 @@ class ChunkerFailing:
         self.count = 0
         self.chunking_time = 0.0  # not updated, just provided so that caller does not crash
 
-    def chunkify(self, fd: BinaryIO = None, fh: int = -1) -> Iterator:
+    def chunkify(self, fd: BinaryIO | None = None, fh: int = -1) -> Iterator:
         """
         Cut a file into chunks.
 

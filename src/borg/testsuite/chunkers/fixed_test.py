@@ -1,6 +1,10 @@
+from io import BytesIO
+import os
+import random
+
 import pytest
 
-from . import cf, make_sparsefile, make_content, fs_supports_sparse
+from . import cf, cf_expand, make_sparsefile, make_content, fs_supports_sparse
 from . import BS, map_sparse1, map_sparse2, map_onlysparse, map_notsparse
 from ...chunkers import ChunkerFixed
 from ...constants import *  # NOQA
@@ -37,3 +41,34 @@ def test_chunkify_sparse(tmpdir, fname, sparse_map, header_size, sparse):
     fn = str(tmpdir / fname)
     make_sparsefile(fn, sparse_map, header_size=header_size)
     get_chunks(fn, sparse=sparse, header_size=header_size) == make_content(sparse_map, header_size=header_size)
+
+
+@pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+@pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
+def test_fuzz_fixed(worker):
+    # Fuzz fixed chunker with random and uniform data of misc. sizes.
+    sizes = [random.randint(1, 4 * 1024 * 1024) for _ in range(50)]
+
+    for block_size, header_size in [(1024, 64), (1234, 0), (4321, 123)]:
+        chunker = ChunkerFixed(block_size, header_size)
+        for size in sizes:
+            # Random data
+            data = os.urandom(size)
+            with BytesIO(data) as bio:
+                parts = cf_expand(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            assert reconstructed == data
+
+            # All-same data (non-zero)
+            data = b"\x42" * size
+            with BytesIO(data) as bio:
+                parts = cf_expand(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            assert reconstructed == data
+
+            # All-zero data
+            data = b"\x00" * size
+            with BytesIO(data) as bio:
+                parts = cf_expand(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            assert reconstructed == data

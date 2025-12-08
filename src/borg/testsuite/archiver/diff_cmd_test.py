@@ -6,8 +6,8 @@ import time
 import pytest
 
 from ...constants import *  # NOQA
-from .. import are_symlinks_supported, are_hardlinks_supported
-from ...platformflags import is_win32, is_darwin
+from .. import are_symlinks_supported, are_hardlinks_supported, granularity_sleep
+from ...platformflags import is_win32, is_freebsd, is_netbsd
 from . import (
     cmd,
     create_regular_file,
@@ -54,7 +54,7 @@ def test_basic_functionality(archivers, request):
     create_regular_file(archiver.input_path, "file_replaced", contents=b"0" * 4096)
     os.unlink("input/file_removed")
     os.unlink("input/file_removed2")
-    time.sleep(1)  # macOS HFS+ has a 1s timestamp granularity
+    granularity_sleep()
     Path("input/file_touched").touch()
     os.rmdir("input/dir_replaced_with_file")
     create_regular_file(archiver.input_path, "dir_replaced_with_file", size=8192)
@@ -176,7 +176,8 @@ def test_basic_functionality(archivers, request):
         assert unexpected not in get_changes("input/file_touched", joutput)
         if not content_only:
             # on win32, ctime is the file creation time and does not change.
-            expected = {"mtime"} if is_win32 else {"mtime", "ctime"}
+            # not sure why netbsd only has mtime, but it does, #8703.
+            expected = {"mtime"} if (is_win32 or is_netbsd) else {"mtime", "ctime"}
             assert expected.issubset({c["type"] for c in get_changes("input/file_touched", joutput)})
         else:
             # And if we're doing content-only, don't show the file at all.
@@ -269,19 +270,14 @@ def test_time_diffs(archivers, request):
     cmd(archiver, "create", "archive1", "input")
     time.sleep(0.1)
     os.unlink("input/test_file")
-    if is_win32:
-        # Sleeping for 15s because Windows doesn't refresh ctime if file is deleted and recreated within 15 seconds.
-        time.sleep(15)
-    elif is_darwin:
-        time.sleep(1)  # HFS has a 1s timestamp granularity
+    granularity_sleep(ctime_quirk=True)
     create_regular_file(archiver.input_path, "test_file", size=15)
     cmd(archiver, "create", "archive2", "input")
     output = cmd(archiver, "diff", "archive1", "archive2", "--format", "'{mtime}{ctime} {path}{NL}'")
     assert "mtime" in output
     assert "ctime" in output  # Should show up on Windows as well since it is a new file.
 
-    if is_darwin:
-        time.sleep(1)  # HFS has a 1s timestamp granularity
+    granularity_sleep()
     os.chmod("input/test_file", 0o777)
     cmd(archiver, "create", "archive3", "input")
     output = cmd(archiver, "diff", "archive2", "archive3", "--format", "'{mtime}{ctime} {path}{NL}'")
@@ -293,7 +289,7 @@ def test_time_diffs(archivers, request):
         assert "ctime" not in output
 
 
-def test_sort_option(archivers, request):
+def test_sort_by_option(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
@@ -313,7 +309,7 @@ def test_sort_option(archivers, request):
     create_regular_file(archiver.input_path, "d_file_added", size=256)
     cmd(archiver, "create", "test1", "input")
 
-    output = cmd(archiver, "diff", "test0", "test1", "--sort", "--content-only")
+    output = cmd(archiver, "diff", "test0", "test1", "--sort-by=path", "--content-only")
     expected = ["a_file_removed", "b_file_added", "c_file_changed", "d_file_added", "e_file_changed", "f_file_removed"]
     assert isinstance(output, str)
     outputs = output.splitlines()
@@ -321,7 +317,120 @@ def test_sort_option(archivers, request):
     assert all(x in line for x, line in zip(expected, outputs))
 
 
-@pytest.mark.skipif(not are_hardlinks_supported(), reason="hardlinks not supported")
+def test_sort_by_invalid_field_is_rejected(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    create_regular_file(archiver.input_path, "file", size=1)
+    cmd(archiver, "create", "a1", "input")
+    create_regular_file(archiver.input_path, "file", size=2)
+    cmd(archiver, "create", "a2", "input")
+
+    # Unsupported field should cause argument parsing error
+    cmd(archiver, "diff", "a1", "a2", "--sort-by=not_a_field", exit_code=EXIT_ERROR)
+
+
+def test_sort_by_size_added_then_path(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # Base archive with two files that will be removed later
+    create_regular_file(archiver.input_path, "r_big_removed", size=50)
+    create_regular_file(archiver.input_path, "r_small_removed", size=5)
+    cmd(archiver, "create", "base", "input")
+
+    # Second archive: remove both above and add two new files of different sizes
+    os.unlink("input/r_big_removed")
+    os.unlink("input/r_small_removed")
+    create_regular_file(archiver.input_path, "a_small_added", size=10)
+    create_regular_file(archiver.input_path, "b_large_added", size=30)
+    cmd(archiver, "create", "next", "input")
+
+    # Sort by size added (ascending), then path to break ties deterministically
+    output = cmd(archiver, "diff", "base", "next", "--sort-by=size_added,path", "--content-only")
+    lines = output.splitlines()
+    # Expect removed entries first (size_added=0), ordered by path, then added entries by increasing size
+    expected_order = [
+        "removed:.*input/r_big_removed",  # size_added=0
+        "removed:.*input/r_small_removed",  # size_added=0
+        "added:.*10 B.*input/a_small_added",
+        "added:.*30 B.*input/b_large_added",
+    ]
+    assert len(lines) == len(expected_order)
+    for pattern, line in zip(expected_order, lines):
+        assert_line_exists([line], pattern)
+
+
+@pytest.mark.parametrize(
+    "sort_key",
+    [
+        "path",
+        "size",
+        "size_added",
+        "size_removed",
+        "size_diff",
+        "user",
+        "group",
+        "uid",
+        "gid",
+        "ctime",
+        "mtime",
+        "ctime_diff",
+        "mtime_diff",
+    ],
+)
+def test_sort_by_all_keys_with_directions(archivers, request, sort_key):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # Prepare initial files
+    create_regular_file(archiver.input_path, "a_removed", size=11)
+    create_regular_file(archiver.input_path, "f_removed", size=22)
+    create_regular_file(archiver.input_path, "c_changed", size=33)
+    create_regular_file(archiver.input_path, "e_changed", size=44)
+    cmd(archiver, "create", "s0", "input")
+
+    # Ensure that subsequent modifications happen on a later timestamp tick than s0
+    granularity_sleep()
+
+    # Create differences for second archive
+    os.unlink("input/a_removed")
+    os.unlink("input/f_removed")
+    os.unlink("input/c_changed")
+    os.unlink("input/e_changed")
+    # Recreate changed files with different sizes
+    create_regular_file(archiver.input_path, "c_changed", size=333)
+    create_regular_file(archiver.input_path, "e_changed", size=444)
+    # Added files
+    create_regular_file(archiver.input_path, "b_added", size=55)
+    create_regular_file(archiver.input_path, "d_added", size=66)
+    cmd(archiver, "create", "s1", "input")
+
+    expected_paths = {
+        "input/a_removed",
+        "input/b_added",
+        "input/c_changed",
+        "input/d_added",
+        "input/e_changed",
+        "input/f_removed",
+    }
+
+    # Exercise both ascending and descending for each key.
+    for direction in ("<", ">"):
+        sort_spec = f"{direction}{sort_key},path"
+        output = cmd(archiver, "diff", "s0", "s1", f"--sort-by={sort_spec}", "--content-only")
+        lines = output.splitlines()
+        assert len(lines) == len(expected_paths)
+        # Validate that we got exactly the expected items regardless of order.
+        # As we do not test the order, this is mostly for test coverage.
+        seen_paths = {line.split()[-1] for line in lines}
+        assert seen_paths == expected_paths
+
+
+@pytest.mark.skipif(
+    not are_hardlinks_supported() or is_freebsd or is_netbsd,
+    reason="hardlinks not supported or test failing on freebsd and netbsd",
+)
 def test_hard_link_deletion_and_replacement(archivers, request):
     archiver = request.getfixturevalue(archivers)
 

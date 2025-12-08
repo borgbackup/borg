@@ -30,8 +30,7 @@ class LRUCache(MutableMapping[K, V]):
         ), "Unexpected attempt to replace a cached item without first deleting the old item."
         while len(self._cache) >= self._capacity:
             self._dispose(self._cache.popitem(last=False)[1])
-        self._cache[key] = value
-        self._cache.move_to_end(key)
+        self._cache[key] = value  # add new entry at the end
 
     def __getitem__(self, key: K) -> V:
         self._cache.move_to_end(key)  # raise KeyError if not found

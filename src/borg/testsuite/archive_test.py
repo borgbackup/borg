@@ -33,25 +33,50 @@ def test_stats_basic(stats):
     assert stats.usize == 20
 
 
-@pytest.mark.parametrize(
-    "item_path, update_size, expected_output",
-    [
-        ("", 0, "20 B O 20 B U 1 N "),  # test unchanged 'stats' fixture
-        ("foo", 10**3, "1.02 kB O 20 B U 1 N foo"),  # test updated original size and set item path
-        # test long item path which exceeds 80 characters
-        ("foo" * 40, 10**3, "1.02 kB O 20 B U 1 N foofoofoofoofoofoofoofoofo...foofoofoofoofoofoofoofoofoofoo"),
-    ],
-)
-def test_stats_progress(item_path, update_size, expected_output, stats, monkeypatch, columns=80):
-    monkeypatch.setenv("COLUMNS", str(columns))
-    out = StringIO()
-    item = Item(path=item_path) if item_path else None
-    s = expected_output
+def test_stats_progress_tty(stats, monkeypatch, columns=80):
+    class TTYStringIO(StringIO):
+        def isatty(self):
+            return True
 
-    stats.update(update_size, unique=False)
-    stats.show_progress(item=item, stream=out)
+    monkeypatch.setenv("COLUMNS", str(columns))
+    out = TTYStringIO()
+    stats.show_progress(stream=out)
+    s = "20 B O 20 B U 1 N "
     buf = " " * (columns - len(s))
     assert out.getvalue() == s + buf + "\r"
+
+    out = TTYStringIO()
+    stats.update(10**3, unique=False)
+    stats.show_progress(item=Item(path="foo"), final=False, stream=out)
+    s = "1.02 kB O 20 B U 1 N foo"
+    buf = " " * (columns - len(s))
+    assert out.getvalue() == s + buf + "\r"
+
+    out = TTYStringIO()
+    stats.show_progress(item=Item(path="foo" * 40), final=False, stream=out)
+    s = "1.02 kB O 20 B U 1 N foofoofoofoofoofoofoofoofo...foofoofoofoofoofoofoofoofoofoo"
+    buf = " " * (columns - len(s))
+    assert out.getvalue() == s + buf + "\r"
+
+
+def test_stats_progress_file(stats, monkeypatch):
+    out = StringIO()
+    stats.show_progress(stream=out)
+    s = "20 B O 20 B U 1 N "
+    assert out.getvalue() == s + "\n"
+
+    out = StringIO()
+    stats.update(10**3, unique=False)
+    path = "foo"
+    stats.show_progress(item=Item(path=path), final=False, stream=out)
+    s = f"1.02 kB O 20 B U 1 N {path}"
+    assert out.getvalue() == s + "\n"
+
+    out = StringIO()
+    path = "foo" * 40
+    stats.show_progress(item=Item(path=path), final=False, stream=out)
+    s = f"1.02 kB O 20 B U 1 N {path}"
+    assert out.getvalue() == s + "\n"
 
 
 def test_stats_format(stats):
@@ -354,7 +379,7 @@ def test_get_item_uid_gid():
     assert gid == 8
 
     if not is_win32:
-        # Due to the hack in borg.platform.windows, user2uid/group2gid always return 0
+        # Due to the hack in borg.platform.windows_ug, user2uid/group2gid always return 0
         # (no matter which username we ask for), and they never raise a KeyError (e.g., for
         # a non-existing user/group name). Thus, these tests can currently not succeed on win32.
 

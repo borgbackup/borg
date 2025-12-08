@@ -10,6 +10,7 @@ from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
 from ..helpers import format_file_size, bin_to_hex
 from ..helpers import ChunkerParams, ChunkIteratorFileWrapper
+from ..item import ChunkListEntry
 from ..manifest import Manifest
 from ..legacyrepository import LegacyRepository
 from ..repository import Repository
@@ -20,7 +21,16 @@ logger = create_logger()
 
 
 def transfer_chunks(
-    upgrader, other_repository, other_manifest, other_chunks, archive, cache, recompress, dry_run, chunker_params=None
+    upgrader,
+    other_repository,
+    other_manifest,
+    other_chunks,
+    archive,
+    cache,
+    manifest,
+    recompress,
+    dry_run,
+    chunker_params=None,
 ):
     """
     Transfer chunks from another repository to the current repository.
@@ -41,7 +51,7 @@ def transfer_chunks(
         file = ChunkIteratorFileWrapper(chunk_iterator)
 
         # Create a chunker with the specified parameters
-        chunker = get_chunker(*chunker_params, key=archive.key, sparse=False)
+        chunker = get_chunker(*chunker_params, key=manifest.key, sparse=False)
         for chunk in chunker.chunkify(file):
             if not dry_run:
                 chunk_id, data = cached_hash(chunk, archive.key.id_hash)
@@ -75,7 +85,10 @@ def transfer_chunks(
                         # A missing correct chunk in other_repository (source) will result in
                         # a missing chunk in repository (destination).
                         # We do NOT want to transfer all-zero replacement chunks from Borg 1 repositories.
-                        pass
+                        # But we want to have a correct chunks list entry. That will be useful in case the
+                        # chunk reappears, and also we could dynamically generate an all-zero replacement
+                        # of the correct size for reading / extracting, if desired.
+                        chunk_entry = ChunkListEntry(chunk_id, size)
                     else:
                         if recompress == "never":
                             # Keep the compressed payload the same; verify via assert_id (that will
@@ -226,6 +239,7 @@ class TransferMixIn:
                             other_chunks,
                             archive,
                             cache,
+                            manifest,
                             args.recompress,
                             dry_run,
                             args.chunker_params,
@@ -349,6 +363,7 @@ class TransferMixIn:
             metavar="UPGRADER",
             dest="upgrader",
             type=str,
+            choices=("NoOp", "From12To20"),
             default="NoOp",
             action=Highlander,
             help="use the upgrader to convert transferred data (default: no conversion)",

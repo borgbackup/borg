@@ -65,7 +65,7 @@ class ArchiveAnalyzer:
             if "chunks" in item:
                 item_chunks = dict(item.chunks)  # chunk id -> plaintext size
                 directory_path = os.path.dirname(item.path)
-                chunks_by_path[directory_path].update(item_chunks)
+                chunks_by_path[directory_path] |= item_chunks
         return chunks_by_path
 
     def analyze_change(self, base, new):

@@ -1,8 +1,11 @@
 from hashlib import sha256
 from io import BytesIO
 import os
+import random
 
-from . import cf
+import pytest
+
+from . import cf, cf_expand
 from ...chunkers import ChunkerBuzHash64
 from ...chunkers.buzhash64 import buzhash64_get_table
 from ...constants import *  # NOQA
@@ -98,3 +101,42 @@ def test_buzhash64_table():
     for bit_pos in range(64):
         bit_count = sum(1 for value in table0 if value & (1 << bit_pos))
         assert bit_count == 128  # 50% of 256 = 128
+
+
+@pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")
+@pytest.mark.parametrize("worker", range(os.cpu_count() or 1))
+def test_fuzz_bh64(worker):
+    # Fuzz buzhash64 with random and uniform data of misc. sizes and misc keys.
+    def rnd_key():
+        return os.urandom(32)
+
+    # decompose CHUNKER64_PARAMS = (algo, min_exp, max_exp, mask_bits, window_size)
+    algo, min_exp, max_exp, mask_bits, win_size = CHUNKER64_PARAMS
+    assert algo == CH_BUZHASH64  # default chunker must be buzhash64 here
+
+    keys = [b"\0" * 32] + [rnd_key() for _ in range(10)]
+    sizes = [random.randint(1, 4 * 1024 * 1024) for _ in range(50)]
+
+    for key in keys:
+        chunker = ChunkerBuzHash64(key, min_exp, max_exp, mask_bits, win_size)
+        for size in sizes:
+            # Random data
+            data = os.urandom(size)
+            with BytesIO(data) as bio:
+                parts = cf_expand(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            assert reconstructed == data
+
+            # All-same data (non-zero)
+            data = b"\x42" * size
+            with BytesIO(data) as bio:
+                parts = cf_expand(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            assert reconstructed == data
+
+            # All-zero data
+            data = b"\x00" * size
+            with BytesIO(data) as bio:
+                parts = cf_expand(chunker.chunkify(bio))
+            reconstructed = b"".join(parts)
+            assert reconstructed == data

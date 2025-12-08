@@ -1,8 +1,7 @@
 import errno
 import os
-import grp
-import pwd
-from functools import lru_cache
+
+from . import posix_ug
 
 from libc.errno cimport errno as c_errno
 
@@ -77,42 +76,6 @@ def local_pid_alive(pid):
         return True
 
 
-@lru_cache(maxsize=None)
-def uid2user(uid, default=None):
-    try:
-        return pwd.getpwuid(uid).pw_name
-    except KeyError:
-        return default
-
-
-@lru_cache(maxsize=None)
-def user2uid(user, default=None):
-    if not user:
-        return default
-    try:
-        return pwd.getpwnam(user).pw_uid
-    except KeyError:
-        return default
-
-
-@lru_cache(maxsize=None)
-def gid2group(gid, default=None):
-    try:
-        return grp.getgrgid(gid).gr_name
-    except KeyError:
-        return default
-
-
-@lru_cache(maxsize=None)
-def group2gid(group, default=None):
-    if not group:
-        return default
-    try:
-        return grp.getgrnam(group).gr_gid
-    except KeyError:
-        return default
-
-
 def posix_acl_use_stored_uid_gid(acl):
     """Replace the user/group field with the stored uid/gid."""
     assert isinstance(acl, bytes)
@@ -131,4 +94,4 @@ def posix_acl_use_stored_uid_gid(acl):
 def getosusername():
     """Return the OS username."""
     uid = os.getuid()
-    return uid2user(uid, uid)
+    return posix_ug._uid2user(uid, uid)

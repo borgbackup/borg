@@ -162,3 +162,112 @@ def test_debug_info(archivers, request):
     archiver = request.getfixturevalue(archivers)
     output = cmd(archiver, "debug", "info")
     assert "Python" in output
+
+
+def test_debug_search_repo_objs(archivers, request):
+    """Test the debug search-repo-objs command with hex and string patterns."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    
+    # Create test data with known content
+    test_string = "unique_test_string_12345"
+    test_data = f"some data before {test_string} some data after".encode()
+    create_regular_file(archiver.input_path, "searchable_file", contents=test_data)
+    
+    # Create an archive with this data
+    cmd(archiver, "create", "test", "input")
+    
+    # Search for the string pattern
+    output = cmd(archiver, "debug", "search-repo-objs", f"str:{test_string}")
+    # The search should find the string in repository objects
+    # We just verify the command completes and produces output
+    assert "Done." in output
+    
+    # Search for a hex pattern (using a simple hex sequence)
+    hex_pattern = "hex:313233"  # hex for "123"
+    output = cmd(archiver, "debug", "search-repo-objs", hex_pattern)
+    assert "Done." in output
+
+
+def test_debug_search_repo_objs_invalid_pattern(archivers, request):
+    """Test search-repo-objs with an invalid search pattern."""
+    import pytest
+    from ...helpers import CommandError
+    
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    
+    # Try to search with invalid pattern (no hex: or str: prefix)
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "debug", "search-repo-objs", "invalid_pattern")
+    
+    assert "search term needs to be hex:" in str(exc_info.value) or "str:" in str(exc_info.value)
+
+
+def test_debug_get_obj_invalid_id(archivers, request):
+    """Test get-obj with an invalid (malformed) hex ID."""
+    import pytest
+    from ...helpers import CommandError
+    
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    
+    # Try to get object with invalid hex ID (not proper hex format)
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "debug", "get-obj", "not_a_valid_hex_id", "output/file")
+    
+    assert "is invalid" in str(exc_info.value)
+
+
+def test_debug_get_obj_not_found(archivers, request):
+    """Test get-obj with a non-existent but valid hex ID."""
+    import pytest
+    from ...helpers import RTError
+    
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    
+    # Valid hex ID format but object doesn't exist in repository
+    fake_id = "0" * 64  # 64 hex characters (32 bytes)
+    
+    with pytest.raises(RTError) as exc_info:
+        cmd(archiver, "debug", "get-obj", fake_id, "output/file")
+    
+    assert "not found" in str(exc_info.value)
+
+
+def test_debug_parse_obj_invalid_id(archivers, request):
+    """Test parse-obj with an invalid (malformed) hex ID."""
+    import pytest
+    from ...helpers import CommandError
+    
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    
+    # Create dummy files for the command
+    create_regular_file(archiver.input_path, "object.bin", contents=b"dummy")
+    
+    # Try to parse with invalid hex ID
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "debug", "parse-obj", "invalid_id", "input/object.bin", "output/data.bin", "output/meta.json")
+    
+    assert "is invalid" in str(exc_info.value)
+
+
+def test_debug_put_obj_invalid_id(archivers, request):
+    """Test put-obj with an invalid (malformed) hex ID."""
+    import pytest
+    from ...helpers import CommandError
+    
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    
+    # Create test file to put
+    create_regular_file(archiver.input_path, "file", contents=b"test data")
+    
+    # Try to put with invalid hex ID
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "debug", "put-obj", "bad_hex_id", "input/file")
+    
+    assert "is invalid" in str(exc_info.value)

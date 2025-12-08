@@ -17,6 +17,8 @@ from ...manifest import Manifest
 from ...platform import is_win32, is_darwin
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError
+import pytest
+from . import cmd
 from .. import has_lchflags
 from .. import changedir
 from .. import (
@@ -1085,3 +1087,117 @@ def test_exclude_nodump_dir_with_file(archivers, request):
     list_output = cmd(archiver, "list", "test", "--short")
     assert "input/nd\n" not in list_output
     assert "input/nd/file_in_ndir\n" not in list_output
+
+
+  
+# def test_invalid_option_errors(archiver):
+#     out = cmd(archiver, "create", "--definitely-not-a-flag", exit_code=2)
+#     assert "unrecognized" in out.lower() or "error" in out.lower()
+
+
+@pytest.mark.skipif(not are_fifos_supported(), reason="FIFOs not supported")
+def test_create_read_special_fifo_direct(archivers, request):
+    """Test --read-special with a FIFO (not via symlink) to cover lines 327-336."""
+    from threading import Thread
+    
+    def fifo_feeder(fn, data):
+        with open(fn, "wb") as f:
+            f.write(data)
+    
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    data = b"test data from fifo" * 100
+    
+    fifo_fn = os.path.join(archiver.input_path, "test_fifo")
+    os.mkfifo(fifo_fn)
+    
+    t = Thread(target=fifo_feeder, args=(fifo_fn, data))
+    t.start()
+    try:
+        cmd(archiver, "create", "--read-special", "test", "input/test_fifo")
+    finally:
+        # Cleanup
+        fd = os.open(fifo_fn, os.O_RDONLY | os.O_NONBLOCK)
+        try:
+            os.read(fd, len(data))
+        except OSError:
+            pass
+        finally:
+            os.close(fd)
+        t.join()
+    
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        with open("input/test_fifo", "rb") as f:
+            extracted_data = f.read()
+    assert extracted_data == data
+
+
+@pytest.mark.skipif(not are_symlinks_supported(), reason="symlinks not supported")
+@pytest.mark.skipif(not are_fifos_supported(), reason="FIFOs not supported")
+def test_create_read_special_symlink_to_fifo_content(archivers, request):
+    """Test --read-special with symlink pointing to FIFO reads the content (lines 305-316)."""
+    from threading import Thread
+    
+    def fifo_feeder(fn, data):
+        with open(fn, "wb") as f:
+            f.write(data)
+    
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    data = b"special content via symlink" * 50
+    
+    fifo_fn = os.path.join(archiver.input_path, "real_fifo")
+    symlink_fn = os.path.join(archiver.input_path, "link_to_fifo")
+    os.mkfifo(fifo_fn)
+    os.symlink(fifo_fn, symlink_fn)
+    
+    t = Thread(target=fifo_feeder, args=(fifo_fn, data))
+    t.start()
+    try:
+        # When using --read-special on a symlink to a FIFO, it should read the FIFO content
+        cmd(archiver, "create", "--read-special", "test", "input/link_to_fifo")
+    finally:
+        # Cleanup
+        fd = os.open(fifo_fn, os.O_RDONLY | os.O_NONBLOCK)
+        try:
+            os.read(fd, len(data))
+        except OSError:
+            pass
+        finally:
+            os.close(fd)
+        t.join()
+    
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+        # The extracted file should contain the FIFO content
+        with open("input/link_to_fifo", "rb") as f:
+            extracted_data = f.read()
+    assert extracted_data == data
+
+
+@pytest.mark.skipif(not is_root(), reason="need (fake)root to create device files")
+def test_create_read_special_char_device(archivers, request):
+    """Test --read-special with character device (lines 337-352)."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    
+    # Create a character device (like /dev/null)
+    # We'll create a device that we can actually read from
+    dev_path = os.path.join(archiver.input_path, "char_dev")
+    # Create a character device with major/minor numbers (1, 3) = /dev/null equivalent
+    os.mknod(dev_path, stat.S_IFCHR | 0o666, os.makedev(1, 3))
+    
+    # Also create regular file for comparison
+    create_regular_file(archiver.input_path, "regular", contents=b"test")
+    
+    # Without --read-special, should store as device
+    cmd(archiver, "create", "test1", "input")
+    output1 = cmd(archiver, "list", "test1", "--format", "{type} {path}{NL}")
+    assert "c input/char_dev" in output1  # 'c' for character device
+    
+    # With --read-special, should read it as a file (will be empty since it's like /dev/null)
+    cmd(archiver, "create", "--read-special", "test2", "input/char_dev")
+    output2 = cmd(archiver, "list", "test2", "--format", "{type} {path}{NL}")
+    # When read-special is used, device content is read and stored as a file
+    assert "input/char_dev" in output2

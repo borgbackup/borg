@@ -346,7 +346,7 @@ class HardLinkManager:
     def __init__(self, *, id_type, info_type):
         self._map = {}
         self.id_type = id_type
-        self.info_type = info_type
+        self.info_type = info_type  # can be a single type or a tuple of types
 
     def borg1_hardlinkable(self, mode):  # legacy
         return stat.S_ISREG(mode) or stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)

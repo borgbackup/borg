@@ -5,6 +5,7 @@ import shutil
 import stat
 import struct
 import time
+from pathlib import Path
 from collections import defaultdict
 from configparser import ConfigParser
 from functools import partial
@@ -190,8 +191,9 @@ class LegacyRepository:
         exit_mcode = 21
 
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True, send_log_cb=None):
-        self.path = os.path.abspath(path)
-        self._location = Location("file://%s" % self.path)
+        p = Path(path).absolute()
+        self.path = str(p)
+        self._location = Location(p.as_uri())
         self.version = None
         # long-running repository methods which emit log or progress output are responsible for calling
         # the ._send_log method periodically to get log and progress output transferred to the borg client

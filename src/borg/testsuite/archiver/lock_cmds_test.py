@@ -1,3 +1,4 @@
+import pytest
 import os
 import subprocess
 import time
@@ -5,6 +6,7 @@ import time
 from ...constants import *  # NOQA
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 from ...helpers import CommandError
+import pytest
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -50,3 +52,31 @@ def test_with_lock_non_existent_command(archivers, request):
     command = ["non_existent_command"]
     expected_ec = CommandError().exit_code
     cmd(archiver, "with-lock", *command, fork=True, exit_code=expected_ec)
+
+
+def test_with_lock_successful_command(archivers, request):
+    """Test that with-lock successfully executes a command and properly manages the lock refreshing thread."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    # Run with fork=False so coverage tracking works properly
+    # This covers lines 20-26 and 30 (thread start, subprocess call, thread terminate)
+    cmd(archiver, "with-lock", "echo", "test", fork=False, exit_code=0)
+
+def test_with_lock_subprocess_failure_inproc(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    import borg.archiver.lock_cmds as lock_cmds
+
+    def fake_call(*args, **kwargs):
+        raise FileNotFoundError("boom")
+
+    monkeypatch.setattr(lock_cmds.subprocess, "call", fake_call)
+
+    expected_ec = CommandError().exit_code
+    # Now run with fork=False so the exception path is covered by coverage
+    # When fork=False, the exception propagates up, so we must catch it
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "with-lock", "dummy-cmd", fork=False)
+    
+    assert "Failed to execute command: boom" in str(exc_info.value)

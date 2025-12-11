@@ -446,3 +446,83 @@ def test_empty_repository(archivers, request):
         for id, _ in repository.list():
             repository.delete(id)
     cmd(archiver, "check", exit_code=1)
+
+
+def test_check_repair_user_cancellation(archivers, request, monkeypatch):
+    """Test that check --repair is cancelled if user doesn't confirm with YES."""
+    from ...helpers import CancelledByUser
+    
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    
+    # Simulate user entering "no" instead of "YES"
+    monkeypatch.setenv("BORG_CHECK_I_KNOW_WHAT_I_AM_DOING", "no")
+    
+    with pytest.raises(CancelledByUser):
+        cmd(archiver, "check", "--repair")
+
+
+def test_check_repository_only_conflicts(archivers, request):
+    """Test that --repository-only conflicts with archive-related options."""
+    from ...helpers import CommandError
+    
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    
+    # --repository-only conflicts with --verify-data
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "check", "--repository-only", "--verify-data")
+    assert "contradicts" in str(exc_info.value)
+    
+    # --repository-only conflicts with --match-archives
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "check", "--repository-only", "--match-archives=*")
+    assert "contradicts" in str(exc_info.value)
+    
+    # --repository-only conflicts with --first
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "check", "--repository-only", "--first=1")
+    assert "contradicts" in str(exc_info.value)
+    
+    # --repository-only conflicts with --last
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "check", "--repository-only", "--last=1")
+    assert "contradicts" in str(exc_info.value)
+
+
+def test_check_repository_only_find_lost_archives_conflict(archivers, request):
+    """Test that --repository-only conflicts with --find-lost-archives."""
+    from ...helpers import CommandError
+    
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "check", "--repository-only", "--find-lost-archives")
+    assert "contradicts" in str(exc_info.value)
+    assert "--find-lost-archives" in str(exc_info.value)
+
+
+def test_check_repair_max_duration_conflict(archivers, request):
+    """Test that --repair conflicts with --max-duration."""
+    from ...helpers import CommandError
+    
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "check", "--repair", "--max-duration=60")
+    assert "--repair does not allow --max-duration" in str(exc_info.value)
+
+
+def test_check_max_duration_requires_repository_only(archivers, request):
+    """Test that --max-duration requires --repository-only."""
+    from ...helpers import CommandError
+    
+    archiver = request.getfixturevalue(archivers)
+    check_cmd_setup(archiver)
+    
+    # --max-duration without --repository-only should fail
+    with pytest.raises(CommandError) as exc_info:
+        cmd(archiver, "check", "--max-duration=60")
+    assert "--repository-only is required for --max-duration" in str(exc_info.value)

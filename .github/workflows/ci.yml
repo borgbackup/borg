@@ -529,7 +529,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{ matrix.version }}-dist
+          name: ${{ matrix.artifact_prefix }}
           path: artifacts/*
           if-no-files-found: ignore
 

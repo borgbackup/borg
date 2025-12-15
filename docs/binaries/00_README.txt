@@ -34,18 +34,15 @@ Binaries built on GitHub servers
 borg-linux-glibc235-x86_64-gh Linux AMD/Intel (built on Ubuntu 22.04 LTS with glibc 2.35)
 borg-linux-glibc235-arm64-gh  Linux ARM (built on Ubuntu 22.04 LTS with glibc 2.35)
 
-borg-macos-14-arm64-gh        macOS Apple Silicon (built on macOS 14 w/o FUSE support)
-borg-macos-13-x86_64-gh       macOS Intel (built on macOS 13 w/o FUSE support)
+borg-macos-15-arm64-gh        macOS Apple Silicon (built on macOS 15 w/o FUSE support)
+borg-macos-15-x86_64-gh       macOS Intel (built on macOS 15 w/o FUSE support)
 
+borg-freebsd-14-x86_64-gh     FreeBSD AMD/Intel (built on FreeBSD 14)
 
 Binaries built locally
 ~~~~~~~~~~~~~~~~~~~~~~
 
-borg-linux-glibc241-x86_64 Linux (built on Debian 13 "Trixie" with glibc 2.41)
-borg-linux-glibc236-x86_64 Linux (built on Debian 12 "Bookworm" with glibc 2.36)
 borg-linux-glibc231-x86_64 Linux (built on Debian 11 "Bullseye" with glibc 2.31)
-
-borg-freebsd-14-x86_64     FreeBSD (built on FreeBSD 14)
 
 Note: if you don't find a specific binary here, check release 1.4.1 or 1.2.9.
 

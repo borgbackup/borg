@@ -523,6 +523,7 @@ cdef class ArchiveItem(PropDict):
     nfiles = PropDictProperty(int)
     size_parts = PropDictProperty(int)  # legacy only
     nfiles_parts = PropDictProperty(int)  # legacy only
+    cwd = PropDictProperty(str, 'surrogate-escaped str')
 
     def update_internal(self, d):
         # legacy support for migration (data from old msgpacks comes in as bytes always, but sometimes we want str)
@@ -530,7 +531,7 @@ cdef class ArchiveItem(PropDict):
             k = fix_key(d, k)
             if k == 'version':
                 assert isinstance(v, int)
-            if k in ('name', 'hostname', 'username', 'comment'):
+            if k in ('name', 'hostname', 'username', 'comment', 'cwd'):
                 v = fix_str_value(d, k)
             if k in ('time', 'time_end'):
                 v = fix_str_value(d, k, 'replace')

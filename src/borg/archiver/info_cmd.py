@@ -46,6 +46,7 @@ class InfoMixIn:
                 Time (end): {end}
                 Duration: {duration}
                 Command line: {command_line}
+                Working Directory: {cwd}
                 Number of files: {stats[nfiles]}
                 Original size: {stats[original_size]}
                 """

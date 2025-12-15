@@ -622,6 +622,7 @@ class Archive:
         else:
             info |= {
                 "command_line": self.metadata.command_line,
+                "cwd": self.metadata.get("cwd", ""),
                 "hostname": self.metadata.hostname,
                 "username": self.metadata.username,
                 "comment": self.metadata.get("comment", ""),
@@ -692,6 +693,7 @@ Duration: {0.duration}
             "tags": list(sorted(self.tags)),
             "item_ptrs": item_ptrs,  # see #1473
             "command_line": join_cmd(sys.argv),
+            "cwd": self.cwd,
             "hostname": hostname,
             "username": getuser(),
             "time": start.isoformat(timespec="microseconds"),

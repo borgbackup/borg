@@ -2,6 +2,7 @@ import json
 import os
 
 from ...constants import *  # NOQA
+from .. import changedir
 from . import cmd, checkts, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -46,3 +47,15 @@ def test_info_json_of_empty_archive(archivers, request):
     assert info_repo["archives"] == []
     info_repo = json.loads(cmd(archiver, "info", "--json", "--last=1"))
     assert info_repo["archives"] == []
+
+
+def test_info_working_directory(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    # create a file in input and create the archive from inside the input directory
+    create_regular_file(archiver.input_path, "file1", size=1)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    expected_cwd = os.path.abspath(archiver.input_path)
+    with changedir(archiver.input_path):
+        cmd(archiver, "create", "test", ".")
+    info_archive = cmd(archiver, "info", "-a", "test")
+    assert f"Working Directory: {expected_cwd}" in info_archive

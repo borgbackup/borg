@@ -21,6 +21,7 @@ ARCHIVE_KEYS = frozenset(['version', 'name', 'hostname', 'username', 'time', 'ti
                           'recreate_source_id', 'recreate_args', 'recreate_partial_chunks',  # used in 1.1.0b1 .. b2
                           'size', 'nfiles',
                           'size_parts', 'nfiles_parts',  # legacy v1 archives
+                          'cwd',
                           ])
 # fmt: on
 

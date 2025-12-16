@@ -156,10 +156,14 @@ above.
 
 New features:
 
+- borg --cockpit: show TUI based on Textual
+- info: show cwd at the time of backup creation, #6191
+- linux ACLs: use acl_to_any_text to avoid libacl name lookups, #8753
+- NetBSD: xattr support, #1332
 - fat binary builds on GitHub (see assets on the GitHub releases page):
 
   - for Linux with glibc 2.35+ (Intel/AMD and ARM64)
-  - for macOS 14+ (Apple Silicon/ARM64) and macOS 13+ (Intel)
+  - for macOS 15+ (Apple Silicon/ARM64 and Intel)
   - using GitHub artifact attestations for release binaries, #9134
 - export-tar/import-tar: support for POSIX ACLs (PAX format)
 - list --format: add "inode" placeholder
@@ -174,7 +178,13 @@ Fixes:
 
 - extract: fs flags: use get/set to influence only specific flags, #9039, Linux, FreeBSD, macOS
 - transfer: fix borg transfer corrupting the source repo index, #9022
+- transfer: create a chunks list entry for missing chunks, see #9208
+- transfer: fix AttributeError with --dry-run, see #9199
+- old archives might not have a comment in metadata, see #9208
+- HardLinkManager: allow NoneType for contentless hardlinks, see #9208
 - legacyrepository: remove auto_recover, #9022
+- legacyremote: accept raise_missing in get/get_many to avoid TypeError
+  with callers that pass it; no behavior change on legacy protocol, #9199
 - fix reading borg 1.x repo index, #9022
 - enable S3/B2 support of borgstore
 - mount --show-rc: display main process return code (rc), #8308
@@ -191,6 +201,7 @@ Other changes:
 - set_flags: remove compression flag support (did not work anyway)
 - Brewfile: use openssl@3
 - GitHub Actions: use korthout/backport-action
+- buzhash/buzhash64: initialise all-zero memory more efficiently
 - tests:
 
   - add fuzzing tests for chunkers
@@ -205,6 +216,13 @@ Other changes:
   - pyproject.toml: correctly define test environments for FUSE testing
   - add granularity_sleep, #9150
   - use context manager when opening files in patterns_test
+  - FUSE related fixes/improvements, #9182
+  - fix pynacl/libsodium build on freebsd, #9214
+  - filter_xattrs now also filters some macOS xattrs
+  - transfer: add --dry-run test
+  - refactor id <-> name lookup for monkeypatching
+  - CI: netbsd: enable xattrs on TMPDIR
+  - improve fs cleanup directly after tests
 - Vagrant:
 
   - add Debian testing/Trixie box
@@ -226,6 +244,7 @@ Other changes:
   - add Arch Linux to the 'Installing from source' docs
   - add systemd-inhibit and examples, #8989
   - code/docs: fix typos and grammar
+  - some fixes/update to the FAQ
 
 
 Version 2.0.0b19 (2025-07-02)

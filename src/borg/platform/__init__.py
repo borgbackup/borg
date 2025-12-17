@@ -6,7 +6,7 @@ Public APIs are documented in platform.base.
 
 from types import ModuleType
 
-from ..platformflags import is_win32, is_linux, is_freebsd, is_netbsd, is_darwin, is_cygwin
+from ..platformflags import is_win32, is_linux, is_freebsd, is_netbsd, is_darwin, is_cygwin, is_haiku
 
 from .base import ENOATTR, API_VERSION
 from .base import SaveFile, sync_dir, fdatasync, safe_fadvise

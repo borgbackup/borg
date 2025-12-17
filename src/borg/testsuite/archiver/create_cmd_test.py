@@ -100,6 +100,7 @@ def test_basic_functionality(archivers, request):
 
     info_output = cmd(archiver, "info", "-a", "test")
     item_count = 5 if has_lchflags else 6  # one file is UF_NODUMP
+    print("archive contents:\n%s" % list_output)
     assert "Number of files: %d" % item_count in info_output
     shutil.rmtree(archiver.cache_path)
     info_output2 = cmd(archiver, "info", "-a", "test")

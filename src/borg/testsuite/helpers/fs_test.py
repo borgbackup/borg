@@ -32,8 +32,10 @@ def test_get_base_dir(monkeypatch):
     monkeypatch.delenv("HOME", raising=False)
     monkeypatch.delenv("USER", raising=False)
     assert get_base_dir(legacy=True) == os.path.expanduser("~")
-    monkeypatch.setenv("USER", "root")
-    assert get_base_dir(legacy=True) == os.path.expanduser("~root")
+    # Haiku OS is a single-user OS, expanding "~root" is not supported.
+    if not sys.platform.startswith("haiku"):
+        monkeypatch.setenv("USER", "root")
+        assert get_base_dir(legacy=True) == os.path.expanduser("~root")
     monkeypatch.setenv("HOME", "/var/tmp/home")
     assert get_base_dir(legacy=True) == "/var/tmp/home"
     monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")

@@ -28,6 +28,11 @@ def test_with_lock(tmp_path):
     command2 = "python3", "-c", 'print("second command - should never get executed")'
     borgwl = "python3", "-m", "borg", "with-lock", f"--lock-wait={lock_wait}"
     popen_options = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+    import sys
+
+    print("sys.path: %r" % sys.path)
+    print("PYTHONPATH: %s" % env.get("PYTHONPATH", ""))
+    print("PATH: %s" % env.get("PATH", ""))
     subprocess.run(command0, env=env, check=True, text=True, capture_output=True)
     assert repo_path.exists()
     with subprocess.Popen([*borgwl, *command1], **popen_options) as p1:

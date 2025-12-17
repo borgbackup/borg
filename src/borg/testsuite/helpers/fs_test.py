@@ -21,7 +21,7 @@ from ...helpers.fs import (
     remove_dotdot_prefixes,
     make_path_safe,
 )
-from ...platform import is_win32, is_darwin
+from ...platform import is_win32, is_darwin, is_haiku
 from .. import are_hardlinks_supported
 from .. import rejected_dotdot_paths
 
@@ -32,8 +32,10 @@ def test_get_base_dir(monkeypatch):
     monkeypatch.delenv("HOME", raising=False)
     monkeypatch.delenv("USER", raising=False)
     assert get_base_dir(legacy=True) == os.path.expanduser("~")
-    monkeypatch.setenv("USER", "root")
-    assert get_base_dir(legacy=True) == os.path.expanduser("~root")
+    # Haiku OS is a single-user OS, expanding "~root" is not supported.
+    if not is_haiku:
+        monkeypatch.setenv("USER", "root")
+        assert get_base_dir(legacy=True) == os.path.expanduser("~root")
     monkeypatch.setenv("HOME", "/var/tmp/home")
     assert get_base_dir(legacy=True) == "/var/tmp/home"
     monkeypatch.setenv("BORG_BASE_DIR", "/var/tmp/base")

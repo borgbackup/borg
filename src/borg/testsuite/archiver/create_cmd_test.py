@@ -73,17 +73,20 @@ def test_basic_functionality(archivers, request):
         "input/bdev",
         "input/cdev",
         "input/dir2",
-        "input/dir2/file2",
-        "input/empty",
-        "input/file1",
-        "input/flagfile",
+        "input/dir2/file2",  # 1
+        "input/empty",  # 2
+        "input/file1",  # 3
+        "input/flagfile",  # 4
+        "input/fusexattr",  # 5
     ]
+    item_count = 5  # we only count regular files
     if are_fifos_supported():
         expected.append("input/fifo1")
     if are_symlinks_supported():
         expected.append("input/link1")
     if are_hardlinks_supported():
         expected.append("input/hardlink")
+        item_count += 1
     if not have_root or not has_mknod:
         # We could not create these device files without (fake)root.
         expected.remove("input/bdev")
@@ -92,14 +95,14 @@ def test_basic_functionality(archivers, request):
         # remove the file we did not back up, so input and output become equal
         expected.remove("input/flagfile")  # this file is UF_NODUMP
         os.remove(os.path.join("input", "flagfile"))
-
+        item_count -= 1
     list_output = cmd(archiver, "list", "test", "--short")
     for name in expected:
         assert name in list_output
     assert_dirs_equal("input", "output/input")
 
     info_output = cmd(archiver, "info", "-a", "test")
-    item_count = 5 if has_lchflags else 6  # one file is UF_NODUMP
+    print("archive contents:\n%s" % list_output)
     assert "Number of files: %d" % item_count in info_output
     shutil.rmtree(archiver.cache_path)
     info_output2 = cmd(archiver, "info", "-a", "test")

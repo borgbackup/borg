@@ -13,7 +13,6 @@ import pytest
 
 from ... import xattr, platform
 from ...constants import *  # NOQA
-from ...platform import ENOATTR
 from ...storelocking import Lock
 from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, has_any_fuse, ENOATTR

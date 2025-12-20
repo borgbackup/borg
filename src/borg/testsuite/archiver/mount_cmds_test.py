@@ -7,6 +7,7 @@ import pytest
 
 from ... import xattr, platform
 from ...constants import *  # NOQA
+from ...platform import ENOATTR
 from ...storelocking import Lock
 from ...helpers import flags_noatime, flags_normal
 from .. import has_lchflags, llfuse
@@ -155,7 +156,7 @@ def test_fuse(archivers, request):
                 try:
                     xattr.getxattr(out_fn, b"user.foo")
                 except OSError as e:
-                    assert e.errno == llfuse.ENOATTR
+                    assert e.errno == ENOATTR
                 else:
                     assert False, "expected OSError(ENOATTR), but no error was raised"
         except OSError as err:

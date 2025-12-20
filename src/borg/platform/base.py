@@ -24,7 +24,11 @@ API_VERSION = "1.2_05"
 fdatasync = getattr(os, "fdatasync", os.fsync)
 has_posix_fadvise = hasattr(os, "posix_fadvise")
 
-from .xattr import ENOATTR
+try:
+    ENOATTR = errno.ENOATTR  # type: ignore[attr-defined]
+except AttributeError:
+    # on some platforms, ENOATTR is missing, use ENODATA there
+    ENOATTR = errno.ENODATA  # type: ignore[attr-defined]
 
 
 def listxattr(path, *, follow_symlinks=False):

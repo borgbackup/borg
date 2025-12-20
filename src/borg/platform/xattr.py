@@ -4,13 +4,6 @@ import os
 from ..helpers import Buffer
 
 
-try:
-    ENOATTR = errno.ENOATTR  # type: ignore[attr-defined]
-except AttributeError:
-    # on some platforms, ENOATTR is missing, use ENODATA there
-    ENOATTR = errno.ENODATA  # type: ignore[attr-defined]
-
-
 buffer = Buffer(bytearray, limit=2**24)
 
 

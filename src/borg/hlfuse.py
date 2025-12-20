@@ -13,8 +13,9 @@ if TYPE_CHECKING:
     # For type checking, assume mfusepy is available
     # This allows mypy to understand hlfuse.Operations
     import mfusepy as hlfuse
+    from .fuse_impl import ENOATTR
 else:
-    from .fuse_impl import hlfuse
+    from .fuse_impl import hlfuse, ENOATTR
 
 from .logger import create_logger
 
@@ -583,8 +584,8 @@ class borgfs(hlfuse.Operations, FuseBackend):
             debug_log(f"getxattr -> {len(result)} bytes")
             return result
         except KeyError:
-            debug_log("getxattr -> ENODATA")
-            raise hlfuse.FuseOSError(errno.ENODATA) from None
+            debug_log("getxattr -> ENOATTR")
+            raise hlfuse.FuseOSError(ENOATTR) from None
 
     def open(self, path, fi):
         debug_log(f"open(path={path!r}, fi={fi})")

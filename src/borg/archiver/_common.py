@@ -125,7 +125,7 @@ def with_repository(
                         f"You can use 'borg transfer' to copy archives from old to new repos."
                     )
                 if manifest or cache:
-                    manifest_ = Manifest.load(repository, compatibility, other=False)
+                    manifest_ = Manifest.load(repository, compatibility, args, other=False)
                     kwargs["manifest"] = manifest_
                     if "compression" in args:
                         manifest_.repo_objs.compressor = args.compression.compressor
@@ -571,6 +571,13 @@ def define_common_options(add_common_option):
         default=Location(other=False),
         action=Highlander,
         help="repository to use",
+    )
+    add_common_option(
+        "--fido2-device",
+        metavar="DEVICE",
+        dest="fido2_device",
+        default=os.environ.get("BORG_FIDO2_DEVICE", "none"),
+        help="select fido2 device to protect the repository key, use ``fido2-token -L`` to list available devices.",
     )
 
 

@@ -412,6 +412,7 @@ _borg-key() {
     case $line[1] in
     (change-passphrase)
       _arguments -s -w -S : \
+        '--fido2-device=[select a FIDO2 device, use "fido2-token -L" to list available devices]:devpath:_files -P /dev/ -W /dev' \
         $common_options
       ;;
     (export)
@@ -556,6 +557,7 @@ _borg-repo-create() {
 
   _arguments -s -w -S : \
     '(-e --encryption)'{-e,--encryption}'=[select encryption key mode (required)]:MODE:(none authenticated authenticated-blake2 keyfile-aes-ocb repokey-aes-ocb keyfile-chacha20-poly1305 repokey-chacha20-poly1305 keyfile-blake2-aes-ocb repokey-blake2-aes-ocb keyfile-blake2-chacha20-poly1305 repokey-blake2-chacha20-poly1305)' \
+    '--fido2-device=[select a FIDO2 device, use "fido2-token -L" to list available devices]:devpath:_files -P /dev/ -W /dev' \
     $common_repo_options \
     '--make-parent-dirs[create parent directories]'
 }

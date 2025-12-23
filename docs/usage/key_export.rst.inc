@@ -21,7 +21,7 @@ borg key export
     +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
     |                                                       | ``--paper``   | Create an export suitable for printing and later type-in               |
     +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
-    |                                                       | ``--qr-html`` | Create an html file suitable for printing and later type-in or qr scan |
+    |                                                       | ``--qr-html`` | Create an HTML file suitable for printing and later type-in or QR scan |
     +-------------------------------------------------------+---------------+------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                 |
     |                                                                                                                                                |
@@ -44,7 +44,7 @@ borg key export
 
     options
         --paper       Create an export suitable for printing and later type-in
-        --qr-html     Create an html file suitable for printing and later type-in or qr scan
+        --qr-html     Create an HTML file suitable for printing and later type-in or QR scan
 
 
     :ref:`common_options`

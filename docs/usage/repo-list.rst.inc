@@ -27,21 +27,21 @@ borg repo-list
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                                                                                  |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. see "borg help match-archives".                                                                                                   |
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. See "borg help match-archives".                                                                                                   |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp                                                     |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--first N``                                | consider first N archives after other filters were applied                                                                                                                      |
+    |                                                                             | ``--first N``                                | consider the first N archives after other filters are applied                                                                                                                   |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--last N``                                 | consider last N archives after other filters were applied                                                                                                                       |
+    |                                                                             | ``--last N``                                 | consider the last N archives after other filters are applied                                                                                                                    |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.                                                                               |
+    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.                                                                               |
+    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g. 7d or 12m.                                                                                                                  |
+    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g., 7d or 12m.                                                                                                                 |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.                                                                                                                  |
+    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.                                                                                                                 |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--deleted``                                | consider only soft-deleted archives.                                                                                                                                            |
     +-----------------------------------------------------------------------------+----------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -68,14 +68,14 @@ borg repo-list
         |
 
     Archive filters
-        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. see "borg help match-archives".
+        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. See "borg help match-archives".
         --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
-        --first N                                consider first N archives after other filters were applied
-        --last N                                 consider last N archives after other filters were applied
-        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
-        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.
-        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g. 7d or 12m.
-        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.
+        --first N                                consider the first N archives after other filters are applied
+        --last N                                 consider the last N archives after other filters are applied
+        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
+        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.
+        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g., 7d or 12m.
+        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.
         --deleted                                consider only soft-deleted archives.
 
 
@@ -89,8 +89,8 @@ This command lists the archives contained in a repository.
 The FORMAT specifier syntax
 +++++++++++++++++++++++++++
 
-The ``--format`` option uses python's `format string syntax
-<https://docs.python.org/3.9/library/string.html#formatstrings>`_.
+The ``--format`` option uses Python's `format string syntax
+<https://docs.python.org/3.10/library/string.html#formatstrings>`_.
 
 Examples:
 ::

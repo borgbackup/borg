@@ -27,17 +27,17 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-BREAK-LOCK" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-BREAK-LOCK" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-break-lock \- Break the repository lock (e.g. in case it was left by a dead borg.
+borg-break-lock \- Breaks the repository lock (for example, if it was left by a dead Borg process).
 .SH SYNOPSIS
 .sp
 borg [common options] break\-lock [options]
 .SH DESCRIPTION
 .sp
 This command breaks the repository and cache locks.
-Please use carefully and only while no borg process (on any machine) is
-trying to access the Cache or the Repository.
+Use with care and only when no Borg process (on any machine) is
+trying to access the cache or the repository.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

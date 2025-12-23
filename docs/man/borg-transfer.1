@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-TRANSFER" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-TRANSFER" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
 borg-transfer \- archives transfer from other repository, optionally upgrade data format
 .SH SYNOPSIS
@@ -125,45 +125,45 @@ rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
-consider first N archives after other filters were applied
+consider the first N archives after other filters are applied
 .TP
 .BI \-\-last \ N
-consider last N archives after other filters were applied
+consider the last N archives after other filters are applied
 .TP
 .BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .EX
-# 0. Have borg 2.0 installed on client AND server, have a b12 repo copy for testing.
+# 0. Have Borg 2.0 installed on the client AND server; have a b12 repository copy for testing.
 
 # 1. Create a new \(dqrelated\(dq repository:
-# here, the existing borg 1.2 repo used repokey\-blake2 (and aes\-ctr mode),
-# thus we use repokey\-blake2\-aes\-ocb for the new borg 2.0 repo.
-# staying with the same chunk id algorithm (blake2) and with the same
+# Here, the existing Borg 1.2 repository used repokey\-blake2 (and AES\-CTR mode),
+# thus we use repokey\-blake2\-aes\-ocb for the new Borg 2.0 repository.
+# Staying with the same chunk ID algorithm (BLAKE2) and with the same
 # key material (via \-\-other\-repo <oldrepo>) will make deduplication work
 # between old archives (copied with borg transfer) and future ones.
-# the AEAD cipher does not matter (everything must be re\-encrypted and
-# re\-authenticated anyway), you could also choose repokey\-blake2\-chacha20\-poly1305.
-# in case your old borg repo did not use blake2, just remove the \(dq\-blake2\(dq.
+# The AEAD cipher does not matter (everything must be re\-encrypted and
+# re\-authenticated anyway); you could also choose repokey\-blake2\-chacha20\-poly1305.
+# In case your old Borg repository did not use BLAKE2, just remove the \(dq\-blake2\(dq.
 $ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 repo\-create \e
        \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-e repokey\-blake2\-aes\-ocb
 
@@ -171,11 +171,11 @@ $ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 repo\-create \e
 $ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \-\-upgrader=From12To20 \e
        \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-\-dry\-run
 
-# 3. Transfer (copy) archives from old repo into new repo (takes time and space!):
+# 3. Transfer (copy) archives from the old repository into the new repository (takes time and space!):
 $ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \-\-upgrader=From12To20 \e
        \-\-other\-repo ssh://borg2@borgbackup/./tests/b12
 
-# 4. Check if we have everything (same as 2.):
+# 4. Check whether we have everything (same as step 2):
 $ borg \-\-repo       ssh://borg2@borgbackup/./tests/b20 transfer \-\-upgrader=From12To20 \e
        \-\-other\-repo ssh://borg2@borgbackup/./tests/b12 \-\-dry\-run
 .EE

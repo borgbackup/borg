@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-UNDELETE" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-UNDELETE" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-undelete \- Undelete archives
+borg-undelete \- Undeletes archives.
 .SH SYNOPSIS
 .sp
 borg [common options] undelete [options] [NAME]
@@ -39,14 +39,15 @@ This command undeletes archives in the repository.
 .sp
 Important: Undeleting archives is only possible before compacting.
 Once \fBborg compact\fP has run, all disk space occupied only by the
-soft\-deleted archives will be freed and undelete is not possible
-anymore.
+soft\-deleted archives will be freed, and undeleting is no longer
+possible.
 .sp
-When in doubt, use \fB\-\-dry\-run \-\-list\fP to see what would be undeleted.
+When in doubt, use \fB\-\-dry\-run \-\-list\fP to see what would be
+undeleted.
 .sp
-You can undelete multiple archives by specifying a matching pattern,
-using the \fB\-\-match\-archives PATTERN\fP option (for more info on these patterns,
-see \fIborg_patterns\fP).
+You can undelete multiple archives by specifying a match pattern using
+the \fB\-\-match\-archives PATTERN\fP option (for more information on these
+patterns, see \fIborg_patterns\fP).
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -60,37 +61,37 @@ specify the archive name
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
-do not change repository
+do not change the repository
 .TP
 .B  \-\-list
-output verbose list of archives
+output a verbose list of archives
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
-consider first N archives after other filters were applied
+consider the first N archives after other filters are applied
 .TP
 .BI \-\-last \ N
-consider last N archives after other filters were applied
+consider the last N archives after other filters are applied
 .TP
 .BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .UNINDENT
 .SH SEE ALSO
 .sp

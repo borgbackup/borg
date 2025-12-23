@@ -52,14 +52,14 @@ This command runs a user-specified command while locking the repository. For exa
 
     $ BORG_REPO=/mnt/borgrepo borg with-lock rsync -av /mnt/borgrepo /somewhere/else/borgrepo
 
-It will first try to acquire the lock (make sure that no other operation is
-running in the repo), then execute the given command as a subprocess and wait
-for its termination, release the lock and return the user command's return
-code as borg's return code.
+It first tries to acquire the lock (make sure that no other operation is
+running in the repository), then executes the given command as a subprocess and waits
+for its termination, releases the lock, and returns the user command's return
+code as Borg's return code.
 
 .. note::
 
     If you copy a repository with the lock held, the lock will be present in
-    the copy. Thus, before using borg on the copy from a different host,
-    you need to use "borg break-lock" on the copied repository, because
+    the copy. Before using Borg on the copy from a different host,
+    you need to run ``borg break-lock`` on the copied repository, because
     Borg is cautious and does not automatically remove stale locks made by a different host.

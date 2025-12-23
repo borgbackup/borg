@@ -27,21 +27,21 @@ borg info
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. see "borg help match-archives".                                               |
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. See "borg help match-archives".                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--first N``                                | consider first N archives after other filters were applied                                                                  |
+    |                                                                             | ``--first N``                                | consider the first N archives after other filters are applied                                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--last N``                                 | consider last N archives after other filters were applied                                                                   |
+    |                                                                             | ``--last N``                                 | consider the last N archives after other filters are applied                                                                |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.                           |
+    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.                          |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.                           |
+    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.                          |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g. 7d or 12m.                                                              |
+    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g., 7d or 12m.                                                             |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.                                                              |
+    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.                                                             |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
@@ -66,14 +66,14 @@ borg info
         |
 
     Archive filters
-        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. see "borg help match-archives".
+        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. See "borg help match-archives".
         --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
-        --first N                                consider first N archives after other filters were applied
-        --last N                                 consider last N archives after other filters were applied
-        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
-        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.
-        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g. 7d or 12m.
-        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.
+        --first N                                consider the first N archives after other filters are applied
+        --last N                                 consider the last N archives after other filters are applied
+        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
+        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.
+        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g., 7d or 12m.
+        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.
 
 
 Description
@@ -83,9 +83,9 @@ This command displays detailed information about the specified archive.
 
 Please note that the deduplicated sizes of the individual archives do not add
 up to the deduplicated size of the repository ("all archives"), because the two
-are meaning different things:
+mean different things:
 
 This archive / deduplicated size = amount of data stored ONLY for this archive
 = unique chunks of this archive.
-All archives / deduplicated size = amount of data stored in the repo
+All archives / deduplicated size = amount of data stored in the repository
 = all chunks in the repository.

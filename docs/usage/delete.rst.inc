@@ -19,9 +19,9 @@ borg delete
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | **options**                                                                                                                                                                                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-n``, ``--dry-run``                        | do not change repository                                                                                                    |
+    |                                                                             | ``-n``, ``--dry-run``                        | do not change the repository                                                                                                |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--list``                                   | output verbose list of archives                                                                                             |
+    |                                                                             | ``--list``                                   | output a verbose list of archives                                                                                           |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                           |
     |                                                                                                                                                                                                                                                          |
@@ -29,21 +29,21 @@ borg delete
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. see "borg help match-archives".                                               |
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. See "borg help match-archives".                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--first N``                                | consider first N archives after other filters were applied                                                                  |
+    |                                                                             | ``--first N``                                | consider the first N archives after other filters are applied                                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--last N``                                 | consider last N archives after other filters were applied                                                                   |
+    |                                                                             | ``--last N``                                 | consider the last N archives after other filters are applied                                                                |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.                           |
+    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.                          |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.                           |
+    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.                          |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g. 7d or 12m.                                                              |
+    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g., 7d or 12m.                                                             |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.                                                              |
+    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.                                                             |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
@@ -61,22 +61,22 @@ borg delete
 
 
     options
-        -n, --dry-run     do not change repository
-        --list            output verbose list of archives
+        -n, --dry-run     do not change the repository
+        --list            output a verbose list of archives
 
 
     :ref:`common_options`
         |
 
     Archive filters
-        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. see "borg help match-archives".
+        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. See "borg help match-archives".
         --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
-        --first N                                consider first N archives after other filters were applied
-        --last N                                 consider last N archives after other filters were applied
-        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
-        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.
-        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g. 7d or 12m.
-        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.
+        --first N                                consider the first N archives after other filters are applied
+        --last N                                 consider the last N archives after other filters are applied
+        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
+        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.
+        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g., 7d or 12m.
+        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.
 
 
 Description
@@ -93,6 +93,6 @@ Important:
 
 When in doubt, use ``--dry-run --list`` to see what would be deleted.
 
-You can delete multiple archives by specifying a matching pattern,
-using the ``--match-archives PATTERN`` option (for more info on these patterns,
-see :ref:`borg_patterns`).
+You can delete multiple archives by specifying a match pattern using
+the ``--match-archives PATTERN`` option (for more information on these
+patterns, see :ref:`borg_patterns`).

@@ -15,7 +15,7 @@ borg mount
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | **positional arguments**                                                                                                                                                                                                                                 |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``MOUNTPOINT``                               | where to mount filesystem                                                                                                   |
+    |                                                                             | ``MOUNTPOINT``                               | where to mount the filesystem                                                                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``PATH``                                     | paths to extract; patterns are supported                                                                                    |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
@@ -23,9 +23,9 @@ borg mount
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``-f``, ``--foreground``                     | stay in foreground, do not daemonize                                                                                        |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-o``                                       | Extra mount options                                                                                                         |
+    |                                                                             | ``-o``                                       | extra mount options                                                                                                         |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--numeric-ids``                            | use numeric user and group identifiers from archive(s)                                                                      |
+    |                                                                             | ``--numeric-ids``                            | use numeric user and group identifiers from archives                                                                        |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                           |
     |                                                                                                                                                                                                                                                          |
@@ -33,21 +33,21 @@ borg mount
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | **Archive filters** — Archive filters can be applied to repository targets.                                                                                                                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. see "borg help match-archives".                                               |
+    |                                                                             | ``-a PATTERN``, ``--match-archives PATTERN`` | only consider archives matching all patterns. See "borg help match-archives".                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--sort-by KEYS``                           | Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--first N``                                | consider first N archives after other filters were applied                                                                  |
+    |                                                                             | ``--first N``                                | consider the first N archives after other filters are applied                                                               |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--last N``                                 | consider last N archives after other filters were applied                                                                   |
+    |                                                                             | ``--last N``                                 | consider the last N archives after other filters are applied                                                                |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.                           |
+    |                                                                             | ``--oldest TIMESPAN``                        | consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.                          |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.                           |
+    |                                                                             | ``--newest TIMESPAN``                        | consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.                          |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g. 7d or 12m.                                                              |
+    |                                                                             | ``--older TIMESPAN``                         | consider archives older than (now - TIMESPAN), e.g., 7d or 12m.                                                             |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.                                                              |
+    |                                                                             | ``--newer TIMESPAN``                         | consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.                                                             |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
     | **Include/Exclude options**                                                                                                                                                                                                                              |
     +-----------------------------------------------------------------------------+----------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------+
@@ -73,29 +73,29 @@ borg mount
 .. only:: latex
 
     MOUNTPOINT
-        where to mount filesystem
+        where to mount the filesystem
     PATH
         paths to extract; patterns are supported
 
 
     options
         -f, --foreground    stay in foreground, do not daemonize
-        -o     Extra mount options
-        --numeric-ids    use numeric user and group identifiers from archive(s)
+        -o     extra mount options
+        --numeric-ids    use numeric user and group identifiers from archives
 
 
     :ref:`common_options`
         |
 
     Archive filters
-        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. see "borg help match-archives".
+        -a PATTERN, --match-archives PATTERN     only consider archives matching all patterns. See "borg help match-archives".
         --sort-by KEYS                           Comma-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
-        --first N                                consider first N archives after other filters were applied
-        --last N                                 consider last N archives after other filters were applied
-        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
-        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g. 7d or 12m.
-        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g. 7d or 12m.
-        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g. 7d or 12m.
+        --first N                                consider the first N archives after other filters are applied
+        --last N                                 consider the last N archives after other filters are applied
+        --oldest TIMESPAN                        consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
+        --newest TIMESPAN                        consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.
+        --older TIMESPAN                         consider archives older than (now - TIMESPAN), e.g., 7d or 12m.
+        --newer TIMESPAN                         consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.
 
 
     Include/Exclude options
@@ -119,15 +119,15 @@ When mounting a repository, the top directories will be named like the
 archives and the directory structure below these will be loaded on-demand from
 the repository when entering these directories, so expect some delay.
 
-Unless the ``--foreground`` option is given the command will run in the
-background until the filesystem is ``umounted``.
+Unless the ``--foreground`` option is given, the command will run in the
+background until the filesystem is ``unmounted``.
 
 Performance tips:
 
-- when doing a "whole repository" mount:
-  do not enter archive dirs if not needed, this avoids on-demand loading.
-- only mount a specific archive, not the whole repository.
-- only mount specific paths in a specific archive, not the complete archive.
+- When doing a "whole repository" mount:
+  do not enter archive directories if not needed; this avoids on-demand loading.
+- Only mount a specific archive, not the whole repository.
+- Only mount specific paths in a specific archive, not the complete archive.
 
 The command ``borgfs`` provides a wrapper for ``borg mount``. This can also be
 used in fstab entries:
@@ -139,35 +139,35 @@ To allow a regular user to use fstab entries, add the ``user`` option:
 For FUSE configuration and mount options, see the mount.fuse(8) manual page.
 
 Borg's default behavior is to use the archived user and group names of each
-file and map them to the system's respective user and group ids.
+file and map them to the system's respective user and group IDs.
 Alternatively, using ``numeric-ids`` will instead use the archived user and
-group ids without any mapping.
+group IDs without any mapping.
 
 The ``uid`` and ``gid`` mount options (implemented by Borg) can be used to
-override the user and group ids of all files (i.e., ``borg mount -o
+override the user and group IDs of all files (i.e., ``borg mount -o
 uid=1000,gid=1000``).
 
 The man page references ``user_id`` and ``group_id`` mount options
-(implemented by fuse) which specify the user and group id of the mount owner
-(aka, the user who does the mounting). It is set automatically by libfuse (or
+(implemented by FUSE) which specify the user and group ID of the mount owner
+(also known as the user who does the mounting). It is set automatically by libfuse (or
 the filesystem if libfuse is not used). However, you should not specify these
-manually. Unlike the ``uid`` and ``gid`` mount options which affect all files,
-``user_id`` and ``group_id`` affect the user and group id of the mounted
+manually. Unlike the ``uid`` and ``gid`` mount options, which affect all files,
+``user_id`` and ``group_id`` affect the user and group ID of the mounted
 (base) directory.
 
-Additional mount options supported by borg:
+Additional mount options supported by Borg:
 
 - ``versions``: when used with a repository mount, this gives a merged, versioned
-  view of the files in the archives. EXPERIMENTAL, layout may change in future.
-- ``allow_damaged_files``: by default damaged files (where chunks are missing)
+  view of the files in the archives. EXPERIMENTAL; layout may change in the future.
+- ``allow_damaged_files``: by default, damaged files (where chunks are missing)
   will return EIO (I/O error) when trying to read the related parts of the file.
   Set this option to replace the missing parts with all-zero bytes.
 - ``ignore_permissions``: for security reasons the ``default_permissions`` mount
-  option is internally enforced by borg. ``ignore_permissions`` can be given to
+  option is internally enforced by Borg. ``ignore_permissions`` can be given to
   not enforce ``default_permissions``.
 
-The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
-to tweak the performance. It sets the number of cached data chunks; additional
+The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is intended for advanced users
+to tweak performance. It sets the number of cached data chunks; additional
 memory usage can be up to ~8 MiB times this number. The default is the number
 of CPU cores.
 
@@ -177,3 +177,10 @@ to delete data unintentionally.
 
 When running in the foreground, ^C/SIGINT cleanly unmounts the filesystem,
 but other signals or crashes do not.
+
+Debugging:
+
+``borg mount`` usually daemonizes and the daemon process sends stdout/stderr
+to /dev/null. Thus, you need to either use ``-f / --foreground`` to make it stay
+in the foreground and not daemonize, or use ``BORG_LOGGING_CONF`` to reconfigure
+the logger to output to a file.

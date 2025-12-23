@@ -27,17 +27,17 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-CREATE" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-create \- Create new archive
+borg-create \- Creates a new archive.
 .SH SYNOPSIS
 .sp
 borg [common options] create [options] NAME [PATH...]
 .SH DESCRIPTION
 .sp
 This command creates a backup archive containing all files found while recursively
-traversing all paths specified. Paths are added to the archive as they are given,
-that means if relative paths are desired, the command has to be run from the correct
+traversing all specified paths. Paths are added to the archive as they are given,
+which means that if relative paths are desired, the command must be run from the correct
 directory.
 .sp
 The slashdot hack in paths (recursion roots) is triggered by using \fB/./\fP:
@@ -45,23 +45,23 @@ The slashdot hack in paths (recursion roots) is triggered by using \fB/./\fP:
 strip the prefix on the left side of \fB\&./\fP from the archived items (in this case,
 \fBthis/gets/archived\fP will be the path in the archived item).
 .sp
-When giving \(aq\-\(aq as path, borg will read data from standard input and create a
-file \(aqstdin\(aq in the created archive from that data. In some cases it\(aqs more
-appropriate to use \-\-content\-from\-command, however. See section \fIReading from
-stdin\fP below for details.
+When specifying \(aq\-\(aq as a path, borg will read data from standard input and create a
+file named \(aqstdin\(aq in the created archive from that data. In some cases, it is more
+appropriate to use \-\-content\-from\-command. See the section \fIReading from stdin\fP
+below for details.
 .sp
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
 .sp
-The archive name does NOT need to be unique, you can and should use the same
-name for a series of archives. The unique archive identifier is its ID (hash)
+The archive name does not need to be unique; you can and should use the same
+name for a series of archives. The unique archive identifier is its ID (hash),
 and you can abbreviate the ID as long as it is unique.
 .sp
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 .sp
 Backup speed is increased by not reprocessing files that are already part of
-existing archives and weren\(aqt modified. The detection of unmodified files is
+existing archives and were not modified. The detection of unmodified files is
 done by comparing multiple file metadata values with previous values kept in
 the files cache.
 .sp
@@ -96,15 +96,15 @@ ctime vs. mtime: safety vs. speed
 .INDENT 0.0
 .IP \(bu 2
 ctime is a rather safe way to detect changes to a file (metadata and contents)
-as it can not be set from userspace. But, a metadata\-only change will already
+as it cannot be set from userspace. But a metadata\-only change will already
 update the ctime, so there might be some unnecessary chunking/hashing even
 without content changes. Some filesystems do not support ctime (change time).
 E.g. doing a chown or chmod to a file will change its ctime.
 .IP \(bu 2
 mtime usually works and only updates if file contents were changed. But mtime
-can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+can be arbitrarily set from userspace, e.g., to set mtime back to the same value
 it had before a content change happened. This can be used maliciously as well as
-well\-meant, but in both cases mtime based cache modes can be problematic.
+well\-meant, but in both cases mtime\-based cache modes can be problematic.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -161,7 +161,7 @@ do not create a backup archive
 print statistics for the created archive
 .TP
 .B  \-\-list
-output verbose list of items (files, dirs, ...)
+output a verbose list of items (files, dirs, ...)
 .TP
 .BI \-\-filter \ STATUSCHARS
 only display items with the given status characters (see description)
@@ -182,7 +182,7 @@ set group GROUP in archive for stdin data (default: do not store group/gid)
 set mode to M in archive for stdin data (default: 0660)
 .TP
 .B  \-\-content\-from\-command
-interpret PATH as command and store its stdout. See also section Reading from stdin below.
+interpret PATH as a command and store its stdout. See also the section \(aqReading from stdin\(aq below.
 .TP
 .B  \-\-paths\-from\-stdin
 read DELIM\-separated list of paths to back up from stdin. All control is external: it will back up all files given \- no more, no less.
@@ -215,7 +215,7 @@ exclude directories that contain a CACHEDIR.TAG file ( <http://www.bford.info/ca
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
 .B  \-\-keep\-exclude\-tags
-if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
+if tag objects are specified with \fB\-\-exclude\-if\-present\fP, do not omit the tag objects themselves from the backup archive
 .UNINDENT
 .SS Filesystem options
 .INDENT 0.0
@@ -272,6 +272,22 @@ specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BI
 select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
 .UNINDENT
 .SH EXAMPLES
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Archive series and performance: In Borg 2, archives that share the same NAME form an \(dqarchive series\(dq.
+The files cache is maintained per series. For best performance on repeated backups, reuse the same
+NAME every time you run \fBborg create\fP for the same dataset (e.g. always use \fBmy\-documents\fP).
+Frequently changing the NAME (for example by embedding date/time like \fBmy\-documents\-2025\-11\-10\fP)
+prevents cache reuse and forces Borg to re\-scan and re\-chunk files, which can make incremental
+backups vastly slower. Only vary the NAME if you intentionally want to start a new series.
+.sp
+If you must vary the archive name but still want cache reuse across names, see the advanced
+knobs described in \fIupgradenotes2\fP (\fBBORG_FILES_CACHE_SUFFIX\fP and \fBBORG_FILES_CACHE_TTL\fP),
+but the recommended approach is to keep a stable NAME per series.
+.UNINDENT
+.UNINDENT
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -295,14 +311,14 @@ $ borg create my\-files                \e
 # /home/<one directory>/.thumbnails is excluded, not /home/*/*/.thumbnails etc.)
 $ borg create my\-files /home \-\-exclude \(aqsh:home/*/.thumbnails\(aq
 
-# Backup the root filesystem into an archive named \(dqroot\-archive\(dq
-# use zlib compression (good, but slow) \- default is lz4 (fast, low compression ratio)
+# Back up the root filesystem into an archive named \(dqroot\-archive\(dq
+# Use zlib compression (good, but slow) — default is LZ4 (fast, low compression ratio)
 $ borg create \-C zlib,6 \-\-one\-file\-system root\-archive /
 
 # Backup into an archive name like FQDN\-root
 $ borg create \(aq{fqdn}\-root\(aq /
 
-# Backup a remote host locally (\(dqpull\(dq style) using sshfs
+# Back up a remote host locally (\(dqpull\(dq style) using SSHFS
 $ mkdir sshfs\-mount
 $ sshfs root@example.com:/ sshfs\-mount
 $ cd sshfs\-mount
@@ -310,8 +326,8 @@ $ borg create example.com\-root .
 $ cd ..
 $ fusermount \-u sshfs\-mount
 
-# Make a big effort in fine granular deduplication (big chunk management
-# overhead, needs a lot of RAM and disk space, see formula in internals docs):
+# Make a big effort in fine\-grained deduplication (big chunk management
+# overhead, needs a lot of RAM and disk space; see the formula in the internals docs):
 $ borg create \-\-chunker\-params buzhash,10,23,16,4095 small /smallstuff
 
 # Backup a raw device (must not be active/in use/mounted at that time)
@@ -335,16 +351,16 @@ $ borg create \-\-compression lzma,N arch ~
 # Only compress compressible data with lzma,N (N = 0..9)
 $ borg create \-\-compression auto,lzma,N arch ~
 
-# Use short hostname and user name as archive name
+# Use the short hostname and username as the archive name
 $ borg create \(aq{hostname}\-{user}\(aq ~
 
-# Backing up relative paths by moving into the correct directory first
+# Back up relative paths by moving into the correct directory first
 $ cd /home/user/Documents
 # The root directory of the archive will be \(dqprojectA\(dq
 $ borg create \(aqdaily\-projectA\(aq projectA
 
 # Use external command to determine files to archive
-# Use \-\-paths\-from\-stdin with find to back up only files less than 1MB in size
+# Use \-\-paths\-from\-stdin with find to back up only files less than 1 MB in size
 $ find ~ \-size \-1000k | borg create \-\-paths\-from\-stdin small\-files\-only
 # Use \-\-paths\-from\-command with find to back up files from only a given user
 $ borg create \-\-paths\-from\-command joes\-files \-\- find /srv/samba/shared \-user joe
@@ -419,7 +435,7 @@ borg usually just stores their metadata:
 .IP \(bu 2
 \(aqc\(aq = char device
 .IP \(bu 2
-\(aqh\(aq = regular file, hardlink (to already seen inodes)
+\(aqh\(aq = regular file, hard link (to already seen inodes)
 .IP \(bu 2
 \(aqs\(aq = symlink
 .IP \(bu 2

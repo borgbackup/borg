@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-IMPORT-TAR" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-IMPORT-TAR" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
 borg-import-tar \- Create a backup archive from a tarball
 .SH SYNOPSIS
@@ -137,25 +137,25 @@ select compression algorithm, see the output of the \(dqborg help compression\(d
 .INDENT 3.5
 .sp
 .EX
-# export as uncompressed tar
+# Export as an uncompressed tar archive
 $ borg export\-tar Monday Monday.tar
 
-# import an uncompressed tar
+# Import an uncompressed tar archive
 $ borg import\-tar Monday Monday.tar
 
-# exclude some file types, compress using gzip
+# Exclude some file types and compress using gzip
 $ borg export\-tar Monday Monday.tar.gz \-\-exclude \(aq*.so\(aq
 
-# use higher compression level with gzip
+# Use a higher compression level with gzip
 $ borg export\-tar \-\-tar\-filter=\(dqgzip \-9\(dq Monday Monday.tar.gz
 
-# copy an archive from repoA to repoB
+# Copy an archive from repoA to repoB
 $ borg \-r repoA export\-tar \-\-tar\-format=BORG archive \- | borg \-r repoB import\-tar archive \-
 
-# export a tar, but instead of storing it on disk, upload it to remote site using curl
+# Export a tar, but instead of storing it on disk, upload it to a remote site using curl
 $ borg export\-tar Monday \- | curl \-\-data\-binary @\- https://somewhere/to/POST
 
-# remote extraction via \(dqtarpipe\(dq
+# Remote extraction via \(aqtarpipe\(aq
 $ borg export\-tar Monday \- | ssh somewhere \(dqcd extracted; tar x\(dq
 .EE
 .UNINDENT
@@ -186,7 +186,7 @@ archive contents (all items with metadata and data)
 Lost:
 .INDENT 0.0
 .IP \(bu 2
-some archive metadata (like the original commandline, execution time, etc.)
+some archive metadata (like the original command line, execution time, etc.)
 .UNINDENT
 .sp
 Please note:

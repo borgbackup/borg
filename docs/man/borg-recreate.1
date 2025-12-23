@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-RECREATE" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-RECREATE" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-recreate \- Re-create archives
+borg-recreate \- Recreate archives.
 .SH SYNOPSIS
 .sp
 borg [common options] recreate [options] [PATH...]
@@ -37,15 +37,15 @@ borg [common options] recreate [options] [PATH...]
 .sp
 Recreate the contents of existing archives.
 .sp
-recreate is a potentially dangerous function and might lead to data loss
+Recreate is a potentially dangerous function and might lead to data loss
 (if used wrongly). BE VERY CAREFUL!
 .sp
 Important: Repository disk space is \fBnot\fP freed until you run \fBborg compact\fP\&.
 .sp
 \fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, \fB\-\-exclude\-if\-present\fP, \fB\-\-keep\-exclude\-tags\fP
 and PATH have the exact same semantics as in \(dqborg create\(dq, but they only check
-for files in the archives and not in the local file system. If PATHs are specified,
-the resulting archives will only contain files from these PATHs.
+files in the archives and not in the local filesystem. If paths are specified,
+the resulting archives will contain only files from those paths.
 .sp
 Note that all paths in an archive are relative, therefore absolute patterns/paths
 will \fInot\fP match (\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, PATHs).
@@ -54,9 +54,9 @@ will \fInot\fP match (\fB\-\-exclude\fP, \fB\-\-exclude\-from\fP, PATHs).
 used to have upgraded Borg 0.xx archives deduplicate with Borg 1.x archives.
 .sp
 \fBUSE WITH CAUTION.\fP
-Depending on the PATHs and patterns given, recreate can be used to
+Depending on the paths and patterns given, recreate can be used to
 delete files from archives permanently.
-When in doubt, use \fB\-\-dry\-run \-\-verbose \-\-list\fP to see how patterns/PATHS are
+When in doubt, use \fB\-\-dry\-run \-\-verbose \-\-list\fP to see how patterns/paths are
 interpreted. See \fIlist_item_flags\fP in \fBborg create\fP for details.
 .sp
 The archive being recreated is only removed after the operation completes. The
@@ -71,8 +71,8 @@ chunker params.
 .sp
 If your most recent borg check found missing chunks, please first run another
 backup for the same data, before doing any rechunking. If you are lucky, that
-will re\-create the missing chunks. Optionally, do another borg check, to see
-if the chunks are still missing).
+will recreate the missing chunks. Optionally, do another borg check to see
+if the chunks are still missing.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -119,34 +119,34 @@ exclude directories that contain a CACHEDIR.TAG file ( <http://www.bford.info/ca
 exclude directories that are tagged by containing a filesystem object with the given NAME
 .TP
 .B  \-\-keep\-exclude\-tags
-if tag objects are specified with \fB\-\-exclude\-if\-present\fP, don\(aqt omit the tag objects themselves from the backup archive
+if tag objects are specified with \fB\-\-exclude\-if\-present\fP, do not omit the tag objects themselves from the backup archive
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
-consider first N archives after other filters were applied
+consider the first N archives after other filters are applied
 .TP
 .BI \-\-last \ N
-consider last N archives after other filters were applied
+consider the last N archives after other filters are applied
 .TP
 .BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-target \ TARGET
 create a new archive with the name ARCHIVE, do not replace existing archive
@@ -168,17 +168,17 @@ rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH
 .INDENT 3.5
 .sp
 .EX
-# Create a backup with little but fast compression
+# Create a backup with fast, low compression
 $ borg create archive /some/files \-\-compression lz4
-# Then compress it \- this might take longer, but the backup has already completed,
-# so no inconsistencies from a long\-running backup job.
+# Then recompress it — this might take longer, but the backup has already completed,
+# so there are no inconsistencies from a long\-running backup job.
 $ borg recreate \-a archive \-\-recompress \-\-compression zlib,9
 
 # Remove unwanted files from all archives in a repository.
-# Note the relative path for the \-\-exclude option \- archives only contain relative paths.
+# Note the relative path for the \-\-exclude option — archives only contain relative paths.
 $ borg recreate \-\-exclude home/icke/Pictures/drunk_photos
 
-# Change archive comment
+# Change the archive comment
 $ borg create \-\-comment \(dqThis is a comment\(dq archivename ~
 $ borg info \-a archivename
 Name: archivename

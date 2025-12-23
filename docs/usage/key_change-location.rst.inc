@@ -50,10 +50,10 @@ borg key change-location
 Description
 ~~~~~~~~~~~
 
-Change the location of a borg key. The key can be stored at different locations:
+Change the location of a Borg key. The key can be stored at different locations:
 
 - keyfile: locally, usually in the home directory
-- repokey: inside the repo (in the repo config)
+- repokey: inside the repository (in the repository config)
 
 Please note:
 

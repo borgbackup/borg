@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-ANALYZE" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-ANALYZE" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-analyze \- Analyze archives
+borg-analyze \- Analyzes archives.
 .SH SYNOPSIS
 .sp
 borg [common options] analyze [options]
@@ -37,21 +37,21 @@ borg [common options] analyze [options]
 .sp
 Analyze archives to find \(dqhot spots\(dq.
 .sp
-Borg analyze relies on the usual archive matching options to select the
+\fBborg analyze\fP relies on the usual archive matching options to select the
 archives that should be considered for analysis (e.g. \fB\-a series_name\fP).
-Then it iterates over all matching archives, over all contained files and
-collects information about chunks stored in all directories it encountered.
+Then it iterates over all matching archives, over all contained files, and
+collects information about chunks stored in all directories it encounters.
 .sp
-It considers chunk IDs and their plaintext sizes (we don\(aqt have the compressed
-size in the repository easily available) and adds up added/removed chunks\(aq
-sizes per direct parent directory and outputs a list of \(dqdirectory: size\(dq.
+It considers chunk IDs and their plaintext sizes (we do not have the compressed
+size in the repository easily available) and adds up the sizes of added and removed
+chunks per direct parent directory, and outputs a list of \(dqdirectory: size\(dq.
 .sp
-You can use that list to find directories with a lot of \(dqactivity\(dq \- maybe
-some of these are temporary or cache directories you did forget to exclude.
+You can use that list to find directories with a lot of \(dqactivity\(dq — maybe
+some of these are temporary or cache directories you forgot to exclude.
 .sp
-To not have these unwanted directories in your backups, you could carefully
-exclude these in \fBborg create\fP (for future backups) or use \fBborg recreate\fP
-to re\-create existing archives without these.
+To avoid including these unwanted directories in your backups, you can carefully
+exclude them in \fBborg create\fP (for future backups) or use \fBborg recreate\fP
+to recreate existing archives without them.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -59,28 +59,28 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
-consider first N archives after other filters were applied
+consider the first N archives after other filters are applied
 .TP
 .BI \-\-last \ N
-consider last N archives after other filters were applied
+consider the last N archives after other filters are applied
 .TP
 .BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .UNINDENT
 .SH SEE ALSO
 .sp

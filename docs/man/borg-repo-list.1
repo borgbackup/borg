@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-LIST" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-REPO-LIST" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-repo-list \- List the archives contained in a repository
+borg-repo-list \- List the archives contained in a repository.
 .SH SYNOPSIS
 .sp
 borg [common options] repo\-list [options]
@@ -55,28 +55,28 @@ Format output as JSON. The form of \fB\-\-format\fP is ignored, but keys used in
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
-consider first N archives after other filters were applied
+consider the first N archives after other filters are applied
 .TP
 .BI \-\-last \ N
-consider last N archives after other filters were applied
+consider the last N archives after other filters are applied
 .TP
 .BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .B  \-\-deleted
 consider only soft\-deleted archives.
@@ -100,7 +100,7 @@ ba56c4a5  Thu, 2024\-09\-26 10:12:45 +0200  src              tw          MacBook
 .SH NOTES
 .SS The FORMAT specifier syntax
 .sp
-The \fB\-\-format\fP option uses python\(aqs format string syntax <https://docs.python.org/3.9/library/string.html#formatstrings>
+The \fB\-\-format\fP option uses Python\(aqs format string syntax <https://docs.python.org/3.10/library/string.html#formatstrings>
 \&.
 .sp
 Examples:

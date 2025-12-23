@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PATTERNS" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-PATTERNS" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
@@ -49,20 +49,32 @@ in the file given with \fB\-\-patterns\-from\fP option and
 for \fBPATH\fP arguments that explicitly support them.
 .UNINDENT
 .sp
-Borg always stores all file paths normalized and relative to the
-current recursion root. The recursion root is also named \fBPATH\fP in
-Borg commands like \fIborg create\fP that do a file discovery, so do not
-confuse the root with the \fBPATH\fP argument of e.g. \fIborg extract\fP\&.
+The path/filenames used as input for the pattern matching start with the
+currently active recursion root. You usually give the recursion root(s)
+when invoking borg and these can be either relative or absolute paths.
 .sp
-Starting with Borg 1.2, paths that are matched against patterns always
-appear relative. If you give \fB/absolute/\fP as root, the paths going
-into the matcher will start with \fBabsolute/\fP\&.
-If you give \fB\&../../relative\fP as root, the paths will be normalized
-as \fBrelative/\fP\&.
+Be careful, your patterns must match the archived paths:
+.INDENT 0.0
+.IP \(bu 2
+Archived paths never start with a leading slash (\(aq/\(aq), nor with \(aq.\(aq, nor with \(aq..\(aq.
+.INDENT 2.0
+.IP \(bu 2
+When you back up absolute paths like \fB/home/user\fP, the archived
+paths start with \fBhome/user\fP\&.
+.IP \(bu 2
+When you back up relative paths like \fB\&./src\fP, the archived paths
+start with \fBsrc\fP\&.
+.IP \(bu 2
+When you back up relative paths like \fB\&../../src\fP, the archived paths
+start with \fBsrc\fP\&.
+.UNINDENT
+.UNINDENT
 .sp
 Borg supports different pattern styles. To define a non\-default
 style for a specific pattern, prefix it with two characters followed
 by a colon \(aq:\(aq (i.e. \fBfm:path/*\fP, \fBsh:path/**\fP).
+.sp
+The default pattern style for \fB\-\-exclude\fP differs from \fB\-\-pattern\fP, see below.
 .INDENT 0.0
 .TP
 .B Fnmatch <https://docs.python.org/3/library/fnmatch.html>
@@ -99,13 +111,13 @@ separators (backslash for Windows and \(aq/\(aq on other systems) in paths are
 always normalized to a forward slash \(aq/\(aq before applying a pattern.
 .TP
 .B Path prefix, selector \fBpp:\fP
-This pattern style is useful to match whole sub\-directories. The pattern
+This pattern style is useful to match whole subdirectories. The pattern
 \fBpp:root/somedir\fP matches \fBroot/somedir\fP and everything therein.
 A leading path separator is always removed.
 .TP
 .B Path full\-match, selector \fBpf:\fP
 This pattern style is (only) useful to match full paths.
-This is kind of a pseudo pattern as it can not have any variable or
+This is kind of a pseudo pattern as it cannot have any variable or
 unspecified parts \- the full path must be given. \fBpf:root/file.ext\fP
 matches \fBroot/file.ext\fP only. A leading path separator is always
 removed.
@@ -136,7 +148,7 @@ Exclusions can be passed via the command line option \fB\-\-exclude\fP\&. When u
 from within a shell, the patterns should be quoted to protect them from
 expansion.
 .sp
-Patterns matching special characters, e.g. white space, within a shell may
+Patterns matching special characters, e.g. whitespace, within a shell may
 require adjustments, such as putting quotation marks around the arguments.
 Example:
 Using bash, the following command line option would match and exclude \(dqitem name\(dq:
@@ -160,6 +172,17 @@ Examples:
 .INDENT 3.5
 .sp
 .EX
+# Exclude a directory anywhere in the tree named \(ga\(gasteamapps/common\(ga\(ga
+# (and everything below it), regardless of where it appears:
+$ borg create \-e \(aqsh:**/steamapps/common/**\(aq archive /
+
+# Exclude the contents of \(ga\(ga/home/user/.cache\(ga\(ga:
+$ borg create \-e \(aqsh:home/user/.cache/**\(aq archive /home/user
+$ borg create \-e home/user/.cache/ archive /home/user
+
+# The file \(aq/home/user/.cache/important\(aq is *not* backed up:
+$ borg create \-e home/user/.cache/ archive / /home/user/.cache/important
+
 # Exclude \(aq/home/user/file.o\(aq but not \(aq/home/user/file.odt\(aq:
 $ borg create \-e \(aq*.o\(aq archive /
 
@@ -167,11 +190,6 @@ $ borg create \-e \(aq*.o\(aq archive /
 # not \(aq/home/user/importantjunk\(aq or \(aq/etc/junk\(aq:
 $ borg create \-e \(aqhome/*/junk\(aq archive /
 
-# Exclude the contents of \(aq/home/user/cache\(aq but not the directory itself:
-$ borg create \-e home/user/cache/ archive /
-
-# The file \(aq/home/user/cache/important\(aq is *not* backed up:
-$ borg create \-e home/user/cache/ archive / /home/user/cache/important
 
 # The contents of directories in \(aq/home\(aq are not backed up when their name
 # ends in \(aq.tmp\(aq
@@ -204,11 +222,13 @@ A recursion root path starts with the prefix \fBR\fP, followed by a path
 (a plain path, not a file pattern). Use this prefix to have the root
 paths in the patterns file rather than as command line arguments.
 .TP
-.B Pattern style prefix \fBP\fP
+.B Pattern style prefix \fBP\fP (only useful within patterns files)
 To change the default pattern style, use the \fBP\fP prefix, followed by
 the pattern style abbreviation (\fBfm\fP, \fBpf\fP, \fBpp\fP, \fBre\fP, \fBsh\fP).
-All patterns following this line will use this style until another style
-is specified.
+All patterns following this line in the same patterns file will use this
+style until another style is specified or the end of the file is reached.
+When the current patterns file is finished, the default pattern style will
+reset.
 .TP
 .B Exclude pattern prefix \fB\-\fP
 Use the prefix \fB\-\fP, followed by a pattern, to define an exclusion.
@@ -272,7 +292,7 @@ character that indicates the action (e.g. \(aqx\(aq for excluding, see
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
-It\(aqs possible that a sub\-directory/file is matched while parent
+It is possible that a subdirectory or file is matched while its parent
 directories are not. In that case, parent directories are not backed
 up and thus their user, group, permission, etc. cannot be restored.
 .UNINDENT

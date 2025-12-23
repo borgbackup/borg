@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-WITH-LOCK" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-WITH-LOCK" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-with-lock \- run a user specified command with the repository lock held
+borg-with-lock \- Runs a user-specified command with the repository lock held.
 .SH SYNOPSIS
 .sp
 borg [common options] with\-lock [options] COMMAND [ARGS...]
@@ -45,17 +45,17 @@ $ BORG_REPO=/mnt/borgrepo borg with\-lock rsync \-av /mnt/borgrepo /somewhere/el
 .UNINDENT
 .UNINDENT
 .sp
-It will first try to acquire the lock (make sure that no other operation is
-running in the repo), then execute the given command as a subprocess and wait
-for its termination, release the lock and return the user command\(aqs return
-code as borg\(aqs return code.
+It first tries to acquire the lock (make sure that no other operation is
+running in the repository), then executes the given command as a subprocess and waits
+for its termination, releases the lock, and returns the user command\(aqs return
+code as Borg\(aqs return code.
 .sp
 \fBNOTE:\fP
 .INDENT 0.0
 .INDENT 3.5
 If you copy a repository with the lock held, the lock will be present in
-the copy. Thus, before using borg on the copy from a different host,
-you need to use \(dqborg break\-lock\(dq on the copied repository, because
+the copy. Before using Borg on the copy from a different host,
+you need to run \fBborg break\-lock\fP on the copied repository, because
 Borg is cautious and does not automatically remove stale locks made by a different host.
 .UNINDENT
 .UNINDENT

@@ -12,6 +12,9 @@ from .base import ENOATTR, API_VERSION
 from .base import SaveFile, sync_dir, fdatasync, safe_fadvise
 from .base import get_process_id, fqdn, hostname, hostid
 
+# work around pyinstaller "forgetting" to include the xattr module
+from . import xattr  # noqa: F401
+
 platform_ug: ModuleType | None = None  # make mypy happy
 
 if is_linux:  # pragma: linux only

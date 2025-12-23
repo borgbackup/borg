@@ -12,7 +12,7 @@ from borg.logger import setup_logging  # noqa: E402
 setup_logging()
 
 from borg.archiver import Archiver  # noqa: E402
-from borg.testsuite import has_lchflags, has_llfuse, has_pyfuse3  # noqa: E402
+from borg.testsuite import has_lchflags, has_llfuse, has_pyfuse3, has_mfusepy  # noqa: E402
 from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported  # noqa: E402
 from borg.testsuite.archiver import BORG_EXES
 from borg.testsuite.platform.platform_test import fakeroot_detected  # noqa: E402
@@ -37,8 +37,9 @@ def clean_env(tmpdir_factory, monkeypatch):
 def pytest_report_header(config, start_path):
     tests = {
         "BSD flags": has_lchflags,
-        "fuse2": has_llfuse,
-        "fuse3": has_pyfuse3,
+        "llfuse": has_llfuse,
+        "pyfuse3": has_pyfuse3,
+        "mfusepy": has_mfusepy,
         "root": not fakeroot_detected(),
         "symlinks": are_symlinks_supported(),
         "hardlinks": are_hardlinks_supported(),

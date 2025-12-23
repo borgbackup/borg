@@ -175,6 +175,7 @@ development header files (sometimes in a separate `-dev` or `-devel` package).
 * Optionally, if you wish to mount an archive as a FUSE filesystem, you need
   a FUSE implementation for Python:
 
+  - mfusepy_ >= 3.1.0 (for fuse 2 and fuse 3, use `pip install borgbackup[mfusepy]`), or
   - pyfuse3_ >= 3.1.1 (for fuse 3, use `pip install borgbackup[pyfuse3]`), or
   - llfuse_ >= 1.3.8 (for fuse 2, use `pip install borgbackup[llfuse]`).
   - Additionally, your OS will need to have FUSE support installed

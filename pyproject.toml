@@ -41,8 +41,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-llfuse = ["llfuse >= 1.3.8"]
-pyfuse3 = ["pyfuse3 >= 3.1.1"]
+llfuse = ["llfuse >= 1.3.8"]  # fuse 2, low-level
+pyfuse3 = ["pyfuse3 >= 3.1.1"]  # fuse 3, low-level, async
+mfusepy = ["mfusepy >= 3.1.0, <4.0.0"]  # fuse 2+3, high-level
+mfusepym = ["mfusepy @ git+https://github.com/mxmlnkn/mfusepy.git@master"]
 nofuse = []
 s3 = ["borgstore[s3] ~= 0.3.0"]
 sftp = ["borgstore[sftp] ~= 0.3.0"]
@@ -166,7 +168,7 @@ ignore_missing_imports = true
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
 # Important: when adding/removing Python versions here,
 #            also update the section "Test environments with different FUSE implementations" accordingly.
-env_list = ["py{310,311,312,313,314}-{none,fuse2,fuse3}", "docs", "ruff", "mypy", "bandit"]
+env_list = ["py{310,311,312,313,314}-{none,llfuse,pyfuse3,mfusepy}", "docs", "ruff", "mypy", "bandit"]
 
 [tool.tox.env_run_base]
 package = "editable-legacy"  # without this it does not find setup_docs when running under fakeroot
@@ -180,53 +182,73 @@ pass_env = ["*"]  # needed by tox4, so env vars are visible for building borg
 # Test environments with different FUSE implementations
 [tool.tox.env.py310-none]
 
-[tool.tox.env.py310-fuse2]
+[tool.tox.env.py310-llfuse]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
 extras = ["llfuse", "sftp", "s3"]
 
-[tool.tox.env.py310-fuse3]
+[tool.tox.env.py310-pyfuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3"]
+
+[tool.tox.env.py310-mfusepy]
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
+extras = ["mfusepy", "sftp", "s3"]
 
 [tool.tox.env.py311-none]
 
-[tool.tox.env.py311-fuse2]
+[tool.tox.env.py311-llfuse]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
 extras = ["llfuse", "sftp", "s3"]
 
-[tool.tox.env.py311-fuse3]
+[tool.tox.env.py311-pyfuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3"]
+
+[tool.tox.env.py311-mfusepy]
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
+extras = ["mfusepy", "sftp", "s3"]
 
 [tool.tox.env.py312-none]
 
-[tool.tox.env.py312-fuse2]
+[tool.tox.env.py312-llfuse]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
 extras = ["llfuse", "sftp", "s3"]
 
-[tool.tox.env.py312-fuse3]
+[tool.tox.env.py312-pyfuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3"]
+
+[tool.tox.env.py312-mfusepy]
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
+extras = ["mfusepy", "sftp", "s3"]
 
 [tool.tox.env.py313-none]
 
-[tool.tox.env.py313-fuse2]
+[tool.tox.env.py313-llfuse]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
 extras = ["llfuse", "sftp", "s3"]
 
-[tool.tox.env.py313-fuse3]
+[tool.tox.env.py313-pyfuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3"]
+
+[tool.tox.env.py313-mfusepy]
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
+extras = ["mfusepy", "sftp", "s3"]
 
 [tool.tox.env.py314-none]
 
-[tool.tox.env.py314-fuse2]
+[tool.tox.env.py314-llfuse]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
 extras = ["llfuse", "sftp", "s3"]
 
-[tool.tox.env.py314-fuse3]
+[tool.tox.env.py314-pyfuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3"]
+
+[tool.tox.env.py314-mfusepy]
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
+extras = ["mfusepy", "sftp", "s3"]
 
 [tool.tox.env.ruff]
 skip_install = true

@@ -41,9 +41,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-llfuse = ["llfuse >= 1.3.8"]
-pyfuse3 = ["pyfuse3 >= 3.1.1"]
-mfusepy = ["mfusepy >= 3.1.0, <4.0.0"]
+llfuse = ["llfuse >= 1.3.8"]  # fuse 2, low-level
+pyfuse3 = ["pyfuse3 >= 3.1.1"]  # fuse 3, low-level, async
+mfusepy = ["mfusepy >= 3.1.0, <4.0.0"]  # fuse 2+3, high-level
 mfusepym = ["mfusepy @ git+https://github.com/mxmlnkn/mfusepy.git@master"]
 nofuse = []
 s3 = ["borgstore[s3] ~= 0.3.0"]

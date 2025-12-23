@@ -144,8 +144,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b20 (not released yet)
------------------------------------
+Version 2.0.0b20 (2025-12-24)
+-----------------------------
 
 Please note:
 

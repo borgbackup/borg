@@ -156,21 +156,23 @@ above.
 
 New features:
 
-- borg --cockpit: show TUI based on Textual
-- info: show cwd at the time of backup creation, #6191
-- linux ACLs: use acl_to_any_text to avoid libacl name lookups, #8753
-- NetBSD: xattr support, #1332
 - fat binary builds on GitHub (see assets on the GitHub releases page):
 
   - for Linux with glibc 2.35+ (Intel/AMD and ARM64)
   - for macOS 15+ (Apple Silicon/ARM64 and Intel)
   - using GitHub artifact attestations for release binaries, #9134
+- borg --cockpit: show status display based on Textual
+- Linux ACLs: use acl_to_any_text to avoid libacl name lookups, #8753.
 - export-tar/import-tar: support for POSIX ACLs (PAX format)
+- NetBSD: xattr support, #1332
+- mount: alternatively, work with high-level fuse library "mfusepy", which
+  supports fuse 2 and 3, #9194. Try it with: pip install borg[mfusepy]
+- diff: --sort-by=field[,field,...], #8998
 - list --format: add "inode" placeholder
+- info: show cwd at the time of backup creation, #6191
 - improved tty-less progress reporting (--progress), #9055
 - BORG_MSGPACK_VERSION_CHECK=no to optionally disable the msgpack version
   check; default is "yes", use at your own risk, #9109.
-- diff: --sort-by=field[,field,...], #8998
 - completion: generate completion scripts for supported shells, #9172,
   uses shtab, supports bash and zsh.
 
@@ -196,11 +198,10 @@ Fixes:
 
 Other changes:
 
-- support Python 3.14, msgpack 1.1.2, use Cython 3.1.4
+- support Python 3.14, msgpack 1.1.2, use Cython 3.2.3
 - require setuptools>=78.1.1, #9042
-- set_flags: remove compression flag support (did not work anyway)
+- "bsdflags" set_flags: remove compression flag support (did not work anyway)
 - Brewfile: use openssl@3
-- GitHub Actions: use korthout/backport-action
 - buzhash/buzhash64: initialise all-zero memory more efficiently
 - tests:
 
@@ -244,7 +245,7 @@ Other changes:
   - add Arch Linux to the 'Installing from source' docs
   - add systemd-inhibit and examples, #8989
   - code/docs: fix typos and grammar
-  - some fixes/update to the FAQ
+  - some fixes/updates to the FAQ
 
 
 Version 2.0.0b19 (2025-07-02)

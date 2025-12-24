@@ -21,11 +21,11 @@ borg extract
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     | **options**                                                                                                                                                                                               |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--list``                            | output verbose list of items (files, dirs, ...)                                                           |
+    |                                                       | ``--list``                            | output a verbose list of items (files, dirs, ...)                                                         |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``-n``, ``--dry-run``                 | do not actually change any files                                                                          |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--numeric-ids``                     | only obey numeric user and group identifiers                                                              |
+    |                                                       | ``--numeric-ids``                     | only use numeric user and group identifiers                                                               |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--noflags``                         | do not extract/set flags (e.g. NODUMP, IMMUTABLE)                                                         |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
@@ -35,9 +35,9 @@ borg extract
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdout``                          | write all extracted data to stdout                                                                        |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--sparse``                          | create holes in output sparse file from all-zero chunks                                                   |
+    |                                                       | ``--sparse``                          | create holes in the output sparse file from all-zero chunks                                               |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--continue``                        | continue a previously interrupted extraction of same archive                                              |
+    |                                                       | ``--continue``                        | continue a previously interrupted extraction of the same archive                                          |
     +-------------------------------------------------------+---------------------------------------+-----------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                            |
     |                                                                                                                                                                                                           |
@@ -73,15 +73,15 @@ borg extract
 
 
     options
-        --list            output verbose list of items (files, dirs, ...)
+        --list            output a verbose list of items (files, dirs, ...)
         -n, --dry-run     do not actually change any files
-        --numeric-ids     only obey numeric user and group identifiers
+        --numeric-ids     only use numeric user and group identifiers
         --noflags         do not extract/set flags (e.g. NODUMP, IMMUTABLE)
         --noacls          do not extract/set ACLs
         --noxattrs        do not extract/set xattrs
         --stdout          write all extracted data to stdout
-        --sparse          create holes in output sparse file from all-zero chunks
-        --continue        continue a previously interrupted extraction of same archive
+        --sparse          create holes in the output sparse file from all-zero chunks
+        --continue        continue a previously interrupted extraction of the same archive
 
 
     :ref:`common_options`
@@ -98,16 +98,20 @@ borg extract
 Description
 ~~~~~~~~~~~
 
-This command extracts the contents of an archive. By default the entire
-archive is extracted but a subset of files and directories can be selected
-by passing a list of ``PATHs`` as arguments. The file selection can further
-be restricted by using the ``--exclude`` option.
+This command extracts the contents of an archive.
 
+By default, the entire archive is extracted, but a subset of files and directories
+can be selected by passing a list of ``PATH`` arguments. The default interpretation
+for the paths to extract is `pp:` which is a literal path-prefix match. If you want
+to use e.g. a wildcard, you must select a different pattern style such as `sh:` or
+`fm:`. See :ref:`borg_patterns` for more information.
+
+The file selection can be further restricted by using the ``--exclude`` option.
 For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
 
 By using ``--dry-run``, you can do all extraction steps except actually writing the
-output data: reading metadata and data chunks from the repo, checking the hash/hmac,
-decrypting, decompressing.
+output data: reading metadata and data chunks from the repository, checking the hash/HMAC,
+decrypting, and decompressing.
 
 ``--progress`` can be slower than no progress display, since it makes one additional
 pass over the archive metadata.
@@ -118,5 +122,5 @@ pass over the archive metadata.
     so make sure you ``cd`` to the right place before calling ``borg extract``.
 
     When parent directories are not extracted (because of using file/directory selection
-    or any other reason), borg can not restore parent directories' metadata, e.g. owner,
-    group, permission, etc.
+    or any other reason), Borg cannot restore parent directories' metadata, e.g., owner,
+    group, permissions, etc.

@@ -12,15 +12,15 @@ borg umount
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+----------------+----------------------------------------+
-    | **positional arguments**                                                                                        |
-    +-------------------------------------------------------+----------------+----------------------------------------+
-    |                                                       | ``MOUNTPOINT`` | mountpoint of the filesystem to umount |
-    +-------------------------------------------------------+----------------+----------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                                  |
-    |                                                                                                                 |
-    | :ref:`common_options`                                                                                           |
-    +-------------------------------------------------------+----------------+----------------------------------------+
+    +-------------------------------------------------------+----------------+-----------------------------------------+
+    | **positional arguments**                                                                                         |
+    +-------------------------------------------------------+----------------+-----------------------------------------+
+    |                                                       | ``MOUNTPOINT`` | mountpoint of the filesystem to unmount |
+    +-------------------------------------------------------+----------------+-----------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                                   |
+    |                                                                                                                  |
+    | :ref:`common_options`                                                                                            |
+    +-------------------------------------------------------+----------------+-----------------------------------------+
 
     .. raw:: html
 
@@ -33,7 +33,7 @@ borg umount
 .. only:: latex
 
     MOUNTPOINT
-        mountpoint of the filesystem to umount
+        mountpoint of the filesystem to unmount
 
 
     :ref:`common_options`
@@ -42,7 +42,7 @@ borg umount
 Description
 ~~~~~~~~~~~
 
-This command un-mounts a FUSE filesystem that was mounted with ``borg mount``.
+This command unmounts a FUSE filesystem that was mounted with ``borg mount``.
 
 This is a convenience wrapper that just calls the platform-specific shell
 command - usually this is either umount or fusermount -u.

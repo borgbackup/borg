@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-SERVE" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-SERVE" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-serve \- Start in server mode. This command is usually not used manually.
+borg-serve \- Starts in server mode. This command is usually not used manually.
 .SH SYNOPSIS
 .sp
 borg [common options] serve [options]
@@ -37,36 +37,36 @@ borg [common options] serve [options]
 .sp
 This command starts a repository server process.
 .sp
-borg serve can currently support:
+\fIborg serve\fP currently supports:
 .INDENT 0.0
 .IP \(bu 2
-Getting automatically started via ssh when the borg client uses a  <ssh://> \&...
-remote repository. In this mode, \fIborg serve\fP will live until that ssh connection
-gets terminated.
+Being automatically started via SSH when the borg client uses an  <ssh://> \&...
+remote repository. In this mode, \fIborg serve\fP will run until that SSH connection
+is terminated.
 .IP \(bu 2
-Getting started by some other means (not by the borg client) as a long\-running socket
+Being started by some other means (not by the borg client) as a long\-running socket
 server to be used for borg clients using a socket://... repository (see the \fI\-\-socket\fP
-option if you do not want to use the default path for the socket and pid file).
+option if you do not want to use the default path for the socket and PID file).
 .UNINDENT
 .sp
-Please note that \fIborg serve\fP does not support giving a specific repository via the
-\fI\-\-repo\fP option or \fIBORG_REPO\fP environment variable. It is always the borg client which
-specifies the repo to use when talking to \fIborg serve\fP\&.
+Please note that \fIborg serve\fP does not support providing a specific repository via the
+\fI\-\-repo\fP option or the \fIBORG_REPO\fP environment variable. It is always the borg client that
+specifies the repository to use when communicating with \fIborg serve\fP\&.
 .sp
-The \-\-permissions option allows enforcing repository permissions:
+The \-\-permissions option enforces repository permissions:
 .INDENT 0.0
 .IP \(bu 2
-\fIall\fP: All permissions are granted (default, permissions system is not used)
+\fIall\fP: All permissions are granted. (Default; the permissions system is not used.)
 .IP \(bu 2
-\fIno\-delete\fP: Allow reading and writing, disallow deleting and overwriting data.
-New archives can be created, existing archives can not be deleted. New chunks can
-be added, existing chunks can not be deleted or overwritten.
+\fIno\-delete\fP: Allow reading and writing; disallow deleting and overwriting data.
+New archives can be created; existing archives cannot be deleted. New chunks can
+be added; existing chunks cannot be deleted or overwritten.
 .IP \(bu 2
-\fIwrite\-only\fP: Allow writing, disallow reading data.
-New archives can be created, existing archives can not be read.
-New chunks can be added, existing chunks can not be read, deleted or overwritten.
+\fIwrite\-only\fP: Allow writing; disallow reading data.
+New archives can be created; existing archives cannot be read.
+New chunks can be added; existing chunks cannot be read, deleted, or overwritten.
 .IP \(bu 2
-\fIread\-only\fP: Allow reading, disallow writing or deleting data.
+\fIread\-only\fP: Allow reading; disallow writing or deleting data.
 Existing archives can be read, but no archives can be created or deleted.
 .UNINDENT
 .SH OPTIONS
@@ -76,10 +76,10 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .INDENT 0.0
 .TP
 .BI \-\-restrict\-to\-path \ PATH
-restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all sub\-directories is granted implicitly; PATH doesn\(aqt need to point directly to a repository.
+Restrict repository access to PATH. Can be specified multiple times to allow the client access to several directories. Access to all subdirectories is granted implicitly; PATH does not need to point directly to a repository.
 .TP
 .BI \-\-restrict\-to\-repository \ PATH
-restrict repository access. Only the repository located at PATH (no sub\-directories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike \fB\-\-restrict\-to\-path\fP sub\-directories are not accessible; PATH needs to point directly at a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
+Restrict repository access. Only the repository located at PATH (no subdirectories are considered) is accessible. Can be specified multiple times to allow the client access to several repositories. Unlike \fB\-\-restrict\-to\-path\fP, subdirectories are not accessible; PATH must point directly to a repository location. PATH may be an empty directory or the last element of PATH may not exist, in which case the client may initialize a repository there.
 .TP
 .B  \-\-permissions
 Set repository permission mode. Overrides BORG_REPO_PERMISSIONS environment variable.
@@ -130,12 +130,12 @@ command=\(dqBORG_XXX=value borg serve [...]\(dq,restrict ssh\-rsa [...]
 .INDENT 3.5
 The examples above use the \fBrestrict\fP directive and assume a POSIX
 compliant shell set as the user\(aqs login shell.
-This does automatically block potential dangerous ssh features, even when
+This automatically blocks potentially dangerous SSH features, even when
 they are added in a future update. Thus, this option should be preferred.
 .sp
-If you\(aqre using openssh\-server < 7.2, however, you have to specify explicitly
-the ssh features to restrict and cannot simply use the restrict option as it
-has been introduced in v7.2. We recommend to use
+If you are using OpenSSH server < 7.2, however, you must explicitly
+specify the SSH features to restrict and cannot simply use the \fBrestrict\fP option, as it
+was introduced in v7.2. We recommend using
 \fBno\-port\-forwarding,no\-X11\-forwarding,no\-pty,no\-agent\-forwarding,no\-user\-rc\fP
 in this case.
 .UNINDENT
@@ -147,9 +147,9 @@ Details about sshd usage: sshd(8) <https://www.openbsd.org/cgi-bin/man.cgi/OpenB
 .sp
 \fBborg serve\fP\(aqs pipes (\fBstdin\fP/\fBstdout\fP/\fBstderr\fP) are connected to the \fBsshd\fP process on the server side. In the event that the SSH connection between \fBborg serve\fP and the client is disconnected or stuck abnormally (for example, due to a network outage), it can take a long time for \fBsshd\fP to notice the client is disconnected. In the meantime, \fBsshd\fP continues running, and as a result so does the \fBborg serve\fP process holding the lock on the repository. This can cause subsequent \fBborg\fP operations on the remote repository to fail with the error: \fBFailed to create/acquire the lock\fP\&.
 .sp
-In order to avoid this, it is recommended to perform the following additional SSH configuration:
+To avoid this, it is recommended to perform the following additional SSH configuration:
 .sp
-Either in the client side\(aqs \fB~/.ssh/config\fP file, or in the client\(aqs \fB/etc/ssh/ssh_config\fP file:
+Either in the client\-side \fB~/.ssh/config\fP file or in the client\(aqs \fB/etc/ssh/ssh_config\fP file:
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -163,9 +163,9 @@ Host backupserver
 .sp
 Replacing \fBbackupserver\fP with the hostname, FQDN or IP address of the borg server.
 .sp
-This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the ssh client process will be terminated, causing the borg process to terminate gracefully.
+This will cause the client to send a keepalive to the server every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the SSH client process will be terminated, causing the borg process to terminate gracefully.
 .sp
-On the server side\(aqs \fBsshd\fP configuration file (typically \fB/etc/ssh/sshd_config\fP):
+In the server\-side \fBsshd\fP configuration file (typically \fB/etc/ssh/sshd_config\fP):
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -176,7 +176,7 @@ ClientAliveCountMax 30
 .UNINDENT
 .UNINDENT
 .sp
-This will cause the server to send a keep alive to the client every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the server\(aqs sshd process will be terminated, causing the \fBborg serve\fP process to terminate gracefully and release the lock on the repository.
+This will cause the server to send a keepalive to the client every 10 seconds. If 30 consecutive keepalives are sent without a response (a time of 300 seconds), the server\(aqs sshd process will be terminated, causing the \fBborg serve\fP process to terminate gracefully and release the lock on the repository.
 .sp
 If you then run borg commands with \fB\-\-lock\-wait 600\fP, this gives sufficient time for the borg serve processes to terminate after the SSH connection is torn down after the 300 second wait for the keepalives to fail.
 .sp
@@ -194,7 +194,7 @@ chsh \-s /bin/sh BORGUSER
 .UNINDENT
 .UNINDENT
 .sp
-Because the configured shell is used by openssh <https://www.openssh.com/>
+Because the configured shell is used by OpenSSH <https://www.openssh.com/>
 
 to execute the command configured through the \fBauthorized_keys\fP file
 using \fB\(dq$SHELL\(dq \-c \(dq$COMMAND\(dq\fP,

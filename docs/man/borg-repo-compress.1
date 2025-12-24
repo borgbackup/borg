@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-COMPRESS" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-REPO-COMPRESS" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-repo-compress \- Repository (re-)compression
+borg-repo-compress \- Repository (re-)compression.
 .SH SYNOPSIS
 .sp
 borg [common options] repo\-compress [options]
@@ -72,10 +72,10 @@ print statistics
 .INDENT 3.5
 .sp
 .EX
-# recompress repo contents
+# Recompress repository contents
 $ borg repo\-compress \-\-progress \-\-compression=zstd,3
 
-# recompress and obfuscate repo contents
+# Recompress and obfuscate repository contents
 $ borg repo\-compress \-\-progress \-\-compression=obfuscate,1,zstd,3
 .EE
 .UNINDENT

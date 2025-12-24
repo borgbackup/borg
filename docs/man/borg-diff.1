@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DIFF" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-DIFF" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-diff \- Diff contents of two archives
+borg-diff \- Finds differences between two archives.
 .SH SYNOPSIS
 .sp
 borg [common options] diff [options] ARCHIVE1 ARCHIVE2 [PATH...]
@@ -37,7 +37,7 @@ borg [common options] diff [options] ARCHIVE1 ARCHIVE2 [PATH...]
 .sp
 This command finds differences (file contents, metadata) between ARCHIVE1 and ARCHIVE2.
 .sp
-For more help on include/exclude patterns, see the \fIborg_patterns\fP command output.
+For more help on include/exclude patterns, see the output of the \fIborg_patterns\fP command.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -51,7 +51,7 @@ ARCHIVE1 name
 ARCHIVE2 name
 .TP
 .B PATH
-paths of items inside the archives to compare; patterns are supported
+paths of items inside the archives to compare; patterns are supported.
 .UNINDENT
 .SS options
 .INDENT 0.0
@@ -60,16 +60,16 @@ paths of items inside the archives to compare; patterns are supported
 only consider numeric user and group identifiers
 .TP
 .B  \-\-same\-chunker\-params
-Override check of chunker parameters.
-.TP
-.B  \-\-sort
-Sort the output lines by file path.
+override the check of chunker parameters
 .TP
 .BI \-\-format \ FORMAT
 specify format for differences between archives (default: \(dq{change} {path}{NL}\(dq)
 .TP
 .B  \-\-json\-lines
 Format output as JSON Lines.
+.TP
+.B  \-\-sort\-by
+Sort output by comma\-separated fields (e.g., \(aq>size_added,path\(aq).
 .TP
 .B  \-\-content\-only
 Only compare differences in content (exclude metadata differences)
@@ -105,13 +105,22 @@ $ borg diff archive1 archive2
 {\(dqpath\(dq: \(dqfile2\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqmodified\(dq, \(dqadded\(dq: 135, \(dqremoved\(dq: 252}]}
 {\(dqpath\(dq: \(dqfile4\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqadded\(dq, \(dqsize\(dq: 0}]}
 {\(dqpath\(dq: \(dqfile3\(dq, \(dqchanges\(dq: [{\(dqtype\(dq: \(dqremoved\(dq, \(dqsize\(dq: 0}]}
+
+
+# Use \-\-sort\-by with a comma\-separated list; sorts apply stably from last to first.
+# Here: primary by net size change descending, tie\-breaker by path ascending
+$ borg diff \-\-sort\-by=\(dq>size_diff,path\(dq archive1 archive2
+    +17 B      \-5 B [\-rw\-r\-\-r\-\- \-> \-rwxr\-xr\-x] file1
+removed         0 B file3
+added           0 B file4
+   +135 B    \-252 B file2
 .EE
 .UNINDENT
 .UNINDENT
 .SH NOTES
 .SS The FORMAT specifier syntax
 .sp
-The \fB\-\-format\fP option uses python\(aqs format string syntax <https://docs.python.org/3.9/library/string.html#formatstrings>
+The \fB\-\-format\fP option uses Python\(aqs format string syntax <https://docs.python.org/3.10/library/string.html#formatstrings>
 \&.
 .sp
 Examples:
@@ -187,6 +196,71 @@ isomtime: file modification time change (ISO 8601)
 .IP \(bu 2
 isoctime: file creation time change (ISO 8601)
 .UNINDENT
+.SS What is compared
+.sp
+For each matching item in both archives, Borg reports:
+.INDENT 0.0
+.IP \(bu 2
+Content changes: total added/removed bytes within files. If chunker parameters are comparable,
+Borg compares chunk IDs quickly; otherwise, it compares the content.
+.IP \(bu 2
+Metadata changes: user, group, mode, and other metadata shown inline, like
+\(dq[old_mode \-> new_mode]\(dq for mode changes. Use \fB\-\-content\-only\fP to suppress metadata changes.
+.IP \(bu 2
+Added/removed items: printed as \(dqadded SIZE path\(dq or \(dqremoved SIZE path\(dq.
+.UNINDENT
+.SS Output formats
+.sp
+The default (text) output shows one line per changed path, e.g.:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
++135 B    \-252 B [ \-rw\-r\-\-r\-\- \-> \-rwxr\-xr\-x ] path/to/file
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+JSON Lines output (\fB\-\-json\-lines\fP) prints one JSON object per changed path, e.g.:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+{\(dqpath\(dq: \(dqPATH\(dq, \(dqchanges\(dq: [
+    {\(dqtype\(dq: \(dqmodified\(dq, \(dqadded\(dq: BYTES, \(dqremoved\(dq: BYTES},
+    {\(dqtype\(dq: \(dqmode\(dq, \(dqold_mode\(dq: \(dq\-rw\-r\-\-r\-\-\(dq, \(dqnew_mode\(dq: \(dq\-rwxr\-xr\-x\(dq},
+    {\(dqtype\(dq: \(dqadded\(dq, \(dqsize\(dq: SIZE},
+    {\(dqtype\(dq: \(dqremoved\(dq, \(dqsize\(dq: SIZE}
+]}
+.EE
+.UNINDENT
+.UNINDENT
+.SS Sorting
+.sp
+Use \fB\-\-sort\-by FIELDS\fP where FIELDS is a comma\-separated list of fields.
+Sorts are applied stably from last to first in the given list. Prepend \(dq>\(dq for
+descending, \(dq<\(dq (or no prefix) for ascending, for example \fB\-\-sort\-by=\(dq>size_added,path\(dq\fP\&.
+Supported fields include:
+.INDENT 0.0
+.IP \(bu 2
+path: the item path
+.IP \(bu 2
+size_added: total bytes added for the item content
+.IP \(bu 2
+size_removed: total bytes removed for the item content
+.IP \(bu 2
+size_diff: size_added \- size_removed (net content change)
+.IP \(bu 2
+size: size of the item as stored in ARCHIVE2 (0 for removed items)
+.IP \(bu 2
+user, group, uid, gid, ctime, mtime: taken from the item state in ARCHIVE2 when present
+.IP \(bu 2
+ctime_diff, mtime_diff: timestamp difference (ARCHIVE2 \- ARCHIVE1)
+.UNINDENT
+.SS Performance considerations
+.sp
+diff automatically detects whether the archives were created with the same chunker
+parameters. If so, only chunk IDs are compared, which is very fast.
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP

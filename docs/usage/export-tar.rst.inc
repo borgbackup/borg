@@ -102,7 +102,7 @@ Alternatively, a ``--tar-filter`` program may be explicitly specified. It should
 read the uncompressed tar stream from stdin and write a compressed/filtered
 tar stream to stdout.
 
-Depending on the ``-tar-format`` option, these formats are created:
+Depending on the ``--tar-format`` option, these formats are created:
 
 +--------------+---------------------------+----------------------------+
 | --tar-format | Specification             | Metadata                   |

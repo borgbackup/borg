@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-TAG" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-TAG" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-tag \- Manage tags
+borg-tag \- Manage tags.
 .SH SYNOPSIS
 .sp
 borg [common options] tag [options] [NAME]
@@ -42,13 +42,13 @@ Borg archives can have a set of tags which can be used for matching archives.
 You can set the tags to a specific set of tags or you can add or remove
 tags from the current set of tags.
 .sp
-User defined tags must not start with \fI@\fP because such tags are considered
+User\-defined tags must not start with \fI@\fP because such tags are considered
 special and users are only allowed to use known special tags:
 .sp
 \fB@PROT\fP: protects archives against archive deletion or pruning.
 .sp
-Pre\-existing special tags can not be removed via \fB\-\-set\fP\&. You can still use
-\fB\-\-set\fP, but you must give pre\-existing special tags also (so they won\(aqt be
+Pre\-existing special tags cannot be removed via \fB\-\-set\fP\&. You can still use
+\fB\-\-set\fP, but you must also give pre\-existing special tags (so they won\(aqt be
 removed).
 .SH OPTIONS
 .sp
@@ -75,28 +75,28 @@ remove tags (can be given multiple times)
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
-consider first N archives after other filters were applied
+consider the first N archives after other filters are applied
 .TP
 .BI \-\-last \ N
-consider last N archives after other filters were applied
+consider the last N archives after other filters are applied
 .TP
 .BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .UNINDENT
 .SH SEE ALSO
 .sp

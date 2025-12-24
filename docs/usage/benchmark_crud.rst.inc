@@ -12,15 +12,15 @@ borg benchmark crud
 
     .. class:: borg-options-table
 
-    +-------------------------------------------------------+----------+------------------------------------------+
-    | **positional arguments**                                                                                    |
-    +-------------------------------------------------------+----------+------------------------------------------+
-    |                                                       | ``PATH`` | path were to create benchmark input data |
-    +-------------------------------------------------------+----------+------------------------------------------+
-    | .. class:: borg-common-opt-ref                                                                              |
-    |                                                                                                             |
-    | :ref:`common_options`                                                                                       |
-    +-------------------------------------------------------+----------+------------------------------------------+
+    +-------------------------------------------------------+----------+-------------------------------------------+
+    | **positional arguments**                                                                                     |
+    +-------------------------------------------------------+----------+-------------------------------------------+
+    |                                                       | ``PATH`` | path where to create benchmark input data |
+    +-------------------------------------------------------+----------+-------------------------------------------+
+    | .. class:: borg-common-opt-ref                                                                               |
+    |                                                                                                              |
+    | :ref:`common_options`                                                                                        |
+    +-------------------------------------------------------+----------+-------------------------------------------+
 
     .. raw:: html
 
@@ -33,7 +33,7 @@ borg benchmark crud
 .. only:: latex
 
     PATH
-        path were to create benchmark input data
+        path where to create benchmark input data
 
 
     :ref:`common_options`
@@ -44,11 +44,11 @@ Description
 
 This command benchmarks borg CRUD (create, read, update, delete) operations.
 
-It creates input data below the given PATH and backups this data into the given REPO.
+It creates input data below the given PATH and backs up this data into the given REPO.
 The REPO must already exist (it could be a fresh empty repo or an existing repo, the
 command will create / read / update / delete some archives named borg-benchmark-crud\* there.
 
-Make sure you have free space there, you'll need about 1GB each (+ overhead).
+Make sure you have free space there; you will need about 1 GB each (+ overhead).
 
 If your repository is encrypted and borg needs a passphrase to unlock the key, use::
 

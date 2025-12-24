@@ -19,19 +19,19 @@ borg diff
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
     |                                                       | ``ARCHIVE2``                          | ARCHIVE2 name                                                                    |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
-    |                                                       | ``PATH``                              | paths of items inside the archives to compare; patterns are supported            |
+    |                                                       | ``PATH``                              | paths of items inside the archives to compare; patterns are supported.           |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
     | **options**                                                                                                                                                                      |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
     |                                                       | ``--numeric-ids``                     | only consider numeric user and group identifiers                                 |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
-    |                                                       | ``--same-chunker-params``             | Override check of chunker parameters.                                            |
-    +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
-    |                                                       | ``--sort``                            | Sort the output lines by file path.                                              |
+    |                                                       | ``--same-chunker-params``             | override the check of chunker parameters                                         |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
     |                                                       | ``--format FORMAT``                   | specify format for differences between archives (default: "{change} {path}{NL}") |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
     |                                                       | ``--json-lines``                      | Format output as JSON Lines.                                                     |
+    +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
+    |                                                       | ``--sort-by``                         | Sort output by comma-separated fields (e.g., '>size_added,path').                |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
     |                                                       | ``--content-only``                    | Only compare differences in content (exclude metadata differences)               |
     +-------------------------------------------------------+---------------------------------------+----------------------------------------------------------------------------------+
@@ -65,15 +65,15 @@ borg diff
     ARCHIVE2
         ARCHIVE2 name
     PATH
-        paths of items inside the archives to compare; patterns are supported
+        paths of items inside the archives to compare; patterns are supported.
 
 
     options
         --numeric-ids    only consider numeric user and group identifiers
-        --same-chunker-params    Override check of chunker parameters.
-        --sort     Sort the output lines by file path.
+        --same-chunker-params    override the check of chunker parameters
         --format FORMAT    specify format for differences between archives (default: "{change} {path}{NL}")
-        --json-lines    Format output as JSON Lines. 
+        --json-lines    Format output as JSON Lines.
+        --sort-by     Sort output by comma-separated fields (e.g., '>size_added,path').
         --content-only    Only compare differences in content (exclude metadata differences)
 
 
@@ -92,15 +92,15 @@ Description
 
 This command finds differences (file contents, metadata) between ARCHIVE1 and ARCHIVE2.
 
-For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
+For more help on include/exclude patterns, see the output of the :ref:`borg_patterns` command.
 
 .. man NOTES
 
 The FORMAT specifier syntax
 +++++++++++++++++++++++++++
 
-The ``--format`` option uses python's `format string syntax
-<https://docs.python.org/3.9/library/string.html#formatstrings>`_.
+The ``--format`` option uses Python's `format string syntax
+<https://docs.python.org/3.10/library/string.html#formatstrings>`_.
 
 Examples:
 ::
@@ -148,3 +148,49 @@ Keys available only when showing differences between archives:
 - ctime: file change time change
 - isomtime: file modification time change (ISO 8601)
 - isoctime: file creation time change (ISO 8601)
+
+
+What is compared
++++++++++++++++++
+For each matching item in both archives, Borg reports:
+
+- Content changes: total added/removed bytes within files. If chunker parameters are comparable,
+  Borg compares chunk IDs quickly; otherwise, it compares the content.
+- Metadata changes: user, group, mode, and other metadata shown inline, like
+  "[old_mode -> new_mode]" for mode changes. Use ``--content-only`` to suppress metadata changes.
+- Added/removed items: printed as "added SIZE path" or "removed SIZE path".
+
+Output formats
+++++++++++++++
+The default (text) output shows one line per changed path, e.g.::
+
+    +135 B    -252 B [ -rw-r--r-- -> -rwxr-xr-x ] path/to/file
+
+JSON Lines output (``--json-lines``) prints one JSON object per changed path, e.g.::
+
+    {"path": "PATH", "changes": [
+        {"type": "modified", "added": BYTES, "removed": BYTES},
+        {"type": "mode", "old_mode": "-rw-r--r--", "new_mode": "-rwxr-xr-x"},
+        {"type": "added", "size": SIZE},
+        {"type": "removed", "size": SIZE}
+    ]}
+
+Sorting
+++++++++
+Use ``--sort-by FIELDS`` where FIELDS is a comma-separated list of fields.
+Sorts are applied stably from last to first in the given list. Prepend ">" for
+descending, "<" (or no prefix) for ascending, for example ``--sort-by=">size_added,path"``.
+Supported fields include:
+
+- path: the item path
+- size_added: total bytes added for the item content
+- size_removed: total bytes removed for the item content
+- size_diff: size_added - size_removed (net content change)
+- size: size of the item as stored in ARCHIVE2 (0 for removed items)
+- user, group, uid, gid, ctime, mtime: taken from the item state in ARCHIVE2 when present
+- ctime_diff, mtime_diff: timestamp difference (ARCHIVE2 - ARCHIVE1)
+
+Performance considerations
+++++++++++++++++++++++++++
+diff automatically detects whether the archives were created with the same chunker
+parameters. If so, only chunk IDs are compared, which is very fast.

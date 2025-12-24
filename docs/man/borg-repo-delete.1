@@ -27,15 +27,15 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-REPO-DELETE" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-REPO-DELETE" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-repo-delete \- Delete a repository
+borg-repo-delete \- Deletes a repository.
 .SH SYNOPSIS
 .sp
 borg [common options] repo\-delete [options]
 .SH DESCRIPTION
 .sp
-This command deletes the complete repository.
+This command deletes a complete repository.
 .sp
 When you delete a complete repository, the security info and local cache for it
 (if any) are also deleted. Alternatively, you can delete just the local cache
@@ -50,13 +50,13 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
-do not change repository
+do not change the repository
 .TP
 .B  \-\-list
-output verbose list of archives
+output a verbose list of archives
 .TP
 .B  \-\-force
-force deletion of corrupted archives, use \fB\-\-force \-\-force\fP in case \fB\-\-force\fP does not work.
+force deletion of corrupted archives; use \fB\-\-force \-\-force\fP if a single \fB\-\-force\fP does not work.
 .TP
 .B  \-\-cache\-only
 delete only the local cache for the given repository

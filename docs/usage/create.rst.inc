@@ -25,7 +25,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-s``, ``--stats``                               | print statistics for the created archive                                                                                                                                                          |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--list``                                        | output verbose list of items (files, dirs, ...)                                                                                                                                                   |
+    |                                                       | ``--list``                                        | output a verbose list of items (files, dirs, ...)                                                                                                                                                 |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--filter STATUSCHARS``                          | only display items with the given status characters (see description)                                                                                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -39,7 +39,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--stdin-mode M``                                | set mode to M in archive for stdin data (default: 0660)                                                                                                                                           |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--content-from-command``                        | interpret PATH as command and store its stdout. See also section Reading from stdin below.                                                                                                        |
+    |                                                       | ``--content-from-command``                        | interpret PATH as a command and store its stdout. See also the section 'Reading from stdin' below.                                                                                                |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--paths-from-stdin``                            | read DELIM-separated list of paths to back up from stdin. All control is external: it will back up all files given - no more, no less.                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -65,7 +65,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--exclude-if-present NAME``                     | exclude directories that are tagged by containing a filesystem object with the given NAME                                                                                                         |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--keep-exclude-tags``                           | if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive                                                                         |
+    |                                                       | ``--keep-exclude-tags``                           | if tag objects are specified with ``--exclude-if-present``, do not omit the tag objects themselves from the backup archive                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | **Filesystem options**                                                                                                                                                                                                                                                                                        |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -123,14 +123,14 @@ borg create
     options
         -n, --dry-run    do not create a backup archive
         -s, --stats     print statistics for the created archive
-        --list          output verbose list of items (files, dirs, ...)
+        --list          output a verbose list of items (files, dirs, ...)
         --filter STATUSCHARS    only display items with the given status characters (see description)
         --json          output stats as JSON. Implies ``--stats``.
         --stdin-name NAME    use NAME in archive for stdin data (default: 'stdin')
         --stdin-user USER    set user USER in archive for stdin data (default: do not store user/uid)
         --stdin-group GROUP    set group GROUP in archive for stdin data (default: do not store group/gid)
         --stdin-mode M    set mode to M in archive for stdin data (default: 0660)
-        --content-from-command    interpret PATH as command and store its stdout. See also section Reading from stdin below.
+        --content-from-command    interpret PATH as a command and store its stdout. See also the section 'Reading from stdin' below.
         --paths-from-stdin    read DELIM-separated list of paths to back up from stdin. All control is external: it will back up all files given - no more, no less.
         --paths-from-command    interpret PATH as command and treat its output as ``--paths-from-stdin``
         --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\n``) 
@@ -146,7 +146,7 @@ borg create
         --patterns-from PATTERNFILE       read include/exclude patterns from PATTERNFILE, one per line
         --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.bford.info/cachedir/spec.html)
         --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
-        --keep-exclude-tags               if tag objects are specified with ``--exclude-if-present``, don't omit the tag objects themselves from the backup archive
+        --keep-exclude-tags               if tag objects are specified with ``--exclude-if-present``, do not omit the tag objects themselves from the backup archive
 
 
     Filesystem options
@@ -175,8 +175,8 @@ Description
 ~~~~~~~~~~~
 
 This command creates a backup archive containing all files found while recursively
-traversing all paths specified. Paths are added to the archive as they are given,
-that means if relative paths are desired, the command has to be run from the correct
+traversing all specified paths. Paths are added to the archive as they are given,
+which means that if relative paths are desired, the command must be run from the correct
 directory.
 
 The slashdot hack in paths (recursion roots) is triggered by using ``/./``:
@@ -184,23 +184,23 @@ The slashdot hack in paths (recursion roots) is triggered by using ``/./``:
 strip the prefix on the left side of ``./`` from the archived items (in this case,
 ``this/gets/archived`` will be the path in the archived item).
 
-When giving '-' as path, borg will read data from standard input and create a
-file 'stdin' in the created archive from that data. In some cases it's more
-appropriate to use --content-from-command, however. See section *Reading from
-stdin* below for details.
+When specifying '-' as a path, borg will read data from standard input and create a
+file named 'stdin' in the created archive from that data. In some cases, it is more
+appropriate to use --content-from-command. See the section *Reading from stdin*
+below for details.
 
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
 
-The archive name does NOT need to be unique, you can and should use the same
-name for a series of archives. The unique archive identifier is its ID (hash)
+The archive name does not need to be unique; you can and should use the same
+name for a series of archives. The unique archive identifier is its ID (hash),
 and you can abbreviate the ID as long as it is unique.
 
 In the archive name, you may use the following placeholders:
 {now}, {utcnow}, {fqdn}, {hostname}, {user} and some others.
 
 Backup speed is increased by not reprocessing files that are already part of
-existing archives and weren't modified. The detection of unmodified files is
+existing archives and were not modified. The detection of unmodified files is
 done by comparing multiple file metadata values with previous values kept in
 the files cache.
 
@@ -226,14 +226,14 @@ improve performance, but reliability of change detection might be reduced.
 ctime vs. mtime: safety vs. speed
 
 - ctime is a rather safe way to detect changes to a file (metadata and contents)
-  as it can not be set from userspace. But, a metadata-only change will already
+  as it cannot be set from userspace. But a metadata-only change will already
   update the ctime, so there might be some unnecessary chunking/hashing even
   without content changes. Some filesystems do not support ctime (change time).
   E.g. doing a chown or chmod to a file will change its ctime.
 - mtime usually works and only updates if file contents were changed. But mtime
-  can be arbitrarily set from userspace, e.g. to set mtime back to the same value
+  can be arbitrarily set from userspace, e.g., to set mtime back to the same value
   it had before a content change happened. This can be used maliciously as well as
-  well-meant, but in both cases mtime based cache modes can be problematic.
+  well-meant, but in both cases mtime-based cache modes can be problematic.
 
 The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
  - ctime (default): Use ctime to detect changes. This is the safest option.
@@ -319,7 +319,7 @@ borg usually just stores their metadata:
 - 'd' = directory
 - 'b' = block device
 - 'c' = char device
-- 'h' = regular file, hardlink (to already seen inodes)
+- 'h' = regular file, hard link (to already seen inodes)
 - 's' = symlink
 - 'f' = fifo
 

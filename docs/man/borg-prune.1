@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PRUNE" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-PRUNE" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-prune \- Prune repository archives according to specified rules
+borg-prune \- Prune archives according to specified rules.
 .SH SYNOPSIS
 .sp
 borg [common options] prune [options] [NAME]
@@ -111,10 +111,10 @@ specify the archive name
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
-do not change repository
+do not change the repository
 .TP
 .B  \-\-list
-output verbose list of archives it keeps/prunes
+output a verbose list of archives it keeps/prunes
 .TP
 .B  \-\-short
 use a less wide archive part format
@@ -162,41 +162,41 @@ number of yearly archives to keep
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .UNINDENT
 .SH EXAMPLES
 .sp
-Be careful, prune is a potentially dangerous command, it will remove backup
+Be careful: prune is a potentially dangerous command that removes backup
 archives.
 .sp
-The default of prune is to apply to \fBall archives in the repository\fP unless
-you restrict its operation to a subset of the archives.
+By default, prune applies to \fBall archives in the repository\fP unless you
+restrict its operation to a subset of the archives.
 .sp
 The recommended way to name archives (with \fBborg create\fP) is to use the
 identical archive name within a series of archives. Then you can simply give
-that name to prune also, so it operates just on that series of archives.
+that name to prune as well, so it operates only on that series of archives.
 .sp
-Alternatively, you can use \fB\-a\fP / \fB\-\-match\-archives\fP to do a match on the
-archive names to select some of them.
-When using \fB\-a\fP, be careful to choose a good pattern \- e.g. do not use a
+Alternatively, you can use \fB\-a\fP/\fB\-\-match\-archives\fP to match archive names
+and select a subset of them.
+When using \fB\-a\fP, be careful to choose a good pattern — for example, do not use a
 prefix \(dqfoo\(dq if you do not also want to match \(dqfoobar\(dq.
 .sp
 It is strongly recommended to always run \fBprune \-v \-\-list \-\-dry\-run ...\fP
-first so you will see what it would do without it actually doing anything.
+first, so you will see what it would do without it actually doing anything.
 .sp
-Don\(aqt forget to run \fBborg compact \-v\fP after prune to actually free disk space.
+Do not forget to run \fBborg compact \-v\fP after prune to actually free disk space.
 .INDENT 0.0
 .INDENT 3.5
 .sp
@@ -205,11 +205,11 @@ Don\(aqt forget to run \fBborg compact \-v\fP after prune to actually free disk 
 # Do a dry\-run without actually deleting anything.
 $ borg prune \-v \-\-list \-\-dry\-run \-\-keep\-daily=7 \-\-keep\-weekly=4
 
-# Similar as above but only apply to the archive series named \(aq{hostname}\(aq:
+# Similar to the above, but only apply to the archive series named \(aq{hostname}\(aq:
 $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \(aq{hostname}\(aq
 
-# Similar as above but apply to archive names starting with the hostname
-# of the machine followed by a \(dq\-\(dq character:
+# Similar to the above, but apply to archive names starting with the hostname
+# of the machine followed by a \(aq\-\(aq character:
 $ borg prune \-v \-\-list \-\-keep\-daily=7 \-\-keep\-weekly=4 \-a \(aqsh:{hostname}\-*\(aq
 
 # Keep 7 end of day, 4 additional end of week archives,

@@ -36,7 +36,7 @@ borg benchmark cpu
 Description
 ~~~~~~~~~~~
 
-This command benchmarks misc. CPU bound borg operations.
+This command benchmarks miscellaneous CPU-bound Borg operations.
 
 It creates input data in memory, runs the operation and then displays throughput.
 To reduce outside influence on the timings, please make sure to run this with:

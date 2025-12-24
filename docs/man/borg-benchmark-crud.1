@@ -27,7 +27,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-BENCHMARK-CRUD" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-BENCHMARK-CRUD" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
 borg-benchmark-crud \- Benchmark Create, Read, Update, Delete for archives.
 .SH SYNOPSIS
@@ -37,11 +37,11 @@ borg [common options] benchmark crud [options] PATH
 .sp
 This command benchmarks borg CRUD (create, read, update, delete) operations.
 .sp
-It creates input data below the given PATH and backups this data into the given REPO.
+It creates input data below the given PATH and backs up this data into the given REPO.
 The REPO must already exist (it could be a fresh empty repo or an existing repo, the
 command will create / read / update / delete some archives named borg\-benchmark\-crud* there.
 .sp
-Make sure you have free space there, you\(aqll need about 1GB each (+ overhead).
+Make sure you have free space there; you will need about 1 GB each (+ overhead).
 .sp
 If your repository is encrypted and borg needs a passphrase to unlock the key, use:
 .INDENT 0.0
@@ -87,7 +87,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .INDENT 0.0
 .TP
 .B PATH
-path were to create benchmark input data
+path where to create benchmark input data
 .UNINDENT
 .SH SEE ALSO
 .sp

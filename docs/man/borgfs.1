@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORGFS" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORGFS" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borgfs \- Mount archive or an entire repository as a FUSE filesystem
+borgfs \- Mounts an archive or an entire repository as a FUSE filesystem.
 .SH SYNOPSIS
 .sp
 borgfs [options] MOUNTPOINT [PATH...]
@@ -43,7 +43,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .INDENT 0.0
 .TP
 .B MOUNTPOINT
-where to mount filesystem
+where to mount the filesystem
 .TP
 .B PATH
 paths to extract; patterns are supported
@@ -54,41 +54,44 @@ paths to extract; patterns are supported
 .B  \-V\fP,\fB  \-\-version
 show version number and exit
 .TP
+.B  \-\-cockpit
+Start the Borg TUI
+.TP
 .B  \-f\fP,\fB  \-\-foreground
 stay in foreground, do not daemonize
 .TP
 .B  \-o
-Extra mount options
+extra mount options
 .TP
 .B  \-\-numeric\-ids
-use numeric user and group identifiers from archive(s)
+use numeric user and group identifiers from archives
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
-consider first N archives after other filters were applied
+consider the first N archives after other filters are applied
 .TP
 .BI \-\-last \ N
-consider last N archives after other filters were applied
+consider the last N archives after other filters are applied
 .TP
 .BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .UNINDENT
 .SS Include/Exclude options
 .INDENT 0.0

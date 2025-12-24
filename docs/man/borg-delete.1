@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-DELETE" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-DELETE" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-delete \- Delete archives
+borg-delete \- Deletes archives.
 .SH SYNOPSIS
 .sp
 borg [common options] delete [options] [NAME]
@@ -49,9 +49,9 @@ you run \fBborg compact\fP\&.
 .sp
 When in doubt, use \fB\-\-dry\-run \-\-list\fP to see what would be deleted.
 .sp
-You can delete multiple archives by specifying a matching pattern,
-using the \fB\-\-match\-archives PATTERN\fP option (for more info on these patterns,
-see \fIborg_patterns\fP).
+You can delete multiple archives by specifying a match pattern using
+the \fB\-\-match\-archives PATTERN\fP option (for more information on these
+patterns, see \fIborg_patterns\fP).
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -65,58 +65,58 @@ specify the archive name
 .INDENT 0.0
 .TP
 .B  \-n\fP,\fB  \-\-dry\-run
-do not change repository
+do not change the repository
 .TP
 .B  \-\-list
-output verbose list of archives
+output a verbose list of archives
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
-consider first N archives after other filters were applied
+consider the first N archives after other filters are applied
 .TP
 .BI \-\-last \ N
-consider last N archives after other filters were applied
+consider the last N archives after other filters are applied
 .TP
 .BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0
 .INDENT 3.5
 .sp
 .EX
-# delete all backup archives named \(dqkenny\-files\(dq:
+# Delete all backup archives named \(dqkenny\-files\(dq:
 $ borg delete \-a kenny\-files
-# actually free disk space:
+# Actually free disk space:
 $ borg compact
 
-# delete a specific backup archive using its unique archive ID prefix
+# Delete a specific backup archive using its unique archive ID prefix
 $ borg delete aid:d34db33f
 
-# delete all archives whose names begin with the machine\(aqs hostname followed by \(dq\-\(dq
+# Delete all archives whose names begin with the machine\(aqs hostname followed by \(dq\-\(dq
 $ borg delete \-a \(aqsh:{hostname}\-*\(aq
 
-# delete all archives whose names contain \(dq\-2012\-\(dq
+# Delete all archives whose names contain \(dq\-2012\-\(dq
 $ borg delete \-a \(aqsh:*\-2012\-*\(aq
 
-# see what would be deleted if delete was run without \-\-dry\-run
+# See what would be deleted if delete was run without \-\-dry\-run
 $ borg delete \-\-list \-\-dry\-run \-a \(aqsh:*\-May\-*\(aq
 .EE
 .UNINDENT

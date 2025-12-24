@@ -27,20 +27,20 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-VERSION" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-VERSION" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-version \- Display the borg client / borg server version
+borg-version \- Displays the Borg client and server versions.
 .SH SYNOPSIS
 .sp
 borg [common options] version [options]
 .SH DESCRIPTION
 .sp
-This command displays the borg client version / borg server version.
+This command displays the Borg client and server versions.
 .sp
-If a local repo is given, the client code directly accesses the repository,
-thus we show the client version also as the server version.
+If a local repository is given, the client code directly accesses the repository,
+so the client version is also shown as the server version.
 .sp
-If a remote repo is given (e.g. ssh:), the remote borg is queried and
+If a remote repository is given (e.g., ssh:), the remote Borg is queried, and
 its version is displayed as the server version.
 .sp
 Examples:
@@ -48,21 +48,21 @@ Examples:
 .INDENT 3.5
 .sp
 .EX
-# local repo (client uses 1.4.0 alpha version)
+# local repository (client uses 1.4.0 alpha version)
 $ borg version /mnt/backup
 1.4.0a / 1.4.0a
 
-# remote repo (client uses 1.4.0 alpha, server uses 1.2.7 release)
+# remote repository (client uses 1.4.0 alpha, server uses 1.2.7 release)
 $ borg version ssh://borg@borgbackup:repo
 1.4.0a / 1.2.7
 .EE
 .UNINDENT
 .UNINDENT
 .sp
-Due to the version tuple format used in borg client/server negotiation, only
+Due to the version tuple format used in Borg client/server negotiation, only
 a simplified version is displayed (as provided by borg.version.format_version).
 .sp
-There is also borg \-\-version to display a potentially more precise client version.
+You can also use \fBborg \-\-version\fP to display a potentially more precise client version.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.

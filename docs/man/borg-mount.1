@@ -27,9 +27,9 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-MOUNT" "1" "2025-08-02" "" "borg backup tool"
+.TH "BORG-MOUNT" "1" "2025-12-23" "" "borg backup tool"
 .SH NAME
-borg-mount \- Mount archive or an entire repository as a FUSE filesystem
+borg-mount \- Mounts an archive or an entire repository as a FUSE filesystem.
 .SH SYNOPSIS
 .sp
 borg [common options] mount [options] MOUNTPOINT [PATH...]
@@ -45,18 +45,18 @@ When mounting a repository, the top directories will be named like the
 archives and the directory structure below these will be loaded on\-demand from
 the repository when entering these directories, so expect some delay.
 .sp
-Unless the \fB\-\-foreground\fP option is given the command will run in the
-background until the filesystem is \fBumounted\fP\&.
+Unless the \fB\-\-foreground\fP option is given, the command will run in the
+background until the filesystem is \fBunmounted\fP\&.
 .sp
 Performance tips:
 .INDENT 0.0
 .IP \(bu 2
-when doing a \(dqwhole repository\(dq mount:
-do not enter archive dirs if not needed, this avoids on\-demand loading.
+When doing a \(dqwhole repository\(dq mount:
+do not enter archive directories if not needed; this avoids on\-demand loading.
 .IP \(bu 2
-only mount a specific archive, not the whole repository.
+Only mount a specific archive, not the whole repository.
 .IP \(bu 2
-only mount specific paths in a specific archive, not the complete archive.
+Only mount specific paths in a specific archive, not the complete archive.
 .UNINDENT
 .sp
 The command \fBborgfs\fP provides a wrapper for \fBborg mount\fP\&. This can also be
@@ -69,39 +69,39 @@ To allow a regular user to use fstab entries, add the \fBuser\fP option:
 For FUSE configuration and mount options, see the mount.fuse(8) manual page.
 .sp
 Borg\(aqs default behavior is to use the archived user and group names of each
-file and map them to the system\(aqs respective user and group ids.
+file and map them to the system\(aqs respective user and group IDs.
 Alternatively, using \fBnumeric\-ids\fP will instead use the archived user and
-group ids without any mapping.
+group IDs without any mapping.
 .sp
 The \fBuid\fP and \fBgid\fP mount options (implemented by Borg) can be used to
-override the user and group ids of all files (i.e., \fBborg mount \-o
+override the user and group IDs of all files (i.e., \fBborg mount \-o
 uid=1000,gid=1000\fP).
 .sp
 The man page references \fBuser_id\fP and \fBgroup_id\fP mount options
-(implemented by fuse) which specify the user and group id of the mount owner
-(aka, the user who does the mounting). It is set automatically by libfuse (or
+(implemented by FUSE) which specify the user and group ID of the mount owner
+(also known as the user who does the mounting). It is set automatically by libfuse (or
 the filesystem if libfuse is not used). However, you should not specify these
-manually. Unlike the \fBuid\fP and \fBgid\fP mount options which affect all files,
-\fBuser_id\fP and \fBgroup_id\fP affect the user and group id of the mounted
+manually. Unlike the \fBuid\fP and \fBgid\fP mount options, which affect all files,
+\fBuser_id\fP and \fBgroup_id\fP affect the user and group ID of the mounted
 (base) directory.
 .sp
-Additional mount options supported by borg:
+Additional mount options supported by Borg:
 .INDENT 0.0
 .IP \(bu 2
 \fBversions\fP: when used with a repository mount, this gives a merged, versioned
-view of the files in the archives. EXPERIMENTAL, layout may change in future.
+view of the files in the archives. EXPERIMENTAL; layout may change in the future.
 .IP \(bu 2
-\fBallow_damaged_files\fP: by default damaged files (where chunks are missing)
+\fBallow_damaged_files\fP: by default, damaged files (where chunks are missing)
 will return EIO (I/O error) when trying to read the related parts of the file.
 Set this option to replace the missing parts with all\-zero bytes.
 .IP \(bu 2
 \fBignore_permissions\fP: for security reasons the \fBdefault_permissions\fP mount
-option is internally enforced by borg. \fBignore_permissions\fP can be given to
+option is internally enforced by Borg. \fBignore_permissions\fP can be given to
 not enforce \fBdefault_permissions\fP\&.
 .UNINDENT
 .sp
-The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is meant for advanced users
-to tweak the performance. It sets the number of cached data chunks; additional
+The BORG_MOUNT_DATA_CACHE_ENTRIES environment variable is intended for advanced users
+to tweak performance. It sets the number of cached data chunks; additional
 memory usage can be up to ~8 MiB times this number. The default is the number
 of CPU cores.
 .sp
@@ -111,6 +111,13 @@ to delete data unintentionally.
 .sp
 When running in the foreground, ^C/SIGINT cleanly unmounts the filesystem,
 but other signals or crashes do not.
+.sp
+Debugging:
+.sp
+\fBborg mount\fP usually daemonizes and the daemon process sends stdout/stderr
+to /dev/null. Thus, you need to either use \fB\-f / \-\-foreground\fP to make it stay
+in the foreground and not daemonize, or use \fBBORG_LOGGING_CONF\fP to reconfigure
+the logger to output to a file.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -118,7 +125,7 @@ See \fIborg\-common(1)\fP for common options of Borg commands.
 .INDENT 0.0
 .TP
 .B MOUNTPOINT
-where to mount filesystem
+where to mount the filesystem
 .TP
 .B PATH
 paths to extract; patterns are supported
@@ -130,37 +137,37 @@ paths to extract; patterns are supported
 stay in foreground, do not daemonize
 .TP
 .B  \-o
-Extra mount options
+extra mount options
 .TP
 .B  \-\-numeric\-ids
-use numeric user and group identifiers from archive(s)
+use numeric user and group identifiers from archives
 .UNINDENT
 .SS Archive filters
 .INDENT 0.0
 .TP
 .BI \-a \ PATTERN\fR,\fB \ \-\-match\-archives \ PATTERN
-only consider archives matching all patterns. see \(dqborg help match\-archives\(dq.
+only consider archives matching all patterns. See \(dqborg help match\-archives\(dq.
 .TP
 .BI \-\-sort\-by \ KEYS
 Comma\-separated list of sorting keys; valid keys are: timestamp, archive, name, id, tags, host, user; default is: timestamp
 .TP
 .BI \-\-first \ N
-consider first N archives after other filters were applied
+consider the first N archives after other filters are applied
 .TP
 .BI \-\-last \ N
-consider last N archives after other filters were applied
+consider the last N archives after other filters are applied
 .TP
 .BI \-\-oldest \ TIMESPAN
-consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g. 7d or 12m.
+consider archives between the oldest archive\(aqs timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newest \ TIMESPAN
-consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g. 7d or 12m.
+consider archives between the newest archive\(aqs timestamp and (newest \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-older \ TIMESPAN
-consider archives older than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives older than (now \- TIMESPAN), e.g., 7d or 12m.
 .TP
 .BI \-\-newer \ TIMESPAN
-consider archives newer than (now \- TIMESPAN), e.g. 7d or 12m.
+consider archives newer than (now \- TIMESPAN), e.g., 7d or 12m.
 .UNINDENT
 .SS Include/Exclude options
 .INDENT 0.0

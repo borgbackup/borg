@@ -565,19 +565,19 @@ def test_extract_xattrs_errors(archivers, request):
         with patch.object(xattr, "setxattr", patched_setxattr_E2BIG):
             out = cmd(archiver, "extract", "test", exit_code=EXIT_WARNING)
             assert "too big for this filesystem" in out
-            assert "when setting extended attribute user.attribute" in out
+            assert "When setting extended attribute user.attribute" in out
         os.remove(input_abspath)
 
         with patch.object(xattr, "setxattr", patched_setxattr_ENOTSUP):
             out = cmd(archiver, "extract", "test", exit_code=EXIT_WARNING)
             assert "ENOTSUP" in out
-            assert "when setting extended attribute user.attribute" in out
+            assert "When setting extended attribute user.attribute" in out
         os.remove(input_abspath)
 
         with patch.object(xattr, "setxattr", patched_setxattr_EACCES):
             out = cmd(archiver, "extract", "test", exit_code=EXIT_WARNING)
             assert "EACCES" in out
-            assert "when setting extended attribute user.attribute" in out
+            assert "When setting extended attribute user.attribute" in out
         assert os.path.isfile(input_abspath)
 
 

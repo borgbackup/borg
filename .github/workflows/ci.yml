@@ -281,8 +281,6 @@ jobs:
       run: |
         pip install -r requirements.d/pyinstaller.txt
         mkdir -p dist/binary
-        # Ensure locally built binaries in ./dist/binary are found during tox tests
-        echo "$GITHUB_WORKSPACE/dist/binary" >> "$GITHUB_PATH"
         pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
 
     - name: Smoke-test the built binary (${{ matrix.binary }})
@@ -331,6 +329,8 @@ jobs:
       run: |
         # do not use fakeroot, but run as root. avoids the dreaded EISDIR sporadic failures. see #2482.
         #sudo -E bash -c "tox -e py"
+        # Ensure locally built binary in ./dist/binary/borg-dir is found during tests
+        export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
         tox --skip-missing-interpreters
 
     - name: Upload coverage to Codecov
@@ -594,9 +594,10 @@ jobs:
 
       - name: Run tests
         run: |
-          ./dist/borg.exe -V
+          # Ensure locally built binary in ./dist/binary/borg-dir is found during tests
+          export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
+          borg.exe -V
           . env/bin/activate
-          borg -V
           python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote"
 
       - name: Upload coverage to Codecov

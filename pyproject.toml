@@ -38,6 +38,7 @@ dependencies = [
   "platformdirs >=2.6.0, <5.0.0; sys_platform != 'darwin'",  # for others: 2.6+ works consistently.
   "argon2-cffi",
   "shtab>=1.8.0",
+  "dateutils"
 ]
 
 [project.optional-dependencies]

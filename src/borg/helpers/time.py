@@ -1,6 +1,7 @@
 import os
 import re
 from datetime import datetime, timezone, timedelta
+from dateutil.relativedelta import relativedelta, MO
 
 
 def parse_timestamp(timestamp, tzinfo=timezone.utc):
@@ -110,6 +111,105 @@ def format_timedelta(td):
     return txt
 
 
+class FlexibleDelta:
+    """
+    Represents an interval that _may_ respect the calendar with relation to week boundaries and exact month lengths.
+    """
+
+    _unit_relativedelta_map = {
+        "y": lambda count: relativedelta(years=count),
+        "m": lambda count: relativedelta(months=count),
+        "w": lambda count: relativedelta(weeks=count),
+        "d": lambda count: relativedelta(days=count),
+        "H": lambda count: relativedelta(hours=count),
+        "M": lambda count: relativedelta(minutes=count),
+        "S": lambda count: relativedelta(seconds=count),
+    }
+
+    _unit_timedelta_map = {
+        "y": lambda count: timedelta(days=count * 365),
+        "m": lambda count: timedelta(days=count * 31),
+        "w": lambda count: timedelta(weeks=count),
+        "d": lambda count: timedelta(days=count),
+        "H": lambda count: timedelta(hours=count),
+        "M": lambda count: timedelta(minutes=count),
+        "S": lambda count: timedelta(seconds=count),
+    }
+
+    _unit_fuzzy_round_func_map = {
+        "y": lambda earlier: relativedelta(
+            years=0 if earlier else 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0
+        ),
+        "m": lambda earlier: relativedelta(
+            months=0 if earlier else 1, day=1, hour=0, minute=0, second=0, microsecond=0
+        ),
+        "w": lambda earlier: relativedelta(
+            weekday=MO(-1), weeks=(0 if earlier else 1), hour=0, minute=0, second=0, microsecond=0
+        ),
+        "d": lambda earlier: relativedelta(days=0 if earlier else 1, hour=0, minute=0, second=0, microsecond=0),
+        "H": lambda earlier: relativedelta(hours=0 if earlier else 1, minute=0, second=0, microsecond=0),
+        "M": lambda earlier: relativedelta(minutes=0 if earlier else 1, second=0, microsecond=0),
+        "S": lambda earlier: relativedelta(seconds=0 if earlier else 1, microsecond=0),
+    }
+
+    def __init__(self, count, unit, fuzzy):
+        self.relativedelta = self._unit_relativedelta_map[unit](count)
+        self.timedelta = self._unit_timedelta_map[unit](count)
+        self.fuzzy_round_func = self._unit_fuzzy_round_func_map[unit]
+        self.fuzzy = fuzzy
+
+        # For repr
+        self.count = count
+        self.unit = unit
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(count={self.count}, unit="{self.unit}", fuzzy={self.fuzzy})'
+
+    _interval_regex = re.compile(r"^(?P<count>\d+)(?P<unit>[ymwdHMS])(?P<fuzzy>z)?$")
+
+    @classmethod
+    def parse(cls, interval_string, fuzzyable=False):
+        """
+        Parse interval string into
+        """
+        match = cls._interval_regex.search(interval_string)
+
+        if not match:
+            raise ValueError(f"Invalid interval format: {interval_string}")
+
+        count = int(match.group("count"))
+        unit = match.group("unit")
+        fuzzy = fuzzyable and match.group("fuzzy") is not None
+
+        return cls(count, unit, fuzzy)
+
+    @classmethod
+    def parse_fuzzy(cls, interval_string):
+        """
+        Convenience fuzzy parser for easy use with argparse
+        """
+        return cls.parse(interval_string, fuzzyable=True)
+
+    def apply(self, base_ts, earlier=False, calendar=False):
+        scale = -1 if earlier else 1
+        delta = self.relativedelta if calendar else self.timedelta
+
+        offset_ts = base_ts + delta * scale
+
+        if self.fuzzy:
+            # Offset further so that timestamp represents the start/end of its unit. e.g. "1yz" rounds result either up
+            # or down to nearest full year after applying initial offset (2025-07-31 - "1yz" = 2024-01-01).
+            offset_ts += self.fuzzy_round_func(earlier)
+
+        return offset_ts
+
+    def add_to(self, base_ts, calendar=False):
+        return self.apply(base_ts, earlier=False, calendar=calendar)
+
+    def subtract_from(self, base_ts, calendar=False):
+        return self.apply(base_ts, earlier=True, calendar=calendar)
+
+
 def calculate_relative_offset(format_string, from_ts, earlier=False):
     """
     Calculate an offset based on a relative marker (e.g., 7d for 7 days, 8m for 8 months).
@@ -119,31 +219,7 @@ def calculate_relative_offset(format_string, from_ts, earlier=False):
     if from_ts is None:
         from_ts = archive_ts_now()
 
-    if format_string is not None:
-        offset_regex = re.compile(r"(?P<offset>\d+)(?P<unit>[ymwdHMS])")
-        match = offset_regex.search(format_string)
-
-        if match:
-            unit = match.group("unit")
-            offset = int(match.group("offset"))
-            offset *= -1 if earlier else 1
-
-            if unit == "y":
-                return from_ts.replace(year=from_ts.year + offset)
-            elif unit == "m":
-                return offset_n_months(from_ts, offset)
-            elif unit == "w":
-                return from_ts + timedelta(days=offset * 7)
-            elif unit == "d":
-                return from_ts + timedelta(days=offset)
-            elif unit == "H":
-                return from_ts + timedelta(seconds=offset * 60 * 60)
-            elif unit == "M":
-                return from_ts + timedelta(seconds=offset * 60)
-            elif unit == "S":
-                return from_ts + timedelta(seconds=offset)
-
-    raise ValueError(f"Invalid relative ts offset format: {format_string}")
+    return FlexibleDelta.parse(format_string).apply(from_ts, earlier=earlier, calendar=True)
 
 
 def offset_n_months(from_ts, n_months):

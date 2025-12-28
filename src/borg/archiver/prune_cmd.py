@@ -149,7 +149,7 @@ class PruneMixIn:
     def do_prune(self, args, repository, manifest):
         """Prune archives according to specified rules."""
         if all(
-            # Needs explicit None-check as interval arg may be 0 (Falsey)
+            # Needs explicit None-check to cover Falsey timedelta(0)
             e is None
             for e in (
                 args.keep,

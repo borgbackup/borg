@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 from typing import ClassVar, Any, TYPE_CHECKING, Literal
 from collections import OrderedDict
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from functools import partial
 from string import Formatter
 
@@ -24,7 +24,7 @@ logger = create_logger()
 from .errors import Error
 from .fs import get_keys_dir, make_path_safe
 from .msgpack import Timestamp
-from .time import OutputTimestamp, format_time, safe_timestamp
+from .time import OutputTimestamp, format_time, safe_timestamp, FlexibleDelta
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
@@ -161,15 +161,15 @@ def interval(s):
     return seconds
 
 
-def int_or_interval(s):
+def int_or_flexibledelta(s):
     try:
         return int(s)
     except ValueError:
         pass
 
     try:
-        return timedelta(seconds=interval(s))
-    except argparse.ArgumentTypeError as e:
+        return FlexibleDelta.parse(s, fuzzyable=True)
+    except ValueError as e:
         raise argparse.ArgumentTypeError(f"Value is neither an integer nor an interval: {e}")
 
 

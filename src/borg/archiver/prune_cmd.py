@@ -10,7 +10,7 @@ from ._common import with_repository, Highlander
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import interval, int_or_interval, sig_int, archivename_validator
+from ..helpers import interval, int_or_flexibledelta, sig_int, archivename_validator
 from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
 from ..manifest import Manifest
 
@@ -105,11 +105,11 @@ PRUNING_PATTERNS = OrderedDict(
 DATETIME_MIN_WITH_ZONE = datetime.min.replace(tzinfo=timezone.utc)
 
 
-def prune_split(archives, rule, n_or_interval, base_timestamp, kept_because={}):
-    if isinstance(n_or_interval, int):
-        n, earliest_timestamp = n_or_interval, None
+def prune_split(archives, rule, n_or_flexibledelta, base_timestamp, kept_because={}):
+    if isinstance(n_or_flexibledelta, int):
+        n, earliest_timestamp = n_or_flexibledelta, None
     else:
-        n, earliest_timestamp = None, base_timestamp - n_or_interval
+        n, earliest_timestamp = None, n_or_flexibledelta.subtract_from(base_timestamp, calendar=True)
 
     def can_retain(a, keep):
         if n is not None:
@@ -194,9 +194,9 @@ class PruneMixIn:
         base_timestamp = datetime.now().astimezone()
         # find archives which need to be kept because of the various time period rules
         for rule in PRUNING_PATTERNS.keys():
-            num_or_interval = getattr(args, rule, None)
-            if num_or_interval is not None:
-                keep += prune_split(archives, rule, num_or_interval, base_timestamp, kept_because)
+            n_or_flexibledelta = getattr(args, rule, None)
+            if n_or_flexibledelta is not None:
+                keep += prune_split(archives, rule, n_or_flexibledelta, base_timestamp, kept_because)
 
         to_delete = set(archives) - set(keep)
         with Cache(repository, manifest, iec=args.iec) as cache:
@@ -346,21 +346,21 @@ class PruneMixIn:
         subparser.add_argument(
             "--keep",
             dest="keep",
-            type=int_or_interval,
+            type=int_or_flexibledelta,
             action=Highlander,
             help="number or time interval of archives to keep",
         )
         subparser.add_argument(
             "--keep-secondly",
             dest="secondly",
-            type=int_or_interval,
+            type=int_or_flexibledelta,
             action=Highlander,
             help="number or time interval of secondly archives to keep",
         )
         subparser.add_argument(
             "--keep-minutely",
             dest="minutely",
-            type=int_or_interval,
+            type=int_or_flexibledelta,
             action=Highlander,
             help="number or time interval of minutely archives to keep",
         )
@@ -368,7 +368,7 @@ class PruneMixIn:
             "-H",
             "--keep-hourly",
             dest="hourly",
-            type=int_or_interval,
+            type=int_or_flexibledelta,
             action=Highlander,
             help="number or time interval of hourly archives to keep",
         )
@@ -376,7 +376,7 @@ class PruneMixIn:
             "-d",
             "--keep-daily",
             dest="daily",
-            type=int_or_interval,
+            type=int_or_flexibledelta,
             action=Highlander,
             help="number or time interval of daily archives to keep",
         )
@@ -384,7 +384,7 @@ class PruneMixIn:
             "-w",
             "--keep-weekly",
             dest="weekly",
-            type=int_or_interval,
+            type=int_or_flexibledelta,
             action=Highlander,
             help="number or time interval of weekly archives to keep",
         )
@@ -392,7 +392,7 @@ class PruneMixIn:
             "-m",
             "--keep-monthly",
             dest="monthly",
-            type=int_or_interval,
+            type=int_or_flexibledelta,
             action=Highlander,
             help="number or time interval of monthly archives to keep",
         )
@@ -400,20 +400,20 @@ class PruneMixIn:
         quarterly_group.add_argument(
             "--keep-13weekly",
             dest="quarterly_13weekly",
-            type=int_or_interval,
+            type=int_or_flexibledelta,
             help="number or time interval of quarterly archives to keep (13 week strategy)",
         )
         quarterly_group.add_argument(
             "--keep-3monthly",
             dest="quarterly_3monthly",
-            type=int_or_interval,
+            type=int_or_flexibledelta,
             help="number or time interval of quarterly archives to keep (3 month strategy)",
         )
         subparser.add_argument(
             "-y",
             "--keep-yearly",
             dest="yearly",
-            type=int_or_interval,
+            type=int_or_flexibledelta,
             action=Highlander,
             help="number or time interval of yearly archives to keep",
         )

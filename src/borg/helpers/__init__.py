@@ -27,7 +27,7 @@ from .misc import sysinfo, log_multi, consume
 from .misc import ChunkIteratorFileWrapper, open_item, chunkit, iter_separated, ErrorIgnoringTextIOWrapper
 from .parseformat import bin_to_hex, hex_to_bin, safe_encode, safe_decode
 from .parseformat import text_to_json, binary_to_json, remove_surrogates, join_cmd
-from .parseformat import eval_escapes, decode_dict, positive_int_validator, interval, int_or_interval
+from .parseformat import eval_escapes, decode_dict, positive_int_validator, interval, int_or_flexibledelta
 from .parseformat import PathSpec, SortBySpec, ChunkerParams, FilesCacheMode, partial_format, DatetimeWrapper
 from .parseformat import format_file_size, parse_file_size, FileSize
 from .parseformat import sizeof_fmt, sizeof_fmt_iec, sizeof_fmt_decimal, Location, text_validator
@@ -43,7 +43,7 @@ from .process import signal_handler, raising_signal_handler, sig_int, ignore_sig
 from .process import popen_with_error_handling, is_terminal, prepare_subprocess_env, create_filter_process
 from .progress import ProgressIndicatorPercent, ProgressIndicatorMessage
 from .time import parse_timestamp, timestamp, safe_timestamp, safe_s, safe_ns, MAX_S, SUPPORT_32BIT_PLATFORMS
-from .time import format_time, format_timedelta, OutputTimestamp, archive_ts_now
+from .time import format_time, format_timedelta, OutputTimestamp, archive_ts_now, FlexibleDelta
 from .yes_no import yes, TRUISH, FALSISH, DEFAULTISH
 
 from .msgpack import is_slow_msgpack, is_supported_msgpack, get_limited_unpacker

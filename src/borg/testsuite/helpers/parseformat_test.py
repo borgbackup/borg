@@ -2,7 +2,7 @@ import base64
 import os
 import re
 from argparse import ArgumentTypeError
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 
@@ -17,7 +17,7 @@ from ...helpers.parseformat import (
     format_file_size,
     parse_file_size,
     interval,
-    int_or_interval,
+    int_or_flexibledelta,
     partial_format,
     clean_lines,
     format_line,
@@ -27,7 +27,7 @@ from ...helpers.parseformat import (
     eval_escapes,
     ChunkerParams,
 )
-from ...helpers.time import format_timedelta, parse_timestamp
+from ...helpers.time import format_timedelta, parse_timestamp, FlexibleDelta
 
 
 def test_bin_to_hex():
@@ -428,13 +428,14 @@ def test_interval_invalid_time_format(invalid_input, error_regex):
         ("0", 0),
         ("5", 5),
         (" 999 ", 999),
-        ("0S", timedelta(seconds=0)),
-        ("5S", timedelta(seconds=5)),
-        ("1m", timedelta(days=31)),
+        ("0S", FlexibleDelta(count=0, unit="S", fuzzy=False)),
+        ("5S", FlexibleDelta(count=5, unit="S", fuzzy=False)),
+        ("1m", FlexibleDelta(count=1, unit="m", fuzzy=False)),
+        ("1mz", FlexibleDelta(count=1, unit="m", fuzzy=True)),
     ],
 )
-def test_int_or_interval(input, result):
-    assert int_or_interval(input) == result
+def test_int_or_flexibledelta(input, result):
+    assert int_or_flexibledelta(input) == result
 
 
 @pytest.mark.parametrize(
@@ -445,9 +446,9 @@ def test_int_or_interval(input, result):
         ("food", r"Value is neither an integer nor an interval:"),
     ],
 )
-def test_int_or_interval_time_unit(invalid_input, error_regex):
+def test_int_or_flexibledelta_time_unit(invalid_input, error_regex):
     with pytest.raises(ArgumentTypeError) as exc:
-        int_or_interval(invalid_input)
+        int_or_flexibledelta(invalid_input)
     assert re.search(error_regex, exc.value.args[0])
 
 

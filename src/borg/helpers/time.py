@@ -165,12 +165,21 @@ class FlexibleDelta:
     def __repr__(self):
         return f'{self.__class__.__name__}(count={self.count}, unit="{self.unit}", fuzzy={self.fuzzy})'
 
+    def __eq__(self, other):
+        if not isinstance(other, FlexibleDelta):
+            return NotImplemented
+        return (self.count, self.unit, self.fuzzy) == (other.count, other.unit, other.fuzzy)
+
     _interval_regex = re.compile(r"^(?P<count>\d+)(?P<unit>[ymwdHMS])(?P<fuzzy>z)?$")
 
     @classmethod
     def parse(cls, interval_string, fuzzyable=False):
         """
-        Parse interval string into
+        Parse interval string into FlexibleDelta on a form like "1w", "25d", or "6Hz" where the unit is one of "y"
+        (years), "m" (months), "w" (weeks), "d" (days), "H" (hours), "M" (minutes), "S" (seconds). A trailing "z"
+        indicates a fuzzy delta (if fuzzyable is True) which is calculated as "apply delta and then take either the
+        start or end of the current unit's interval" -- subtracting "1dz" means subtracting 1 day and then adjusting to
+        the start of that day.
         """
         match = cls._interval_regex.search(interval_string)
 

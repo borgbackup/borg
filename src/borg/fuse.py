@@ -1,3 +1,18 @@
+"""
+FUSE filesystem implementation for `borg mount`.
+
+IMPORTANT
+=========
+
+This code is only safe for single-threaded and synchronous (non-async) usage.
+
+- llfuse is synchronous and used with workers=1, so there is only 1 thread,
+  and we are safe.
+- pyfuse3 uses Trio, which only uses 1 thread, but could use this code in an
+  asynchronous manner. However, as long as we do not use any asynchronous
+  operations (like using "await") in this code, it is still de facto
+  synchronous, and we are safe.
+"""
 import errno
 import functools
 import io

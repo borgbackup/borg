@@ -162,7 +162,7 @@ class ItemCache:
         for key, (csize, data) in zip(archive_item_ids, self.decrypted_repository.get_many(archive_item_ids)):
             # Store the chunk ID in the meta-array
             if write_offset + 32 >= len(meta):
-                self.meta = meta = meta + bytes(self.GROW_META_BY)
+                meta.extend(bytes(self.GROW_META_BY))
             meta[write_offset:write_offset + 32] = key
             current_id_offset = write_offset
             write_offset += 32
@@ -200,7 +200,7 @@ class ItemCache:
                 msgpacked_bytes = b''
 
                 if write_offset + 9 >= len(meta):
-                    self.meta = meta = meta + bytes(self.GROW_META_BY)
+                    meta.extend(bytes(self.GROW_META_BY))
 
                 # item entries in the meta-array come in two different flavours, both nine bytes long.
                 # (1) for items that span chunks:

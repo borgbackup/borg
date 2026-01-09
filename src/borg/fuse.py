@@ -567,6 +567,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                                 user=dir_user, group=dir_group, uid=dir_uid, gid=dir_gid)
         self._create_filesystem()
         llfuse.init(self, mountpoint, options)
+        logger.warn('the mounted archive may contain symlinks that point outside the archive tree. When following such symlinks you may see files that are not part of the archive,or different versions of files than those stored in the archive.')
         if not foreground:
             if isinstance(self.repository_uncached, RemoteRepository):
                 daemonize()

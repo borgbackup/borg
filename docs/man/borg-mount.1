@@ -45,11 +45,6 @@ When mounting a repository, the top directories will be named like the
 archives and the directory structure below these will be loaded on\-demand from
 the repository when entering these directories, so expect some delay.
 .sp
-Care should be taken, as borg will backup symlinks as is,
-and when having mounted an archive or repository,
-it is possible to "jump" out of the mountpoint by following a symlink.
-As of version 1.4.4 borg will print a warning when mounting for this reason.
-.sp
 Unless the \fB\-\-foreground\fP option is given the command will run in the
 background until the filesystem is \fBunmounted\fP\&.
 .sp

@@ -3231,8 +3231,6 @@ class Archiver:
         or repository is mounted, it is possible to “jump” outside the mount point 
         by following a symlink. If this happens, files or directories (or versions of them)
         that are not part of the archive or repository may appear to be within the mount point.
-        To avoid this behavior, it is recommended to use ``borg extract`` 
-        to retrieve files from backups.
 
         Unless the ``--foreground`` option is given the command will run in the
         background until the filesystem is ``unmounted``.

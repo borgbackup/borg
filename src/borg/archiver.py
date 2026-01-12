@@ -3227,6 +3227,11 @@ class Archiver:
         archives and the directory structure below these will be loaded on-demand from
         the repository when entering these directories, so expect some delay.
 
+        Care should be taken, as Borg backs up symlinks as-is. When an archive 
+        or repository is mounted, it is possible to “jump” outside the mount point 
+        by following a symlink. If this happens, files or directories (or versions of them)
+        that are not part of the archive or repository may appear to be within the mount point.
+
         Unless the ``--foreground`` option is given the command will run in the
         background until the filesystem is ``unmounted``.
 

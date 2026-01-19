@@ -567,7 +567,8 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         llfuse.init(self, mountpoint, options)
         logger.warning(
             "Warning: The mounted archive is capable of containing symlinks that point outside the archive tree.\
-            When following such symlinks you may see files and directories within the mountpoint that do not reflect the archive content."
+            When following such symlinks you may see files and directories within the mountpoint\
+            that do not reflect the archive content."
         )
         if not foreground:
             if isinstance(self.repository_uncached, RemoteRepository):

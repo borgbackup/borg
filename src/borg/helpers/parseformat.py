@@ -24,7 +24,7 @@ logger = create_logger()
 from .errors import Error
 from .fs import get_keys_dir, make_path_safe
 from .msgpack import Timestamp
-from .time import OutputTimestamp, format_time, safe_timestamp
+from .time import OutputTimestamp, format_time, safe_timestamp, FlexibleDelta
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
@@ -155,10 +155,22 @@ def interval(s):
     except ValueError:
         seconds = -1
 
-    if seconds <= 0:
-        raise argparse.ArgumentTypeError(f'Invalid number "{number}": expected positive integer')
+    if seconds < 0:
+        raise argparse.ArgumentTypeError(f'Invalid number "{number}": expected nonnegative integer')
 
     return seconds
+
+
+def int_or_flexibledelta(s):
+    try:
+        return int(s)
+    except ValueError:
+        pass
+
+    try:
+        return FlexibleDelta.parse(s, fuzzyable=True)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"Value is neither an integer nor an interval: {e}")
 
 
 def ChunkerParams(s):

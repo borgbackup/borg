@@ -2406,8 +2406,8 @@ class Archiver:
     def do_debug_convert_profile(self, args):
         """convert Borg profile to Python profile"""
         import marshal
-        with args.output, args.input:
-            marshal.dump(msgpack.unpack(args.input, use_list=False, raw=False), args.output)
+        with open(args.input, 'rb') as input_file, open(args.output, 'wb') as output_file:
+            marshal.dump(msgpack.unpack(input_file, use_list=False, raw=False), output_file)
 
     @with_repository(lock=False, manifest=False)
     def do_break_lock(self, args, repository):
@@ -3227,8 +3227,8 @@ class Archiver:
         archives and the directory structure below these will be loaded on-demand from
         the repository when entering these directories, so expect some delay.
 
-        Care should be taken, as Borg backs up symlinks as-is. When an archive 
-        or repository is mounted, it is possible to “jump” outside the mount point 
+        Care should be taken, as Borg backs up symlinks as-is. When an archive
+        or repository is mounted, it is possible to “jump” outside the mount point
         by following a symlink. If this happens, files or directories (or versions of them)
         that are not part of the archive or repository may appear to be within the mount point.
 
@@ -4140,10 +4140,8 @@ class Archiver:
                                           formatter_class=argparse.RawDescriptionHelpFormatter,
                                           help='convert Borg profile to Python profile (debug)')
         subparser.set_defaults(func=self.do_debug_convert_profile)
-        subparser.add_argument('input', metavar='INPUT', type=argparse.FileType('rb'),
-                               help='Borg profile')
-        subparser.add_argument('output', metavar='OUTPUT', type=argparse.FileType('wb'),
-                               help='Output file')
+        subparser.add_argument('input', metavar='INPUT', type=str, help='Borg profile')
+        subparser.add_argument('output', metavar='OUTPUT', type=str, help='Output file')
 
         # borg delete
         delete_epilog = process_epilog("""

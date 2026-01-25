@@ -14,3 +14,4 @@ pytest-benchmark
 Cython
 pre-commit
 bandit[toml]
+boto3

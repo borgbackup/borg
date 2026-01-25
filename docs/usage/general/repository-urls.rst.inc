@@ -38,6 +38,8 @@ If you are connecting to AWS S3, ``[schema://hostname[:port]]`` is optional, but
 
 Note: There is a known issue with some S3-compatible services, e.g., Backblaze B2. If you encounter problems, try using ``b2:`` instead of ``s3:`` in the URL.
 
+Note: ``boto3`` is required to use s3 repositories. Install it with `pip install boto3` in your venv
+
 
 If you frequently need the same repository URL, it is a good idea to set the
 ``BORG_REPO`` environment variable to set a default repository URL:

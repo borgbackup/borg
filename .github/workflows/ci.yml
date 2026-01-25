@@ -583,14 +583,15 @@ jobs:
           # build borg.exe
           . env/bin/activate
           pip install -e .
-          pyinstaller -y scripts/borg.exe.spec
+          mkdir -p dist/binary
+          pyinstaller -y --clean --distpath=dist/binary scripts/borg.exe.spec
           # build sdist and wheel in dist/...
           python -m build
 
       - uses: actions/upload-artifact@v4
         with:
           name: borg-windows
-          path: dist/borg.exe
+          path: dist/binary/borg.exe
 
       - name: Run tests
         run: |

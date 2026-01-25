@@ -3,6 +3,7 @@ import sys
 import argparse
 import logging
 import os
+import posixpath
 import stat
 import subprocess
 import time
@@ -16,11 +17,11 @@ from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProce
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
-from ..helpers import comment_validator, ChunkerParams, PathSpec
+from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec
 from ..helpers import archivename_validator, FilesCacheMode
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
-from ..helpers import get_cache_dir, os_stat, get_strip_prefix
+from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
 from ..helpers import dir_is_tagged
 from ..helpers import log_multi
 from ..helpers import basic_json_data, json_print
@@ -106,8 +107,9 @@ class CreateMixIn:
                     pipe_bin = sys.stdin.buffer
                 pipe = TextIOWrapper(pipe_bin, errors="surrogateescape")
                 for path in iter_separated(pipe, paths_sep):
+                    path = slashify(path)
                     strip_prefix = get_strip_prefix(path)
-                    path = os.path.normpath(path)
+                    path = posixpath.normpath(path)
                     try:
                         with backup_io("stat"):
                             st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)
@@ -160,7 +162,7 @@ class CreateMixIn:
                         continue
 
                     strip_prefix = get_strip_prefix(path)
-                    path = os.path.normpath(path)
+                    path = posixpath.normpath(path)
                     try:
                         with backup_io("stat"):
                             st = os_stat(path=path, parent_fd=None, name=None, follow_symlinks=False)
@@ -489,7 +491,7 @@ class CreateMixIn:
                                             path=path, fd=child_fd, st=st, strip_prefix=strip_prefix
                                         )
                                     for tag_name in tag_names:
-                                        tag_path = os.path.join(path, tag_name)
+                                        tag_path = posixpath.join(path, tag_name)
                                         self._rec_walk(
                                             path=tag_path,
                                             parent_fd=child_fd,
@@ -523,7 +525,7 @@ class CreateMixIn:
                         with backup_io("scandir"):
                             entries = helpers.scandir_inorder(path=path, fd=child_fd)
                         for dirent in entries:
-                            normpath = os.path.normpath(os.path.join(path, dirent.name))
+                            normpath = posixpath.normpath(posixpath.join(path, dirent.name))
                             self._rec_walk(
                                 path=normpath,
                                 parent_fd=child_fd,
@@ -962,5 +964,5 @@ class CreateMixIn:
 
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument(
-            "paths", metavar="PATH", nargs="*", type=PathSpec, action="extend", help="paths to archive"
+            "paths", metavar="PATH", nargs="*", type=FilesystemPathSpec, action="extend", help="paths to archive"
         )

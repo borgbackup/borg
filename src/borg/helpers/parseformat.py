@@ -22,12 +22,13 @@ from ..logger import create_logger
 logger = create_logger()
 
 from .errors import Error
-from .fs import get_keys_dir, make_path_safe
+from .fs import get_keys_dir, make_path_safe, slashify
 from .msgpack import Timestamp
 from .time import OutputTimestamp, format_time, safe_timestamp
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
+from ..platformflags import is_win32
 
 if TYPE_CHECKING:
     from ..item import ItemDiff
@@ -334,6 +335,12 @@ def PathSpec(text):
     return text
 
 
+def FilesystemPathSpec(text):
+    if not text:
+        raise argparse.ArgumentTypeError("Empty strings are not accepted as paths.")
+    return slashify(text)
+
+
 def SortBySpec(text):
     from ..manifest import AI_HUMAN_SORT_KEYS
 
@@ -557,7 +564,8 @@ class Location:
         m = self.local_re.match(text)
         if m:
             self.proto = "file"
-            self.path = os.path.abspath(os.path.normpath(m.group("path")))
+            path = m.group("path")
+            self.path = slashify(os.path.abspath(path)) if is_win32 else os.path.abspath(path)
             return True
         return False
 

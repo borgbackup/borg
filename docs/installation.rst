@@ -180,6 +180,10 @@ development header files (sometimes in a separate `-dev` or `-devel` package).
   - llfuse_ >= 1.3.8 (for fuse 2, use `pip install borgbackup[llfuse]`).
   - Additionally, your OS will need to have FUSE support installed
     (e.g. a package `fuse` for fuse 2 or a package `fuse3` for fuse 3 support).
+* Optionally, if you wish to use S3/B2 Backend:
+  - borgstore[s3] ~= 0.3.0 (use `pip install borgbackup[s3]`)
+* Optionally, if you wish to use SFTP Backend:
+  - borgstore[sftp] ~= 0.3.0 (use `pip install borgbackup[sftp]`)
 
 If you have troubles finding the right package names, have a look at the
 distribution specific sections below or the Vagrantfile in the git repository,

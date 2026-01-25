@@ -1705,12 +1705,23 @@ class Archiver:
             elif uncommitted_deletes > 0:
                 checkpoint_func()
             if args.stats:
+                stats_logger = logging.getLogger('borg.output.stats')
+                stats_logger.info('Archive counts:')
+                stats_logger.info('Number of archives:                %d', len(manifest.archives))
+                
+                if args.glob_archives:
+                    stats_logger.info('Number of archives matching pattern: %d', len(archives_checkpoints))
+                
+                stats_logger.info('Number of archives kept:           %d', len(archives_checkpoints) - len(to_delete))
+                stats_logger.info('Number of archives pruned:         %d', len(to_delete))
+                stats_logger.info(' ')  
+
                 log_multi(DASHES,
                           STATS_HEADER,
                           stats.summary.format(label='Deleted data:', stats=stats),
                           str(cache),
                           DASHES, logger=logging.getLogger('borg.output.stats'))
-
+    
     @with_repository(fake=('tam', 'check_tam', 'disable_tam', 'archives_tam', 'check_archives_tam'), invert_fake=True, manifest=False, exclusive=True)
     def do_upgrade(self, args, repository, manifest=None, key=None):
         """upgrade a repository from a previous version"""

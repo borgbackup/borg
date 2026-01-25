@@ -20,7 +20,7 @@ from .errors import BackupPermissionError, BackupIOError, BackupFileNotFoundErro
 from .fs import ensure_dir, join_base_dir, get_socket_filename
 from .fs import get_security_dir, get_keys_dir, get_base_dir, get_cache_dir, get_config_dir, get_runtime_dir
 from .fs import dir_is_tagged, dir_is_cachedir, remove_dotdot_prefixes, make_path_safe, scandir_inorder
-from .fs import secure_erase, safe_unlink, dash_open, os_open, os_stat, get_strip_prefix, umount
+from .fs import secure_erase, safe_unlink, dash_open, os_open, os_stat, get_strip_prefix, umount, slashify
 from .fs import O_, flags_dir, flags_special_follow, flags_special, flags_base, flags_normal, flags_noatime
 from .fs import HardLinkManager
 from .misc import sysinfo, log_multi, consume
@@ -28,7 +28,15 @@ from .misc import ChunkIteratorFileWrapper, open_item, chunkit, iter_separated, 
 from .parseformat import bin_to_hex, hex_to_bin, safe_encode, safe_decode
 from .parseformat import text_to_json, binary_to_json, remove_surrogates, join_cmd
 from .parseformat import eval_escapes, decode_dict, positive_int_validator, interval
-from .parseformat import PathSpec, SortBySpec, ChunkerParams, FilesCacheMode, partial_format, DatetimeWrapper
+from .parseformat import (
+    PathSpec,
+    FilesystemPathSpec,
+    SortBySpec,
+    ChunkerParams,
+    FilesCacheMode,
+    partial_format,
+    DatetimeWrapper,
+)
 from .parseformat import format_file_size, parse_file_size, FileSize
 from .parseformat import sizeof_fmt, sizeof_fmt_iec, sizeof_fmt_decimal, Location, text_validator
 from .parseformat import format_line, replace_placeholders, PlaceholderError, relative_time_marker_validator

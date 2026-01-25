@@ -1,7 +1,6 @@
 import sys
 import argparse
 import logging
-import os
 import stat
 
 from ._common import with_repository, with_archive
@@ -60,7 +59,7 @@ class ExtractMixIn:
         for item in archive.iter_items():
             orig_path = item.path
             if strip_components:
-                stripped_path = os.sep.join(orig_path.split(os.sep)[strip_components:])
+                stripped_path = "/".join(orig_path.split("/")[strip_components:])
                 if not stripped_path:
                     continue
                 item.path = stripped_path

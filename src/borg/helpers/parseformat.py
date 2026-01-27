@@ -18,6 +18,7 @@ from functools import partial
 from string import Formatter
 
 from ..logger import create_logger
+from ..platformflags import is_win32
 
 logger = create_logger()
 
@@ -453,8 +454,8 @@ class Location:
         (?P<path>.+)
     """
 
-    # abs_path must start with a slash.
-    abs_path_re = r"(?P<path>/.+)"
+    # abs_path must start with a slash (or drive letter on Windows).
+    abs_path_re = r"(?P<path>[A-Za-z]:/.+)" if is_win32 else r"(?P<path>/.+)"
 
     # path may or may not start with a slash.
     abs_or_rel_path_re = r"(?P<path>.+)"
@@ -493,7 +494,8 @@ class Location:
 
     rclone_re = re.compile(r"(?P<proto>rclone):(?P<path>(.*))", re.VERBOSE)
 
-    file_or_socket_re = re.compile(r"(?P<proto>(file|socket))://" + abs_path_re, re.VERBOSE)
+    sl = "/" if is_win32 else ""
+    file_or_socket_re = re.compile(r"(?P<proto>(file|socket))://" + sl + abs_path_re, re.VERBOSE)
 
     local_re = re.compile(local_path_re, re.VERBOSE)
 

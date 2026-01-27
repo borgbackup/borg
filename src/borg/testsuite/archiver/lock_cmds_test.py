@@ -8,7 +8,7 @@ import pytest
 from ...constants import *  # NOQA
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 from ...helpers import CommandError
-from ...platformflags import is_haiku
+from ...platformflags import is_haiku, is_win32
 from ...repository import _local_abspath_to_file_url
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
@@ -20,7 +20,7 @@ def test_break_lock(archivers, request):
     cmd(archiver, "break-lock")
 
 
-@pytest.mark.skipif(is_haiku, reason="does not find borg python module on Haiku OS")
+@pytest.mark.skipif(is_haiku or is_win32, reason="does not find borg python module on Haiku OS and Windows")
 def test_with_lock(tmp_path):
     repo_path = tmp_path / "repo"
     env = os.environ.copy()

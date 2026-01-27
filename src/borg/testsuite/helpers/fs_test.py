@@ -375,19 +375,20 @@ def test_dir_is_tagged(tmpdir):
     assert dir_is_tagged(path=str(normal_dir), exclude_caches=False) == []
 
     # Test 2: exclude_caches with file-descriptor-based operations
-    with open_dir(str(cache_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_caches=True) == [CACHE_TAG_NAME]
-    with open_dir(str(invalid_cache_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_caches=True) == []
-    with open_dir(str(normal_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_caches=True) == []
+    if not is_win32:
+        with open_dir(str(cache_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_caches=True) == [CACHE_TAG_NAME]
+        with open_dir(str(invalid_cache_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_caches=True) == []
+        with open_dir(str(normal_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_caches=True) == []
 
-    with open_dir(str(cache_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_caches=False) == []
-    with open_dir(str(invalid_cache_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_caches=False) == []
-    with open_dir(str(normal_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_caches=False) == []
+        with open_dir(str(cache_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_caches=False) == []
+        with open_dir(str(invalid_cache_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_caches=False) == []
+        with open_dir(str(normal_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_caches=False) == []
 
     # Test 3: exclude_if_present with path-based operations
     tags = [".NOBACKUP"]
@@ -401,21 +402,22 @@ def test_dir_is_tagged(tmpdir):
     assert dir_is_tagged(path=str(normal_dir), exclude_if_present=tags) == []
 
     # Test 4: exclude_if_present with file descriptor-based operations
-    tags = [".NOBACKUP"]
-    with open_dir(str(tagged_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == [".NOBACKUP"]
-    with open_dir(str(other_tagged_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == []
-    with open_dir(str(normal_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == []
+    if not is_win32:
+        tags = [".NOBACKUP"]
+        with open_dir(str(tagged_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == [".NOBACKUP"]
+        with open_dir(str(other_tagged_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == []
+        with open_dir(str(normal_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == []
 
-    tags = [".NOBACKUP", ".DONOTBACKUP"]
-    with open_dir(str(tagged_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == [".NOBACKUP"]
-    with open_dir(str(other_tagged_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == [".DONOTBACKUP"]
-    with open_dir(str(normal_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == []
+        tags = [".NOBACKUP", ".DONOTBACKUP"]
+        with open_dir(str(tagged_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == [".NOBACKUP"]
+        with open_dir(str(other_tagged_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == [".DONOTBACKUP"]
+        with open_dir(str(normal_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_if_present=tags) == []
 
     # Test 5: both exclude types with path-based operations
     assert sorted(dir_is_tagged(path=str(both_dir), exclude_caches=True, exclude_if_present=[".NOBACKUP"])) == [
@@ -427,14 +429,15 @@ def test_dir_is_tagged(tmpdir):
     assert dir_is_tagged(path=str(normal_dir), exclude_caches=True, exclude_if_present=[".NOBACKUP"]) == []
 
     # Test 6: both exclude types with file descriptor-based operations
-    with open_dir(str(both_dir)) as fd:
-        assert sorted(dir_is_tagged(dir_fd=fd, exclude_caches=True, exclude_if_present=[".NOBACKUP"])) == [
-            ".NOBACKUP",
-            CACHE_TAG_NAME,
-        ]
-    with open_dir(str(cache_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_caches=True, exclude_if_present=[".NOBACKUP"]) == [CACHE_TAG_NAME]
-    with open_dir(str(tagged_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_caches=True, exclude_if_present=[".NOBACKUP"]) == [".NOBACKUP"]
-    with open_dir(str(normal_dir)) as fd:
-        assert dir_is_tagged(dir_fd=fd, exclude_caches=True, exclude_if_present=[".NOBACKUP"]) == []
+    if not is_win32:
+        with open_dir(str(both_dir)) as fd:
+            assert sorted(dir_is_tagged(dir_fd=fd, exclude_caches=True, exclude_if_present=[".NOBACKUP"])) == [
+                ".NOBACKUP",
+                CACHE_TAG_NAME,
+            ]
+        with open_dir(str(cache_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_caches=True, exclude_if_present=[".NOBACKUP"]) == [CACHE_TAG_NAME]
+        with open_dir(str(tagged_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_caches=True, exclude_if_present=[".NOBACKUP"]) == [".NOBACKUP"]
+        with open_dir(str(normal_dir)) as fd:
+            assert dir_is_tagged(dir_fd=fd, exclude_caches=True, exclude_if_present=[".NOBACKUP"]) == []

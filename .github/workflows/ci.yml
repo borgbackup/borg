@@ -305,6 +305,8 @@ jobs:
         ./borg-dir/borg.exe -V
         tar czf borg.tgz borg-dir
         popd
+        # Ensure locally built binary in ./dist/binary/borg-dir is found during tests
+        export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
         echo "borg.exe binary in PATH"
         borg.exe -V
 

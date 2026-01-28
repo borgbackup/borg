@@ -18,7 +18,6 @@ from functools import partial
 from string import Formatter
 
 from ..logger import create_logger
-from ..platformflags import is_win32
 
 logger = create_logger()
 

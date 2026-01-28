@@ -21,6 +21,7 @@ a = Analysis([os.path.join(basepath, 'src', 'borg', '__main__.py'), ],
              binaries=[],
              datas=[
                 (os.path.join(basepath, 'src', 'borg', 'paperkey.html'), 'borg'),
+                (os.path.join(basepath, 'src', 'borg', 'cockpit', 'cockpit.tcss'), os.path.join('borg', 'cockpit')),
              ],
              hiddenimports=hiddenimports,
              hookspath=[],

@@ -32,9 +32,10 @@ For SSH and SFTP URLs, the ``user@`` and ``:port`` parts are optional.
 
 **Remote repositories** accessed via S3:
 
-``(s3|b2):[profile|(access_key_id:access_key_secret)@][schema://hostname[:port]]/bucket/path`` — see the boto3 docs for more details about credentials.
+``(s3|b2):[(profile|(access_key_id:access_key_secret))@][scheme://hostname[:port]]/bucket/path`` — see the boto3 docs for more details about credentials.
 
 If you are connecting to AWS S3, ``[schema://hostname[:port]]`` is optional, but ``bucket`` and ``path`` are always required.
+`scheme` is usually `https` here, hostname and optional port refer to your S3/B2 server, if that is not Amazon's.
 
 Note: There is a known issue with some S3-compatible services, e.g., Backblaze B2. If you encounter problems, try using ``b2:`` instead of ``s3:`` in the URL.
 

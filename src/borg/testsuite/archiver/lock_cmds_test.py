@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 import pytest
 
@@ -9,7 +10,6 @@ from ...constants import *  # NOQA
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 from ...helpers import CommandError
 from ...platformflags import is_haiku, is_win32
-from ...repository import _local_abspath_to_file_url
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -24,7 +24,7 @@ def test_break_lock(archivers, request):
 def test_with_lock(tmp_path):
     repo_path = tmp_path / "repo"
     env = os.environ.copy()
-    env["BORG_REPO"] = _local_abspath_to_file_url(str(repo_path.absolute()))
+    env["BORG_REPO"] = Path(repo_path).as_uri()
     # test debug output:
     print("sys.path: %r" % sys.path)
     print("PYTHONPATH: %s" % env.get("PYTHONPATH", ""))

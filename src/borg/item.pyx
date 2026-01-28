@@ -7,7 +7,7 @@ from cpython.bytes cimport PyBytes_AsStringAndSize
 from .constants import ITEM_KEYS, ARCHIVE_KEYS
 from .helpers import StableDict
 from .helpers import format_file_size
-from .helpers.fs import assert_sanitized_path, to_sanitized_path
+from .helpers.fs import assert_sanitized_path, to_sanitized_path, percentify, slashify
 from .helpers.msgpack import timestamp_to_int, int_to_timestamp, Timestamp
 from .helpers.time import OutputTimestamp, safe_timestamp
 
@@ -265,7 +265,7 @@ cdef class Item(PropDict):
 
     path = PropDictProperty(str, 'surrogate-escaped str', encode=assert_sanitized_path, decode=to_sanitized_path)
     source = PropDictProperty(str, 'surrogate-escaped str')  # legacy borg 1.x. borg 2: see .target
-    target = PropDictProperty(str, 'surrogate-escaped str')
+    target = PropDictProperty(str, 'surrogate-escaped str', encode=slashify, decode=percentify)
     user = PropDictProperty(str, 'surrogate-escaped str')
     group = PropDictProperty(str, 'surrogate-escaped str')
 

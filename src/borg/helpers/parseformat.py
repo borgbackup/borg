@@ -471,7 +471,7 @@ class Location:
         re.VERBOSE,
     )
 
-    # (s3|b2):[profile|(access_key_id:access_key_secret)@][schema://hostname[:port]]/bucket/path
+    # (s3|b2):[(profile|(access_key_id:access_key_secret))@][scheme://hostname[:port]]/bucket/path
     s3_re = re.compile(
         r"""
         (?P<s3type>(s3|b2)):
@@ -481,7 +481,7 @@ class Location:
             (?P<access_key_id>[^:@]+):(?P<access_key_secret>[^@]+)  # access key and secret
         )@)?  # optional authentication
         (
-            [^:/]+://  # scheme
+            [^:/]+://  # scheme (often https)
             (?P<hostname>[^:/]+)
             (:(?P<port>\d+))?
         )?  # optional endpoint

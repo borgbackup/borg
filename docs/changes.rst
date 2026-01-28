@@ -144,8 +144,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b20 (2025-12-24)
------------------------------
+Version 2.0.0b21 (not released yet)
+-----------------------------------
 
 Please note:
 
@@ -153,6 +153,35 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- ...
+
+Fixes:
+
+- fix file: URL parsing for windows
+
+  - Linux: /abs/path -> file:///abs/path
+  - Windows: c:/abs/path -> file:///c:/abs/path
+
+Other changes:
+
+- mount: warn about symlinks pointing outside of the mountpoint, #9254
+- Version: do not access private attributes, #9263
+- tests / CI:
+
+  - fix and re-enable Windows CI (some tests are skipped on Windows)
+  - CI: faster with borg-dir/borg.exe, #9236
+  - fix mismatch in xattr test, #9238
+- docs:
+
+  - fix S3 url description, #9249
+  - add a note that you need to install boto3 if you want to use S3/B2 URLs
+
+
+Version 2.0.0b20 (2025-12-24)
+-----------------------------
 
 New features:
 

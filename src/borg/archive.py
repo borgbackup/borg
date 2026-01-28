@@ -1159,7 +1159,7 @@ class MetadataCollector:
         self.noxattrs = noxattrs
         self.nobirthtime = nobirthtime
 
-    def stat_simple_attrs(self, st, path, fd=None):
+    def stat_simple_attrs(self, st, path, fd=None, st_before_open=None):
         attrs = dict(
             mode=st.st_mode,
             uid=st.st_uid,
@@ -1170,7 +1170,13 @@ class MetadataCollector:
         # atime/ctime). it can be useful to omit atime/ctime, if they change without the
         # file content changing - e.g. to get better metadata deduplication.
         if not self.noatime:
-            attrs['atime'] = safe_ns(st.st_atime_ns)
+            # If a pre-open stat result was provided and it refers to same fs object,
+            # then preserve the original atime. Avoid race conditions.
+            if st_before_open is not None and st_before_open.st_ino == st.st_ino:
+                atime = min(st_before_open.st_atime_ns, st.st_atime_ns)
+            else:
+                atime = st.st_atime_ns
+            attrs['atime'] = safe_ns(atime)
         if not self.noctime:
             attrs['ctime'] = safe_ns(st.st_ctime_ns)
         if not self.nobirthtime:
@@ -1205,8 +1211,8 @@ class MetadataCollector:
                         raise
         return attrs
 
-    def stat_attrs(self, st, path, fd=None):
-        attrs = self.stat_simple_attrs(st, path, fd=fd)
+    def stat_attrs(self, st, path, fd=None, st_before_open=None):
+        attrs = self.stat_simple_attrs(st, path, fd=fd, st_before_open=st_before_open)
         attrs.update(self.stat_ext_attrs(st, path, fd=fd))
         return attrs
 
@@ -1454,10 +1460,14 @@ class FilesystemObjectProcessors:
         with self.create_helper(path, st, None, strip_prefix=strip_prefix) as (item, status, hardlinked, hardlink_master):  # no status yet
             if item is None:
                 return status
+            # Remember the filename-based stat result we obtained before opening the file.
+            # On platforms without O_NOATIME, merely opening a file for reading can update
+            # the atime. We want to store the original atime as seen before opening.
+            st_before_open = st
             with OsOpen(path=path, parent_fd=parent_fd, name=name, flags=flags, noatime=True) as fd:
                 with backup_io('fstat'):
-                    st = stat_update_check(st, os.fstat(fd))
-                item.update(self.metadata_collector.stat_simple_attrs(st, path, fd=fd))
+                    st = stat_update_check(st_before_open, os.fstat(fd))
+                item.update(self.metadata_collector.stat_simple_attrs(st, path, fd=fd, st_before_open=st_before_open))
                 is_special_file = is_special(st.st_mode)
                 if is_special_file:
                     # we process a special file like a regular file. reflect that in mode,

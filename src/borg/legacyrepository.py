@@ -27,6 +27,7 @@ from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
 from .repoobj import RepoObj
 from .checksums import crc32, StreamingXXH64
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
+from .repository import _local_abspath_to_file_url
 
 logger = create_logger(__name__)
 
@@ -191,7 +192,7 @@ class LegacyRepository:
 
     def __init__(self, path, create=False, exclusive=False, lock_wait=None, lock=True, send_log_cb=None):
         self.path = os.path.abspath(path)
-        self._location = Location("file://%s" % self.path)
+        self._location = Location(_local_abspath_to_file_url(self.path))
         self.version = None
         # long-running repository methods which emit log or progress output are responsible for calling
         # the ._send_log method periodically to get log and progress output transferred to the borg client

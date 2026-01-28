@@ -4,6 +4,7 @@ import pytest
 
 from borgstore.store import Store
 
+from ..repository import _local_abspath_to_file_url
 from ..storelocking import Lock, NotLocked, LockTimeout
 
 ID1 = "foo", 1, 1
@@ -11,8 +12,9 @@ ID2 = "bar", 2, 2
 
 
 @pytest.fixture()
-def lockstore(tmpdir):
-    store = Store("file://" + str(tmpdir / "lockstore"), levels={"locks/": [0]})
+def lockstore(tmp_path):
+    lockstore_path = tmp_path / "lockstore"
+    store = Store(_local_abspath_to_file_url(str(lockstore_path.absolute())), levels={"locks/": [0]})
     store.create()
     with store:
         yield store

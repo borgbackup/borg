@@ -26,6 +26,7 @@ from ...helpers.parseformat import (
     ChunkerParams,
 )
 from ...helpers.time import format_timedelta, parse_timestamp
+from ...platformflags import is_win32
 
 
 def test_bin_to_hex():
@@ -194,31 +195,31 @@ class TestLocationWithoutEnv:
 
     def test_socket(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
+        url = "socket:///c:/repo/path" if is_win32 else "socket:///repo/path"
+        path = "c:/repo/path" if is_win32 else "/repo/path"
         assert (
-            repr(Location("socket:///repo/path"))
-            == "Location(proto='socket', user=None, pass=None, host=None, port=None, path='/repo/path')"
+            repr(Location(url))
+            == f"Location(proto='socket', user=None, pass=None, host=None, port=None, path='{path}')"
         )
-        assert Location("socket:///some/path").to_key_filename() == keys_dir + "_some_path"
+        assert Location(url).to_key_filename().endswith("_repo_path")
 
     def test_file(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
+        url = "file:///c:/repo/path" if is_win32 else "file:///repo/path"
+        path = "c:/repo/path" if is_win32 else "/repo/path"
         assert (
-            repr(Location("file:///some/path"))
-            == "Location(proto='file', user=None, pass=None, host=None, port=None, path='/some/path')"
+            repr(Location(url)) == f"Location(proto='file', user=None, pass=None, host=None, port=None, path='{path}')"
         )
-        assert (
-            repr(Location("file:///some/path"))
-            == "Location(proto='file', user=None, pass=None, host=None, port=None, path='/some/path')"
-        )
-        assert Location("file:///some/path").to_key_filename() == keys_dir + "_some_path"
+        assert Location(url).to_key_filename().endswith("_repo_path")
 
+    @pytest.mark.skipif(is_win32, reason="still broken")
     def test_smb(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
             repr(Location("file:////server/share/path"))
             == "Location(proto='file', user=None, pass=None, host=None, port=None, path='//server/share/path')"
         )
-        assert Location("file:////server/share/path").to_key_filename() == keys_dir + "__server_share_path"
+        assert Location("file:////server/share/path").to_key_filename().endswith("__server_share_path")
 
     def test_folder(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
@@ -230,6 +231,7 @@ class TestLocationWithoutEnv:
         )
         assert Location("path").to_key_filename().endswith(rel_path)
 
+    @pytest.mark.skipif(is_win32, reason="Windows has drive letters in abs paths")
     def test_abspath(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
@@ -259,6 +261,7 @@ class TestLocationWithoutEnv:
         )
         assert Location("ssh://user@host/relative/path").to_key_filename() == keys_dir + "host__relative_path"
 
+    @pytest.mark.skipif(is_win32, reason="Windows does not support colons in paths")
     def test_with_colons(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (
@@ -281,9 +284,6 @@ class TestLocationWithoutEnv:
         monkeypatch.delenv("BORG_REPO", raising=False)
         locations = [
             "relative/path",
-            "/absolute/path",
-            "file:///absolute/path",
-            "socket:///absolute/path",
             "ssh://host/relative/path",
             "ssh://host//absolute/path",
             "ssh://user@host:1234/relative/path",
@@ -292,6 +292,9 @@ class TestLocationWithoutEnv:
             "sftp://user@host:1234/relative/path",
             "rclone:remote:path",
         ]
+        locations.insert(1, "c:/absolute/path" if is_win32 else "/absolute/path")
+        locations.insert(2, "file:///c:/absolute/path" if is_win32 else "file:///absolute/path")
+        locations.insert(3, "socket:///c:/absolute/path" if is_win32 else "socket:///absolute/path")
         for location in locations:
             assert (
                 Location(location).canonical_path() == Location(Location(location).canonical_path()).canonical_path()

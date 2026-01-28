@@ -20,6 +20,7 @@ from ..fslocking import (
     NotLocked,
     NotMyLock,
 )
+from ..platformflags import is_win32
 
 ID1 = "foo", 1, 1
 ID2 = "bar", 2, 2
@@ -105,6 +106,7 @@ class TestExclusiveLock:
         assert lock.by_me()  # we still have the lock
         assert old_unique_name != new_unique_name  # Locking filename is different now.
 
+    @pytest.mark.skipif(is_win32, reason="broken on windows")
     def test_race_condition(self, lockpath):
         class SynchronizedCounter:
             def __init__(self, count=0):

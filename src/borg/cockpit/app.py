@@ -53,21 +53,26 @@ class BorgCockpitApp(App):
 
     def on_mount(self) -> None:
         """Initialize components."""
-        from .runner import BorgRunner
-
         self.query_one("#logo").styles.animate("opacity", 1, duration=1)
         self.query_one("#slogan").styles.animate("opacity", 1, duration=1)
+
+        # Delay runner start until after widgets are fully mounted
+        self.call_after_refresh(self.start_runner)
+
+    def start_runner(self) -> None:
+        """Start the Borg runner after all widgets are mounted."""
+        from .runner import BorgRunner
+
+        # Speed tracking
+        self.total_lines_processed = 0
+        self.last_lines_processed = 0
+        self.speed_timer = self.set_interval(1.0, self.compute_speed)
 
         self.start_time = time.monotonic()
         self.process_running = True
         args = getattr(self, "borg_args", ["--version"])  # Default to safe command if none passed
         self.runner = BorgRunner(args, self.handle_log_event)
         self.runner_task = asyncio.create_task(self.runner.start())
-
-        # Speed tracking
-        self.total_lines_processed = 0
-        self.last_lines_processed = 0
-        self.speed_timer = self.set_interval(1.0, self.compute_speed)
 
     def compute_speed(self) -> None:
         """Calculate and update speed (lines per second)."""

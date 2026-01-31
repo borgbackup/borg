@@ -1658,6 +1658,12 @@ class Archiver:
                 keep += prune_split(archives, rule, num, kept_because)
 
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
+        pruned_checkpoints_len = len(set(checkpoints) - set(keep_checkpoints))
+        pruned_archives_len = len(to_delete) - pruned_checkpoints_len
+        logger.info('Found %d normal archives and %d checkpoint archives.',
+                    len(archives), len(checkpoints))
+        logger.info('Keeping %d archives and %d checkpoints, pruning %d archives and %d checkpoints.',
+                    len(keep), len(keep_checkpoints), pruned_archives_len, pruned_checkpoints_len)
         stats = Statistics(iec=args.iec)
         with Cache(repository, key, manifest, lock_wait=self.lock_wait, iec=args.iec) as cache:
             def checkpoint_func():

@@ -1658,6 +1658,14 @@ class Archiver:
                 keep += prune_split(archives, rule, num, kept_because)
 
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
+        stats_logger = logging.getLogger('borg.output.prune')
+        pruned_checkpoints_len = len([a for a in to_delete if a in checkpoints])
+        pruned_archives_len = len(to_delete) - pruned_checkpoints_len
+
+        stats_logger.info('Found %d normal archives and %d checkpoint archives.', 
+                          len(archives), len(checkpoints))
+        stats_logger.info('Keeping %d archives and %d checkpoints, pruning %d archives and %d checkpoints.',
+                          len(keep), len(keep_checkpoints), pruned_archives_len, pruned_checkpoints_len)
         stats = Statistics(iec=args.iec)
         with Cache(repository, key, manifest, lock_wait=self.lock_wait, iec=args.iec) as cache:
             def checkpoint_func():
@@ -1704,17 +1712,6 @@ class Archiver:
                 raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
                 checkpoint_func()
-            if args.stats:
-                stats_logger = logging.getLogger('borg.output.stats')
-                stats_logger.info('Archive counts:')
-                stats_logger.info('Number of archives:                %d', len(manifest.archives))
-                
-                if args.glob_archives:
-                    stats_logger.info('Number of archives matching pattern: %d', len(archives_checkpoints))
-                
-                stats_logger.info('Number of archives kept:           %d', len(archives_checkpoints) - len(to_delete))
-                stats_logger.info('Number of archives pruned:         %d', len(to_delete))
-                stats_logger.info(' ')  
 
                 log_multi(DASHES,
                           STATS_HEADER,

@@ -141,9 +141,6 @@ jobs:
             ]
           }' || '{
             "include": [
-              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "mypy"},
-              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-llfuse"},
               {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-llfuse", "binary": "borg-linux-glibc235-x86_64-gh"},
               {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-llfuse", "binary": "borg-linux-glibc235-arm64-gh"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},

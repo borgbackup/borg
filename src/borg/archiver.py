@@ -1658,7 +1658,6 @@ class Archiver:
                 keep += prune_split(archives, rule, num, kept_because)
 
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
-        logger = logging.getLogger('borg.output.prune')
         pruned_checkpoints_len = len(set(checkpoints) - set(keep_checkpoints))
         pruned_archives_len = len(to_delete) - pruned_checkpoints_len
         logger.info('Found %d normal archives and %d checkpoint archives.',

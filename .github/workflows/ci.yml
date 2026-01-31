@@ -179,6 +179,15 @@ jobs:
             ${{ runner.os }}-pip-
             ${{ runner.os }}-
 
+    - name: Cache tox environments
+      uses: actions/cache@v4
+      with:
+        path: .tox
+        key: ${{ runner.os }}-tox-${{ matrix.toxenv }}-${{ hashFiles('requirements.d/development.txt', 'pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-tox-${{ matrix.toxenv }}-
+          ${{ runner.os }}-tox-
+
     - name: Install Linux packages
       if: ${{ runner.os == 'Linux' }}
       run: |

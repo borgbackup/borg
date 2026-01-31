@@ -1658,14 +1658,13 @@ class Archiver:
                 keep += prune_split(archives, rule, num, kept_because)
 
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
-        stats_logger = logging.getLogger('borg.output.prune')
-        pruned_checkpoints_len = len([a for a in to_delete if a in checkpoints])
+        logger = logging.getLogger('borg.output.prune')
+        pruned_checkpoints_len = len(set(checkpoints) - set(keep_checkpoints))
         pruned_archives_len = len(to_delete) - pruned_checkpoints_len
-
-        stats_logger.info('Found %d normal archives and %d checkpoint archives.', 
-                          len(archives), len(checkpoints))
-        stats_logger.info('Keeping %d archives and %d checkpoints, pruning %d archives and %d checkpoints.',
-                          len(keep), len(keep_checkpoints), pruned_archives_len, pruned_checkpoints_len)
+        logger.info('Found %d normal archives and %d checkpoint archives.',
+                    len(archives), len(checkpoints))
+        logger.info('Keeping %d archives and %d checkpoints, pruning %d archives and %d checkpoints.',
+                    len(keep), len(keep_checkpoints), pruned_archives_len, pruned_checkpoints_len)
         stats = Statistics(iec=args.iec)
         with Cache(repository, key, manifest, lock_wait=self.lock_wait, iec=args.iec) as cache:
             def checkpoint_func():
@@ -1712,13 +1711,13 @@ class Archiver:
                 raise Error("Got Ctrl-C / SIGINT.")
             elif uncommitted_deletes > 0:
                 checkpoint_func()
-
+            if args.stats:
                 log_multi(DASHES,
                           STATS_HEADER,
                           stats.summary.format(label='Deleted data:', stats=stats),
                           str(cache),
                           DASHES, logger=logging.getLogger('borg.output.stats'))
-    
+
     @with_repository(fake=('tam', 'check_tam', 'disable_tam', 'archives_tam', 'check_archives_tam'), invert_fake=True, manifest=False, exclusive=True)
     def do_upgrade(self, args, repository, manifest=None, key=None):
         """upgrade a repository from a previous version"""

@@ -1,6 +1,7 @@
 import errno
 import os
 import socket
+import unicodedata
 import uuid
 from pathlib import Path
 
@@ -266,7 +267,20 @@ def swidth(s):
 
     For western scripts, this is just len(s), but for cjk glyphs, 2 cells are used.
     """
-    return len(s)
+    width = 0
+    for char in s:
+        # Get the East Asian Width property
+        ea_width = unicodedata.east_asian_width(char)
+
+        # Wide (W) and Fullwidth (F) characters take 2 cells
+        if ea_width in ("W", "F"):
+            width += 2
+        # Not a zero-width characters (combining marks, format characters)
+        elif unicodedata.category(char) not in ("Mn", "Me", "Cf"):
+            # Normal characters take 1 cell
+            width += 1
+
+    return width
 
 
 # patched socket.getfqdn() - see https://bugs.python.org/issue5004

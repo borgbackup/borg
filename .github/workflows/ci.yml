@@ -54,7 +54,7 @@ jobs:
 
     runs-on: ubuntu-24.04
     timeout-minutes: 25
-    needs: [lint, security]
+    needs: [lint]
 
     steps:
     - uses: actions/checkout@v4
@@ -122,7 +122,7 @@ jobs:
 
   native_tests:
 
-    needs: [lint, security]
+    needs: [lint]
     permissions:
       contents: read
       id-token: write
@@ -203,7 +203,7 @@ jobs:
         brew bundle install
 
     - name: Configure OpenSSH SFTP server (test only)
-      if: ${{ runner.os == 'Linux' }}
+      if: ${{ runner.os == 'Linux' && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
       run: |
         sudo mkdir -p /run/sshd
         sudo useradd -m -s /bin/bash sftpuser || true
@@ -233,7 +233,7 @@ jobs:
         echo "BORG_TEST_SFTP_REPO=sftp://sftpuser@localhost:22/borg/sftp-repo" >> $GITHUB_ENV
 
     - name: Install and configure MinIO S3 server (test only)
-      if: ${{ runner.os == 'Linux' }}
+      if: ${{ runner.os == 'Linux' && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
       run: |
         set -e
         arch=$(uname -m)
@@ -349,7 +349,7 @@ jobs:
       attestations: write
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    needs: [lint, security]
+    needs: [lint]
     continue-on-error: true
 
     strategy:
@@ -547,7 +547,7 @@ jobs:
     if: true  # can be used to temporarily disable the build
     runs-on: windows-latest
     timeout-minutes: 90
-    needs: [lint, security]
+    needs: [lint]
 
     env:
       PY_COLORS: 1

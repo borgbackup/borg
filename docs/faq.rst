@@ -381,11 +381,10 @@ How important is the $HOME/.config/borg directory?
 The Borg config directory has content that you should take care of:
 
 ``keys`` subdirectory
-  All your borg keyfile keys are stored in this directory. Please note that
-  borg repokey keys are stored inside the repository. You MUST make sure to have an
-  independent backup of these keyfiles, otherwise you cannot access your backups anymore if you lose
-  them. You also MUST keep these files secret; everyone who gains access to your repository and has
-  the corresponding keyfile (and the key passphrase) can extract it.
+  All your borg keyfile keys are stored in this directory. Please note that borg
+  repokey keys are stored inside the repository. In any case, you MUST make sure
+  to have an independent backup of the borg keys, see :ref:`borg_key_export` for
+  more details.
 
 Make sure that only you have access to the Borg config directory.
 

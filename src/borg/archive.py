@@ -831,10 +831,16 @@ Duration: {0.duration}
             st = os.stat(path, follow_symlinks=False)
             if continue_extraction and same_item(item, st):
                 return  # done! we already have fully extracted this file in a previous run.
-            elif stat.S_ISDIR(st.st_mode):
-                os.rmdir(path)
-            else:
+            if not stat.S_ISDIR(st.st_mode):
                 os.unlink(path)
+            elif stat.S_ISDIR(item.mode):
+                # if we have an existing directory and we want to extract a directory,
+                # we just use the existing one and do not remove it.
+                # This fixes the issue that the existing directory might be a BTRFS subvolume.
+                # If we removed it, we would lose the subvolume, see #4233.
+                pass
+            else:
+                os.rmdir(path)  # only works for empty directories
         except UnicodeEncodeError:
             raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
@@ -883,6 +889,12 @@ Duration: {0.duration}
                 if not os.path.exists(path):
                     os.mkdir(path)
                 if restore_attrs:
+                    # note: if we did not create the directory freshly, existing attributes
+                    # might get mixed up with the archived attributes. this is acceptable,
+                    # considering we usually extract into an empty base directory.
+                    # when continuing an extraction, the existing attributes and the archived
+                    # attributes should be identical anyway.
+                    # Also, we want to avoid #4223 (losing btrfs subvolumes).
                     self.restore_attrs(path, item)
             elif stat.S_ISLNK(mode):
                 make_parent(path)

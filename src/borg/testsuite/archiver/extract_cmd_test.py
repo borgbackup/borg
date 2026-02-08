@@ -791,3 +791,20 @@ def test_extract_file_with_missing_chunk(archivers, request):
     output = cmd(archiver, "extract", "archive")
     # TODO: this is a bit dirty still: no warning/error rc, no filename output for the damaged file.
     assert f"repository object {bin_to_hex(chunk.id)} missing, returning {chunk.size} zero bytes." in output
+
+
+def test_extract_existing_directory(archivers, request):
+    # if we extract a directory and there is already a directory at that location,
+    # we should just use the existing directory and not remove/recreate it.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    os.mkdir("input/dir")
+    cmd(archiver, "create", "test", "input")
+    with changedir("output"):
+        # create pre-existing directory:
+        os.makedirs("input/dir", exist_ok=True)
+        st1 = os.stat("input/dir")
+        # extract
+        cmd(archiver, "extract", "test")
+        st2 = os.stat("input/dir")
+    assert st1.st_ino == st2.st_ino

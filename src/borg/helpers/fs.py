@@ -252,7 +252,7 @@ def make_path_safe(path):
     if "\\.." in path or "..\\" in path:
         raise ValueError(f"unexpected '..' element in path {path!r}")
 
-    path = percentify(path)
+    path = map_chars(path)
 
     path = path.lstrip("/")
     if path.startswith("../") or "/../" in path or path.endswith("/..") or path == "..":
@@ -270,15 +270,32 @@ def slashify(path):
     return path.replace("\\", "/") if is_win32 else path
 
 
-def percentify(path):
-    """
-    Replace backslashes with percent signs if running on Windows.
+# Bijective mapping to Unicode Private Use Area (like cifs mapchars)
+WINDOWS_MAP_CHARS = str.maketrans(
+    {
+        "<": "\uF03C",
+        ">": "\uF03E",
+        ":": "\uF03A",
+        '"': "\uF022",
+        "\\": "\uF05C",
+        "|": "\uF07C",
+        "?": "\uF03F",
+        "*": "\uF02A",
+    }
+)
 
-    Use case: if an archived path contains backslashes (which is not a path separator on POSIX
-    and could appear as a normal character in POSIX paths), we need to replace them with percent
-    signs to make the path usable on Windows.
+
+def map_chars(path):
     """
-    return path.replace("\\", "%") if is_win32 else path
+    Map reserved characters if running on Windows.
+
+    Use case: if an archived path contains reserved characters (that are not reserved on POSIX)
+    we need to replace them with replacements to make the path usable on Windows.
+    """
+    if not is_win32:
+        return path
+
+    return path.translate(WINDOWS_MAP_CHARS)
 
 
 def get_strip_prefix(path):

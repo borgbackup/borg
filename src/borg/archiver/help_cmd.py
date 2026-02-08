@@ -109,9 +109,14 @@ class HelpMixIn:
             **Windows path handling**: All paths in Borg archives use forward slashes (``/``)
             as path separators, regardless of the platform. When creating archives on Windows,
             backslashes from filesystem paths are automatically converted to forward slashes.
-            When extracting archives created on POSIX systems that contain literal backslashes
-            in filenames (which is rare, but possible), the backslash character is replaced
-            with ``%`` on Windows to prevent misinterpretation as a path separator.
+
+        .. note::
+
+            **Windows reserved characters**: On Windows, when extracting archives created on
+            POSIX systems, paths may contain characters that are reserved from being used in
+            file or directory names (like: ``< > : " \\ | ? *``).
+            These are replaced by characters in the unicode private use area (``U+F0xx``) like
+            the CIFS mapchars feature also does it. It won't be pretty, but at least it works.
 
         Exclusions can be passed via the command line option ``--exclude``. When used
         from within a shell, the patterns should be quoted to protect them from

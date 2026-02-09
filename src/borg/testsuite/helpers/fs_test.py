@@ -20,6 +20,7 @@ from ...helpers.fs import (
     safe_unlink,
     remove_dotdot_prefixes,
     make_path_safe,
+    map_chars,
 )
 from ...platform import is_win32, is_darwin, is_haiku
 from .. import are_hardlinks_supported
@@ -441,3 +442,24 @@ def test_dir_is_tagged(tmpdir):
             assert dir_is_tagged(dir_fd=fd, exclude_caches=True, exclude_if_present=[".NOBACKUP"]) == [".NOBACKUP"]
         with open_dir(str(normal_dir)) as fd:
             assert dir_is_tagged(dir_fd=fd, exclude_caches=True, exclude_if_present=[".NOBACKUP"]) == []
+
+
+def test_map_chars(monkeypatch):
+    # Test behavior on non-Windows (should return path unchanged)
+    monkeypatch.setattr("borg.helpers.fs.is_win32", False)
+    assert map_chars("foo/bar") == "foo/bar"
+    assert map_chars("foo\\bar") == "foo\\bar"
+    assert map_chars("foo:bar") == "foo:bar"
+
+    # Test behavior on Windows
+    monkeypatch.setattr("borg.helpers.fs.is_win32", True)
+
+    # Reserved characters replacement
+    assert map_chars("foo:bar") == "foo\uf03abar"
+    assert map_chars("foo<bar") == "foo\uf03cbar"
+    assert map_chars("foo>bar") == "foo\uf03ebar"
+    assert map_chars('foo"bar') == "foo\uf022bar"
+    assert map_chars("foo\\bar") == "foo\uf05cbar"
+    assert map_chars("foo|bar") == "foo\uf07cbar"
+    assert map_chars("foo?bar") == "foo\uf03fbar"
+    assert map_chars("foo*bar") == "foo\uf02abar"

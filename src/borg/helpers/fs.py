@@ -249,11 +249,53 @@ def make_path_safe(path):
     For reasons of security, a ValueError is raised should
     `path` contain any '..' elements.
     """
+    if "\\.." in path or "..\\" in path:
+        raise ValueError(f"unexpected '..' element in path {path!r}")
+
+    path = map_chars(path)
+
     path = path.lstrip("/")
     if path.startswith("../") or "/../" in path or path.endswith("/..") or path == "..":
         raise ValueError(f"unexpected '..' element in path {path!r}")
     path = posixpath.normpath(path)
     return path
+
+
+def slashify(path):
+    """
+    Replace backslashes with forward slashes if running on Windows.
+
+    Use case: we always want to use forward slashes, even on Windows.
+    """
+    return path.replace("\\", "/") if is_win32 else path
+
+
+# Bijective mapping to Unicode Private Use Area (like cifs mapchars)
+WINDOWS_MAP_CHARS = str.maketrans(
+    {
+        "<": "\uF03C",
+        ">": "\uF03E",
+        ":": "\uF03A",
+        '"': "\uF022",
+        "\\": "\uF05C",
+        "|": "\uF07C",
+        "?": "\uF03F",
+        "*": "\uF02A",
+    }
+)
+
+
+def map_chars(path):
+    """
+    Map reserved characters if running on Windows.
+
+    Use case: if an archived path contains reserved characters (that are not reserved on POSIX)
+    we need to replace them with replacements to make the path usable on Windows.
+    """
+    if not is_win32:
+        return path
+
+    return path.translate(WINDOWS_MAP_CHARS)
 
 
 def get_strip_prefix(path):
@@ -265,7 +307,7 @@ def get_strip_prefix(path):
     pos = path.find("/./")  # detect slashdot hack
     if pos > 0:
         # found a prefix to strip! make sure it ends with one "/"!
-        return os.path.normpath(path[:pos]) + os.sep
+        return posixpath.normpath(path[:pos]) + "/"
     else:
         # no or empty prefix, nothing to strip!
         return None
@@ -276,15 +318,14 @@ _dotdot_re = re.compile(r"^(\.\./)+")
 
 def remove_dotdot_prefixes(path):
     """
-    Remove '../'s at the beginning of `path`. Additionally,
-    the path is made relative.
+    Remove '../'s at the beginning of `path`. Additionally, the path is made relative.
 
-    `path` is expected to be normalized already (e.g. via `os.path.normpath()`).
+    `path` is expected to be normalized already (e.g. via `posixpath.normpath()`).
     """
+    assert "\\" not in path
     if is_win32:
         if len(path) > 1 and path[1] == ":":
             path = path.replace(":", "", 1)
-        path = path.replace("\\", "/")
 
     path = path.lstrip("/")
     path = _dotdot_re.sub("", path)

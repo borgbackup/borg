@@ -2,6 +2,7 @@ import base64
 import errno
 import json
 import os
+import posixpath
 import stat
 import sys
 import time
@@ -1243,8 +1244,8 @@ class FilesystemObjectProcessors:
     @contextmanager
     def create_helper(self, path, st, status=None, hardlinkable=True, strip_prefix=None):
         if strip_prefix is not None:
-            assert not path.endswith(os.sep)
-            if strip_prefix.startswith(path + os.sep):
+            assert not path.endswith("/")
+            if strip_prefix.startswith(path + "/"):
                 # still on a directory level that shall be stripped - do not create an item for this!
                 yield None, "x", False, None
                 return
@@ -1547,7 +1548,7 @@ class TarfileObjectProcessors:
 
             # if the tar has names starting with "./", normalize them like borg create also does.
             # ./dir/file must become dir/file in the borg archive.
-            normalized_path = os.path.normpath(tarinfo.name)
+            normalized_path = posixpath.normpath(tarinfo.name)
             item = Item(
                 path=make_path_safe(normalized_path),
                 mode=tarinfo.mode | type,
@@ -1608,7 +1609,7 @@ class TarfileObjectProcessors:
     def process_hardlink(self, *, tarinfo, status, type):
         with self.create_helper(tarinfo, status, type) as (item, status):
             # create a not hardlinked borg item, reusing the chunks, see HardLinkManager.__doc__
-            normalized_path = os.path.normpath(tarinfo.linkname)
+            normalized_path = posixpath.normpath(tarinfo.linkname)
             safe_path = make_path_safe(normalized_path)
             chunks = self.hlm.retrieve(safe_path)
             if chunks is not None:

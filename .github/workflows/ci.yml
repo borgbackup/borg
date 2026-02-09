@@ -174,19 +174,19 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.d/development.txt') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.d/development.txt') }}
         restore-keys: |
-            ${{ runner.os }}-pip-
-            ${{ runner.os }}-
+            ${{ runner.os }}-${{ runner.arch }}-pip-
+            ${{ runner.os }}-${{ runner.arch }}-
 
     - name: Cache tox environments
       uses: actions/cache@v4
       with:
         path: .tox
-        key: ${{ runner.os }}-tox-${{ matrix.toxenv }}-${{ hashFiles('requirements.d/development.txt', 'pyproject.toml') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-tox-${{ matrix.toxenv }}-${{ hashFiles('requirements.d/development.txt', 'pyproject.toml') }}
         restore-keys: |
-          ${{ runner.os }}-tox-${{ matrix.toxenv }}-
-          ${{ runner.os }}-tox-
+          ${{ runner.os }}-${{ runner.arch }}-tox-${{ matrix.toxenv }}-
+          ${{ runner.os }}-${{ runner.arch }}-tox-
 
     - name: Install Linux packages
       if: ${{ runner.os == 'Linux' }}

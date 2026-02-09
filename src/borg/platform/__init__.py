@@ -10,7 +10,7 @@ from ..platformflags import is_win32, is_linux, is_freebsd, is_netbsd, is_darwin
 
 from .base import ENOATTR, API_VERSION
 from .base import SaveFile, sync_dir, fdatasync, safe_fadvise
-from .base import get_process_id, fqdn, hostname, hostid
+from .base import get_process_id, fqdn, hostname, hostid, swidth
 
 # work around pyinstaller "forgetting" to include the xattr module
 from . import xattr  # noqa: F401
@@ -24,7 +24,6 @@ if is_linux:  # pragma: linux only
     from .linux import set_flags, get_flags
     from .linux import SyncFile
     from .posix import process_alive, local_pid_alive
-    from .posix import swidth
     from .posix import get_errno
     from .posix import getosusername
     from . import posix_ug as platform_ug
@@ -36,7 +35,6 @@ elif is_freebsd:  # pragma: freebsd only
     from .base import get_flags
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
-    from .posix import swidth
     from .posix import get_errno
     from .posix import getosusername
     from . import posix_ug as platform_ug
@@ -47,7 +45,6 @@ elif is_netbsd:  # pragma: netbsd only
     from .base import set_flags, get_flags
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
-    from .posix import swidth
     from .posix import get_errno
     from .posix import getosusername
     from . import posix_ug as platform_ug
@@ -60,7 +57,6 @@ elif is_darwin:  # pragma: darwin only
     from .base import get_flags
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
-    from .posix import swidth
     from .posix import get_errno
     from .posix import getosusername
     from . import posix_ug as platform_ug
@@ -72,7 +68,6 @@ elif not is_win32:  # pragma: posix only
     from .base import set_flags, get_flags
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
-    from .posix import swidth
     from .posix import get_errno
     from .posix import getosusername
     from . import posix_ug as platform_ug
@@ -84,7 +79,6 @@ else:  # pragma: win32 only
     from .base import set_flags, get_flags
     from .base import SyncFile
     from .windows import process_alive, local_pid_alive
-    from .base import swidth
     from .windows import getosusername
     from . import windows_ug as platform_ug
 

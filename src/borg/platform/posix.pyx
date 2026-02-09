@@ -5,32 +5,9 @@ from . import posix_ug
 
 from libc.errno cimport errno as c_errno
 
-from cpython.mem cimport PyMem_Free
-from libc.stddef cimport wchar_t
-
-cdef extern from "wchar.h":
-    # https://www.man7.org/linux/man-pages/man3/wcswidth.3.html
-    cdef int wcswidth(const wchar_t *s, size_t n)
-
-
-cdef extern from "Python.h":
-    # https://docs.python.org/3/c-api/unicode.html#c.PyUnicode_AsWideCharString
-    wchar_t* PyUnicode_AsWideCharString(object, Py_ssize_t*) except NULL
-
 
 def get_errno():
     return c_errno
-
-
-def swidth(s):
-    cdef Py_ssize_t size
-    cdef wchar_t *as_wchar = PyUnicode_AsWideCharString(s, &size)
-    terminal_width = wcswidth(as_wchar, <size_t>size)
-    PyMem_Free(as_wchar)
-    if terminal_width >= 0:
-        return terminal_width
-    else:
-        return len(s)
 
 
 def process_alive(host, pid, thread):

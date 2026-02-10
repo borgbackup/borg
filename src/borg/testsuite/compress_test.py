@@ -232,7 +232,7 @@ def test_invalid_compression_level(invalid_spec):
     ],
 )
 def test_padme_obfuscation(data_length, expected_padding):
-    compressor = Compressor(name="obfuscate", level=250, compressor=Compressor("none"))
+    compressor = CompressionSpec("obfuscate,250,none").compressor
     data = b"x" * data_length
     meta, compressed = compressor.compress(dict(type=ROBJ_FILE_STREAM), data)
 
@@ -251,7 +251,7 @@ def test_padme_obfuscation(data_length, expected_padding):
     ],
 )
 def test_robj_specific_obfuscation(data_length, expected_padding, robj_type):
-    compressor = Compressor(name="obfuscate", level=250, compressor=Compressor("none"))
+    compressor = CompressionSpec("obfuscate,250,none").compressor
     data = b"x" * data_length
     meta, compressed = compressor.compress(dict(type=robj_type), data)
 

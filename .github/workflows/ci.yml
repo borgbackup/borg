@@ -337,16 +337,29 @@ jobs:
         #sudo -E bash -c "tox -e py"
         # Ensure locally built binary in ./dist/binary/borg-dir is found during tests
         export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
-        tox --skip-missing-interpreters
+        tox --skip-missing-interpreters -- --junitxml=test-results.xml
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+    - name: Upload test results to Codecov
+      if: ${{ !cancelled() }}
+      uses: codecov/codecov-action@v5
       env:
         OS: ${{ runner.os }}
         python: ${{ matrix.python-version }}
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        env_vars: OS, python
+        report_type: test_results
+        env_vars: OS,python
+        files: test-results.xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      env:
+        OS: ${{ runner.os }}
+        python: ${{ matrix.python-version }}
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        report_type: coverage
+        env_vars: OS,python
 
   vm_tests:
     permissions:
@@ -605,13 +618,26 @@ jobs:
           export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
           borg.exe -V
           . env/bin/activate
-          python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote"
+          python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote" --junitxml=test-results.xml
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
         env:
           OS: ${{ runner.os }}
           python: '3.11'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          env_vars: OS, python
+          report_type: test_results
+          env_vars: OS,python
+          files: test-results.xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          OS: ${{ runner.os }}
+          python: '3.11'
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: coverage
+          env_vars: OS,python

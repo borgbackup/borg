@@ -201,3 +201,61 @@ def test_list_inode_hardlinks(archivers, request):
         assert inodes["input/fileA"] != inodes["input/fileC"]
     else:
         pytest.skip("Platform does not provide inode numbers for items")
+
+
+def test_fingerprint(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", contents=b"content")
+    create_regular_file(archiver.input_path, "file2", contents=b"other")
+    cmd(archiver, "create", "test1", "input")
+
+    output = cmd(archiver, "list", "test1", "--format={fingerprint} {path}{NL}")
+    fingerprints1 = {}
+    for line in output.splitlines():
+        fp, path = line.split(" ", 1)
+        fingerprints1[path] = fp
+
+    # Same content, same chunker params -> same fingerprint
+    cmd(archiver, "create", "test2", "input")
+    output = cmd(archiver, "list", "test2", "--format={fingerprint} {path}{NL}")
+    fingerprints2 = {}
+    for line in output.splitlines():
+        fp, path = line.split(" ", 1)
+        fingerprints2[path] = fp
+    assert fingerprints1 == fingerprints2
+
+    # Modified content -> different fingerprint
+    create_regular_file(archiver.input_path, "file1", contents=b"modification")
+    cmd(archiver, "create", "test3", "input")
+    output = cmd(archiver, "list", "test3", "--format={fingerprint} {path}{NL}")
+    fingerprints3 = {}
+    for line in output.splitlines():
+        fp, path = line.split(" ", 1)
+        fingerprints3[path] = fp
+    assert fingerprints1["input/file1"] != fingerprints3["input/file1"]
+    # Unmodified file should still match
+    assert fingerprints1["input/file2"] == fingerprints3["input/file2"]
+
+    # Different chunker params -> different fingerprint
+    # We can use the same repo but specify different chunker params for a new archive
+    cmd(archiver, "create", "--chunker-params=fixed,4096", "test4", "input")
+    output = cmd(archiver, "list", "test4", "--format={fingerprint} {path}{NL}")
+    fingerprints4 = {}
+    for line in output.splitlines():
+        fp, path = line.split(" ", 1)
+        fingerprints4[path] = fp
+
+    # Even unmodified files should have different fingerprints because conditions_hash changed
+    assert fingerprints1["input/file2"] != fingerprints4["input/file2"]
+
+    # Also try with buzhash64
+    cmd(archiver, "create", "--chunker-params=buzhash64,10,23,16,4095", "test5", "input")
+    output = cmd(archiver, "list", "test5", "--format={fingerprint} {path}{NL}")
+    fingerprints5 = {}
+    for line in output.splitlines():
+        fp, path = line.split(" ", 1)
+        fingerprints5[path] = fp
+
+    # Even unmodified files should have different fingerprints because conditions_hash changed
+    assert fingerprints1["input/file2"] != fingerprints5["input/file2"]

@@ -600,8 +600,8 @@ class CompressionSpec:
         elif self.name == 'obfuscate':
             if 3 <= count <= 5:
                 level = int(values[1])
-                if not ((1 <= level <= 6) or (110 <= level <= 123)):
-                    raise ArgumentTypeError("level must be >= 1 and <= 6 or >= 110 and <= 123")
+                if not ((1 <= level <= 6) or (110 <= level <= 123) or (level == 250)):
+                    raise ArgumentTypeError("level must be (inclusively) within 1...6, 110...123 or equal to 250")
                 self.level = level
                 compression = ','.join(values[2:])
             else:

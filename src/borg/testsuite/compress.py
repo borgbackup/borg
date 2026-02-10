@@ -215,7 +215,7 @@ def test_obfuscate():
     ],
 )
 def test_padme_obfuscation(data_length, expected_padding):
-    compressor = Compressor(name="obfuscate", level=250, compressor=Compressor("none"))
+    compressor = CompressionSpec("obfuscate,250,none").compressor
     # The inner compressor will add an inner header of 2 bytes, so we reduce the data length by 2 bytes
     # to be able to use (almost) the same test cases as in the master branch.
     data = b"x" * (data_length - 2)

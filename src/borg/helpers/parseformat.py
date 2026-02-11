@@ -15,6 +15,7 @@ from typing import ClassVar, Any, TYPE_CHECKING, Literal
 from collections import OrderedDict
 from datetime import datetime, timezone
 from functools import partial
+from hashlib import sha256
 from string import Formatter
 
 from ..logger import create_logger
@@ -876,6 +877,7 @@ class ItemFormatter(BaseFormatter):
         "isoctime": "file change time (ISO 8601 format)",
         "isoatime": "file access time (ISO 8601 format)",
         "xxh64": "XXH64 checksum of this file (note: this is NOT a cryptographic hash!)",
+        "fingerprint": "Fingerprint of the file content (may have false negatives), format: H(conditions)-H(chunk_ids)",
         "archiveid": "internal ID of the archive",
         "archivename": "name of the archive",
     }
@@ -883,7 +885,7 @@ class ItemFormatter(BaseFormatter):
         ("type", "mode", "uid", "gid", "user", "group", "path", "target", "hlid", "inode", "flags"),
         ("size", "num_chunks"),
         ("mtime", "ctime", "atime", "isomtime", "isoctime", "isoatime"),
-        tuple(sorted(hash_algorithms)),
+        tuple(["fingerprint"] + sorted(hash_algorithms)),
         ("archiveid", "archivename", "extra"),
     )
 
@@ -903,6 +905,15 @@ class ItemFormatter(BaseFormatter):
         self.archive = archive
         # track which keys were requested in the format string
         self.format_keys = {f[1] for f in Formatter().parse(format)}
+
+        # we want a hash over the conditions that influence the chunk ID list for a given file content:
+        # - the id algorithm and key
+        # - the chunker seed (if any - buzhash64 derives seed from id_key)
+        # - the chunker params
+        key = archive.key
+        conditions = f"{key.TYPE_STR!r}{key.id_key!r}{key.chunk_seed!r}{archive.metadata.get('chunker_params')!r}"
+        self.conditions_hash = sha256(conditions.encode()).hexdigest()
+
         self.call_keys = {
             "size": self.calculate_size,
             "num_chunks": self.calculate_num_chunks,
@@ -912,6 +923,7 @@ class ItemFormatter(BaseFormatter):
             "mtime": partial(self.format_time, "mtime"),
             "ctime": partial(self.format_time, "ctime"),
             "atime": partial(self.format_time, "atime"),
+            "fingerprint": self.calculate_fingerprint,
         }
         for hash_function in self.hash_algorithms:
             self.call_keys[hash_function] = partial(self.hash_item, hash_function)
@@ -962,6 +974,16 @@ class ItemFormatter(BaseFormatter):
     def calculate_size(self, item):
         # note: does not support hard link slaves, they will be size 0
         return item.get_size()
+
+    def calculate_fingerprint(self, item):
+        # calculate a very fast file contents fingerprint
+        chunks = item.get("chunks")
+        if chunks is None:
+            return ""
+        chunks_hash = sha256(b"".join(c.id for c in chunks)).hexdigest()
+        # we do not encounter many different conditions hashes, so the collision probability is low.
+        # thus, we can keep it short and only return 64 bits from the conditions hash.
+        return f"{self.conditions_hash[:16]}-{chunks_hash}"
 
     def hash_item(self, hash_function, item):
         if "chunks" not in item:

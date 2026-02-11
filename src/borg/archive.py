@@ -782,12 +782,17 @@ Duration: {0.duration}
 
         def same_item(item, st):
             """Is the archived item the same as the filesystem item at the same path with stat st?"""
-            if not stat.S_ISREG(st.st_mode):
-                # we only "optimize" for regular files.
+            is_file = stat.S_ISREG(st.st_mode)
+            is_dir = stat.S_ISDIR(st.st_mode)
+            if not (is_file or is_dir):
+                # we only "optimize" for regular files and directories.
                 # other file types are less frequent and have no content extraction we could "optimize away".
                 return False
-            if item.mode != st.st_mode or item.size != st.st_size:
-                # the size check catches incomplete previous file extraction
+            if item.mode != st.st_mode:
+                # we want to extract a different type of file than what is present in the filesystem.
+                return False
+            if is_file and item.size != st.st_size:
+                # the size check catches incomplete previous regular file extraction
                 return False
             if item.get("mtime") != st.st_mtime_ns:
                 # note: mtime is "extracted" late, after xattrs and ACLs, but before flags.
@@ -831,10 +836,16 @@ Duration: {0.duration}
             st = os.stat(path, follow_symlinks=False)
             if continue_extraction and same_item(item, st):
                 return  # done! we already have fully extracted this file in a previous run.
-            elif stat.S_ISDIR(st.st_mode):
-                os.rmdir(path)
-            else:
+            if not stat.S_ISDIR(st.st_mode):
                 os.unlink(path)
+            elif stat.S_ISDIR(item.mode):
+                # if we have an existing directory and we want to extract a directory,
+                # we just use the existing one and do not remove it.
+                # This fixes the issue that the existing directory might be a BTRFS subvolume.
+                # If we removed it, we would lose the subvolume, see #4233.
+                pass
+            else:
+                os.rmdir(path)  # only works for empty directories
         except UnicodeEncodeError:
             raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
@@ -883,6 +894,12 @@ Duration: {0.duration}
                 if not os.path.exists(path):
                     os.mkdir(path)
                 if restore_attrs:
+                    # note: if we did not create the directory freshly, existing attributes
+                    # might get mixed up with the archived attributes. this is acceptable,
+                    # considering we usually extract into an empty base directory.
+                    # when continuing an extraction, the existing attributes and the archived
+                    # attributes should be identical anyway.
+                    # Also, we want to avoid #4223 (losing btrfs subvolumes).
                     self.restore_attrs(path, item)
             elif stat.S_ISLNK(mode):
                 make_parent(path)

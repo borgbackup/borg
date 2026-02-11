@@ -1,5 +1,6 @@
 import errno
 import os
+from pathlib import Path
 import shutil
 import stat
 from unittest.mock import patch
@@ -707,51 +708,67 @@ def test_extract_continue(archivers, request):
     archiver = request.getfixturevalue(archivers)
     CONTENTS1, CONTENTS2, CONTENTS3 = b"contents1" * 100, b"contents2" * 200, b"contents3" * 300
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    create_regular_file(archiver.input_path, "file1", contents=CONTENTS1)
-    create_regular_file(archiver.input_path, "file2", contents=CONTENTS2)
-    create_regular_file(archiver.input_path, "file3", contents=CONTENTS3)
+    create_regular_file(archiver.input_path, "dir1/file1", contents=CONTENTS1)
+    create_regular_file(archiver.input_path, "dir2/file2", contents=CONTENTS2)
+    create_regular_file(archiver.input_path, "dir3/file3", contents=CONTENTS3)
     cmd(archiver, "create", "arch", "input")
+
+    granularity_sleep()
 
     with changedir("output"):
         # we simulate an interrupted/partial extraction:
         cmd(archiver, "extract", "arch")
-        # do not modify file1, it stands for a successfully extracted file
-        file1_st = os.stat("input/file1")
+        # do not modify dir1 and file1, they stand for a successfully extracted files
+        dir1_st = os.stat("input/dir1")
+        file1_st = os.stat("input/dir1/file1")
+        # simulate a partially extracted dir2 (wrong mtime)
         # simulate a partially extracted file2 (smaller size, archived mtime not yet set)
-        file2_st = os.stat("input/file2")
+        dir2_st = os.stat("input/dir2")
+        file2_st = os.stat("input/dir2/file2")
         # make a hard link, so it does not free the inode when unlinking input/file2
-        os.link("input/file2", "hardlink-to-keep-inode-f2")
-        os.truncate("input/file2", 123)  # -> incorrect size, incorrect mtime
-        # simulate file3 has not yet been extracted
-        file3_st = os.stat("input/file3")
+        os.link("input/dir2/file2", "hardlink-to-keep-inode-f2")
+        os.truncate("input/dir2/file2", 123)  # -> incorrect size, incorrect mtime
+        Path("input/dir2").touch()  # -> mtime "incorrect" (not as archived)
+        # simulate dir3 and file3 have not yet been extracted
+        dir3_st = os.stat("input/dir3")
+        file3_st = os.stat("input/dir3/file3")
         # make a hard link, so it does not free the inode when unlinking input/file3
-        os.link("input/file3", "hardlink-to-keep-inode-f3")
-        os.remove("input/file3")
+        os.link("input/dir3/file3", "hardlink-to-keep-inode-f3")
+        os.remove("input/dir3/file3")
+        os.rmdir("input/dir3")
+
     granularity_sleep()
 
     with changedir("output"):
         # now try to continue extracting, using the same archive, same output dir:
         cmd(archiver, "extract", "arch", "--continue")
-        now_file1_st = os.stat("input/file1")
+        now_dir1_st = os.stat("input/dir1")
+        now_file1_st = os.stat("input/dir1/file1")
+        assert dir1_st.st_ino == now_dir1_st.st_ino  # dir1 was NOT extracted again
+        assert dir1_st.st_mtime_ns == now_dir1_st.st_mtime_ns  # dir1 has correct mtime
         assert file1_st.st_ino == now_file1_st.st_ino  # file1 was NOT extracted again
         assert file1_st.st_mtime_ns == now_file1_st.st_mtime_ns  # has correct mtime
-        new_file2_st = os.stat("input/file2")
+        now_dir2_st = os.stat("input/dir2")
+        new_file2_st = os.stat("input/dir2/file2")
+        assert dir2_st.st_ino == now_dir2_st.st_ino  # dir2 was not removed/recreated
+        assert dir2_st.st_mtime_ns == now_dir2_st.st_mtime_ns  # dir2 mtime was fixed
         assert file2_st.st_ino != new_file2_st.st_ino  # file2 was extracted again
         assert file2_st.st_mtime_ns == new_file2_st.st_mtime_ns  # has correct mtime
-        new_file3_st = os.stat("input/file3")
-        assert file3_st.st_ino != new_file3_st.st_ino  # file3 was extracted again
-        assert file3_st.st_mtime_ns == new_file3_st.st_mtime_ns  # has correct mtime
+        new_dir3_st = os.stat("input/dir3")
+        new_file3_st = os.stat("input/dir3/file3")
+        assert dir3_st.st_mtime_ns == new_dir3_st.st_mtime_ns  # dir3 was extracted again
+        assert file3_st.st_mtime_ns == new_file3_st.st_mtime_ns  # file3 was extracted again
         # windows has a strange ctime behaviour when deleting and recreating a file
         if not is_win32:
             assert file1_st.st_ctime_ns == now_file1_st.st_ctime_ns  # file not extracted again
             assert file2_st.st_ctime_ns != new_file2_st.st_ctime_ns  # file extracted again
             assert file3_st.st_ctime_ns != new_file3_st.st_ctime_ns  # file extracted again
         # check if all contents (and thus also file sizes) are correct:
-        with open("input/file1", "rb") as f:
+        with open("input/dir1/file1", "rb") as f:
             assert f.read() == CONTENTS1
-        with open("input/file2", "rb") as f:
+        with open("input/dir2/file2", "rb") as f:
             assert f.read() == CONTENTS2
-        with open("input/file3", "rb") as f:
+        with open("input/dir3/file3", "rb") as f:
             assert f.read() == CONTENTS3
 
 
@@ -791,3 +808,20 @@ def test_extract_file_with_missing_chunk(archivers, request):
     output = cmd(archiver, "extract", "archive")
     # TODO: this is a bit dirty still: no warning/error rc, no filename output for the damaged file.
     assert f"repository object {bin_to_hex(chunk.id)} missing, returning {chunk.size} zero bytes." in output
+
+
+def test_extract_existing_directory(archivers, request):
+    # if we extract a directory and there is already a directory at that location,
+    # we should just use the existing directory and not remove/recreate it.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    os.mkdir("input/dir")
+    cmd(archiver, "create", "test", "input")
+    with changedir("output"):
+        # create pre-existing directory:
+        os.makedirs("input/dir", exist_ok=True)
+        st1 = os.stat("input/dir")
+        # extract
+        cmd(archiver, "extract", "test")
+        st2 = os.stat("input/dir")
+    assert st1.st_ino == st2.st_ino

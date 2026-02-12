@@ -1797,7 +1797,7 @@ class ArchiveChecker:
                 # if we kill the defect chunk here, subsequent actions within this "borg check"
                 # run will find missing chunks and replace them with all-zero replacement
                 # chunks and flag the files as "repaired".
-                # if another backup is done later and the missing chunks get backupped again,
+                # if another backup is done later and the missing chunks get backed up again,
                 # a "borg check" afterwards can heal all files where this chunk was missing.
                 logger.warning('Found defect chunks. They will be deleted now, so affected files can '
                                'get repaired now and maybe healed later.')

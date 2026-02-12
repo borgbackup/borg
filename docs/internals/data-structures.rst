@@ -818,7 +818,7 @@ bucket is reached.
 This particular mode of operation is open addressing with linear probing.
 
 When the hash table is filled to 75%, its size is grown. When it's
-emptied to 25%, its size is shrinked. Operations on it have a variable
+emptied to 25%, its size is shrunk. Operations on it have a variable
 complexity between constant and linear with low factor, and memory overhead
 varies between 33% and 300%.
 

@@ -75,11 +75,11 @@ class XattrTestCase(BaseTestCase):
         self.assert_equal(len(buffer), 128)
 
 
-@pytest.mark.parametrize('lstring, splitted', (
+@pytest.mark.parametrize('lstring, expected', (
     (b'', []),
     (b'\x00', [b'']),
     (b'\x01a', [b'a']),
     (b'\x01a\x02cd', [b'a', b'cd']),
 ))
-def test_split_lstring(lstring, splitted):
-    assert split_lstring(lstring) == splitted
+def test_split_lstring(lstring, expected):
+    assert split_lstring(lstring) == expected

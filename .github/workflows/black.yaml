@@ -8,6 +8,7 @@ on: [push, pull_request]
 jobs:
   lint:
     runs-on: ubuntu-22.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: psf/black@stable

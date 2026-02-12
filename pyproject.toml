@@ -93,24 +93,6 @@ skip-magic-trailing-comma = true
 line-length = 120
 target-version = "py310"
 
-# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
-select = ["E", "F"]
-
-# for reference ...
-#   E402 module level import not at top
-#   E501 line too long
-#   F401 import unused
-#   F405 undefined or defined from star imports
-#   F811 redef of unused var
-
-# borg code style guidelines:
-# Ignoring E203 due to https://github.com/PyCQA/pycodestyle/issues/373.
-ignore = ["E203", "F405", "E402"]
-
-# Allow autofix for all enabled rules (when `--fix` is provided).
-fixable = ["A", "B", "C", "D", "E", "F", "G", "I", "N", "Q", "S", "T", "W", "ANN", "ARG", "BLE", "COM", "DJ", "DTZ", "EM", "ERA", "EXE", "FBT", "ICN", "INP", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
-unfixable = []
-
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".cache",
@@ -125,6 +107,24 @@ exclude = [
     "dist",
 ]
 
+[tool.ruff.lint]
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
+select = ["E", "F"]
+
+# for reference ...
+#   E402 module level import not at top
+#   E501 line too long
+#   F401 import unused
+#   F405 undefined or defined from star imports
+#   F811 redef of unused var
+
+# borg code style guidelines:
+ignore = ["F405", "E402"]
+
+# Allow autofix for all enabled rules (when `--fix` is provided).
+fixable = ["ALL"]
+unfixable = []
+
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
@@ -132,7 +132,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # please note that the values are adjusted so that they do not cause failures
 # with existing code. if you want to change them, you should first fix all
 # ruff failures that appear with your change.
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "scripts/make.py" = ["E501"]
 "src/borg/archive.py" = ["E501"]
 "src/borg/archiver/help_cmd.py" = ["E501"]
@@ -142,7 +142,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "src/borg/testsuite/archiver/disk_full_test.py" = ["F811"]
 "src/borg/testsuite/archiver/return_codes_test.py" = ["F811"]
 "src/borg/testsuite/benchmark_test.py" = ["F811"]
-"src/borg/testsuite/platform_test.py" = ["F811"]
+"src/borg/testsuite/platform/platform_test.py" = ["F811"]
 
 [tool.pytest.ini_options]
 markers = []

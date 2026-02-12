@@ -592,7 +592,7 @@ These are your options to protect against that:
 How can I protect against theft, sabotage, lightning, fire, ...?
 ----------------------------------------------------------------
 
-In general: if your only backup medium is nearby the backupped machine and
+In general: if your only backup medium is nearby the backed-up machine and
 always connected, you can easily get into trouble: they likely share the same
 fate if something goes really wrong.
 

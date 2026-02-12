@@ -402,7 +402,7 @@ class Repository:
                 except StoreObjectNotFound:
                     pass
                 if not partial:
-                    # if we did a full pass in one go, we built a complete, uptodate ChunkIndex, cache it!
+                    # if we did a full pass in one go, we built a complete, up-to-date ChunkIndex, cache it!
                     from .cache import write_chunkindex_to_repo_cache
 
                     write_chunkindex_to_repo_cache(

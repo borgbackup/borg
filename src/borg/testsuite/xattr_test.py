@@ -78,7 +78,7 @@ def test_getxattr_buffer_growth(tempfile_symlink):
 
 
 @pytest.mark.parametrize(
-    "lstring, splitted", [(b"", []), (b"\x00", [b""]), (b"\x01a", [b"a"]), (b"\x01a\x02cd", [b"a", b"cd"])]
+    "lstring, expected", [(b"", []), (b"\x00", [b""]), (b"\x01a", [b"a"]), (b"\x01a\x02cd", [b"a", b"cd"])]
 )
-def test_split_lstring(lstring, splitted):
-    assert split_lstring(lstring) == splitted
+def test_split_lstring(lstring, expected):
+    assert split_lstring(lstring) == expected

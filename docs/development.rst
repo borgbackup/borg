@@ -136,7 +136,7 @@ Start by checking out the appropriate branch:
     git checkout master
 
 It is best practice for a developer to keep local ``master`` branch as an
-uptodate copy of the upstream ``master`` branch and always do own work in a
+up-to-date copy of the upstream ``master`` branch and always do own work in a
 separate feature or bugfix branch.
 This is useful to be able to rebase own branches onto the upstream branches
 they were branched from, if necessary.
@@ -194,7 +194,7 @@ Rebase feature branch onto updated master branch
 ------------------------------------------------
 
 After updating the local ``master`` branch from upstream, the feature branch
-can be checked out and rebased onto (the now uptodate) ``master`` branch.
+can be checked out and rebased onto (the now up-to-date) ``master`` branch.
 ::
 
     git checkout MYCONTRIB-master

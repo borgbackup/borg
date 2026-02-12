@@ -925,7 +925,7 @@ change rate-limit on the fly:
 
     pv -R $(pidof pv) -L 102400
 
-.. _pipeviewer: http://www.ivarch.com/programs/pv.shtml
+.. _pipeviewer: https://www.ivarch.com/programs/pv.shtml
 
 
 How can I avoid unwanted base directories getting stored into archives?

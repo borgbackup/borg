@@ -396,6 +396,11 @@ jobs:
             display_name: OpenBSD
             do_binaries: false
 
+          - os: omnios
+            version: 'r151056'
+            display_name: OmniOS
+            do_binaries: false
+
           - os: haiku
             version: 'r1beta5'
             display_name: Haiku
@@ -521,6 +526,33 @@ jobs:
 
                 export BORG_OPENSSL_NAME=eopenssl34
                 tox -e py312-none
+                ;;
+
+              omnios)
+                sudo pkg install gcc14 git pkg-config python-313 gnu-make gnu-coreutils
+                sudo ln -sf /usr/bin/python3.13 /usr/bin/python3
+                sudo ln -sf /usr/bin/python3.13-config /usr/bin/python3-config
+                sudo python3 -m ensurepip
+                sudo python3 -m pip install virtualenv
+
+                # install libxxhash from source
+                git clone --depth 1 https://github.com/Cyan4973/xxHash.git
+                cd xxHash
+                sudo gmake install INSTALL=/usr/gnu/bin/install PREFIX=/usr/local
+                cd ..
+                export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+                export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
+
+                python3 -m venv .venv
+                . .venv/bin/activate
+                python -V
+                pip -V
+                python -m pip install --upgrade pip wheel
+                pip install -r requirements.d/development.txt
+                # no fuse support on omnios in our tests usually
+                pip install -e .
+
+                tox -e py313-none
                 ;;
 
               haiku)

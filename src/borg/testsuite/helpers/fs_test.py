@@ -318,6 +318,23 @@ def test_invalid_make_path_safe(path):
         make_path_safe(path)
 
 
+def test_make_path_safe_win32_drive_letters(monkeypatch):
+    monkeypatch.setattr("borg.helpers.fs.is_win32", True)
+    # Basic drive letter
+    assert make_path_safe("C:\\Users") == "C/Users"
+    assert make_path_safe("C:\\Users\\test") == "C/Users/test"
+    # Lowercase drive letter -> Uppercase
+    assert make_path_safe("c:\\windows") == "C/windows"
+    # Relative path with backslashes
+    assert make_path_safe("foo\\bar") == "foo/bar"
+    # Just drive letter
+    assert make_path_safe("D:") == "D"
+    # Drive letter with forward slash
+    assert make_path_safe("E:/test") == "E/test"
+    # Mixed separators
+    assert make_path_safe("F:\\Mixed/Separators") == "F/Mixed/Separators"
+
+
 def test_dir_is_tagged(tmpdir):
     """Test dir_is_tagged with both path-based and file descriptor-based operations."""
 

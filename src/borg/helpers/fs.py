@@ -252,6 +252,12 @@ def make_path_safe(path):
     if "\\.." in path or "..\\" in path:
         raise ValueError(f"unexpected '..' element in path {path!r}")
 
+    path = slashify(path)
+
+    if is_win32 and len(path) >= 2 and path[1] == ":":
+        # Handle drive letters: C:/path -> C/path
+        path = path[0].upper() + path[2:]
+
     path = map_chars(path)
 
     path = path.lstrip("/")

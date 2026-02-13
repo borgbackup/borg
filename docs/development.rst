@@ -304,6 +304,50 @@ Usage::
    # To copy files from the VM (in this case, the generated binary):
    vagrant scp OS:/vagrant/borg/borg.exe .
 
+Using Podman
+------------
+
+macOS-based developers (and others who prefer containers) can run the Linux test suite locally using Podman.
+
+Prerequisites:
+
+-   Install Podman (e.g., ``brew install podman``).
+-   Initialize the Podman machine, only once: ``podman machine init``.
+-   Start the Podman machine, before using it: ``podman machine start``.
+
+Usage::
+
+    # Open an interactive shell in the container (default if no command given):
+    ./scripts/linux-run
+
+    # Run the default tox environment:
+    ./scripts/linux-run tox
+
+    # Run a specific tox environment:
+    ./scripts/linux-run tox -e py311-pyfuse3
+
+    # Pass arguments to pytest (e.g., run specific tests):
+    ./scripts/linux-run tox -e py313-pyfuse3 -- -k mount
+
+    # Switch base image (temporarily):
+    ./scripts/linux-run --image python:3.11-bookworm tox
+
+Resource Usage
+~~~~~~~~~~~~~~
+
+The default Podman VM uses 2GB RAM and half your CPUs.
+For heavy tests (parallel execution), this might be tight.
+
+-   **Check usage:** Run ``podman stats`` in another terminal while tests are running.
+-   **Increase resources:**
+
+    ::
+
+        podman machine stop
+        podman machine set --cpus 6 --memory 4096
+        podman machine start
+
+
 Creating standalone binaries
 ----------------------------
 

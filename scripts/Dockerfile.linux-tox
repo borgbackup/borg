@@ -1,0 +1,30 @@
+ARG BASE_IMAGE=python:3.13
+FROM ${BASE_IMAGE}
+
+# Install system dependencies
+# These match the dependencies installed in CI for Linux (Debian/Ubuntu)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    libacl1-dev \
+    libxxhash-dev \
+    liblz4-dev \
+    libzstd-dev \
+    libfuse3-dev \
+    fuse3 \
+    python3-dev \
+    git \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install tox
+RUN pip install tox
+
+# Set working directory
+WORKDIR /app
+
+# Check that we have the expected python version
+RUN python3 --version
+
+# Default command (can be overridden)
+CMD ["tox"]

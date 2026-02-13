@@ -344,7 +344,7 @@ jobs:
         tox --skip-missing-interpreters -- --junitxml=test-results.xml
 
     - name: Upload test results to Codecov
-      if: ${{ !cancelled() }}
+      if: ${{ !cancelled() && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
       uses: codecov/codecov-action@v5
       env:
         OS: ${{ runner.os }}
@@ -356,6 +356,7 @@ jobs:
         files: test-results.xml
 
     - name: Upload coverage to Codecov
+      if: ${{ !cancelled() && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
       uses: codecov/codecov-action@v5
       env:
         OS: ${{ runner.os }}

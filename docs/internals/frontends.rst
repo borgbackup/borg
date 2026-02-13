@@ -280,7 +280,7 @@ and :ref:`borg_list` implement a ``--json`` option which turns their regular out
 
 Some commands, like :ref:`borg_list` and :ref:`borg_diff`, can produce *a lot* of JSON. Since many JSON implementations
 don't support a streaming mode of operation, which is pretty much required to deal with this amount of JSON, these
-commands implement a ``--json-lines`` option which generates output in the `JSON lines <http://jsonlines.org/>`_ format,
+commands implement a ``--json-lines`` option which generates output in the `JSON lines <https://jsonlines.org/>`_ format,
 which is simply a number of JSON objects separated by new lines.
 
 Dates are formatted according to ISO 8601 in local time. No explicit time zone is specified *at this time*

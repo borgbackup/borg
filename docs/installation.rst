@@ -70,8 +70,8 @@ Ubuntu       `Ubuntu packages`_, `Ubuntu PPA`_             ``apt install borgbac
 .. _FreeBSD ports: https://www.freshports.org/archivers/py-borgbackup/
 .. _ebuild: https://packages.gentoo.org/packages/app-backup/borgbackup
 .. _GNU Guix: https://www.gnu.org/software/guix/package-list.html#borg
-.. _pkgsrc: http://pkgsrc.se/sysutils/py-borgbackup
-.. _cauldron: http://madb.mageia.org/package/show/application/0/release/cauldron/name/borgbackup
+.. _pkgsrc: https://pkgsrc.se/sysutils/py-borgbackup
+.. _cauldron: https://madb.mageia.org/package/show/application/0/release/cauldron/name/borgbackup
 .. _.nix file: https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/backup/borgbackup/default.nix
 .. _OpenBSD ports: https://cvsweb.openbsd.org/cgi-bin/cvsweb/ports/sysutils/borgbackup/
 .. _OpenIndiana hipster repository: https://pkg.openindiana.org/hipster/en/search.shtml?token=borg&action=Search
@@ -138,7 +138,7 @@ environment variable before running Borg.
 If a new version is released, you will have to download it manually and replace
 the old version using the same steps as shown above.
 
-.. _pyinstaller: http://www.pyinstaller.org
+.. _pyinstaller: https://www.pyinstaller.org
 .. _releases: https://github.com/borgbackup/borg/releases
 
 .. _source-install:

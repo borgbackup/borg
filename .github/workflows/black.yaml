@@ -15,6 +15,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - uses: psf/black@stable
+      - uses: psf/black@6305bf1ae645ab7541be4f5028a86239316178eb  # 26.1.0
         with:
             version: "~= 24.0"

@@ -5,7 +5,7 @@ import struct
 
 from borghash import HashTableNT
 
-API_VERSION = '1.2_01'
+
 
 cdef _NoDefault = object()
 

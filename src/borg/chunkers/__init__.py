@@ -4,8 +4,6 @@ from .failing import ChunkerFailing
 from .fixed import ChunkerFixed
 from .reader import *  # noqa
 
-API_VERSION = "1.2_01"
-
 
 def get_chunker(algo, *params, **kw):
     key = kw.get("key", None)

@@ -1,5 +1,3 @@
-API_VERSION = "1.2_01"
-
 import os
 import errno
 from typing import BinaryIO, Iterator

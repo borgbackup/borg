@@ -3,8 +3,6 @@
 
 from typing import Optional, Union
 
-API_VERSION: str
-
 # Module-level functions
 def num_cipher_blocks(length: int, blocksize: int = 16) -> int:
     """Return the number of cipher blocks required to encrypt/decrypt <length> bytes of data."""

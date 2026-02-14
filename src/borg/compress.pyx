@@ -29,7 +29,7 @@ except ImportError:
 from .constants import MAX_DATA_SIZE, ROBJ_FILE_STREAM
 from .helpers import Buffer, DecompressionError
 
-API_VERSION = '1.2_02'
+
 
 cdef extern from "lz4.h":
     int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxOutputSize) nogil

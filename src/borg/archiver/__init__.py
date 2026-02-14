@@ -40,7 +40,7 @@ try:
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
-    from ..helpers import check_extension_modules
+
     from ..helpers import is_slow_msgpack, is_supported_msgpack, sysinfo
     from ..helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
     from ..helpers import ErrorIgnoringTextIOWrapper
@@ -456,7 +456,6 @@ class Archiver(
 
     def prerun_checks(self, logger, is_serve):
 
-        check_extension_modules()
         selftest(logger)
 
     def _setup_implied_logging(self, args):

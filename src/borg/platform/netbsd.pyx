@@ -1,6 +1,6 @@
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
 
-API_VERSION = '1.2_05'
+
 
 cdef extern from "sys/extattr.h":
     ssize_t c_extattr_list_file "extattr_list_file" (const char *path, int attrnamespace, void *data, size_t nbytes)

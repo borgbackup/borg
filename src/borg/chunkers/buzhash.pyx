@@ -1,6 +1,6 @@
 # cython: language_level=3
 
-API_VERSION = '1.2_01'
+
 
 import cython
 import time

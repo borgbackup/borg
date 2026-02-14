@@ -17,7 +17,7 @@ except ImportError:
 
 from libc cimport errno
 
-API_VERSION = '1.2_05'
+
 
 cdef extern from "sys/xattr.h":
     ssize_t c_listxattr "listxattr" (const char *path, char *list, size_t size)

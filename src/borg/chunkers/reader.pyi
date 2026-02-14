@@ -1,7 +1,5 @@
 from typing import NamedTuple, Tuple, Dict, List, Any, Type, BinaryIO, Iterator
 
-API_VERSION: str
-
 has_seek_hole: bool
 
 class _Chunk(NamedTuple):

@@ -1,0 +1,110 @@
+#!/bin/bash
+# run commands in a linux container, e.g. for testing - for more info, see docs/development.rst.
+
+set -euo pipefail
+# set -x # Uncomment for debugging
+
+# Default configuration
+BASE_IMAGE="python:3.13"
+IMAGE_NAME="borg-test-env"
+CONTAINER_NAME="borg-test-runner"
+
+usage() {
+    echo "Usage: $0 [options] [command [args...]]"
+    echo ""
+    echo "Options:"
+    echo "  --image IMAGE    Base Docker image to use (default: $BASE_IMAGE)"
+    echo "  --rebuild        Force rebuild of the container image"
+    echo "  --help           Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                                       # Open interactive shell (default)"
+    echo "  $0 tox -e py313-pyfuse3                  # Run tox in the container"
+    echo "  $0 --image python:3.11 tox -e py311-none # Run with specific image"
+    echo "  $0 ls -la                                # Run arbitrary command"
+    exit 1
+}
+
+# Parse specific arguments
+REBUILD=false
+
+# We use an array to store the command and its arguments.
+COMMAND=()
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --image)
+            BASE_IMAGE="$2"
+            shift 2
+            ;;
+        --rebuild)
+            REBUILD=true
+            shift
+            ;;
+        --help)
+            usage
+            ;;
+        --)
+            # Stop option parsing and treat the rest as command
+            shift
+            COMMAND+=("$@")
+            break
+            ;;
+        *)
+            # Stop option parsing and treat this and the rest as command
+            COMMAND+=("$@")
+            break
+            ;;
+    esac
+done
+
+# Ensure Podman is available
+if ! command -v podman &> /dev/null; then
+    echo "Error: podman is not installed. Please run 'brew install podman' and initialize it."
+    exit 1
+fi
+
+# Build the image if needed or requested.
+# We tag the image with the base image name to allow multiple versions.
+TAG_SUFFIX=$(echo "$BASE_IMAGE" | tr ':' '-')
+FULL_IMAGE_NAME="${IMAGE_NAME}:${TAG_SUFFIX}"
+
+if [[ "$REBUILD" == "true" ]] || ! podman image exists "$FULL_IMAGE_NAME"; then
+    echo "Building test image based on $BASE_IMAGE..."
+    podman build \
+        --build-arg BASE_IMAGE="$BASE_IMAGE" \
+        -t "$FULL_IMAGE_NAME" \
+        -f scripts/Dockerfile.linux-tox .
+fi
+
+echo "Running in container..."
+echo "Base Image: $BASE_IMAGE"
+if [[ ${#COMMAND[@]} -gt 0 ]]; then
+    echo "Command: ${COMMAND[*]}"
+else
+    echo "Command: /bin/bash (default)"
+fi
+
+# Run the container
+# --userns=keep-id: Maps the container user to the host user (Crucial for macOS volume mounts)
+# --security-opt label=disable: Disables SELinux separation if active (harmless on macOS)
+# --device /dev/fuse: Required for FUSE filesystem support (borg mount tests)
+# --volume $(pwd):/app: Mounts current directory to /app
+# --mount type=volume,dst=/tmp: Using a volume for /tmp to prevent issues with tmp files from different users
+
+CMD=(podman run --rm -it \
+    --name "$CONTAINER_NAME" \
+    --userns=keep-id \
+    --cap-add SYS_ADMIN \
+    --security-opt label=disable \
+    --device /dev/fuse \
+    --volume "$(pwd):/app" \
+    --mount type=volume,dst=/tmp \
+    --workdir /app \
+    "$FULL_IMAGE_NAME")
+
+if [[ ${#COMMAND[@]} -gt 0 ]]; then
+    "${CMD[@]}" "${COMMAND[@]}"
+else
+    "${CMD[@]}" /bin/bash
+fi

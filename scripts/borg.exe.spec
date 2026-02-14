@@ -12,7 +12,7 @@ basepath = os.path.abspath(os.path.join(here, '..'))
 if is_win32:
     hiddenimports = ['borghash']
 else:
-    hiddenimports = ['borg.platform.posix', 'borghash']
+    hiddenimports = ['borg.platform.posix', 'borghash', 'rich._unicode_data.unicode17-0-0']
 
 block_cipher = None
 
@@ -21,6 +21,7 @@ a = Analysis([os.path.join(basepath, 'src', 'borg', '__main__.py'), ],
              binaries=[],
              datas=[
                 (os.path.join(basepath, 'src', 'borg', 'paperkey.html'), 'borg'),
+                (os.path.join(basepath, 'src', 'borg', 'cockpit', 'cockpit.tcss'), os.path.join('borg', 'cockpit')),
              ],
              hiddenimports=hiddenimports,
              hookspath=[],

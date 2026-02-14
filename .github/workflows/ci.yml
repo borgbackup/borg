@@ -277,13 +277,13 @@ jobs:
     - name: Install borgbackup
       run: |
         if [[ "$TOXENV" == *"llfuse"* ]]; then
-          pip install -ve ".[llfuse]"
+          pip install -ve ".[llfuse,cockpit,s3,sftp]"
         elif [[ "$TOXENV" == *"pyfuse3"* ]]; then
-          pip install -ve ".[pyfuse3]"
+          pip install -ve ".[pyfuse3,cockpit,s3,sftp]"
         elif [[ "$TOXENV" == *"mfusepy"* ]]; then
-          pip install -ve ".[mfusepy]"
+          pip install -ve ".[mfusepy,cockpit,s3,sftp]"
         else
-          pip install -ve .
+          pip install -ve ".[cockpit,s3,sftp]"
         fi
 
     - name: Build Borg fat binaries (${{ matrix.binary }})
@@ -305,6 +305,8 @@ jobs:
         ./borg-dir/borg.exe -V
         tar czf borg.tgz borg-dir
         popd
+        # Ensure locally built binary in ./dist/binary/borg-dir is found during tests
+        export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
         echo "borg.exe binary in PATH"
         borg.exe -V
 
@@ -454,7 +456,7 @@ jobs:
                 pip -V
                 python -m pip install --upgrade pip wheel
                 pip install -r requirements.d/development.txt
-                pip install -e ".[mfusepy]"
+                pip install -e ".[mfusepy,cockpit,s3,sftp]"
                 tox -e py311-mfusepy
 
                 if [[ "${{ matrix.do_binaries }}" == "true" && "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
@@ -638,7 +640,7 @@ jobs:
         run: |
           # build borg.exe
           . env/bin/activate
-          pip install -e .
+          pip install -e ".[cockpit,s3,sftp]"
           mkdir -p dist/binary
           pyinstaller -y --clean --distpath=dist/binary scripts/borg.exe.spec
           # build sdist and wheel in dist/...

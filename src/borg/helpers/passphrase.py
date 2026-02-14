@@ -41,6 +41,12 @@ class PasswordRetriesExceeded(Error):
 
 class Passphrase(str):
     @classmethod
+    def _check_ambiguity(cls, vars):
+        set_vars = [v for v in vars if v in os.environ]
+        if len(set_vars) > 1:
+            raise Error("More than one passphrase environment variable is set: " + ", ".join(set_vars))
+
+    @classmethod
     def _env_passphrase(cls, env_var, default=None):
         passphrase = os.environ.get(env_var, default)
         if passphrase is not None:
@@ -48,6 +54,10 @@ class Passphrase(str):
 
     @classmethod
     def env_passphrase(cls, default=None, other=False):
+        if other:
+            cls._check_ambiguity(["BORG_OTHER_PASSPHRASE", "BORG_OTHER_PASSCOMMAND", "BORG_OTHER_PASSPHRASE_FD"])
+        else:
+            cls._check_ambiguity(["BORG_PASSPHRASE", "BORG_PASSCOMMAND", "BORG_PASSPHRASE_FD"])
         env_var = "BORG_OTHER_PASSPHRASE" if other else "BORG_PASSPHRASE"
         passphrase = cls._env_passphrase(env_var, default)
         if passphrase is not None:

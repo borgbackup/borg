@@ -1,16 +1,4 @@
-import os
-
 from .errors import RTError
-from ..platformflags import is_win32
-
-
-def check_python():
-    if is_win32:
-        required_funcs = {os.stat}
-    else:
-        required_funcs = {os.stat, os.utime, os.chown}
-    if not os.supports_follow_symlinks.issuperset(required_funcs):
-        raise RTError("""FATAL: This Python was compiled for a too old (g)libc and lacks required functionality.""")
 
 
 def check_extension_modules():

@@ -10,7 +10,7 @@ import logging
 from collections import namedtuple
 
 from ..constants import *  # NOQA
-from .checks import check_extension_modules, check_python
+from .checks import check_extension_modules
 from .datastruct import StableDict, Buffer, EfficientCollectionQueue
 from .errors import Error, ErrorWithTraceback, IntegrityError, DecompressionError, CancelledByUser, CommandError
 from .errors import RTError, modern_ec

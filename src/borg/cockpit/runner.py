@@ -28,7 +28,10 @@ class BorgRunner:
             self.logger.warning("Borg process already running.")
             return
 
-        cmd = [sys.executable, "-m", "borg"] + self.command
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable] + self.command  # executable == pyinstaller binary
+        else:
+            cmd = [sys.executable, "-m", "borg"] + self.command  # executable == python interpreter
 
         self.logger.info(f"Starting Borg process: {cmd}")
 

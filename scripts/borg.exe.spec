@@ -27,7 +27,7 @@ a = Analysis([os.path.join(basepath, 'src', 'borg', '__main__.py'), ],
              hookspath=[],
              runtime_hooks=[],
              excludes=[
-                '_ssl', 'ssl',
+                # '_ssl', 'ssl',  # do not exclude these, needed for pyfuse3/trio
                 'pkg_resources',  # avoid pkg_resources related warnings
              ],
              win_no_prefer_redirects=False,

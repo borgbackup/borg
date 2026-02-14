@@ -10,6 +10,7 @@ on:
       - '**.pyx'
       - '**.c'
       - '**.h'
+      - '.github/workflows/codeql-analysis.yml'
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ master ]
@@ -18,6 +19,7 @@ on:
       - '**.pyx'
       - '**.c'
       - '**.h'
+      - '.github/workflows/codeql-analysis.yml'
   schedule:
     - cron: '39 2 * * 5'
 

@@ -8,10 +8,12 @@ on:
     paths:
       - '**.py'
       - 'pyproject.toml'
+      - '.github/workflows/black.yaml'
   pull_request:
     paths:
       - '**.py'
       - 'pyproject.toml'
+      - '.github/workflows/black.yaml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}

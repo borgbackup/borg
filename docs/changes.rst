@@ -414,11 +414,38 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.3 (2025-12-02)
---------------------------
+Version 1.4.4 (not yet released)
+--------------------------------
 
 For upgrade and compatibility hints, please also read the "Upgrade Notes" section
 above.
+
+New features:
+
+- prune: added -v / --info output, #9262
+- mount: warn about symlinks pointing outside of the mountpoint, #9254    
+
+Fixes:
+
+- compress: make Padme size obfuscation usable ("obfuscate,250,...")
+
+Other changes:
+
+- pyinstaller binary: do not exclude ssl, needed for pyfuse3/trio, #9196
+- mount: fuse fs performance improvement
+- CI / tests:
+
+  - build linux binaries with pyfuse3
+  - use macos-15 to build the binaries
+  - tox: use pytest -n auto by default to speed up tests
+  - scripts/linux-run: run commands (e.g. tox) in a podman linux container
+- docs:
+  - fix typos found by codespell
+  - update binary readme
+
+
+Version 1.4.3 (2025-12-02)
+--------------------------
 
 New features:
 

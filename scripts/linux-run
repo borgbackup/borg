@@ -74,7 +74,7 @@ if [[ "$REBUILD" == "true" ]] || ! podman image exists "$FULL_IMAGE_NAME"; then
     podman build \
         --build-arg BASE_IMAGE="$BASE_IMAGE" \
         -t "$FULL_IMAGE_NAME" \
-        -f scripts/Dockerfile.linux-tox .
+        -f scripts/Dockerfile.linux-run .
 fi
 
 echo "Running in container..."

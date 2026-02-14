@@ -8,7 +8,7 @@ from . import posix_ug
 from ..helpers import safe_decode, safe_encode
 from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
 
-API_VERSION = '1.2_05'
+
 
 cdef extern from *:
     """

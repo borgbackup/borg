@@ -45,7 +45,7 @@ from libc.stdlib cimport malloc, free
 from libc.stdint cimport uint8_t, uint32_t, uint64_t
 from libc.string cimport memset, memcpy
 
-API_VERSION = '1.3_01'
+
 
 cdef extern from "openssl/crypto.h":
     int CRYPTO_memcmp(const void *a, const void *b, size_t len)

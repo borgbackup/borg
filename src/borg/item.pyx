@@ -17,7 +17,7 @@ cdef extern from "_item.c":
     object _optr_to_object(object bytes)
 
 
-API_VERSION = '1.2_01'
+
 
 
 def fix_key(data, key, *, errors='strict'):

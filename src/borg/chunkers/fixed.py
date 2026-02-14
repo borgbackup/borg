@@ -1,6 +1,5 @@
 from typing import Iterator, BinaryIO
 
-API_VERSION = "1.2_01"
 
 import time
 

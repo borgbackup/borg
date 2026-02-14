@@ -20,7 +20,6 @@ platform API; in this way, platform APIs provided by the platform-specific suppo
 are correctly composed into the base functionality.
 """
 
-API_VERSION = "1.2_05"
 
 fdatasync = getattr(os, "fdatasync", os.fsync)
 has_posix_fadvise = hasattr(os, "posix_fadvise")

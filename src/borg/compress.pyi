@@ -1,7 +1,5 @@
 from typing import Any, Type, Dict, Tuple
 
-API_VERSION: str
-
 def get_compressor(name: str, **kwargs) -> Any: ...
 
 class CompressionSpec:

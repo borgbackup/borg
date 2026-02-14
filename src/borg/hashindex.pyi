@@ -1,7 +1,5 @@
 from typing import NamedTuple, Tuple, Type, IO, Iterator, Any
 
-API_VERSION: str
-
 PATH_OR_FILE = str | IO
 
 class ChunkIndexEntry(NamedTuple):

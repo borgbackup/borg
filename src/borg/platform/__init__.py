@@ -8,7 +8,7 @@ from types import ModuleType
 
 from ..platformflags import is_win32, is_linux, is_freebsd, is_netbsd, is_darwin, is_cygwin, is_haiku
 
-from .base import ENOATTR, API_VERSION
+from .base import ENOATTR
 from .base import SaveFile, sync_dir, fdatasync, safe_fadvise
 from .base import get_process_id, fqdn, hostname, hostid, swidth
 
@@ -18,7 +18,6 @@ from . import xattr  # noqa: F401
 platform_ug: ModuleType | None = None  # make mypy happy
 
 if is_linux:  # pragma: linux only
-    from .linux import API_VERSION as OS_API_VERSION
     from .linux import listxattr, getxattr, setxattr
     from .linux import acl_get, acl_set
     from .linux import set_flags, get_flags
@@ -28,7 +27,6 @@ if is_linux:  # pragma: linux only
     from .posix import getosusername
     from . import posix_ug as platform_ug
 elif is_freebsd:  # pragma: freebsd only
-    from .freebsd import API_VERSION as OS_API_VERSION
     from .freebsd import listxattr, getxattr, setxattr
     from .freebsd import acl_get, acl_set
     from .freebsd import set_flags
@@ -39,7 +37,6 @@ elif is_freebsd:  # pragma: freebsd only
     from .posix import getosusername
     from . import posix_ug as platform_ug
 elif is_netbsd:  # pragma: netbsd only
-    from .netbsd import API_VERSION as OS_API_VERSION
     from .netbsd import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
@@ -49,7 +46,6 @@ elif is_netbsd:  # pragma: netbsd only
     from .posix import getosusername
     from . import posix_ug as platform_ug
 elif is_darwin:  # pragma: darwin only
-    from .darwin import API_VERSION as OS_API_VERSION
     from .darwin import listxattr, getxattr, setxattr
     from .darwin import acl_get, acl_set
     from .darwin import is_darwin_feature_64_bit_inode, _get_birthtime_ns
@@ -62,7 +58,6 @@ elif is_darwin:  # pragma: darwin only
     from . import posix_ug as platform_ug
 elif not is_win32:  # pragma: posix only
     # Generic code for all other POSIX OSes
-    OS_API_VERSION = API_VERSION
     from .base import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
@@ -73,7 +68,6 @@ elif not is_win32:  # pragma: posix only
     from . import posix_ug as platform_ug
 else:  # pragma: win32 only
     # Win32-specific stuff
-    OS_API_VERSION = API_VERSION
     from .base import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags

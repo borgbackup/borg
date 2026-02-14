@@ -2,8 +2,6 @@ from typing import Set, NamedTuple, Tuple, Mapping, Dict, List, Iterator, Callab
 
 from .helpers import StableDict
 
-API_VERSION: str
-
 def want_bytes(v: Any, *, errors: str = ...) -> bytes: ...
 def chunks_contents_equal(chunks1: Iterator, chunks2: Iterator) -> bool: ...
 

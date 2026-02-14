@@ -3,7 +3,15 @@
 
 name: Lint
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+  pull_request:
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}

@@ -7,8 +7,8 @@ Data structures and file formats
 ================================
 
 This page documents the internal data structures and storage
-mechanisms of Borg. It is partly based on `mailing list
-discussion about internals`_ and also on static code analysis.
+mechanisms of Borg. It is partly based on mailing list
+discussions and also on static code analysis.
 
 .. todo:: Clarify terms, perhaps create a glossary.
           ID (client?) vs. key (repository?),

@@ -150,7 +150,7 @@ def get_cache_dir(*, legacy=False, create=True):
                     """
             # This file is a cache directory tag created by Borg.
             # For information about cache directory tags, see:
-            #       http://www.bford.info/cachedir/spec.html
+            #       https://www.bford.info/cachedir/spec.html
             """
                 ).encode("ascii")
             )
@@ -184,7 +184,7 @@ def get_config_dir(*, legacy=False, create=True):
 def dir_is_cachedir(path=None, dir_fd=None):
     """Determines whether the specified directory is a cache directory (and
     therefore should potentially be excluded from the backup) according to
-    the CACHEDIR.TAG protocol (http://www.bford.info/cachedir/spec.html).
+    the CACHEDIR.TAG protocol (https://www.bford.info/cachedir/spec.html).
 
     If dir_fd is provided, operations will be based on the directory file descriptor.
     Otherwise (path is provided), operations will be based on the directory path.

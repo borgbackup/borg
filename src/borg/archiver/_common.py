@@ -298,7 +298,7 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
             "--exclude-caches",
             dest="exclude_caches",
             action="store_true",
-            help="exclude directories that contain a CACHEDIR.TAG file " "(http://www.bford.info/cachedir/spec.html)",
+            help="exclude directories that contain a CACHEDIR.TAG file " "(https://www.bford.info/cachedir/spec.html)",
         )
         add_option(
             "--exclude-if-present",

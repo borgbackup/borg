@@ -15,7 +15,7 @@ def test_tag_set(archivers, request):
     assert "tags: aa." in output
     output = cmd(archiver, "tag", "-a", "archive", "--set", "bb")
     assert "tags: bb." in output
-    output = cmd(archiver, "tag", "-a", "archive", "--set", "bb", "--set", "aa")
+    output = cmd(archiver, "tag", "-a", "archive", "--set", "bb", "aa")
     assert "tags: aa,bb." in output  # sorted!
     output = cmd(archiver, "tag", "-a", "archive", "--set", "")
     assert "tags: ." in output  # no tags!
@@ -46,7 +46,7 @@ def test_tag_set_noclobber_special(archivers, request):
     output = cmd(archiver, "tag", "-a", "archive", "--set", "clobber")
     assert "tags: @PROT." in output
     # it is possible though to use --set if the existing special tags are also given:
-    output = cmd(archiver, "tag", "-a", "archive", "--set", "noclobber", "--set", "@PROT")
+    output = cmd(archiver, "tag", "-a", "archive", "--set", "noclobber", "@PROT")
     assert "tags: @PROT,noclobber." in output
 
 

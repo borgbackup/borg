@@ -95,7 +95,7 @@ class TagMixIn:
             dest="set_tags",
             metavar="TAG",
             type=tag_validator,
-            action="append",
+            nargs="*",
             help="set tags (can be given multiple times)",
         )
         subparser.add_argument(
@@ -103,7 +103,7 @@ class TagMixIn:
             dest="add_tags",
             metavar="TAG",
             type=tag_validator,
-            action="append",
+            nargs="*",
             help="add tags (can be given multiple times)",
         )
         subparser.add_argument(
@@ -111,7 +111,7 @@ class TagMixIn:
             dest="remove_tags",
             metavar="TAG",
             type=tag_validator,
-            action="append",
+            nargs="*",
             help="remove tags (can be given multiple times)",
         )
         define_archive_filters_group(subparser)

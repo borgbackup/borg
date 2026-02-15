@@ -46,6 +46,7 @@ try:
     from ..helpers import ErrorIgnoringTextIOWrapper
     from ..helpers import msgpack
     from ..helpers import sig_int
+    from ..platformflags import is_win32, is_msystem
     from ..remote import RemoteRepository
     from ..selftest import selftest
 except BaseException:
@@ -455,7 +456,14 @@ class Archiver(
         return args
 
     def prerun_checks(self, logger, is_serve):
-
+        if not is_serve:
+            if is_win32 and is_msystem:
+                if "MSYS2_ARG_CONV_EXCL" not in os.environ or "MSYS2_ENV_CONV_EXCL" not in os.environ:
+                    logger.warning(
+                        "MSYS2 path translation is active. This can cause POSIX paths to be mangled into "
+                        "Windows paths in archives. Consider setting MSYS2_ARG_CONV_EXCL='*' and "
+                        "MSYS2_ENV_CONV_EXCL='*'. See https://www.msys2.org/docs/filesystem-paths/ for details."
+                    )
         selftest(logger)
 
     def _setup_implied_logging(self, args):

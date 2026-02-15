@@ -18,6 +18,7 @@ and jsonargparse's API. Key adaptations:
 import argparse
 
 from jsonargparse import ArgumentParser as _JAPArgumentParser
+from jsonargparse._core import ArgumentGroup as _JAPArgumentGroup
 
 
 def _is_highlander_action(action):
@@ -56,8 +57,8 @@ def _make_type_converting_action(base_action_name, type_fn):
     return TypeConvertingAction
 
 
-class ArgumentParser(_JAPArgumentParser):
-    """ArgumentParser bridging Borg's argparse patterns with jsonargparse."""
+class BorgAddArgumentMixin:
+    """Mixin to provide Borg's add_argument logic to ArgumentParser and ArgumentGroup."""
 
     def add_argument(self, *args, **kwargs):
         """Handle type+action combination that jsonargparse forbids.
@@ -106,6 +107,22 @@ class ArgumentParser(_JAPArgumentParser):
                 return result
 
         return super().add_argument(*args, **kwargs)
+
+
+class ArgumentGroup(BorgAddArgumentMixin, _JAPArgumentGroup):
+    """ArgumentGroup that supports Borg's add_argument patterns."""
+
+    pass
+
+
+class ArgumentParser(BorgAddArgumentMixin, _JAPArgumentParser):
+    """ArgumentParser bridging Borg's argparse patterns with jsonargparse."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Force jsonargparse to use our ArgumentGroup class instead of trying to
+        # auto-generate one from source code (which is fragile and fails on Windows CI).
+        self._group_class = ArgumentGroup
 
 
 def flatten_namespace(args):

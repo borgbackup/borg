@@ -47,6 +47,9 @@ else:
 if sys.platform.startswith("netbsd"):
     st_mtime_ns_round = -4  # 10us - strange: only >1 microsecond resolution here?
 
+if is_win32:
+    st_mtime_ns_round = -7  # 10ms resolution
+
 
 def same_ts_ns(ts_ns1, ts_ns2):
     """Compare two timestamps (both in nanoseconds) to determine whether they are (roughly) equal."""
@@ -187,24 +190,29 @@ def is_utime_fully_supported():
         # Some filesystems (such as SSHFS) don't support utime on symlinks
         if are_symlinks_supported():
             os.symlink("something", filepath)
+            try:
+                os.utime(filepath, (1000, 2000), follow_symlinks=False)
+                new_stats = os.stat(filepath, follow_symlinks=False)
+                if new_stats.st_atime == 1000 and new_stats.st_mtime == 2000:
+                    return True
+            except OSError:
+                pass
+            except NotImplementedError:
+                pass
         else:
             open(filepath, "w").close()
-        try:
-            os.utime(filepath, (1000, 2000), follow_symlinks=False)
-            new_stats = os.stat(filepath, follow_symlinks=False)
-            if new_stats.st_atime == 1000 and new_stats.st_mtime == 2000:
-                return True
-        except OSError:
-            pass
-        except NotImplementedError:
-            pass
-        return False
+            try:
+                os.utime(filepath, (1000, 2000))
+                new_stats = os.stat(filepath)
+                if new_stats.st_atime == 1000 and new_stats.st_mtime == 2000:
+                    return True
+            except OSError:
+                pass
+    return False
 
 
 @functools.lru_cache
 def is_birthtime_fully_supported():
-    if not hasattr(os.stat_result, "st_birthtime"):
-        return False
     with unopened_tempfile() as filepath:
         # Some filesystems (such as SSHFS) don't support utime on symlinks
         if are_symlinks_supported():
@@ -212,15 +220,19 @@ def is_birthtime_fully_supported():
         else:
             open(filepath, "w").close()
         try:
-            birthtime, mtime, atime = 946598400, 946684800, 946771200
-            os.utime(filepath, (atime, birthtime), follow_symlinks=False)
-            os.utime(filepath, (atime, mtime), follow_symlinks=False)
-            new_stats = os.stat(filepath, follow_symlinks=False)
-            if new_stats.st_birthtime == birthtime and new_stats.st_mtime == mtime and new_stats.st_atime == atime:
+            birthtime_ns, mtime_ns, atime_ns = 946598400 * 10**9, 946684800 * 10**9, 946771200 * 10**9
+            platform.set_birthtime(filepath, birthtime_ns)
+            os.utime(filepath, ns=(atime_ns, mtime_ns))
+            new_stats = os.stat(filepath)
+            bt = platform.get_birthtime_ns(new_stats, filepath)
+            if (
+                bt is not None
+                and same_ts_ns(bt, birthtime_ns)
+                and same_ts_ns(new_stats.st_mtime_ns, mtime_ns)
+                and same_ts_ns(new_stats.st_atime_ns, atime_ns)
+            ):
                 return True
-        except OSError:
-            pass
-        except NotImplementedError:
+        except (OSError, NotImplementedError, AttributeError):
             pass
         return False
 

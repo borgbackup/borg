@@ -34,6 +34,7 @@ from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
+from . import platform
 from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
 from .helpers import parse_timestamp, archive_ts_now
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
@@ -977,44 +978,13 @@ Duration: {0.duration}
                 if warning:
                     set_ec(EXIT_WARNING)
             # set timestamps rather late
-            mtime = item.mtime
-            atime = item.atime if "atime" in item else mtime
-            if "birthtime" in item:
-                birthtime = item.birthtime
-                try:
-                    # This should work on FreeBSD, NetBSD, and Darwin and be harmless on other platforms.
-                    # See utimes(2) on either of the BSDs for details.
-                    if fd:
-                        os.utime(fd, None, ns=(atime, birthtime))
-                    else:
-                        os.utime(path, None, ns=(atime, birthtime), follow_symlinks=False)
-                except OSError:
-                    # some systems don't support calling utime on a symlink
-                    pass
-            try:
-                if fd:
-                    os.utime(fd, None, ns=(atime, mtime))
-                else:
-                    os.utime(path, None, ns=(atime, mtime), follow_symlinks=False)
-            except OSError:
-                # some systems don't support calling utime on a symlink
-                pass
+            platform.set_timestamps(path, item, fd=fd, follow_symlinks=symlink)
             # bsdflags include the immutable flag and need to be set last:
             if not self.noflags and "bsdflags" in item:
                 try:
                     set_flags(path, item.bsdflags, fd=fd)
                 except OSError:
                     pass
-        else:  # win32
-            # set timestamps rather late
-            mtime = item.mtime
-            atime = item.atime if "atime" in item else mtime
-            try:
-                # note: no fd support on win32
-                os.utime(path, None, ns=(atime, mtime))
-            except OSError:
-                # some systems don't support calling utime on a symlink
-                pass
 
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)

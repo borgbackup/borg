@@ -1,5 +1,7 @@
 import argparse
 
+from ._argparse import ArgumentParser
+
 from ..constants import *  # NOQA
 from ..remote import RepositoryServer
 
@@ -52,16 +54,15 @@ class ServeMixIn:
           Existing archives can be read, but no archives can be created or deleted.
         """
         )
-        subparser = subparsers.add_parser(
-            "serve",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_serve.__doc__,
             epilog=serve_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="start the repository server process",
         )
-        subparser.set_defaults(func=self.do_serve)
+
+        subparsers.add_subcommand("serve", subparser, help="start the repository server process")
         subparser.add_argument(
             "--restrict-to-path",
             metavar="PATH",

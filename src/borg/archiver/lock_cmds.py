@@ -1,4 +1,6 @@
 import argparse
+
+from ._argparse import ArgumentParser
 import subprocess
 
 from ._common import with_repository
@@ -45,16 +47,15 @@ class LocksMixIn:
         trying to access the cache or the repository.
         """
         )
-        subparser = subparsers.add_parser(
-            "break-lock",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_break_lock.__doc__,
             epilog=break_lock_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="break the repository and cache locks",
         )
-        subparser.set_defaults(func=self.do_break_lock)
+
+        subparsers.add_subcommand("break-lock", subparser, help="break the repository and cache locks")
 
         with_lock_epilog = process_epilog(
             """
@@ -77,15 +78,14 @@ class LocksMixIn:
             Borg is cautious and does not automatically remove stale locks made by a different host.
         """
         )
-        subparser = subparsers.add_parser(
-            "with-lock",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_with_lock.__doc__,
             epilog=with_lock_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="run a user command with the lock held",
         )
-        subparser.set_defaults(func=self.do_with_lock)
+
+        subparsers.add_subcommand("with-lock", subparser, help="run a user command with the lock held")
         subparser.add_argument("command", metavar="COMMAND", help="command to run")
         subparser.add_argument("args", metavar="ARGS", nargs=argparse.REMAINDER, help="command arguments")

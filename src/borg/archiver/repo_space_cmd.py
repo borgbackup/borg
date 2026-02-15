@@ -1,4 +1,6 @@
 import argparse
+
+from ._argparse import ArgumentParser
 import math
 import os
 
@@ -86,16 +88,15 @@ class RepoSpaceMixIn:
         Reserved space is always rounded up to full reservation blocks of 64 MiB.
         """
         )
-        subparser = subparsers.add_parser(
-            "repo-space",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_space.__doc__,
             epilog=repo_space_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="manage reserved space in a repository",
         )
-        subparser.set_defaults(func=self.do_repo_space)
+
+        subparsers.add_subcommand("repo-space", subparser, help="manage reserved space in a repository")
         subparser.add_argument(
             "--reserve",
             metavar="SPACE",

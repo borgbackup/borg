@@ -1,4 +1,6 @@
 import argparse
+
+from ._argparse import ArgumentParser
 from collections import OrderedDict
 from datetime import datetime, timezone, timedelta
 import logging
@@ -273,16 +275,15 @@ class PruneMixIn:
         the ``borg repo-list`` description for more details about the format string).
         """
         )
-        subparser = subparsers.add_parser(
-            "prune",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_prune.__doc__,
             epilog=prune_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="prune archives",
         )
-        subparser.set_defaults(func=self.do_prune)
+
+        subparsers.add_subcommand("prune", subparser, help="prune archives")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
         )

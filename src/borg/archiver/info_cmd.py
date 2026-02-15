@@ -1,4 +1,6 @@
 import argparse
+
+from ._argparse import ArgumentParser
 import textwrap
 from datetime import timedelta
 
@@ -77,16 +79,15 @@ class InfoMixIn:
         = all chunks in the repository.
         """
         )
-        subparser = subparsers.add_parser(
-            "info",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_info.__doc__,
             epilog=info_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="show repository or archive information",
         )
-        subparser.set_defaults(func=self.do_info)
+
+        subparsers.add_subcommand("info", subparser, help="show repository or archive information")
         subparser.add_argument("--json", action="store_true", help="format output as JSON")
         define_archive_filters_group(subparser)
         subparser.add_argument(

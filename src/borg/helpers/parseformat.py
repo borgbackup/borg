@@ -1309,13 +1309,27 @@ class Highlander(argparse.Action):
     """make sure some option is only given once"""
 
     def __init__(self, *args, **kwargs):
+        # Pick up type function from class attribute (set by BoundHighlander in _argparse.py)
+        # or from kwargs (for direct use with standard argparse).
+        self._type_fn = getattr(self.__class__, "_type_fn_override", None) or kwargs.pop("type", None)
         self.__called = False
         super().__init__(*args, **kwargs)
+        # Apply the type function to string defaults so that converted values
+        # are used even when the option is not given on the command line.
+        # We need to do this ourselves because type= was stripped before reaching
+        # argparse/jsonargparse, so they won't auto-convert the default.
+        if self._type_fn is not None and isinstance(self.default, str):
+            self.default = self._type_fn(self.default)
 
     def __call__(self, parser, namespace, values, option_string=None):
         if self.__called:
             raise argparse.ArgumentError(self, "There can be only one.")
         self.__called = True
+        if self._type_fn is not None and isinstance(values, str):
+            try:
+                values = self._type_fn(values)
+            except argparse.ArgumentTypeError as e:
+                raise argparse.ArgumentError(self, str(e))
         setattr(namespace, self.dest, values)
 
 

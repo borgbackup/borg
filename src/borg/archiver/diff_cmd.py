@@ -1,4 +1,6 @@
 import argparse
+
+from ._argparse import ArgumentParser
 import textwrap
 import json
 import sys
@@ -293,16 +295,15 @@ class DiffMixIn:
                     raise argparse.ArgumentTypeError(f"unsupported sort field: {field}")
             return ",".join(parts)
 
-        subparser = subparsers.add_parser(
-            "diff",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_diff.__doc__,
             epilog=diff_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="find differences in archive contents",
         )
-        subparser.set_defaults(func=self.do_diff)
+
+        subparsers.add_subcommand("diff", subparser, help="find differences in archive contents")
         subparser.add_argument(
             "--numeric-ids",
             dest="numeric_ids",

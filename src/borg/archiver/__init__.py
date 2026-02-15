@@ -16,6 +16,7 @@ else:
 
 try:
     import argparse
+    from ._argparse import ArgumentParser, flatten_namespace
     import faulthandler
     import functools
     import inspect
@@ -63,16 +64,64 @@ STATS_HEADER = "                       Original size    Deduplicated size"
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
 
 
-def get_func(args):
-    # This works around https://bugs.python.org/issue9351
-    # func is used at the leaf parsers of the argparse parser tree,
-    # fallback_func at next level towards the root,
-    # fallback2_func at the 2nd next level (which is root in our case).
-    for name in "func", "fallback_func", "fallback2_func":
-        func = getattr(args, name, None)
-        if func is not None:
-            return func
-    raise Exception("expected func attributes not found")
+# Command dispatch table: maps subcommand names to method names on the Archiver class.
+# For nested subcommands (key, debug, benchmark), the value is a dict mapping
+# the nested subcommand name to the method name.
+COMMAND_DISPATCH = {
+    "analyze": "do_analyze",
+    "benchmark": {"crud": "do_benchmark_crud", "cpu": "do_benchmark_cpu"},
+    "break-lock": "do_break_lock",
+    "check": "do_check",
+    "compact": "do_compact",
+    "completion": "do_completion",
+    "create": "do_create",
+    "debug": {
+        "info": "do_debug_info",
+        "dump-archive-items": "do_debug_dump_archive_items",
+        "dump-archive": "do_debug_dump_archive",
+        "dump-manifest": "do_debug_dump_manifest",
+        "dump-repo-objs": "do_debug_dump_repo_objs",
+        "search-repo-objs": "do_debug_search_repo_objs",
+        "id-hash": "do_debug_id_hash",
+        "parse-obj": "do_debug_parse_obj",
+        "format-obj": "do_debug_format_obj",
+        "get-obj": "do_debug_get_obj",
+        "put-obj": "do_debug_put_obj",
+        "delete-obj": "do_debug_delete_obj",
+        "convert-profile": "do_debug_convert_profile",
+    },
+    "delete": "do_delete",
+    "diff": "do_diff",
+    "export-tar": "do_export_tar",
+    "extract": "do_extract",
+    "help": "do_help",
+    "import-tar": "do_import_tar",
+    "info": "do_info",
+    "key": {
+        "change-passphrase": "do_change_passphrase",
+        "change-location": "do_change_location",
+        "export": "do_key_export",
+        "import": "do_key_import",
+    },
+    "list": "do_list",
+    "mount": "do_mount",
+    "prune": "do_prune",
+    "repo-compress": "do_repo_compress",
+    "repo-create": "do_repo_create",
+    "repo-delete": "do_repo_delete",
+    "repo-info": "do_repo_info",
+    "repo-list": "do_repo_list",
+    "repo-space": "do_repo_space",
+    "recreate": "do_recreate",
+    "rename": "do_rename",
+    "serve": "do_serve",
+    "tag": "do_tag",
+    "transfer": "do_transfer",
+    "umount": "do_umount",
+    "undelete": "do_undelete",
+    "version": "do_version",
+    "with-lock": "do_with_lock",
+}
 
 
 from .analyze_cmd import AnalyzeMixIn
@@ -328,9 +377,7 @@ class Archiver(
     def build_parser(self):
         from ._common import define_common_options
 
-        parser = argparse.ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups", add_help=False)
-        # paths and patterns must have an empty list as default everywhere
-        parser.set_defaults(fallback2_func=functools.partial(self.do_maincommand_help, parser), paths=[], patterns=[])
+        parser = ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups", add_help=False)
         parser.common_options = self.CommonOptions(
             define_common_options, suffix_precedence=("_maincommand", "_midcommand", "_subcommand")
         )
@@ -340,32 +387,29 @@ class Archiver(
         parser.add_argument("--cockpit", dest="cockpit", action="store_true", help="Start the Borg TUI")
         parser.common_options.add_common_group(parser, "_maincommand", provide_defaults=True)
 
-        common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
-        common_parser.set_defaults(paths=[], patterns=[])
+        common_parser = ArgumentParser(add_help=False, prog=self.prog)
         parser.common_options.add_common_group(common_parser, "_subcommand")
 
-        mid_common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
-        mid_common_parser.set_defaults(paths=[], patterns=[])
+        mid_common_parser = ArgumentParser(add_help=False, prog=self.prog)
         parser.common_options.add_common_group(mid_common_parser, "_midcommand")
 
         if parser.prog == "borgfs":
             return self.build_parser_borgfs(parser)
 
-        subparsers = parser.add_subparsers(title="required arguments", metavar="<command>")
+        subparsers = parser.add_subcommands(required=False)
 
+        # Phase 1: All level-1 subcommands (ALL must be added before any level-2).
+        # Non-nested commands:
         self.build_parser_analyze(subparsers, common_parser, mid_common_parser)
-        self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
         self.build_parser_check(subparsers, common_parser, mid_common_parser)
         self.build_parser_compact(subparsers, common_parser, mid_common_parser)
         self.build_parser_completion(subparsers, common_parser, mid_common_parser)
         self.build_parser_create(subparsers, common_parser, mid_common_parser)
-        self.build_parser_debug(subparsers, common_parser, mid_common_parser)
         self.build_parser_delete(subparsers, common_parser, mid_common_parser)
         self.build_parser_diff(subparsers, common_parser, mid_common_parser)
         self.build_parser_extract(subparsers, common_parser, mid_common_parser)
         self.build_parser_help(subparsers, common_parser, mid_common_parser, parser)
         self.build_parser_info(subparsers, common_parser, mid_common_parser)
-        self.build_parser_keys(subparsers, common_parser, mid_common_parser)
         self.build_parser_list(subparsers, common_parser, mid_common_parser)
         self.build_parser_locks(subparsers, common_parser, mid_common_parser)
         self.build_parser_mount_umount(subparsers, common_parser, mid_common_parser)
@@ -384,12 +428,69 @@ class Archiver(
         self.build_parser_transfer(subparsers, common_parser, mid_common_parser)
         self.build_parser_undelete(subparsers, common_parser, mid_common_parser)
         self.build_parser_version(subparsers, common_parser, mid_common_parser)
+        # Nested commands: add level-1 container parsers only
+        benchmark_parser = self.build_parser_benchmarks_l1(subparsers, mid_common_parser)
+        debug_parser = self.build_parser_debug_l1(subparsers, mid_common_parser)
+        key_parser = self.build_parser_keys_l1(subparsers, mid_common_parser)
+
+        # Phase 2: All level-2 subcommands (must be after ALL level-1 are added).
+        self.build_parser_benchmarks_l2(benchmark_parser, common_parser)
+        self.build_parser_debug_l2(debug_parser, common_parser)
+        self.build_parser_keys_l2(key_parser, common_parser)
+
+        # Build the commands dict for help and completion
+        self._commands = self._build_commands_dict(subparsers)
+
         return parser
+
+    def _build_commands_dict(self, subparsers):
+        """Build a dict mapping command names to their parsers for help/completion."""
+        commands = {}
+        # subparsers is an _ActionSubCommands instance with a .choices dict
+        for name, parser in subparsers.choices.items():
+            commands[name] = parser
+            # For nested subcommands (key, debug, benchmark), check _subcommands_action
+            nested_action = getattr(parser, "_subcommands_action", None)
+            if nested_action is not None and hasattr(nested_action, "choices"):
+                for sub_name, sub_parser in nested_action.choices.items():
+                    commands[f"{name} {sub_name}"] = sub_parser
+        return commands
+
+    def get_func(self, args):
+        """Get the handler function from the dispatch table based on subcommand name."""
+        subcmd = getattr(args, "subcommand", None)
+        if subcmd is None:
+            return functools.partial(self.do_maincommand_help, self.parser)
+
+        dispatch = COMMAND_DISPATCH.get(subcmd)
+        if dispatch is None:
+            return functools.partial(self.do_maincommand_help, self.parser)
+
+        if isinstance(dispatch, dict):
+            # Nested subcommand (key, debug, benchmark)
+            subcmd_ns = getattr(args, subcmd, None)
+            nested_subcmd = getattr(subcmd_ns, "subcommand", None) if subcmd_ns else None
+            if nested_subcmd is None:
+                # No nested subcommand given, show subcommand help
+                # We need the parser for the mid-level command
+                return functools.partial(self.do_subcommand_help, self.parser)
+            method_name = dispatch.get(nested_subcmd)
+            if method_name is None:
+                return functools.partial(self.do_subcommand_help, self.parser)
+            func = getattr(self, method_name)
+        else:
+            func = getattr(self, dispatch)
+
+        # Special handling for "help" command which needs extra args
+        if subcmd == "help":
+            func = functools.partial(self.do_help, self.parser, getattr(self, "_commands", {}))
+
+        return func
 
     def get_args(self, argv, cmd):
         """Usually just returns argv, except when dealing with an SSH forced command for borg serve."""
         result = self.parse_args(argv[1:])
-        if cmd is not None and result.func == self.do_serve:
+        if cmd is not None and self.get_func(result) == self.do_serve:
             # borg serve case:
             # - "result" is how borg got invoked (e.g. via forced command from authorized_keys),
             # - "client_result" (from "cmd") refers to the command the client wanted to execute,
@@ -399,7 +500,7 @@ class Archiver(
             # the borg command line.
             client_argv = list(itertools.dropwhile(lambda arg: "=" in arg, client_argv))
             client_result = self.parse_args(client_argv[1:])
-            if client_result.func == result.func:
+            if self.get_func(client_result) == self.get_func(result):
                 # make sure we only process like normal if the client is executing
                 # the same command as specified in the forced command, otherwise
                 # just skip this block and return the forced command (== result).
@@ -423,17 +524,24 @@ class Archiver(
         if args:
             args = self.preprocess_args(args)
         parser = self.build_parser()
+        self.parser = parser  # save for get_func and help
         args = parser.parse_args(args or ["-h"])
+        # Flatten jsonargparse's nested namespace into a flat one
+        args = flatten_namespace(args)
         parser.common_options.resolve(args)
-        func = get_func(args)
-        if func == self.do_create and args.paths and args.paths_from_stdin:
+        func = self.get_func(args)
+        if func == self.do_create and getattr(args, "paths", []) and getattr(args, "paths_from_stdin", False):
             parser.error("Must not pass PATH with --paths-from-stdin.")
-        if args.progress and getattr(args, "output_list", False) and not args.log_json:
+        if (
+            getattr(args, "progress", False)
+            and getattr(args, "output_list", False)
+            and not getattr(args, "log_json", False)
+        ):
             parser.error("Options --progress and --list do not play nicely together.")
-        if func == self.do_create and not args.paths:
-            if args.content_from_command or args.paths_from_command:
+        if func == self.do_create and not getattr(args, "paths", []):
+            if getattr(args, "content_from_command", False) or getattr(args, "paths_from_command", False):
                 parser.error("No command given.")
-            elif not args.paths_from_stdin:
+            elif not getattr(args, "paths_from_stdin", False):
                 # need at least 1 path but args.paths may also be populated from patterns
                 parser.error("Need at least one PATH argument.")
         # we can only have a complete knowledge of placeholder replacements we should do **after** arg parsing,
@@ -486,7 +594,7 @@ class Archiver(
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
-        func = get_func(args)
+        func = self.get_func(args)
         # do not use loggers before this!
         is_serve = func == self.do_serve
         self.log_json = args.log_json and not is_serve
@@ -542,6 +650,7 @@ class Archiver(
         else:
             rc = func(args)
             assert rc is None
+
             return get_ec(rc)
 
 

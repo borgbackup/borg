@@ -37,6 +37,7 @@ dependencies = [
   "platformdirs >=3.0.0, <5.0.0; sys_platform == 'darwin'",  # for macOS: breaking changes in 3.0.0.
   "platformdirs >=2.6.0, <5.0.0; sys_platform != 'darwin'",  # for others: 2.6+ works consistently.
   "argon2-cffi",
+  "jsonargparse>=4.27.0",
   "shtab>=1.8.0",
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
 ]

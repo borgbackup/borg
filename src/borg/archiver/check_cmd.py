@@ -1,4 +1,6 @@
 import argparse
+
+from ._argparse import ArgumentParser
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
@@ -182,16 +184,15 @@ class CheckMixIn:
         ``borg compact`` would remove the archives' data completely.
         """
         )
-        subparser = subparsers.add_parser(
-            "check",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_check.__doc__,
             epilog=check_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="verify the repository",
         )
-        subparser.set_defaults(func=self.do_check)
+
+        subparsers.add_subcommand("check", subparser, help="verify the repository")
         subparser.add_argument(
             "--repository-only", dest="repo_only", action="store_true", help="only perform repository checks"
         )

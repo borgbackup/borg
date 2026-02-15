@@ -34,7 +34,7 @@ def test_get_args():
     args = archiver.get_args(
         ["borg", "serve", "--umask=0027", "--restrict-to-path=/p1", "--restrict-to-path=/p2"], "borg serve --info"
     )
-    assert args.func == archiver.do_serve
+    assert archiver.get_func(args) == archiver.do_serve
     assert args.restrict_to_paths == ["/p1", "/p2"]
     assert args.umask == 0o027
     assert args.log_level == "info"
@@ -66,13 +66,13 @@ def test_get_args():
         ["borg", "serve", "--restrict-to-path=/p1", "--restrict-to-path=/p2"],
         f"borg --repo=/ repo-create {RK_ENCRYPTION}",
     )
-    assert args.func == archiver.do_serve
+    assert archiver.get_func(args) == archiver.do_serve
 
     # Check that environment variables in the forced command don't cause issues. If the command
     # were not forced, environment variables would be interpreted by the shell, but this does not
     # happen for forced commands - we get the verbatim command line and need to deal with env vars.
     args = archiver.get_args(["borg", "serve"], "BORG_FOO=bar borg serve --info")
-    assert args.func == archiver.do_serve
+    assert archiver.get_func(args) == archiver.do_serve
 
 
 class TestCommonOptions:

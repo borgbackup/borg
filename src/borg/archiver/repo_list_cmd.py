@@ -1,4 +1,6 @@
 import argparse
+
+from ._argparse import ArgumentParser
 import os
 import textwrap
 import sys
@@ -85,16 +87,15 @@ class RepoListMixIn:
             )
             + ArchiveFormatter.keys_help()
         )
-        subparser = subparsers.add_parser(
-            "repo-list",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_list.__doc__,
             epilog=repo_list_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="list repository contents",
         )
-        subparser.set_defaults(func=self.do_repo_list)
+
+        subparsers.add_subcommand("repo-list", subparser, help="list repository contents")
         subparser.add_argument(
             "--short", dest="short", action="store_true", help="only print the archive IDs, nothing else"
         )

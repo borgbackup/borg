@@ -52,6 +52,8 @@ The following argument types have intelligent, context-aware completion:
 
 import argparse
 
+from ._argparse import ArgumentParser
+
 import shtab
 
 from ._common import process_epilog
@@ -750,16 +752,14 @@ class CompletionMixIn:
         """
         )
 
-        subparser = subparsers.add_parser(
-            "completion",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_completion.__doc__,
             epilog=completion_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="output shell completion script",
         )
-        subparser.set_defaults(func=self.do_completion)
+        subparsers.add_subcommand("completion", subparser, help="output shell completion script")
         subparser.add_argument(
             "shell", metavar="SHELL", choices=shells, help="shell to generate completion for (one of: %(choices)s)"
         )

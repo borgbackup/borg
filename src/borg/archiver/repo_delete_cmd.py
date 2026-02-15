@@ -1,5 +1,7 @@
 import argparse
 
+from ._argparse import ArgumentParser
+
 from ._common import with_repository
 from ..cache import Cache, SecurityManager
 from ..constants import *  # NOQA
@@ -102,16 +104,15 @@ class RepoDeleteMixIn:
         Always first use ``--dry-run --list`` to see what would be deleted.
         """
         )
-        subparser = subparsers.add_parser(
-            "repo-delete",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_delete.__doc__,
             epilog=repo_delete_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="delete a repository",
         )
-        subparser.set_defaults(func=self.do_repo_delete)
+
+        subparsers.add_subcommand("repo-delete", subparser, help="delete a repository")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
         )

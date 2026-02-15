@@ -1,6 +1,8 @@
 import errno
 import sys
 import argparse
+
+from ._argparse import ArgumentParser
 import logging
 import os
 import posixpath
@@ -773,16 +775,15 @@ class CreateMixIn:
         """
         )
 
-        subparser = subparsers.add_parser(
-            "create",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_create.__doc__,
             epilog=create_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="create a backup",
         )
-        subparser.set_defaults(func=self.do_create)
+
+        subparsers.add_subcommand("create", subparser, help="create a backup")
 
         # note: --dry-run and --stats are mutually exclusive, but we do not want to abort when
         #  parsing, but rather proceed with the dry-run, but without stats (see run() method).

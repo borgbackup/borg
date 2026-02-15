@@ -14,6 +14,7 @@ from ...constants import *  # NOQA
 from ...constants import zeros
 from ...manifest import Manifest
 from ...platform import is_win32
+from ...platformflags import is_msystem
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError
 from .. import has_lchflags, has_mknod
@@ -148,6 +149,45 @@ def test_archived_paths(archivers, request):
     # check path in archived items (json):
     archive_list = cmd(archiver, "list", "test", "--json-lines")
     assert expected_paths == sorted([json.loads(line)["path"] for line in archive_list.splitlines() if line])
+
+
+@pytest.mark.skipif(not is_msystem, reason="only for msystem")
+def test_create_msys2_path_translation_warning(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "test")
+
+    # When MSYS2 path translation is active (variables NOT set), a warning should be emitted.
+    monkeypatch.delenv("MSYS2_ARG_CONV_EXCL", raising=False)
+    monkeypatch.delenv("MSYS2_ENV_CONV_EXCL", raising=False)
+    output = cmd(archiver, "create", "test1", "input", fork=True)
+    assert "MSYS2 path translation is active." in output
+
+    # When the variables ARE set, the warning should not be emitted,
+    # and /tmp should be archived properly without being translated to msys64/tmp.
+    monkeypatch.setenv("MSYS2_ARG_CONV_EXCL", "*")
+    monkeypatch.setenv("MSYS2_ENV_CONV_EXCL", "*")
+
+    # We must create a real /tmp directory to avoid file not found errors,
+    # since we will pass '/tmp' directly to Borg
+    tmp_path = os.path.abspath("/tmp")
+    os.makedirs(tmp_path, exist_ok=True)
+    test_filepath = os.path.join(tmp_path, "borg_msys2_test_file")
+    with open(test_filepath, "w") as f:
+        f.write("test")
+
+    try:
+        output2 = cmd(archiver, "create", "test2", "/tmp", fork=True)
+        assert "MSYS2 path translation is active." not in output2
+
+        archive_list = cmd(archiver, "list", "test2", "--json-lines")
+        paths = [json.loads(line)["path"] for line in archive_list.splitlines() if line]
+
+        # Verify that msys64 is not present and paths start with tmp/
+        assert not any("msys64" in p for p in paths)
+        assert any(p.startswith("tmp/borg_msys2_test_file") for p in paths)
+    finally:
+        os.unlink(test_filepath)
 
 
 @requires_hardlinks

@@ -611,6 +611,8 @@ jobs:
 
     env:
       PY_COLORS: 1
+      MSYS2_ARG_CONV_EXCL: "*"
+      MSYS2_ENV_CONV_EXCL: "*"
 
     defaults:
       run:

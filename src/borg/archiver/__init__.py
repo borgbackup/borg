@@ -64,66 +64,6 @@ STATS_HEADER = "                       Original size    Deduplicated size"
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
 
 
-# Command dispatch table: maps subcommand names to method names on the Archiver class.
-# For nested subcommands (key, debug, benchmark), the value is a dict mapping
-# the nested subcommand name to the method name.
-COMMAND_DISPATCH = {
-    "analyze": "do_analyze",
-    "benchmark": {"crud": "do_benchmark_crud", "cpu": "do_benchmark_cpu"},
-    "break-lock": "do_break_lock",
-    "check": "do_check",
-    "compact": "do_compact",
-    "completion": "do_completion",
-    "create": "do_create",
-    "debug": {
-        "info": "do_debug_info",
-        "dump-archive-items": "do_debug_dump_archive_items",
-        "dump-archive": "do_debug_dump_archive",
-        "dump-manifest": "do_debug_dump_manifest",
-        "dump-repo-objs": "do_debug_dump_repo_objs",
-        "search-repo-objs": "do_debug_search_repo_objs",
-        "id-hash": "do_debug_id_hash",
-        "parse-obj": "do_debug_parse_obj",
-        "format-obj": "do_debug_format_obj",
-        "get-obj": "do_debug_get_obj",
-        "put-obj": "do_debug_put_obj",
-        "delete-obj": "do_debug_delete_obj",
-        "convert-profile": "do_debug_convert_profile",
-    },
-    "delete": "do_delete",
-    "diff": "do_diff",
-    "export-tar": "do_export_tar",
-    "extract": "do_extract",
-    "help": "do_help",
-    "import-tar": "do_import_tar",
-    "info": "do_info",
-    "key": {
-        "change-passphrase": "do_change_passphrase",
-        "change-location": "do_change_location",
-        "export": "do_key_export",
-        "import": "do_key_import",
-    },
-    "list": "do_list",
-    "mount": "do_mount",
-    "prune": "do_prune",
-    "repo-compress": "do_repo_compress",
-    "repo-create": "do_repo_create",
-    "repo-delete": "do_repo_delete",
-    "repo-info": "do_repo_info",
-    "repo-list": "do_repo_list",
-    "repo-space": "do_repo_space",
-    "recreate": "do_recreate",
-    "rename": "do_rename",
-    "serve": "do_serve",
-    "tag": "do_tag",
-    "transfer": "do_transfer",
-    "umount": "do_umount",
-    "undelete": "do_undelete",
-    "version": "do_version",
-    "with-lock": "do_with_lock",
-}
-
-
 from .analyze_cmd import AnalyzeMixIn
 from .benchmark_cmd import BenchmarkMixIn
 from .check_cmd import CheckMixIn
@@ -462,24 +402,23 @@ class Archiver(
         if subcmd is None:
             return functools.partial(self.do_maincommand_help, self.parser)
 
-        dispatch = COMMAND_DISPATCH.get(subcmd)
-        if dispatch is None:
-            return functools.partial(self.do_maincommand_help, self.parser)
+        subcmd_ns = getattr(args, subcmd, None)
+        nested_subcmd = getattr(subcmd_ns, "subcommand", None) if subcmd_ns else None
 
-        if isinstance(dispatch, dict):
-            # Nested subcommand (key, debug, benchmark)
-            subcmd_ns = getattr(args, subcmd, None)
-            nested_subcmd = getattr(subcmd_ns, "subcommand", None) if subcmd_ns else None
-            if nested_subcmd is None:
-                # No nested subcommand given, show subcommand help
-                # We need the parser for the mid-level command
-                return functools.partial(self.do_subcommand_help, self.parser)
-            method_name = dispatch.get(nested_subcmd)
-            if method_name is None:
-                return functools.partial(self.do_subcommand_help, self.parser)
-            func = getattr(self, method_name)
+        if nested_subcmd is None:
+            method_name = f"do_{subcmd}".replace("-", "_")
         else:
-            func = getattr(self, dispatch)
+            method_name = f"do_{subcmd}_{nested_subcmd}".replace("-", "_")
+
+        func = getattr(self, method_name, None)
+
+        if func is None:
+            # Fallback for container commands or unknown commands
+            if nested_subcmd is None and subcmd_ns is not None:
+                # Might be a container command without a subcommand selected (e.g. just "borg key")
+                subparser = getattr(self, "_commands", {}).get(subcmd)
+                return functools.partial(self.do_subcommand_help, subparser or self.parser)
+            return functools.partial(self.do_maincommand_help, self.parser)
 
         # Special handling for "help" command which needs extra args
         if subcmd == "help":

@@ -19,7 +19,7 @@ logger = create_logger(__name__)
 
 class KeysMixIn:
     @with_repository(compatibility=(Manifest.Operation.CHECK,))
-    def do_change_passphrase(self, args, repository, manifest):
+    def do_key_change_passphrase(self, args, repository, manifest):
         """Changes the repository key file passphrase."""
         key = manifest.key
         if not hasattr(key, "change_passphrase"):
@@ -31,7 +31,7 @@ class KeysMixIn:
             logger.info("Key location: %s", key.find_key())
 
     @with_repository(exclusive=True, manifest=True, cache=True, compatibility=(Manifest.Operation.CHECK,))
-    def do_change_location(self, args, repository, manifest, cache):
+    def do_key_change_location(self, args, repository, manifest, cache):
         """Changes the repository key location."""
         key = manifest.key
         if not hasattr(key, "change_passphrase"):
@@ -239,7 +239,7 @@ class KeysMixIn:
         subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
-            description=self.do_change_passphrase.__doc__,
+            description=self.do_key_change_passphrase.__doc__,
             epilog=change_passphrase_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
@@ -261,7 +261,7 @@ class KeysMixIn:
         subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
-            description=self.do_change_location.__doc__,
+            description=self.do_key_change_location.__doc__,
             epilog=change_location_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )

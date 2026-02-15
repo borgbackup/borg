@@ -294,6 +294,11 @@ omit = [
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
+    "pragma: win32 only",
+    "pragma: posix only",
+    "pragma: linux only",
+    "pragma: darwin only",
+    "pragma: netbsd only",
     "pragma: freebsd only",
     "pragma: unknown platform only",
     "def __repr__",

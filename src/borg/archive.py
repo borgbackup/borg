@@ -34,7 +34,7 @@ from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
-from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
+from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns, set_birthtime
 from .helpers import parse_timestamp, archive_ts_now
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd, remove_dotdot_prefixes
@@ -1005,8 +1005,10 @@ Duration: {0.duration}
                     set_flags(path, item.bsdflags, fd=fd)
                 except OSError:
                     pass
-        else:  # win32
+        else:  # pragma: win32 only
             # set timestamps rather late
+            if "birthtime" in item:
+                set_birthtime(path, item.birthtime)
             mtime = item.mtime
             atime = item.atime if "atime" in item else mtime
             try:

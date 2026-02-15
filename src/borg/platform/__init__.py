@@ -21,6 +21,7 @@ if is_linux:  # pragma: linux only
     from .linux import listxattr, getxattr, setxattr
     from .linux import acl_get, acl_set
     from .linux import set_flags, get_flags
+    from .base import set_birthtime
     from .linux import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import get_errno
@@ -31,6 +32,7 @@ elif is_freebsd:  # pragma: freebsd only
     from .freebsd import acl_get, acl_set
     from .freebsd import set_flags
     from .base import get_flags
+    from .base import set_birthtime
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import get_errno
@@ -40,6 +42,7 @@ elif is_netbsd:  # pragma: netbsd only
     from .netbsd import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
+    from .base import set_birthtime
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import get_errno
@@ -51,6 +54,7 @@ elif is_darwin:  # pragma: darwin only
     from .darwin import is_darwin_feature_64_bit_inode, _get_birthtime_ns
     from .darwin import set_flags
     from .base import get_flags
+    from .base import set_birthtime
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import get_errno
@@ -61,6 +65,7 @@ elif not is_win32:  # pragma: posix only
     from .base import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
+    from .base import set_birthtime
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive
     from .posix import get_errno
@@ -71,6 +76,7 @@ else:  # pragma: win32 only
     from .base import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
+    from .windows import set_birthtime  # type: ignore[no-redef]
     from .base import SyncFile
     from .windows import process_alive, local_pid_alive
     from .windows import getosusername

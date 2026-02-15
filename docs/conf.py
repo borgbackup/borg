@@ -250,5 +250,5 @@ extensions = [
 
 extlinks = {
     "issue": ("https://github.com/borgbackup/borg/issues/%s", "#%s"),
-    "targz_url": ("https://pypi.python.org/packages/source/b/borgbackup/%%s-%s.tar.gz" % version, None),
+    "targz_url": ("https://pypi.org/project/borgbackup/%s/#files", None),
 }

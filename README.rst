@@ -160,7 +160,7 @@ Links
 
 * `Main website <https://borgbackup.readthedocs.io/>`_
 * `Releases <https://github.com/borgbackup/borg/releases>`_,
-  `PyPI packages <https://pypi.python.org/pypi/borgbackup>`_ and
+  `PyPI packages <https://pypi.org/project/borgbackup/>`_ and
   `Changelog <https://github.com/borgbackup/borg/blob/master/docs/changes.rst>`_
 * `Offline documentation <https://readthedocs.org/projects/borgbackup/downloads>`_
 * `GitHub <https://github.com/borgbackup/borg>`_ and

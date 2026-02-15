@@ -1,7 +1,7 @@
 .. highlight:: bash
 .. |package_dirname| replace:: borgbackup-|version|
 .. |package_filename| replace:: |package_dirname|.tar.gz
-.. |package_url| replace:: https://pypi.python.org/packages/source/b/borgbackup/|package_filename|
+.. |package_url| replace:: https://pypi.org/project/borgbackup/#files
 .. |git_url| replace:: https://github.com/borgbackup/borg.git
 .. _github: https://github.com/borgbackup/borg
 .. _issue tracker: https://github.com/borgbackup/borg/issues
@@ -21,11 +21,11 @@
 .. _`Python 3`: https://www.python.org/
 .. _Buzhash: https://en.wikipedia.org/wiki/Buzhash
 .. _msgpack: https://msgpack.org/
-.. _`msgpack-python`: https://pypi.python.org/pypi/msgpack-python/
-.. _llfuse: https://pypi.python.org/pypi/llfuse/
-.. _mfusepy: https://pypi.python.org/pypi/mfusepy/
-.. _pyfuse3: https://pypi.python.org/pypi/pyfuse3/
+.. _`msgpack-python`: https://pypi.org/project/msgpack-python/
+.. _llfuse: https://pypi.org/project/llfuse/
+.. _mfusepy: https://pypi.org/project/mfusepy/
+.. _pyfuse3: https://pypi.org/project/pyfuse3/
 .. _userspace filesystems: https://en.wikipedia.org/wiki/Filesystem_in_Userspace
 .. _Cython: http://cython.org/
-.. _virtualenv: https://pypi.python.org/pypi/virtualenv/
+.. _virtualenv: https://pypi.org/project/virtualenv/
 .. _mailing list discussion about internals: http://librelist.com/browser/attic/2014/5/6/questions-and-suggestions-about-inner-working-of-attic>

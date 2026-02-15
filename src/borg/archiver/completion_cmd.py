@@ -52,8 +52,6 @@ The following argument types have intelligent, context-aware completion:
 
 import argparse
 
-from ._argparse import ArgumentParser
-
 import shtab
 
 from ._common import process_epilog
@@ -68,6 +66,7 @@ from ..helpers import (
     relative_time_marker_validator,
     parse_file_size,
 )
+from ..helpers.jap_wrapper import ArgumentParser
 from ..helpers.time import timestamp
 from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format

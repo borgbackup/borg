@@ -1,11 +1,10 @@
 import argparse
 
-from ._argparse import ArgumentParser
-
 from ._common import with_repository, define_archive_filters_group
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, archivename_validator, tag_validator, Error
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger

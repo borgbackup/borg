@@ -1,6 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
 import os
 import textwrap
 import sys
@@ -10,6 +9,7 @@ from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import ItemFormatter, BaseFormatter, archivename_validator, PathSpec
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -90,7 +90,6 @@ class ListMixIn:
             ...
 
         The following keys are always available:
-
 
         """
             )

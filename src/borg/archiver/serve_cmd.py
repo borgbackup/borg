@@ -1,8 +1,7 @@
 import argparse
 
-from ._argparse import ArgumentParser
-
 from ..constants import *  # NOQA
+from ..helpers.jap_wrapper import ArgumentParser
 from ..remote import RepositoryServer
 
 from ..logger import create_logger

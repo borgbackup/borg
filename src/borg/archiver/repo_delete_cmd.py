@@ -1,7 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
-
 from ._common import with_repository
 from ..cache import Cache, SecurityManager
 from ..constants import *  # NOQA
@@ -9,6 +7,7 @@ from ..helpers import CancelledByUser
 from ..helpers import format_archive
 from ..helpers import bin_to_hex
 from ..helpers import yes
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest, NoManifestError
 
 from ..logger import create_logger

@@ -1,10 +1,9 @@
 import argparse
 
-from ._argparse import ArgumentParser
-
 from ._common import with_repository, with_archive
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger

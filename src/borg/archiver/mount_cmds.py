@@ -1,6 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
 import os
 
 from ._common import with_repository, Highlander
@@ -8,6 +7,7 @@ from ..constants import *  # NOQA
 from ..helpers import RTError
 from ..helpers import PathSpec
 from ..helpers import umount
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 from ..remote import cache_if_remote
 

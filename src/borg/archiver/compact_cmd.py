@@ -1,6 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
 from pathlib import Path
 
 from ._common import with_repository
@@ -12,6 +11,7 @@ from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..helpers import set_ec, EXIT_ERROR, format_file_size, bin_to_hex
 from ..helpers import ProgressIndicatorPercent
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 from ..remote import RemoteRepository
 from ..repository import Repository, repo_lister

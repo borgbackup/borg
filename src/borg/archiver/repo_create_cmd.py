@@ -1,13 +1,12 @@
 import argparse
 
-from ._argparse import ArgumentParser
-
 from ._common import with_repository, with_other_repository, Highlander
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names
 from ..helpers import CancelledByUser
 from ..helpers import location_validator, Location
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger

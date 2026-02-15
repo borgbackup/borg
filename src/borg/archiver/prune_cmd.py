@@ -1,6 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
 from collections import OrderedDict
 from datetime import datetime, timezone, timedelta
 import logging
@@ -13,6 +12,7 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
 from ..helpers import archivename_validator
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger

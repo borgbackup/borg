@@ -1,6 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
 from collections import defaultdict
 import os
 
@@ -9,6 +8,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, Error
 from ..helpers import ProgressIndicatorPercent
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 from ..remote import RemoteRepository
 from ..repository import Repository

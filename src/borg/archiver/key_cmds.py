@@ -1,6 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
 import os
 
 from ..constants import *  # NOQA
@@ -8,6 +7,7 @@ from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2
 from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
 from ..crypto.keymanager import KeyManager
 from ..helpers import PathSpec, CommandError
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ._common import with_repository

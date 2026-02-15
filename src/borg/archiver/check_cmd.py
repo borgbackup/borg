@@ -1,11 +1,11 @@
 import argparse
 
-from ._argparse import ArgumentParser
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
 from ..helpers import yes
+from ..helpers.jap_wrapper import ArgumentParser
 
 from ..logger import create_logger
 

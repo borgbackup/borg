@@ -1309,7 +1309,7 @@ class Highlander(argparse.Action):
     """make sure some option is only given once"""
 
     def __init__(self, *args, **kwargs):
-        # Pick up type function from class attribute (set by BoundHighlander in _argparse.py)
+        # Pick up type function from class attribute (set by BoundHighlander in jap_wrapper.py)
         # or from kwargs (for direct use with standard argparse).
         self._type_fn = getattr(self.__class__, "_type_fn_override", None) or kwargs.pop("type", None)
         self.__called = False

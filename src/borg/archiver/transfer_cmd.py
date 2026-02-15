@@ -1,7 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
-
 from ._common import with_repository, with_other_repository, Highlander
 from ..archive import Archive, cached_hash, DownloadPipeline
 from ..chunkers import get_chunker
@@ -12,6 +10,7 @@ from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
 from ..helpers import format_file_size, bin_to_hex
 from ..helpers import ChunkerParams, ChunkIteratorFileWrapper
+from ..helpers.jap_wrapper import ArgumentParser
 from ..item import ChunkListEntry
 from ..manifest import Manifest
 from ..legacyrepository import LegacyRepository
@@ -311,7 +310,6 @@ class TransferMixIn:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
 
-
         Data migration / upgrade from borg 1.x
         ++++++++++++++++++++++++++++++++++++++
 
@@ -331,7 +329,6 @@ class TransferMixIn:
             # to re-chunk using different chunker parameters:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO \\
                  --chunker-params=buzhash,19,23,21,4095
-
 
         """
         )

@@ -1,6 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
 import os
 import textwrap
 import sys
@@ -8,6 +7,7 @@ import sys
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -73,7 +73,6 @@ class RepoListMixIn:
             ...
 
         The following keys are always available:
-
 
         """
             )

@@ -1,12 +1,12 @@
 import argparse
 
-from ._argparse import ArgumentParser
 import subprocess
 
 from ._common import with_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import prepare_subprocess_env, set_ec, CommandError, ThreadRunner
+from ..helpers.jap_wrapper import ArgumentParser
 
 from ..logger import create_logger
 

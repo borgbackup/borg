@@ -1,6 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
 import textwrap
 import json
 import sys
@@ -11,6 +10,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
 from ..helpers import IncludePatternNeverMatchedWarning, remove_surrogates
+from ..helpers.jap_wrapper import ArgumentParser
 from ..item import ItemDiff
 from ..manifest import Manifest
 from ..logger import create_logger
@@ -204,7 +204,6 @@ class DiffMixIn:
             ...
 
         The following keys are always available:
-
 
         """
             )

@@ -1,6 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
 import base64
 import logging
 import os
@@ -22,6 +21,7 @@ from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ._common import with_repository, with_archive, Highlander, define_exclusion_group

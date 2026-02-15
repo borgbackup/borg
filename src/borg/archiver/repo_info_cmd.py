@@ -1,11 +1,11 @@
 import argparse
 
-from ._argparse import ArgumentParser
 import textwrap
 
 from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, json_print, basic_json_data
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger

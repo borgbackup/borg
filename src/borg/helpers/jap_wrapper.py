@@ -23,7 +23,7 @@ from jsonargparse import ArgumentParser as _JAPArgumentParser
 def _is_highlander_action(action):
     """Check if action is a Highlander subclass."""
     try:
-        from ..helpers.parseformat import Highlander
+        from .parseformat import Highlander
     except ImportError:
         return False
     return isinstance(action, type) and issubclass(action, Highlander)

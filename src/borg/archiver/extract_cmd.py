@@ -1,7 +1,6 @@
 import sys
 import argparse
 
-from ._argparse import ArgumentParser
 import logging
 import stat
 
@@ -14,6 +13,7 @@ from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import BackupWarning, IncludePatternNeverMatchedWarning
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger

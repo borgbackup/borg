@@ -2,7 +2,6 @@ import errno
 import sys
 import argparse
 
-from ._argparse import ArgumentParser
 import logging
 import os
 import posixpath
@@ -33,6 +32,7 @@ from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
 from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -681,7 +681,6 @@ class CreateMixIn:
         subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint).
         macOS examples are the apfs mounts of a typical macOS installation.
         Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
-
 
         .. _list_item_flags:
 

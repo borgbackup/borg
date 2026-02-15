@@ -16,7 +16,6 @@ else:
 
 try:
     import argparse
-    from ._argparse import ArgumentParser, flatten_namespace
     import faulthandler
     import functools
     import inspect
@@ -47,6 +46,7 @@ try:
     from ..helpers import ErrorIgnoringTextIOWrapper
     from ..helpers import msgpack
     from ..helpers import sig_int
+    from ..helpers.jap_wrapper import ArgumentParser, flatten_namespace
     from ..remote import RemoteRepository
     from ..selftest import selftest
 except BaseException:

@@ -1,7 +1,5 @@
 import argparse
 
-from ._argparse import ArgumentParser
-
 from ._common import with_repository, Highlander
 from ._common import build_matcher
 from ..archive import ArchiveRecreater
@@ -9,6 +7,7 @@ from ..constants import *  # NOQA
 from ..compress import CompressionSpec
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex
 from ..helpers import timestamp
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger

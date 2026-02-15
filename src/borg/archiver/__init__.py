@@ -46,6 +46,7 @@ try:
     from ..helpers import msgpack
     from ..helpers import sig_int
     from ..helpers import get_config_dir
+    from ..platformflags import is_msystem
     from ..remote import RemoteRepository
     from ..selftest import selftest
 except BaseException:
@@ -397,7 +398,16 @@ class Archiver(
         return functools.partial(self.do_maincommand_help, parser)
 
     def prerun_checks(self, logger, is_serve):
-
+        if (
+            not is_serve
+            and is_msystem
+            and ("MSYS2_ARG_CONV_EXCL" not in os.environ or "MSYS2_ENV_CONV_EXCL" not in os.environ)
+        ):
+            logger.warning(
+                "MSYS2 path translation is active. This can cause POSIX paths to be mangled into "
+                "Windows paths in archives. Consider setting MSYS2_ARG_CONV_EXCL='*' and "
+                "MSYS2_ENV_CONV_EXCL='*'. See https://www.msys2.org/docs/filesystem-paths/ for details."
+            )
         selftest(logger)
 
     def _setup_implied_logging(self, args):

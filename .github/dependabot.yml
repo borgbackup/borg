@@ -8,3 +8,11 @@ updates:
       actions:
         patterns:
           - "*"
+  - package-ecosystem: "pip"
+    directory: "/requirements.d"
+    schedule:
+      interval: "weekly"
+    groups:
+      pip-dependencies:
+        patterns:
+          - "*"

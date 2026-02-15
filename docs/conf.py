@@ -248,7 +248,4 @@ extensions = [
     "guzzle_sphinx_theme",  # register the theme as an extension to generate a sitemap.xml
 ]
 
-extlinks = {
-    "issue": ("https://github.com/borgbackup/borg/issues/%s", "#%s"),
-    "targz_url": ("https://pypi.python.org/packages/source/b/borgbackup/%%s-%s.tar.gz" % version, None),
-}
+extlinks = {"issue": ("https://github.com/borgbackup/borg/issues/%s", "#%s")}

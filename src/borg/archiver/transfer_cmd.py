@@ -1,6 +1,6 @@
 import argparse
 
-from ._common import with_repository, with_other_repository, Highlander
+from ._common import with_repository, with_other_repository
 from ..archive import Archive, cached_hash, DownloadPipeline
 from ..chunkers import get_chunker
 from ..compress import CompressionSpec
@@ -9,7 +9,7 @@ from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
 from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
 from ..helpers import format_file_size, bin_to_hex
-from ..helpers import ChunkerParams, ChunkIteratorFileWrapper
+from ..helpers import ChunkerParams, ChunkIteratorFileWrapper, compression_spec_validator
 from ..helpers.jap_wrapper import ArgumentParser
 from ..item import ChunkListEntry
 from ..manifest import Manifest
@@ -350,7 +350,6 @@ class TransferMixIn:
             dest="other_location",
             type=location_validator(other=True),
             default=Location(other=True),
-            action=Highlander,
             help="transfer archives from the other repository",
         )
         subparser.add_argument(
@@ -363,7 +362,6 @@ class TransferMixIn:
             type=str,
             choices=("NoOp", "From12To20"),
             default="NoOp",
-            action=Highlander,
             help="use the upgrader to convert transferred data (default: no conversion)",
         )
         subparser.add_argument(
@@ -371,9 +369,8 @@ class TransferMixIn:
             "--compression",
             metavar="COMPRESSION",
             dest="compression",
-            type=CompressionSpec,
+            type=compression_spec_validator,
             default=CompressionSpec("lz4"),
-            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
         subparser.add_argument(
@@ -384,7 +381,6 @@ class TransferMixIn:
             default="never",
             const="always",
             choices=("never", "always"),
-            action=Highlander,
             help="recompress data chunks according to `MODE` and ``--compression``. "
             "Possible modes are "
             "`always`: recompress unconditionally; and "
@@ -398,7 +394,6 @@ class TransferMixIn:
             dest="chunker_params",
             type=ChunkerParams,
             default=None,
-            action=Highlander,
             help="rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
             "HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. "
             "default: do not rechunk",

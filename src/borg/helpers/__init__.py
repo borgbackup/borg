@@ -36,6 +36,8 @@ from .parseformat import (
     FilesCacheMode,
     partial_format,
     DatetimeWrapper,
+    SafePathSpec,
+    compression_spec_validator,
 )
 from .parseformat import format_file_size, parse_file_size, FileSize
 from .parseformat import sizeof_fmt, sizeof_fmt_iec, sizeof_fmt_decimal, Location, text_validator
@@ -45,7 +47,6 @@ from .parseformat import location_validator, archivename_validator, comment_vali
 from .parseformat import BaseFormatter, ArchiveFormatter, ItemFormatter, DiffFormatter, file_status
 from .parseformat import swidth_slice, ellipsis_truncate
 from .parseformat import BorgJsonEncoder, basic_json_data, json_print, json_dump, prepare_dump_dict
-from .parseformat import Highlander, MakePathSafeAction
 from .process import daemonize, daemonizing, ThreadRunner
 from .process import signal_handler, raising_signal_handler, sig_int, ignore_sigint, SigHup, SigTerm
 from .process import popen_with_error_handling, is_terminal, prepare_subprocess_env, create_filter_process

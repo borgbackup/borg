@@ -11,7 +11,7 @@ from ..helpers import sysinfo
 from ..helpers import bin_to_hex, hex_to_bin, prepare_dump_dict
 from ..helpers import dash_open
 from ..helpers import StableDict
-from ..helpers import archivename_validator
+from ..helpers import archivename_validator, compression_spec_validator
 from ..helpers import CommandError, RTError
 from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
@@ -19,7 +19,7 @@ from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, repo_lister
 from ..repoobj import RepoObj
 
-from ._common import with_repository, Highlander
+from ._common import with_repository
 from ._common import process_epilog
 
 
@@ -429,7 +429,6 @@ class DebugMixIn:
             "wanted",
             metavar="WANTED",
             type=str,
-            action=Highlander,
             help="term to search the repo for, either 0x1234abcd hex term or a string",
         )
         debug_id_hash_epilog = process_epilog(
@@ -500,9 +499,8 @@ class DebugMixIn:
             "--compression",
             metavar="COMPRESSION",
             dest="compression",
-            type=CompressionSpec,
+            type=compression_spec_validator,
             default=CompressionSpec("lz4"),
-            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
         subparser.add_argument(

@@ -2,7 +2,7 @@ import argparse
 
 import os
 
-from ._common import with_repository, Highlander
+from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import RTError
 from ..helpers import PathSpec
@@ -201,7 +201,7 @@ class MountMixIn:
         parser.add_argument(
             "-f", "--foreground", dest="foreground", action="store_true", help="stay in foreground, do not daemonize"
         )
-        parser.add_argument("-o", dest="options", type=str, action=Highlander, help="extra mount options")
+        parser.add_argument("-o", dest="options", type=str, help="extra mount options")
         parser.add_argument(
             "--numeric-ids",
             dest="numeric_ids",

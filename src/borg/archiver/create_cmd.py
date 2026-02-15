@@ -10,7 +10,7 @@ import subprocess
 import time
 from io import TextIOWrapper
 
-from ._common import with_repository, Highlander
+from ._common import with_repository
 from .. import helpers
 from ..archive import Archive, is_special
 from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io, OsOpen, stat_update_check
@@ -18,7 +18,7 @@ from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProce
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
-from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec
+from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, compression_spec_validator
 from ..helpers import archivename_validator, FilesCacheMode
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
@@ -30,7 +30,7 @@ from ..helpers import flags_dir, flags_special_follow, flags_special
 from ..helpers import prepare_subprocess_env
 from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
-from ..helpers import MakePathSafeAction
+from ..helpers import SafePathSpec
 from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
 from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
@@ -800,7 +800,6 @@ class CreateMixIn:
             "--filter",
             metavar="STATUSCHARS",
             dest="output_filter",
-            action=Highlander,
             help="only display items with the given status characters (see description)",
         )
         subparser.add_argument("--json", action="store_true", help="output stats as JSON. Implies ``--stats``.")
@@ -809,7 +808,7 @@ class CreateMixIn:
             metavar="NAME",
             dest="stdin_name",
             default="stdin",
-            action=MakePathSafeAction,
+            type=SafePathSpec,
             help="use NAME in archive for stdin data (default: %(default)r)",
         )
         subparser.add_argument(
@@ -817,7 +816,6 @@ class CreateMixIn:
             metavar="USER",
             dest="stdin_user",
             default=None,
-            action=Highlander,
             help="set user USER in archive for stdin data (default: do not store user/uid)",
         )
         subparser.add_argument(
@@ -825,16 +823,14 @@ class CreateMixIn:
             metavar="GROUP",
             dest="stdin_group",
             default=None,
-            action=Highlander,
             help="set group GROUP in archive for stdin data (default: do not store group/gid)",
         )
         subparser.add_argument(
             "--stdin-mode",
             metavar="M",
             dest="stdin_mode",
-            type=lambda s: int(s, 8),
+            type=lambda s: int(s, 8) if isinstance(s, str) else s,
             default=STDIN_MODE_DEFAULT,
-            action=Highlander,
             help="set mode to M in archive for stdin data (default: %(default)04o)",
         )
         subparser.add_argument(
@@ -855,7 +851,6 @@ class CreateMixIn:
         )
         subparser.add_argument(
             "--paths-delimiter",
-            action=Highlander,
             metavar="DELIM",
             help="set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\\n``) ",
         )
@@ -907,7 +902,6 @@ class CreateMixIn:
             "--files-cache",
             metavar="MODE",
             dest="files_cache_mode",
-            action=Highlander,
             type=FilesCacheMode,
             default=FILES_CACHE_MODE_UI_DEFAULT,
             help="operate files cache in MODE. default: %s" % FILES_CACHE_MODE_UI_DEFAULT,
@@ -916,7 +910,6 @@ class CreateMixIn:
             "--files-changed",
             metavar="MODE",
             dest="files_changed",
-            action=Highlander,
             choices=["ctime", "mtime", "disabled"],
             default="mtime" if is_win32 else "ctime",
             help="specify how to detect if a file has changed during backup (ctime, mtime, disabled). "
@@ -937,7 +930,6 @@ class CreateMixIn:
             dest="comment",
             type=comment_validator,
             default="",
-            action=Highlander,
             help="add a comment text to the archive",
         )
         archive_group.add_argument(
@@ -946,7 +938,6 @@ class CreateMixIn:
             dest="timestamp",
             type=timestamp,
             default=None,
-            action=Highlander,
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
             "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
         )
@@ -956,7 +947,6 @@ class CreateMixIn:
             dest="chunker_params",
             type=ChunkerParams,
             default=CHUNKER_PARAMS,
-            action=Highlander,
             help="specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
             "HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %s,%d,%d,%d,%d" % CHUNKER_PARAMS,
         )
@@ -965,9 +955,8 @@ class CreateMixIn:
             "--compression",
             metavar="COMPRESSION",
             dest="compression",
-            type=CompressionSpec,
+            type=compression_spec_validator,
             default=CompressionSpec("lz4"),
-            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
 

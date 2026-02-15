@@ -8,7 +8,6 @@ from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
 from ..helpers import SortBySpec, positive_int_validator, location_validator, Location, relative_time_marker_validator
-from ..helpers import Highlander
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
@@ -323,7 +322,6 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
             dest="strip_components",
             type=int,
             default=0,
-            action=Highlander,
             help="Remove the specified number of leading path elements. "
             "Paths with fewer elements will be silently skipped.",
         )
@@ -359,7 +357,6 @@ def define_archive_filters_group(
             dest="sort_by",
             type=SortBySpec,
             default=sort_by_default,
-            action=Highlander,
             help="Comma-separated list of sorting keys; valid keys are: {}; default is: {}".format(
                 ", ".join(AI_HUMAN_SORT_KEYS), sort_by_default
             ),
@@ -372,8 +369,7 @@ def define_archive_filters_group(
             metavar="N",
             dest="first",
             type=positive_int_validator,
-            default=0,
-            action=Highlander,
+            default=None,
             help="consider the first N archives after other filters are applied",
         )
         group.add_argument(
@@ -381,8 +377,7 @@ def define_archive_filters_group(
             metavar="N",
             dest="last",
             type=positive_int_validator,
-            default=0,
-            action=Highlander,
+            default=None,
             help="consider the last N archives after other filters are applied",
         )
 
@@ -393,7 +388,6 @@ def define_archive_filters_group(
             metavar="TIMESPAN",
             dest="oldest",
             type=relative_time_marker_validator,
-            action=Highlander,
             help="consider archives between the oldest archive's timestamp and (oldest + TIMESPAN), e.g., 7d or 12m.",
         )
         group.add_argument(
@@ -401,7 +395,6 @@ def define_archive_filters_group(
             metavar="TIMESPAN",
             dest="newest",
             type=relative_time_marker_validator,
-            action=Highlander,
             help="consider archives between the newest archive's timestamp and (newest - TIMESPAN), e.g., 7d or 12m.",
         )
 
@@ -412,7 +405,6 @@ def define_archive_filters_group(
             metavar="TIMESPAN",
             dest="older",
             type=relative_time_marker_validator,
-            action=Highlander,
             help="consider archives older than (now - TIMESPAN), e.g., 7d or 12m.",
         )
         group.add_argument(
@@ -420,7 +412,6 @@ def define_archive_filters_group(
             metavar="TIMESPAN",
             dest="newer",
             type=relative_time_marker_validator,
-            action=Highlander,
             help="consider archives newer than (now - TIMESPAN), e.g., 7d or 12m.",
         )
 
@@ -499,7 +490,6 @@ def define_common_options(add_common_option):
         dest="lock_wait",
         type=int,
         default=int(os.environ.get("BORG_LOCK_WAIT", 10)),
-        action=Highlander,
         help="wait at most SECONDS for acquiring a repository/cache lock (default: %(default)d).",
     )
     add_common_option("--show-version", dest="show_version", action="store_true", help="show/log the borg version")
@@ -508,16 +498,14 @@ def define_common_options(add_common_option):
         "--umask",
         metavar="M",
         dest="umask",
-        type=lambda s: int(s, 8),
+        type=lambda s: int(s, 8) if isinstance(s, str) else s,
         default=UMASK_DEFAULT,
-        action=Highlander,
         help="set umask to M (local only, default: %(default)04o)",
     )
     add_common_option(
         "--remote-path",
         metavar="PATH",
         dest="remote_path",
-        action=Highlander,
         help='use PATH as borg executable on the remote (default: "borg")',
     )
     add_common_option(
@@ -525,7 +513,6 @@ def define_common_options(add_common_option):
         metavar="RATE",
         dest="upload_ratelimit",
         type=int,
-        action=Highlander,
         help="set network upload rate limit in kiByte/s (default: 0=unlimited)",
     )
     add_common_option(
@@ -533,7 +520,6 @@ def define_common_options(add_common_option):
         metavar="UPLOAD_BUFFER",
         dest="upload_buffer",
         type=int,
-        action=Highlander,
         help="set network upload buffer size in MiB. (default: 0=no buffer)",
     )
     add_common_option(
@@ -541,7 +527,6 @@ def define_common_options(add_common_option):
         metavar="FILE",
         dest="debug_profile",
         default=None,
-        action=Highlander,
         help="Write execution profile in Borg format into FILE. For local use a Python-"
         'compatible file can be generated by suffixing FILE with ".pyprof".',
     )
@@ -549,7 +534,6 @@ def define_common_options(add_common_option):
         "--rsh",
         metavar="RSH",
         dest="rsh",
-        action=Highlander,
         help="Use this command to connect to the 'borg serve' process (default: 'ssh')",
     )
     add_common_option(
@@ -559,7 +543,6 @@ def define_common_options(add_common_option):
         default=False,
         const=True,
         nargs="?",
-        action=Highlander,
         help="Use UNIX DOMAIN (IPC) socket at PATH for client/server communication with socket: protocol.",
     )
     add_common_option(
@@ -569,7 +552,6 @@ def define_common_options(add_common_option):
         dest="location",
         type=location_validator(other=False),
         default=Location(other=False),
-        action=Highlander,
         help="repository to use",
     )
 

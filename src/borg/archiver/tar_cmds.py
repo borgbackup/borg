@@ -16,7 +16,7 @@ from ..helpers import dash_open
 from ..helpers import msgpack
 from ..helpers import create_filter_process
 from ..helpers import ChunkIteratorFileWrapper
-from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams
+from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, compression_spec_validator
 from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
@@ -24,7 +24,7 @@ from ..helpers import log_multi
 from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
-from ._common import with_repository, with_archive, Highlander, define_exclusion_group
+from ._common import with_repository, with_archive, define_exclusion_group
 from ._common import build_matcher, build_filter
 
 from ..logger import create_logger
@@ -398,11 +398,7 @@ class TarMixIn:
 
         subparsers.add_subcommand("export-tar", subparser, help="create tarball from archive")
         subparser.add_argument(
-            "--tar-filter",
-            dest="tar_filter",
-            default="auto",
-            action=Highlander,
-            help="filter program to pipe data through",
+            "--tar-filter", dest="tar_filter", default="auto", help="filter program to pipe data through"
         )
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output verbose list of items (files, dirs, ...)"
@@ -413,7 +409,6 @@ class TarMixIn:
             dest="tar_format",
             default="PAX",
             choices=("BORG", "PAX", "GNU"),
-            action=Highlander,
             help="select tar format: BORG, PAX or GNU",
         )
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
@@ -473,11 +468,7 @@ class TarMixIn:
 
         subparsers.add_subcommand("import-tar", subparser, help=self.do_import_tar.__doc__)
         subparser.add_argument(
-            "--tar-filter",
-            dest="tar_filter",
-            default="auto",
-            action=Highlander,
-            help="filter program to pipe data through",
+            "--tar-filter", dest="tar_filter", default="auto", help="filter program to pipe data through"
         )
         subparser.add_argument(
             "-s",
@@ -498,7 +489,6 @@ class TarMixIn:
             "--filter",
             dest="output_filter",
             metavar="STATUSCHARS",
-            action=Highlander,
             help="only display items with the given status characters",
         )
         subparser.add_argument("--json", action="store_true", help="output stats as JSON (implies --stats)")
@@ -516,7 +506,6 @@ class TarMixIn:
             dest="comment",
             type=comment_validator,
             default="",
-            action=Highlander,
             help="add a comment text to the archive",
         )
         archive_group.add_argument(
@@ -524,7 +513,6 @@ class TarMixIn:
             dest="timestamp",
             type=timestamp,
             default=None,
-            action=Highlander,
             metavar="TIMESTAMP",
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
             "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
@@ -534,7 +522,6 @@ class TarMixIn:
             dest="chunker_params",
             type=ChunkerParams,
             default=CHUNKER_PARAMS,
-            action=Highlander,
             metavar="PARAMS",
             help="specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
             "HASH_MASK_BITS, HASH_WINDOW_SIZE). default: %s,%d,%d,%d,%d" % CHUNKER_PARAMS,
@@ -544,9 +531,8 @@ class TarMixIn:
             "--compression",
             metavar="COMPRESSION",
             dest="compression",
-            type=CompressionSpec,
+            type=compression_spec_validator,
             default=CompressionSpec("lz4"),
-            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
 

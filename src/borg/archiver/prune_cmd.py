@@ -6,7 +6,7 @@ import logging
 from operator import attrgetter
 import os
 
-from ._common import with_repository, Highlander
+from ._common import with_repository
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -301,7 +301,6 @@ class PruneMixIn:
             "--format",
             metavar="FORMAT",
             dest="format",
-            action=Highlander,
             help="specify format for the archive part " '(default: "{archive:<36} {time} [{id}]")',
         )
         subparser.add_argument(
@@ -309,7 +308,6 @@ class PruneMixIn:
             metavar="INTERVAL",
             dest="within",
             type=interval,
-            action=Highlander,
             help="keep all archives within this time interval",
         )
         subparser.add_argument(
@@ -318,52 +316,22 @@ class PruneMixIn:
             dest="secondly",
             type=int,
             default=0,
-            action=Highlander,
             help="number of secondly archives to keep",
         )
         subparser.add_argument(
-            "--keep-minutely",
-            dest="minutely",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="number of minutely archives to keep",
+            "--keep-minutely", dest="minutely", type=int, default=0, help="number of minutely archives to keep"
         )
         subparser.add_argument(
-            "-H",
-            "--keep-hourly",
-            dest="hourly",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="number of hourly archives to keep",
+            "-H", "--keep-hourly", dest="hourly", type=int, default=0, help="number of hourly archives to keep"
         )
         subparser.add_argument(
-            "-d",
-            "--keep-daily",
-            dest="daily",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="number of daily archives to keep",
+            "-d", "--keep-daily", dest="daily", type=int, default=0, help="number of daily archives to keep"
         )
         subparser.add_argument(
-            "-w",
-            "--keep-weekly",
-            dest="weekly",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="number of weekly archives to keep",
+            "-w", "--keep-weekly", dest="weekly", type=int, default=0, help="number of weekly archives to keep"
         )
         subparser.add_argument(
-            "-m",
-            "--keep-monthly",
-            dest="monthly",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="number of monthly archives to keep",
+            "-m", "--keep-monthly", dest="monthly", type=int, default=0, help="number of monthly archives to keep"
         )
         quarterly_group = subparser.add_mutually_exclusive_group()
         quarterly_group.add_argument(
@@ -381,13 +349,7 @@ class PruneMixIn:
             help="number of quarterly archives to keep (3 month strategy)",
         )
         subparser.add_argument(
-            "-y",
-            "--keep-yearly",
-            dest="yearly",
-            type=int,
-            default=0,
-            action=Highlander,
-            help="number of yearly archives to keep",
+            "-y", "--keep-yearly", dest="yearly", type=int, default=0, help="number of yearly archives to keep"
         )
         define_archive_filters_group(subparser, sort_by=False, first_last=False)
         subparser.add_argument(

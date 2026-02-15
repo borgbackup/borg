@@ -31,7 +31,6 @@ try:
 
     logger = create_logger()
 
-    from ._common import Highlander
     from .. import __version__
     from ..constants import *  # NOQA
     from ..helpers import EXIT_WARNING, EXIT_ERROR, EXIT_SIGNAL_BASE
@@ -240,15 +239,7 @@ class Archiver(
             def add_argument(*args, **kwargs):
                 if "dest" in kwargs:
                     kwargs.setdefault("action", "store")
-                    assert kwargs["action"] in (
-                        Highlander,
-                        "help",
-                        "store_const",
-                        "store_true",
-                        "store_false",
-                        "store",
-                        "append",
-                    )
+                    assert kwargs["action"] in ("help", "store_const", "store_true", "store_false", "store", "append")
                     is_append = kwargs["action"] == "append"
                     if is_append:
                         self.append_options.add(kwargs["dest"])

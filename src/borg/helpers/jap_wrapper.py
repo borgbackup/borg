@@ -21,15 +21,6 @@ from jsonargparse import ArgumentParser as _JAPArgumentParser
 from jsonargparse._core import ArgumentGroup as _JAPArgumentGroup
 
 
-def _is_highlander_action(action):
-    """Check if action is a Highlander subclass."""
-    try:
-        from .parseformat import Highlander
-    except ImportError:
-        return False
-    return isinstance(action, type) and issubclass(action, Highlander)
-
-
 def _make_type_converting_action(base_action_name, type_fn):
     """Create a custom action class that wraps a standard action and applies type conversion.
 
@@ -65,26 +56,12 @@ class BorgAddArgumentMixin:
 
         jsonargparse raises ValueError when both type= and action= are given.
         We strip type= from kwargs and ensure the action handles type conversion:
-        - Highlander/subclasses: type bound as class attribute _type_fn_override
         - Standard string actions: wrapped in TypeConvertingAction
         - Other custom actions: type stored as _type_fn on action instance
         """
         action = kwargs.get("action")
         if action is not None and "type" in kwargs:
             type_fn = kwargs.pop("type")
-
-            if _is_highlander_action(action):
-                # Create a dynamic subclass with _type_fn pre-bound as a class attribute.
-                # Highlander's __init__ will pick this up.
-                action_cls = action
-
-                class BoundHighlander(action_cls):
-                    _type_fn_override = type_fn
-
-                BoundHighlander.__name__ = action_cls.__name__
-                BoundHighlander.__qualname__ = action_cls.__qualname__
-                kwargs["action"] = BoundHighlander
-                return super().add_argument(*args, **kwargs)
 
             if isinstance(action, str):
                 # Standard action string like 'append', 'store'

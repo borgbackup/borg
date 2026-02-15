@@ -1,6 +1,6 @@
 import argparse
 
-from ._common import with_repository, Highlander
+from ._common import with_repository
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
@@ -217,7 +217,6 @@ class CheckMixIn:
             dest="max_duration",
             type=int,
             default=0,
-            action=Highlander,
             help="perform only a partial repository check for at most SECONDS seconds (default: unlimited)",
         )
         define_archive_filters_group(subparser)

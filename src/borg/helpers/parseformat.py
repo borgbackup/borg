@@ -121,7 +121,7 @@ def decode_dict(d, keys, encoding="utf-8", errors="surrogateescape"):
 
 
 def positive_int_validator(value):
-    """argparse type for positive integers."""
+    """argparse type for positive integers > 0."""
     int_value = int(value)
     if int_value <= 0:
         raise argparse.ArgumentTypeError("A positive integer is required: %s" % value)
@@ -146,6 +146,9 @@ def interval(s):
         S=1,
     )
 
+    if isinstance(s, int):
+        return s
+
     if s.endswith(tuple(multiplier.keys())):
         number = s[:-1]
         suffix = s[-1]
@@ -163,7 +166,17 @@ def interval(s):
     return seconds
 
 
+def compression_spec_validator(s):
+    from ..compress import CompressionSpec
+
+    if isinstance(s, CompressionSpec):
+        return s
+    return CompressionSpec(s)
+
+
 def ChunkerParams(s):
+    if isinstance(s, tuple):
+        return s
     params = s.strip().split(",")
     count = len(params)
     if count == 0:
@@ -228,6 +241,8 @@ def ChunkerParams(s):
 def FilesCacheMode(s):
     ENTRIES_MAP = dict(ctime="c", mtime="m", size="s", inode="i", rechunk="r", disabled="d")
     VALID_MODES = ("cis", "ims", "cs", "ms", "cr", "mr", "d", "s")  # letters in alpha order
+    if s in VALID_MODES:
+        return s
     entries = set(s.strip().split(","))
     if not entries <= set(ENTRIES_MAP):
         raise argparse.ArgumentTypeError(
@@ -346,6 +361,8 @@ def SortBySpec(text):
     from ..manifest import AI_HUMAN_SORT_KEYS
 
     for token in text.split(","):
+        if token == "ts":
+            continue
         if token not in AI_HUMAN_SORT_KEYS:
             raise argparse.ArgumentTypeError("Invalid sort key: %s" % token)
     return text.replace("timestamp", "ts").replace("archive", "name")
@@ -369,6 +386,8 @@ class FileSize(int):
 
 def parse_file_size(s):
     """Return int from file size (1234, 55G, 1.7T)."""
+    if isinstance(s, int):
+        return s
     if not s:
         return int(s)  # will raise
     s = s.upper()
@@ -629,6 +648,8 @@ class Location:
 
 def location_validator(proto=None, other=False):
     def validator(text):
+        if isinstance(text, Location):
+            return text
         try:
             loc = Location(text, other=other)
         except ValueError as err:
@@ -1305,40 +1326,11 @@ def prepare_dump_dict(d):
     return decode(d)
 
 
-class Highlander(argparse.Action):
-    """make sure some option is only given once"""
-
-    def __init__(self, *args, **kwargs):
-        # Pick up type function from class attribute (set by BoundHighlander in jap_wrapper.py)
-        # or from kwargs (for direct use with standard argparse).
-        self._type_fn = getattr(self.__class__, "_type_fn_override", None) or kwargs.pop("type", None)
-        self.__called = False
-        super().__init__(*args, **kwargs)
-        # Apply the type function to string defaults so that converted values
-        # are used even when the option is not given on the command line.
-        # We need to do this ourselves because type= was stripped before reaching
-        # argparse/jsonargparse, so they won't auto-convert the default.
-        if self._type_fn is not None and isinstance(self.default, str):
-            self.default = self._type_fn(self.default)
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        if self.__called:
-            raise argparse.ArgumentError(self, "There can be only one.")
-        self.__called = True
-        if self._type_fn is not None and isinstance(values, str):
-            try:
-                values = self._type_fn(values)
-            except argparse.ArgumentTypeError as e:
-                raise argparse.ArgumentError(self, str(e))
-        setattr(namespace, self.dest, values)
-
-
-class MakePathSafeAction(Highlander):
-    def __call__(self, parser, namespace, path, option_string=None):
-        try:
-            sanitized_path = make_path_safe(path)
-        except ValueError as e:
-            raise argparse.ArgumentError(self, e)
-        if sanitized_path == ".":
-            raise argparse.ArgumentError(self, f"{path!r} is not a valid file name")
-        setattr(namespace, self.dest, sanitized_path)
+def SafePathSpec(path):
+    try:
+        sanitized_path = make_path_safe(path)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(str(e))
+    if sanitized_path == ".":
+        raise argparse.ArgumentTypeError(f"{path!r} is not a valid file name")
+    return sanitized_path

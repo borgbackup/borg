@@ -1,11 +1,18 @@
 import argparse
 
-from ._common import with_repository, Highlander
+from ._common import with_repository
 from ._common import build_matcher
 from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec
-from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex
+from ..helpers import (
+    archivename_validator,
+    comment_validator,
+    PathSpec,
+    ChunkerParams,
+    bin_to_hex,
+    compression_spec_validator,
+)
 from ..helpers import timestamp
 from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
@@ -118,7 +125,6 @@ class RecreateMixIn:
             "--filter",
             metavar="STATUSCHARS",
             dest="output_filter",
-            action=Highlander,
             help="only display items with the given status characters (listed in borg create --help)",
         )
         subparser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true", help="do not change anything")
@@ -133,7 +139,6 @@ class RecreateMixIn:
             metavar="TARGET",
             default=None,
             type=archivename_validator,
-            action=Highlander,
             help="create a new archive with the name ARCHIVE, do not replace existing archive",
         )
         archive_group.add_argument(
@@ -142,7 +147,6 @@ class RecreateMixIn:
             dest="comment",
             type=comment_validator,
             default=None,
-            action=Highlander,
             help="add a comment text to the archive",
         )
         archive_group.add_argument(
@@ -151,7 +155,6 @@ class RecreateMixIn:
             dest="timestamp",
             type=timestamp,
             default=None,
-            action=Highlander,
             help="manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, "
             "(+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.",
         )
@@ -160,9 +163,8 @@ class RecreateMixIn:
             "--compression",
             metavar="COMPRESSION",
             dest="compression",
-            type=CompressionSpec,
+            type=compression_spec_validator,
             default=CompressionSpec("lz4"),
-            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
         archive_group.add_argument(
@@ -171,7 +173,6 @@ class RecreateMixIn:
             dest="chunker_params",
             type=ChunkerParams,
             default=None,
-            action=Highlander,
             help="rechunk using given chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, "
             "HASH_MASK_BITS, HASH_WINDOW_SIZE) or `default` to use the chunker defaults. "
             "default: do not rechunk",

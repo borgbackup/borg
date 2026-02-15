@@ -4,7 +4,7 @@ import os
 import textwrap
 import sys
 
-from ._common import with_repository, build_matcher, Highlander
+from ._common import with_repository, build_matcher
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
@@ -119,7 +119,6 @@ class ListMixIn:
             "--format",
             metavar="FORMAT",
             dest="format",
-            action=Highlander,
             help="specify format for file listing "
             '(default: "{mode} {user:6} {group:6} {size:8} {mtime} {path}{extra}{NL}")',
         )

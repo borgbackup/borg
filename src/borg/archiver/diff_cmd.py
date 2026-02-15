@@ -5,7 +5,7 @@ import json
 import sys
 import os
 
-from ._common import with_repository, build_matcher, Highlander
+from ._common import with_repository, build_matcher
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
@@ -319,7 +319,6 @@ class DiffMixIn:
             "--format",
             metavar="FORMAT",
             dest="format",
-            action=Highlander,
             help='specify format for differences between archives (default: "{change} {path}{NL}")',
         )
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines.")

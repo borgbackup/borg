@@ -5,7 +5,7 @@ import os
 
 from borgstore.store import ItemInfo
 
-from ._common import with_repository, Highlander
+from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import parse_file_size, format_file_size
 from ..helpers.jap_wrapper import ArgumentParser
@@ -102,7 +102,6 @@ class RepoSpaceMixIn:
             dest="reserve_space",
             default=0,
             type=parse_file_size,
-            action=Highlander,
             help="Amount of space to reserve (e.g. 100M, 1G). Default: 0.",
         )
         subparser.add_argument(

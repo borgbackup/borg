@@ -10,22 +10,6 @@ def test_bad_filters(archiver):
     cmd(archiver, "delete", "--first", "1", "--last", "1", fork=True, exit_code=2)
 
 
-def test_highlander(archiver):
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "--comment", "comment 1", "test-1", __file__)
-    error_msg = "There can be only one"
-    # Default umask value is 0077
-    # Test that it works with a one-time specified default or custom value
-    output_default = cmd(archiver, "--umask", "0077", "repo-list")
-    assert error_msg not in output_default
-    output_custom = cmd(archiver, "--umask", "0007", "repo-list")
-    assert error_msg not in output_custom
-    # Test that all combinations of custom and default values fail
-    for first, second in [("0007", "0007"), ("0007", "0077"), ("0077", "0007"), ("0077", "0077")]:
-        output_custom = cmd(archiver, "--umask", first, "--umask", second, "repo-list", exit_code=2)
-        assert error_msg in output_custom
-
-
 def test_get_args():
     archiver = Archiver()
     # everything normal:

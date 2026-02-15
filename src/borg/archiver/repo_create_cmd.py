@@ -1,6 +1,6 @@
 import argparse
 
-from ._common import with_repository, with_other_repository, Highlander
+from ._common import with_repository, with_other_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names
@@ -206,7 +206,6 @@ class RepoCreateMixIn:
             dest="other_location",
             type=location_validator(other=True),
             default=Location(other=True),
-            action=Highlander,
             help="reuse the key material from the other repository",
         )
         subparser.add_argument(
@@ -219,7 +218,6 @@ class RepoCreateMixIn:
             dest="encryption",
             required=True,
             choices=key_argument_names(),
-            action=Highlander,
             help="select encryption key mode **(required)**",
         )
         subparser.add_argument(

@@ -4,7 +4,7 @@ import os
 import textwrap
 import sys
 
-from ._common import with_repository, Highlander
+from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
 from ..helpers.jap_wrapper import ArgumentParser
@@ -102,7 +102,6 @@ class RepoListMixIn:
             "--format",
             metavar="FORMAT",
             dest="format",
-            action=Highlander,
             help="specify format for archive listing " '(default: "{archive:<36} {time} [{id}]{NL}")',
         )
         subparser.add_argument(

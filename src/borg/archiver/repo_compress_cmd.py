@@ -2,11 +2,11 @@ import argparse
 
 from collections import defaultdict
 
-from ._common import with_repository, Highlander
+from ._common import with_repository
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec, ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..hashindex import ChunkIndex
-from ..helpers import sig_int, ProgressIndicatorPercent, Error
+from ..helpers import sig_int, ProgressIndicatorPercent, Error, compression_spec_validator
 from ..helpers.jap_wrapper import ArgumentParser
 from ..repository import Repository
 from ..remote import RemoteRepository
@@ -197,9 +197,8 @@ class RepoCompressMixIn:
             "--compression",
             metavar="COMPRESSION",
             dest="compression",
-            type=CompressionSpec,
+            type=compression_spec_validator,
             default=CompressionSpec("lz4"),
-            action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
         )
 

@@ -69,6 +69,32 @@ def setxattr(path, name, value, *, follow_symlinks=False):
     """
 
 
+def set_birthtime(path, birthtime_ns, *, fd=None):
+    """
+    Set creation time (birthtime) on *path* to *birthtime_ns*.
+    """
+    raise NotImplementedError("set_birthtime is not supported on this platform")
+
+
+def set_timestamps(path, item, fd=None, follow_symlinks=False):
+    """Set timestamps (mtime, atime, birthtime) from *item* on *path* (*fd*)."""
+    mtime = item.mtime
+    atime = item.atime if "atime" in item else mtime
+    if "birthtime" in item:
+        # This implementation uses the "utime trick" to set birthtime on BSDs and macOS.
+        # It sets mtime to the birthtime first, which pulls back birthtime, and then
+        # sets it to the final value. On other POSIX platforms, it's harmless.
+        birthtime = item.birthtime
+        try:
+            os.utime(fd or path, ns=(atime, birthtime), follow_symlinks=follow_symlinks)
+        except OSError:
+            pass
+    try:
+        os.utime(fd or path, ns=(atime, mtime), follow_symlinks=follow_symlinks)
+    except OSError:
+        pass
+
+
 def acl_get(path, item, st, numeric_ids=False, fd=None):
     """
     Save ACL entries.

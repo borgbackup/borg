@@ -10,6 +10,7 @@ from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
 from ..helpers import format_file_size, bin_to_hex
 from ..helpers import ChunkerParams, ChunkIteratorFileWrapper
+from ..helpers.jap_wrapper import ArgumentParser
 from ..item import ChunkListEntry
 from ..manifest import Manifest
 from ..legacyrepository import LegacyRepository
@@ -309,7 +310,6 @@ class TransferMixIn:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
 
-
         Data migration / upgrade from borg 1.x
         ++++++++++++++++++++++++++++++++++++++
 
@@ -330,19 +330,17 @@ class TransferMixIn:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO \\
                  --chunker-params=buzhash,19,23,21,4095
 
-
         """
         )
-        subparser = subparsers.add_parser(
-            "transfer",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_transfer.__doc__,
             epilog=transfer_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="transfer of archives from another repository",
         )
-        subparser.set_defaults(func=self.do_transfer)
+
+        subparsers.add_subcommand("transfer", subparser, help="transfer of archives from another repository")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository, just check"
         )

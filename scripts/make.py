@@ -46,7 +46,7 @@ class BuildUsage:
         is_subcommand = False
         choices = {}
         for action in parser._actions:
-            if action.choices is not None and "SubParsersAction" in str(action.__class__):
+            if action.choices is not None and "_ActionSubCommands" in str(action.__class__):
                 is_subcommand = True
                 for cmd, parser in action.choices.items():
                     choices[prefix + cmd] = parser
@@ -323,7 +323,7 @@ class BuildMan:
         is_subcommand = False
         choices = {}
         for action in parser._actions:
-            if action.choices is not None and "SubParsersAction" in str(action.__class__):
+            if action.choices is not None and "_ActionSubCommands" in str(action.__class__):
                 is_subcommand = True
                 for cmd, parser in action.choices.items():
                     choices[prefix + cmd] = parser
@@ -349,7 +349,7 @@ class BuildMan:
 
             self.write_heading(write, "SYNOPSIS")
             if is_intermediary:
-                subparsers = [action for action in parser._actions if "SubParsersAction" in str(action.__class__)][0]
+                subparsers = [action for action in parser._actions if "_ActionSubCommands" in str(action.__class__)][0]
                 for subcommand in subparsers.choices:
                     write("| borg", "[common options]", command, subcommand, "...")
                     self.see_also.setdefault(command, []).append(f"{command}-{subcommand}")

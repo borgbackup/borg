@@ -1,8 +1,8 @@
 import collections
-import functools
 import textwrap
 
 from ..constants import *  # NOQA
+from ..helpers.jap_wrapper import ArgumentParser
 from ..helpers.nanorst import rst_to_terminal
 
 
@@ -160,7 +160,6 @@ class HelpMixIn:
             # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
             # not '/home/user/importantjunk' or '/etc/junk':
             $ borg create -e 'home/*/junk' archive /
-
 
             # The contents of directories in '/home' are not backed up when their name
             # ends in '.tmp'
@@ -551,10 +550,8 @@ class HelpMixIn:
     do_maincommand_help = do_subcommand_help
 
     def build_parser_help(self, subparsers, common_parser, mid_common_parser, parser):
-        subparser = subparsers.add_parser(
-            "help", parents=[common_parser], add_help=False, description="Extra help", help="Extra help"
-        )
+        subparser = ArgumentParser(parents=[common_parser], add_help=False, description="Extra help")
+        subparsers.add_subcommand("help", subparser, help="Extra help")
         subparser.add_argument("--epilog-only", dest="epilog_only", action="store_true")
         subparser.add_argument("--usage-only", dest="usage_only", action="store_true")
-        subparser.set_defaults(func=functools.partial(self.do_help, parser, subparsers.choices))
         subparser.add_argument("topic", metavar="TOPIC", type=str, nargs="?", help="additional help on TOPIC")

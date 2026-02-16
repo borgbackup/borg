@@ -41,6 +41,11 @@ class ArgparsePatternAction(argparse.Action):
         super().__init__(nargs=nargs, **kw)
 
     def __call__(self, parser, args, values, option_string=None):
+        # jsonargparse may initialize list-like attributes to None instead of []
+        if args.paths is None:
+            args.paths = []
+        if args.patterns is None:
+            args.patterns = []
         parse_patternfile_line(values[0], args.paths, args.patterns, ShellPattern)
 
 
@@ -60,11 +65,19 @@ class ArgparsePatternFileAction(argparse.Action):
             raise Error(str(e))
 
     def parse(self, fobj, args):
+        # jsonargparse may initialize list-like attributes to None instead of []
+        if args.paths is None:
+            args.paths = []
+        if args.patterns is None:
+            args.patterns = []
         load_pattern_file(fobj, args.paths, args.patterns)
 
 
 class ArgparseExcludeFileAction(ArgparsePatternFileAction):
     def parse(self, fobj, args):
+        # jsonargparse may initialize list-like attributes to None instead of []
+        if args.patterns is None:
+            args.patterns = []
         load_exclude_file(fobj, args.patterns)
 
 

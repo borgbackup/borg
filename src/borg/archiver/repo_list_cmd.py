@@ -1,4 +1,5 @@
 import argparse
+
 import os
 import textwrap
 import sys
@@ -6,6 +7,7 @@ import sys
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -72,7 +74,6 @@ class RepoListMixIn:
 
         The following keys are always available:
 
-
         """
             )
             + BaseFormatter.keys_help()
@@ -85,16 +86,15 @@ class RepoListMixIn:
             )
             + ArchiveFormatter.keys_help()
         )
-        subparser = subparsers.add_parser(
-            "repo-list",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_list.__doc__,
             epilog=repo_list_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="list repository contents",
         )
-        subparser.set_defaults(func=self.do_repo_list)
+
+        subparsers.add_subcommand("repo-list", subparser, help="list repository contents")
         subparser.add_argument(
             "--short", dest="short", action="store_true", help="only print the archive IDs, nothing else"
         )

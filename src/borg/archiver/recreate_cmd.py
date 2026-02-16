@@ -7,6 +7,7 @@ from ..constants import *  # NOQA
 from ..compress import CompressionSpec
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex
 from ..helpers import timestamp
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -101,16 +102,15 @@ class RecreateMixIn:
         if the chunks are still missing.
         """
         )
-        subparser = subparsers.add_parser(
-            "recreate",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_recreate.__doc__,
             epilog=recreate_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help=self.do_recreate.__doc__,
         )
-        subparser.set_defaults(func=self.do_recreate)
+
+        subparsers.add_subcommand("recreate", subparser, help=self.do_recreate.__doc__)
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output verbose list of items (files, dirs, ...)"
         )

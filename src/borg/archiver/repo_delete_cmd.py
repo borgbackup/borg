@@ -7,6 +7,7 @@ from ..helpers import CancelledByUser
 from ..helpers import format_archive
 from ..helpers import bin_to_hex
 from ..helpers import yes
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest, NoManifestError
 
 from ..logger import create_logger
@@ -102,16 +103,15 @@ class RepoDeleteMixIn:
         Always first use ``--dry-run --list`` to see what would be deleted.
         """
         )
-        subparser = subparsers.add_parser(
-            "repo-delete",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_delete.__doc__,
             epilog=repo_delete_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="delete a repository",
         )
-        subparser.set_defaults(func=self.do_repo_delete)
+
+        subparsers.add_subcommand("repo-delete", subparser, help="delete a repository")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
         )

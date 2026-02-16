@@ -1,4 +1,5 @@
 import argparse
+
 import textwrap
 import json
 import sys
@@ -9,6 +10,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
 from ..helpers import IncludePatternNeverMatchedWarning, remove_surrogates
+from ..helpers.jap_wrapper import ArgumentParser
 from ..item import ItemDiff
 from ..manifest import Manifest
 from ..logger import create_logger
@@ -203,7 +205,6 @@ class DiffMixIn:
 
         The following keys are always available:
 
-
         """
             )
             + BaseFormatter.keys_help()
@@ -293,16 +294,15 @@ class DiffMixIn:
                     raise argparse.ArgumentTypeError(f"unsupported sort field: {field}")
             return ",".join(parts)
 
-        subparser = subparsers.add_parser(
-            "diff",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_diff.__doc__,
             epilog=diff_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="find differences in archive contents",
         )
-        subparser.set_defaults(func=self.do_diff)
+
+        subparsers.add_subcommand("diff", subparser, help="find differences in archive contents")
         subparser.add_argument(
             "--numeric-ids",
             dest="numeric_ids",

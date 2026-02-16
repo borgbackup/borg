@@ -1,6 +1,7 @@
 import errno
 import sys
 import argparse
+
 import logging
 import os
 import posixpath
@@ -31,6 +32,7 @@ from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
 from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
+from ..helpers.jap_wrapper import ArgumentParser
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -672,7 +674,6 @@ class CreateMixIn:
         macOS examples are the apfs mounts of a typical macOS installation.
         Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
 
-
         .. _list_item_flags:
 
         Item flags
@@ -765,16 +766,15 @@ class CreateMixIn:
         """
         )
 
-        subparser = subparsers.add_parser(
-            "create",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_create.__doc__,
             epilog=create_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="create a backup",
         )
-        subparser.set_defaults(func=self.do_create)
+
+        subparsers.add_subcommand("create", subparser, help="create a backup")
 
         # note: --dry-run and --stats are mutually exclusive, but we do not want to abort when
         #  parsing, but rather proceed with the dry-run, but without stats (see run() method).

@@ -485,11 +485,17 @@ class BuildMan:
         from docutils.core import publish_string
         from docutils.nodes import inline
         from docutils.parsers.rst import roles
+        from borg.archiver._common import rst_plain_text_references
 
         def issue(name, rawtext, text, lineno, inliner, options={}, content=[]):
             return [inline(rawtext, "#" + text)], []
 
+        def ref_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
+            replacement = rst_plain_text_references.get(text, text)
+            return [inline(rawtext, replacement)], []
+
         roles.register_local_role("issue", issue)
+        roles.register_local_role("ref", ref_role)
         # We give the source_path so that docutils can find relative includes
         # as-if the document where located in the docs/ directory.
         man_page = publish_string(source=rst, source_path="docs/%s.rst" % name, writer=manpage.Writer())

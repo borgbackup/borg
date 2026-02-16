@@ -167,10 +167,15 @@ Fixes:
 
 Other changes:
 
+- remove handwritten bash and zsh shell completions, #9178.
+  these are now auto-generated via ``borg completion bash/zsh`` (using shtab).
+  fish completions are kept until shtab gains fish support.
 - mount: warn about symlinks pointing outside of the mountpoint, #9254
 - Version: do not access private attributes, #9263
 - tests / CI:
 
+  - completion: focused tests for auto-generated shell completions
+    (syntax validation, size sanity, borg-specific preamble behavior)
   - fix and re-enable Windows CI (some tests are skipped on Windows)
   - CI: faster with borg-dir/borg.exe, #9236
   - fix mismatch in xattr test, #9238

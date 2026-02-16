@@ -1,6 +1,7 @@
 import argparse
 from contextlib import contextmanager
 import functools
+import json
 import os
 import tempfile
 import time
@@ -116,14 +117,38 @@ class BenchmarkMixIn:
         for msg, count, size, random in tests:
             with test_files(args.path, count, size, random) as path:
                 dt_create, dt_update, dt_extract, dt_delete = measurement_run(args.location.canonical_path(), path)
-            total_size_MB = count * size / 1e06
-            file_size_formatted = format_file_size(size)
-            content = "random" if random else "all-zero"
-            fmt = "%s-%-10s %9.2f MB/s (%d * %s %s files: %.2fs)"
-            print(fmt % ("C", msg, total_size_MB / dt_create, count, file_size_formatted, content, dt_create))
-            print(fmt % ("R", msg, total_size_MB / dt_extract, count, file_size_formatted, content, dt_extract))
-            print(fmt % ("U", msg, total_size_MB / dt_update, count, file_size_formatted, content, dt_update))
-            print(fmt % ("D", msg, total_size_MB / dt_delete, count, file_size_formatted, content, dt_delete))
+            total_size = count * size
+            if args.json_lines:
+                for cmd_letter, cmd_name, dt in [
+                    ("C", "create1", dt_create),
+                    ("R", "extract", dt_extract),
+                    ("U", "create2", dt_update),
+                    ("D", "delete", dt_delete),
+                ]:
+                    print(
+                        json.dumps(
+                            {
+                                "id": f"{cmd_letter}-{msg}",
+                                "command": cmd_name,
+                                "sample": msg,
+                                "sample_count": count,
+                                "sample_size": size,
+                                "sample_random": random,
+                                "time": dt,
+                                "io": int(total_size / dt),
+                            },
+                            sort_keys=True,
+                        )
+                    )
+            else:
+                total_size_MB = total_size / 1e06
+                file_size_formatted = format_file_size(size)
+                content = "random" if random else "all-zero"
+                fmt = "%s-%-10s %9.2f MB/s (%d * %s %s files: %.2fs)"
+                print(fmt % ("C", msg, total_size_MB / dt_create, count, file_size_formatted, content, dt_create))
+                print(fmt % ("R", msg, total_size_MB / dt_extract, count, file_size_formatted, content, dt_extract))
+                print(fmt % ("U", msg, total_size_MB / dt_update, count, file_size_formatted, content, dt_update))
+                print(fmt % ("D", msg, total_size_MB / dt_delete, count, file_size_formatted, content, dt_delete))
 
     def do_benchmark_cpu(self, args):
         """Benchmark CPU-bound operations."""
@@ -378,6 +403,7 @@ class BenchmarkMixIn:
         subparser.set_defaults(func=self.do_benchmark_crud)
 
         subparser.add_argument("path", metavar="PATH", help="path where to create benchmark input data")
+        subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines.")
 
         bench_cpu_epilog = process_epilog(
             """

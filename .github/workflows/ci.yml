@@ -488,7 +488,7 @@ jobs:
               netbsd)
                 arch="$(uname -m)"
                 sudo -E mkdir -p /usr/pkg/etc/pkgin
-                echo "http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
+                echo "https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
                 sudo -E pkgin update
                 sudo -E pkgin -y upgrade
                 sudo -E pkgin -y install zstd lz4 xxhash git

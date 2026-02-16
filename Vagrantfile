@@ -97,7 +97,7 @@ end
 
 def packages_netbsd
   return <<-EOF
-    echo 'http://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/9.3/All' > /usr/pkg/etc/pkgin/repositories.conf
+    echo 'https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/9.3/All' > /usr/pkg/etc/pkgin/repositories.conf
     pkgin update
     pkgin -y upgrade
     pkg_add zstd lz4 xxhash git

@@ -221,6 +221,9 @@ class Archiver(
             # This is the sentinel object that replaces all default values in parsers
             # below the top-level parser.
             self.default_sentinel = object()
+            # Maps dest names to their type functions, for options where type= was
+            # stripped from sub-parsers to avoid jsonargparse validation of sentinel defaults.
+            self.type_functions = dict()
 
         def add_common_group(self, parser, suffix, provide_defaults=False):
             """
@@ -238,9 +241,9 @@ class Archiver(
 
             def add_argument(*args, **kwargs):
                 if "dest" in kwargs:
-                    kwargs.setdefault("action", "store")
-                    assert kwargs["action"] in ("help", "store_const", "store_true", "store_false", "store", "append")
-                    is_append = kwargs["action"] == "append"
+                    action = kwargs.get("action", "store")
+                    assert action in ("help", "store_const", "store_true", "store_false", "store", "append")
+                    is_append = action == "append"
                     if is_append:
                         self.append_options.add(kwargs["dest"])
                         assert (
@@ -258,6 +261,11 @@ class Archiver(
                         kwargs["help"] = kwargs["help"] % kwargs
                         if not is_append:
                             kwargs["default"] = self.default_sentinel
+                            # Remove type= so jsonargparse won't validate the sentinel default.
+                            # Store the type function for manual conversion in resolve().
+                            type_fn = kwargs.pop("type", None)
+                            if type_fn is not None:
+                                self.type_functions[kwargs["dest"]] = type_fn
 
                 common_group.add_argument(*args, **kwargs)
 
@@ -286,6 +294,10 @@ class Archiver(
                         # value was indeed specified on this level. Transfer value to target,
                         # and un-clobber the args (for tidiness - you *cannot* use the suffixed
                         # names for other purposes, obviously).
+                        # Apply type conversion if type= was stripped from this sub-parser.
+                        type_fn = self.type_functions.get(map_from)
+                        if type_fn is not None and isinstance(value, str):
+                            value = type_fn(value)
                         setattr(args, map_to, value)
                     try:
                         delattr(args, map_from)

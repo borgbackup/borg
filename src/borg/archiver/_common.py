@@ -17,10 +17,10 @@ from ..legacyrepository import LegacyRepository
 from ..repository import Repository
 from ..repoobj import RepoObj, RepoObj1
 from ..patterns import (
+    ArgparseExcludePatternAction,
     ArgparsePatternAction,
     ArgparseExcludeFileAction,
     ArgparsePatternFileAction,
-    parse_exclude_pattern,
 )
 
 
@@ -272,8 +272,7 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
         "--exclude",
         metavar="PATTERN",
         dest="patterns",
-        type=parse_exclude_pattern,
-        action="append",
+        action=ArgparseExcludePatternAction,
         help="exclude paths matching PATTERN",
     )
     add_option(
@@ -304,7 +303,6 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
             metavar="NAME",
             dest="exclude_if_present",
             action="append",
-            type=str,
             help="exclude directories that are tagged by containing a filesystem object with the given NAME",
         )
         add_option(

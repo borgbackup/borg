@@ -17,11 +17,22 @@ def _bash_available():
         return False
 
 
+def _zsh_available():
+    try:
+        subprocess.run(["zsh", "--version"], capture_output=True, check=True)
+        return True
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
+
+needs_bash = pytest.mark.skipif(not _bash_available(), reason="Bash not available")
+needs_zsh = pytest.mark.skipif(not _zsh_available(), reason="Zsh not available")
+
+
 def _run_bash_completion_fn(completion_script, setup_code):
     """Source the completion script in bash and run setup_code, return subprocess result."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".bash", delete=False) as f:
         f.write(completion_script)
-        f.flush()
         script_path = f.name
     try:
         result = subprocess.run(
@@ -54,53 +65,42 @@ def test_zsh_completion_nontrivial(archivers, request):
 # -- syntax validation --------------------------------------------------------
 
 
+def _check_shell_syntax(script_content, shell, suffix):
+    """Write script_content to a temp file and verify syntax with ``shell -n``."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
+        f.write(script_content)
+        script_path = f.name
+    try:
+        result = subprocess.run([shell, "-n", script_path], capture_output=True)
+    finally:
+        os.unlink(script_path)
+    return result
+
+
+@needs_bash
 def test_bash_completion_syntax(archivers, request):
     """Verify the generated Bash completion script has valid syntax."""
     archiver = request.getfixturevalue(archivers)
     output = cmd(archiver, "completion", "bash")
-
-    if not _bash_available():
-        pytest.skip("Bash not available")
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".bash", delete=False) as f:
-        f.write(output)
-        f.flush()
-        script_path = f.name
-    try:
-        result = subprocess.run(["bash", "-n", script_path], capture_output=True)
-    finally:
-        os.unlink(script_path)
+    result = _check_shell_syntax(output, "bash", ".bash")
     assert result.returncode == 0, f"Generated Bash completion has syntax errors: {result.stderr.decode()}"
 
 
+@needs_zsh
 def test_zsh_completion_syntax(archivers, request):
     """Verify the generated Zsh completion script has valid syntax."""
     archiver = request.getfixturevalue(archivers)
     output = cmd(archiver, "completion", "zsh")
-
-    try:
-        subprocess.run(["zsh", "--version"], capture_output=True, check=True)
-    except (subprocess.SubprocessError, FileNotFoundError):
-        pytest.skip("Zsh not available")
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".zsh", delete=False) as f:
-        f.write(output)
-        f.flush()
-        script_path = f.name
-    try:
-        result = subprocess.run(["zsh", "-n", script_path], capture_output=True)
-    finally:
-        os.unlink(script_path)
+    result = _check_shell_syntax(output, "zsh", ".zsh")
     assert result.returncode == 0, f"Generated Zsh completion has syntax errors: {result.stderr.decode()}"
 
 
 # -- borg-specific preamble function behavior (bash) --------------------------
 
 
+@needs_bash
 def test_bash_sortby_dedup(archivers, request):
     """_borg_complete_sortby should not re-offer already-selected sort keys."""
-    if not _bash_available():
-        pytest.skip("Bash not available")
     archiver = request.getfixturevalue(archivers)
     script = cmd(archiver, "completion", "bash")
 
@@ -118,10 +118,9 @@ def test_bash_sortby_dedup(archivers, request):
     assert any("archive" in line for line in lines), f"expected 'archive' in completions: {lines}"
 
 
+@needs_bash
 def test_bash_filescachemode_exclusivity(archivers, request):
     """_borg_complete_filescachemode should enforce ctime/mtime and disabled mutual exclusion."""
-    if not _bash_available():
-        pytest.skip("Bash not available")
     archiver = request.getfixturevalue(archivers)
     script = cmd(archiver, "completion", "bash")
 
@@ -151,10 +150,9 @@ def test_bash_filescachemode_exclusivity(archivers, request):
     assert "disabled" not in bare_keys3, f"disabled offered after size: {bare_keys3}"
 
 
+@needs_bash
 def test_bash_archive_name_completion(archivers, request):
     """_borg_complete_archive should complete archive names from a real repo."""
-    if not _bash_available():
-        pytest.skip("Bash not available")
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "mybackup-2024", archiver.input_path)
@@ -171,10 +169,9 @@ def test_bash_archive_name_completion(archivers, request):
     assert "mybackup-2025" in result.stdout, f"archive name missing: {result.stdout}"
 
 
+@needs_bash
 def test_bash_archive_aid_completion(archivers, request):
     """_borg_complete_archive should complete aid: prefixed archive IDs."""
-    if not _bash_available():
-        pytest.skip("Bash not available")
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "testarchive", archiver.input_path)

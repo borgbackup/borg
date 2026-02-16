@@ -64,13 +64,15 @@ class ArgparsePatternFileAction(argparse.Action):
         except FileNotFoundError as e:
             raise Error(str(e))
 
+    # Class-level storage for roots from pattern files, to avoid being overwritten
+    # by the positional "paths" argument. Merged into args.paths in flatten_namespace().
+    roots_from_patterns = []
+
     def parse(self, fobj, args):
         # jsonargparse may initialize list-like attributes to None instead of []
-        if args.paths is None:
-            args.paths = []
         if args.patterns is None:
             args.patterns = []
-        load_pattern_file(fobj, args.paths, args.patterns)
+        load_pattern_file(fobj, ArgparsePatternFileAction.roots_from_patterns, args.patterns)
 
 
 class ArgparseExcludeFileAction(ArgparsePatternFileAction):

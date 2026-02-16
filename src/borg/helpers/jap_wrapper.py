@@ -152,4 +152,14 @@ def flatten_namespace(args):
     if not getattr(args, "patterns", None):
         args.patterns = []
 
+    # Merge roots from pattern files (R lines in --patterns-from) with CLI paths.
+    # Pattern file roots are stored separately during parsing to avoid being
+    # overwritten by the positional "paths" argument.
+    from ..patterns import ArgparsePatternFileAction
+
+    roots_from_patterns = ArgparsePatternFileAction.roots_from_patterns
+    if roots_from_patterns:
+        args.paths = list(roots_from_patterns) + args.paths
+        ArgparsePatternFileAction.roots_from_patterns.clear()
+
     return args

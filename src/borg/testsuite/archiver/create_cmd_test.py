@@ -475,6 +475,26 @@ def test_create_pattern_file(archivers, request):
     assert "- input/otherfile" in output
 
 
+def test_create_pattern_file_mixed_roots(archivers, request):
+    """test that roots from a pattern file and roots from the command line can be mixed."""
+    archiver = request.getfixturevalue(archivers)
+    patterns_file_path2 = os.path.join(archiver.tmpdir, "patterns_roots")
+    with open(patterns_file_path2, "wb") as fd:
+        fd.write(b"R input/dir1\n- input/dir1/file2\n")
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "dir1/file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "dir1/file2", size=1024 * 80)
+    create_regular_file(archiver.input_path, "dir2/file3", size=1024 * 80)
+    # root "input/dir1" comes from the pattern file, root "input/dir2" from the command line
+    output = cmd(archiver, "create", "-v", "--list", "--patterns-from=" + patterns_file_path2, "test", "input/dir2")
+    # file1 is included (root from pattern file, not excluded)
+    assert "A input/dir1/file1" in output
+    # file2 is excluded by the pattern file
+    assert "- input/dir1/file2" in output
+    # file3 is included (root from command line)
+    assert "A input/dir2/file3" in output
+
+
 def test_create_pattern_exclude_folder_but_recurse(archivers, request):
     """test when patterns exclude a parent folder, but include a child"""
     archiver = request.getfixturevalue(archivers)

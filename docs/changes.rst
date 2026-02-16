@@ -178,6 +178,7 @@ Other changes:
 
   - fix S3 url description, #9249
   - add a note that you need to install boto3 if you want to use S3/B2 URLs
+  - man pages: fix broken :ref: references (e.g. borg_patterns), #7239
 
 
 Version 2.0.0b20 (2025-12-24)

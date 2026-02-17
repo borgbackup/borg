@@ -148,9 +148,9 @@ jobs:
             ]
           }' || '{
             "include": [
-              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-llfuse", "binary": "borg-linux-glibc235-x86_64-gh"},
-              {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-llfuse", "binary": "borg-linux-glibc235-arm64-gh"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-pyfuse3", "binary": "borg-linux-glibc235-x86_64-gh"},
+              {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-pyfuse3", "binary": "borg-linux-glibc235-arm64-gh"},
+              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-llfuse"},
               {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-pyfuse3"},
               {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"},
               {"os": "macos-15-intel", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-15-x86_64-gh"},

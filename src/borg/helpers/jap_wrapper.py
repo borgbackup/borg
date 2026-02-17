@@ -3,7 +3,11 @@
 This module provides a compatibility layer between Borg's argparse patterns
 and jsonargparse's API. Key adaptations:
 
-1. Namespace flattening: jsonargparse creates nested namespaces for subcommands
+1. type+action combination: jsonargparse forbids combining type= and action=
+   in add_argument(). Our override keeps type= at call sites for readability
+   and wraps both into a composite action class that jsonargparse accepts.
+
+2. Namespace flattening: jsonargparse creates nested namespaces for subcommands
    (args.create.name instead of args.name). flatten_namespace() merges these
    into a flat namespace compatible with Borg's command handlers.
 """
@@ -14,13 +18,58 @@ from jsonargparse import ArgumentParser as _JAPArgumentParser
 from jsonargparse._core import ArgumentGroup as _JAPArgumentGroup
 
 
-class ArgumentGroup(_JAPArgumentGroup):
-    """ArgumentGroup for Borg."""
+def _make_type_converting_action(base_action_name, type_fn):
+    """Create a custom action class that wraps a standard action and applies type conversion.
+
+    jsonargparse forbids type+action, so we strip both from kwargs and replace
+    them with a single composite action class that does type conversion + action.
+    """
+    _action_map = {"append": argparse._AppendAction, "store": argparse._StoreAction}
+    base_cls = _action_map.get(base_action_name)
+    if base_cls is None:
+        return None
+
+    class TypeConvertingAction(base_cls):
+        def __call__(self, parser, namespace, values, option_string=None):
+            if type_fn is not None and isinstance(values, str):
+                try:
+                    values = type_fn(values)
+                except argparse.ArgumentTypeError as e:
+                    raise argparse.ArgumentError(self, str(e))
+            super().__call__(parser, namespace, values, option_string)
+
+    TypeConvertingAction.__name__ = f"TypeConverting{base_action_name.title()}Action"
+    return TypeConvertingAction
+
+
+class BorgAddArgumentMixin:
+    """Mixin that handles the type+action combination jsonargparse forbids.
+
+    Call sites can use both type= and action= naturally (e.g. type=parse_exclude_pattern,
+    action="append"). This mixin intercepts the call, strips both, and creates a
+    composite action class that jsonargparse accepts.
+    """
+
+    def add_argument(self, *args, **kwargs):
+        action = kwargs.get("action")
+        if action is not None and "type" in kwargs and isinstance(action, str):
+            type_fn = kwargs.pop("type")
+            wrapper = _make_type_converting_action(action, type_fn)
+            if wrapper is not None:
+                kwargs["action"] = wrapper
+            else:
+                # Unknown action string, put type back and hope for the best.
+                kwargs["type"] = type_fn
+        return super().add_argument(*args, **kwargs)
+
+
+class ArgumentGroup(BorgAddArgumentMixin, _JAPArgumentGroup):
+    """ArgumentGroup that supports Borg's add_argument patterns."""
 
     pass
 
 
-class ArgumentParser(_JAPArgumentParser):
+class ArgumentParser(BorgAddArgumentMixin, _JAPArgumentParser):
     """ArgumentParser bridging Borg's argparse patterns with jsonargparse."""
 
     def __init__(self, *args, **kwargs):

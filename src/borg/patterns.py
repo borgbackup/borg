@@ -75,15 +75,6 @@ class ArgparsePatternFileAction(argparse.Action):
         load_pattern_file(fobj, ArgparsePatternFileAction.roots_from_patterns, args.patterns)
 
 
-class ArgparseExcludePatternAction(argparse.Action):
-    """Action for --exclude that parses and appends an exclude pattern."""
-
-    def __call__(self, parser, args, values, option_string=None):
-        if args.patterns is None:
-            args.patterns = []
-        args.patterns.append(parse_exclude_pattern(values))
-
-
 class ArgparseExcludeFileAction(ArgparsePatternFileAction):
     def parse(self, fobj, args):
         # jsonargparse may initialize list-like attributes to None instead of []

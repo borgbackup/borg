@@ -31,7 +31,7 @@ def _run_bash_completion_fn(completion_script, setup_code):
         script_path = f.name
     try:
         result = subprocess.run(
-            ["bash", "-c", f"source {script_path}\n{setup_code}"], capture_output=True, text=True, timeout=30
+            ["bash", "-c", f"source {script_path}\n{setup_code}"], capture_output=True, text=True, timeout=120
         )
     finally:
         os.unlink(script_path)

@@ -8,6 +8,7 @@ import time
 from ..constants import *  # NOQA
 from ..crypto.key import FlexiKey
 from ..helpers import format_file_size
+from ..helpers import json_print
 from ..helpers import msgpack
 from ..helpers import get_reset_ec
 from ..item import Item
@@ -128,6 +129,8 @@ class BenchmarkMixIn:
         """Benchmark CPU-bound operations."""
         from timeit import timeit
 
+        result = {} if args.json else None
+
         random_10M = os.urandom(10 * 1000 * 1000)
         key_256 = os.urandom(32)
         key_128 = os.urandom(16)
@@ -136,8 +139,11 @@ class BenchmarkMixIn:
         import io
         from ..chunkers import get_chunker  # noqa
 
-        print("Chunkers =======================================================")
-        size = "1GB"
+        if not args.json:
+            print("Chunkers =======================================================")
+        else:
+            result["chunkers"] = []
+        size = 1000000000
 
         def chunkit(ch):
             with io.BytesIO(random_10M) as data_file:
@@ -160,31 +166,53 @@ class BenchmarkMixIn:
             ),
             ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
         ]:
-            print(f"{spec:<24} {size:<10} {timeit(func, setup, number=100, globals=vars):.3f}s")
+            dt = timeit(func, setup, number=100, globals=vars)
+            if args.json:
+                algo, _, algo_params = spec.partition(",")
+                result["chunkers"].append({"algo": algo, "algo_params": algo_params, "size": size, "time": dt})
+            else:
+                print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
 
         from ..checksums import crc32, xxh64
 
-        print("Non-cryptographic checksums / hashes ===========================")
-        size = "1GB"
+        if not args.json:
+            print("Non-cryptographic checksums / hashes ===========================")
+        else:
+            result["checksums"] = []
+        size = 1000000000
         tests = [("xxh64", lambda: xxh64(random_10M)), ("crc32 (zlib)", lambda: crc32(random_10M))]
         for spec, func in tests:
-            print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
+            dt = timeit(func, number=100)
+            if args.json:
+                result["checksums"].append({"algo": spec, "size": size, "time": dt})
+            else:
+                print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
 
         from ..crypto.low_level import hmac_sha256, blake2b_256
 
-        print("Cryptographic hashes / MACs ====================================")
-        size = "1GB"
+        if not args.json:
+            print("Cryptographic hashes / MACs ====================================")
+        else:
+            result["hashes"] = []
+        size = 1000000000
         for spec, func in [
             ("hmac-sha256", lambda: hmac_sha256(key_256, random_10M)),
             ("blake2b-256", lambda: blake2b_256(key_256, random_10M)),
         ]:
-            print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
+            dt = timeit(func, number=100)
+            if args.json:
+                result["hashes"].append({"algo": spec, "size": size, "time": dt})
+            else:
+                print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
 
         from ..crypto.low_level import AES256_CTR_BLAKE2b, AES256_CTR_HMAC_SHA256
         from ..crypto.low_level import AES256_OCB, CHACHA20_POLY1305
 
-        print("Encryption =====================================================")
-        size = "1GB"
+        if not args.json:
+            print("Encryption =====================================================")
+        else:
+            result["encryption"] = []
+        size = 1000000000
 
         tests = [
             (
@@ -211,19 +239,33 @@ class BenchmarkMixIn:
             ),
         ]
         for spec, func in tests:
-            print(f"{spec:<24} {size:<10} {timeit(func, number=100):.3f}s")
+            dt = timeit(func, number=100)
+            if args.json:
+                result["encryption"].append({"algo": spec, "size": size, "time": dt})
+            else:
+                print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
 
-        print("KDFs (slow is GOOD, use argon2!) ===============================")
+        if not args.json:
+            print("KDFs (slow is GOOD, use argon2!) ===============================")
+        else:
+            result["kdf"] = []
         count = 5
         for spec, func in [
             ("pbkdf2", lambda: FlexiKey.pbkdf2("mypassphrase", b"salt" * 8, PBKDF2_ITERATIONS, 32)),
             ("argon2", lambda: FlexiKey.argon2("mypassphrase", 64, b"S" * ARGON2_SALT_BYTES, **ARGON2_ARGS)),
         ]:
-            print(f"{spec:<24} {count:<10} {timeit(func, number=count):.3f}s")
+            dt = timeit(func, number=count)
+            if args.json:
+                result["kdf"].append({"algo": spec, "count": count, "time": dt})
+            else:
+                print(f"{spec:<24} {count:<10} {dt:.3f}s")
 
         from ..compress import CompressionSpec
 
-        print("Compression ====================================================")
+        if not args.json:
+            print("Compression ====================================================")
+        else:
+            result["compression"] = []
         for spec in [
             "lz4",
             "zstd,1",
@@ -240,15 +282,30 @@ class BenchmarkMixIn:
             "lzma,9",
         ]:
             compressor = CompressionSpec(spec).compressor
-            size = "0.1GB"
-            print(f"{spec:<12} {size:<10} {timeit(lambda: compressor.compress({}, random_10M), number=10):.3f}s")
+            size = 100000000
+            dt = timeit(lambda: compressor.compress({}, random_10M), number=10)
+            if args.json:
+                algo, _, algo_params = spec.partition(",")
+                result["compression"].append({"algo": algo, "algo_params": algo_params, "size": size, "time": dt})
+            else:
+                print(f"{spec:<12} {format_file_size(size):<10} {dt:.3f}s")
 
-        print("msgpack ========================================================")
+        if not args.json:
+            print("msgpack ========================================================")
+        else:
+            result["msgpack"] = []
         item = Item(path="foo/bar/baz", mode=660, mtime=1234567)
         items = [item.as_dict()] * 1000
         size = "100k Items"
         spec = "msgpack"
-        print(f"{spec:<12} {size:<10} {timeit(lambda: msgpack.packb(items), number=100):.3f}s")
+        dt = timeit(lambda: msgpack.packb(items), number=100)
+        if args.json:
+            result["msgpack"].append({"algo": spec, "count": 100000, "time": dt})
+        else:
+            print(f"{spec:<12} {size:<10} {dt:.3f}s")
+
+        if args.json:
+            json_print(result)
 
     def build_parser_benchmarks(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
@@ -343,3 +400,4 @@ class BenchmarkMixIn:
             help="benchmarks Borg CPU-bound operations.",
         )
         subparser.set_defaults(func=self.do_benchmark_cpu)
+        subparser.add_argument("--json", action="store_true", help="format output as JSON")

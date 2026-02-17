@@ -1,3 +1,4 @@
+import functools
 import os
 import subprocess
 import tempfile
@@ -9,24 +10,18 @@ from . import cmd, generate_archiver_tests, RK_ENCRYPTION
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local")  # NOQA
 
 
-def _bash_available():
+@functools.lru_cache
+def cmd_available(cmd):
+    """Check if a shell command is available."""
     try:
-        subprocess.run(["bash", "--version"], capture_output=True, check=True)
+        subprocess.run(cmd.split(), capture_output=True, check=True)
         return True
     except (subprocess.SubprocessError, FileNotFoundError):
         return False
 
 
-def _zsh_available():
-    try:
-        subprocess.run(["zsh", "--version"], capture_output=True, check=True)
-        return True
-    except (subprocess.SubprocessError, FileNotFoundError):
-        return False
-
-
-needs_bash = pytest.mark.skipif(not _bash_available(), reason="Bash not available")
-needs_zsh = pytest.mark.skipif(not _zsh_available(), reason="Zsh not available")
+needs_bash = pytest.mark.skipif(not cmd_available("bash --version"), reason="Bash not available")
+needs_zsh = pytest.mark.skipif(not cmd_available("zsh --version"), reason="Zsh not available")
 
 
 def _run_bash_completion_fn(completion_script, setup_code):

@@ -10,9 +10,15 @@ updates:
           - "*"
   - package-ecosystem: "pip"
     directory: "/requirements.d"
+    ignore:
+    - dependency-name: "black"
     schedule:
       interval: "weekly"
+    cooldown:
+      semver-major-days: 90
+      semver-minor-days: 30
     groups:
       pip-dependencies:
         patterns:
           - "*"
+

@@ -22,6 +22,7 @@ Examples
     $ export BORG_REPO=ssh://user@hostname/~/backup
     # repokey: stores the encrypted key in <REPO_DIR>/config
     $ borg repo-create --encryption=repokey-aes-ocb
-    # keyfile: stores the encrypted key in ~/.config/borg/keys/
+    # keyfile: stores the encrypted key in the config dir's keys/ subdir
+    # (e.g. ~/.config/borg/keys/ on Linux, ~/Library/Application Support/borg/keys/ on macOS)
     $ borg repo-create --encryption=keyfile-aes-ocb
 

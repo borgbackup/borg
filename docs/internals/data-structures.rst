@@ -736,7 +736,8 @@ Key files
 .. seealso:: The :ref:`key_encryption` section for an in-depth review of the key encryption.
 
 When initializing a repository with one of the "keyfile" encryption modes,
-Borg creates an associated key file in ``$HOME/.config/borg/keys``.
+Borg creates an associated key file in the keys subdirectory of the borg config
+directory (see :ref:`env_vars` for platform-specific default paths).
 
 The same key is also used in the "repokey" modes, which store it in the repository.
 

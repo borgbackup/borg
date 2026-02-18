@@ -15,6 +15,7 @@ from ..manifest import Manifest
 from ..legacyrepository import LegacyRepository
 from ..repository import Repository
 
+from ..helpers.coverage_diy import mark, register
 from ..logger import create_logger
 
 logger = create_logger()
@@ -136,57 +137,136 @@ class TransferMixIn:
         """archives transfer from other repository, optionally upgrade data format"""
         key = manifest.key
         other_key = other_manifest.key
+
+        ALL_TRANSFER_BRANCHES = {
+            "DT_1_true",
+            "DT_1_false",
+            "DT_2_true",
+            "DT_2_false",
+            "DT_3_true",
+            "DT_3_false",
+            "DT_4_true",
+            "DT_4_false",
+            "DT_5_true",
+            "DT_5_false",
+            "DT_6_true",
+            "DT_6_false",
+            "DT_7_true",
+            "DT_7_false",
+            "DT_8_true",
+            "DT_8_false",
+            "DT_9_true",
+            "DT_9_false",
+            "DT_10_true",
+            "DT_10_false",
+            "DT_11_true",
+            "DT_12_true",
+            "DT_13_true",
+            "DT_14_true",
+            "DT_14_false",
+            "DT_15_true",
+            "DT_15_false",
+            "DT_16_true",
+            "DT_16_elif",
+            "DT_16_false",
+            "DT_17_true",
+            "DT_17_false",
+            "DT_18_true",
+            "DT_18_false",
+            "DT_19_true",
+            "DT_19_false",
+            "DT_20_true",
+            "DT_20_false",
+            "DT_21_true",
+            "DT_21_false",
+        }
+
+        for flag in ALL_TRANSFER_BRANCHES:
+            register(flag)
+
         if not uses_same_id_hash(other_key, key):
+            mark("DT_1_true")
             raise Error(
                 "You must keep the same ID hash ([HMAC-]SHA256 or BLAKE2b) or deduplication will break. "
                 "Use a related repository!"
             )
+        else:
+            mark("DT_1_false")
+
         if not uses_same_chunker_secret(other_key, key):
+            mark("DT_2_true")
             raise Error(
                 "You must use the same chunker secret or deduplication will break. " "Use a related repository!"
             )
+        else:
+            mark("DT_2_false")
 
         dry_run = args.dry_run
         archive_infos = other_manifest.archives.list_considering(args)
         count = len(archive_infos)
+
         if count == 0:
+            mark("DT_3_true")
             return
+        else:
+            mark("DT_3_false")
 
         an_errors = []
         for archive_info in archive_infos:
             try:
                 archivename_validator(archive_info.name)
+                mark("DT_4_false")  # no exception
             except argparse.ArgumentTypeError as err:
+                mark("DT_4_true")  # exception raised
                 an_errors.append(str(err))
+
         if an_errors:
+            mark("DT_5_true")
             an_errors.insert(0, "Invalid archive names detected, please rename them before transfer:")
             raise Error("\n".join(an_errors))
+        else:
+            mark("DT_5_false")
 
         ac_errors = []
         for archive_info in archive_infos:
             archive = Archive(other_manifest, archive_info.id)
             try:
                 comment_validator(archive.metadata.get("comment", ""))
+                mark("DT_6_false")  # no exception
             except argparse.ArgumentTypeError as err:
+                mark("DT_6_true")  # exception raised
                 ac_errors.append(f"{archive_info.name}: {err}")
+
         if ac_errors:
+            mark("DT_7_true")
             ac_errors.insert(0, "Invalid archive comments detected, please fix them before transfer:")
             raise Error("\n".join(ac_errors))
+        else:
+            mark("DT_7_false")
 
         from .. import upgrade as upgrade_mod
 
         v1_or_v2 = getattr(args, "v1_or_v2", False)
         upgrader = args.upgrader
+
         if upgrader == "NoOp" and v1_or_v2:
+            mark("DT_8_true")
             upgrader = "From12To20"
+        else:
+            mark("DT_8_false")
 
         try:
             UpgraderCls = getattr(upgrade_mod, f"Upgrader{upgrader}")
+            mark("DT_9_false")  # no exception
         except AttributeError:
+            mark("DT_9_true")  # exception raised
             raise Error(f"No such upgrader: {upgrader}")
 
         if UpgraderCls is not upgrade_mod.UpgraderFrom12To20 and other_manifest.repository.version == 1:
+            mark("DT_10_true")
             raise Error("To transfer from a borg 1.x repo, you need to use: --upgrader=From12To20")
+        else:
+            mark("DT_10_false")
 
         upgrader = UpgraderCls(cache=cache, args=args)
 
@@ -204,18 +284,27 @@ class TransferMixIn:
             if not dry_run and manifest.archives.exists_name_and_ts(name, archive_info.ts):
                 # Useful for Borg 1.x -> 2 transfers; we have unique names in Borg 1.x.
                 # Also useful for Borg 2 -> 2 transfers with metadata changes (ID changes).
+                mark("DT_11_true")
                 print(f"{name} {ts_str}: archive is already present in destination repo, skipping.")
             elif not dry_run and manifest.archives.exists_name_and_id(name, id):
                 # Useful for Borg 2 -> 2 transfers without changes (ID stays the same)
+                mark("DT_12_true")
                 print(f"{name} {id_hex}: archive is already present in destination repo, skipping.")
             else:
+                mark("DT_13_true")  # actual transfer path
+
                 if not dry_run:
+                    mark("DT_14_true")
                     print(f"{name} {ts_str} {id_hex}: copying archive to destination repo...")
+                else:
+                    mark("DT_14_false")
+
                 other_archive = Archive(other_manifest, id)
                 archive = (
                     Archive(manifest, name, cache=cache, create=True, progress=args.progress) if not dry_run else None
                 )
                 upgrader.new_archive(archive=archive)
+
                 for item in other_archive.iter_items():
                     is_part = bool(item.get("part", False))
                     if is_part:
@@ -224,14 +313,25 @@ class TransferMixIn:
                         # Borg 2 archives do not have such special part items anymore.
                         # So let's remove them from old archives also, considering there is no
                         # code anymore that deals with them in special ways (e.g., to get stats right).
+                        mark("DT_15_true")
                         continue
                     if "chunks_healthy" in item:  # legacy
                         other_chunks = item.chunks_healthy  # chunks_healthy has the CORRECT chunks list, if present.
+                    else:
+                        mark("DT_15_false")
+
+                    if "chunks_healthy" in item:
+                        mark("DT_16_true")
+                        other_chunks = item.chunks_healthy
                     elif "chunks" in item:
+                        mark("DT_16_elif")
                         other_chunks = item.chunks
                     else:
+                        mark("DT_16_false")
                         other_chunks = None
+
                     if other_chunks is not None:
+                        mark("DT_17_true")
                         chunks, transfer, present = transfer_chunks(
                             upgrader,
                             other_repository,
@@ -245,16 +345,30 @@ class TransferMixIn:
                             args.chunker_params,
                         )
                         if not dry_run:
+                            mark("DT_18_true")
                             item.chunks = chunks
                             archive.stats.nfiles += 1
+                        else:
+                            mark("DT_18_false")
                         transfer_size += transfer
                         present_size += present
+                    else:
+                        mark("DT_17_false")
+
                     if not dry_run:
+                        mark("DT_19_true")
                         item = upgrader.upgrade_item(item=item)
                         archive.add_item(item, show_progress=args.progress)
+                    else:
+                        mark("DT_19_false")
+
                 if not dry_run:
+                    mark("DT_20_true")
                     if args.progress:
+                        mark("DT_21_true")
                         archive.stats.show_progress(final=True)
+                    else:
+                        mark("DT_21_false")
                     additional_metadata = upgrader.upgrade_archive_metadata(metadata=other_archive.metadata)
                     archive.save(additional_metadata=additional_metadata)
                     print(
@@ -263,6 +377,7 @@ class TransferMixIn:
                         f"present_size: {format_file_size(present_size)}"
                     )
                 else:
+                    mark("DT_20_false")
                     print(
                         f"{name} {ts_str} {id_hex}: completed"
                         if transfer_size == 0

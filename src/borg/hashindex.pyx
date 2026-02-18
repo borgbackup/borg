@@ -237,8 +237,8 @@ cdef class NSIndex(IndexBase):
         iter.index = self.index
         if marker:
             key = hashindex_get(self.index, <unsigned char *>marker)
-            if marker is None:
-                raise IndexError
+            if not key:
+                raise KeyError("marker not found")
             iter.key = key - self.key_size
         return iter
 
@@ -354,8 +354,8 @@ cdef class ChunkIndex(IndexBase):
         iter.index = self.index
         if marker:
             key = hashindex_get(self.index, <unsigned char *>marker)
-            if marker is None:
-                raise IndexError
+            if not key:
+                raise KeyError("marker not found")
             iter.key = key - self.key_size
         return iter
 

@@ -102,3 +102,18 @@ def test_yes_env_output(capfd, monkeypatch):
     assert out == ""
     assert env_var in err
     assert "yes" in err
+
+def test_yes_prompt_false(): # Reaches line 91
+    assert yes(prompt=False, default=True)
+    
+def test_yes_unicode_decode_error(): # Line 96
+    input = FakeInputs(["error", "y"])
+    assert yes(input=input)
+    
+def test_yes_invalid_msg(capfd): # Line 115
+    input = FakeInputs(["invalid", "y"])
+    assert yes(invalid_msg="bad answer", input=input)
+    
+def test_yes_default_msg(capfd):
+    input = FakeInputs([""])
+    assert yes(default=True, default_msg="using default", input=input)

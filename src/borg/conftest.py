@@ -17,6 +17,11 @@ from borg.testsuite import are_symlinks_supported, are_hardlinks_supported, is_u
 from borg.testsuite.archiver import BORG_EXES
 from borg.testsuite.platform.platform_test import fakeroot_detected  # noqa: E402
 
+try:
+    from borg.helpers.coverage_diy import report
+except ImportError:
+    report = None
+
 
 @pytest.fixture(autouse=True)
 def clean_env(tmpdir_factory, monkeypatch):
@@ -137,3 +142,7 @@ def binary_archiver(archiver):
     archiver.EXE = "borg.exe"
     archiver.FORK_DEFAULT = True
     yield archiver
+
+def pytest_sessionfinish(session, exitstatus):
+    if report:
+        report()

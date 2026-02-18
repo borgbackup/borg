@@ -375,10 +375,13 @@ Security
 
 .. _home_config_borg:
 
-How important is the $HOME/.config/borg directory?
---------------------------------------------------
+How important is the borg config directory?
+-------------------------------------------
 
-The Borg config directory has content that you should take care of:
+The borg config directory (``~/.config/borg`` on Linux,
+``~/Library/Application Support/borg`` on macOS,
+``C:\Users\<user>\AppData\Roaming\borg`` on Windows -- see :ref:`env_vars`)
+has content that you should take care of:
 
 ``keys`` subdirectory
   All your borg keyfile keys are stored in this directory. Please note that borg
@@ -386,7 +389,7 @@ The Borg config directory has content that you should take care of:
   to have an independent backup of the borg keys, see :ref:`borg_key_export` for
   more details.
 
-Make sure that only you have access to the Borg config directory.
+Make sure that only you have access to the borg config directory.
 
 
 Note about creating multiple keyfile repositories at the same path
@@ -398,7 +401,7 @@ was moved away or unmounted), Borg will not overwrite or reuse the existing
 key file in your keys directory. Instead, it creates a new key file by
 appending a numeric suffix to the base name (e.g., .2, .3, ...).
 
-This means you may see multiple key files like:
+This means you may see multiple key files like (example paths for Linux):
 
 - ~/.config/borg/keys/home_user_backup
 - ~/.config/borg/keys/home_user_backup.2
@@ -410,10 +413,13 @@ overwrite.
 
 .. _home_data_borg:
 
-How important is the $HOME/.local/share/borg directory?
--------------------------------------------------------
+How important is the borg data directory?
+-----------------------------------------
 
-The Borg data directory has content that you should take care of:
+The borg data directory (``~/.local/share/borg`` on Linux,
+``~/Library/Application Support/borg`` on macOS,
+``C:\Users\<user>\AppData\Local\borg`` on Windows -- see :ref:`env_vars`)
+has content that you should take care of:
 
 ``security`` subdirectory
   Each directory here represents one Borg repository by its ID and contains the last known status.

@@ -126,7 +126,19 @@ Compatibility notes:
 
   - XDG_*_HOME is not honoured on macOS and on Windows.
   - BORG_BASE_DIR can still be used to enforce some base dir + .config/ or .cache/.
-  - the default macOS config and cache dir will now be in ~/Library/Application Support/borg/.
+  - on macOS, the default directories move to native locations:
+    config/data: ``~/Library/Application Support/borg/``,
+    cache: ``~/Library/Caches/borg/``,
+    runtime: ``~/Library/Caches/TemporaryItems/borg/``.
+  - on Windows, the default directories are:
+    config: ``C:\Users\<user>\AppData\Roaming\borg``,
+    cache: ``C:\Users\<user>\AppData\Local\borg\Cache``,
+    data: ``C:\Users\<user>\AppData\Local\borg``.
+  - **keyfile users on macOS (and Windows)**: borg 2 will look for key files in the
+    new platform-specific config directory instead of ``~/.config/borg/keys/`` where
+    borg 1.x stored them. You can set ``BORG_KEYS_DIR`` to point to the old location,
+    or copy the key file to the new location. See :ref:`env_vars` and the ``borg transfer``
+    documentation for details.
 - create: different included/excluded status chars, #7321
 
   - dry-run: now uses "+" (was: "-") and "-" (was: "x") for included/excluded status

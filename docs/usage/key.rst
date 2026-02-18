@@ -28,6 +28,15 @@ Examples
     Remember your passphrase. Your data will be inaccessible without it.
     Key updated
 
+.. note::
+
+    The key file paths shown above are the defaults for Linux (``~/.config/borg/keys/``).
+    On macOS, key files are stored in ``~/Library/Application Support/borg/keys/``.
+    On Windows, they are stored in ``C:\Users\<user>\AppData\Roaming\borg\keys\``.
+    See :ref:`env_vars` for details.
+
+::
+
     # Import a previously-exported key into the specified
     # key file (creating or overwriting the output key)
     # (keyfile repositories only)

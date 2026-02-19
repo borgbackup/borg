@@ -1,6 +1,6 @@
 import pytest
 
-from ...helpers.nanorst import rst_to_text
+from ...helpers.nanorst import rst_to_text, coverage_hits
 
 
 def test_inline():
@@ -36,3 +36,61 @@ def test_undefined_ref():
     with pytest.raises(ValueError) as exc_info:
         rst_to_text("See :ref:`foo`.")
     assert "Undefined reference" in str(exc_info.value)
+
+########################################################################
+
+def test_display_diy_coverage_report_before_tests():
+    """
+    Attention:
+    Run using -s flag.
+   
+    pytest -s src/borg/testsuite/helpers/nanorst_test.py
+
+    This counts how many branches were hit. Each branch has an id.
+    """
+    print("\n" + "="*30)
+    print("DIY BRANCH COVERAGE REPORT: BEFORE TESTS")
+    print("="*30)
+    
+    for i in range(1, 26):
+        status = "hit" if coverage_hits.get(i) else "not hit"
+        print(f"Branch {i}: {status}")
+    
+    print("-" * 30)
+    
+    total_branches = 25
+    hit_count = sum(1 for hit in coverage_hits.values() if hit)
+    percentage = (hit_count / total_branches) * 100
+    
+    print(f"Total Branches: {total_branches}")
+    print(f"Branches Hit:   {hit_count}")
+    print(f"Coverage:       {percentage:.1f}%")
+    print("="*30)
+
+
+def test_display_diy_coverage_report_after_tests():
+    """
+    Attention:
+    Run using -s flag: 
+    pytest -s src/borg/testsuite/helpers/nanorst_test.py
+
+    This counts how many branches were hit after the tests.
+    """
+    print("\n" + "="*30)
+    print("DIY BRANCH COVERAGE REPORT: AFTER TESTS")
+    print("="*30)
+    
+    for i in range(1, 26):
+        status = "hit" if coverage_hits.get(i) else "not hit"
+        print(f"Branch {i}: {status}")
+    
+    print("-" * 30)
+    
+    total_branches = 25
+    hit_count = sum(1 for hit in coverage_hits.values() if hit)
+    percentage = (hit_count / total_branches) * 100
+    
+    print(f"Total Branches: {total_branches}")
+    print(f"Branches Hit:   {hit_count}")
+    print(f"Coverage:       {percentage:.1f}%")
+    print("="*30)

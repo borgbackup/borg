@@ -3,6 +3,7 @@ import sys
 
 from . import is_terminal
 
+coverage_hits = {i: False for i in range(1, 26)}
 
 class TextPecker:
     def __init__(self, s):
@@ -66,61 +67,85 @@ def rst_to_text(text, state_hook=None, references=None):
     inline_single = ("*", "`")
 
     while True:
+        coverage_hits[1] = True
         char = text.read(1)
         if not char:
+            coverage_hits[2] = True
             break
+        else:
+            coverage_hits[3] = True
         next = text.peek(1)  # type: str
 
         if state == "text":
+            coverage_hits[4] = True
             if char == "\\" and text.peek(1) in inline_single:
+                coverage_hits[6] = True
                 continue
+            else:
+                coverage_hits[7] = True
             if text.peek(-1) != "\\":
+                coverage_hits[8] = True
                 if char in inline_single and next != char:
+                    coverage_hits[10] = True
                     state_hook(state, char, out)
                     state = char
                     continue
                 if char == next == "*":
+                    coverage_hits[11] = True
                     state_hook(state, "**", out)
                     state = "**"
                     text.read(1)
                     continue
                 if char == next == "`":
+                    coverage_hits[12] = True
                     state_hook(state, "``", out)
                     state = "``"
                     text.read(1)
                     continue
                 if text.peek(-1).isspace() and char == ":" and text.peek(5) == "ref:`":
+                    coverage_hits[13] = True
                     # translate reference
                     text.read(5)
                     ref = ""
                     while True:
+                        coverage_hits[14] = True
                         char = text.peek(1)
                         if char == "`":
+                            coverage_hits[15] = True
                             text.read(1)
                             break
                         if char == "\n":
+                            coverage_hits[16] = True
                             text.read(1)
                             continue  # merge line breaks in :ref:`...\n...`
                         ref += text.read(1)
                     try:
+                        coverage_hits[17] = True
                         out.write(references[ref])
                     except KeyError:
+                        coverage_hits[18] = True
                         raise ValueError(
                             "Undefined reference in Archiver help: %r — please add reference "
                             "substitution to 'rst_plain_text_references'" % ref
                         )
                     continue
                 if char == ":" and text.peek(2) == ":\n":  # End of line code block
+                    coverage_hits[19] = True
                     text.read(2)
                     state_hook(state, "code-block", out)
                     state = "code-block"
                     out.write(":\n")
                     continue
+            else:
+                coverage_hits[9] = True
+
             if text.peek(-2) in ("\n\n", "") and char == next == ".":
+                coverage_hits[20] = True
                 text.read(2)
                 directive, is_directive, arguments = text.readline().partition("::")
                 text.read(1)
                 if not is_directive:
+                    coverage_hits[21] = True
                     # partition: if the separator is not in the text, the leftmost output is the entire input
                     if directive == "nanorst: inline-fill":
                         inline_mode = "fill"
@@ -129,13 +154,17 @@ def rst_to_text(text, state_hook=None, references=None):
                     continue
                 process_directive(directive, arguments.strip(), out, state_hook)
                 continue
+        else:
+            coverage_hits[5] = True
         if state in inline_single and char == state:
+            coverage_hits[22] = True
             state_hook(state, "text", out)
             state = "text"
             if inline_mode == "fill":
                 out.write(2 * " ")
             continue
         if state == "``" and char == next == "`":
+            coverage_hits[23] = True
             state_hook(state, "text", out)
             state = "text"
             text.read(1)
@@ -143,11 +172,13 @@ def rst_to_text(text, state_hook=None, references=None):
                 out.write(4 * " ")
             continue
         if state == "**" and char == next == "*":
+            coverage_hits[24] = True
             state_hook(state, "text", out)
             state = "text"
             text.read(1)
             continue
         if state == "code-block" and char == next == "\n" and text.peek(5)[1:] != "    ":
+            coverage_hits[25] = True
             # Foo::
             #
             #     *stuff* *code* *ignore .. all markup*

@@ -694,17 +694,6 @@ class FilesCacheMixin:
         )
 
 
-def try_upgrade_to_b14(repository):
-    # TODO: remove this before 2.0.0 release
-    # we just delete any present chunk index cache here, it is invalid due to the
-    # refcount -> flags change we did and due to the different CHUNKINDEX_HASH_SEED.
-    for name in "chunks_hash", "chunks":
-        try:
-            repository.store_delete(f"cache/{name}")
-        except (Repository.ObjectNotFound, StoreObjectNotFound):
-            pass  # likely already upgraded
-
-
 def list_chunkindex_hashes(repository):
     hashes = []
     for info in repository.store_list("cache"):
@@ -807,7 +796,6 @@ def read_chunkindex_from_repo_cache(repository, hash):
 
 
 def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immediately=False):
-    try_upgrade_to_b14(repository)
     # first, try to build a fresh, mostly complete chunk index from centrally cached chunk indexes:
     if not disable_caches:
         hashes = list_chunkindex_hashes(repository)

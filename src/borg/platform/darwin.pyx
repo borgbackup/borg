@@ -262,3 +262,33 @@ def set_flags(path, bsd_flags, fd=None):
         path_bytes = os.fsencode(path)
         if lchflags(path_bytes, c_flags) == -1:
             raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path_bytes))
+
+
+import errno as errno_mod
+import fcntl as fcntl_mod
+
+
+def fdatasync(fd):
+    """macOS fdatasync using F_FULLFSYNC for true data durability.
+
+    On macOS, os.fsync() only flushes to the drive's write cache.
+    fcntl F_FULLFSYNC flushes to persistent storage.
+    Falls back to os.fsync() if F_FULLFSYNC is not supported.
+    """
+    try:
+        fcntl_mod.fcntl(fd, fcntl_mod.F_FULLFSYNC)
+    except OSError:
+        # F_FULLFSYNC not supported (e.g. network filesystem), fall back
+        os.fsync(fd)
+
+
+def sync_dir(path):
+    """Sync a directory to persistent storage on macOS using F_FULLFSYNC."""
+    fd = os.open(str(path), os.O_RDONLY)
+    try:
+        fdatasync(fd)
+    except OSError as os_error:
+        if os_error.errno != errno_mod.EINVAL:
+            raise
+    finally:
+        os.close(fd)

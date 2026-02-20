@@ -151,7 +151,6 @@ class SyncFile:
 
     Calling SyncFile(path) for an existing path will raise FileExistsError. See the comment in __init__.
 
-    TODO: Use F_FULLSYNC on macOS.
     TODO: A Windows implementation should use CreateFile with FILE_FLAG_WRITE_THROUGH.
     """
 

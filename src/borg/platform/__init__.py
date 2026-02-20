@@ -50,6 +50,7 @@ elif is_darwin:  # pragma: darwin only
     from .darwin import acl_get, acl_set
     from .darwin import is_darwin_feature_64_bit_inode, _get_birthtime_ns
     from .darwin import set_flags
+    from .darwin import fdatasync, sync_dir  # type: ignore[no-redef]
     from .base import get_flags
     from .base import SyncFile
     from .posix import process_alive, local_pid_alive

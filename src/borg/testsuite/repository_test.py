@@ -9,7 +9,7 @@ from ..helpers import Location
 from ..helpers import IntegrityError
 from ..platformflags import is_win32
 from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed
-from ..repository import Repository, MAX_DATA_SIZE
+from ..repository import Repository, StoreObjectNotFound, MAX_DATA_SIZE
 from ..repoobj import RepoObj
 from .hashindex_test import H
 
@@ -213,6 +213,12 @@ def test_remote_rpc_exception_transport(remote_repository):
             assert len(e.args) == 2
             assert e.args[0] == s1
             assert e.args[1] == remote_repository.location.processed
+
+        try:
+            remote_repository.call("inject_exception", {"kind": "StoreObjectNotFound"})
+        except StoreObjectNotFound as e:
+            assert len(e.args) == 1
+            assert e.args[0] == s1
 
         try:
             remote_repository.call("inject_exception", {"kind": "InvalidRPCMethod"})

@@ -712,8 +712,7 @@ def delete_chunkindex_cache(repository):
         cache_name = f"cache/chunks.{hash}"
         try:
             repository.store_delete(cache_name)
-        except (Repository.ObjectNotFound, StoreObjectNotFound):
-            # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
+        except StoreObjectNotFound:
             pass
     logger.debug(f"cached chunk indexes deleted: {hashes}")
 
@@ -769,8 +768,7 @@ def write_chunkindex_to_repo_cache(
             cache_name = f"cache/chunks.{hash}"
             try:
                 repository.store_delete(cache_name)
-            except (Repository.ObjectNotFound, StoreObjectNotFound):
-                # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
+            except StoreObjectNotFound:
                 pass
         if delete_these:
             logger.debug(f"cached chunk indexes deleted: {delete_these}")
@@ -782,8 +780,7 @@ def read_chunkindex_from_repo_cache(repository, hash):
     logger.debug(f"trying to load {cache_name} from the repo...")
     try:
         chunks_data = repository.store_load(cache_name)
-    except (Repository.ObjectNotFound, StoreObjectNotFound):
-        # TODO: ^ seem like RemoteRepository raises Repository.ONF instead of StoreONF
+    except StoreObjectNotFound:
         logger.debug(f"{cache_name} not found in the repository.")
     else:
         if xxh64(chunks_data, seed=CHUNKINDEX_HASH_SEED) == hex_to_bin(hash):

@@ -35,7 +35,7 @@ from .logger import create_logger, borg_serve_log_queue
 from .manifest import NoManifestError
 from .helpers import msgpack
 from .legacyrepository import LegacyRepository
-from .repository import Repository
+from .repository import Repository, StoreObjectNotFound
 from .version import parse_version, format_version
 from .checksums import xxh64
 from .helpers.datastruct import EfficientCollectionQueue
@@ -269,11 +269,17 @@ class RepositoryServer:  # pragma: no cover
                                 logging.debug("\n".join(ex_full))
 
                             sys_info = sysinfo()
+                            # StoreObjectNotFound and Repository.ObjectNotFound both have
+                            # __name__ == "ObjectNotFound", so we need to distinguish them
+                            # explicitly for correct client-side reconstruction.
+                            exc_cls_name = (
+                                "StoreObjectNotFound" if isinstance(e, StoreObjectNotFound) else e.__class__.__name__
+                            )
                             try:
                                 msg = msgpack.packb(
                                     {
                                         MSGID: msgid,
-                                        "exception_class": e.__class__.__name__,
+                                        "exception_class": exc_cls_name,
                                         "exception_args": e.args,
                                         "exception_full": ex_full,
                                         "exception_short": ex_short,
@@ -285,7 +291,7 @@ class RepositoryServer:  # pragma: no cover
                                 msg = msgpack.packb(
                                     {
                                         MSGID: msgid,
-                                        "exception_class": e.__class__.__name__,
+                                        "exception_class": exc_cls_name,
                                         "exception_args": [
                                             x if isinstance(x, (str, bytes, int)) else None for x in e.args
                                         ],
@@ -403,6 +409,8 @@ class RepositoryServer:  # pragma: no cover
             raise PathNotAllowed("foo")
         elif kind == "ObjectNotFound":
             raise self.RepoCls.ObjectNotFound(s1, s2)
+        elif kind == "StoreObjectNotFound":
+            raise StoreObjectNotFound(s1)
         elif kind == "InvalidRPCMethod":
             raise InvalidRPCMethod(s1)
         elif kind == "divide":
@@ -784,6 +792,8 @@ class RemoteRepository:
                 raise Repository.ParentPathDoesNotExist(args[0])
             elif error == "ObjectNotFound":
                 raise Repository.ObjectNotFound(args[0], self.location.processed)
+            elif error == "StoreObjectNotFound":
+                raise StoreObjectNotFound(args[0])
             elif error == "InvalidRPCMethod":
                 raise InvalidRPCMethod(args[0])
             elif error == "LockTimeout":

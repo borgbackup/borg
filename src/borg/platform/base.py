@@ -151,7 +151,7 @@ class SyncFile:
 
     Calling SyncFile(path) for an existing path will raise FileExistsError. See the comment in __init__.
 
-    TODO: A Windows implementation should use CreateFile with FILE_FLAG_WRITE_THROUGH.
+    See platform/windows.pyx for the Windows implementation using CreateFile with FILE_FLAG_WRITE_THROUGH.
     """
 
     def __init__(self, path, *, fd=None, binary=False):

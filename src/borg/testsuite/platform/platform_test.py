@@ -74,6 +74,7 @@ skipif_not_freebsd = pytest.mark.skipif(not is_freebsd, reason="FreeBSD-only tes
 skipif_not_posix = pytest.mark.skipif(not (is_linux or is_freebsd or is_darwin), reason="POSIX-only tests")
 skipif_fakeroot_detected = pytest.mark.skipif(fakeroot_detected(), reason="not compatible with fakeroot")
 skipif_acls_not_working = pytest.mark.skipif(not are_acls_working(), reason="ACLs do not work")
+skipif_not_win32 = pytest.mark.skipif(not is_win32, reason="Windows-only test")
 skipif_no_ubel_user = pytest.mark.skipif(not user_exists("übel"), reason="requires übel user")
 
 

@@ -19,8 +19,9 @@ from .platform import listxattr, getxattr, setxattr, ENOATTR
 
 # If we are running with fakeroot on Linux, then use the xattr functions of fakeroot. This is needed by
 # the 'test_extract_capabilities' test, but also allows xattrs to work with fakeroot on Linux in normal use.
-# TODO: Check whether fakeroot supports xattrs on all platforms supported below.
-# TODO: If that's the case then we can make Borg fakeroot-xattr-compatible on these as well.
+# Note: fakeroot xattr support is Linux-only. fakeroot only wraps the Linux-style setxattr/getxattr API,
+# but FreeBSD/NetBSD use the extattr_* API instead, so fakeroot never intercepts xattr calls there.
+# On macOS, fakeroot explicitly disables xattr wrapping due to prototype incompatibilities.
 XATTR_FAKEROOT = False
 if sys.platform.startswith("linux"):
     LD_PRELOAD = os.environ.get("LD_PRELOAD", "")

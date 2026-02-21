@@ -3,7 +3,7 @@ import os
 import pytest
 
 from ..platform.xattr import buffer, split_lstring
-from ..xattr import is_enabled, getxattr, setxattr, listxattr
+from ..xattr import is_enabled, getxattr, setxattr, listxattr, XATTR_FAKEROOT
 from ..platformflags import is_linux
 
 
@@ -82,3 +82,11 @@ def test_getxattr_buffer_growth(tempfile_symlink):
 )
 def test_split_lstring(lstring, expected):
     assert split_lstring(lstring) == expected
+
+
+def test_xattr_fakeroot_flag():
+    """XATTR_FAKEROOT must be False when not on Linux or when fakeroot is not active."""
+    if not is_linux:
+        assert XATTR_FAKEROOT is False
+    if "FAKEROOTKEY" not in os.environ:
+        assert XATTR_FAKEROOT is False

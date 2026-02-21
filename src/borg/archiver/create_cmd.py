@@ -252,6 +252,13 @@ class CreateMixIn:
                     nobirthtime=args.nobirthtime,
                 )
                 cp = ChunksProcessor(cache=cache, key=key, add_item=archive.add_item, rechunkify=False)
+                if is_win32 and args.files_changed == "ctime":
+                    self.print_warning(
+                        "--files-changed=ctime is not supported on Windows "
+                        "(ctime is file creation time, not change time). Using mtime instead.",
+                        wc=None,
+                    )
+                    args.files_changed = "mtime"
                 fso = FilesystemObjectProcessors(
                     metadata_collector=metadata_collector,
                     cache=cache,
@@ -621,8 +628,9 @@ class CreateMixIn:
           well-meant, but in both cases mtime-based cache modes can be problematic.
 
         The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
-         - ctime (default): Use ctime to detect changes. This is the safest option.
-         - mtime: Use mtime to detect changes.
+         - ctime (default on POSIX): Use ctime to detect changes. This is the safest option.
+           Not supported on Windows (ctime is file creation time there).
+         - mtime (default on Windows): Use mtime to detect changes.
          - disabled: Disable the "file has changed while we backed it up" detection completely.
            This is not recommended unless you know what you're doing, as it could lead to
            inconsistent backups if files change during the backup process.
@@ -910,8 +918,9 @@ class CreateMixIn:
             dest="files_changed",
             action=Highlander,
             choices=["ctime", "mtime", "disabled"],
-            default="ctime",
-            help="specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime",
+            default="mtime" if is_win32 else "ctime",
+            help="specify how to detect if a file has changed during backup (ctime, mtime, disabled). "
+            "default: ctime (on Windows: mtime, because ctime is file creation time there).",
         )
         fs_group.add_argument(
             "--read-special",

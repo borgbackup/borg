@@ -265,8 +265,8 @@ class DebugMixIn:
             meta = json.load(f)
 
         repo_objs = manifest.repo_objs
-        # TODO: support misc repo object types other than ROBJ_FILE_STREAM
-        data_encrypted = repo_objs.format(id=id, meta=meta, data=data, ro_type=ROBJ_FILE_STREAM)
+        ro_type = meta.pop("type", ROBJ_FILE_STREAM)
+        data_encrypted = repo_objs.format(id=id, meta=meta, data=data, ro_type=ro_type)
 
         with open(args.object_path, "wb") as f:
             f.write(data_encrypted)

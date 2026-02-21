@@ -1,4 +1,5 @@
 import errno
+import io
 import os
 import socket
 import unicodedata
@@ -180,6 +181,12 @@ class SyncFile:
     def write(self, data):
         self.f.write(data)
 
+    def seek(self, offset, whence=io.SEEK_SET):
+        return self.f.seek(offset, whence)
+
+    def tell(self):
+        return self.f.tell()
+
     def sync(self):
         """
         Synchronize file contents. Everything written prior to sync() must become durable before anything written
@@ -195,6 +202,8 @@ class SyncFile:
 
     def close(self):
         """sync() and close."""
+        if self.f.closed:
+            return
         from .. import platform
 
         dirname = None

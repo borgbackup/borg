@@ -582,36 +582,39 @@ class FilesCacheMixin:
         discard_after = min(newest_cmtime, start_backup_time)
         ttl = int(os.environ.get("BORG_FILES_CACHE_TTL", 2))
         files_cache_logger.debug("FILES-CACHE-SAVE: starting...")
-        # TODO: use something like SaveFile here, but that didn't work due to SyncFile missing .seek().
-        with IntegrityCheckedFile(path=str(self.path / self.files_cache_name()), write=True) as fd:
-            entries = 0
-            age_discarded = 0
-            race_discarded = 0
-            for path_hash, entry in files.items():
-                entry = self.decompress_entry(entry)
-                if entry.age == 0:  # current entries
-                    if max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < discard_after:
-                        # Only keep files seen in this backup that old enough not to suffer race conditions relating
-                        # to filesystem snapshots and ctime/mtime granularity or being modified while we read them.
-                        keep = True
-                    else:
-                        keep = False
-                        race_discarded += 1
-                else:  # old entries
-                    if entry.age < ttl:
-                        # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
-                        keep = True
-                    else:
-                        keep = False
-                        age_discarded += 1
-                if keep:
-                    msgpack.pack((path_hash, entry), fd)
-                    entries += 1
+        cache_path = str(self.path / self.files_cache_name())
+        with SaveFile(cache_path, binary=True) as sync_file:
+            with IntegrityCheckedFile(path=cache_path, write=True, override_fd=sync_file) as fd:
+                entries = 0
+                age_discarded = 0
+                race_discarded = 0
+                for path_hash, entry in files.items():
+                    entry = self.decompress_entry(entry)
+                    if entry.age == 0:  # current entries
+                        if max(timestamp_to_int(entry.ctime), timestamp_to_int(entry.mtime)) < discard_after:
+                            # Only keep files seen in this backup that old enough not to suffer race conditions
+                            # relating to filesystem snapshots and ctime/mtime granularity or being modified
+                            # while we read them.
+                            keep = True
+                        else:
+                            keep = False
+                            race_discarded += 1
+                    else:  # old entries
+                        if entry.age < ttl:
+                            # Also keep files from older backups that have not reached BORG_FILES_CACHE_TTL yet.
+                            keep = True
+                        else:
+                            keep = False
+                            age_discarded += 1
+                    if keep:
+                        msgpack.pack((path_hash, entry), fd)
+                        entries += 1
+            integrity_data = fd.integrity_data
         files_cache_logger.debug(f"FILES-CACHE-KILL: removed {age_discarded} entries with age >= TTL [{ttl}]")
         t_str = datetime.fromtimestamp(discard_after / 1e9, timezone.utc).isoformat()
         files_cache_logger.debug(f"FILES-CACHE-KILL: removed {race_discarded} entries with ctime/mtime >= {t_str}")
         files_cache_logger.debug(f"FILES-CACHE-SAVE: finished, {entries} remaining entries saved.")
-        return fd.integrity_data
+        return integrity_data
 
     def file_known_and_unchanged(self, hashed_path, path_hash, st):
         """

@@ -18,6 +18,7 @@ from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
 from .repoobj import RepoObj
+from .helpers.coverage_diy import mark, register, coverage
 
 logger = create_logger(__name__)
 
@@ -292,6 +293,112 @@ class Repository:
     def check(self, repair=False, max_duration=0):
         """Check repository consistency"""
 
+        CP_BRANCHES = [
+            # mode / assertions
+            "CHK_01_T_partial",
+            "CHK_01_F_partial",
+            "CHK_02_assert_repair_and_partial",
+
+            # partial: load last key exists vs not found
+            "CHK_03_T_partial_load_lastkey",
+            "CHK_03_F_partial_load_lastkey_notfound",
+
+            # full: delete lastkey success vs not found
+            "CHK_04_T_full_delete_lastkey",
+            "CHK_04_F_full_delete_lastkey_notfound",
+
+            # last_key_checked present vs empty
+            "CHK_05_T_lastkey_nonempty",
+            "CHK_05_F_lastkey_empty",
+
+            # store.list / iterating infos: outer except
+            "CHK_06_T_iter_infos",
+            "CHK_06_F_no_data_prefix",
+
+            # per-info flow
+            "CHK_07_T_skip_key_le_lastkey",
+            "CHK_07_F_skip_key_le_lastkey",
+
+            "CHK_08_T_load_obj_ok",
+            "CHK_08_F_load_obj_notfound",
+
+            # object validity: header size ok vs too small
+            "CHK_09_T_obj_ge_hdr",
+            "CHK_09_F_obj_too_small",
+
+            # meta size ok vs mismatch
+            "CHK_10_T_meta_size_ok",
+            "CHK_10_F_meta_size_bad",
+
+            # meta hash ok vs mismatch
+            "CHK_11_T_meta_hash_ok",
+            "CHK_11_F_meta_hash_bad",
+
+            # data size ok vs mismatch
+            "CHK_12_T_data_size_ok",
+            "CHK_12_F_data_size_bad",
+
+            # data hash ok vs mismatch
+            "CHK_13_T_data_hash_ok",
+            "CHK_13_F_data_hash_bad",
+
+            # obj_corrupted flag after check_object
+            "CHK_14_T_obj_corrupted",
+            "CHK_14_F_obj_not_corrupted",
+
+            # repair path entered or not
+            "CHK_15_T_repair_on_corruption",
+            "CHK_15_F_no_repair_or_no_corruption",
+
+            # repair reload: vanished vs reloaded
+            "CHK_16_T_reload_notfound",
+            "CHK_16_F_reload_ok",
+
+            # after reload: still corrupted vs fixed
+            "CHK_17_T_reload_still_corrupt",
+            "CHK_17_F_reload_fixed",
+
+            # delete corrupted object executed
+            "CHK_18_delete_corrupted",
+
+            # index add condition
+            "CHK_19_T_add_to_index",
+            "CHK_19_F_skip_add_to_index",
+
+            # checkpointing every 5 mins
+            "CHK_20_T_checkpoint",
+            "CHK_20_F_no_checkpoint",
+
+            # partial duration stop
+            "CHK_21_T_partial_break",
+            "CHK_21_F_no_partial_break",
+
+            # for/else completion
+            "CHK_22_T_for_else_completed",
+            "CHK_22_F_loop_broken",
+
+            # after completion: delete lastkey ok vs notfound
+            "CHK_23_T_delete_lastkey_after_full",
+            "CHK_23_F_delete_lastkey_after_full_notfound",
+
+            # write chunkindex cache in full mode
+            "CHK_24_T_write_chunkindex_cache",
+            "CHK_24_F_no_write_chunkindex_cache",
+
+            # final status logging branches
+            "CHK_25_T_no_errors",
+            "CHK_25_F_has_errors",
+
+            "CHK_26_T_errors_and_repair",
+            "CHK_26_F_errors_no_repair",
+
+            # return condition
+            "CHK_27_T_return_ok",
+            "CHK_27_F_return_fail",
+        ]
+        for bid in CP_BRANCHES:
+            register(bid)
+
         def log_error(msg):
             nonlocal obj_corrupted
             obj_corrupted = True
@@ -299,127 +406,208 @@ class Repository:
 
         def check_object(obj):
             """Check if obj looks valid."""
+            nonlocal obj_corrupted
             hdr_size = RepoObj.obj_header.size
             obj_size = len(obj)
+
             if obj_size >= hdr_size:
+                mark("CHK_09_T_obj_ge_hdr")
                 hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
                 meta = obj[hdr_size : hdr_size + hdr.meta_size]
                 if hdr.meta_size != len(meta):
+                    mark("CHK_10_F_meta_size_bad")
                     log_error("metadata size incorrect.")
-                elif hdr.meta_hash != xxh64(meta):
-                    log_error("metadata does not match checksum.")
+                else:
+                    mark("CHK_10_T_meta_size_ok")
+                    if hdr.meta_hash != xxh64(meta):
+                        mark("CHK_11_F_meta_hash_bad")
+                        log_error("metadata does not match checksum.")
+                    else:
+                        mark("CHK_11_T_meta_hash_ok")
+
                 data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
                 if hdr.data_size != len(data):
+                    mark("CHK_12_F_data_size_bad")
                     log_error("data size incorrect.")
-                elif hdr.data_hash != xxh64(data):
-                    log_error("data does not match checksum.")
+                else:
+                    mark("CHK_12_T_data_size_ok")
+                    if hdr.data_hash != xxh64(data):
+                        mark("CHK_13_F_data_hash_bad")
+                        log_error("data does not match checksum.")
+                    else:
+                        mark("CHK_13_T_data_hash_ok")
             else:
+                mark("CHK_09_F_obj_too_small")
                 log_error("too small.")
 
-        # TODO: progress indicator, ...
         partial = bool(max_duration)
+        if partial:
+            mark("CHK_01_T_partial")
+        else:
+            mark("CHK_01_F_partial")
+
+        # Track this assert as a branch point (even though assert can be stripped with -O)
+        if repair and partial:
+            mark("CHK_02_assert_repair_and_partial")
         assert not (repair and partial)
+
         mode = "partial" if partial else "full"
         LAST_KEY_CHECKED = "cache/last-key-checked"
         logger.info(f"Starting {mode} repository check")
+
         if partial:
-            # continue a past partial check (if any) or from a checkpoint or start one from beginning
             try:
                 last_key_checked = self.store.load(LAST_KEY_CHECKED).decode()
+                mark("CHK_03_T_partial_load_lastkey")
             except StoreObjectNotFound:
+                mark("CHK_03_F_partial_load_lastkey_notfound")
                 last_key_checked = ""
         else:
-            # start from the beginning and also forget about any potential past partial checks
             last_key_checked = ""
-            try:
-                self.store.delete(LAST_KEY_CHECKED)
-            except StoreObjectNotFound:
-                pass
+        try:
+            self.store.delete(LAST_KEY_CHECKED)
+            mark("CHK_04_T_full_delete_lastkey")
+        except StoreObjectNotFound:
+            mark("CHK_04_F_full_delete_lastkey_notfound")
+            pass
+
         if last_key_checked:
+            mark("CHK_05_T_lastkey_nonempty")
             logger.info(f"Skipping to keys after {last_key_checked}.")
         else:
+            mark("CHK_05_F_lastkey_empty")
             logger.info("Starting from beginning.")
+
         t_start = time.monotonic()
         t_last_checkpoint = t_start
         objs_checked = objs_errors = 0
         chunks = ChunkIndex()
-        # we don't do refcounting anymore, neither we can know here whether any archive
-        # is using this object, but we assume that this is the case.
-        # As we don't do garbage collection here, this is not a problem.
-        # We also don't know the plaintext size, so we set it to 0.
         init_entry = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0)
         infos = self.store.list("data")
+
         try:
+            mark("CHK_06_T_iter_infos")
             for info in infos:
                 self._lock_refresh()
                 key = "data/%s" % info.name
-                if key <= last_key_checked:  # needs sorted keys
+
+                if key <= last_key_checked:
+                    mark("CHK_07_T_skip_key_le_lastkey")
                     continue
+                else:
+                    mark("CHK_07_F_skip_key_le_lastkey")
+
                 try:
                     obj = self.store.load(key)
+                    mark("CHK_08_T_load_obj_ok")
                 except StoreObjectNotFound:
-                    # looks like object vanished since store.list(), ignore that.
+                    mark("CHK_08_F_load_obj_notfound")
                     continue
+
                 obj_corrupted = False
                 check_object(obj)
                 objs_checked += 1
+
                 if obj_corrupted:
+                    mark("CHK_14_T_obj_corrupted")
                     objs_errors += 1
+
                     if repair:
-                        # if it is corrupted, we can't do much except getting rid of it.
-                        # but let's just retry loading it, in case the error goes away.
+                        mark("CHK_15_T_repair_on_corruption")
                         try:
                             obj = self.store.load(key)
+                            mark("CHK_16_F_reload_ok")
                         except StoreObjectNotFound:
+                            mark("CHK_16_T_reload_notfound")
                             log_error("existing object vanished.")
                         else:
                             obj_corrupted = False
                             check_object(obj)
                             if obj_corrupted:
+                                mark("CHK_17_T_reload_still_corrupt")
                                 log_error("reloading did not help, deleting it!")
                                 self.store.delete(key)
+                                mark("CHK_18_delete_corrupted")
                             else:
+                                mark("CHK_17_F_reload_fixed")
                                 log_error("reloading did help, inconsistent behaviour detected!")
+                    else:
+                        mark("CHK_15_F_no_repair_or_no_corruption")
+                else:
+                    mark("CHK_14_F_obj_not_corrupted")
+                    mark("CHK_15_F_no_repair_or_no_corruption")
+
                 if not (obj_corrupted and repair):
-                    # add all existing objects to the index.
-                    # borg check: the index may have corrupted objects (we did not delete them)
-                    # borg check --repair: the index will only have non-corrupted objects.
+                    mark("CHK_19_T_add_to_index")
                     id = hex_to_bin(info.name)
                     chunks[id] = init_entry
+                else:
+                    mark("CHK_19_F_skip_add_to_index")
+
                 now = time.monotonic()
-                if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
+                if now > t_last_checkpoint + 300:
+                    mark("CHK_20_T_checkpoint")
                     t_last_checkpoint = now
                     logger.info(f"Checkpointing at key {key}.")
                     self.store.store(LAST_KEY_CHECKED, key.encode())
+                else:
+                    mark("CHK_20_F_no_checkpoint")
+
                 if partial and now > t_start + max_duration:
+                    mark("CHK_21_T_partial_break")
                     logger.info(f"Finished partial repository check, last key checked is {key}.")
                     self.store.store(LAST_KEY_CHECKED, key.encode())
                     break
+                else:
+                    mark("CHK_21_F_no_partial_break")
             else:
+                mark("CHK_22_T_for_else_completed")
                 logger.info("Finished repository check.")
                 try:
                     self.store.delete(LAST_KEY_CHECKED)
+                    mark("CHK_23_T_delete_lastkey_after_full")
                 except StoreObjectNotFound:
+                    mark("CHK_23_F_delete_lastkey_after_full_notfound")
                     pass
-                if not partial:
-                    # if we did a full pass in one go, we built a complete, up-to-date ChunkIndex, cache it!
-                    from .cache import write_chunkindex_to_repo_cache
 
+                if not partial:
+                    mark("CHK_24_T_write_chunkindex_cache")
+                    from .cache import write_chunkindex_to_repo_cache
                     write_chunkindex_to_repo_cache(
                         self, chunks, incremental=False, clear=True, force_write=True, delete_other=True
                     )
+                else:
+                    mark("CHK_24_F_no_write_chunkindex_cache")
+            # if we broke out of the loop, for/else did not run
+            # mark that explicitly:
+            # (Only mark broken if we didn't already mark completed.)
+            if not coverage.get("CHK_22_T_for_else_completed", False):
+                mark("CHK_22_F_loop_broken")
+
         except StoreObjectNotFound:
-            # it can be that there is no "data/" at all, then it crashes when iterating infos.
+            mark("CHK_06_F_no_data_prefix")
             pass
+
         logger.info(f"Checked {objs_checked} repository objects, {objs_errors} errors.")
+
         if objs_errors == 0:
+            mark("CHK_25_T_no_errors")
             logger.info(f"Finished {mode} repository check, no problems found.")
         else:
-            if repair:
-                logger.info(f"Finished {mode} repository check, errors found and repaired.")
-            else:
-                logger.error(f"Finished {mode} repository check, errors found.")
-        return objs_errors == 0 or repair
+            mark("CHK_25_F_has_errors")
+        if repair:
+            mark("CHK_26_T_errors_and_repair")
+            logger.info(f"Finished {mode} repository check, errors found and repaired.")
+        else:
+            mark("CHK_26_F_errors_no_repair")
+            logger.error(f"Finished {mode} repository check, errors found.")
+
+        result = (objs_errors == 0) or repair
+        if result:
+            mark("CHK_27_T_return_ok")
+        else:
+            mark("CHK_27_F_return_fail")
+        return result
 
     def list(self, limit=None, marker=None):
         """

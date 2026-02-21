@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from functools import partial
 from hashlib import sha256
 from string import Formatter
+from .coverage_diy import mark
 
 from ..logger import create_logger
 
@@ -30,6 +31,7 @@ from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
 from ..platformflags import is_win32
+from borg.helpers.coverage_diy import register
 
 if TYPE_CHECKING:
     from ..item import ItemDiff
@@ -164,64 +166,168 @@ def interval(s):
 
 
 def ChunkerParams(s):
+    CP_BRANCHES = [
+    "CP_01_T_count0",
+    "CP_01_F_count0",
+
+    "CP_02_T_fail_3",
+    "CP_02_F_fail_3",
+
+    "CP_03_T_fixed_2to3",
+    "CP_03_F_fixed_2to3",
+
+    "CP_04_T_count3_header",
+    "CP_04_F_count3_header",
+
+    "CP_05_T_block_lt64",
+    "CP_05_F_block_lt64",
+
+    "CP_06_T_exceed_max",
+    "CP_06_F_exceed_max",
+
+    "CP_07_T_default_1",
+    "CP_07_F_default_1",
+
+    "CP_08_T_buz64_5",
+    "CP_08_F_buz64_5",
+
+    "CP_09_T_mask_range",
+    "CP_09_F_mask_range",
+
+    "CP_10_T_min_lt6",
+    "CP_10_F_min_lt6",
+
+    "CP_11_T_max_gt23",
+    "CP_11_F_max_gt23",
+
+    "CP_12_T_buz_or_compat",
+    "CP_12_F_buz_or_compat",
+
+    "CP_13_T_mask_range2",
+    "CP_13_F_mask_range2",
+
+    "CP_14_T_min_lt6_2",
+    "CP_14_F_min_lt6_2",
+
+    "CP_15_T_max_gt23_2",
+    "CP_15_F_max_gt23_2",
+
+    "CP_16_T_window_even",
+    "CP_16_F_window_even",
+
+    "CP_17_invalid_params",
+    ]
+    for bid in CP_BRANCHES:
+        register(bid)
     params = s.strip().split(",")
     count = len(params)
     if count == 0:
+        mark("CP_01_T_count0")
         raise argparse.ArgumentTypeError("no chunker params given")
+    else:
+        mark("CP_01_F_count0")
     algo = params[0].lower()
     if algo == CH_FAIL and count == 3:
+        mark("CP_02_T_fail_3")
         block_size = int(params[1])
         fail_map = str(params[2])
         return algo, block_size, fail_map
+    else:
+        mark("CP_02_F_fail_3")
     if algo == CH_FIXED and 2 <= count <= 3:  # fixed, block_size[, header_size]
+        mark("CP_03_T_fixed_2to3")
         block_size = int(params[1])
-        header_size = int(params[2]) if count == 3 else 0
+        if count == 3:
+            mark("CP_04_T_count3_header")
+            header_size = int(params[2])
+        else:
+            mark("CP_04_F_count3_header")
+            header_size = 0
         if block_size < 64:
             # we are only disallowing the most extreme cases of abuse here - this does NOT imply
             # that cutting chunks of the minimum allowed size is efficient concerning storage
             # or in-memory chunk management.
             # choose the block (chunk) size wisely: if you have a lot of data and you cut
             # it into very small chunks, you are asking for trouble!
+            mark("CP_05_T_block_lt64")
             raise argparse.ArgumentTypeError("block_size must not be less than 64 Bytes")
+        else:
+            mark("CP_05_F_block_lt64")
         if block_size > MAX_DATA_SIZE or header_size > MAX_DATA_SIZE:
+            mark("CP_06_T_exceed_max")
             raise argparse.ArgumentTypeError(
                 "block_size and header_size must not exceed MAX_DATA_SIZE [%d]" % MAX_DATA_SIZE
             )
+        else:
+            mark("CP_06_F_exceed_max")
         return algo, block_size, header_size
+    else:
+        mark("CP_03_F_fixed_2to3")
     if algo == "default" and count == 1:  # default
+        mark("CP_07_T_default_1")
         return CHUNKER_PARAMS
+    else:
+        mark("CP_07_F_default_1")
     if algo == CH_BUZHASH64 and count == 5:  # buzhash64, chunk_min, chunk_max, chunk_mask, window_size
+        mark("CP_08_T_buz64_5")
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[1:])
         if not (chunk_min <= chunk_mask <= chunk_max):
+            mark("CP_09_T_mask_range")
             raise argparse.ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
+        else:
+            mark("CP_09_F_mask_range")
         if chunk_min < 6:
             # see comment in 'fixed' algo check
+            mark("CP_10_T_min_lt6")
             raise argparse.ArgumentTypeError(
                 "min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)"
             )
+        else:
+            mark("CP_10_F_min_lt6")
         if chunk_max > 23:
+            mark("CP_11_T_max_gt23")
             raise argparse.ArgumentTypeError(
                 "max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)"
             )
+        else:
+            mark("CP_11_F_max_gt23")
         # note that for buzhash64, there is no problem with even window_size.
         return CH_BUZHASH64, chunk_min, chunk_max, chunk_mask, window_size
+    else:
+        mark("CP_08_F_buz64_5")
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):
     if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
+        mark("CP_12_T_buz_or_compat")
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[count - 4 :])
         if not (chunk_min <= chunk_mask <= chunk_max):
+            mark("CP_13_T_mask_range2")
             raise argparse.ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
+        else:
+            mark("CP_13_F_mask_range2")
         if chunk_min < 6:
             # see comment in 'fixed' algo check
+            mark("CP_14_T_min_lt6_2")
             raise argparse.ArgumentTypeError(
                 "min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)"
             )
+        else:
+            mark("CP_14_F_min_lt6_2")
         if chunk_max > 23:
+            mark("CP_15_T_max_gt23_2")
             raise argparse.ArgumentTypeError(
                 "max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)"
             )
+        else:
+            mark("CP_15_F_max_gt23_2")
         if window_size % 2 == 0:
+            mark("CP_16_T_window_even")
             raise argparse.ArgumentTypeError("window_size must be an uneven (odd) number")
+        else:
+            mark("CP_16_F_window_even")
         return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
+    else:
+        mark("CP_12_F_buz_or_compat")
+    mark("CP_17_invalid_params")
     raise argparse.ArgumentTypeError("invalid chunker params")
 
 

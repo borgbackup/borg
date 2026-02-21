@@ -5,7 +5,7 @@ import pytest
 from .hashindex_test import H
 from .crypto.key_test import TestKey
 from ..archive import Statistics
-from ..cache import AdHocWithFilesCache
+from ..cache import AdHocWithFilesCache, delete_chunkindex_cache, read_chunkindex_from_repo_cache
 from ..crypto.key import AESOCBRepoKey
 from ..manifest import Manifest
 from ..repository import Repository
@@ -53,3 +53,32 @@ class TestAdHocWithFilesCache:
         assert cache.file_known_and_unchanged(b"foo", bytes(32), st) == (False, None)
         assert cache.cache_mode == "d"
         assert cache.files == {}
+
+
+def test_delete_chunkindex_cache_missing(tmp_path):
+    """delete_chunkindex_cache handles StoreObjectNotFound when cache entries do not exist."""
+    from borgstore.store import ObjectNotFound as StoreObjectNotFound
+
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        # Create a cache entry so list_chunkindex_hashes finds it.
+        repository.store_store(f"cache/chunks.{'a' * 64}", b"data")
+        # Patch store_delete to raise StoreObjectNotFound (simulates a race or already-deleted entry).
+        original_store_delete = repository.store_delete
+
+        def failing_store_delete(name):
+            raise StoreObjectNotFound(name)
+
+        repository.store_delete = failing_store_delete
+        # Should not raise — the except StoreObjectNotFound catches it.
+        delete_chunkindex_cache(repository)
+        repository.store_delete = original_store_delete
+
+
+def test_read_chunkindex_from_repo_cache_missing(tmp_path):
+    """read_chunkindex_from_repo_cache handles StoreObjectNotFound when cache does not exist."""
+    repository_location = os.fspath(tmp_path / "repository")
+    with Repository(repository_location, exclusive=True, create=True) as repository:
+        # Try to load a non-existent cache entry — should return None, not raise.
+        result = read_chunkindex_from_repo_cache(repository, "f" * 64)
+        assert result is None

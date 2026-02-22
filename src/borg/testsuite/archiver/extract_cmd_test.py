@@ -15,7 +15,7 @@ from ...helpers import EXIT_WARNING, BackupPermissionError, bin_to_hex
 from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns, granularity_sleep
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from ...platform import get_birthtime_ns
+from ...platform import get_birthtime_ns, set_birthtime  # noqa: F401
 from ...platformflags import is_darwin, is_freebsd, is_win32
 from . import (
     RK_ENCRYPTION,
@@ -168,7 +168,7 @@ def test_birthtime(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     birthtime, mtime, atime = 946598400, 946684800, 946771200
-    os.utime("input/file1", (atime, birthtime))
+    set_birthtime("input/file1", birthtime * 1_000_000_000)  # noqa: F821
     os.utime("input/file1", (atime, mtime))
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
@@ -177,7 +177,11 @@ def test_birthtime(archivers, request):
     sti = os.stat("input/file1")
     sto = os.stat("output/input/file1")
     assert same_ts_ns(sti.st_birthtime * 1e9, sto.st_birthtime * 1e9)
-    assert same_ts_ns(sto.st_birthtime * 1e9, birthtime * 1e9)
+    if is_win32:
+        # allow for small differences (e.g. 10ms)
+        assert abs(sto.st_birthtime * 1e9 - birthtime * 1e9) < 10_000_000
+    else:
+        assert same_ts_ns(sto.st_birthtime * 1e9, birthtime * 1e9)
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
     assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
 

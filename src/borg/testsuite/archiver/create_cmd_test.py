@@ -5,6 +5,7 @@ import tempfile
 import shutil
 import socket
 import stat
+import sys
 import subprocess
 
 import pytest
@@ -211,19 +212,23 @@ def test_unix_socket(archivers, request, monkeypatch):
 def test_nobirthtime(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
-    birthtime, mtime, atime = 946598400, 946684800, 946771200
-    os.utime("input/file1", (atime, birthtime))
-    os.utime("input/file1", (atime, mtime))
+    birthtime_ns, mtime_ns, atime_ns = 946598400 * 10**9, 946684800 * 10**9, 946771200 * 10**9
+    if sys.platform == "win32":
+        platform.set_birthtime("input/file1", birthtime_ns)
+    os.utime("input/file1", ns=(atime_ns, mtime_ns))
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input", "--nobirthtime")
     with changedir("output"):
         cmd(archiver, "extract", "test")
     sti = os.stat("input/file1")
     sto = os.stat("output/input/file1")
-    assert same_ts_ns(sti.st_birthtime * 1e9, birthtime * 1e9)
-    assert same_ts_ns(sto.st_birthtime * 1e9, mtime * 1e9)
+    assert same_ts_ns(sti.st_birthtime * 1e9, birthtime_ns)
+    if sys.platform == "win32":
+        assert not same_ts_ns(sto.st_birthtime * 1e9, birthtime_ns)
+    else:
+        assert same_ts_ns(sto.st_birthtime * 1e9, mtime_ns)
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
-    assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
+    assert same_ts_ns(sto.st_mtime_ns, mtime_ns)
 
 
 def test_create_stdin(archivers, request):

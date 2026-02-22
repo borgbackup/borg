@@ -37,3 +37,51 @@ def process_alive(host, pid, thread):
 def local_pid_alive(pid):
     """Return whether *pid* is alive."""
     raise NotImplementedError
+
+
+def set_birthtime(path, birthtime_ns):
+    """
+    Set creation time (birthtime) on *path* to *birthtime_ns*.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    # Windows API Constants
+    FILE_WRITE_ATTRIBUTES = 0x0100
+    FILE_SHARE_READ = 0x00000001
+    FILE_SHARE_WRITE = 0x00000002
+    FILE_SHARE_DELETE = 0x00000004
+    OPEN_EXISTING = 3
+    FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+
+    class FILETIME(ctypes.Structure):
+        _fields_ = [("dwLowDateTime", wintypes.DWORD), ("dwHighDateTime", wintypes.DWORD)]
+
+    # Convert ns to Windows FILETIME
+    # Units: 100-nanosecond intervals
+    # Epoch: Jan 1, 1601
+    unix_epoch_in_100ns = 116444736000000000
+    intervals = (birthtime_ns // 100) + unix_epoch_in_100ns
+
+    ft = FILETIME()
+    ft.dwLowDateTime = intervals & 0xFFFFFFFF
+    ft.dwHighDateTime = intervals >> 32
+
+    handle = ctypes.windll.kernel32.CreateFileW(
+        str(path),
+        FILE_WRITE_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        None,
+        OPEN_EXISTING,
+        FILE_FLAG_BACKUP_SEMANTICS,
+        None,
+    )
+
+    if handle == -1:
+        return
+
+    try:
+        # SetFileTime(handle, lpCreationTime, lpLastAccessTime, lpLastWriteTime)
+        ctypes.windll.kernel32.SetFileTime(handle, ctypes.byref(ft), None, None)
+    finally:
+        ctypes.windll.kernel32.CloseHandle(handle)

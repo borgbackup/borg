@@ -68,6 +68,13 @@ def setxattr(path, name, value, *, follow_symlinks=False):
     """
 
 
+def set_birthtime(path, birthtime_ns):
+    """
+    Set creation time (birthtime) on *path* to *birthtime_ns*.
+    """
+    raise NotImplementedError("set_birthtime is not supported on this platform")
+
+
 def acl_get(path, item, st, numeric_ids=False, fd=None):
     """
     Save ACL entries.

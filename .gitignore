@@ -28,3 +28,6 @@ borg.exe
 .coverage
 .coverage.*
 .vagrant
+src/borg/hashindex.c
+src/borg/platform/netbsd.c
+

@@ -29,6 +29,12 @@ except ImportError:
 from .constants import MAX_DATA_SIZE, ROBJ_FILE_STREAM
 from .helpers import Buffer, DecompressionError
 
+import sys
+
+if sys.version_info >= (3, 14):
+    from compression import zstd
+else:
+    from backports import zstd
 
 
 cdef extern from "lz4.h":
@@ -36,20 +42,7 @@ cdef extern from "lz4.h":
     int LZ4_decompress_safe(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
     int LZ4_compressBound(int inputSize) nogil
 
-
-cdef extern from "zstd.h":
-    size_t ZSTD_compress(void* dst, size_t dstCapacity, const void* src, size_t srcSize, int  compressionLevel) nogil
-    size_t ZSTD_decompress(void* dst, size_t dstCapacity, const void* src, size_t compressedSize) nogil
-    size_t ZSTD_compressBound(size_t srcSize) nogil
-    unsigned long long ZSTD_CONTENTSIZE_UNKNOWN
-    unsigned long long ZSTD_CONTENTSIZE_ERROR
-    unsigned long long ZSTD_getFrameContentSize(const void *src, size_t srcSize) nogil
-    unsigned ZSTD_isError(size_t code) nogil
-    const char* ZSTD_getErrorName(size_t code) nogil
-
-
 buffer = Buffer(bytearray, size=0)
-
 
 cdef class CompressorBase:
     """
@@ -303,12 +296,10 @@ class LZMA(DecidingCompressor):
         except lzma.LZMAError as e:
             raise DecompressionError(str(e)) from None
 
-
 class ZSTD(DecidingCompressor):
-    """zstd compression / decompression (pypi: zstandard, gh: python-zstandard)"""
-    # This is a NOT THREAD SAFE implementation.
-    # Only ONE python context must be created at a time.
-    # It should work flawlessly as long as borg will call ONLY ONE compression job at time.
+    """
+    zstd compression / decompression (python stdlib (python >= 3.14))
+    """
     ID = 0x03
     name = 'zstd'
 
@@ -316,61 +307,21 @@ class ZSTD(DecidingCompressor):
         super().__init__(level=level, legacy_mode=legacy_mode, **kwargs)
         self.level = level
 
-    def _decide(self, meta, idata):
-        """
-        Decides what to do with *data*. Returns (compressor, zstd_data).
-
-        *zstd_data* is the ZSTD result if *compressor* is ZSTD as well, otherwise it is None.
-        """
-        if not isinstance(idata, bytes):
-            idata = bytes(idata)  # code below does not work with memoryview
-        cdef int isize = len(idata)
-        cdef int osize
-        cdef char *source = idata
-        cdef char *dest
-        cdef int level = self.level
-        osize = ZSTD_compressBound(isize)
-        buf = buffer.get(osize)
-        dest = <char *> buf
-        with nogil:
-            osize = ZSTD_compress(dest, osize, source, isize, level)
-        if ZSTD_isError(osize):
-            raise Exception('zstd compress failed: %s' % ZSTD_getErrorName(osize))
-        # only compress if the result actually is smaller
-        if osize < isize:
-            return self, (meta, dest[:osize])
+    def _decide(self, meta, data):
+        zstd_data = zstd.compress(data, self.level)
+        if len(zstd_data) < len(data):
+            return self, (meta, zstd_data)
         else:
             return NONE_COMPRESSOR, (meta, None)
-
+    
     def decompress(self, meta, data):
-        meta, idata = super().decompress(meta, data)
-        if not isinstance(idata, bytes):
-            idata = bytes(idata)  # code below does not work with memoryview
-        cdef int isize = len(idata)
-        cdef unsigned long long osize
-        cdef unsigned long long rsize
-        cdef char *source = idata
-        cdef char *dest
-        osize = ZSTD_getFrameContentSize(source, isize)
-        if osize == ZSTD_CONTENTSIZE_ERROR:
-            raise DecompressionError('zstd get size failed: data was not compressed by zstd')
-        if osize == ZSTD_CONTENTSIZE_UNKNOWN:
-            raise DecompressionError('zstd get size failed: original size unknown')
+        meta, data = super().decompress(meta, data)
         try:
-            buf = buffer.get(osize)
-        except MemoryError:
-            raise DecompressionError('MemoryError')
-        dest = <char *> buf
-        with nogil:
-            rsize = ZSTD_decompress(dest, osize, source, isize)
-        if ZSTD_isError(rsize):
-            raise DecompressionError('zstd decompress failed: %s' % ZSTD_getErrorName(rsize))
-        if rsize != osize:
-            raise DecompressionError('zstd decompress failed: size mismatch')
-        data = dest[:osize]
-        self.check_fix_size(meta, data)
-        return meta, data
-
+            data = zstd.decompress(data)
+            self.check_fix_size(meta, data)
+            return meta, data
+        except zstd.ZstdError as e:
+            raise DecompressionError(str(e)) from None
 
 class ZLIB(DecidingCompressor):
     """

@@ -1,5 +1,4 @@
 brew 'pkgconf'
-brew 'zstd'
 brew 'lz4'
 brew 'xxhash'
 brew 'openssl@3'

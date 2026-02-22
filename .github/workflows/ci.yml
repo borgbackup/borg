@@ -79,7 +79,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y pkg-config build-essential
-        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
+        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev
 
     - name: Install Python dependencies
       run: |
@@ -200,7 +200,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y pkg-config build-essential
-        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
+        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev
         sudo apt-get install -y bash zsh fish  # for shell completion tests
         sudo apt-get install -y rclone openssh-server curl
         if [[ "$TOXENV" == *"llfuse"* ]]; then
@@ -435,7 +435,7 @@ jobs:
               freebsd)
                 export IGNORE_OSVERSION=yes
                 sudo -E pkg update -f
-                sudo -E pkg install -y xxhash liblz4 zstd pkgconf
+                sudo -E pkg install -y xxhash liblz4 pkgconf
                 sudo -E pkg install -y fusefs-libs
                 sudo -E kldload fusefs
                 sudo -E sysctl vfs.usermount=1
@@ -491,7 +491,7 @@ jobs:
                 echo "https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/${arch}/10.1/All" | sudo tee /usr/pkg/etc/pkgin/repositories.conf > /dev/null
                 sudo -E pkgin update
                 sudo -E pkgin -y upgrade
-                sudo -E pkgin -y install zstd lz4 xxhash git
+                sudo -E pkgin -y install lz4 xxhash git
                 sudo -E pkgin -y install rust
                 sudo -E pkgin -y install pkg-config
                 sudo -E pkgin -y install py311-pip py311-virtualenv py311-tox
@@ -525,7 +525,7 @@ jobs:
                 ;;
 
               openbsd)
-                sudo -E pkg_add xxhash lz4 zstd git
+                sudo -E pkg_add xxhash lz4 git
                 sudo -E pkg_add rust
                 sudo -E pkg_add openssl%3.4
                 sudo -E pkg_add py3-pip py3-virtualenv py3-tox
@@ -563,12 +563,12 @@ jobs:
 
               haiku)
                 pkgman refresh
-                pkgman install -y git pkgconfig zstd lz4 xxhash
+                pkgman install -y git pkgconfig lz4 xxhash
                 pkgman install -y openssl3
                 pkgman install -y rust_bin
                 pkgman install -y python3.10
                 pkgman install -y cffi
-                pkgman install -y lz4_devel zstd_devel xxhash_devel openssl3_devel libffi_devel
+                pkgman install -y lz4_devel xxhash_devel openssl3_devel libffi_devel
 
                 # there is no pkgman package for tox, so we install it into a venv
                 python3 -m ensurepip --upgrade
@@ -578,7 +578,6 @@ jobs:
 
                 export PKG_CONFIG_PATH="/system/develop/lib/pkgconfig:/system/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
                 export BORG_LIBLZ4_PREFIX=/system/develop
-                export BORG_LIBZSTD_PREFIX=/system/develop
                 export BORG_LIBXXHASH_PREFIX=/system/develop
                 export BORG_OPENSSL_PREFIX=/system/develop
                 pip install -r requirements.d/development.txt

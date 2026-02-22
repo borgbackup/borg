@@ -16,7 +16,6 @@ build:
         - libacl1-dev
         - libssl-dev
         - liblz4-dev
-        - libzstd-dev
         - libxxhash-dev
 
 python:

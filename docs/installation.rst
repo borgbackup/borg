@@ -166,7 +166,6 @@ development header files (sometimes in a separate `-dev` or `-devel` package).
 * libacl_ (which depends on libattr_)
 * libxxhash_ >= 0.8.1
 * liblz4_ >= 1.7.0 (r129)
-* libzstd_ >= 1.3.0
 * libffi (required for argon2-cffi-bindings)
 * pkg-config (cli tool) - Borg uses this to discover header and library
   locations automatically. Alternatively, you can also point to them via some
@@ -201,7 +200,7 @@ Arch Linux
 
 Install the runtime and build dependencies::
 
-    pacman -S python python-pip python-virtualenv openssl acl xxhash lz4 zstd base-devel
+    pacman -S python python-pip python-virtualenv openssl acl xxhash lz4 base-devel
     pacman -S fuse2     # needed for llfuse
     pacman -S fuse3     # needed for pyfuse3
 
@@ -217,7 +216,7 @@ Install the dependencies with development headers::
     sudo apt-get install python3 python3-dev python3-pip python3-virtualenv \
     libacl1-dev \
     libssl-dev \
-    liblz4-dev libzstd-dev libxxhash-dev \
+    liblz4-dev libxxhash-dev \
     libffi-dev \
     build-essential pkg-config
     sudo apt-get install libfuse-dev fuse    # needed for llfuse
@@ -235,7 +234,7 @@ Install the dependencies with development headers::
     sudo dnf install python3 python3-devel python3-pip python3-virtualenv \
     libacl-devel \
     openssl-devel \
-    lz4-devel libzstd-devel xxhash-devel \
+    lz4-devel xxhash-devel \
     libffi-devel \
     pkgconf
     sudo dnf install gcc gcc-c++ redhat-rpm-config
@@ -252,7 +251,7 @@ Install the dependencies automatically using zypper::
 Alternatively, you can enumerate all build dependencies in the command line::
 
     sudo zypper install python3 python3-devel \
-    libacl-devel openssl-devel xxhash-devel libzstd-devel liblz4-devel \
+    libacl-devel openssl-devel xxhash-devel liblz4-devel \
     libffi-devel \
     python3-Cython python3-Sphinx python3-msgpack-python python3-pkgconfig pkgconf \
     python3-pytest python3-setuptools python3-setuptools_scm \
@@ -303,7 +302,7 @@ and commands to make FUSE work for using the mount command.
 
      pkg install -y python3 pkgconf
      pkg install openssl
-     pkg install liblz4 zstd xxhash
+     pkg install liblz4 xxhash
      pkg install fusefs-libs  # needed for llfuse
      pkg install -y git
      python3 -m ensurepip # to install pip for Python3
@@ -347,7 +346,7 @@ Use the Cygwin installer to install the dependencies::
 
     python39 python39-devel
     python39-setuptools python39-pip python39-wheel python39-virtualenv
-    libssl-devel libxxhash-devel liblz4-devel libzstd-devel
+    libssl-devel libxxhash-devel liblz4-devel
     binutils gcc-g++ git make openssh
 
 Make sure to use a virtual environment to avoid confusions with any Python installed on Windows.

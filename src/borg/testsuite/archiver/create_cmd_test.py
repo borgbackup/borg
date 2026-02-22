@@ -687,6 +687,20 @@ def test_file_status_cs_cache_mode(archivers, request):
     assert "M input/file1" in output
 
 
+def test_files_changed_modes(archivers, request):
+    """test that all --files-changed modes are accepted and work"""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=10)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    # test mtime mode (works on all platforms including Windows)
+    cmd(archiver, "create", "test_mtime", "input", "--files-changed=mtime")
+    # test disabled mode
+    cmd(archiver, "create", "test_disabled", "input", "--files-changed=disabled")
+    if not is_win32:
+        # test ctime mode (only meaningful on POSIX, where ctime = inode change time)
+        cmd(archiver, "create", "test_ctime", "input", "--files-changed=ctime")
+
+
 def test_file_status_ms_cache_mode(archivers, request):
     """test that a chmod'ed file with no content changes does not get chunked again in mtime,size cache_mode"""
     archiver = request.getfixturevalue(archivers)

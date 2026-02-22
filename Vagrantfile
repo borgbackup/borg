@@ -16,7 +16,7 @@ def packages_debianoid(user)
     apt-get -y -qq dist-upgrade
     # for building borgbackup and dependencies:
     apt install -y pkg-config
-    apt install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev || true
+    apt install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev || true
     apt install -y libfuse-dev fuse || true
     apt install -y libfuse3-dev fuse3 || true
     apt install -y locales || true
@@ -38,7 +38,7 @@ def packages_freebsd
     # install all the (security and other) updates, base system
     freebsd-update --not-running-from-cron fetch install
     # for building borgbackup and dependencies:
-    pkg install -y xxhash liblz4 zstd pkgconf
+    pkg install -y xxhash liblz4 pkgconf
     pkg install -y fusefs-libs || true
     pkg install -y fusefs-libs3 || true
     pkg install -y rust
@@ -85,7 +85,6 @@ def packages_openbsd
     chsh -s bash vagrant
     pkg_add xxhash
     pkg_add lz4
-    pkg_add zstd
     pkg_add git  # no fakeroot
     pkg_add rust
     pkg_add openssl%3.4
@@ -100,7 +99,7 @@ def packages_netbsd
     echo 'https://ftp.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/9.3/All' > /usr/pkg/etc/pkgin/repositories.conf
     pkgin update
     pkgin -y upgrade
-    pkg_add zstd lz4 xxhash git
+    pkg_add lz4 xxhash git
     pkg_add rust
     pkg_add bash
     chsh -s bash vagrant

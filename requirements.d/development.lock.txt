@@ -1,3 +1,4 @@
+chardet==5.2.0
 setuptools==80.9.0
 setuptools-scm==9.2.2
 pip==26.0.1

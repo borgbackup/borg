@@ -41,7 +41,7 @@ borg recreate
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--patterns-from PATTERNFILE``                   | read include/exclude patterns from PATTERNFILE, one per line                                                                                                                                      |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                                             | ``--exclude-caches``                              | exclude directories that contain a CACHEDIR.TAG file (http://www.bford.info/cachedir/spec.html)                                                                                                   |
+    |                                                                             | ``--exclude-caches``                              | exclude directories that contain a CACHEDIR.TAG file (https://www.bford.info/cachedir/spec.html)                                                                                                  |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                                             | ``--exclude-if-present NAME``                     | exclude directories that are tagged by containing a filesystem object with the given NAME                                                                                                         |
     +-----------------------------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -105,7 +105,7 @@ borg recreate
         --exclude-from EXCLUDEFILE        read exclude patterns from EXCLUDEFILE, one per line
         --pattern PATTERN                 include/exclude paths matching PATTERN
         --patterns-from PATTERNFILE       read include/exclude patterns from PATTERNFILE, one per line
-        --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (http://www.bford.info/cachedir/spec.html)
+        --exclude-caches                  exclude directories that contain a CACHEDIR.TAG file (https://www.bford.info/cachedir/spec.html)
         --exclude-if-present NAME         exclude directories that are tagged by containing a filesystem object with the given NAME
         --keep-exclude-tags               if tag objects are specified with ``--exclude-if-present``, do not omit the tag objects themselves from the backup archive
 

@@ -140,6 +140,7 @@ Keys available only when listing files in an archive:
 - isoctime: file change time (ISO 8601 format)
 - isoatime: file access time (ISO 8601 format)
 
+- fingerprint: Fingerprint of the file content (may have false negatives), format: H(conditions)-H(chunk_ids)
 - blake2b
 - blake2s
 - md5

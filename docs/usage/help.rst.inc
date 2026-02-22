@@ -31,10 +31,13 @@ Be careful, your patterns must match the archived paths:
     start with ``src``.
   - When you back up relative paths like ``../../src``, the archived paths
     start with ``src``.
+  - On native Windows, archived absolute paths look like ``C/Windows/System32``.
 
 Borg supports different pattern styles. To define a non-default
 style for a specific pattern, prefix it with two characters followed
 by a colon ':' (i.e. ``fm:path/*``, ``sh:path/**``).
+
+Note: Windows users must only use forward slashes in patterns, not backslashes.
 
 The default pattern style for ``--exclude`` differs from ``--pattern``, see below.
 
@@ -44,8 +47,8 @@ The default pattern style for ``--exclude`` differs from ``--pattern``, see belo
     any number of characters, '?' matching any single character, '[...]'
     matching any single character specified, including ranges, and '[!...]'
     matching any character not specified. For the purpose of these patterns,
-    the path separator (backslash for Windows and '/' on other systems) is not
-    treated specially. Wrap meta-characters in brackets for a literal
+    the path separator (forward slash '/') is not treated specially.
+    Wrap meta-characters in brackets for a literal
     match (i.e. ``[?]`` to match the literal character '?'). For a path
     to match a pattern, the full path must match, or it must match
     from the start of the full path to just before a path separator. Except
@@ -65,9 +68,7 @@ Shell-style patterns, selector ``sh:``
 `Regular expressions <https://docs.python.org/3/library/re.html>`_, selector ``re:``
     Unlike shell patterns, regular expressions are not required to match the full
     path and any substring match is sufficient. It is strongly recommended to
-    anchor patterns to the start ('^'), to the end ('$') or both. Path
-    separators (backslash for Windows and '/' on other systems) in paths are
-    always normalized to a forward slash '/' before applying a pattern.
+    anchor patterns to the start ('^'), to the end ('$') or both.
 
 Path prefix, selector ``pp:``
     This pattern style is useful to match whole subdirectories. The pattern
@@ -98,6 +99,20 @@ Path full-match, selector ``pf:``
     paths. If untrusted users are able to supply patterns, ensure they
     cannot supply ``re:`` patterns. Further, ensure that ``sh:`` and
     ``fm:`` patterns only contain a handful of wildcards at most.
+
+.. note::
+
+    **Windows path handling**: All paths in Borg archives use forward slashes (``/``)
+    as path separators, regardless of the platform. When creating archives on Windows,
+    backslashes from filesystem paths are automatically converted to forward slashes.
+
+.. note::
+
+    **Windows reserved characters**: On Windows, when extracting archives created on
+    POSIX systems, paths may contain characters that are reserved from being used in
+    file or directory names (like: ``< > : " \ | ? *``).
+    These are replaced by characters in the unicode private use area (``U+F0xx``) like
+    the CIFS mapchars feature also does it. It won't be pretty, but at least it works.
 
 Exclusions can be passed via the command line option ``--exclude``. When used
 from within a shell, the patterns should be quoted to protect them from

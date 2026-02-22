@@ -29,7 +29,7 @@ from ..repoobj import RepoObj
 
 
 from .low_level import AES, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256
-from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, AES256_OCB, CHACHA20_POLY1305
+from .low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b_legacy, AES256_OCB, CHACHA20_POLY1305
 from . import low_level
 
 # workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
@@ -123,7 +123,7 @@ def uses_same_id_hash(other_key, key):
     new_sha256_ids = (PlaintextKey,)
     old_hmac_sha256_ids = (RepoKey, KeyfileKey, AuthenticatedKey)
     new_hmac_sha256_ids = (AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey, AuthenticatedKey)
-    old_blake2_ids = (Blake2RepoKey, Blake2KeyfileKey, Blake2AuthenticatedKey)
+    old_blake2_ids = tuple()  # empty tuple, old blake2 IDs are incompatible with new blake2 IDs
     new_blake2_ids = (
         Blake2AESOCBRepoKey,
         Blake2AESOCBKeyfileKey,
@@ -276,7 +276,7 @@ class PlaintextKey(KeyBase):
         return memoryview(data)[1:]
 
 
-def random_blake2b_256_key():
+def random_blake2b_256_key_legacy():  # borg 1.x created the key this way
     # This might look a bit curious, but is the same construction used in the keyed mode of BLAKE2b.
     # Why limit the key to 64 bytes and pad it with 64 nulls nonetheless? The answer is that BLAKE2b
     # has a 128 byte block size, but only 64 bytes of internal state (this is also referred to as a
@@ -290,22 +290,36 @@ def random_blake2b_256_key():
     return os.urandom(64) + bytes(64)
 
 
-class ID_BLAKE2b_256:
+class ID_BLAKE2b_256_legacy:  # borg 1.x
     """
     Key mix-in class for using BLAKE2b-256 for the id key.
-
-    The id_key length must be 32 bytes.
     """
 
     def id_hash(self, data):
-        return blake2b_256(self.id_key, data)
+        return blake2b_256(self.id_key, data, legacy=True)
 
     def init_from_random_data(self):
         super().init_from_random_data()
         enc_key = os.urandom(32)
-        enc_hmac_key = random_blake2b_256_key()
+        enc_hmac_key = random_blake2b_256_key_legacy()
         self.crypt_key = enc_key + enc_hmac_key
-        self.id_key = random_blake2b_256_key()
+        self.id_key = random_blake2b_256_key_legacy()
+
+
+class ID_BLAKE2b_256:  # borg 2: either use the "fixed" blake2b or use blake3? see #8867
+    """
+    Key mix-in class for using BLAKE2b-256 for the id key.
+    """
+
+    def id_hash(self, data):
+        return blake2b_256(self.id_key, data, legacy=False)
+
+    def init_from_random_data(self):
+        super().init_from_random_data()
+        enc_key = os.urandom(32)
+        enc_hmac_key = os.urandom(64)
+        self.crypt_key = enc_key + enc_hmac_key
+        self.id_key = os.urandom(64)
 
 
 class ID_HMAC_SHA_256:
@@ -747,22 +761,22 @@ class RepoKey(ID_HMAC_SHA_256, AESKeyBase, FlexiKey):
     CIPHERSUITE = AES256_CTR_HMAC_SHA256
 
 
-class Blake2KeyfileKey(ID_BLAKE2b_256, AESKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
-    TYPE = KeyType.BLAKE2KEYFILE
-    NAME = "key file BLAKE2b"
-    ARG_NAME = "keyfile-blake2"
+class Blake2KeyfileKeyLegacy(ID_BLAKE2b_256_legacy, AESKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}  # ???
+    TYPE = KeyType.BLAKE2KEYFILE  # ???
+    NAME = "key file BLAKE2b (legacy)"
+    ARG_NAME = "keyfile-blake2-legacy"
     STORAGE = KeyBlobStorage.KEYFILE
-    CIPHERSUITE = AES256_CTR_BLAKE2b
+    CIPHERSUITE = AES256_CTR_BLAKE2b_legacy
 
 
-class Blake2RepoKey(ID_BLAKE2b_256, AESKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}
-    TYPE = KeyType.BLAKE2REPO
-    NAME = "repokey BLAKE2b"
-    ARG_NAME = "repokey-blake2"
+class Blake2RepoKeyLegacy(ID_BLAKE2b_256_legacy, AESKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE2KEYFILE, KeyType.BLAKE2REPO}  # ???
+    TYPE = KeyType.BLAKE2REPO  # ???
+    NAME = "repokey BLAKE2b (legacy)"
+    ARG_NAME = "repokey-blake2-legacy"
     STORAGE = KeyBlobStorage.REPO
-    CIPHERSUITE = AES256_CTR_BLAKE2b
+    CIPHERSUITE = AES256_CTR_BLAKE2b_legacy
 
 
 class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
@@ -811,14 +825,21 @@ class AuthenticatedKey(ID_HMAC_SHA_256, AuthenticatedKeyBase):
     ARG_NAME = "authenticated"
 
 
+class Blake2AuthenticatedKeyLegacy(ID_BLAKE2b_256_legacy, AuthenticatedKeyBase):
+    TYPE = KeyType.BLAKE2AUTHENTICATEDLEGACY
+    TYPES_ACCEPTABLE = {TYPE}
+    NAME = "authenticated BLAKE2b (legacy)"
+    ARG_NAME = "authenticated-blake2-legacy"
+
+
+# ------------ new crypto ------------
+
+
 class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):
     TYPE = KeyType.BLAKE2AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
     NAME = "authenticated BLAKE2b"
     ARG_NAME = "authenticated-blake2"
-
-
-# ------------ new crypto ------------
 
 
 class AEADKeyBase(KeyBase):
@@ -1003,11 +1024,12 @@ class Blake2CHPORepoKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
 
 
 LEGACY_KEY_TYPES = (
-    # legacy (AES-CTR based) crypto
+    # legacy (AES-CTR or Blake2_legacy based) crypto
     KeyfileKey,
     RepoKey,
-    Blake2KeyfileKey,
-    Blake2RepoKey,
+    Blake2KeyfileKeyLegacy,
+    Blake2RepoKeyLegacy,
+    Blake2AuthenticatedKeyLegacy,
 )
 
 AVAILABLE_KEY_TYPES = (
@@ -1015,12 +1037,12 @@ AVAILABLE_KEY_TYPES = (
     # not encrypted modes
     PlaintextKey,
     AuthenticatedKey,
-    Blake2AuthenticatedKey,
     # new crypto
     AESOCBKeyfileKey,
     AESOCBRepoKey,
     CHPOKeyfileKey,
     CHPORepoKey,
+    Blake2AuthenticatedKey,
     Blake2AESOCBKeyfileKey,
     Blake2AESOCBRepoKey,
     Blake2CHPOKeyfileKey,

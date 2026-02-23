@@ -95,6 +95,12 @@ def test_basic_operations(repo_fixtures, request):
                 continue
             assert pdchunk(repository.get(H(x))) == b"SOMEDATA"
 
+def test_repository_path(tmp_path):
+    location = os.fspath(tmp_path / "@repo")
+    repository = Repository(location)
+    assert repository.url.endswith("@repo")
+    
+    repository.open(exclusive=False)
 
 def test_read_data(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:

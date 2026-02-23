@@ -4,6 +4,7 @@ build
 dist
 .tox
 src/borg/compress.c
+src/borg/hashindex.c
 src/borg/crypto/low_level.c
 src/borg/item.c
 src/borg/chunkers/buzhash.c
@@ -12,6 +13,7 @@ src/borg/chunkers/reader.c
 src/borg/checksums.c
 src/borg/platform/darwin.c
 src/borg/platform/freebsd.c
+src/borg/platform/netbsd.c
 src/borg/platform/linux.c
 src/borg/platform/syncfilerange.c
 src/borg/platform/posix.c
@@ -28,3 +30,4 @@ borg.exe
 .coverage
 .coverage.*
 .vagrant
+

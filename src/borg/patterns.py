@@ -66,7 +66,7 @@ class ArgparsePatternFileAction(argparse.Action):
 
     # Class-level storage for roots from pattern files, to avoid being overwritten
     # by the positional "paths" argument. Merged into args.paths in flatten_namespace().
-    roots_from_patterns = []
+    roots_from_patterns: list[str] = []
 
     def parse(self, fobj, args):
         # jsonargparse may initialize list-like attributes to None instead of []

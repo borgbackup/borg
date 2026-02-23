@@ -66,7 +66,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y pkg-config build-essential
-        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev libzstd-dev
+        sudo apt-get install -y libssl-dev libacl1-dev libxxhash-dev liblz4-dev
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v4

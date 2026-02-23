@@ -160,7 +160,6 @@ if not on_rtd:
     compress_ext_kwargs = members_appended(
         dict(sources=[compress_source]),
         lib_ext_kwargs(pc, "BORG_LIBLZ4_PREFIX", "lz4", "liblz4", ">= 1.7.0"),
-        lib_ext_kwargs(pc, "BORG_LIBZSTD_PREFIX", "zstd", "libzstd", ">= 1.3.0"),
         dict(extra_compile_args=cflags),
     )
 

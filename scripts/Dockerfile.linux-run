@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libacl1-dev \
     libxxhash-dev \
     liblz4-dev \
-    libzstd-dev \
     libfuse3-dev \
     fuse3 \
     python3-dev \

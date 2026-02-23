@@ -218,9 +218,6 @@ Building:
     BORG_LIBLZ4_PREFIX
         Adds given prefix directory to the default locations. If a 'include/lz4.h' is found Borg
         will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
-    BORG_LIBZSTD_PREFIX
-        Adds given prefix directory to the default locations. If a 'include/zstd.h' is found Borg
-        will be linked against the system libzstd instead of a bundled implementation. (setup.py)
 
 Please note:
 

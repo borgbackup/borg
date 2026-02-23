@@ -328,7 +328,6 @@ def remove_dotdot_prefixes(path):
 
     `path` is expected to be normalized already (e.g. via `posixpath.normpath()`).
     """
-    assert "\\" not in path
     if is_win32:
         if len(path) > 1 and path[1] == ":":
             path = path.replace(":", "", 1)

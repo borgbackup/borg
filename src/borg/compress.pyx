@@ -627,6 +627,9 @@ class Compressor:
 
 class CompressionSpec:
     def __init__(self, s):
+        if isinstance(s, CompressionSpec):
+            self.__dict__.update(s.__dict__)
+            return
         values = s.split(',')
         count = len(values)
         if count < 1:

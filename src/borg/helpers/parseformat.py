@@ -130,6 +130,8 @@ def positive_int_validator(value):
 
 def interval(s):
     """Convert a string representing a valid interval to a number of seconds."""
+    if isinstance(s, int):
+        return s
     seconds_in_a_minute = 60
     seconds_in_an_hour = 60 * seconds_in_a_minute
     seconds_in_a_day = 24 * seconds_in_an_hour
@@ -164,6 +166,8 @@ def interval(s):
 
 
 def ChunkerParams(s):
+    if isinstance(s, tuple):
+        return s
     params = s.strip().split(",")
     count = len(params)
     if count == 0:
@@ -228,6 +232,8 @@ def ChunkerParams(s):
 def FilesCacheMode(s):
     ENTRIES_MAP = dict(ctime="c", mtime="m", size="s", inode="i", rechunk="r", disabled="d")
     VALID_MODES = ("cis", "ims", "cs", "ms", "cr", "mr", "d", "s")  # letters in alpha order
+    if s in VALID_MODES:
+        return s
     entries = set(s.strip().split(","))
     if not entries <= set(ENTRIES_MAP):
         raise argparse.ArgumentTypeError(
@@ -369,6 +375,8 @@ class FileSize(int):
 
 def parse_file_size(s):
     """Return int from file size (1234, 55G, 1.7T)."""
+    if isinstance(s, int):
+        return s
     if not s:
         return int(s)  # will raise
     s = s.upper()
@@ -507,6 +515,9 @@ class Location:
     local_re = re.compile(local_path_re, re.VERBOSE)
 
     def __init__(self, text="", overrides={}, other=False):
+        if isinstance(text, Location):
+            self.__dict__.update(text.__dict__)
+            return
         self.repo_env_var = "BORG_OTHER_REPO" if other else "BORG_REPO"
         self.valid = False
         self.proto = None

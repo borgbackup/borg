@@ -28,6 +28,8 @@ def parse_local_timestamp(timestamp, tzinfo=None):
 
 def timestamp(s):
     """Convert a --timestamp=s argument to a datetime object."""
+    if isinstance(s, datetime):
+        return s
     try:
         # is it pointing to a file / directory?
         ts = safe_s(os.stat(s).st_mtime)

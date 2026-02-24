@@ -37,6 +37,8 @@ def utcfromtimestampns(ts_ns: int) -> datetime:
 
 def timestamp(s):
     """Convert a --timestamp=s argument to a datetime object."""
+    if isinstance(s, datetime):
+        return s
     try:
         # is it pointing to a file / directory?
         ts_ns = safe_ns(os.stat(s).st_mtime_ns)

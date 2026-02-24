@@ -84,6 +84,7 @@ class DiffMixIn:
                 wc=None,
             )
 
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
 
         diffs_iter = Archive.compare_archives_iter(

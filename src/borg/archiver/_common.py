@@ -574,10 +574,11 @@ def define_common_options(add_common_option):
     )
 
 
-def build_matcher(inclexcl_patterns, include_paths):
+def build_matcher(inclexcl_patterns, include_paths, pattern_roots=()):
     matcher = PatternMatcher()
     matcher.add_inclexcl(inclexcl_patterns)
-    matcher.add_includepaths(include_paths)
+    paths = list(pattern_roots) + list(include_paths)
+    matcher.add_includepaths(paths)
     return matcher
 
 

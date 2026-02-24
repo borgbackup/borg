@@ -1,5 +1,7 @@
 import argparse
 
+from jsonargparse import ArgumentParser
+
 from ._common import with_repository, Highlander
 from ._common import build_matcher
 from ..archive import ArchiveRecreater
@@ -102,16 +104,14 @@ class RecreateMixIn:
         if the chunks are still missing.
         """
         )
-        subparser = subparsers.add_parser(
-            "recreate",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_recreate.__doc__,
             epilog=recreate_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help=self.do_recreate.__doc__,
         )
-        subparser.set_defaults(func=self.do_recreate)
+        subparsers.add_subcommand("recreate", subparser, help=self.do_recreate.__doc__)
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output verbose list of items (files, dirs, ...)"
         )

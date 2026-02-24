@@ -6,6 +6,8 @@ import stat
 import tarfile
 import time
 
+from jsonargparse import ArgumentParser
+
 from ..archive import Archive, TarfileObjectProcessors, ChunksProcessor
 from ..compress import CompressionSpec
 from ..constants import *  # NOQA
@@ -387,16 +389,14 @@ class TarMixIn:
         pass over the archive metadata.
         """
         )
-        subparser = subparsers.add_parser(
-            "export-tar",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_export_tar.__doc__,
             epilog=export_tar_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="create tarball from archive",
         )
-        subparser.set_defaults(func=self.do_export_tar)
+        subparsers.add_subcommand("export-tar", subparser, help="create tarball from archive")
         subparser.add_argument(
             "--tar-filter",
             dest="tar_filter",
@@ -463,16 +463,14 @@ class TarMixIn:
         ``--ignore-zeros`` option to skip through the stop markers between them.
         """
         )
-        subparser = subparsers.add_parser(
-            "import-tar",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_import_tar.__doc__,
             epilog=import_tar_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help=self.do_import_tar.__doc__,
         )
-        subparser.set_defaults(func=self.do_import_tar)
+        subparsers.add_subcommand("import-tar", subparser, help=self.do_import_tar.__doc__)
         subparser.add_argument(
             "--tar-filter",
             dest="tar_filter",

@@ -1,3 +1,4 @@
+import argparse
 import functools
 import os
 import textwrap
@@ -269,12 +270,27 @@ def process_epilog(epilog):
 
 def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components=False):
     add_option(
+        "--pattern-roots-internal",
+        dest="pattern_roots",
+        action="append",
+        default=[],
+        help=argparse.SUPPRESS,
+    )
+    add_option(
+        "--patterns-internal",
+        dest="patterns",
+        action="append",
+        default=[],
+        help=argparse.SUPPRESS,
+    )
+    add_option(
         "-e",
         "--exclude",
         metavar="PATTERN",
         dest="patterns",
         type=parse_exclude_pattern,
         action="append",
+        default=[],
         help="exclude paths matching PATTERN",
     )
     add_option(
@@ -372,7 +388,6 @@ def define_archive_filters_group(
             metavar="N",
             dest="first",
             type=positive_int_validator,
-            default=0,
             action=Highlander,
             help="consider the first N archives after other filters are applied",
         )
@@ -381,7 +396,6 @@ def define_archive_filters_group(
             metavar="N",
             dest="last",
             type=positive_int_validator,
-            default=0,
             action=Highlander,
             help="consider the last N archives after other filters are applied",
         )
@@ -508,7 +522,7 @@ def define_common_options(add_common_option):
         "--umask",
         metavar="M",
         dest="umask",
-        type=lambda s: int(s, 8),
+        type=lambda s: s if isinstance(s, int) else int(s, 8),
         default=UMASK_DEFAULT,
         action=Highlander,
         help="set umask to M (local only, default: %(default)04o)",

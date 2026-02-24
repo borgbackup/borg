@@ -330,7 +330,7 @@ class Archiver(
 
         parser = argparse.ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups", add_help=False)
         # paths and patterns must have an empty list as default everywhere
-        parser.set_defaults(fallback2_func=functools.partial(self.do_maincommand_help, parser), paths=[], patterns=[])
+        parser.set_defaults(fallback2_func=functools.partial(self.do_maincommand_help, parser), paths=[], patterns=[], pattern_roots=[])
         parser.common_options = self.CommonOptions(
             define_common_options, suffix_precedence=("_maincommand", "_midcommand", "_subcommand")
         )
@@ -341,11 +341,11 @@ class Archiver(
         parser.common_options.add_common_group(parser, "_maincommand", provide_defaults=True)
 
         common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
-        common_parser.set_defaults(paths=[], patterns=[])
+        common_parser.set_defaults(paths=[], patterns=[], pattern_roots=[])
         parser.common_options.add_common_group(common_parser, "_subcommand")
 
         mid_common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
-        mid_common_parser.set_defaults(paths=[], patterns=[])
+        mid_common_parser.set_defaults(paths=[], patterns=[], pattern_roots=[])
         parser.common_options.add_common_group(mid_common_parser, "_midcommand")
 
         if parser.prog == "borgfs":
@@ -433,8 +433,7 @@ class Archiver(
         if func == self.do_create and not args.paths:
             if args.content_from_command or args.paths_from_command:
                 parser.error("No command given.")
-            elif not args.paths_from_stdin:
-                # need at least 1 path but args.paths may also be populated from patterns
+            elif not args.paths_from_stdin and not args.pattern_roots:
                 parser.error("Need at least one PATH argument.")
         # we can only have a complete knowledge of placeholder replacements we should do **after** arg parsing,
         # e.g. due to options like --timestamp that override the current time.

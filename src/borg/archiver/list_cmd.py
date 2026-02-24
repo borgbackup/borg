@@ -19,6 +19,7 @@ class ListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest):
         """List archive contents."""
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
         if args.format is not None:
             format = args.format

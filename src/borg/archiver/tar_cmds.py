@@ -87,6 +87,7 @@ class TarMixIn:
             self._export_tar(args, archive, _stream)
 
     def _export_tar(self, args, archive, tarstream):
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
 
         progress = args.progress

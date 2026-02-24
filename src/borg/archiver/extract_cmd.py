@@ -33,6 +33,7 @@ class ExtractMixIn:
                     "For example, install locales and use: LANG=en_US.UTF-8"
                 )
 
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
 
         progress = args.progress

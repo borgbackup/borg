@@ -41,7 +41,7 @@ class ArgparsePatternAction(argparse.Action):
         super().__init__(nargs=nargs, **kw)
 
     def __call__(self, parser, args, values, option_string=None):
-        parse_patternfile_line(values[0], args.paths, args.patterns, ShellPattern)
+        parse_patternfile_line(values[0], args.pattern_roots, args.patterns, ShellPattern)
 
 
 class ArgparsePatternFileAction(argparse.Action):
@@ -60,7 +60,7 @@ class ArgparsePatternFileAction(argparse.Action):
             raise Error(str(e))
 
     def parse(self, fobj, args):
-        load_pattern_file(fobj, args.paths, args.patterns)
+        load_pattern_file(fobj, args.pattern_roots, args.patterns)
 
 
 class ArgparseExcludeFileAction(ArgparsePatternFileAction):

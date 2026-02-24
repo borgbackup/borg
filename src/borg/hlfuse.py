@@ -193,6 +193,7 @@ class FuseBackend:
 
         archive = Archive(self._manifest, archive_id)
         strip_components = self._args.strip_components
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(self._args.patterns, self._args.paths)
         hlm = HardLinkManager(id_type=bytes, info_type=str)
 

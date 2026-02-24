@@ -18,6 +18,7 @@ class RecreateMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, cache):
         """Recreate archives."""
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter

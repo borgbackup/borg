@@ -137,7 +137,8 @@ class CreateMixIn:
                     if rc != 0:
                         raise CommandError(f"Command {args.paths[0]!r} exited with status {rc}")
             else:
-                for path in args.paths:
+                paths = list(args.pattern_roots) + list(args.paths)
+                for path in paths:
                     if path == "":  # issue #5637
                         self.print_warning("An empty string was given as PATH, ignoring.")
                         continue

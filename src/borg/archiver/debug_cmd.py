@@ -1,7 +1,8 @@
 import argparse
-import functools
 import json
 import textwrap
+
+from jsonargparse import ArgumentParser
 
 from ..archive import Archive
 from ..compress import CompressionSpec
@@ -319,18 +320,16 @@ class DebugMixIn:
         what you are doing or if a trusted developer tells you what to do."""
         )
 
-        subparser = subparsers.add_parser(
-            "debug",
+        subparser = ArgumentParser(
             parents=[mid_common_parser],
             add_help=False,
             description="debugging command (not intended for normal use)",
             epilog=debug_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="debugging command (not intended for normal use)",
         )
+        subparsers.add_subcommand("debug", subparser, help="debugging command (not intended for normal use)")
 
-        debug_parsers = subparser.add_subparsers(title="required arguments", metavar="<command>")
-        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
+        debug_parsers = subparser.add_subcommands(required=False, title="required arguments", metavar="<command>")
 
         debug_info_epilog = process_epilog(
             """
@@ -339,32 +338,28 @@ class DebugMixIn:
         already appended at the end of the traceback.
         """
         )
-        subparser = debug_parsers.add_parser(
-            "info",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_info.__doc__,
             epilog=debug_info_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="show system infos for debugging / bug reports (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_info)
+        debug_parsers.add_subcommand("info", subparser, help="show system infos for debugging / bug reports (debug)")
 
         debug_dump_archive_items_epilog = process_epilog(
             """
         This command dumps raw (but decrypted and decompressed) archive items (only metadata) to files.
         """
         )
-        subparser = debug_parsers.add_parser(
-            "dump-archive-items",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_dump_archive_items.__doc__,
             epilog=debug_dump_archive_items_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="dump archive items (metadata) (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_dump_archive_items)
+        debug_parsers.add_subcommand("dump-archive-items", subparser, help="dump archive items (metadata) (debug)")
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
 
         debug_dump_archive_epilog = process_epilog(
@@ -372,16 +367,14 @@ class DebugMixIn:
         This command dumps all metadata of an archive in a decoded form to a file.
         """
         )
-        subparser = debug_parsers.add_parser(
-            "dump-archive",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_dump_archive.__doc__,
             epilog=debug_dump_archive_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="dump decoded archive metadata (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_dump_archive)
+        debug_parsers.add_subcommand("dump-archive", subparser, help="dump decoded archive metadata (debug)")
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
         subparser.add_argument("path", metavar="PATH", type=str, help="file to dump data into")
 
@@ -390,16 +383,14 @@ class DebugMixIn:
         This command dumps manifest metadata of a repository in a decoded form to a file.
         """
         )
-        subparser = debug_parsers.add_parser(
-            "dump-manifest",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_dump_manifest.__doc__,
             epilog=debug_dump_manifest_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="dump decoded repository metadata (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_dump_manifest)
+        debug_parsers.add_subcommand("dump-manifest", subparser, help="dump decoded repository metadata (debug)")
         subparser.add_argument("path", metavar="PATH", type=str, help="file to dump data into")
 
         debug_dump_repo_objs_epilog = process_epilog(
@@ -407,32 +398,28 @@ class DebugMixIn:
         This command dumps raw (but decrypted and decompressed) repo objects to files.
         """
         )
-        subparser = debug_parsers.add_parser(
-            "dump-repo-objs",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_dump_repo_objs.__doc__,
             epilog=debug_dump_repo_objs_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="dump repo objects (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_dump_repo_objs)
+        debug_parsers.add_subcommand("dump-repo-objs", subparser, help="dump repo objects (debug)")
 
         debug_search_repo_objs_epilog = process_epilog(
             """
         This command searches raw (but decrypted and decompressed) repo objects for a specific bytes sequence.
         """
         )
-        subparser = debug_parsers.add_parser(
-            "search-repo-objs",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_search_repo_objs.__doc__,
             epilog=debug_search_repo_objs_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="search repo objects (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_search_repo_objs)
+        debug_parsers.add_subcommand("search-repo-objs", subparser, help="search repo objects (debug)")
         subparser.add_argument(
             "wanted",
             metavar="WANTED",
@@ -445,16 +432,14 @@ class DebugMixIn:
                 This command computes the id-hash for some file content.
                 """
         )
-        subparser = debug_parsers.add_parser(
-            "id-hash",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_id_hash.__doc__,
             epilog=debug_id_hash_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="compute id-hash for some file content (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_id_hash)
+        debug_parsers.add_subcommand("id-hash", subparser, help="compute id-hash for some file content (debug)")
         subparser.add_argument(
             "path", metavar="PATH", type=str, help="content for which the id-hash shall get computed"
         )
@@ -465,16 +450,14 @@ class DebugMixIn:
                 This command parses the object file into metadata (as json) and uncompressed data.
                 """
         )
-        subparser = debug_parsers.add_parser(
-            "parse-obj",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_parse_obj.__doc__,
             epilog=debug_parse_obj_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="parse borg object file into meta dict and data",
         )
-        subparser.set_defaults(func=self.do_debug_parse_obj)
+        debug_parsers.add_subcommand("parse-obj", subparser, help="parse borg object file into meta dict and data")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
         subparser.add_argument(
             "object_path", metavar="OBJECT_PATH", type=str, help="path of the object file to parse data from"
@@ -492,16 +475,14 @@ class DebugMixIn:
                 This command formats the file and metadata into a Borg object file.
                 """
         )
-        subparser = debug_parsers.add_parser(
-            "format-obj",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_format_obj.__doc__,
             epilog=debug_format_obj_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="format file and metadata into a Borg object file",
         )
-        subparser.set_defaults(func=self.do_debug_format_obj)
+        debug_parsers.add_subcommand("format-obj", subparser, help="format file and metadata into a Borg object file")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
         subparser.add_argument(
             "binary_path", metavar="BINARY_PATH", type=str, help="path of the file to convert into an object file"
@@ -531,16 +512,14 @@ class DebugMixIn:
         This command gets an object from the repository.
         """
         )
-        subparser = debug_parsers.add_parser(
-            "get-obj",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_get_obj.__doc__,
             epilog=debug_get_obj_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="get object from repository (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_get_obj)
+        debug_parsers.add_subcommand("get-obj", subparser, help="get object from repository (debug)")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
         subparser.add_argument("path", metavar="PATH", type=str, help="file to write object data into")
 
@@ -549,16 +528,14 @@ class DebugMixIn:
         This command puts an object into the repository.
         """
         )
-        subparser = debug_parsers.add_parser(
-            "put-obj",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_put_obj.__doc__,
             epilog=debug_put_obj_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="put object to repository (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_put_obj)
+        debug_parsers.add_subcommand("put-obj", subparser, help="put object to repository (debug)")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to put into the repo")
         subparser.add_argument("path", metavar="PATH", type=str, help="file to read and create object from")
 
@@ -567,16 +544,14 @@ class DebugMixIn:
         This command deletes objects from the repository.
         """
         )
-        subparser = debug_parsers.add_parser(
-            "delete-obj",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_delete_obj.__doc__,
             epilog=debug_delete_obj_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="delete object from repository (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_delete_obj)
+        debug_parsers.add_subcommand("delete-obj", subparser, help="delete object from repository (debug)")
         subparser.add_argument(
             "ids", metavar="IDs", nargs="+", type=str, help="hex object ID(s) to delete from the repo"
         )
@@ -586,15 +561,13 @@ class DebugMixIn:
         Convert a Borg profile to a Python cProfile compatible profile.
         """
         )
-        subparser = debug_parsers.add_parser(
-            "convert-profile",
-            parents=[common_parser],
+        subparser = ArgumentParser(
+            parents=[mid_common_parser],
             add_help=False,
             description=self.do_debug_convert_profile.__doc__,
             epilog=debug_convert_profile_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="convert Borg profile to Python profile (debug)",
         )
-        subparser.set_defaults(func=self.do_debug_convert_profile)
+        debug_parsers.add_subcommand("convert-profile", subparser, help="convert Borg profile to Python profile (debug)")
         subparser.add_argument("input", metavar="INPUT", type=str, help="Borg profile")
         subparser.add_argument("output", metavar="OUTPUT", type=str, help="Output file")

@@ -40,6 +40,7 @@ dependencies = [
   "shtab>=1.8.0",
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
   "xxhash>=2.0.0",
+  "jsonargparse @ git+https://github.com/omni-us/jsonargparse.git@main",
 ]
 
 [project.optional-dependencies]

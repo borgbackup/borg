@@ -1,6 +1,7 @@
 import argparse
-import functools
 import os
+
+from jsonargparse import ArgumentParser
 
 from ..constants import *  # NOQA
 from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
@@ -120,18 +121,16 @@ class KeysMixIn:
     def build_parser_keys(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog
 
-        subparser = subparsers.add_parser(
-            "key",
+        subparser = ArgumentParser(
             parents=[mid_common_parser],
             add_help=False,
             description="Manage the keyfile or repokey of a repository",
             epilog="",
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="manage the repository key",
         )
+        subparsers.add_subcommand("key", subparser, help="manage the repository key")
 
-        key_parsers = subparser.add_subparsers(title="required arguments", metavar="<command>")
-        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
+        key_parsers = subparser.add_subcommands(required=False, title="required arguments", metavar="<command>")
 
         key_export_epilog = process_epilog(
             """
@@ -164,16 +163,14 @@ class KeysMixIn:
         HTML template with a QR code and a copy of the ``--paper``-formatted key.
         """
         )
-        subparser = key_parsers.add_parser(
-            "export",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_key_export.__doc__,
             epilog=key_export_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="export the repository key for backup",
         )
-        subparser.set_defaults(func=self.do_key_export)
+        key_parsers.add_subcommand("export", subparser, help="export the repository key for backup")
         subparser.add_argument("path", metavar="PATH", nargs="?", type=PathSpec, help="where to store the backup")
         subparser.add_argument(
             "--paper",
@@ -206,16 +203,14 @@ class KeysMixIn:
         key import`` creates a new key file in ``$BORG_KEYS_DIR``.
         """
         )
-        subparser = key_parsers.add_parser(
-            "import",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_key_import.__doc__,
             epilog=key_import_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="import the repository key from backup",
         )
-        subparser.set_defaults(func=self.do_key_import)
+        key_parsers.add_subcommand("import", subparser, help="import the repository key from backup")
         subparser.add_argument(
             "path", metavar="PATH", nargs="?", type=PathSpec, help="path to the backup ('-' to read from stdin)"
         )
@@ -237,16 +232,14 @@ class KeysMixIn:
         does not protect future (nor past) backups to the same repository.
         """
         )
-        subparser = key_parsers.add_parser(
-            "change-passphrase",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_key_change_passphrase.__doc__,
             epilog=change_passphrase_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="change the repository passphrase",
         )
-        subparser.set_defaults(func=self.do_key_change_passphrase)
+        key_parsers.add_subcommand("change-passphrase", subparser, help="change the repository passphrase")
 
         change_location_epilog = process_epilog(
             """
@@ -261,16 +254,14 @@ class KeysMixIn:
         thus you must ONLY give the key location (keyfile or repokey).
         """
         )
-        subparser = key_parsers.add_parser(
-            "change-location",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_key_change_location.__doc__,
             epilog=change_location_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="change the key location",
         )
-        subparser.set_defaults(func=self.do_key_change_location)
+        key_parsers.add_subcommand("change-location", subparser, help="change the key location")
         subparser.add_argument(
             "key_mode", metavar="KEY_LOCATION", choices=("repokey", "keyfile"), help="select key location"
         )

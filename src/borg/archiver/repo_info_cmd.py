@@ -1,6 +1,8 @@
 import argparse
 import textwrap
 
+from jsonargparse import ArgumentParser
+
 from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, json_print, basic_json_data
@@ -63,14 +65,12 @@ class RepoInfoMixIn:
         This command displays detailed information about the repository.
         """
         )
-        subparser = subparsers.add_parser(
-            "repo-info",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_repo_info.__doc__,
             epilog=repo_info_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="show repository information",
         )
-        subparser.set_defaults(func=self.do_repo_info)
+        subparsers.add_subcommand("repo-info", subparser, help="show repository information")
         subparser.add_argument("--json", action="store_true", help="format output as JSON")

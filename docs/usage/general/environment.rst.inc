@@ -138,8 +138,8 @@ General:
 
 Output formatting:
     BORG_LIST_FORMAT
-        Giving the default value for ``borg repo-list --format=X``.
-    BORG_RLIST_FORMAT
+        Giving the default value for ``borg list --format=X``.
+    BORG_REPO_LIST_FORMAT
         Giving the default value for ``borg repo-list --format=X``.
     BORG_PRUNE_FORMAT
         Giving the default value for ``borg prune --format=X``.

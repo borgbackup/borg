@@ -121,7 +121,7 @@ def decode_dict(d, keys, encoding="utf-8", errors="surrogateescape"):
 
 
 def positive_int_validator(value):
-    """argparse type for positive integers."""
+    """argparse type for positive integers, N > 0."""
     int_value = int(value)
     if int_value <= 0:
         raise argparse.ArgumentTypeError("A positive integer is required: %s" % value)
@@ -352,7 +352,7 @@ def SortBySpec(text):
     from ..manifest import AI_HUMAN_SORT_KEYS
 
     for token in text.split(","):
-        if token not in AI_HUMAN_SORT_KEYS:
+        if token not in AI_HUMAN_SORT_KEYS and token != "ts":  # idempotency: do not reject ts
             raise argparse.ArgumentTypeError("Invalid sort key: %s" % token)
     return text.replace("timestamp", "ts").replace("archive", "name")
 

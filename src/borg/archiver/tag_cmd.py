@@ -1,5 +1,7 @@
 import argparse
 
+from jsonargparse import ArgumentParser
+
 from ._common import with_repository, define_archive_filters_group
 from ..archive import Archive
 from ..constants import *  # NOQA
@@ -80,39 +82,37 @@ class TagMixIn:
             removed).
             """
         )
-        subparser = subparsers.add_parser(
-            "tag",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_tag.__doc__,
             epilog=tag_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="tag archives",
         )
-        subparser.set_defaults(func=self.do_tag)
+        subparsers.add_subcommand("tag", subparser, help="tag archives")
         subparser.add_argument(
             "--set",
             dest="set_tags",
             metavar="TAG",
             type=tag_validator,
-            action="append",
-            help="set tags (can be given multiple times)",
+            nargs="+",
+            help="set tags",
         )
         subparser.add_argument(
             "--add",
             dest="add_tags",
             metavar="TAG",
             type=tag_validator,
-            action="append",
-            help="add tags (can be given multiple times)",
+            nargs="+",
+            help="add tags",
         )
         subparser.add_argument(
             "--remove",
             dest="remove_tags",
             metavar="TAG",
             type=tag_validator,
-            action="append",
-            help="remove tags (can be given multiple times)",
+            nargs="+",
+            help="remove tags",
         )
         define_archive_filters_group(subparser)
         subparser.add_argument(

@@ -1,6 +1,8 @@
 import argparse
 from pathlib import Path
 
+from jsonargparse import ArgumentParser
+
 from ._common import with_repository
 from ..archive import Archive
 from ..cache import write_chunkindex_to_repo_cache, build_chunkindex_from_repo
@@ -257,16 +259,14 @@ class CompactMixIn:
             thus it cannot compute before/after compaction size statistics).
             """
         )
-        subparser = subparsers.add_parser(
-            "compact",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_compact.__doc__,
             epilog=compact_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="compact the repository",
         )
-        subparser.set_defaults(func=self.do_compact)
+        subparsers.add_subcommand("compact", subparser, help="compact the repository")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
         )

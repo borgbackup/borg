@@ -3,6 +3,8 @@ import os
 import textwrap
 import sys
 
+from jsonargparse import ArgumentParser
+
 from ._common import with_repository, build_matcher, Highlander
 from ..archive import Archive
 from ..cache import Cache
@@ -103,16 +105,14 @@ class ListMixIn:
             )
             + ItemFormatter.keys_help()
         )
-        subparser = subparsers.add_parser(
-            "list",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_list.__doc__,
             epilog=list_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="list archive contents",
         )
-        subparser.set_defaults(func=self.do_list)
+        subparsers.add_subcommand("list", subparser, help="list archive contents")
         subparser.add_argument(
             "--short", dest="short", action="store_true", help="only print file/directory names, nothing else"
         )

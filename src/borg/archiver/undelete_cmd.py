@@ -1,6 +1,8 @@
 import argparse
 import logging
 
+from jsonargparse import ArgumentParser
+
 from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import format_archive, CommandError, bin_to_hex, archivename_validator
@@ -72,16 +74,14 @@ class UnDeleteMixIn:
         patterns, see :ref:`borg_patterns`).
         """
         )
-        subparser = subparsers.add_parser(
-            "undelete",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_undelete.__doc__,
             epilog=undelete_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="undelete archives",
         )
-        subparser.set_defaults(func=self.do_undelete)
+        subparsers.add_subcommand("undelete", subparser, help="undelete archives")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
         )

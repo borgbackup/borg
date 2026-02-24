@@ -27,6 +27,8 @@ try:
     import signal
     from datetime import datetime, timezone
 
+    from jsonargparse import ArgumentParser
+
     from ..logger import create_logger, setup_logging
 
     logger = create_logger()
@@ -40,6 +42,7 @@ try:
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
+    from ..helpers.jap_helpers import flatten_namespace
 
     from ..helpers import is_slow_msgpack, is_supported_msgpack, sysinfo
     from ..helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
@@ -63,16 +66,7 @@ STATS_HEADER = "                       Original size    Deduplicated size"
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
 
 
-def get_func(args):
-    # This works around https://bugs.python.org/issue9351
-    # func is used at the leaf parsers of the argparse parser tree,
-    # fallback_func at next level towards the root,
-    # fallback2_func at the 2nd next level (which is root in our case).
-    for name in "func", "fallback_func", "fallback2_func":
-        func = getattr(args, name, None)
-        if func is not None:
-            return func
-    raise Exception("expected func attributes not found")
+
 
 
 from .analyze_cmd import AnalyzeMixIn
@@ -277,7 +271,7 @@ class Archiver(
                         # Note: We control all inputs.
                         kwargs["help"] = kwargs["help"] % kwargs
                         if not is_append:
-                            kwargs["default"] = self.default_sentinel
+                            kwargs["default"] = argparse.SUPPRESS
 
                 common_group.add_argument(*args, **kwargs)
 
@@ -328,9 +322,8 @@ class Archiver(
     def build_parser(self):
         from ._common import define_common_options
 
-        parser = argparse.ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups", add_help=False)
+        parser = ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups", add_help=False)
         # paths and patterns must have an empty list as default everywhere
-        parser.set_defaults(fallback2_func=functools.partial(self.do_maincommand_help, parser), paths=[], patterns=[], pattern_roots=[])
         parser.common_options = self.CommonOptions(
             define_common_options, suffix_precedence=("_maincommand", "_midcommand", "_subcommand")
         )
@@ -340,18 +333,16 @@ class Archiver(
         parser.add_argument("--cockpit", dest="cockpit", action="store_true", help="Start the Borg TUI")
         parser.common_options.add_common_group(parser, "_maincommand", provide_defaults=True)
 
-        common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
-        common_parser.set_defaults(paths=[], patterns=[], pattern_roots=[])
+        common_parser = ArgumentParser(add_help=False, prog=self.prog)
         parser.common_options.add_common_group(common_parser, "_subcommand")
 
-        mid_common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
-        mid_common_parser.set_defaults(paths=[], patterns=[], pattern_roots=[])
+        mid_common_parser = ArgumentParser(add_help=False, prog=self.prog)
         parser.common_options.add_common_group(mid_common_parser, "_midcommand")
 
         if parser.prog == "borgfs":
             return self.build_parser_borgfs(parser)
 
-        subparsers = parser.add_subparsers(title="required arguments", metavar="<command>")
+        subparsers = parser.add_subcommands(required=False, title="required arguments", metavar="<command>")
 
         self.build_parser_analyze(subparsers, common_parser, mid_common_parser)
         self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
@@ -424,8 +415,15 @@ class Archiver(
             args = self.preprocess_args(args)
         parser = self.build_parser()
         args = parser.parse_args(args or ["-h"])
+        args = flatten_namespace(args)
+
+        # Ensure list defaults previously handled by set_defaults are present
+        for list_attr in ("paths", "patterns", "pattern_roots"):
+            if getattr(args, list_attr, None) is None:
+                setattr(args, list_attr, [])
+
         parser.common_options.resolve(args)
-        func = get_func(args)
+        func = self.get_func(args, parser)
         if func == self.do_create and args.paths and args.paths_from_stdin:
             parser.error("Must not pass PATH with --paths-from-stdin.")
         if args.progress and getattr(args, "output_list", False) and not args.log_json:
@@ -451,7 +449,23 @@ class Archiver(
             if value:
                 setattr(args, name, [replace_placeholders(elem) for elem in value])
 
+        args.func = func
+
         return args
+
+    def get_func(self, args, parser):
+        if not getattr(args, "subcommand", None):
+            return functools.partial(self.do_maincommand_help, parser)
+
+        method_name = "do_" + args.subcommand.replace(" ", "_").replace("-", "_")
+        func = getattr(self, method_name, None)
+        if func is not None:
+            if method_name == "do_help":
+                return functools.partial(func, parser)
+            return func
+
+        # fallback to general help for e.g., "borg key"
+        return functools.partial(self.do_maincommand_help, parser)
 
     def prerun_checks(self, logger, is_serve):
 
@@ -485,7 +499,7 @@ class Archiver(
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
-        func = get_func(args)
+        func = args.func
         # do not use loggers before this!
         is_serve = func == self.do_serve
         self.log_json = args.log_json and not is_serve

@@ -1,5 +1,7 @@
 import argparse
 
+from jsonargparse import ArgumentParser
+
 from ._common import with_repository, with_other_repository, Highlander
 from ..archive import Archive, cached_hash, DownloadPipeline
 from ..chunkers import get_chunker
@@ -333,16 +335,14 @@ class TransferMixIn:
 
         """
         )
-        subparser = subparsers.add_parser(
-            "transfer",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_transfer.__doc__,
             epilog=transfer_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="transfer of archives from another repository",
         )
-        subparser.set_defaults(func=self.do_transfer)
+        subparsers.add_subcommand("transfer", subparser, help="transfer of archives from another repository")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository, just check"
         )

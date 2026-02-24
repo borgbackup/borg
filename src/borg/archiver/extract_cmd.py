@@ -3,6 +3,8 @@ import argparse
 import logging
 import stat
 
+from jsonargparse import ArgumentParser
+
 from ._common import with_repository, with_archive
 from ._common import build_filter, build_matcher
 from ..archive import BackupError
@@ -155,16 +157,14 @@ class ExtractMixIn:
             group, permissions, etc.
         """
         )
-        subparser = subparsers.add_parser(
-            "extract",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_extract.__doc__,
             epilog=extract_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="extract archive contents",
         )
-        subparser.set_defaults(func=self.do_extract)
+        subparsers.add_subcommand("extract", subparser, help="extract archive contents")
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output a verbose list of items (files, dirs, ...)"
         )

@@ -1,6 +1,8 @@
 import argparse
 import logging
 
+from jsonargparse import ArgumentParser
+
 from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import format_archive, CommandError, bin_to_hex, archivename_validator
@@ -80,16 +82,14 @@ class DeleteMixIn:
         patterns, see :ref:`borg_patterns`).
         """
         )
-        subparser = subparsers.add_parser(
-            "delete",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_delete.__doc__,
             epilog=delete_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="delete archives",
         )
-        subparser.set_defaults(func=self.do_delete)
+        subparsers.add_subcommand("delete", subparser, help="delete archives")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"
         )

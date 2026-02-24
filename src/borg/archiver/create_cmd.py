@@ -9,6 +9,8 @@ import subprocess
 import time
 from io import TextIOWrapper
 
+from jsonargparse import ArgumentParser
+
 from ._common import with_repository, Highlander
 from .. import helpers
 from ..archive import Archive, is_special
@@ -774,16 +776,14 @@ class CreateMixIn:
         """
         )
 
-        subparser = subparsers.add_parser(
-            "create",
+        subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description=self.do_create.__doc__,
             epilog=create_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="create a backup",
         )
-        subparser.set_defaults(func=self.do_create)
+        subparsers.add_subcommand("create", subparser, help="create a backup")
 
         # note: --dry-run and --stats are mutually exclusive, but we do not want to abort when
         #  parsing, but rather proceed with the dry-run, but without stats (see run() method).
@@ -833,7 +833,7 @@ class CreateMixIn:
             "--stdin-mode",
             metavar="M",
             dest="stdin_mode",
-            type=lambda s: int(s, 8),
+            type=lambda s: s if isinstance(s, int) else int(s, 8),
             default=STDIN_MODE_DEFAULT,
             action=Highlander,
             help="set mode to M in archive for stdin data (default: %(default)04o)",

@@ -39,6 +39,7 @@ dependencies = [
   "argon2-cffi",
   "shtab>=1.8.0",
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
+  "jsonargparse @ git+https://github.com/omni-us/jsonargparse.git@main",
 ]
 
 [project.optional-dependencies]

@@ -27,7 +27,7 @@ try:
     import signal
     from datetime import datetime, timezone
 
-    from jsonargparse import ArgumentParser
+    from jsonargparse import ArgumentParser, Namespace, SUPPRESS
 
     from ..logger import create_logger, setup_logging
 
@@ -268,14 +268,14 @@ class Archiver(
                         # Note: We control all inputs.
                         kwargs["help"] = kwargs["help"] % kwargs
                         if not is_append:
-                            kwargs["default"] = argparse.SUPPRESS
+                            kwargs["default"] = SUPPRESS
 
                 common_group.add_argument(*args, **kwargs)
 
             common_group = parser.add_argument_group("Common options")
             self.define_common_options(add_argument)
 
-        def resolve(self, args: argparse.Namespace):  # Namespace has "in" but otherwise is not like a dict.
+        def resolve(self, args: Namespace):  # Namespace has "in" but otherwise is not like a dict.
             """
             Resolve the multiple definitions of each common option to the final value.
             """

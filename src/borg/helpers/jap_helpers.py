@@ -1,14 +1,14 @@
-import argparse
+from jsonargparse import Namespace
 from typing import Any
 
 
-def flatten_namespace(ns: Any) -> argparse.Namespace:
+def flatten_namespace(ns: Any) -> Namespace:
     """
     Recursively flattens a nested namespace into a single-level namespace.
     JSONArgparse uses nested namespaces for subcommands, whereas borg's
     internal dispatch and logic expect a flat namespace.
     """
-    flat = argparse.Namespace()
+    flat = Namespace()
 
     # Extract the nested path of subcommands
     subcmds = []
@@ -25,7 +25,7 @@ def flatten_namespace(ns: Any) -> argparse.Namespace:
             vars(source).items() if hasattr(source, "__dict__") else source.items() if hasattr(source, "items") else []
         )
         for k, v in items:
-            if isinstance(v, argparse.Namespace) or type(v).__name__ == "Namespace":
+            if isinstance(v, Namespace) or type(v).__name__ == "Namespace":
                 _flatten(v, target)
             else:
                 if k != "subcommand" and not hasattr(target, k):

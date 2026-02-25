@@ -1,7 +1,7 @@
 import argparse
 import subprocess
 
-from jsonargparse import ArgumentParser
+from jsonargparse import ArgumentParser, REMAINDER
 
 from ._common import with_repository
 from ..cache import Cache
@@ -86,4 +86,4 @@ class LocksMixIn:
         )
         subparsers.add_subcommand("with-lock", subparser, help="run a user command with the lock held")
         subparser.add_argument("command", metavar="COMMAND", help="command to run")
-        subparser.add_argument("args", metavar="ARGS", nargs=argparse.REMAINDER, help="command arguments")
+        subparser.add_argument("args", metavar="ARGS", nargs=REMAINDER, help="command arguments")

@@ -5,7 +5,7 @@ from ..archive import Archive
 from ..cache import write_chunkindex_to_repo_cache, build_chunkindex_from_repo
 from ..cache import files_cache_name, discover_files_cache_names
 from ..helpers import get_cache_dir
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..helpers import set_ec, EXIT_ERROR, format_file_size, bin_to_hex

@@ -7,7 +7,7 @@ from collections import namedtuple
 from enum import Enum
 
 from .helpers import clean_lines, shellpattern
-from .helpers.jap_helpers import Action, ArgumentTypeError
+from .helpers.argparsing import Action, ArgumentTypeError
 from .helpers.errors import Error
 
 

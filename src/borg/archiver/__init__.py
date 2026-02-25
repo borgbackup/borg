@@ -39,7 +39,7 @@ try:
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
-    from ..helpers.jap_helpers import flatten_namespace, ArgumentTypeError, ArgumentParser, Namespace, SUPPRESS
+    from ..helpers.argparsing import flatten_namespace, ArgumentTypeError, ArgumentParser, Namespace, SUPPRESS
     from ..helpers import is_slow_msgpack, is_supported_msgpack, sysinfo
     from ..helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
     from ..helpers import ErrorIgnoringTextIOWrapper

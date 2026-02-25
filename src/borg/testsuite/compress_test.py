@@ -5,7 +5,7 @@ import pytest
 
 from ..compress import get_compressor, Compressor, CompressionSpec, CNONE, ZLIB, LZ4, LZMA, ZSTD, Auto
 from ..constants import ROBJ_FILE_STREAM, ROBJ_ARCHIVE_META
-from ..helpers.jap_helpers import ArgumentTypeError
+from ..helpers.argparsing import ArgumentTypeError
 
 DATA = b"fooooooooobaaaaaaaar" * 10
 params = dict(name="zlib", level=6)

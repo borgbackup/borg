@@ -11,7 +11,7 @@ from ..helpers import format_file_size
 from ..helpers import json_print
 from ..helpers import msgpack
 from ..helpers import get_reset_ec
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..item import Item
 from ..platform import SyncFile
 

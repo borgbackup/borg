@@ -9,7 +9,7 @@ from ..cache import Cache, assert_secure
 from ..helpers import Error
 from ..helpers import SortBySpec, positive_int_validator, location_validator, Location, relative_time_marker_validator
 from ..helpers import Highlander
-from ..helpers.jap_helpers import SUPPRESS
+from ..helpers.argparsing import SUPPRESS
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher

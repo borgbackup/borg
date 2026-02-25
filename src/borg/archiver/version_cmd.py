@@ -1,6 +1,6 @@
 from .. import __version__
 from ..constants import *  # NOQA
-from ..helpers.jap_helpers import RawDescriptionHelpFormatter, ArgumentParser
+from ..helpers.argparsing import RawDescriptionHelpFormatter, ArgumentParser
 from ..remote import RemoteRepository
 
 from ..logger import create_logger

@@ -408,7 +408,9 @@ class BenchmarkMixIn:
             epilog=bench_crud_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
-        benchmark_parsers.add_subcommand("crud", subparser, help="benchmarks Borg CRUD (create, extract, update, delete).")
+        benchmark_parsers.add_subcommand(
+            "crud", subparser, help="benchmarks Borg CRUD (create, extract, update, delete)."
+        )
 
         subparser.add_argument("path", metavar="PATH", help="path where to create benchmark input data")
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines.")

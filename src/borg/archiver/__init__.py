@@ -66,9 +66,6 @@ STATS_HEADER = "                       Original size    Deduplicated size"
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
 
 
-
-
-
 from .analyze_cmd import AnalyzeMixIn
 from .benchmark_cmd import BenchmarkMixIn
 from .check_cmd import CheckMixIn

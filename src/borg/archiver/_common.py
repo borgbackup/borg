@@ -269,20 +269,8 @@ def process_epilog(epilog):
 
 
 def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components=False):
-    add_option(
-        "--pattern-roots-internal",
-        dest="pattern_roots",
-        action="append",
-        default=[],
-        help=argparse.SUPPRESS,
-    )
-    add_option(
-        "--patterns-internal",
-        dest="patterns",
-        action="append",
-        default=[],
-        help=argparse.SUPPRESS,
-    )
+    add_option("--pattern-roots-internal", dest="pattern_roots", action="append", default=[], help=argparse.SUPPRESS)
+    add_option("--patterns-internal", dest="patterns", action="append", default=[], help=argparse.SUPPRESS)
     add_option(
         "-e",
         "--exclude",

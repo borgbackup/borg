@@ -1,9 +1,6 @@
 import sys
-import argparse
 import logging
 import stat
-
-from jsonargparse import ArgumentParser
 
 from ._common import with_repository, with_archive
 from ._common import build_filter, build_matcher
@@ -14,6 +11,7 @@ from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import BackupWarning, IncludePatternNeverMatchedWarning
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -162,7 +160,7 @@ class ExtractMixIn:
             add_help=False,
             description=self.do_extract.__doc__,
             epilog=extract_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("extract", subparser, help="extract archive contents")
         subparser.add_argument(

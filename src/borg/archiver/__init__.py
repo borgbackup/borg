@@ -15,7 +15,6 @@ else:
     sys.exit(2)  # == EXIT_ERROR
 
 try:
-    import argparse
     import faulthandler
     import functools
     import inspect
@@ -26,8 +25,6 @@ try:
     import shlex
     import signal
     from datetime import datetime, timezone
-
-    from jsonargparse import ArgumentParser, Namespace, SUPPRESS
 
     from ..logger import create_logger, setup_logging
 
@@ -42,8 +39,7 @@ try:
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
-    from ..helpers.jap_helpers import flatten_namespace
-
+    from ..helpers.jap_helpers import flatten_namespace, ArgumentTypeError, ArgumentParser, Namespace, SUPPRESS
     from ..helpers import is_slow_msgpack, is_supported_msgpack, sysinfo
     from ..helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
     from ..helpers import ErrorIgnoringTextIOWrapper
@@ -643,7 +639,7 @@ def main():  # pragma: no cover
                 tb = format_tb(e)
                 print(tb, file=sys.stderr)
             sys.exit(e.exit_code)
-        except argparse.ArgumentTypeError as e:
+        except ArgumentTypeError as e:
             # we might not have logging setup yet, so get out quickly
             print(str(e), file=sys.stderr)
             sys.exit(CommandError.exit_mcode if modern_ec else EXIT_ERROR)

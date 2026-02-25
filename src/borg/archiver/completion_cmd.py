@@ -50,12 +50,10 @@ The following argument types have intelligent, context-aware completion:
    - Suggests common file size values (500M, 1G, 10G, 100G, 1T, etc.)
 """
 
-import argparse
-
 import shtab
 
-from jsonargparse import ArgumentParser
 from jsonargparse._actions import _ActionSubCommands
+from jsonargparse._completions import prepare_actions_context, shtab_prepare_actions, bash_compgen_typehint
 
 from ._common import process_epilog
 from ..constants import *  # NOQA
@@ -69,6 +67,7 @@ from ..helpers import (
     relative_time_marker_validator,
     parse_file_size,
 )
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..helpers.time import timestamp
 from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format
@@ -343,7 +342,6 @@ _borg_help_topics() {
     compgen -W "${choices}" -- "$1"
 }
 """
-
 
 # Global zsh preamble providing dynamic completion for aid:<hex> archive IDs.
 #
@@ -735,16 +733,8 @@ class CompletionMixIn:
         bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)
         zsh_preamble = partial_format(ZSH_PREAMBLE_TMPL, mapping)
 
-        from jsonargparse._completions import (
-            prepare_actions_context,
-            shtab_prepare_actions,
-            norm_name,
-            bash_compgen_typehint,
-        )
-
-        prog = norm_name(parser.prog)
-        if not prog:
-            prog = "borg"
+        parser.prog = "borg"
+        prog = "borg"
         preambles = []
         if args.shell == "bash":
             preambles.append(bash_compgen_typehint.strip().replace("%s", prog))
@@ -777,7 +767,7 @@ class CompletionMixIn:
             add_help=False,
             description=self.do_completion.__doc__,
             epilog=completion_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("completion", subparser, help="output shell completion script")
         subparser.add_argument(

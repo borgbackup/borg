@@ -1,4 +1,3 @@
-import argparse
 import os
 import zlib
 
@@ -6,6 +5,7 @@ import pytest
 
 from ..compress import get_compressor, Compressor, CompressionSpec, CNONE, ZLIB, LZ4, LZMA, ZSTD, Auto
 from ..constants import ROBJ_FILE_STREAM, ROBJ_ARCHIVE_META
+from ..helpers.jap_helpers import ArgumentTypeError
 
 DATA = b"fooooooooobaaaaaaaar" * 10
 params = dict(name="zlib", level=6)
@@ -209,7 +209,7 @@ def test_specified_compression_level(c_type, c_name, c_levels):
 
 @pytest.mark.parametrize("invalid_spec", ["", "lzma,9,invalid", "invalid"])
 def test_invalid_compression_level(invalid_spec):
-    with pytest.raises(argparse.ArgumentTypeError):
+    with pytest.raises(ArgumentTypeError):
         CompressionSpec(invalid_spec)
 
 

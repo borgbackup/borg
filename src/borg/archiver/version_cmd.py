@@ -1,7 +1,6 @@
-import argparse
-
 from .. import __version__
 from ..constants import *  # NOQA
+from ..helpers.jap_helpers import RawDescriptionHelpFormatter, ArgumentParser
 from ..remote import RemoteRepository
 
 from ..logger import create_logger
@@ -23,7 +22,6 @@ class VersionMixIn:
         print(f"{format_version(client_version)} / {format_version(server_version)}")
 
     def build_parser_version(self, subparsers, common_parser, mid_common_parser):
-        from jsonargparse import ArgumentParser
         from ._common import process_epilog
 
         version_epilog = process_epilog(
@@ -57,6 +55,6 @@ class VersionMixIn:
             add_help=False,
             description=self.do_version.__doc__,
             epilog=version_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("version", subparser, help="display the Borg client and server versions")

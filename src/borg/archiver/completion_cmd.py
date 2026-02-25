@@ -55,6 +55,7 @@ import argparse
 import shtab
 
 from jsonargparse import ArgumentParser
+from jsonargparse._actions import _ActionSubCommands
 
 from ._common import process_epilog
 from ..constants import *  # NOQA
@@ -630,12 +631,11 @@ _borg_help_topics() {
 """
 
 
-def _attach_completion(parser: argparse.ArgumentParser, type_class, completion_dict: dict):
+def _attach_completion(parser: ArgumentParser, type_class, completion_dict: dict):
     """Tag all arguments with type `type_class` with completion choices from `completion_dict`."""
 
     for action in parser._actions:
-        # Recurse into subparsers
-        if isinstance(action, argparse._SubParsersAction):
+        if isinstance(action, _ActionSubCommands):
             for sub in action.choices.values():
                 _attach_completion(sub, type_class, completion_dict)
             continue
@@ -644,10 +644,10 @@ def _attach_completion(parser: argparse.ArgumentParser, type_class, completion_d
             action.complete = completion_dict  # type: ignore[attr-defined]
 
 
-def _attach_help_completion(parser: argparse.ArgumentParser, completion_dict: dict):
+def _attach_help_completion(parser: ArgumentParser, completion_dict: dict):
     """Tag the 'topic' argument of the 'help' command with static completion choices."""
     for action in parser._actions:
-        if isinstance(action, argparse._SubParsersAction):
+        if isinstance(action, _ActionSubCommands):
             for sub in action.choices.values():
                 _attach_help_completion(sub, completion_dict)
             continue
@@ -694,7 +694,7 @@ class CompletionMixIn:
         # Collect all commands and help topics for "borg help" completion
         help_choices = list(self.helptext.keys())
         for action in parser._actions:
-            if isinstance(action, argparse._SubParsersAction):
+            if isinstance(action, _ActionSubCommands):
                 help_choices.extend(action.choices.keys())
 
         help_completion_fn = "_borg_help_topics"
@@ -734,8 +734,28 @@ class CompletionMixIn:
         }
         bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)
         zsh_preamble = partial_format(ZSH_PREAMBLE_TMPL, mapping)
-        preamble = {"bash": bash_preamble, "zsh": zsh_preamble}
-        script = shtab.complete(parser, shell=args.shell, preamble=preamble)  # nosec B604
+
+        from jsonargparse._completions import (
+            prepare_actions_context,
+            shtab_prepare_actions,
+            norm_name,
+            bash_compgen_typehint,
+        )
+
+        prog = norm_name(parser.prog)
+        if not prog:
+            prog = "borg"
+        preambles = []
+        if args.shell == "bash":
+            preambles.append(bash_compgen_typehint.strip().replace("%s", prog))
+            preambles.append(bash_preamble)
+        elif args.shell == "zsh":
+            preambles.append(zsh_preamble)
+
+        with prepare_actions_context(args.shell, prog, preambles):
+            shtab_prepare_actions(parser)
+
+        script = shtab.complete(parser, shell=args.shell, preamble="\n".join(preambles))  # nosec B604
         print(script)
 
     def build_parser_completion(self, subparsers, common_parser, mid_common_parser):

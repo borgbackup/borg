@@ -11,7 +11,7 @@ from ..helpers import dash_open
 from ..helpers import StableDict
 from ..helpers import archivename_validator
 from ..helpers import CommandError, RTError
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, repo_lister

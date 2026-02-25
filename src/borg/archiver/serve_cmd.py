@@ -2,7 +2,7 @@ from ..constants import *  # NOQA
 from ..remote import RepositoryServer
 
 from ..logger import create_logger
-from ..helpers.jap_helpers import RawDescriptionHelpFormatter, ArgumentParser
+from ..helpers.argparsing import RawDescriptionHelpFormatter, ArgumentParser
 
 logger = create_logger()
 

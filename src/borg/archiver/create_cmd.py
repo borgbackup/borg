@@ -30,7 +30,7 @@ from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
 from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32

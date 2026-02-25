@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from ..helpers.jap_helpers import ArgumentTypeError
+from ..helpers.argparsing import ArgumentTypeError
 from ..patterns import PathFullPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, RegexPattern
 from ..patterns import load_exclude_file, load_pattern_file
 from ..patterns import parse_pattern, PatternMatcher

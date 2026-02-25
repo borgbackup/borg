@@ -5,7 +5,7 @@ from ..constants import *  # NOQA
 from ..compress import CompressionSpec
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex
 from ..helpers import timestamp
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger

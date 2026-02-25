@@ -5,7 +5,7 @@ from ..constants import *  # NOQA
 from ..compress import CompressionSpec, ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..hashindex import ChunkIndex
 from ..helpers import sig_int, ProgressIndicatorPercent, Error
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..repository import Repository
 from ..remote import RemoteRepository
 from ..manifest import Manifest

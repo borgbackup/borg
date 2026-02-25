@@ -1,7 +1,7 @@
 import collections
 import textwrap
 
-from ..helpers.jap_helpers import ArgumentParser
+from ..helpers.argparsing import ArgumentParser
 from ..constants import *  # NOQA
 from ..helpers.nanorst import rst_to_terminal
 

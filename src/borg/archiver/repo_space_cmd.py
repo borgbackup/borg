@@ -6,7 +6,7 @@ from borgstore.store import ItemInfo
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import parse_file_size, format_file_size
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 
 from ..logger import create_logger
 

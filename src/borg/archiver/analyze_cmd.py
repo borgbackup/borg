@@ -6,7 +6,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, Error
 from ..helpers import ProgressIndicatorPercent
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 from ..remote import RemoteRepository
 from ..repository import Repository

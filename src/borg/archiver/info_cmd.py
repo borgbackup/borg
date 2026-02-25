@@ -5,7 +5,7 @@ from ._common import with_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import format_timedelta, json_print, basic_json_data, archivename_validator
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger

@@ -8,7 +8,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
 from ..helpers import IncludePatternNeverMatchedWarning, remove_surrogates
-from ..helpers.jap_helpers import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
 from ..item import ItemDiff
 from ..manifest import Manifest
 from ..logger import create_logger

@@ -4,7 +4,7 @@ from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names
 from ..helpers import CancelledByUser
 from ..helpers import location_validator, Location
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger

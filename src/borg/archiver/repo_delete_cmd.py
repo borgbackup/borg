@@ -5,7 +5,7 @@ from ..helpers import CancelledByUser
 from ..helpers import format_archive
 from ..helpers import bin_to_hex
 from ..helpers import yes
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest, NoManifestError
 
 from ..logger import create_logger

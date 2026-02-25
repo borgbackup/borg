@@ -1,7 +1,7 @@
 import pytest
 
 from . import Archiver, RK_ENCRYPTION, cmd
-from ...helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter, flatten_namespace
+from ...helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter, flatten_namespace
 
 
 def test_bad_filters(archiver):

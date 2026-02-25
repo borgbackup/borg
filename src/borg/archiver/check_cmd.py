@@ -3,7 +3,7 @@ from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
 from ..helpers import yes
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 
 from ..logger import create_logger
 

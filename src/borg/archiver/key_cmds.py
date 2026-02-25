@@ -1,13 +1,11 @@
-import argparse
 import os
-
-from jsonargparse import ArgumentParser
 
 from ..constants import *  # NOQA
 from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
 from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
 from ..crypto.keymanager import KeyManager
 from ..helpers import PathSpec, CommandError
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ._common import with_repository
@@ -126,7 +124,7 @@ class KeysMixIn:
             add_help=False,
             description="Manage the keyfile or repokey of a repository",
             epilog="",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("key", subparser, help="manage the repository key")
 
@@ -168,7 +166,7 @@ class KeysMixIn:
             add_help=False,
             description=self.do_key_export.__doc__,
             epilog=key_export_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         key_parsers.add_subcommand("export", subparser, help="export the repository key for backup")
         subparser.add_argument("path", metavar="PATH", nargs="?", type=PathSpec, help="where to store the backup")
@@ -208,7 +206,7 @@ class KeysMixIn:
             add_help=False,
             description=self.do_key_import.__doc__,
             epilog=key_import_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         key_parsers.add_subcommand("import", subparser, help="import the repository key from backup")
         subparser.add_argument(
@@ -237,7 +235,7 @@ class KeysMixIn:
             add_help=False,
             description=self.do_key_change_passphrase.__doc__,
             epilog=change_passphrase_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         key_parsers.add_subcommand("change-passphrase", subparser, help="change the repository passphrase")
 
@@ -259,7 +257,7 @@ class KeysMixIn:
             add_help=False,
             description=self.do_key_change_location.__doc__,
             epilog=change_location_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         key_parsers.add_subcommand("change-location", subparser, help="change the key location")
         subparser.add_argument(

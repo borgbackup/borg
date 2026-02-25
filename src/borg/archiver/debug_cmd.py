@@ -1,8 +1,5 @@
-import argparse
 import json
 import textwrap
-
-from jsonargparse import ArgumentParser
 
 from ..archive import Archive
 from ..compress import CompressionSpec
@@ -14,6 +11,7 @@ from ..helpers import dash_open
 from ..helpers import StableDict
 from ..helpers import archivename_validator
 from ..helpers import CommandError, RTError
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 from ..platform import get_process_id
 from ..repository import Repository, LIST_SCAN_LIMIT, repo_lister
@@ -325,7 +323,7 @@ class DebugMixIn:
             add_help=False,
             description="debugging command (not intended for normal use)",
             epilog=debug_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("debug", subparser, help="debugging command (not intended for normal use)")
 
@@ -343,7 +341,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_info.__doc__,
             epilog=debug_info_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("info", subparser, help="show system infos for debugging / bug reports (debug)")
 
@@ -357,7 +355,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_dump_archive_items.__doc__,
             epilog=debug_dump_archive_items_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("dump-archive-items", subparser, help="dump archive items (metadata) (debug)")
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
@@ -372,7 +370,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_dump_archive.__doc__,
             epilog=debug_dump_archive_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("dump-archive", subparser, help="dump decoded archive metadata (debug)")
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
@@ -388,7 +386,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_dump_manifest.__doc__,
             epilog=debug_dump_manifest_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("dump-manifest", subparser, help="dump decoded repository metadata (debug)")
         subparser.add_argument("path", metavar="PATH", type=str, help="file to dump data into")
@@ -403,7 +401,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_dump_repo_objs.__doc__,
             epilog=debug_dump_repo_objs_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("dump-repo-objs", subparser, help="dump repo objects (debug)")
 
@@ -417,7 +415,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_search_repo_objs.__doc__,
             epilog=debug_search_repo_objs_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("search-repo-objs", subparser, help="search repo objects (debug)")
         subparser.add_argument(
@@ -437,7 +435,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_id_hash.__doc__,
             epilog=debug_id_hash_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("id-hash", subparser, help="compute id-hash for some file content (debug)")
         subparser.add_argument(
@@ -455,7 +453,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_parse_obj.__doc__,
             epilog=debug_parse_obj_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("parse-obj", subparser, help="parse borg object file into meta dict and data")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
@@ -480,7 +478,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_format_obj.__doc__,
             epilog=debug_format_obj_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("format-obj", subparser, help="format file and metadata into a Borg object file")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
@@ -517,7 +515,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_get_obj.__doc__,
             epilog=debug_get_obj_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("get-obj", subparser, help="get object from repository (debug)")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to get from the repo")
@@ -533,7 +531,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_put_obj.__doc__,
             epilog=debug_put_obj_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("put-obj", subparser, help="put object to repository (debug)")
         subparser.add_argument("id", metavar="ID", type=str, help="hex object ID to put into the repo")
@@ -549,7 +547,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_delete_obj.__doc__,
             epilog=debug_delete_obj_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand("delete-obj", subparser, help="delete object from repository (debug)")
         subparser.add_argument(
@@ -566,7 +564,7 @@ class DebugMixIn:
             add_help=False,
             description=self.do_debug_convert_profile.__doc__,
             epilog=debug_convert_profile_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         debug_parsers.add_subcommand(
             "convert-profile", subparser, help="convert Borg profile to Python profile (debug)"

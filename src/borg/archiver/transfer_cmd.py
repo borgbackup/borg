@@ -1,7 +1,3 @@
-import argparse
-
-from jsonargparse import ArgumentParser
-
 from ._common import with_repository, with_other_repository, Highlander
 from ..archive import Archive, cached_hash, DownloadPipeline
 from ..chunkers import get_chunker
@@ -12,6 +8,7 @@ from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
 from ..helpers import format_file_size, bin_to_hex
 from ..helpers import ChunkerParams, ChunkIteratorFileWrapper
+from ..helpers.jap_helpers import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
 from ..item import ChunkListEntry
 from ..manifest import Manifest
 from ..legacyrepository import LegacyRepository
@@ -158,7 +155,7 @@ class TransferMixIn:
         for archive_info in archive_infos:
             try:
                 archivename_validator(archive_info.name)
-            except argparse.ArgumentTypeError as err:
+            except ArgumentTypeError as err:
                 an_errors.append(str(err))
         if an_errors:
             an_errors.insert(0, "Invalid archive names detected, please rename them before transfer:")
@@ -169,7 +166,7 @@ class TransferMixIn:
             archive = Archive(other_manifest, archive_info.id)
             try:
                 comment_validator(archive.metadata.get("comment", ""))
-            except argparse.ArgumentTypeError as err:
+            except ArgumentTypeError as err:
                 ac_errors.append(f"{archive_info.name}: {err}")
         if ac_errors:
             ac_errors.insert(0, "Invalid archive comments detected, please fix them before transfer:")
@@ -311,7 +308,6 @@ class TransferMixIn:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
 
-
         Data migration / upgrade from borg 1.x
         ++++++++++++++++++++++++++++++++++++++
 
@@ -332,7 +328,6 @@ class TransferMixIn:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO \\
                  --chunker-params=buzhash,19,23,21,4095
 
-
         """
         )
         subparser = ArgumentParser(
@@ -340,7 +335,7 @@ class TransferMixIn:
             add_help=False,
             description=self.do_transfer.__doc__,
             epilog=transfer_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("transfer", subparser, help="transfer of archives from another repository")
         subparser.add_argument(

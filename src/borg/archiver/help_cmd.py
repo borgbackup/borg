@@ -1,8 +1,7 @@
 import collections
 import textwrap
 
-from jsonargparse import ArgumentParser
-
+from ..helpers.jap_helpers import ArgumentParser
 from ..constants import *  # NOQA
 from ..helpers.nanorst import rst_to_terminal
 
@@ -161,7 +160,6 @@ class HelpMixIn:
             # Exclude '/home/user/junk' and '/home/user/subdir/junk' but
             # not '/home/user/importantjunk' or '/etc/junk':
             $ borg create -e 'home/*/junk' archive /
-
 
             # The contents of directories in '/home' are not backed up when their name
             # ends in '.tmp'

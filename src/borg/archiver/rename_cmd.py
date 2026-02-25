@@ -1,10 +1,7 @@
-import argparse
-
-from jsonargparse import ArgumentParser
-
 from ._common import with_repository, with_archive
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -35,7 +32,7 @@ class RenameMixIn:
             add_help=False,
             description=self.do_rename.__doc__,
             epilog=rename_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("rename", subparser, help="rename an archive")
         subparser.add_argument(

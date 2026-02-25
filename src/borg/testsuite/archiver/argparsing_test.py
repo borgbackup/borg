@@ -1,9 +1,7 @@
-import argparse
 import pytest
 
-from jsonargparse import ArgumentParser
-
 from . import Archiver, RK_ENCRYPTION, cmd
+from ...helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter, flatten_namespace
 
 
 def test_bad_filters(archiver):
@@ -118,14 +116,12 @@ class TestCommonOptions:
 
     @pytest.fixture
     def parse_vars_from_line(self, parser, subcommands, common_parser):
-        from ...helpers.jap_helpers import flatten_namespace
-
         subparser = ArgumentParser(
             parents=[common_parser],
             add_help=False,
             description="foo",
             epilog="bar",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparser.add_argument("--foo-bar", dest="foo_bar", action="store_true")
         subcommands.add_subcommand("subcmd", subparser, help="baz")

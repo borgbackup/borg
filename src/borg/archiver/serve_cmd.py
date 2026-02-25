@@ -1,9 +1,8 @@
-import argparse
-
 from ..constants import *  # NOQA
 from ..remote import RepositoryServer
 
 from ..logger import create_logger
+from ..helpers.jap_helpers import RawDescriptionHelpFormatter, ArgumentParser
 
 logger = create_logger()
 
@@ -19,7 +18,6 @@ class ServeMixIn:
         ).serve()
 
     def build_parser_serve(self, subparsers, common_parser, mid_common_parser):
-        from jsonargparse import ArgumentParser
         from ._common import process_epilog
 
         serve_epilog = process_epilog(
@@ -58,7 +56,7 @@ class ServeMixIn:
             add_help=False,
             description=self.do_serve.__doc__,
             epilog=serve_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("serve", subparser, help="start the repository server process")
         subparser.add_argument(

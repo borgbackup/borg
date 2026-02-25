@@ -1,11 +1,8 @@
-import argparse
 from collections import OrderedDict
 from datetime import datetime, timezone, timedelta
 import logging
 from operator import attrgetter
 import os
-
-from jsonargparse import ArgumentParser
 
 from ._common import with_repository, Highlander
 from ..archive import Archive
@@ -13,6 +10,7 @@ from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
 from ..helpers import archivename_validator
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -285,7 +283,7 @@ class PruneMixIn:
             add_help=False,
             description=self.do_prune.__doc__,
             epilog=prune_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("prune", subparser, help="prune archives")
         subparser.add_argument(

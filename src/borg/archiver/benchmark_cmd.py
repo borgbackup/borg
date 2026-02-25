@@ -1,4 +1,3 @@
-import argparse
 from contextlib import contextmanager
 import json
 import logging
@@ -6,14 +5,13 @@ import os
 import tempfile
 import time
 
-from jsonargparse import ArgumentParser
-
 from ..constants import *  # NOQA
 from ..crypto.key import FlexiKey
 from ..helpers import format_file_size
 from ..helpers import json_print
 from ..helpers import msgpack
 from ..helpers import get_reset_ec
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..item import Item
 from ..platform import SyncFile
 
@@ -354,7 +352,7 @@ class BenchmarkMixIn:
             add_help=False,
             description="benchmark command",
             epilog=benchmark_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("benchmark", subparser, help="benchmark command")
 
@@ -406,7 +404,7 @@ class BenchmarkMixIn:
             add_help=False,
             description=self.do_benchmark_crud.__doc__,
             epilog=bench_crud_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         benchmark_parsers.add_subcommand(
             "crud", subparser, help="benchmarks Borg CRUD (create, extract, update, delete)."
@@ -431,7 +429,7 @@ class BenchmarkMixIn:
             add_help=False,
             description=self.do_benchmark_cpu.__doc__,
             epilog=bench_cpu_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         benchmark_parsers.add_subcommand("cpu", subparser, help="benchmarks Borg CPU-bound operations.")
         subparser.add_argument("--json", action="store_true", help="format output as JSON")

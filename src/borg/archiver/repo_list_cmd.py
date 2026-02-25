@@ -1,13 +1,11 @@
-import argparse
 import os
 import textwrap
 import sys
 
-from jsonargparse import ArgumentParser
-
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -74,7 +72,6 @@ class RepoListMixIn:
 
         The following keys are always available:
 
-
         """
             )
             + BaseFormatter.keys_help()
@@ -92,7 +89,7 @@ class RepoListMixIn:
             add_help=False,
             description=self.do_repo_list.__doc__,
             epilog=repo_list_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("repo-list", subparser, help="list repository contents")
         subparser.add_argument(

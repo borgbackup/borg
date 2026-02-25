@@ -1,11 +1,8 @@
-import argparse
-
-from jsonargparse import ArgumentParser
-
 from ._common import with_repository, define_archive_filters_group
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, archivename_validator, tag_validator, Error
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -87,7 +84,7 @@ class TagMixIn:
             add_help=False,
             description=self.do_tag.__doc__,
             epilog=tag_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("tag", subparser, help="tag archives")
         subparser.add_argument("--set", dest="set_tags", metavar="TAG", type=tag_validator, nargs="+", help="set tags")

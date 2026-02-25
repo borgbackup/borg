@@ -1,6 +1,5 @@
 import errno
 import sys
-import argparse
 import logging
 import os
 import posixpath
@@ -8,8 +7,6 @@ import stat
 import subprocess
 import time
 from io import TextIOWrapper
-
-from jsonargparse import ArgumentParser
 
 from ._common import with_repository, Highlander
 from .. import helpers
@@ -33,6 +30,7 @@ from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
 from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -683,7 +681,6 @@ class CreateMixIn:
         macOS examples are the apfs mounts of a typical macOS installation.
         Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
 
-
         .. _list_item_flags:
 
         Item flags
@@ -781,7 +778,7 @@ class CreateMixIn:
             add_help=False,
             description=self.do_create.__doc__,
             epilog=create_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("create", subparser, help="create a backup")
 

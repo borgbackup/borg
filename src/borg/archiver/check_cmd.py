@@ -1,12 +1,9 @@
-import argparse
-
-from jsonargparse import ArgumentParser
-
 from ._common import with_repository, Highlander
 from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
 from ..helpers import yes
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 
 from ..logger import create_logger
 
@@ -190,7 +187,7 @@ class CheckMixIn:
             add_help=False,
             description=self.do_check.__doc__,
             epilog=check_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("check", subparser, help="verify the repository")
         subparser.add_argument(

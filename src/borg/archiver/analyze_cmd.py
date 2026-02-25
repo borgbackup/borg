@@ -1,14 +1,12 @@
-import argparse
 from collections import defaultdict
 import os
-
-from jsonargparse import ArgumentParser
 
 from ._common import with_repository, define_archive_filters_group
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, Error
 from ..helpers import ProgressIndicatorPercent
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 from ..remote import RemoteRepository
 from ..repository import Repository
@@ -133,7 +131,7 @@ class AnalyzeMixIn:
             add_help=False,
             description=self.do_analyze.__doc__,
             epilog=analyze_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("analyze", subparser, help="analyze archives")
         define_archive_filters_group(subparser)

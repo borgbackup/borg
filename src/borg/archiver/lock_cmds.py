@@ -1,12 +1,10 @@
-import argparse
 import subprocess
-
-from jsonargparse import ArgumentParser, REMAINDER
 
 from ._common import with_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import prepare_subprocess_env, set_ec, CommandError, ThreadRunner
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter, REMAINDER
 
 from ..logger import create_logger
 
@@ -52,7 +50,7 @@ class LocksMixIn:
             add_help=False,
             description=self.do_break_lock.__doc__,
             epilog=break_lock_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("break-lock", subparser, help="break the repository and cache locks")
 
@@ -82,7 +80,7 @@ class LocksMixIn:
             add_help=False,
             description=self.do_with_lock.__doc__,
             epilog=with_lock_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("with-lock", subparser, help="run a user command with the lock held")
         subparser.add_argument("command", metavar="COMMAND", help="command to run")

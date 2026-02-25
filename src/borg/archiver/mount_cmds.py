@@ -1,13 +1,11 @@
-import argparse
 import os
-
-from jsonargparse import ArgumentParser
 
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import RTError
 from ..helpers import PathSpec
 from ..helpers import umount
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 from ..remote import cache_if_remote
 
@@ -158,7 +156,7 @@ class MountMixIn:
             add_help=False,
             description=self.do_mount.__doc__,
             epilog=mount_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("mount", subparser, help="mount a repository")
         self._define_borg_mount(subparser)
@@ -176,7 +174,7 @@ class MountMixIn:
             add_help=False,
             description=self.do_umount.__doc__,
             epilog=umount_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("umount", subparser, help="unmount a repository")
         subparser.add_argument(
@@ -187,7 +185,7 @@ class MountMixIn:
         assert parser.prog == "borgfs"
         parser.description = self.do_mount.__doc__
         parser.epilog = "For more information, see borg mount --help."
-        parser.formatter_class = argparse.RawDescriptionHelpFormatter
+        parser.formatter_class = RawDescriptionHelpFormatter
         parser.help = "mount a repository"
         self._define_borg_mount(parser)
         return parser

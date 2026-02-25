@@ -1,5 +1,9 @@
-from jsonargparse import Namespace
 from typing import Any
+
+# here are the only imports from argparse and jsonargparse,
+# all other imports of these names import them from here:
+from argparse import Action, ArgumentError, ArgumentTypeError, RawDescriptionHelpFormatter  # noqa: F401
+from jsonargparse import ArgumentParser, Namespace, SUPPRESS, REMAINDER  # noqa: F401
 
 
 def flatten_namespace(ns: Any) -> Namespace:

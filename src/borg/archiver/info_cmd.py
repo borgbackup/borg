@@ -1,13 +1,11 @@
-import argparse
 import textwrap
 from datetime import timedelta
-
-from jsonargparse import ArgumentParser
 
 from ._common import with_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import format_timedelta, json_print, basic_json_data, archivename_validator
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -84,7 +82,7 @@ class InfoMixIn:
             add_help=False,
             description=self.do_info.__doc__,
             epilog=info_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("info", subparser, help="show repository or archive information")
         subparser.add_argument("--json", action="store_true", help="format output as JSON")

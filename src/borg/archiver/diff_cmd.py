@@ -1,16 +1,14 @@
-import argparse
 import textwrap
 import json
 import sys
 import os
-
-from jsonargparse import ArgumentParser
 
 from ._common import with_repository, build_matcher, Highlander
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
 from ..helpers import IncludePatternNeverMatchedWarning, remove_surrogates
+from ..helpers.jap_helpers import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
 from ..item import ItemDiff
 from ..manifest import Manifest
 from ..logger import create_logger
@@ -206,7 +204,6 @@ class DiffMixIn:
 
         The following keys are always available:
 
-
         """
             )
             + BaseFormatter.keys_help()
@@ -271,7 +268,7 @@ class DiffMixIn:
 
         def diff_sort_spec_validator(s):
             if not isinstance(s, str):
-                raise argparse.ArgumentTypeError("unsupported sort field (not a string)")
+                raise ArgumentTypeError("unsupported sort field (not a string)")
             allowed = {
                 "path",
                 "size_added",
@@ -289,11 +286,11 @@ class DiffMixIn:
             }
             parts = [p.strip() for p in s.split(",") if p.strip()]
             if not parts:
-                raise argparse.ArgumentTypeError("unsupported sort field: empty spec")
+                raise ArgumentTypeError("unsupported sort field: empty spec")
             for spec in parts:
                 field = spec[1:] if spec and spec[0] in (">", "<") else spec
                 if field not in allowed:
-                    raise argparse.ArgumentTypeError(f"unsupported sort field: {field}")
+                    raise ArgumentTypeError(f"unsupported sort field: {field}")
             return ",".join(parts)
 
         subparser = ArgumentParser(
@@ -301,7 +298,7 @@ class DiffMixIn:
             add_help=False,
             description=self.do_diff.__doc__,
             epilog=diff_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("diff", subparser, help="find differences in archive contents")
         subparser.add_argument(

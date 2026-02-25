@@ -1,13 +1,11 @@
-import argparse
 from collections import defaultdict
-
-from jsonargparse import ArgumentParser
 
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..compress import CompressionSpec, ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..hashindex import ChunkIndex
 from ..helpers import sig_int, ProgressIndicatorPercent, Error
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..repository import Repository
 from ..remote import RemoteRepository
 from ..manifest import Manifest
@@ -187,7 +185,7 @@ class RepoCompressMixIn:
             add_help=False,
             description=self.do_repo_compress.__doc__,
             epilog=repo_compress_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("repo-compress", subparser, help=self.do_repo_compress.__doc__)
 

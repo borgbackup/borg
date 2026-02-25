@@ -1,5 +1,4 @@
 import abc
-import argparse
 import base64
 import binascii
 import hashlib
@@ -24,6 +23,7 @@ logger = create_logger()
 
 from .errors import Error
 from .fs import get_keys_dir, make_path_safe, slashify
+from .jap_helpers import Action, ArgumentError, ArgumentTypeError
 from .msgpack import Timestamp
 from .time import OutputTimestamp, format_time, safe_timestamp
 from .. import __version__ as borg_version
@@ -124,7 +124,7 @@ def positive_int_validator(value):
     """argparse type for positive integers, N > 0."""
     int_value = int(value)
     if int_value <= 0:
-        raise argparse.ArgumentTypeError("A positive integer is required: %s" % value)
+        raise ArgumentTypeError("A positive integer is required: %s" % value)
     return int_value
 
 
@@ -152,7 +152,7 @@ def interval(s):
         number = s[:-1]
         suffix = s[-1]
     else:
-        raise argparse.ArgumentTypeError(f'Unexpected time unit "{s[-1]}": choose from {", ".join(multiplier)}')
+        raise ArgumentTypeError(f'Unexpected time unit "{s[-1]}": choose from {", ".join(multiplier)}')
 
     try:
         seconds = int(number) * multiplier[suffix]
@@ -160,7 +160,7 @@ def interval(s):
         seconds = -1
 
     if seconds <= 0:
-        raise argparse.ArgumentTypeError(f'Invalid number "{number}": expected positive integer')
+        raise ArgumentTypeError(f'Invalid number "{number}": expected positive integer')
 
     return seconds
 
@@ -171,7 +171,7 @@ def ChunkerParams(s):
     params = s.strip().split(",")
     count = len(params)
     if count == 0:
-        raise argparse.ArgumentTypeError("no chunker params given")
+        raise ArgumentTypeError("no chunker params given")
     algo = params[0].lower()
     if algo == CH_FAIL and count == 3:
         block_size = int(params[1])
@@ -186,47 +186,37 @@ def ChunkerParams(s):
             # or in-memory chunk management.
             # choose the block (chunk) size wisely: if you have a lot of data and you cut
             # it into very small chunks, you are asking for trouble!
-            raise argparse.ArgumentTypeError("block_size must not be less than 64 Bytes")
+            raise ArgumentTypeError("block_size must not be less than 64 Bytes")
         if block_size > MAX_DATA_SIZE or header_size > MAX_DATA_SIZE:
-            raise argparse.ArgumentTypeError(
-                "block_size and header_size must not exceed MAX_DATA_SIZE [%d]" % MAX_DATA_SIZE
-            )
+            raise ArgumentTypeError("block_size and header_size must not exceed MAX_DATA_SIZE [%d]" % MAX_DATA_SIZE)
         return algo, block_size, header_size
     if algo == "default" and count == 1:  # default
         return CHUNKER_PARAMS
     if algo == CH_BUZHASH64 and count == 5:  # buzhash64, chunk_min, chunk_max, chunk_mask, window_size
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[1:])
         if not (chunk_min <= chunk_mask <= chunk_max):
-            raise argparse.ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
+            raise ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
         if chunk_min < 6:
             # see comment in 'fixed' algo check
-            raise argparse.ArgumentTypeError(
-                "min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)"
-            )
+            raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
         if chunk_max > 23:
-            raise argparse.ArgumentTypeError(
-                "max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)"
-            )
+            raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
         # note that for buzhash64, there is no problem with even window_size.
         return CH_BUZHASH64, chunk_min, chunk_max, chunk_mask, window_size
     # this must stay last as it deals with old-style compat mode (no algorithm, 4 params, buzhash):
     if algo == CH_BUZHASH and count == 5 or count == 4:  # [buzhash, ]chunk_min, chunk_max, chunk_mask, window_size
         chunk_min, chunk_max, chunk_mask, window_size = (int(p) for p in params[count - 4 :])
         if not (chunk_min <= chunk_mask <= chunk_max):
-            raise argparse.ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
+            raise ArgumentTypeError("required: chunk_min <= chunk_mask <= chunk_max")
         if chunk_min < 6:
             # see comment in 'fixed' algo check
-            raise argparse.ArgumentTypeError(
-                "min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)"
-            )
+            raise ArgumentTypeError("min. chunk size exponent must not be less than 6 (2^6 = 64B min. chunk size)")
         if chunk_max > 23:
-            raise argparse.ArgumentTypeError(
-                "max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)"
-            )
+            raise ArgumentTypeError("max. chunk size exponent must not be more than 23 (2^23 = 8MiB max. chunk size)")
         if window_size % 2 == 0:
-            raise argparse.ArgumentTypeError("window_size must be an uneven (odd) number")
+            raise ArgumentTypeError("window_size must be an uneven (odd) number")
         return CH_BUZHASH, chunk_min, chunk_max, chunk_mask, window_size
-    raise argparse.ArgumentTypeError("invalid chunker params")
+    raise ArgumentTypeError("invalid chunker params")
 
 
 def FilesCacheMode(s):
@@ -236,13 +226,11 @@ def FilesCacheMode(s):
         return s
     entries = set(s.strip().split(","))
     if not entries <= set(ENTRIES_MAP):
-        raise argparse.ArgumentTypeError(
-            "cache mode must be a comma-separated list of: %s" % ",".join(sorted(ENTRIES_MAP))
-        )
+        raise ArgumentTypeError("cache mode must be a comma-separated list of: %s" % ",".join(sorted(ENTRIES_MAP)))
     short_entries = {ENTRIES_MAP[entry] for entry in entries}
     mode = "".join(sorted(short_entries))
     if mode not in VALID_MODES:
-        raise argparse.ArgumentTypeError("cache mode short must be one of: %s" % ",".join(VALID_MODES))
+        raise ArgumentTypeError("cache mode short must be one of: %s" % ",".join(VALID_MODES))
     return mode
 
 
@@ -338,13 +326,13 @@ replace_placeholders = PlaceholderReplacer()
 
 def PathSpec(text):
     if not text:
-        raise argparse.ArgumentTypeError("Empty strings are not accepted as paths.")
+        raise ArgumentTypeError("Empty strings are not accepted as paths.")
     return text
 
 
 def FilesystemPathSpec(text):
     if not text:
-        raise argparse.ArgumentTypeError("Empty strings are not accepted as paths.")
+        raise ArgumentTypeError("Empty strings are not accepted as paths.")
     return slashify(text)
 
 
@@ -353,7 +341,7 @@ def SortBySpec(text):
 
     for sort_key in text.split(","):
         if sort_key not in AI_HUMAN_SORT_KEYS and sort_key != "ts":  # idempotency: do not reject ts
-            raise argparse.ArgumentTypeError("Invalid sort key: %s" % sort_key)
+            raise ArgumentTypeError("Invalid sort key: %s" % sort_key)
     return text.replace("timestamp", "ts").replace("archive", "name")
 
 
@@ -643,12 +631,12 @@ def location_validator(proto=None, other=False):
         try:
             loc = Location(text, other=other)
         except ValueError as err:
-            raise argparse.ArgumentTypeError(str(err)) from None
+            raise ArgumentTypeError(str(err)) from None
         if proto is not None and loc.proto != proto:
             if proto == "file":
-                raise argparse.ArgumentTypeError('"%s": Repository must be local' % text)
+                raise ArgumentTypeError('"%s": Repository must be local' % text)
             else:
-                raise argparse.ArgumentTypeError('"%s": Repository must be remote' % text)
+                raise ArgumentTypeError('"%s": Repository must be remote' % text)
         return loc
 
     return validator
@@ -658,7 +646,7 @@ def relative_time_marker_validator(text: str):
     time_marker_regex = r"^\d+[ymwdHMS]$"
     match = re.compile(time_marker_regex).search(text)
     if not match:
-        raise argparse.ArgumentTypeError(f"Invalid relative time marker used: {text}, choose from y, m, w, d, H, M, S")
+        raise ArgumentTypeError(f"Invalid relative time marker used: {text}, choose from y, m, w, d, H, M, S")
     else:
         return text
 
@@ -667,22 +655,20 @@ def text_validator(*, name, max_length, min_length=0, invalid_ctrl_chars="\0", i
     def validator(text):
         assert isinstance(text, str)
         if len(text) < min_length:
-            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [length < {min_length}]')
+            raise ArgumentTypeError(f'Invalid {name}: "{text}" [length < {min_length}]')
         if len(text) > max_length:
-            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [length > {max_length}]')
+            raise ArgumentTypeError(f'Invalid {name}: "{text}" [length > {max_length}]')
         if invalid_ctrl_chars and re.search(f"[{re.escape(invalid_ctrl_chars)}]", text):
-            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [invalid control chars detected]')
+            raise ArgumentTypeError(f'Invalid {name}: "{text}" [invalid control chars detected]')
         if invalid_chars and re.search(f"[{re.escape(invalid_chars)}]", text):
-            raise argparse.ArgumentTypeError(
-                f'Invalid {name}: "{text}" [invalid chars detected matching "{invalid_chars}"]'
-            )
+            raise ArgumentTypeError(f'Invalid {name}: "{text}" [invalid chars detected matching "{invalid_chars}"]')
         if no_blanks and (text.startswith(" ") or text.endswith(" ")):
-            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [leading or trailing blanks detected]')
+            raise ArgumentTypeError(f'Invalid {name}: "{text}" [leading or trailing blanks detected]')
         try:
             text.encode("utf-8", errors="strict")
         except UnicodeEncodeError:
             # looks like text contains surrogate-escapes
-            raise argparse.ArgumentTypeError(f'Invalid {name}: "{text}" [contains non-unicode characters]')
+            raise ArgumentTypeError(f'Invalid {name}: "{text}" [contains non-unicode characters]')
         return text
 
     return validator
@@ -1316,7 +1302,7 @@ def prepare_dump_dict(d):
     return decode(d)
 
 
-class Highlander(argparse.Action):
+class Highlander(Action):
     """make sure some option is only given once"""
 
     def __init__(self, *args, **kwargs):
@@ -1325,7 +1311,7 @@ class Highlander(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         if self.__called:
-            raise argparse.ArgumentError(self, "There can be only one.")
+            raise ArgumentError(self, "There can be only one.")
         self.__called = True
         setattr(namespace, self.dest, values)
 
@@ -1335,7 +1321,7 @@ class MakePathSafeAction(Highlander):
         try:
             sanitized_path = make_path_safe(path)
         except ValueError as e:
-            raise argparse.ArgumentError(self, e)
+            raise ArgumentError(self, e)
         if sanitized_path == ".":
-            raise argparse.ArgumentError(self, f"{path!r} is not a valid file name")
+            raise ArgumentError(self, f"{path!r} is not a valid file name")
         setattr(namespace, self.dest, sanitized_path)

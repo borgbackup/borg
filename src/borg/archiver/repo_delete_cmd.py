@@ -1,7 +1,3 @@
-import argparse
-
-from jsonargparse import ArgumentParser
-
 from ._common import with_repository
 from ..cache import Cache, SecurityManager
 from ..constants import *  # NOQA
@@ -9,6 +5,7 @@ from ..helpers import CancelledByUser
 from ..helpers import format_archive
 from ..helpers import bin_to_hex
 from ..helpers import yes
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest, NoManifestError
 
 from ..logger import create_logger
@@ -109,7 +106,7 @@ class RepoDeleteMixIn:
             add_help=False,
             description=self.do_repo_delete.__doc__,
             epilog=repo_delete_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("repo-delete", subparser, help="delete a repository")
         subparser.add_argument(

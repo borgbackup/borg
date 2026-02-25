@@ -15,10 +15,10 @@ which compressor has been used to compress the data and dispatch to the correct
 decompressor.
 """
 
-from argparse import ArgumentTypeError
 import math
 import random
 from struct import Struct
+import sys
 import zlib
 
 try:
@@ -28,14 +28,12 @@ except ImportError:
 
 from .constants import MAX_DATA_SIZE, ROBJ_FILE_STREAM
 from .helpers import Buffer, DecompressionError
-
-import sys
+from .helpers.jap_helpers import ArgumentTypeError
 
 if sys.version_info >= (3, 14):
     from compression import zstd
 else:
     from backports import zstd
-
 
 cdef extern from "lz4.h":
     int LZ4_compress_default(const char* source, char* dest, int inputSize, int maxOutputSize) nogil
@@ -120,7 +118,6 @@ cdef class CompressorBase:
         else:
             pass  # raise ValueError("size not present and not in legacy mode")
 
-
 cdef class DecidingCompressor(CompressorBase):
     """
     base class for (de)compression classes that (based on an internal _decide
@@ -187,7 +184,6 @@ class CNONE(CompressorBase):
             data = bytes(data)
         self.check_fix_size(meta, data)
         return meta, data
-
 
 class LZ4(DecidingCompressor):
     """
@@ -259,7 +255,6 @@ class LZ4(DecidingCompressor):
         data = dest[:rsize]
         self.check_fix_size(meta, data)
         return meta, data
-
 
 class LZMA(DecidingCompressor):
     """
@@ -355,7 +350,6 @@ class ZLIB(DecidingCompressor):
         except zlib.error as e:
             raise DecompressionError(str(e)) from None
 
-
 class ZLIB_legacy(CompressorBase):
     """
     zlib compression / decompression (python stdlib)
@@ -401,7 +395,6 @@ class ZLIB_legacy(CompressorBase):
             return meta, data
         except zlib.error as e:
             raise DecompressionError(str(e)) from None
-
 
 class Auto(CompressorBase):
     """
@@ -483,7 +476,6 @@ class Auto(CompressorBase):
     @classmethod
     def detect(cls, data):
         raise NotImplementedError
-
 
 class ObfuscateSize(CompressorBase):
     """
@@ -569,7 +561,6 @@ class ObfuscateSize(CompressorBase):
             self.compressor = compressor_cls()
         return self.compressor.decompress(meta, compressed_data)  # decompress data
 
-
 # Maps valid compressor names to their class
 COMPRESSOR_TABLE = {
     CNONE.name: CNONE,
@@ -623,7 +614,6 @@ class Compressor:
                 return cls, (255 if cls.name == 'zlib_legacy' else level)
         else:
             raise ValueError('No decompressor for this data found: %r.', data[:2])
-
 
 class CompressionSpec:
     def __init__(self, s):

@@ -1,11 +1,9 @@
-import argparse
 import logging
-
-from jsonargparse import ArgumentParser
 
 from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import format_archive, CommandError, bin_to_hex, archivename_validator
+from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -87,7 +85,7 @@ class DeleteMixIn:
             add_help=False,
             description=self.do_delete.__doc__,
             epilog=delete_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
+            formatter_class=RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("delete", subparser, help="delete archives")
         subparser.add_argument(

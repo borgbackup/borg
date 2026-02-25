@@ -1,10 +1,10 @@
-import argparse
 import io
 import os.path
 import sys
 
 import pytest
 
+from ..helpers.jap_helpers import ArgumentTypeError
 from ..patterns import PathFullPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, RegexPattern
 from ..patterns import load_exclude_file, load_pattern_file
 from ..patterns import parse_pattern, PatternMatcher
@@ -491,7 +491,7 @@ def test_load_invalid_patterns_from_file(tmpdir, lines):
     with patternfile.open("wt") as fh:
         fh.write("\n".join(lines))
     filename = str(patternfile)
-    with pytest.raises(argparse.ArgumentTypeError):
+    with pytest.raises(ArgumentTypeError):
         roots = []
         inclexclpatterns = []
         with open(filename) as f:

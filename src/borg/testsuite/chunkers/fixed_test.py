@@ -34,13 +34,15 @@ from ...constants import *  # NOQA
 )
 def test_chunkify_sparse(tmpdir, fname, sparse_map, header_size, sparse):
     def get_chunks(fname, sparse, header_size):
-        chunker = ChunkerFixed(4096, header_size=header_size, sparse=sparse)
+        chunker = ChunkerFixed(BS, header_size=header_size, sparse=sparse)
         with open(fname, "rb") as fd:
             return cf(chunker.chunkify(fd))
 
+    # this only works if sparse map blocks are same size as fixed chunker blocks
     fn = str(tmpdir / fname)
     make_sparsefile(fn, sparse_map, header_size=header_size)
-    get_chunks(fn, sparse=sparse, header_size=header_size) == make_content(sparse_map, header_size=header_size)
+    expected_content = make_content(sparse_map, header_size=header_size)
+    assert get_chunks(fn, sparse=sparse, header_size=header_size) == expected_content
 
 
 @pytest.mark.skipif("BORG_TESTS_SLOW" not in os.environ, reason="slow tests not enabled, use BORG_TESTS_SLOW=1")

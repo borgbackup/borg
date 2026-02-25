@@ -90,29 +90,10 @@ class TagMixIn:
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
         subparsers.add_subcommand("tag", subparser, help="tag archives")
+        subparser.add_argument("--set", dest="set_tags", metavar="TAG", type=tag_validator, nargs="+", help="set tags")
+        subparser.add_argument("--add", dest="add_tags", metavar="TAG", type=tag_validator, nargs="+", help="add tags")
         subparser.add_argument(
-            "--set",
-            dest="set_tags",
-            metavar="TAG",
-            type=tag_validator,
-            nargs="+",
-            help="set tags",
-        )
-        subparser.add_argument(
-            "--add",
-            dest="add_tags",
-            metavar="TAG",
-            type=tag_validator,
-            nargs="+",
-            help="add tags",
-        )
-        subparser.add_argument(
-            "--remove",
-            dest="remove_tags",
-            metavar="TAG",
-            type=tag_validator,
-            nargs="+",
-            help="remove tags",
+            "--remove", dest="remove_tags", metavar="TAG", type=tag_validator, nargs="+", help="remove tags"
         )
         define_archive_filters_group(subparser)
         subparser.add_argument(

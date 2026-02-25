@@ -568,6 +568,8 @@ class DebugMixIn:
             epilog=debug_convert_profile_epilog,
             formatter_class=argparse.RawDescriptionHelpFormatter,
         )
-        debug_parsers.add_subcommand("convert-profile", subparser, help="convert Borg profile to Python profile (debug)")
+        debug_parsers.add_subcommand(
+            "convert-profile", subparser, help="convert Borg profile to Python profile (debug)"
+        )
         subparser.add_argument("input", metavar="INPUT", type=str, help="Borg profile")
         subparser.add_argument("output", metavar="OUTPUT", type=str, help="Output file")

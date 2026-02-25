@@ -28,7 +28,7 @@ except ImportError:
 
 from .constants import MAX_DATA_SIZE, ROBJ_FILE_STREAM
 from .helpers import Buffer, DecompressionError
-from .helpers.jap_helpers import ArgumentTypeError
+from .helpers.argparsing import ArgumentTypeError
 
 if sys.version_info >= (3, 14):
     from compression import zstd

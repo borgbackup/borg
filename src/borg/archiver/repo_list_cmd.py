@@ -5,7 +5,7 @@ import sys
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, ArchiveFormatter, json_print, basic_json_data
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger

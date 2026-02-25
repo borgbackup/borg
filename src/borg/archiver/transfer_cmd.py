@@ -8,7 +8,7 @@ from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
 from ..helpers import format_file_size, bin_to_hex
 from ..helpers import ChunkerParams, ChunkIteratorFileWrapper
-from ..helpers.jap_helpers import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
 from ..item import ChunkListEntry
 from ..manifest import Manifest
 from ..legacyrepository import LegacyRepository

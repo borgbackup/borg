@@ -67,7 +67,7 @@ from ..helpers import (
     relative_time_marker_validator,
     parse_file_size,
 )
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..helpers.time import timestamp
 from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format

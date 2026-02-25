@@ -19,7 +19,7 @@ from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ._common import with_repository, with_archive, Highlander, define_exclusion_group

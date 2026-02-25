@@ -5,7 +5,7 @@ from ..constants import *  # NOQA
 from ..helpers import RTError
 from ..helpers import PathSpec
 from ..helpers import umount
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 from ..remote import cache_if_remote
 

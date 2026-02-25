@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 
 from ...constants import *  # NOQA
-from ...helpers.jap_helpers import ArgumentTypeError
+from ...helpers.argparsing import ArgumentTypeError
 from ...helpers.parseformat import (
     bin_to_hex,
     binary_to_json,

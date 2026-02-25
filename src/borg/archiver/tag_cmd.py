@@ -2,7 +2,7 @@ from ._common import with_repository, define_archive_filters_group
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, archivename_validator, tag_validator, Error
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger

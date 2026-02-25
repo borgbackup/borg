@@ -8,7 +8,7 @@ from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
 from ..helpers import archivename_validator
-from ..helpers.jap_helpers import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest
 
 from ..logger import create_logger

@@ -63,13 +63,13 @@ from ..helpers import (
     FilesCacheMode,
     PathSpec,
     ChunkerParams,
+    CompressionSpec,
     tag_validator,
     relative_time_marker_validator,
     parse_file_size,
 )
 from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..helpers.time import timestamp
-from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
 

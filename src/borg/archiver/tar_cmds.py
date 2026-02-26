@@ -5,7 +5,6 @@ import stat
 import tarfile
 
 from ..archive import Archive, TarfileObjectProcessors, ChunksProcessor
-from ..compress import CompressionSpec
 from ..constants import *  # NOQA
 from ..helpers import HardLinkManager, IncludePatternNeverMatchedWarning
 from ..helpers import ProgressIndicatorPercent
@@ -13,7 +12,7 @@ from ..helpers import dash_open
 from ..helpers import msgpack
 from ..helpers import create_filter_process
 from ..helpers import ChunkIteratorFileWrapper
-from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams
+from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, CompressionSpec
 from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print

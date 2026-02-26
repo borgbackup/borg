@@ -25,7 +25,6 @@ from . import xattr
 from .chunkers import get_chunker, Chunk
 from .cache import ChunkListEntry, build_chunkindex_from_repo, delete_chunkindex_cache
 from .crypto.key import key_factory, UnsupportedPayloadError
-from .compress import CompressionSpec
 from .constants import *  # NOQA
 from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .helpers import BackupError, BackupRaceConditionError, BackupItemExcluded
@@ -35,7 +34,7 @@ from .helpers import HardLinkManager
 from .helpers import ChunkIteratorFileWrapper, open_item
 from .helpers import Error, IntegrityError, set_ec
 from .platform import uid2user, user2uid, gid2group, group2gid, get_birthtime_ns
-from .helpers import parse_timestamp, archive_ts_now
+from .helpers import parse_timestamp, archive_ts_now, CompressionSpec
 from .helpers import OutputTimestamp, format_timedelta, format_file_size, file_status, FileSize
 from .helpers import safe_encode, make_path_safe, remove_surrogates, text_to_json, join_cmd, remove_dotdot_prefixes
 from .helpers import StableDict

@@ -2,14 +2,13 @@ import json
 import textwrap
 
 from ..archive import Archive
-from ..compress import CompressionSpec
 from ..constants import *  # NOQA
 from ..helpers import msgpack
 from ..helpers import sysinfo
 from ..helpers import bin_to_hex, hex_to_bin, prepare_dump_dict
 from ..helpers import dash_open
 from ..helpers import StableDict
-from ..helpers import archivename_validator
+from ..helpers import archivename_validator, CompressionSpec
 from ..helpers import CommandError, RTError
 from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest

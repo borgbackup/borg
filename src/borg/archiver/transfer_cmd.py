@@ -1,13 +1,12 @@
 from ._common import with_repository, with_other_repository, Highlander
 from ..archive import Archive, cached_hash, DownloadPipeline
 from ..chunkers import get_chunker
-from ..compress import CompressionSpec
 from ..constants import *  # NOQA
 from ..crypto.key import uses_same_id_hash, uses_same_chunker_secret
 from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
 from ..helpers import format_file_size, bin_to_hex
-from ..helpers import ChunkerParams, ChunkIteratorFileWrapper
+from ..helpers import ChunkerParams, ChunkIteratorFileWrapper, CompressionSpec
 from ..helpers.argparsing import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
 from ..item import ChunkListEntry
 from ..manifest import Manifest

@@ -7,7 +7,7 @@ import time
 
 from ..constants import *  # NOQA
 from ..crypto.key import FlexiKey
-from ..helpers import format_file_size
+from ..helpers import format_file_size, CompressionSpec
 from ..helpers import json_print
 from ..helpers import msgpack
 from ..helpers import get_reset_ec
@@ -294,8 +294,6 @@ class BenchmarkMixIn:
                 result["kdf"].append({"algo": spec, "count": count, "time": dt})
             else:
                 print(f"{spec:<24} {count:<10} {dt:.3f}s")
-
-        from ..compress import CompressionSpec
 
         if not args.json:
             print("Compression ====================================================")

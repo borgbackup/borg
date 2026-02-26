@@ -3,7 +3,8 @@ import zlib
 
 import pytest
 
-from ..compress import get_compressor, Compressor, CompressionSpec, CNONE, ZLIB, LZ4, LZMA, ZSTD, Auto
+from ..compress import get_compressor, Compressor, CNONE, ZLIB, LZ4, LZMA, ZSTD, Auto
+from ..helpers import CompressionSpec
 from ..constants import ROBJ_FILE_STREAM, ROBJ_ARCHIVE_META
 from ..helpers.argparsing import ArgumentTypeError
 

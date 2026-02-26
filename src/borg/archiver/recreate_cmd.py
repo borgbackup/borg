@@ -2,8 +2,7 @@ from ._common import with_repository, Highlander
 from ._common import build_matcher
 from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
-from ..compress import CompressionSpec
-from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex
+from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex, CompressionSpec
 from ..helpers import timestamp
 from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..manifest import Manifest

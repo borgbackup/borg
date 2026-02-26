@@ -2,9 +2,9 @@ from collections import defaultdict
 
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
-from ..compress import CompressionSpec, ObfuscateSize, Auto, COMPRESSOR_TABLE
+from ..compress import ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..hashindex import ChunkIndex
-from ..helpers import sig_int, ProgressIndicatorPercent, Error
+from ..helpers import sig_int, ProgressIndicatorPercent, Error, CompressionSpec
 from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
 from ..repository import Repository
 from ..remote import RemoteRepository

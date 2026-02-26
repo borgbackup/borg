@@ -15,8 +15,7 @@ from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io,
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..compress import CompressionSpec
-from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec
+from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, CompressionSpec
 from ..helpers import archivename_validator, FilesCacheMode
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now

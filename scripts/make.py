@@ -9,6 +9,7 @@ import textwrap
 from collections import OrderedDict
 from datetime import datetime, timezone
 import time
+import argparse  # do not change to jsonargparse, shall not require 3rd party pkgs
 
 
 def format_metavar(option):
@@ -100,17 +101,18 @@ class BuildUsage:
         return is_subcommand
 
     def write_usage(self, parser, fp):
-        if any(len(o.option_strings) for o in parser._actions):
+        actions = [o for o in parser._actions if getattr(o, "help", None) != argparse.SUPPRESS]
+        if any(len(o.option_strings) for o in actions):
             fp.write(" [options]")
-        for option in parser._actions:
+        for option in actions:
             if option.option_strings:
                 continue
             fp.write(" " + format_metavar(option))
         fp.write("\n\n")
 
     def write_options(self, parser, fp):
-        def is_positional_group(group):
-            return any(not o.option_strings for o in group._group_actions)
+        def is_positional_group(actions):
+            return any(not o.option_strings for o in actions)
 
         # HTML output:
         # A table using some column-spans
@@ -121,17 +123,18 @@ class BuildUsage:
                 # (no of columns used, columns, ...)
                 rows.append((1, ".. class:: borg-common-opt-ref\n\n:ref:`common_options`"))
             else:
-                if not group._group_actions:
+                actions = [o for o in group._group_actions if getattr(o, "help", None) != argparse.SUPPRESS]
+                if not actions:
                     continue
                 group_header = "**%s**" % group.title
                 if group.description:
                     group_header += " — " + group.description
                 rows.append((1, group_header))
-                if is_positional_group(group):
-                    for option in group._group_actions:
+                if is_positional_group(actions):
+                    for option in actions:
                         rows.append((3, "", "``%s``" % option.metavar, option.help or ""))
                 else:
-                    for option in group._group_actions:
+                    for option in actions:
                         if option.metavar:
                             option_fmt = "``%s " + option.metavar + "``"
                         else:
@@ -218,18 +221,19 @@ class BuildUsage:
         )
 
     def write_options_group(self, group, fp, with_title=True, base_indent=4):
-        def is_positional_group(group):
-            return any(not o.option_strings for o in group._group_actions)
+        def is_positional_group(actions):
+            return any(not o.option_strings for o in actions)
 
         indent = " " * base_indent
+        actions = [o for o in group._group_actions if getattr(o, "help", None) != argparse.SUPPRESS]
 
-        if is_positional_group(group):
-            for option in group._group_actions:
+        if is_positional_group(actions):
+            for option in actions:
                 fp.write(option.metavar + "\n")
                 fp.write(textwrap.indent(option.help or "", " " * base_indent) + "\n")
             return
 
-        if not group._group_actions:
+        if not actions:
             return
 
         if with_title:
@@ -238,7 +242,7 @@ class BuildUsage:
 
         opts = OrderedDict()
 
-        for option in group._group_actions:
+        for option in actions:
             if option.metavar:
                 option_fmt = "%s " + option.metavar
             else:
@@ -503,34 +507,38 @@ class BuildMan:
             fd.write(man_page)
 
     def write_usage(self, write, parser):
-        if any(len(o.option_strings) for o in parser._actions):
+        actions = [o for o in parser._actions if getattr(o, "help", None) != argparse.SUPPRESS]
+        if any(len(o.option_strings) for o in actions):
             write(" [options] ", end="")
-        for option in parser._actions:
+        for option in actions:
             if option.option_strings:
                 continue
             write(format_metavar(option), end=" ")
 
     def write_options(self, write, parser):
         for group in parser._action_groups:
-            if group.title == "Common options" or not group._group_actions:
+            actions = [o for o in group._group_actions if getattr(o, "help", None) != argparse.SUPPRESS]
+            if group.title == "Common options" or not actions:
                 continue
             title = "arguments" if group.title == "positional arguments" else group.title
             self.write_heading(write, title, "+")
             self.write_options_group(write, group)
 
     def write_options_group(self, write, group):
-        def is_positional_group(group):
-            return any(not o.option_strings for o in group._group_actions)
+        def is_positional_group(actions):
+            return any(not o.option_strings for o in actions)
 
-        if is_positional_group(group):
-            for option in group._group_actions:
+        actions = [o for o in group._group_actions if getattr(o, "help", None) != argparse.SUPPRESS]
+
+        if is_positional_group(actions):
+            for option in actions:
                 write(option.metavar)
                 write(textwrap.indent(option.help or "", " " * 4))
             return
 
         opts = OrderedDict()
 
-        for option in group._group_actions:
+        for option in actions:
             if option.metavar:
                 option_fmt = "%s " + option.metavar
             else:

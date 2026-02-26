@@ -32,6 +32,7 @@ from .parseformat import (
     PathSpec,
     FilesystemPathSpec,
     SortBySpec,
+    CompressionSpec,
     ChunkerParams,
     FilesCacheMode,
     partial_format,

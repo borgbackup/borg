@@ -16,7 +16,7 @@ from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProce
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, CompressionSpec
-from ..helpers import archivename_validator, FilesCacheMode
+from ..helpers import archivename_validator, FilesCacheMode, octal_int
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
@@ -829,7 +829,7 @@ class CreateMixIn:
             "--stdin-mode",
             metavar="M",
             dest="stdin_mode",
-            type=lambda s: s if isinstance(s, int) else int(s, 8),
+            type=octal_int,
             default=STDIN_MODE_DEFAULT,
             action=Highlander,
             help="set mode to M in archive for stdin data (default: %(default)04o)",

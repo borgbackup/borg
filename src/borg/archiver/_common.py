@@ -8,7 +8,7 @@ from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
 from ..helpers import SortBySpec, positive_int_validator, location_validator, Location, relative_time_marker_validator
-from ..helpers import Highlander
+from ..helpers import Highlander, octal_int
 from ..helpers.argparsing import SUPPRESS
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
@@ -510,7 +510,7 @@ def define_common_options(add_common_option):
         "--umask",
         metavar="M",
         dest="umask",
-        type=lambda s: s if isinstance(s, int) else int(s, 8),
+        type=octal_int,
         default=UMASK_DEFAULT,
         action=Highlander,
         help="set umask to M (local only, default: %(default)04o)",

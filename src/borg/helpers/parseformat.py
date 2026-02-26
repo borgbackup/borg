@@ -35,6 +35,12 @@ if TYPE_CHECKING:
     from ..item import ItemDiff
 
 
+def octal_int(s):
+    if isinstance(s, int):
+        return s
+    return int(s, 8)
+
+
 def bin_to_hex(binary):
     return binascii.hexlify(binary).decode("ascii")
 

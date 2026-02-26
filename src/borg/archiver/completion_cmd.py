@@ -52,9 +52,6 @@ The following argument types have intelligent, context-aware completion:
 
 import shtab
 
-from jsonargparse._actions import _ActionSubCommands
-from jsonargparse._completions import prepare_actions_context, shtab_prepare_actions, bash_compgen_typehint
-
 from ._common import process_epilog
 from ..constants import *  # NOQA
 from ..helpers import (
@@ -69,6 +66,8 @@ from ..helpers import (
     parse_file_size,
 )
 from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import _ActionSubCommands
+from ..helpers.argparsing import prepare_actions_context, shtab_prepare_actions, bash_compgen_typehint
 from ..helpers.time import timestamp
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS

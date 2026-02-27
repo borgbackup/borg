@@ -3,7 +3,7 @@ import logging
 from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import format_archive, CommandError, bin_to_hex, archivename_validator
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -80,13 +80,7 @@ class DeleteMixIn:
         patterns, see :ref:`borg_patterns`).
         """
         )
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_delete.__doc__,
-            epilog=delete_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_delete.__doc__, epilog=delete_epilog)
         subparsers.add_subcommand("delete", subparser, help="delete archives")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"

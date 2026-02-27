@@ -1,7 +1,7 @@
 import pytest
 
 from . import Archiver, RK_ENCRYPTION, cmd
-from ...helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter, flatten_namespace
+from ...helpers.argparsing import ArgumentParser, flatten_namespace
 
 
 def test_bad_filters(archiver):
@@ -93,7 +93,7 @@ class TestCommonOptions:
 
     @pytest.fixture
     def basic_parser(self):
-        parser = ArgumentParser(prog="test", description="test parser", add_help=False)
+        parser = ArgumentParser(prog="test", description="test parser")
         parser.common_options = Archiver.CommonOptions(self.define_common_options)
         return parser
 
@@ -108,19 +108,13 @@ class TestCommonOptions:
 
     @pytest.fixture
     def common_parser(self, parser):
-        common_parser = ArgumentParser(add_help=False, prog="test")
+        common_parser = ArgumentParser(prog="test")
         parser.common_options.add_common_group(common_parser)
         return common_parser
 
     @pytest.fixture
     def parse_vars_from_line(self, parser, subcommands, common_parser):
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description="foo",
-            epilog="bar",
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description="foo", epilog="bar")
         subparser.add_argument("--foo-bar", dest="foo_bar", action="store_true")
         subcommands.add_subcommand("subcmd", subparser, help="baz")
 

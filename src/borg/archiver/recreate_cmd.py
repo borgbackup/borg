@@ -4,7 +4,7 @@ from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex, CompressionSpec
 from ..helpers import timestamp
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -101,11 +101,7 @@ class RecreateMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_recreate.__doc__,
-            epilog=recreate_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_recreate.__doc__, epilog=recreate_epilog
         )
         subparsers.add_subcommand("recreate", subparser, help=self.do_recreate.__doc__)
         subparser.add_argument(

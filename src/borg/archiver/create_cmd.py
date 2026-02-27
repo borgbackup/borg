@@ -29,7 +29,7 @@ from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
 from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -772,13 +772,7 @@ class CreateMixIn:
         """
         )
 
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_create.__doc__,
-            epilog=create_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_create.__doc__, epilog=create_epilog)
         subparsers.add_subcommand("create", subparser, help="create a backup")
 
         # note: --dry-run and --stats are mutually exclusive, but we do not want to abort when

@@ -4,7 +4,7 @@ from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names
 from ..helpers import CancelledByUser
 from ..helpers import location_validator, Location
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -190,11 +190,7 @@ class RepoCreateMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_repo_create.__doc__,
-            epilog=repo_create_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_repo_create.__doc__, epilog=repo_create_epilog
         )
         subparsers.add_subcommand("repo-create", subparser, help="create a new, empty repository")
         subparser.add_argument(

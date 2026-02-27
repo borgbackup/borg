@@ -5,7 +5,7 @@ from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2
 from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
 from ..crypto.keymanager import KeyManager
 from ..helpers import PathSpec, CommandError
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ._common import with_repository
@@ -120,11 +120,7 @@ class KeysMixIn:
         from ._common import process_epilog
 
         subparser = ArgumentParser(
-            parents=[mid_common_parser],
-            add_help=False,
-            description="Manage the keyfile or repokey of a repository",
-            epilog="",
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[mid_common_parser], description="Manage the keyfile or repokey of a repository", epilog=""
         )
         subparsers.add_subcommand("key", subparser, help="manage the repository key")
 
@@ -162,11 +158,7 @@ class KeysMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_key_export.__doc__,
-            epilog=key_export_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_key_export.__doc__, epilog=key_export_epilog
         )
         key_parsers.add_subcommand("export", subparser, help="export the repository key for backup")
         subparser.add_argument("path", metavar="PATH", nargs="?", type=PathSpec, help="where to store the backup")
@@ -202,11 +194,7 @@ class KeysMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_key_import.__doc__,
-            epilog=key_import_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_key_import.__doc__, epilog=key_import_epilog
         )
         key_parsers.add_subcommand("import", subparser, help="import the repository key from backup")
         subparser.add_argument(
@@ -231,11 +219,7 @@ class KeysMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_key_change_passphrase.__doc__,
-            epilog=change_passphrase_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_key_change_passphrase.__doc__, epilog=change_passphrase_epilog
         )
         key_parsers.add_subcommand("change-passphrase", subparser, help="change the repository passphrase")
 
@@ -253,11 +237,7 @@ class KeysMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_key_change_location.__doc__,
-            epilog=change_location_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_key_change_location.__doc__, epilog=change_location_epilog
         )
         key_parsers.add_subcommand("change-location", subparser, help="change the key location")
         subparser.add_argument(

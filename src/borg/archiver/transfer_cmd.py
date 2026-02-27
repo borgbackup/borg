@@ -7,7 +7,7 @@ from ..helpers import Error
 from ..helpers import location_validator, Location, archivename_validator, comment_validator
 from ..helpers import format_file_size, bin_to_hex
 from ..helpers import ChunkerParams, ChunkIteratorFileWrapper, CompressionSpec
-from ..helpers.argparsing import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, ArgumentTypeError
 from ..item import ChunkListEntry
 from ..manifest import Manifest
 from ..legacyrepository import LegacyRepository
@@ -330,11 +330,7 @@ class TransferMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_transfer.__doc__,
-            epilog=transfer_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_transfer.__doc__, epilog=transfer_epilog
         )
         subparsers.add_subcommand("transfer", subparser, help="transfer of archives from another repository")
         subparser.add_argument(

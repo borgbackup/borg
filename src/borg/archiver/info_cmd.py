@@ -5,7 +5,7 @@ from ._common import with_repository
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import format_timedelta, json_print, basic_json_data, archivename_validator
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -77,13 +77,7 @@ class InfoMixIn:
         = all chunks in the repository.
         """
         )
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_info.__doc__,
-            epilog=info_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_info.__doc__, epilog=info_epilog)
         subparsers.add_subcommand("info", subparser, help="show repository or archive information")
         subparser.add_argument("--json", action="store_true", help="format output as JSON")
         define_archive_filters_group(subparser)

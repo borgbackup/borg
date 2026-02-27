@@ -39,7 +39,7 @@ try:
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
-    from ..helpers.argparsing import flatten_namespace, ArgumentTypeError, ArgumentParser, Namespace, SUPPRESS
+    from ..helpers.argparsing import flatten_namespace, ArgumentTypeError, ArgumentParser, SUPPRESS
     from ..helpers import is_slow_msgpack, is_supported_msgpack, sysinfo
     from ..helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
     from ..helpers import ErrorIgnoringTextIOWrapper
@@ -178,62 +178,45 @@ class Archiver(
 
     class CommonOptions:
         """
-        Support class to allow specifying common options directly after the top-level command.
+        Support class to allow specifying common options at multiple levels of the command hierarchy.
 
-        Normally options can only be specified on the parser defining them, which means
-        that generally speaking *all* options go after all sub-commands. This is annoying
-        for common options in scripts, e.g. --remote-path or logging options.
+        Common options (e.g. --log-level, --repo) can be placed anywhere in the command line:
 
-        This class allows adding the same set of options to both the top-level parser
-        and the final sub-command parsers (but not intermediary sub-commands, at least for now).
+            borg --info create ...          # before the subcommand
+            borg create --info ...          # after the subcommand
+            borg --info debug info --debug  # at both levels of a two-level command
 
-        It does so by giving every option's target name ("dest") a suffix indicating its level
-        -- no two options in the parser hierarchy can have the same target --
-        then, after parsing the command line, multiple definitions are resolved.
+        Each parser level registers the same options with the same dest names.
+        Defaults are only provided on the top-level parser; all sub-parsers use SUPPRESS so
+        that unset options don't appear in the namespace at all.
 
-        Defaults are handled by only setting them on the top-level parser and setting
-        a sentinel object in all sub-parsers, which then allows one to discern which parser
-        supplied the option.
+        flatten_namespace() handles precedence: it walks sub-namespaces depth-first, so the
+        most-specific (innermost) value wins.  For append-action options (e.g. --debug-topic)
+        it merges lists from all levels.
         """
 
-        def __init__(self, define_common_options, suffix_precedence):
+        def __init__(self, define_common_options):
             """
             *define_common_options* should be a callable taking one argument, which
-            will be a argparse.Parser.add_argument-like function.
+            will be an argparse.Parser.add_argument-like function.
 
             *define_common_options* will be called multiple times, and should call
             the passed function to define common options exactly the same way each time.
-
-            *suffix_precedence* should be a tuple of the suffixes that will be used.
-            It is ordered from lowest precedence to highest precedence:
-            An option specified on the parser belonging to index 0 is overridden if the
-            same option is specified on any parser with a higher index.
             """
             self.define_common_options = define_common_options
-            self.suffix_precedence = suffix_precedence
-
-            # Maps suffixes to sets of target names.
-            # E.g. common_options["_subcommand"] = {..., "log_level", ...}
-            self.common_options = dict()
-            # Set of options with the 'append' action.
-            self.append_options = set()
             # This is the sentinel object that replaces all default values in parsers
             # below the top-level parser.
             self.default_sentinel = object()
 
-        def add_common_group(self, parser, suffix, provide_defaults=False):
+        def add_common_group(self, parser, provide_defaults=False):
             """
             Add common options to *parser*.
 
-            *provide_defaults* must only be True exactly once in a parser hierarchy,
-            at the top level, and False on all lower levels. The default is chosen
-            accordingly.
-
-            *suffix* indicates the suffix to use internally. It also indicates
-            which precedence the *parser* has for common options. See *suffix_precedence*
-            of __init__.
+            *provide_defaults* must be True exactly once in a parser hierarchy (the top-level
+            parser) and False on all sub-parsers.  Sub-parsers get SUPPRESS as the default so
+            that an unspecified option produces no attribute, leaving the top-level default intact
+            after flatten_namespace() merges the namespaces.
             """
-            assert suffix in self.suffix_precedence
 
             def add_argument(*args, **kwargs):
                 if "dest" in kwargs:
@@ -248,20 +231,9 @@ class Archiver(
                         "append",
                     )
                     is_append = kwargs["action"] == "append"
-                    if is_append:
-                        self.append_options.add(kwargs["dest"])
-                        assert (
-                            kwargs["default"] == []
-                        ), "The default is explicitly constructed as an empty list in resolve()"
-                    else:
-                        self.common_options.setdefault(suffix, set()).add(kwargs["dest"])
-                    kwargs["dest"] += suffix
                     if not provide_defaults:
-                        # Interpolate help now, in case the %(default)d (or so) is mentioned,
+                        # Interpolate help now, in case %(default)d (or similar) is mentioned,
                         # to avoid producing incorrect help output.
-                        # Assumption: Interpolated output can safely be interpolated again,
-                        # which should always be the case.
-                        # Note: We control all inputs.
                         kwargs["help"] = kwargs["help"] % kwargs
                         if not is_append:
                             kwargs["default"] = SUPPRESS
@@ -271,66 +243,23 @@ class Archiver(
             common_group = parser.add_argument_group("Common options")
             self.define_common_options(add_argument)
 
-        def resolve(self, args: Namespace):  # Namespace has "in" but otherwise is not like a dict.
-            """
-            Resolve the multiple definitions of each common option to the final value.
-            """
-            for suffix in self.suffix_precedence:
-                # From highest level to lowest level, so the "most-specific" option wins, e.g.
-                # "borg --debug create --info" shall result in --info being effective.
-                for dest in self.common_options.get(suffix, []):
-                    # map_from is this suffix' option name, e.g. log_level_subcommand
-                    # map_to is the target name, e.g. log_level
-                    map_from = dest + suffix
-                    map_to = dest
-                    # Retrieve value; depending on the action it may not exist, but usually does
-                    # (store_const/store_true/store_false), either because the action implied a default
-                    # or a default is explicitly supplied.
-                    # Note that defaults on lower levels are replaced with default_sentinel.
-                    # Only the top level has defaults.
-                    value = getattr(args, map_from, self.default_sentinel)
-                    if value is not self.default_sentinel:
-                        # value was indeed specified on this level. Transfer value to target,
-                        # and un-clobber the args (for tidiness - you *cannot* use the suffixed
-                        # names for other purposes, obviously).
-                        setattr(args, map_to, value)
-                    try:
-                        delattr(args, map_from)
-                    except AttributeError:
-                        pass
-
-            # Options with an "append" action need some special treatment. Instead of
-            # overriding values, all specified values are merged together.
-            for dest in self.append_options:
-                option_value = []
-                for suffix in self.suffix_precedence:
-                    # Find values of this suffix, if any, and add them to the final list
-                    extend_from = dest + suffix
-                    if extend_from in args:
-                        values = getattr(args, extend_from)
-                        delattr(args, extend_from)
-                        option_value.extend(values)
-                setattr(args, dest, option_value)
-
     def build_parser(self):
         from ._common import define_common_options
 
         parser = ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups", add_help=False)
         # paths and patterns must have an empty list as default everywhere
-        parser.common_options = self.CommonOptions(
-            define_common_options, suffix_precedence=("_maincommand", "_midcommand", "_subcommand")
-        )
+        parser.common_options = self.CommonOptions(define_common_options)
         parser.add_argument(
             "-V", "--version", action="version", version="%(prog)s " + __version__, help="show version number and exit"
         )
         parser.add_argument("--cockpit", dest="cockpit", action="store_true", help="Start the Borg TUI")
-        parser.common_options.add_common_group(parser, "_maincommand", provide_defaults=True)
+        parser.common_options.add_common_group(parser, provide_defaults=True)
 
         common_parser = ArgumentParser(add_help=False, prog=self.prog)
-        parser.common_options.add_common_group(common_parser, "_subcommand")
+        parser.common_options.add_common_group(common_parser)
 
         mid_common_parser = ArgumentParser(add_help=False, prog=self.prog)
-        parser.common_options.add_common_group(mid_common_parser, "_midcommand")
+        parser.common_options.add_common_group(mid_common_parser)
 
         if parser.prog == "borgfs":
             return self.build_parser_borgfs(parser)
@@ -415,7 +344,6 @@ class Archiver(
             if getattr(args, list_attr, None) is None:
                 setattr(args, list_attr, [])
 
-        parser.common_options.resolve(args)
         func = self.get_func(args, parser)
         if func == self.do_create and args.paths and args.paths_from_stdin:
             parser.error("Must not pass PATH with --paths-from-stdin.")

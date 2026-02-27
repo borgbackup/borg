@@ -94,9 +94,7 @@ class TestCommonOptions:
     @pytest.fixture
     def basic_parser(self):
         parser = ArgumentParser(prog="test", description="test parser", add_help=False)
-        parser.common_options = Archiver.CommonOptions(
-            self.define_common_options, suffix_precedence=("_level0", "_level1")
-        )
+        parser.common_options = Archiver.CommonOptions(self.define_common_options)
         return parser
 
     @pytest.fixture
@@ -105,13 +103,13 @@ class TestCommonOptions:
 
     @pytest.fixture
     def parser(self, basic_parser):
-        basic_parser.common_options.add_common_group(basic_parser, "_level0", provide_defaults=True)
+        basic_parser.common_options.add_common_group(basic_parser, provide_defaults=True)
         return basic_parser
 
     @pytest.fixture
     def common_parser(self, parser):
         common_parser = ArgumentParser(add_help=False, prog="test")
-        parser.common_options.add_common_group(common_parser, "_level1")
+        parser.common_options.add_common_group(common_parser)
         return common_parser
 
     @pytest.fixture
@@ -130,7 +128,6 @@ class TestCommonOptions:
             print(line)
             args = parser.parse_args(line)
             args = flatten_namespace(args)
-            parser.common_options.resolve(args)
             return vars(args)
 
         return parse_vars_from_line

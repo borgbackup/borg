@@ -41,6 +41,7 @@ dependencies = [
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
   "xxhash>=2.0.0",
   "jsonargparse @ git+https://github.com/omni-us/jsonargparse.git@main",
+  "PyYAML>=6.0.2",  # we need to register our types with yaml, jsonargparse uses yaml for config files
 ]
 
 [project.optional-dependencies]
@@ -260,7 +261,7 @@ deps = ["ruff"]
 commands = [["ruff", "check", "."]]
 
 [tool.tox.env.mypy]
-deps = ["pytest", "mypy", "pkgconfig"]
+deps = ["pytest", "mypy", "pkgconfig", "types-PyYAML"]
 commands = [["mypy", "--ignore-missing-imports"]]
 
 [tool.tox.env.docs]

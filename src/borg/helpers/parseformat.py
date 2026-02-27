@@ -21,9 +21,11 @@ from ..logger import create_logger
 
 logger = create_logger()
 
+import yaml
+
 from .errors import Error
 from .fs import get_keys_dir, make_path_safe, slashify
-from .argparsing import Action, ArgumentError, ArgumentTypeError
+from .argparsing import Action, ArgumentError, ArgumentTypeError, register_type
 from .msgpack import Timestamp
 from .time import OutputTimestamp, format_time, safe_timestamp
 from .. import __version__ as borg_version
@@ -236,10 +238,22 @@ class CompressionSpec:
         elif self.name == "obfuscate":
             return get_compressor(self.name, level=self.level, compressor=self.inner.compressor)
 
+    def __str__(self):
+        if self.name in ("none", "lz4"):
+            return f"{self.name}"
+        elif self.name in ("zlib", "lzma", "zstd", "zlib_legacy"):
+            return f"{self.name},{self.level}"
+        elif self.name == "auto":
+            return f"auto,{self.inner}"
+        elif self.name == "obfuscate":
+            return f"obfuscate,{self.level},{self.inner}"
+        else:
+            raise ValueError(f"unsupported compression type: {self.name}")
+
 
 def ChunkerParams(s):
-    if isinstance(s, tuple):
-        return s
+    if isinstance(s, (list, tuple)):
+        return tuple(s)
     params = s.strip().split(",")
     count = len(params)
     if count == 0:
@@ -712,6 +726,18 @@ def location_validator(proto=None, other=False):
         return loc
 
     return validator
+
+
+# Register types with jsonargparse so they can be represented in config files
+# (e.g. for --print_config). Two things are needed:
+# 1. A YAML representer so yaml.safe_dump can serialize Location objects to strings.
+# 2. A jsonargparse register_type so it knows how to deserialize strings back to Location.
+
+yaml.SafeDumper.add_representer(Location, lambda dumper, loc: dumper.represent_str(loc.raw or ""))
+register_type(Location, serializer=lambda loc: loc.raw or "")
+
+yaml.SafeDumper.add_representer(CompressionSpec, lambda dumper, cs: dumper.represent_str(str(cs)))
+register_type(CompressionSpec)
 
 
 def relative_time_marker_validator(text: str):

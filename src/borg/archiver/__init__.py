@@ -251,6 +251,8 @@ class Archiver(
             prog=self.prog,
             description="Borg - Deduplicated Backups",
             default_config_files=[os.path.join(get_config_dir(), "default.yaml")],
+            default_env=True,
+            env_prefix="BORG",
         )
         parser.add_argument("--config", action="config")
         # paths and patterns must have an empty list as default everywhere

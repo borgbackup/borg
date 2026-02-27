@@ -246,7 +246,7 @@ class Archiver(
     def build_parser(self):
         from ._common import define_common_options
 
-        parser = ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups", add_help=False)
+        parser = ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups")
         # paths and patterns must have an empty list as default everywhere
         parser.common_options = self.CommonOptions(define_common_options)
         parser.add_argument(
@@ -255,10 +255,10 @@ class Archiver(
         parser.add_argument("--cockpit", dest="cockpit", action="store_true", help="Start the Borg TUI")
         parser.common_options.add_common_group(parser, provide_defaults=True)
 
-        common_parser = ArgumentParser(add_help=False, prog=self.prog)
+        common_parser = ArgumentParser(prog=self.prog)
         parser.common_options.add_common_group(common_parser)
 
-        mid_common_parser = ArgumentParser(add_help=False, prog=self.prog)
+        mid_common_parser = ArgumentParser(prog=self.prog)
         parser.common_options.add_common_group(mid_common_parser)
 
         if parser.prog == "borgfs":

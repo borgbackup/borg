@@ -3,7 +3,7 @@ import logging
 from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import format_archive, CommandError, bin_to_hex, archivename_validator
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -73,11 +73,7 @@ class UnDeleteMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_undelete.__doc__,
-            epilog=undelete_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_undelete.__doc__, epilog=undelete_epilog
         )
         subparsers.add_subcommand("undelete", subparser, help="undelete archives")
         subparser.add_argument(

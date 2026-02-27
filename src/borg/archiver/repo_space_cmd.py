@@ -6,7 +6,7 @@ from borgstore.store import ItemInfo
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import parse_file_size, format_file_size
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 
 from ..logger import create_logger
 
@@ -86,11 +86,7 @@ class RepoSpaceMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_repo_space.__doc__,
-            epilog=repo_space_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_repo_space.__doc__, epilog=repo_space_epilog
         )
         subparsers.add_subcommand("repo-space", subparser, help="manage reserved space in a repository")
         subparser.add_argument(

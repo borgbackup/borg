@@ -3,7 +3,7 @@ from ..archive import ArchiveChecker
 from ..constants import *  # NOQA
 from ..helpers import set_ec, EXIT_WARNING, CancelledByUser, CommandError, IntegrityError
 from ..helpers import yes
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 
 from ..logger import create_logger
 
@@ -182,13 +182,7 @@ class CheckMixIn:
         ``borg compact`` would remove the archives' data completely.
         """
         )
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_check.__doc__,
-            epilog=check_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_check.__doc__, epilog=check_epilog)
         subparsers.add_subcommand("check", subparser, help="verify the repository")
         subparser.add_argument(
             "--repository-only", dest="repo_only", action="store_true", help="only perform repository checks"

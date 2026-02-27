@@ -3,7 +3,7 @@ import textwrap
 from ._common import with_repository
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, json_print, basic_json_data
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -64,11 +64,7 @@ class RepoInfoMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_repo_info.__doc__,
-            epilog=repo_info_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_repo_info.__doc__, epilog=repo_info_epilog
         )
         subparsers.add_subcommand("repo-info", subparser, help="show repository information")
         subparser.add_argument("--json", action="store_true", help="format output as JSON")

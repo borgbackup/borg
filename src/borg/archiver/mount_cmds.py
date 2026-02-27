@@ -5,7 +5,7 @@ from ..constants import *  # NOQA
 from ..helpers import RTError
 from ..helpers import PathSpec
 from ..helpers import umount
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 from ..remote import cache_if_remote
 
@@ -151,13 +151,7 @@ class MountMixIn:
         the logger to output to a file.
         """
         )
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_mount.__doc__,
-            epilog=mount_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_mount.__doc__, epilog=mount_epilog)
         subparsers.add_subcommand("mount", subparser, help="mount a repository")
         self._define_borg_mount(subparser)
 
@@ -169,13 +163,7 @@ class MountMixIn:
         command - usually this is either umount or fusermount -u.
         """
         )
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_umount.__doc__,
-            epilog=umount_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_umount.__doc__, epilog=umount_epilog)
         subparsers.add_subcommand("umount", subparser, help="unmount a repository")
         subparser.add_argument(
             "mountpoint", metavar="MOUNTPOINT", type=str, help="mountpoint of the filesystem to unmount"
@@ -185,7 +173,6 @@ class MountMixIn:
         assert parser.prog == "borgfs"
         parser.description = self.do_mount.__doc__
         parser.epilog = "For more information, see borg mount --help."
-        parser.formatter_class = RawDescriptionHelpFormatter
         parser.help = "mount a repository"
         self._define_borg_mount(parser)
         return parser

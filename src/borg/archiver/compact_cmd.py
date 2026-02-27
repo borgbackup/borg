@@ -5,7 +5,7 @@ from ..archive import Archive
 from ..cache import write_chunkindex_to_repo_cache, build_chunkindex_from_repo
 from ..cache import files_cache_name, discover_files_cache_names
 from ..helpers import get_cache_dir
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..constants import *  # NOQA
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..helpers import set_ec, EXIT_ERROR, format_file_size, bin_to_hex
@@ -257,13 +257,7 @@ class CompactMixIn:
             thus it cannot compute before/after compaction size statistics).
             """
         )
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_compact.__doc__,
-            epilog=compact_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_compact.__doc__, epilog=compact_epilog)
         subparsers.add_subcommand("compact", subparser, help="compact the repository")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change the repository"

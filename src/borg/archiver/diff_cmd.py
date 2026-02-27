@@ -8,7 +8,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
 from ..helpers import IncludePatternNeverMatchedWarning, remove_surrogates
-from ..helpers.argparsing import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser, ArgumentTypeError
 from ..item import ItemDiff
 from ..manifest import Manifest
 from ..logger import create_logger
@@ -293,13 +293,7 @@ class DiffMixIn:
                     raise ArgumentTypeError(f"unsupported sort field: {field}")
             return ",".join(parts)
 
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_diff.__doc__,
-            epilog=diff_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_diff.__doc__, epilog=diff_epilog)
         subparsers.add_subcommand("diff", subparser, help="find differences in archive contents")
         subparser.add_argument(
             "--numeric-ids",

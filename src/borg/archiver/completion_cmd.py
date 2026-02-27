@@ -65,7 +65,7 @@ from ..helpers import (
     relative_time_marker_validator,
     parse_file_size,
 )
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..helpers.argparsing import _ActionSubCommands
 from ..helpers.argparsing import prepare_actions_context, shtab_prepare_actions, bash_compgen_typehint
 from ..helpers.time import timestamp
@@ -762,11 +762,7 @@ class CompletionMixIn:
         )
 
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_completion.__doc__,
-            epilog=completion_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_completion.__doc__, epilog=completion_epilog
         )
         subparsers.add_subcommand("completion", subparser, help="output shell completion script")
         subparser.add_argument(

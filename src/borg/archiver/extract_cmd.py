@@ -11,7 +11,7 @@ from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import BackupWarning, IncludePatternNeverMatchedWarning
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -155,13 +155,7 @@ class ExtractMixIn:
             group, permissions, etc.
         """
         )
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_extract.__doc__,
-            epilog=extract_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_extract.__doc__, epilog=extract_epilog)
         subparsers.add_subcommand("extract", subparser, help="extract archive contents")
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output a verbose list of items (files, dirs, ...)"

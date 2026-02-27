@@ -18,7 +18,7 @@ from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ._common import with_repository, with_archive, Highlander, define_exclusion_group
@@ -387,11 +387,7 @@ class TarMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_export_tar.__doc__,
-            epilog=export_tar_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_export_tar.__doc__, epilog=export_tar_epilog
         )
         subparsers.add_subcommand("export-tar", subparser, help="create tarball from archive")
         subparser.add_argument(
@@ -461,11 +457,7 @@ class TarMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_import_tar.__doc__,
-            epilog=import_tar_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_import_tar.__doc__, epilog=import_tar_epilog
         )
         subparsers.add_subcommand("import-tar", subparser, help=self.do_import_tar.__doc__)
         subparser.add_argument(

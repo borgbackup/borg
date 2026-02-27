@@ -8,6 +8,10 @@
 
 .. include:: general/return-codes.rst.inc
 
+.. _config:
+
+.. include:: general/config.rst.inc
+
 .. _env_vars:
 
 .. include:: general/environment.rst.inc

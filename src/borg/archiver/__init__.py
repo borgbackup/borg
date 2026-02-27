@@ -45,6 +45,7 @@ try:
     from ..helpers import ErrorIgnoringTextIOWrapper
     from ..helpers import msgpack
     from ..helpers import sig_int
+    from ..helpers import get_config_dir
     from ..remote import RemoteRepository
     from ..selftest import selftest
 except BaseException:
@@ -246,7 +247,12 @@ class Archiver(
     def build_parser(self):
         from ._common import define_common_options
 
-        parser = ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups")
+        parser = ArgumentParser(
+            prog=self.prog,
+            description="Borg - Deduplicated Backups",
+            default_config_files=[os.path.join(get_config_dir(), "default.yaml")],
+        )
+        parser.add_argument("--config", action="config")
         # paths and patterns must have an empty list as default everywhere
         parser.common_options = self.CommonOptions(define_common_options)
         parser.add_argument(

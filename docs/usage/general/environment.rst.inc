@@ -161,30 +161,86 @@ Some automatic "answerers" (if set, they automatically answer confirmation quest
 .. _XDG env var: https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html
 
 Directories and files:
+
+    .. note::
+
+        Borg 2 uses the `platformdirs <https://pypi.org/project/platformdirs/>`_ library to determine
+        default directory locations. This means that default paths are **platform-specific**:
+
+        - **Linux**: Uses XDG Base Directory Specification paths (e.g., ``~/.config/borg``,
+          ``~/.cache/borg``, ``~/.local/share/borg``). `XDG env var`_ variables are honoured.
+        - **macOS**: Uses native macOS directories (e.g., ``~/Library/Application Support/borg``,
+          ``~/Library/Caches/borg``). `XDG env var`_ variables are **not** honoured.
+        - **Windows**: Uses Windows AppData directories (e.g., ``C:\Users\<user>\AppData\Roaming\borg``,
+          ``C:\Users\<user>\AppData\Local\borg``). `XDG env var`_ variables are **not** honoured.
+
+        On all platforms, you can override each directory individually using the specific environment
+        variables described below. You can also set ``BORG_BASE_DIR`` to force borg to use
+        ``BORG_BASE_DIR/.config/borg``, ``BORG_BASE_DIR/.cache/borg``, etc., regardless of the platform.
+
+    Default directory locations by platform (when no ``BORG_*`` environment variables are set):
+
+    .. list-table::
+       :header-rows: 1
+       :widths: 15 25 30 30
+
+       * - Directory
+         - Linux
+         - macOS
+         - Windows
+       * - Config
+         - ``~/.config/borg``
+         - ``~/Library/Application Support/borg``
+         - ``%APPDATA%\borg``
+       * - Cache
+         - ``~/.cache/borg``
+         - ``~/Library/Caches/borg``
+         - ``%LOCALAPPDATA%\borg\Cache``
+       * - Data
+         - ``~/.local/share/borg``
+         - ``~/Library/Application Support/borg``
+         - ``%LOCALAPPDATA%\borg``
+       * - Runtime
+         - ``/run/user/<uid>/borg``
+         - ``~/Library/Caches/TemporaryItems/borg``
+         - ``%TEMP%\borg``
+       * - Keys
+         - ``<config_dir>/keys``
+         - ``<config_dir>/keys``
+         - ``<config_dir>\keys``
+       * - Security
+         - ``<data_dir>/security``
+         - ``<data_dir>/security``
+         - ``<data_dir>\security``
+
     BORG_BASE_DIR
         Defaults to ``$HOME`` or ``~$USER`` or ``~`` (in that order).
         If you want to move all borg-specific folders to a custom path at once, all you need to do is
         to modify ``BORG_BASE_DIR``: the other paths for cache, config etc. will adapt accordingly
         (assuming you didn't set them to a different custom value).
     BORG_CACHE_DIR
-        Defaults to ``$BORG_BASE_DIR/.cache/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
-        `XDG env var`_ ``XDG_CACHE_HOME`` is set, then ``$XDG_CACHE_HOME/borg`` is being used instead.
+        Defaults to the platform-specific cache directory (see table above).
+        If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.cache/borg``.
+        On Linux, `XDG env var`_ ``XDG_CACHE_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains the local cache and might need a lot
         of space for dealing with big repositories. Make sure you're aware of the associated
         security aspects of the cache location: :ref:`cache_security`
     BORG_CONFIG_DIR
-        Defaults to ``$BORG_BASE_DIR/.config/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
-        `XDG env var`_ ``XDG_CONFIG_HOME`` is set, then ``$XDG_CONFIG_HOME/borg`` is being used instead.
+        Defaults to the platform-specific config directory (see table above).
+        If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.config/borg``.
+        On Linux, `XDG env var`_ ``XDG_CONFIG_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains all borg configuration directories, see the FAQ
         for a security advisory about the data in this directory: :ref:`home_config_borg`
     BORG_DATA_DIR
-        Defaults to ``$BORG_BASE_DIR/.local/share/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
-        `XDG env var`_ ``XDG_DATA_HOME`` is set, then ``$XDG_DATA_HOME/borg`` is being used instead.
+        Defaults to the platform-specific data directory (see table above).
+        If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.local/share/borg``.
+        On Linux, `XDG env var`_ ``XDG_DATA_HOME`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains all borg data directories, see the FAQ
         for a security advisory about the data in this directory: :ref:`home_data_borg`
     BORG_RUNTIME_DIR
-        Defaults to ``$BORG_BASE_DIR/.cache/borg``. If ``BORG_BASE_DIR`` is not explicitly set while
-        `XDG env var`_ ``XDG_RUNTIME_DIR`` is set, then ``$XDG_RUNTIME_DIR/borg`` is being used instead.
+        Defaults to the platform-specific runtime directory (see table above).
+        If ``BORG_BASE_DIR`` is set, defaults to ``$BORG_BASE_DIR/.cache/borg``.
+        On Linux, `XDG env var`_ ``XDG_RUNTIME_DIR`` is also honoured if ``BORG_BASE_DIR`` is not set.
         This directory contains borg runtime files, like e.g. the socket file.
     BORG_SECURITY_DIR
         Defaults to ``$BORG_DATA_DIR/security``.

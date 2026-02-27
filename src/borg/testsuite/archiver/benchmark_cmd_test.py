@@ -45,7 +45,8 @@ def test_benchmark_crud_json_lines(archiver, monkeypatch):
         assert entry["io"] > 0
 
 
-def test_benchmark_cpu(archiver):
+def test_benchmark_cpu(archiver, monkeypatch):
+    monkeypatch.setenv("_BORG_BENCHMARK_CPU_TEST", "YES")
     output = cmd(archiver, "benchmark", "cpu")
     # verify all section headers appear in the plain-text output
     assert "Chunkers" in output
@@ -57,7 +58,8 @@ def test_benchmark_cpu(archiver):
     assert "msgpack" in output
 
 
-def test_benchmark_cpu_json(archiver):
+def test_benchmark_cpu_json(archiver, monkeypatch):
+    monkeypatch.setenv("_BORG_BENCHMARK_CPU_TEST", "YES")
     output = cmd(archiver, "benchmark", "cpu", "--json")
     result = json.loads(output)
     assert isinstance(result, dict)

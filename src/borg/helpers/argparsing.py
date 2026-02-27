@@ -102,6 +102,7 @@ from argparse import Action, ArgumentError, ArgumentTypeError, RawDescriptionHel
 from jsonargparse import ArgumentParser as _ArgumentParser  # we subclass that to add custom behavior
 from jsonargparse import Namespace, SUPPRESS, REMAINDER  # noqa: F401
 from jsonargparse.typing import register_type  # noqa: F401
+from jsonargparse.typing import PositiveInt  # noqa: F401
 
 # borg completion uses these private symbols, so we need to import them:
 from jsonargparse._actions import _ActionSubCommands  # noqa: F401

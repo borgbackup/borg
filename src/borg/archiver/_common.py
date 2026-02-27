@@ -7,9 +7,9 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
-from ..helpers import SortBySpec, positive_int_validator, location_validator, Location, relative_time_marker_validator
+from ..helpers import SortBySpec, location_validator, Location, relative_time_marker_validator
 from ..helpers import Highlander, octal_int
-from ..helpers.argparsing import SUPPRESS
+from ..helpers.argparsing import SUPPRESS, PositiveInt
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
@@ -375,7 +375,7 @@ def define_archive_filters_group(
             "--first",
             metavar="N",
             dest="first",
-            type=positive_int_validator,
+            type=PositiveInt,
             action=Highlander,
             help="consider the first N archives after other filters are applied",
         )
@@ -383,7 +383,7 @@ def define_archive_filters_group(
             "--last",
             metavar="N",
             dest="last",
-            type=positive_int_validator,
+            type=PositiveInt,
             action=Highlander,
             help="consider the last N archives after other filters are applied",
         )

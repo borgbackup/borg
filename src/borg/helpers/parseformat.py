@@ -128,14 +128,6 @@ def decode_dict(d, keys, encoding="utf-8", errors="surrogateescape"):
     return d
 
 
-def positive_int_validator(value):
-    """argparse type for positive integers, N > 0."""
-    int_value = int(value)
-    if int_value <= 0:
-        raise ArgumentTypeError("A positive integer is required: %s" % value)
-    return int_value
-
-
 def interval(s):
     """Convert a string representing a valid interval to a number of seconds."""
     if isinstance(s, int):

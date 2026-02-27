@@ -5,7 +5,7 @@ from ..constants import *  # NOQA
 from ..compress import ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..hashindex import ChunkIndex
 from ..helpers import sig_int, ProgressIndicatorPercent, Error, CompressionSpec
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..repository import Repository
 from ..remote import RemoteRepository
 from ..manifest import Manifest
@@ -181,11 +181,7 @@ class RepoCompressMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_repo_compress.__doc__,
-            epilog=repo_compress_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_repo_compress.__doc__, epilog=repo_compress_epilog
         )
         subparsers.add_subcommand("repo-compress", subparser, help=self.do_repo_compress.__doc__)
 

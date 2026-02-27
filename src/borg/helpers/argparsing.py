@@ -99,12 +99,19 @@ from typing import Any
 # here are the only imports from argparse and jsonargparse,
 # all other imports of these names import them from here:
 from argparse import Action, ArgumentError, ArgumentTypeError, RawDescriptionHelpFormatter  # noqa: F401
-from jsonargparse import ArgumentParser, Namespace, SUPPRESS, REMAINDER  # noqa: F401
+from jsonargparse import ArgumentParser as _ArgumentParser  # we subclass that to add custom behavior
+from jsonargparse import Namespace, SUPPRESS, REMAINDER  # noqa: F401
 
 # borg completion uses these private symbols, so we need to import them:
 from jsonargparse._actions import _ActionSubCommands  # noqa: F401
 from jsonargparse._completions import prepare_actions_context, shtab_prepare_actions  # noqa: F401
 from jsonargparse._completions import bash_compgen_typehint  # noqa: F401
+
+
+class ArgumentParser(_ArgumentParser):
+    # the borg code always uses RawDescriptionHelpFormatter and add_help=False:
+    def __init__(self, *args, formatter_class=RawDescriptionHelpFormatter, add_help=False, **kwargs):
+        super().__init__(*args, formatter_class=formatter_class, add_help=add_help, **kwargs)
 
 
 def flatten_namespace(ns: Any) -> Namespace:

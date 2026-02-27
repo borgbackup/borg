@@ -2,7 +2,7 @@ from ._common import with_repository, define_archive_filters_group
 from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, archivename_validator, tag_validator, Error
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -79,13 +79,7 @@ class TagMixIn:
             removed).
             """
         )
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_tag.__doc__,
-            epilog=tag_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_tag.__doc__, epilog=tag_epilog)
         subparsers.add_subcommand("tag", subparser, help="tag archives")
         subparser.add_argument("--set", dest="set_tags", metavar="TAG", type=tag_validator, nargs="+", help="set tags")
         subparser.add_argument("--add", dest="add_tags", metavar="TAG", type=tag_validator, nargs="+", help="add tags")

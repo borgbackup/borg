@@ -4,7 +4,7 @@ from ._common import with_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import prepare_subprocess_env, set_ec, CommandError, ThreadRunner
-from ..helpers.argparsing import ArgumentParser, RawDescriptionHelpFormatter, REMAINDER
+from ..helpers.argparsing import ArgumentParser, REMAINDER
 
 from ..logger import create_logger
 
@@ -46,11 +46,7 @@ class LocksMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_break_lock.__doc__,
-            epilog=break_lock_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_break_lock.__doc__, epilog=break_lock_epilog
         )
         subparsers.add_subcommand("break-lock", subparser, help="break the repository and cache locks")
 
@@ -76,11 +72,7 @@ class LocksMixIn:
         """
         )
         subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_with_lock.__doc__,
-            epilog=with_lock_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
+            parents=[common_parser], description=self.do_with_lock.__doc__, epilog=with_lock_epilog
         )
         subparsers.add_subcommand("with-lock", subparser, help="run a user command with the lock held")
         subparser.add_argument("command", metavar="COMMAND", help="command to run")

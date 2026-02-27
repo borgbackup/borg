@@ -2,7 +2,7 @@ from ..constants import *  # NOQA
 from ..remote import RepositoryServer
 
 from ..logger import create_logger
-from ..helpers.argparsing import RawDescriptionHelpFormatter, ArgumentParser
+from ..helpers.argparsing import ArgumentParser
 
 logger = create_logger()
 
@@ -51,13 +51,7 @@ class ServeMixIn:
           Existing archives can be read, but no archives can be created or deleted.
         """
         )
-        subparser = ArgumentParser(
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_serve.__doc__,
-            epilog=serve_epilog,
-            formatter_class=RawDescriptionHelpFormatter,
-        )
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_serve.__doc__, epilog=serve_epilog)
         subparsers.add_subcommand("serve", subparser, help="start the repository server process")
         subparser.add_argument(
             "--restrict-to-path",

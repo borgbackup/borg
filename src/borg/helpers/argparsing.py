@@ -115,6 +115,60 @@ class ArgumentParser(_ArgumentParser):
     def __init__(self, *args, formatter_class=RawDescriptionHelpFormatter, add_help=False, **kwargs):
         super().__init__(*args, formatter_class=formatter_class, add_help=add_help, **kwargs)
 
+    def add_argument(self, *args, **kwargs):
+        # the current implementation of store_true in jsonargparse has troubles with
+        # env vars, see https://github.com/omni-us/jsonargparse/issues/857
+        if "action" in kwargs and kwargs["action"] == "store_true":
+            kwargs["action"] = ActionYes
+        return super().add_argument(*args, **kwargs)
+
+
+class ActionYes(Action):  # subclass ActionYesNo?
+    """Option ``--opt`` to set ``True``, replacement for store_true."""
+
+    # ActionYesNo can be too much and cannot support short options (e.g. -v instead of --verbose).
+    # ActionYes supports short options.
+    # ActionYes does not add the additional "no" options as ActionYesNo does.
+    # ActionYes can only store True if the option is used, the default is fixed to False.
+
+    def __init__(self, **kwargs):
+        """Initializer for ActionYes instance.
+
+        Raises:
+            ValueError: If a parameter is invalid.
+        """
+        if kwargs:
+            if len(kwargs["option_strings"]) == 0:
+                raise ValueError(f'{type(self).__name__} not intended for positional arguments  ({kwargs["dest"]}).')
+            kwargs["nargs"] = 0
+            kwargs["metavar"] = None
+            if "default" not in kwargs:
+                kwargs["default"] = False
+            kwargs["type"] = ActionYes._boolean_type
+            super().__init__(**kwargs)
+
+    def __call__(self, *args, **kwargs):
+        """Sets the corresponding key to True if the option is used."""
+        if len(args) == 0:
+            return ActionYes(**kwargs)
+        setattr(args[1], self.dest, True)
+
+    def _add_dest_prefix(self, prefix):
+        self.dest = prefix + "." + self.dest
+        self.option_strings[0] = "--" + prefix + "." + self.option_strings[0][2:]
+
+    @staticmethod
+    def _boolean_type(x):
+        if isinstance(x, str) and x.lower() in {"true", "yes", "false", "no"}:
+            x = True if x.lower() in {"true", "yes"} else False
+        elif not isinstance(x, bool):
+            raise TypeError(f"Value not boolean: {x}.")
+        return x
+
+    def completer(self, **kwargs):
+        """Used by argcomplete to support tab completion of arguments."""
+        return []
+
 
 def flatten_namespace(ns: Any) -> Namespace:
     """

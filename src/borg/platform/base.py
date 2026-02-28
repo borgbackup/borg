@@ -1,4 +1,5 @@
 import errno
+import io
 import os
 import socket
 import unicodedata
@@ -163,7 +164,7 @@ class SyncFile:
                that corresponds to path (like from os.open(path, ...) or os.mkstemp(...))
         :param binary: whether to open in binary mode, default is False.
         """
-        mode = "xb" if binary else "x"  # x -> raise FileExists exception in open() if file exists already
+        mode = "x+b" if binary else "x+"  # x -> raise FileExists exception in open() if file exists already
         self.path = path
         if fd is None:
             self.f = open(str(path), mode=mode)  # Python file object
@@ -180,6 +181,15 @@ class SyncFile:
     def write(self, data):
         self.f.write(data)
 
+    def read(self, *args, **kwargs):
+        return self.f.read(*args, **kwargs)
+
+    def seek(self, offset, whence=io.SEEK_SET):
+        return self.f.seek(offset, whence)
+
+    def tell(self):
+        return self.f.tell()
+
     def sync(self):
         """
         Synchronize file contents. Everything written prior to sync() must become durable before anything written
@@ -195,6 +205,8 @@ class SyncFile:
 
     def close(self):
         """sync() and close."""
+        if self.f.closed:
+            return
         from .. import platform
 
         dirname = None

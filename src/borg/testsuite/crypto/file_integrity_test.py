@@ -1,6 +1,7 @@
 import pytest
 
-from ...crypto.file_integrity import DetachedIntegrityCheckedFile, FileIntegrityError
+from ...crypto.file_integrity import DetachedIntegrityCheckedFile, FileIntegrityError, IntegrityCheckedFile
+from ...platform import SyncFile
 
 
 class TestReadIntegrityFile:
@@ -130,3 +131,19 @@ class TestDetachedIntegrityCheckedFileParts:
                 if not partial_read:
                     fd.read()
                 # But overall it explodes with the final digest. Neat, eh?
+
+
+class TestIntegrityCheckedFileWithSyncFile:
+    def test_write_and_verify_with_syncfile(self, tmp_path):
+        """IntegrityCheckedFile works correctly with SyncFile as override_fd."""
+        path = str(tmp_path / "testfile")
+        with SyncFile(path, binary=True) as sf:
+            with IntegrityCheckedFile(path=path, write=True, override_fd=sf) as fd:
+                fd.write(b"test data for integrity check")
+            integrity_data = fd.integrity_data
+
+        assert integrity_data is not None
+
+        # verify the written data can be read back with integrity check
+        with IntegrityCheckedFile(path=path, write=False, integrity_data=integrity_data) as fd:
+            assert fd.read() == b"test data for integrity check"

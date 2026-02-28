@@ -1,3 +1,15 @@
+Configuration Precedence
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+ From lowest to highest:
+
+    1. Defaults defined in the source code.
+    2. Default config file (``$BORG_CONFIG_DIR/default.yaml``).
+    3. ``--config`` file(s) (in the order given).
+    4. Full config environment variable: (``BORG_CONFIG``).
+    5. Environment variables (e.g. ``BORG_LOG_LEVEL``).
+    6. Command-line arguments in order left to right (might include config files).
+
 Configuration files
 ~~~~~~~~~~~~~~~~~~~
 
@@ -43,12 +55,6 @@ File format
     to placing them before the subcommand on the command line).  Keys nested
     under a subcommand name (e.g. ``create:``) are only applied when that
     subcommand is invoked.
-
-Precedence (lowest to highest)
-    1. Default config file (``$BORG_CONFIG_DIR/default.yaml``)
-    2. ``--config`` file(s) (in the order given)
-    3. Environment variables (e.g. ``BORG_REPO``)
-    4. Command-line arguments
 
 .. note::
     ``--print_config`` shows the merged effective configuration and is a

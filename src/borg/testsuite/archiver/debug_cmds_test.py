@@ -123,6 +123,28 @@ def test_debug_id_hash_format_put_get_parse_obj(archivers, request):
     assert meta_read.get("clevel") == c.compressor.level
 
 
+def test_debug_format_obj_respects_type(archivers, request):
+    """Test format-obj uses the type from metadata JSON, not just ROBJ_FILE_STREAM."""
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    data = b"some data" * 100
+    meta_dict = {"some": "property", "type": ROBJ_ARCHIVE_STREAM}
+    meta = json.dumps(meta_dict).encode()
+    create_regular_file(archiver.input_path, "data.bin", contents=data)
+    create_regular_file(archiver.input_path, "meta.json", contents=meta)
+    output = cmd(archiver, "debug", "id-hash", "input/data.bin")
+    id_hash = output.strip()
+    cmd(archiver, "debug", "format-obj", id_hash, "input/data.bin", "input/meta.json", "input/repoobj.bin")
+    output = cmd(archiver, "debug", "put-obj", id_hash, "input/repoobj.bin")
+    assert id_hash in output
+    output = cmd(archiver, "debug", "get-obj", id_hash, "output/object.bin")
+    assert id_hash in output
+    cmd(archiver, "debug", "parse-obj", id_hash, "output/object.bin", "output/data.bin", "output/meta.json")
+    with open("output/meta.json") as f:
+        meta_read = json.load(f)
+    assert meta_read["type"] == ROBJ_ARCHIVE_STREAM
+
+
 def test_debug_dump_manifest(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

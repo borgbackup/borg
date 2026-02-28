@@ -659,7 +659,7 @@ jobs:
           export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
           borg.exe -V
           . env/bin/activate
-          python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote" --junitxml=test-results.xml
+          python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote" --cov=borg --cov-config=pyproject.toml --junitxml=test-results.xml
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}

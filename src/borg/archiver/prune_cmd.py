@@ -170,6 +170,8 @@ class PruneMixIn:
                 keep += prune_split(archives, rule, num, kept_because)
 
         to_delete = set(archives) - set(keep)
+        logger.info("Found %d archives.", len(archives))
+        logger.info("Keeping %d archives, pruning %d archives.", len(keep), len(to_delete))
         with Cache(repository, manifest, iec=args.iec) as cache:
             list_logger = logging.getLogger("borg.output.list")
             # set up counters for the progress display

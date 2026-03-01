@@ -123,22 +123,16 @@ class ArgumentParser(_ArgumentParser):
         return super().add_argument(*args, **kwargs)
 
     def merge_config(self, cfg_from: Namespace, cfg_to: Namespace) -> Namespace:
-        """Merges cfg_from into cfg_to, with special handling for ActionYes (boolean flag) fields.
+        """Merges cfg_from into cfg_to, skipping None and protecting True from False.
 
-        For ActionYes fields (bool or None values): True always wins over False/None, so that
-        env-var-sourced True values are not overwritten by config-file or default False values.
-        For all other fields: cfg_from wins over cfg_to (standard jsonargparse behaviour).
-        None values in cfg_from are skipped so they don't overwrite any value in cfg_to.
+        - None values in cfg_from are skipped so they don't overwrite real values in cfg_to.
+        - False in cfg_from never overwrites True in cfg_to, so that env-var-sourced True
+          values survive merging with defaults or config-file values.
         """
         cfg_from = cfg_from.clone()
         cfg_to = cfg_to.clone()
-        action_yes_dests = {ac.dest for ac in self._actions if isinstance(ac, ActionYes)}
         for key, value in list(vars(cfg_from).items()):
-            if value is None:
-                # Never let a None from cfg_from overwrite anything in cfg_to.
-                delattr(cfg_from, key)
-            elif value is False and cfg_to.get(key) is True and key in action_yes_dests:
-                # For ActionYes flags: True (e.g. from env var) wins over False (e.g. from config file).
+            if value is None or (value is False and cfg_to.get(key) is True):
                 delattr(cfg_from, key)
         cfg_to.update(cfg_from)
         return cfg_to

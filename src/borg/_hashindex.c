@@ -718,10 +718,10 @@ hashindex_len(HashIndex *index)
     return index->num_entries;
 }
 
-static int
+static int64_t
 hashindex_size(HashIndex *index)
 {
-    return sizeof(HashHeader) + index->num_buckets * index->bucket_size;
+    return sizeof(HashHeader) + (int64_t)index->num_buckets * index->bucket_size;
 }
 
 /*

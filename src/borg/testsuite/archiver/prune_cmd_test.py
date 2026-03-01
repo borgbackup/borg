@@ -400,3 +400,19 @@ def test_prune_split_no_archives():
 
     assert keep == []
     assert kept_because == {}
+
+
+def test_prune_list_with_metadata_format(archivers, request):
+    # Regression test for: prune --list with a format string that requires loading
+    # archive metadata (e.g. {hostname}) must not fail when archives are deleted.
+    # The bug was that format_item() was called after archive.delete(), causing
+    # Archive.DoesNotExist when the formatter tried to lazy-load the archive.
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", src_dir)
+    cmd(archiver, "create", "test2", src_dir)
+    # {hostname} is a "call key" that triggers lazy loading of the archive from the repo.
+    # With the buggy code this would raise Archive.DoesNotExist for the pruned archive.
+    output = cmd(archiver, "prune", "--list", "--keep-daily=1", "--format={name} {hostname}{NL}")
+    assert "test1" in output
+    assert "test2" in output

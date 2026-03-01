@@ -36,6 +36,8 @@ class DeleteMixIn:
         logger_list = logging.getLogger("borg.output.list")
         for i, archive_info in enumerate(archive_infos, 1):
             name, id, hex_id = archive_info.name, archive_info.id, bin_to_hex(archive_info.id)
+            # format early before deletion of the archive
+            archive_formatted = format_archive(archive_info)
             try:
                 # this does NOT use Archive.delete, so this code hopefully even works in cases a corrupt archive
                 # would make the code in class Archive crash, so the user can at least get rid of such archives.
@@ -47,7 +49,7 @@ class DeleteMixIn:
                 deleted = True
                 if self.output_list:
                     msg = "Would delete: {} ({}/{})" if dry_run else "Deleted archive: {} ({}/{})"
-                    logger_list.info(msg.format(format_archive(archive_info), i, count))
+                    logger_list.info(msg.format(archive_formatted, i, count))
         if dry_run:
             logger.info("Finished dry-run.")
         elif deleted:

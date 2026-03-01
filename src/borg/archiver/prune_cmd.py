@@ -179,29 +179,32 @@ class PruneMixIn:
             archives_deleted = 0
             uncommitted_deletes = 0
             pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
-            for archive in archives:
+            for archive_info in archives:
                 if sig_int and sig_int.action_done():
                     break
-                if archive in to_delete:
+                # format_item may internally load the archive from the repository,
+                # so we must call it before deleting the archive.
+                archive_formatted = formatter.format_item(archive_info, jsonline=False)
+                if archive_info in to_delete:
                     pi.show()
                     if args.dry_run:
                         log_message = "Would prune:"
                     else:
                         archives_deleted += 1
                         log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
-                        archive = Archive(manifest, archive.id, cache=cache)
+                        archive = Archive(manifest, archive_info.id, cache=cache)
                         archive.delete()
                         uncommitted_deletes += 1
                 else:
                     log_message = "Keeping archive (rule: {rule} #{num}):".format(
-                        rule=kept_because[archive.id][0], num=kept_because[archive.id][1]
+                        rule=kept_because[archive_info.id][0], num=kept_because[archive_info.id][1]
                     )
                 if (
                     args.output_list
-                    or (args.list_pruned and archive in to_delete)
-                    or (args.list_kept and archive not in to_delete)
+                    or (args.list_pruned and archive_info in to_delete)
+                    or (args.list_kept and archive_info not in to_delete)
                 ):
-                    list_logger.info(f"{log_message:<44} {formatter.format_item(archive, jsonline=False)}")
+                    list_logger.info(f"{log_message:<44} {archive_formatted}")
             pi.finish()
             if sig_int:
                 raise Error("Got Ctrl-C / SIGINT.")

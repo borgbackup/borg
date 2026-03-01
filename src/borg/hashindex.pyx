@@ -4,7 +4,7 @@ import locale
 import os
 
 cimport cython
-from libc.stdint cimport uint32_t, UINT32_MAX, uint64_t
+from libc.stdint cimport int64_t, uint32_t, UINT32_MAX, uint64_t
 from libc.errno cimport errno
 from libc.string cimport memcpy
 from cpython.exc cimport PyErr_SetFromErrnoWithFilename
@@ -26,7 +26,7 @@ cdef extern from "_hashindex.c":
     HashIndex *hashindex_init(int capacity, int key_size, int value_size)
     void hashindex_free(HashIndex *index)
     int hashindex_len(HashIndex *index)
-    int hashindex_size(HashIndex *index)
+    int64_t hashindex_size(HashIndex *index)
     void hashindex_write(HashIndex *index, object file_py) except *
     unsigned char *hashindex_get(HashIndex *index, unsigned char *key)
     unsigned char *hashindex_next_key(HashIndex *index, unsigned char *key)

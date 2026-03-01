@@ -72,7 +72,7 @@ else:  # pragma: win32 only
     from .base import listxattr, getxattr, setxattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
-    from .base import SyncFile
+    from .windows import SyncFile
     from .windows import process_alive, local_pid_alive
     from .windows import getosusername
     from . import windows_ug as platform_ug

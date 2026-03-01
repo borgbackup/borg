@@ -345,7 +345,17 @@ class Archiver(
             args = self.preprocess_args(args)
         parser = self.build_parser()
         args = parser.parse_args(args or ["-h"])
-        args = flatten_namespace(args)
+        # Collect all ActionYes dests from the parser and all subparsers so flatten_namespace
+        # can correctly convert None (flag absent) to False only for boolean flag fields.
+        # We scan _actions directly because parent parser actions are copied into subparser._actions
+        # by argparse, so they won't appear in the subparser's own _action_yes_dests set.
+        from ..helpers.argparsing import ActionYes as _ActionYes
+
+        action_yes_dests = {ac.dest for ac in parser._actions if isinstance(ac, _ActionYes)}
+        if parser._subcommands_action is not None:
+            for sp in parser._subcommands_action._name_parser_map.values():
+                action_yes_dests.update(ac.dest for ac in sp._actions if isinstance(ac, _ActionYes))
+        args = flatten_namespace(args, action_yes_dests=action_yes_dests)
 
         # Ensure list defaults previously handled by set_defaults are present
         for list_attr in ("paths", "patterns", "pattern_roots"):

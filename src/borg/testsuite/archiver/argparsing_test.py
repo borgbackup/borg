@@ -1,7 +1,7 @@
 import pytest
 
 from . import Archiver, RK_ENCRYPTION, cmd
-from ...helpers.argparsing import ArgumentParser, flatten_namespace
+from ...helpers.argparsing import ActionYes, ArgumentParser, flatten_namespace
 
 
 def test_bad_filters(archiver):
@@ -24,6 +24,14 @@ def test_highlander(archiver):
     for first, second in [("0007", "0007"), ("0007", "0077"), ("0077", "0007"), ("0077", "0077")]:
         output_custom = cmd(archiver, "--umask", first, "--umask", second, "repo-list", exit_code=2)
         assert error_msg in output_custom
+
+
+def test_env_var_bool_flag(monkeypatch):
+    """BORG_CREATE__STATS=true must activate --stats even without the CLI flag."""
+    monkeypatch.setenv("BORG_CREATE__STATS", "true")
+    archiver = Archiver()
+    args = archiver.parse_args(["create", "test", "/some/path"])
+    assert args.stats is True, "env var BORG_CREATE__STATS=true must set stats=True"
 
 
 def test_get_args():
@@ -121,7 +129,11 @@ class TestCommonOptions:
         def parse_vars_from_line(*line):
             print(line)
             args = parser.parse_args(line)
-            args = flatten_namespace(args)
+            action_yes_dests = {ac.dest for ac in parser._actions if isinstance(ac, ActionYes)}
+            if parser._subcommands_action is not None:
+                for sp in parser._subcommands_action._name_parser_map.values():
+                    action_yes_dests.update(ac.dest for ac in sp._actions if isinstance(ac, ActionYes))
+            args = flatten_namespace(args, action_yes_dests=action_yes_dests)
             return vars(args)
 
         return parse_vars_from_line

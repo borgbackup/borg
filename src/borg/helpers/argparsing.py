@@ -122,6 +122,27 @@ class ArgumentParser(_ArgumentParser):
             kwargs["action"] = ActionYes
         return super().add_argument(*args, **kwargs)
 
+    def merge_config(self, cfg_from: Namespace, cfg_to: Namespace) -> Namespace:
+        """Merges cfg_from into cfg_to, with special handling for ActionYes (boolean flag) fields.
+
+        For ActionYes fields (bool or None values): True always wins over False/None, so that
+        env-var-sourced True values are not overwritten by config-file or default False values.
+        For all other fields: cfg_from wins over cfg_to (standard jsonargparse behaviour).
+        None values in cfg_from are skipped so they don't overwrite any value in cfg_to.
+        """
+        cfg_from = cfg_from.clone()
+        cfg_to = cfg_to.clone()
+        action_yes_dests = {ac.dest for ac in self._actions if isinstance(ac, ActionYes)}
+        for key, value in list(vars(cfg_from).items()):
+            if value is None:
+                # Never let a None from cfg_from overwrite anything in cfg_to.
+                delattr(cfg_from, key)
+            elif value is False and cfg_to.get(key) is True and key in action_yes_dests:
+                # For ActionYes flags: True (e.g. from env var) wins over False (e.g. from config file).
+                delattr(cfg_from, key)
+        cfg_to.update(cfg_from)
+        return cfg_to
+
 
 class ActionYes(Action):  # subclass ActionYesNo?
     """Option ``--opt`` to set ``True``, replacement for store_true."""
@@ -129,7 +150,9 @@ class ActionYes(Action):  # subclass ActionYesNo?
     # ActionYesNo can be too much and cannot support short options (e.g. -v instead of --verbose).
     # ActionYes supports short options.
     # ActionYes does not add the additional "no" options as ActionYesNo does.
-    # ActionYes can only store True if the option is used, the default is fixed to False.
+    # ActionYes can only store True if the option is used.
+    # The default is None (not False) so that env-var values are not overwritten
+    # by a False default when the flag is absent from the CLI.
 
     def __init__(self, **kwargs):
         """Initializer for ActionYes instance.
@@ -143,7 +166,7 @@ class ActionYes(Action):  # subclass ActionYesNo?
             kwargs["nargs"] = 0
             kwargs["metavar"] = None
             if "default" not in kwargs:
-                kwargs["default"] = False
+                kwargs["default"] = None  # None so env-var values are not overwritten by a False default.
             kwargs["type"] = ActionYes._boolean_type
             super().__init__(**kwargs)
 
@@ -159,6 +182,8 @@ class ActionYes(Action):  # subclass ActionYesNo?
 
     @staticmethod
     def _boolean_type(x):
+        if x is None:
+            return None  # Preserve None so env-var values are not overwritten by a False default.
         if isinstance(x, str) and x.lower() in {"true", "yes", "false", "no"}:
             x = True if x.lower() in {"true", "yes"} else False
         elif not isinstance(x, bool):
@@ -170,7 +195,7 @@ class ActionYes(Action):  # subclass ActionYesNo?
         return []
 
 
-def flatten_namespace(ns: Any) -> Namespace:
+def flatten_namespace(ns: Any, action_yes_dests: set = frozenset()) -> Namespace:
     """
     Flattens the nested namespace jsonargparse produces for subcommands into a
     single-level namespace that borg's dispatch and command implementations expect.
@@ -178,6 +203,7 @@ def flatten_namespace(ns: Any) -> Namespace:
     Inner (subcommand) values take precedence over outer (top-level) values.
     For list-typed values (append-action options like --debug-topic) that appear
     at multiple levels, the lists are merged: outer values first, inner values last.
+    ActionYes fields with a None value (flag absent from CLI and no env var) are set to False.
     """
     flat = Namespace()
 
@@ -204,6 +230,9 @@ def flatten_namespace(ns: Any) -> Namespace:
             continue
         existing = getattr(flat, dest, None)
         if existing is None:
+            # For ActionYes flags absent from CLI and env: treat None as False.
+            if value is None and dest in action_yes_dests:
+                value = False
             setattr(flat, dest, value)
         elif isinstance(existing, list) and isinstance(value, list):
             # Append-action options (e.g. --debug-topic): outer values come first.

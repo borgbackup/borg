@@ -1,5 +1,4 @@
 import sys
-import argparse
 import logging
 import stat
 
@@ -12,6 +11,7 @@ from ..helpers import remove_surrogates
 from ..helpers import HardLinkManager
 from ..helpers import ProgressIndicatorPercent
 from ..helpers import BackupWarning, IncludePatternNeverMatchedWarning
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -33,6 +33,7 @@ class ExtractMixIn:
                     "For example, install locales and use: LANG=en_US.UTF-8"
                 )
 
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
 
         progress = args.progress
@@ -154,16 +155,8 @@ class ExtractMixIn:
             group, permissions, etc.
         """
         )
-        subparser = subparsers.add_parser(
-            "extract",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_extract.__doc__,
-            epilog=extract_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="extract archive contents",
-        )
-        subparser.set_defaults(func=self.do_extract)
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_extract.__doc__, epilog=extract_epilog)
+        subparsers.add_subcommand("extract", subparser, help="extract archive contents")
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output a verbose list of items (files, dirs, ...)"
         )

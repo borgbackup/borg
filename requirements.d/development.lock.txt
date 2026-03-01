@@ -14,3 +14,4 @@ pytest-cov==7.0.0
 pytest-benchmark==5.2.3
 Cython==3.2.4
 pre-commit==4.5.1
+types-PyYAML==6.0.12.20250915

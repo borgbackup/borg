@@ -1,4 +1,3 @@
-import argparse
 import os
 import textwrap
 import sys
@@ -8,6 +7,7 @@ from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import ItemFormatter, BaseFormatter, archivename_validator, PathSpec
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -19,6 +19,7 @@ class ListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest):
         """List archive contents."""
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
         if args.format is not None:
             format = args.format
@@ -89,7 +90,6 @@ class ListMixIn:
 
         The following keys are always available:
 
-
         """
             )
             + BaseFormatter.keys_help()
@@ -102,16 +102,8 @@ class ListMixIn:
             )
             + ItemFormatter.keys_help()
         )
-        subparser = subparsers.add_parser(
-            "list",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_list.__doc__,
-            epilog=list_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="list archive contents",
-        )
-        subparser.set_defaults(func=self.do_list)
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_list.__doc__, epilog=list_epilog)
+        subparsers.add_subcommand("list", subparser, help="list archive contents")
         subparser.add_argument(
             "--short", dest="short", action="store_true", help="only print file/directory names, nothing else"
         )

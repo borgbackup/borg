@@ -50,8 +50,6 @@ The following argument types have intelligent, context-aware completion:
    - Suggests common file size values (500M, 1G, 10G, 100G, 1T, etc.)
 """
 
-import argparse
-
 import shtab
 
 from ._common import process_epilog
@@ -62,12 +60,15 @@ from ..helpers import (
     FilesCacheMode,
     PathSpec,
     ChunkerParams,
+    CompressionSpec,
     tag_validator,
     relative_time_marker_validator,
     parse_file_size,
 )
+from ..helpers.argparsing import ArgumentParser
+from ..helpers.argparsing import _ActionSubCommands
+from ..helpers.argparsing import prepare_actions_context, shtab_prepare_actions, bash_compgen_typehint
 from ..helpers.time import timestamp
-from ..compress import CompressionSpec
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
 
@@ -340,7 +341,6 @@ _borg_help_topics() {
     compgen -W "${choices}" -- "$1"
 }
 """
-
 
 # Global zsh preamble providing dynamic completion for aid:<hex> archive IDs.
 #
@@ -628,12 +628,11 @@ _borg_help_topics() {
 """
 
 
-def _attach_completion(parser: argparse.ArgumentParser, type_class, completion_dict: dict):
+def _attach_completion(parser: ArgumentParser, type_class, completion_dict: dict):
     """Tag all arguments with type `type_class` with completion choices from `completion_dict`."""
 
     for action in parser._actions:
-        # Recurse into subparsers
-        if isinstance(action, argparse._SubParsersAction):
+        if isinstance(action, _ActionSubCommands):
             for sub in action.choices.values():
                 _attach_completion(sub, type_class, completion_dict)
             continue
@@ -642,10 +641,10 @@ def _attach_completion(parser: argparse.ArgumentParser, type_class, completion_d
             action.complete = completion_dict  # type: ignore[attr-defined]
 
 
-def _attach_help_completion(parser: argparse.ArgumentParser, completion_dict: dict):
+def _attach_help_completion(parser: ArgumentParser, completion_dict: dict):
     """Tag the 'topic' argument of the 'help' command with static completion choices."""
     for action in parser._actions:
-        if isinstance(action, argparse._SubParsersAction):
+        if isinstance(action, _ActionSubCommands):
             for sub in action.choices.values():
                 _attach_help_completion(sub, completion_dict)
             continue
@@ -692,7 +691,7 @@ class CompletionMixIn:
         # Collect all commands and help topics for "borg help" completion
         help_choices = list(self.helptext.keys())
         for action in parser._actions:
-            if isinstance(action, argparse._SubParsersAction):
+            if isinstance(action, _ActionSubCommands):
                 help_choices.extend(action.choices.keys())
 
         help_completion_fn = "_borg_help_topics"
@@ -732,8 +731,20 @@ class CompletionMixIn:
         }
         bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)
         zsh_preamble = partial_format(ZSH_PREAMBLE_TMPL, mapping)
-        preamble = {"bash": bash_preamble, "zsh": zsh_preamble}
-        script = shtab.complete(parser, shell=args.shell, preamble=preamble)  # nosec B604
+
+        parser.prog = "borg"
+        prog = "borg"
+        preambles = []
+        if args.shell == "bash":
+            preambles.append(bash_compgen_typehint.strip().replace("%s", prog))
+            preambles.append(bash_preamble)
+        elif args.shell == "zsh":
+            preambles.append(zsh_preamble)
+
+        with prepare_actions_context(args.shell, prog, preambles):
+            shtab_prepare_actions(parser)
+
+        script = shtab.complete(parser, shell=args.shell, preamble="\n".join(preambles))  # nosec B604
         print(script)
 
     def build_parser_completion(self, subparsers, common_parser, mid_common_parser):
@@ -750,16 +761,10 @@ class CompletionMixIn:
         """
         )
 
-        subparser = subparsers.add_parser(
-            "completion",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_completion.__doc__,
-            epilog=completion_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="output shell completion script",
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_completion.__doc__, epilog=completion_epilog
         )
-        subparser.set_defaults(func=self.do_completion)
+        subparsers.add_subcommand("completion", subparser, help="output shell completion script")
         subparser.add_argument(
             "shell", metavar="SHELL", choices=shells, help="shell to generate completion for (one of: %(choices)s)"
         )

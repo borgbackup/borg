@@ -1,11 +1,11 @@
-import argparse
 from collections import defaultdict
 
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
-from ..compress import CompressionSpec, ObfuscateSize, Auto, COMPRESSOR_TABLE
+from ..compress import ObfuscateSize, Auto, COMPRESSOR_TABLE
 from ..hashindex import ChunkIndex
-from ..helpers import sig_int, ProgressIndicatorPercent, Error
+from ..helpers import sig_int, ProgressIndicatorPercent, Error, CompressionSpec
+from ..helpers.argparsing import ArgumentParser
 from ..repository import Repository
 from ..remote import RemoteRepository
 from ..manifest import Manifest
@@ -180,16 +180,10 @@ class RepoCompressMixIn:
         You do **not** need to run ``borg compact`` after ``borg repo-compress``.
         """
         )
-        subparser = subparsers.add_parser(
-            "repo-compress",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_repo_compress.__doc__,
-            epilog=repo_compress_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help=self.do_repo_compress.__doc__,
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_repo_compress.__doc__, epilog=repo_compress_epilog
         )
-        subparser.set_defaults(func=self.do_repo_compress)
+        subparsers.add_subcommand("repo-compress", subparser, help=self.do_repo_compress.__doc__)
 
         subparser.add_argument(
             "-C",

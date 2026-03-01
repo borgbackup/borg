@@ -15,7 +15,6 @@ else:
     sys.exit(2)  # == EXIT_ERROR
 
 try:
-    import argparse
     import faulthandler
     import functools
     import inspect
@@ -40,12 +39,13 @@ try:
     from ..helpers import format_file_size
     from ..helpers import remove_surrogates, text_to_json
     from ..helpers import DatetimeWrapper, replace_placeholders
-
+    from ..helpers.argparsing import flatten_namespace, ArgumentTypeError, ArgumentParser, SUPPRESS
     from ..helpers import is_slow_msgpack, is_supported_msgpack, sysinfo
     from ..helpers import signal_handler, raising_signal_handler, SigHup, SigTerm
     from ..helpers import ErrorIgnoringTextIOWrapper
     from ..helpers import msgpack
     from ..helpers import sig_int
+    from ..helpers import get_config_dir
     from ..remote import RemoteRepository
     from ..selftest import selftest
 except BaseException:
@@ -61,18 +61,6 @@ assert EXIT_ERROR == 2, "EXIT_ERROR is not 2, as expected - fix assert AND excep
 STATS_HEADER = "                       Original size    Deduplicated size"
 
 PURE_PYTHON_MSGPACK_WARNING = "Using a pure-python msgpack! This will result in lower performance."
-
-
-def get_func(args):
-    # This works around https://bugs.python.org/issue9351
-    # func is used at the leaf parsers of the argparse parser tree,
-    # fallback_func at next level towards the root,
-    # fallback2_func at the 2nd next level (which is root in our case).
-    for name in "func", "fallback_func", "fallback2_func":
-        func = getattr(args, name, None)
-        if func is not None:
-            return func
-    raise Exception("expected func attributes not found")
 
 
 from .analyze_cmd import AnalyzeMixIn
@@ -191,62 +179,45 @@ class Archiver(
 
     class CommonOptions:
         """
-        Support class to allow specifying common options directly after the top-level command.
+        Support class to allow specifying common options at multiple levels of the command hierarchy.
 
-        Normally options can only be specified on the parser defining them, which means
-        that generally speaking *all* options go after all sub-commands. This is annoying
-        for common options in scripts, e.g. --remote-path or logging options.
+        Common options (e.g. --log-level, --repo) can be placed anywhere in the command line:
 
-        This class allows adding the same set of options to both the top-level parser
-        and the final sub-command parsers (but not intermediary sub-commands, at least for now).
+            borg --info create ...          # before the subcommand
+            borg create --info ...          # after the subcommand
+            borg --info debug info --debug  # at both levels of a two-level command
 
-        It does so by giving every option's target name ("dest") a suffix indicating its level
-        -- no two options in the parser hierarchy can have the same target --
-        then, after parsing the command line, multiple definitions are resolved.
+        Each parser level registers the same options with the same dest names.
+        Defaults are only provided on the top-level parser; all sub-parsers use SUPPRESS so
+        that unset options don't appear in the namespace at all.
 
-        Defaults are handled by only setting them on the top-level parser and setting
-        a sentinel object in all sub-parsers, which then allows one to discern which parser
-        supplied the option.
+        flatten_namespace() handles precedence: it walks sub-namespaces depth-first, so the
+        most-specific (innermost) value wins.  For append-action options (e.g. --debug-topic)
+        it merges lists from all levels.
         """
 
-        def __init__(self, define_common_options, suffix_precedence):
+        def __init__(self, define_common_options):
             """
             *define_common_options* should be a callable taking one argument, which
-            will be a argparse.Parser.add_argument-like function.
+            will be an argparse.Parser.add_argument-like function.
 
             *define_common_options* will be called multiple times, and should call
             the passed function to define common options exactly the same way each time.
-
-            *suffix_precedence* should be a tuple of the suffixes that will be used.
-            It is ordered from lowest precedence to highest precedence:
-            An option specified on the parser belonging to index 0 is overridden if the
-            same option is specified on any parser with a higher index.
             """
             self.define_common_options = define_common_options
-            self.suffix_precedence = suffix_precedence
-
-            # Maps suffixes to sets of target names.
-            # E.g. common_options["_subcommand"] = {..., "log_level", ...}
-            self.common_options = dict()
-            # Set of options with the 'append' action.
-            self.append_options = set()
             # This is the sentinel object that replaces all default values in parsers
             # below the top-level parser.
             self.default_sentinel = object()
 
-        def add_common_group(self, parser, suffix, provide_defaults=False):
+        def add_common_group(self, parser, provide_defaults=False):
             """
             Add common options to *parser*.
 
-            *provide_defaults* must only be True exactly once in a parser hierarchy,
-            at the top level, and False on all lower levels. The default is chosen
-            accordingly.
-
-            *suffix* indicates the suffix to use internally. It also indicates
-            which precedence the *parser* has for common options. See *suffix_precedence*
-            of __init__.
+            *provide_defaults* must be True exactly once in a parser hierarchy (the top-level
+            parser) and False on all sub-parsers.  Sub-parsers get SUPPRESS as the default so
+            that an unspecified option produces no attribute, leaving the top-level default intact
+            after flatten_namespace() merges the namespaces.
             """
-            assert suffix in self.suffix_precedence
 
             def add_argument(*args, **kwargs):
                 if "dest" in kwargs:
@@ -261,97 +232,47 @@ class Archiver(
                         "append",
                     )
                     is_append = kwargs["action"] == "append"
-                    if is_append:
-                        self.append_options.add(kwargs["dest"])
-                        assert (
-                            kwargs["default"] == []
-                        ), "The default is explicitly constructed as an empty list in resolve()"
-                    else:
-                        self.common_options.setdefault(suffix, set()).add(kwargs["dest"])
-                    kwargs["dest"] += suffix
                     if not provide_defaults:
-                        # Interpolate help now, in case the %(default)d (or so) is mentioned,
+                        # Interpolate help now, in case %(default)d (or similar) is mentioned,
                         # to avoid producing incorrect help output.
-                        # Assumption: Interpolated output can safely be interpolated again,
-                        # which should always be the case.
-                        # Note: We control all inputs.
                         kwargs["help"] = kwargs["help"] % kwargs
                         if not is_append:
-                            kwargs["default"] = self.default_sentinel
+                            kwargs["default"] = SUPPRESS
 
                 common_group.add_argument(*args, **kwargs)
 
             common_group = parser.add_argument_group("Common options")
             self.define_common_options(add_argument)
 
-        def resolve(self, args: argparse.Namespace):  # Namespace has "in" but otherwise is not like a dict.
-            """
-            Resolve the multiple definitions of each common option to the final value.
-            """
-            for suffix in self.suffix_precedence:
-                # From highest level to lowest level, so the "most-specific" option wins, e.g.
-                # "borg --debug create --info" shall result in --info being effective.
-                for dest in self.common_options.get(suffix, []):
-                    # map_from is this suffix' option name, e.g. log_level_subcommand
-                    # map_to is the target name, e.g. log_level
-                    map_from = dest + suffix
-                    map_to = dest
-                    # Retrieve value; depending on the action it may not exist, but usually does
-                    # (store_const/store_true/store_false), either because the action implied a default
-                    # or a default is explicitly supplied.
-                    # Note that defaults on lower levels are replaced with default_sentinel.
-                    # Only the top level has defaults.
-                    value = getattr(args, map_from, self.default_sentinel)
-                    if value is not self.default_sentinel:
-                        # value was indeed specified on this level. Transfer value to target,
-                        # and un-clobber the args (for tidiness - you *cannot* use the suffixed
-                        # names for other purposes, obviously).
-                        setattr(args, map_to, value)
-                    try:
-                        delattr(args, map_from)
-                    except AttributeError:
-                        pass
-
-            # Options with an "append" action need some special treatment. Instead of
-            # overriding values, all specified values are merged together.
-            for dest in self.append_options:
-                option_value = []
-                for suffix in self.suffix_precedence:
-                    # Find values of this suffix, if any, and add them to the final list
-                    extend_from = dest + suffix
-                    if extend_from in args:
-                        values = getattr(args, extend_from)
-                        delattr(args, extend_from)
-                        option_value.extend(values)
-                setattr(args, dest, option_value)
-
     def build_parser(self):
         from ._common import define_common_options
 
-        parser = argparse.ArgumentParser(prog=self.prog, description="Borg - Deduplicated Backups", add_help=False)
-        # paths and patterns must have an empty list as default everywhere
-        parser.set_defaults(fallback2_func=functools.partial(self.do_maincommand_help, parser), paths=[], patterns=[])
-        parser.common_options = self.CommonOptions(
-            define_common_options, suffix_precedence=("_maincommand", "_midcommand", "_subcommand")
+        parser = ArgumentParser(
+            prog=self.prog,
+            description="Borg - Deduplicated Backups",
+            default_config_files=[os.path.join(get_config_dir(), "default.yaml")],
+            default_env=True,
+            env_prefix="BORG",
         )
+        parser.add_argument("--config", action="config")
+        # paths and patterns must have an empty list as default everywhere
+        parser.common_options = self.CommonOptions(define_common_options)
         parser.add_argument(
             "-V", "--version", action="version", version="%(prog)s " + __version__, help="show version number and exit"
         )
         parser.add_argument("--cockpit", dest="cockpit", action="store_true", help="Start the Borg TUI")
-        parser.common_options.add_common_group(parser, "_maincommand", provide_defaults=True)
+        parser.common_options.add_common_group(parser, provide_defaults=True)
 
-        common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
-        common_parser.set_defaults(paths=[], patterns=[])
-        parser.common_options.add_common_group(common_parser, "_subcommand")
+        common_parser = ArgumentParser(prog=self.prog)
+        parser.common_options.add_common_group(common_parser)
 
-        mid_common_parser = argparse.ArgumentParser(add_help=False, prog=self.prog)
-        mid_common_parser.set_defaults(paths=[], patterns=[])
-        parser.common_options.add_common_group(mid_common_parser, "_midcommand")
+        mid_common_parser = ArgumentParser(prog=self.prog)
+        parser.common_options.add_common_group(mid_common_parser)
 
         if parser.prog == "borgfs":
             return self.build_parser_borgfs(parser)
 
-        subparsers = parser.add_subparsers(title="required arguments", metavar="<command>")
+        subparsers = parser.add_subcommands(required=False, title="required arguments", metavar="<command>")
 
         self.build_parser_analyze(subparsers, common_parser, mid_common_parser)
         self.build_parser_benchmarks(subparsers, common_parser, mid_common_parser)
@@ -424,8 +345,24 @@ class Archiver(
             args = self.preprocess_args(args)
         parser = self.build_parser()
         args = parser.parse_args(args or ["-h"])
-        parser.common_options.resolve(args)
-        func = get_func(args)
+        # Collect all ActionYes dests from the parser and all subparsers so flatten_namespace
+        # can correctly convert None (flag absent) to False only for boolean flag fields.
+        # We scan _actions directly because parent parser actions are copied into subparser._actions
+        # by argparse, so they won't appear in the subparser's own _action_yes_dests set.
+        from ..helpers.argparsing import ActionYes as _ActionYes
+
+        action_yes_dests = {ac.dest for ac in parser._actions if isinstance(ac, _ActionYes)}
+        if parser._subcommands_action is not None:
+            for sp in parser._subcommands_action._name_parser_map.values():
+                action_yes_dests.update(ac.dest for ac in sp._actions if isinstance(ac, _ActionYes))
+        args = flatten_namespace(args, action_yes_dests=action_yes_dests)
+
+        # Ensure list defaults previously handled by set_defaults are present
+        for list_attr in ("paths", "patterns", "pattern_roots"):
+            if getattr(args, list_attr, None) is None:
+                setattr(args, list_attr, [])
+
+        func = self.get_func(args, parser)
         if func == self.do_create and args.paths and args.paths_from_stdin:
             parser.error("Must not pass PATH with --paths-from-stdin.")
         if args.progress and getattr(args, "output_list", False) and not args.log_json:
@@ -433,8 +370,7 @@ class Archiver(
         if func == self.do_create and not args.paths:
             if args.content_from_command or args.paths_from_command:
                 parser.error("No command given.")
-            elif not args.paths_from_stdin:
-                # need at least 1 path but args.paths may also be populated from patterns
+            elif not args.paths_from_stdin and not args.pattern_roots:
                 parser.error("Need at least one PATH argument.")
         # we can only have a complete knowledge of placeholder replacements we should do **after** arg parsing,
         # e.g. due to options like --timestamp that override the current time.
@@ -452,7 +388,23 @@ class Archiver(
             if value:
                 setattr(args, name, [replace_placeholders(elem) for elem in value])
 
+        args.func = func
+
         return args
+
+    def get_func(self, args, parser):
+        if not getattr(args, "subcommand", None):
+            return functools.partial(self.do_maincommand_help, parser)
+
+        method_name = "do_" + args.subcommand.replace(" ", "_").replace("-", "_")
+        func = getattr(self, method_name, None)
+        if func is not None:
+            if method_name == "do_help":
+                return functools.partial(func, parser)
+            return func
+
+        # fallback to general help for e.g., "borg key"
+        return functools.partial(self.do_maincommand_help, parser)
 
     def prerun_checks(self, logger, is_serve):
 
@@ -486,7 +438,7 @@ class Archiver(
     def run(self, args):
         os.umask(args.umask)  # early, before opening files
         self.lock_wait = args.lock_wait
-        func = get_func(args)
+        func = args.func
         # do not use loggers before this!
         is_serve = func == self.do_serve
         self.log_json = args.log_json and not is_serve
@@ -633,7 +585,7 @@ def main():  # pragma: no cover
                 tb = format_tb(e)
                 print(tb, file=sys.stderr)
             sys.exit(e.exit_code)
-        except argparse.ArgumentTypeError as e:
+        except ArgumentTypeError as e:
             # we might not have logging setup yet, so get out quickly
             print(str(e), file=sys.stderr)
             sys.exit(CommandError.exit_mcode if modern_ec else EXIT_ERROR)

@@ -1,4 +1,3 @@
-import argparse
 import base64
 import logging
 import os
@@ -7,7 +6,6 @@ import tarfile
 import time
 
 from ..archive import Archive, TarfileObjectProcessors, ChunksProcessor
-from ..compress import CompressionSpec
 from ..constants import *  # NOQA
 from ..helpers import HardLinkManager, IncludePatternNeverMatchedWarning
 from ..helpers import ProgressIndicatorPercent
@@ -15,11 +13,12 @@ from ..helpers import dash_open
 from ..helpers import msgpack
 from ..helpers import create_filter_process
 from ..helpers import ChunkIteratorFileWrapper
-from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams
+from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, CompressionSpec
 from ..helpers import remove_surrogates
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import basic_json_data, json_print
 from ..helpers import log_multi
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ._common import with_repository, with_archive, Highlander, define_exclusion_group
@@ -87,6 +86,7 @@ class TarMixIn:
             self._export_tar(args, archive, _stream)
 
     def _export_tar(self, args, archive, tarstream):
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
 
         progress = args.progress
@@ -386,16 +386,10 @@ class TarMixIn:
         pass over the archive metadata.
         """
         )
-        subparser = subparsers.add_parser(
-            "export-tar",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_export_tar.__doc__,
-            epilog=export_tar_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="create tarball from archive",
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_export_tar.__doc__, epilog=export_tar_epilog
         )
-        subparser.set_defaults(func=self.do_export_tar)
+        subparsers.add_subcommand("export-tar", subparser, help="create tarball from archive")
         subparser.add_argument(
             "--tar-filter",
             dest="tar_filter",
@@ -462,16 +456,10 @@ class TarMixIn:
         ``--ignore-zeros`` option to skip through the stop markers between them.
         """
         )
-        subparser = subparsers.add_parser(
-            "import-tar",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_import_tar.__doc__,
-            epilog=import_tar_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help=self.do_import_tar.__doc__,
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_import_tar.__doc__, epilog=import_tar_epilog
         )
-        subparser.set_defaults(func=self.do_import_tar)
+        subparsers.add_subcommand("import-tar", subparser, help=self.do_import_tar.__doc__)
         subparser.add_argument(
             "--tar-filter",
             dest="tar_filter",

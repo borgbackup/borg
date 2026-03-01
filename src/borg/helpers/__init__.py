@@ -25,13 +25,14 @@ from .fs import O_, flags_dir, flags_special_follow, flags_special, flags_base, 
 from .fs import HardLinkManager
 from .misc import sysinfo, log_multi, consume
 from .misc import ChunkIteratorFileWrapper, open_item, chunkit, iter_separated, ErrorIgnoringTextIOWrapper
-from .parseformat import bin_to_hex, hex_to_bin, safe_encode, safe_decode
+from .parseformat import octal_int, bin_to_hex, hex_to_bin, safe_encode, safe_decode
 from .parseformat import text_to_json, binary_to_json, remove_surrogates, join_cmd
-from .parseformat import eval_escapes, decode_dict, positive_int_validator, interval
+from .parseformat import eval_escapes, decode_dict, interval
 from .parseformat import (
     PathSpec,
     FilesystemPathSpec,
     SortBySpec,
+    CompressionSpec,
     ChunkerParams,
     FilesCacheMode,
     partial_format,

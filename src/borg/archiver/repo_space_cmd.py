@@ -1,4 +1,3 @@
-import argparse
 import math
 import os
 
@@ -7,6 +6,7 @@ from borgstore.store import ItemInfo
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import parse_file_size, format_file_size
+from ..helpers.argparsing import ArgumentParser
 
 from ..logger import create_logger
 
@@ -82,20 +82,13 @@ class RepoSpaceMixIn:
             $ borg compact -v  # only this actually frees space of deleted archives
             $ borg repo-space --reserve 1G  # reserve space again for next time
 
-
         Reserved space is always rounded up to full reservation blocks of 64 MiB.
         """
         )
-        subparser = subparsers.add_parser(
-            "repo-space",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_repo_space.__doc__,
-            epilog=repo_space_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="manage reserved space in a repository",
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_repo_space.__doc__, epilog=repo_space_epilog
         )
-        subparser.set_defaults(func=self.do_repo_space)
+        subparsers.add_subcommand("repo-space", subparser, help="manage reserved space in a repository")
         subparser.add_argument(
             "--reserve",
             metavar="SPACE",

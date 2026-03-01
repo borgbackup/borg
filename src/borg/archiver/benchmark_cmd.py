@@ -1,6 +1,4 @@
-import argparse
 from contextlib import contextmanager
-import functools
 import json
 import logging
 import os
@@ -9,10 +7,11 @@ import time
 
 from ..constants import *  # NOQA
 from ..crypto.key import FlexiKey
-from ..helpers import format_file_size
+from ..helpers import format_file_size, CompressionSpec
 from ..helpers import json_print
 from ..helpers import msgpack
 from ..helpers import get_reset_ec
+from ..helpers.argparsing import ArgumentParser
 from ..item import Item
 from ..platform import SyncFile
 
@@ -296,8 +295,6 @@ class BenchmarkMixIn:
             else:
                 print(f"{spec:<24} {count:<10} {dt:.3f}s")
 
-        from ..compress import CompressionSpec
-
         if not args.json:
             print("Compression ====================================================")
         else:
@@ -348,18 +345,12 @@ class BenchmarkMixIn:
 
         benchmark_epilog = process_epilog("These commands do various benchmarks.")
 
-        subparser = subparsers.add_parser(
-            "benchmark",
-            parents=[mid_common_parser],
-            add_help=False,
-            description="benchmark command",
-            epilog=benchmark_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="benchmark command",
+        subparser = ArgumentParser(
+            parents=[mid_common_parser], description="benchmark command", epilog=benchmark_epilog
         )
+        subparsers.add_subcommand("benchmark", subparser, help="benchmark command")
 
-        benchmark_parsers = subparser.add_subparsers(title="required arguments", metavar="<command>")
-        subparser.set_defaults(fallback_func=functools.partial(self.do_subcommand_help, subparser))
+        benchmark_parsers = subparser.add_subcommands(required=False, title="required arguments", metavar="<command>")
 
         bench_crud_epilog = process_epilog(
             """
@@ -402,16 +393,12 @@ class BenchmarkMixIn:
         Try multiple measurements and having a otherwise idle machine (and network, if you use it).
         """
         )
-        subparser = benchmark_parsers.add_parser(
-            "crud",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_benchmark_crud.__doc__,
-            epilog=bench_crud_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="benchmarks Borg CRUD (create, extract, update, delete).",
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_benchmark_crud.__doc__, epilog=bench_crud_epilog
         )
-        subparser.set_defaults(func=self.do_benchmark_crud)
+        benchmark_parsers.add_subcommand(
+            "crud", subparser, help="benchmarks Borg CRUD (create, extract, update, delete)."
+        )
 
         subparser.add_argument("path", metavar="PATH", help="path where to create benchmark input data")
         subparser.add_argument("--json-lines", action="store_true", help="Format output as JSON Lines.")
@@ -427,14 +414,8 @@ class BenchmarkMixIn:
         - enough free memory so there will be no slow down due to paging activity
         """
         )
-        subparser = benchmark_parsers.add_parser(
-            "cpu",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_benchmark_cpu.__doc__,
-            epilog=bench_cpu_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="benchmarks Borg CPU-bound operations.",
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_benchmark_cpu.__doc__, epilog=bench_cpu_epilog
         )
-        subparser.set_defaults(func=self.do_benchmark_cpu)
+        benchmark_parsers.add_subcommand("cpu", subparser, help="benchmarks Borg CPU-bound operations.")
         subparser.add_argument("--json", action="store_true", help="format output as JSON")

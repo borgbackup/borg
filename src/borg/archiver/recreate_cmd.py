@@ -1,12 +1,10 @@
-import argparse
-
 from ._common import with_repository, Highlander
 from ._common import build_matcher
 from ..archive import ArchiveRecreater
 from ..constants import *  # NOQA
-from ..compress import CompressionSpec
-from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex
+from ..helpers import archivename_validator, comment_validator, PathSpec, ChunkerParams, bin_to_hex, CompressionSpec
 from ..helpers import timestamp
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -18,6 +16,7 @@ class RecreateMixIn:
     @with_repository(cache=True, compatibility=(Manifest.Operation.CHECK,))
     def do_recreate(self, args, repository, manifest, cache):
         """Recreate archives."""
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
         self.output_list = args.output_list
         self.output_filter = args.output_filter
@@ -101,16 +100,10 @@ class RecreateMixIn:
         if the chunks are still missing.
         """
         )
-        subparser = subparsers.add_parser(
-            "recreate",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_recreate.__doc__,
-            epilog=recreate_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help=self.do_recreate.__doc__,
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_recreate.__doc__, epilog=recreate_epilog
         )
-        subparser.set_defaults(func=self.do_recreate)
+        subparsers.add_subcommand("recreate", subparser, help=self.do_recreate.__doc__)
         subparser.add_argument(
             "--list", dest="output_list", action="store_true", help="output verbose list of items (files, dirs, ...)"
         )

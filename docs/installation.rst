@@ -327,6 +327,29 @@ Install the dependencies with the provided script::
 
     ./scripts/msys2-install-deps
 
+.. _msys2_path_translation:
+
+MSYS2 Path Translation
+++++++++++++++++++++++
+
+When running Borg within an MSYS2 environment, the shell
+automatically translates POSIX-style paths (like ``/tmp`` or ``/C/Users``) to
+Windows paths (like ``C:\msys64\tmp`` or ``C:\Users``) before they reach the
+Borg process.
+
+This behavior can result in absolute Windows paths being stored in your backups,
+which may not be what you intended if you use POSIX paths for portability.
+
+To disable this automatic translation for Borg, you can use environment variables
+to exclude everything from conversion. Similarly, MSYS2 also translates
+environment variables that look like paths. To disable this generally for Borg,
+set both variables::
+
+    export MSYS2_ARG_CONV_EXCL="*"
+    export MSYS2_ENV_CONV_EXCL="*"
+
+For more details, see the `MSYS2 documentation on filesystem paths <https://www.msys2.org/docs/filesystem-paths/>`__.
+
 Windows 10's Linux Subsystem
 ++++++++++++++++++++++++++++
 

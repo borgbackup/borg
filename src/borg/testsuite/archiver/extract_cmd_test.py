@@ -15,7 +15,7 @@ from ...helpers import EXIT_WARNING, BackupPermissionError, bin_to_hex
 from ...helpers import flags_noatime, flags_normal
 from .. import changedir, same_ts_ns, granularity_sleep
 from .. import are_symlinks_supported, are_hardlinks_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from ...platform import get_birthtime_ns
+from ...platform import get_birthtime_ns, set_birthtime
 from ...platformflags import is_darwin, is_freebsd, is_win32
 from . import (
     RK_ENCRYPTION,
@@ -162,24 +162,43 @@ def test_atime(archivers, request):
         assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
 
 
-@pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot setup and execute test without utime")
 @pytest.mark.skipif(not is_birthtime_fully_supported(), reason="cannot setup and execute test without birthtime")
 def test_birthtime(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
-    birthtime, mtime, atime = 946598400, 946684800, 946771200
-    os.utime("input/file1", (atime, birthtime))
-    os.utime("input/file1", (atime, mtime))
+    birthtime_ns, mtime_ns, atime_ns = 946598400 * 10**9, 946684800 * 10**9, 946771200 * 10**9
+    set_birthtime("input/file1", birthtime_ns)
+    os.utime("input/file1", (atime_ns, mtime_ns))
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     with changedir("output"):
         cmd(archiver, "extract", "test")
     sti = os.stat("input/file1")
     sto = os.stat("output/input/file1")
-    assert same_ts_ns(sti.st_birthtime * 1e9, sto.st_birthtime * 1e9)
-    assert same_ts_ns(sto.st_birthtime * 1e9, birthtime * 1e9)
+    assert same_ts_ns(get_birthtime_ns(sti, "input/file1"), birthtime_ns)
+    assert same_ts_ns(get_birthtime_ns(sto, "output/input/file1"), birthtime_ns)
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
-    assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
+    assert same_ts_ns(sto.st_mtime_ns, mtime_ns)
+
+
+@pytest.mark.skipif(not is_birthtime_fully_supported(), reason="cannot setup and execute test without birthtime")
+def test_nobirthtime(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    birthtime_ns, mtime_ns, atime_ns = 946598400 * 10**9, 946684800 * 10**9, 946771200 * 10**9
+    set_birthtime("input/file1", birthtime_ns)
+    os.utime("input/file1", (atime_ns, mtime_ns))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input", "--nobirthtime")
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+    sti = os.stat("input/file1")
+    sto = os.stat("output/input/file1")
+    assert same_ts_ns(get_birthtime_ns(sti, "input/file1"), birthtime_ns)
+    # verifying that birthtime was NOT restored (it remains at its "natural" creation time or mtime pullback)
+    assert not same_ts_ns(get_birthtime_ns(sto, "output/input/file1"), birthtime_ns)
+    assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
+    assert same_ts_ns(sto.st_mtime_ns, mtime_ns)
 
 
 @pytest.mark.skipif(is_win32, reason="frequent test failures on github CI on win32")

@@ -26,12 +26,21 @@ def parse_local_timestamp(timestamp, tzinfo=None):
     return dt
 
 
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def utcfromtimestampns(ts_ns: int) -> datetime:
+    # similar to datetime.fromtimestamp, but works with ns and avoids floating point.
+    # also, it would avoid an overflow on 32bit platforms with old glibc.
+    return _EPOCH + timedelta(microseconds=ts_ns // 1000)
+
+
 def timestamp(s):
     """Convert a --timestamp=s argument to a datetime object."""
     try:
         # is it pointing to a file / directory?
-        ts = safe_s(os.stat(s).st_mtime)
-        return datetime.fromtimestamp(ts, tz=timezone.utc)
+        ts_ns = safe_ns(os.stat(s).st_mtime_ns)
+        return utcfromtimestampns(ts_ns)
     except OSError:
         # didn't work, try parsing as an ISO timestamp. if no TZ is given, we assume local timezone.
         return parse_local_timestamp(s)
@@ -84,7 +93,7 @@ def safe_ns(ts):
 
 def safe_timestamp(item_timestamp_ns):
     t_ns = safe_ns(item_timestamp_ns)
-    return datetime.fromtimestamp(t_ns / 1e9, timezone.utc)  # return tz-aware utc datetime obj
+    return utcfromtimestampns(t_ns)  # return tz-aware utc datetime obj
 
 
 def format_time(ts: datetime, format_spec=""):

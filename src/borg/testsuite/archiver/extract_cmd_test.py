@@ -153,13 +153,13 @@ def test_atime(archivers, request):
     sti = os.stat("input/file1")
     sto = os.stat("output/input/file1")
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
-    assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
+    assert same_ts_ns(sto.st_mtime_ns, mtime * 10**9)
     if have_noatime:
         assert same_ts_ns(sti.st_atime_ns, sto.st_atime_ns)
-        assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
+        assert same_ts_ns(sto.st_atime_ns, atime * 10**9)
     else:
         # it touched the input file's atime while backing it up
-        assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
+        assert same_ts_ns(sto.st_atime_ns, atime * 10**9)
 
 
 @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot setup and execute test without utime")
@@ -179,7 +179,7 @@ def test_birthtime(archivers, request):
     assert same_ts_ns(sti.st_birthtime * 1e9, sto.st_birthtime * 1e9)
     assert same_ts_ns(sto.st_birthtime * 1e9, birthtime * 1e9)
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
-    assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
+    assert same_ts_ns(sto.st_mtime_ns, mtime * 10**9)
 
 
 @pytest.mark.skipif(is_win32, reason="frequent test failures on github CI on win32")

@@ -178,3 +178,45 @@ cite {
 #common-options .option {
     white-space: nowrap;
 }
+/* Remove the right-column max-width cap so content fills the full available width. */
+#right-column {
+    max-width: none;
+}
+/* Hide the default RTD flyout since we show the version selector in the sidebar. */
+readthedocs-flyout {
+    display: none !important;
+}
+/* Version selector in the sidebar. */
+.version-selector {
+    padding: 0 22px;
+    margin: 7px 0 7px 0;
+    font-size: 14px;
+}
+.version-selector label {
+    display: block;
+    margin-bottom: 4px;
+    color: #000;
+}
+.version-selector select {
+    width: 100%;
+    padding: 4px;
+    background-color: #fafafa;
+    color: #000;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+.version-selector::after {
+    content: '';
+    display: block;
+    border-top: 1px solid #ccc;
+    margin: 7px 0 0 0;
+}
+/* Reduce top and bottom margin of searchbox block to 7px to match separator spacing. */
+.sidebar-block:has(#main-search) {
+    margin-top: 7px;
+    margin-bottom: 7px;
+}
+/* Reduce the separator margin below the search block to 7px. */
+.sphinxsidebar > .sidebar-block:has(#main-search):after {
+    margin: 7px 22px 0 22px;
+}

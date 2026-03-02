@@ -174,7 +174,6 @@ class PruneMixIn:
         # set up counters for the progress display
         to_delete_len = len(to_delete)
         archives_deleted = 0
-        uncommitted_deletes = 0
         pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
         for archive_info in archives:
             if sig_int and sig_int.action_done():
@@ -187,10 +186,9 @@ class PruneMixIn:
                 if args.dry_run:
                     log_message = "Would prune:"
                 else:
-                    archives_deleted += 1
                     log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
                     manifest.archives.delete_by_id(archive_info.id)
-                    uncommitted_deletes += 1
+                    archives_deleted += 1
             else:
                 log_message = "Keeping archive (rule: {rule} #{num}):".format(
                     rule=kept_because[archive_info.id][0], num=kept_because[archive_info.id][1]
@@ -202,10 +200,11 @@ class PruneMixIn:
             ):
                 list_logger.info(f"{log_message:<44} {archive_formatted}")
         pi.finish()
+        if archives_deleted > 0:
+            manifest.write()
+            self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         if sig_int:
             raise Error("Got Ctrl-C / SIGINT.")
-        elif uncommitted_deletes > 0:
-            manifest.write()
 
     def build_parser_prune(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

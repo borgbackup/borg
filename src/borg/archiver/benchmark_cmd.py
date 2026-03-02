@@ -171,6 +171,7 @@ class BenchmarkMixIn:
         # Use minimal iterations and data size in test mode to keep CI fast.
         number_default = 1 if is_test else 100
         number_compression = 1 if is_test else 10
+        number_kdf = 1 if is_test else 5
         data_size = 100 * 1000 if is_test else 10 * 1000 * 1000
 
         random_10M = os.urandom(data_size)
@@ -291,16 +292,15 @@ class BenchmarkMixIn:
             print("KDFs (slow is GOOD, use argon2!) ===============================")
         else:
             result["kdf"] = []
-        count = 1 if is_test else 5
         for spec, func in [
             ("pbkdf2", lambda: FlexiKey.pbkdf2("mypassphrase", b"salt" * 8, PBKDF2_ITERATIONS, 32)),
             ("argon2", lambda: FlexiKey.argon2("mypassphrase", 64, b"S" * ARGON2_SALT_BYTES, **ARGON2_ARGS)),
         ]:
-            dt = timeit(func, number=count)
+            dt = timeit(func, number=number_kdf)
             if args.json:
-                result["kdf"].append({"algo": spec, "count": count, "time": dt})
+                result["kdf"].append({"algo": spec, "count": number_kdf, "time": dt})
             else:
-                print(f"{spec:<24} {count:<10} {dt:.3f}s")
+                print(f"{spec:<24} {number_kdf:<10} {dt:.3f}s")
 
         from ..compress import CompressionSpec
 

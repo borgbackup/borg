@@ -67,7 +67,6 @@ from ..helpers import (
 )
 from ..helpers.argparsing import ArgumentParser
 from ..helpers.argparsing import _ActionSubCommands
-from ..helpers.argparsing import prepare_actions_context, shtab_prepare_actions, bash_compgen_typehint
 from ..helpers.time import timestamp
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
@@ -732,19 +731,13 @@ class CompletionMixIn:
         bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)
         zsh_preamble = partial_format(ZSH_PREAMBLE_TMPL, mapping)
 
-        parser.prog = "borg"
-        prog = "borg"
-        preambles = []
         if args.shell == "bash":
-            preambles.append(bash_compgen_typehint.strip().replace("%s", prog))
-            preambles.append(bash_preamble)
+            preambles = [bash_preamble]
         elif args.shell == "zsh":
-            preambles.append(zsh_preamble)
-
-        with prepare_actions_context(args.shell, prog, preambles):
-            shtab_prepare_actions(parser)
-
-        script = shtab.complete(parser, shell=args.shell, preamble="\n".join(preambles))  # nosec B604
+            preambles = [zsh_preamble]
+        else:
+            preambles = []
+        script = parser.get_completion_script(f"shtab-{args.shell}", preambles=preambles)
         print(script)
 
     def build_parser_completion(self, subparsers, common_parser, mid_common_parser):

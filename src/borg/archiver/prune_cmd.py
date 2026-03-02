@@ -6,8 +6,6 @@ from operator import attrgetter
 import os
 
 from ._common import with_repository, Highlander
-from ..archive import Archive
-from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
 from ..helpers import archivename_validator
@@ -172,44 +170,41 @@ class PruneMixIn:
         to_delete = set(archives) - set(keep)
         logger.info("Found %d archives.", len(archives))
         logger.info("Keeping %d archives, pruning %d archives.", len(keep), len(to_delete))
-        with Cache(repository, manifest, iec=args.iec) as cache:
-            list_logger = logging.getLogger("borg.output.list")
-            # set up counters for the progress display
-            to_delete_len = len(to_delete)
-            archives_deleted = 0
-            uncommitted_deletes = 0
-            pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
-            for archive_info in archives:
-                if sig_int and sig_int.action_done():
-                    break
-                # format_item may internally load the archive from the repository,
-                # so we must call it before deleting the archive.
-                archive_formatted = formatter.format_item(archive_info, jsonline=False)
-                if archive_info in to_delete:
-                    pi.show()
-                    if args.dry_run:
-                        log_message = "Would prune:"
-                    else:
-                        archives_deleted += 1
-                        log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
-                        archive = Archive(manifest, archive_info.id, cache=cache)
-                        archive.delete()
-                        uncommitted_deletes += 1
+        list_logger = logging.getLogger("borg.output.list")
+        # set up counters for the progress display
+        to_delete_len = len(to_delete)
+        archives_deleted = 0
+        pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
+        for archive_info in archives:
+            if sig_int and sig_int.action_done():
+                break
+            # format_item may internally load the archive from the repository,
+            # so we must call it before deleting the archive.
+            archive_formatted = formatter.format_item(archive_info, jsonline=False)
+            if archive_info in to_delete:
+                pi.show()
+                if args.dry_run:
+                    log_message = "Would prune:"
                 else:
-                    log_message = "Keeping archive (rule: {rule} #{num}):".format(
-                        rule=kept_because[archive_info.id][0], num=kept_because[archive_info.id][1]
-                    )
-                if (
-                    args.output_list
-                    or (args.list_pruned and archive_info in to_delete)
-                    or (args.list_kept and archive_info not in to_delete)
-                ):
-                    list_logger.info(f"{log_message:<44} {archive_formatted}")
-            pi.finish()
-            if sig_int:
-                raise Error("Got Ctrl-C / SIGINT.")
-            elif uncommitted_deletes > 0:
-                manifest.write()
+                    log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
+                    manifest.archives.delete_by_id(archive_info.id)
+                    archives_deleted += 1
+            else:
+                log_message = "Keeping archive (rule: {rule} #{num}):".format(
+                    rule=kept_because[archive_info.id][0], num=kept_because[archive_info.id][1]
+                )
+            if (
+                args.output_list
+                or (args.list_pruned and archive_info in to_delete)
+                or (args.list_kept and archive_info not in to_delete)
+            ):
+                list_logger.info(f"{log_message:<44} {archive_formatted}")
+        pi.finish()
+        if archives_deleted > 0:
+            manifest.write()
+            self.print_warning('Done. Run "borg compact" to free space.', wc=None)
+        if sig_int:
+            raise Error("Got Ctrl-C / SIGINT.")
 
     def build_parser_prune(self, subparsers, common_parser, mid_common_parser):
         from ._common import process_epilog

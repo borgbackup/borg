@@ -106,8 +106,6 @@ from jsonargparse.typing import PositiveInt  # noqa: F401
 
 # borg completion uses these private symbols, so we need to import them:
 from jsonargparse._actions import _ActionSubCommands  # noqa: F401
-from jsonargparse._completions import prepare_actions_context, shtab_prepare_actions  # noqa: F401
-from jsonargparse._completions import bash_compgen_typehint  # noqa: F401
 
 
 class ArgumentParser(_ArgumentParser):

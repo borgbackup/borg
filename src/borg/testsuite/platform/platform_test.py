@@ -5,9 +5,9 @@ import os
 import pytest
 
 from ...platformflags import is_darwin, is_freebsd, is_linux, is_win32
-from ...platform import acl_get, acl_set
+from ...platform import acl_get, acl_set, set_birthtime, get_birthtime_ns
 from ...platform import get_process_id, process_alive
-from .. import unopened_tempfile
+from .. import unopened_tempfile, same_ts_ns, is_birthtime_fully_supported
 from ..fslocking_test import free_pid  # NOQA
 
 
@@ -94,3 +94,41 @@ def test_process_id():
     assert len(hostname) > 0
     assert pid > 0
     assert get_process_id() == (hostname, pid, tid)
+
+
+@pytest.mark.skipif(not is_birthtime_fully_supported(), reason="birthtime not supported on this platform/FS")
+def test_set_birthtime(tmp_path):
+    test_file = tmp_path / "test_birthtime.txt"
+    test_file.write_text("content")
+
+    st = os.stat(test_file)
+    original_birthtime = get_birthtime_ns(st, test_file)
+    assert original_birthtime is not None
+
+    # Set a new birthtime (e.g., 1 hour ago)
+    new_birthtime_ns = original_birthtime - 3600 * 10**9
+
+    set_birthtime(test_file, new_birthtime_ns)
+
+    st_new = os.stat(test_file)
+    restored_birthtime = get_birthtime_ns(st_new, test_file)
+    assert same_ts_ns(restored_birthtime, new_birthtime_ns)
+
+
+@pytest.mark.skipif(not is_birthtime_fully_supported(), reason="birthtime not supported on this platform/FS")
+def test_set_birthtime_fd(tmp_path):
+    test_file = tmp_path / "test_birthtime_fd.txt"
+    test_file.write_text("content")
+
+    st = os.stat(test_file)
+    original_birthtime = get_birthtime_ns(st, test_file)
+    assert original_birthtime is not None
+
+    new_birthtime_ns = original_birthtime - 7200 * 10**9
+
+    with open(test_file, "r+") as f:
+        set_birthtime(test_file, new_birthtime_ns, fd=f.fileno())
+
+    st_new = os.stat(test_file)
+    restored_birthtime = get_birthtime_ns(st_new, test_file)
+    assert same_ts_ns(restored_birthtime, new_birthtime_ns)

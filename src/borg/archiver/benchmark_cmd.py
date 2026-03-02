@@ -167,7 +167,14 @@ class BenchmarkMixIn:
 
         result = {} if args.json else None
 
-        random_10M = os.urandom(10 * 1000 * 1000)
+        is_test = "_BORG_BENCHMARK_CPU_TEST" in os.environ
+        # Use minimal iterations and data size in test mode to keep CI fast.
+        number_default = 1 if is_test else 100
+        number_compression = 1 if is_test else 10
+        number_kdf = 1 if is_test else 5
+        data_size = 100 * 1000 if is_test else 10 * 1000 * 1000
+
+        random_10M = os.urandom(data_size)
         key_256 = os.urandom(32)
         key_128 = os.urandom(16)
         key_96 = os.urandom(12)
@@ -202,7 +209,7 @@ class BenchmarkMixIn:
             ),
             ("fixed,1048576", "ch = get_chunker('fixed', 1048576, sparse=False)", "chunkit(ch)", locals()),
         ]:
-            dt = timeit(func, setup, number=100, globals=vars)
+            dt = timeit(func, setup, number=number_default, globals=vars)
             if args.json:
                 algo, _, algo_params = spec.partition(",")
                 result["chunkers"].append({"algo": algo, "algo_params": algo_params, "size": size, "time": dt})
@@ -218,7 +225,7 @@ class BenchmarkMixIn:
         size = 1000000000
         tests = [("xxh64", lambda: xxh64(random_10M)), ("crc32 (zlib)", lambda: crc32(random_10M))]
         for spec, func in tests:
-            dt = timeit(func, number=100)
+            dt = timeit(func, number=number_default)
             if args.json:
                 result["checksums"].append({"algo": spec, "size": size, "time": dt})
             else:
@@ -235,7 +242,7 @@ class BenchmarkMixIn:
             ("hmac-sha256", lambda: hmac_sha256(key_256, random_10M)),
             ("blake2b-256", lambda: blake2b_256(key_256, random_10M)),
         ]:
-            dt = timeit(func, number=100)
+            dt = timeit(func, number=number_default)
             if args.json:
                 result["hashes"].append({"algo": spec, "size": size, "time": dt})
             else:
@@ -275,7 +282,7 @@ class BenchmarkMixIn:
             ),
         ]
         for spec, func in tests:
-            dt = timeit(func, number=100)
+            dt = timeit(func, number=number_default)
             if args.json:
                 result["encryption"].append({"algo": spec, "size": size, "time": dt})
             else:
@@ -285,16 +292,15 @@ class BenchmarkMixIn:
             print("KDFs (slow is GOOD, use argon2!) ===============================")
         else:
             result["kdf"] = []
-        count = 5
         for spec, func in [
             ("pbkdf2", lambda: FlexiKey.pbkdf2("mypassphrase", b"salt" * 8, PBKDF2_ITERATIONS, 32)),
             ("argon2", lambda: FlexiKey.argon2("mypassphrase", 64, b"S" * ARGON2_SALT_BYTES, **ARGON2_ARGS)),
         ]:
-            dt = timeit(func, number=count)
+            dt = timeit(func, number=number_kdf)
             if args.json:
-                result["kdf"].append({"algo": spec, "count": count, "time": dt})
+                result["kdf"].append({"algo": spec, "count": number_kdf, "time": dt})
             else:
-                print(f"{spec:<24} {count:<10} {dt:.3f}s")
+                print(f"{spec:<24} {number_kdf:<10} {dt:.3f}s")
 
         from ..compress import CompressionSpec
 
@@ -319,7 +325,7 @@ class BenchmarkMixIn:
         ]:
             compressor = CompressionSpec(spec).compressor
             size = 100000000
-            dt = timeit(lambda: compressor.compress({}, random_10M), number=10)
+            dt = timeit(lambda: compressor.compress({}, random_10M), number=number_compression)
             if args.json:
                 algo, _, algo_params = spec.partition(",")
                 result["compression"].append({"algo": algo, "algo_params": algo_params, "size": size, "time": dt})
@@ -334,7 +340,7 @@ class BenchmarkMixIn:
         items = [item.as_dict()] * 1000
         size = "100k Items"
         spec = "msgpack"
-        dt = timeit(lambda: msgpack.packb(items), number=100)
+        dt = timeit(lambda: msgpack.packb(items), number=number_default)
         if args.json:
             result["msgpack"].append({"algo": spec, "count": 100000, "time": dt})
         else:

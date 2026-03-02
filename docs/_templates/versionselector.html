@@ -1,0 +1,29 @@
+<div class="version-selector" id="borg-version-selector" style="display:none;">
+  <label for="version-select">Select your Borg version:</label>
+  <select id="version-select"></select>
+</div>
+<script type="text/javascript">
+  // Populate the version selector using ReadTheDocs data if available.
+  function borgInitVersionSelector(data) {
+    var versions = data && data.versions && data.versions.active;
+    if (!versions || !versions.length) return;
+    var current = data.versions && data.versions.current && data.versions.current.slug;
+    var select = document.getElementById("version-select");
+    if (!select) return;
+    versions.forEach(function(v) {
+      var opt = document.createElement("option");
+      opt.value = v.urls.documentation;
+      opt.textContent = v.slug;
+      if (v.slug === current) opt.selected = true;
+      select.appendChild(opt);
+    });
+    select.addEventListener("change", function() {
+      window.location.href = this.value;
+    });
+    document.getElementById("borg-version-selector").style.display = "";
+  }
+
+  document.addEventListener("readthedocs-addons-data-ready", function(event) {
+    borgInitVersionSelector(event.detail.data());
+  });
+</script>

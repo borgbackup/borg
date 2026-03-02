@@ -161,7 +161,7 @@ smartquotes_action = 'qe'  # no D in there means "do not transform -- and ---"
 
 # Custom sidebar templates, maps document names to template names.
 html_sidebars = {
-    '**': ['logo-text.html', 'searchbox.html', 'globaltoc.html'],
+    '**': ['logo-text.html', "versionselector.html", 'searchbox.html', 'globaltoc.html'],
 }
 
 # Additional templates that should be rendered to pages, maps page names to

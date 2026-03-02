@@ -53,7 +53,7 @@ def timestamp(s):
 # As long as people are using borg on 32bit platforms to access borg archives, we must
 # keep this value True. But we can expect that we can stop supporting 32bit platforms
 # well before coming close to the year 2038, so this will never be a practical problem.
-SUPPORT_32BIT_PLATFORMS = True  # set this to False before y2038.
+SUPPORT_32BIT_PLATFORMS = False  # set this to False before y2038.
 
 if SUPPORT_32BIT_PLATFORMS:
     # second timestamps will fit into a signed int32 (platform time_t limit).

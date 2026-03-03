@@ -11,7 +11,10 @@ REQUIRED_ITEM_KEYS = frozenset(["path", "mtime"])
 
 # this set must be kept complete, otherwise rebuild_manifest might malfunction:
 # fmt: off
-ARCHIVE_KEYS = frozenset(['version', 'name', 'hostname', 'username', 'time', 'time_end',
+ARCHIVE_KEYS = frozenset(['version', 'name', 'hostname', 'username',
+                          'time',  # v2+ archives AND borg 1.x archives
+                          'time_end',  # only legacy borg 1.x
+                          'start', 'end',  # v2+ archives
                           'tags',  # v2+ archives
                           'items',  # legacy v1 archives
                           'item_ptrs',  # v2+ archives

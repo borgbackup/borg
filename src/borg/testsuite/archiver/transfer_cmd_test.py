@@ -80,12 +80,14 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
         # timestamps:
         # borg 1.2 transformed to local time and had microseconds = 0, no tzoffset
         # borg 2 uses local time, with microseconds and with tzoffset
-        for key in "start", "time":
-            # fix expectation: local time meant +01:00, so we convert that to whatever local tz is here.
-            expected_archive[key] = convert_tz(expected_archive[key], repo12_tzoffset, None)
-            # set microseconds to 0, so we can compare got with expected.
-            got_ts = parse_timestamp(got_archive[key])
-            got_archive[key] = got_ts.replace(microsecond=0).isoformat(timespec="microseconds")
+        # the only important timestamp is "time", which has the nominal timestamp of the archive.
+        del expected_archive["start"]
+        key = "time"
+        # fix expectation: local time meant +01:00, so we convert that to whatever local tz is here.
+        expected_archive[key] = convert_tz(expected_archive[key], repo12_tzoffset, None)
+        # set microseconds to 0, so we can compare got with expected.
+        got_ts = parse_timestamp(got_archive[key])
+        got_archive[key] = got_ts.replace(microsecond=0).isoformat(timespec="microseconds")
     assert got == expected
 
     for archive in got["archives"]:

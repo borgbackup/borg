@@ -500,8 +500,8 @@ class Archive:
         noxattrs=False,
         progress=False,
         chunker_params=CHUNKER_PARAMS,
+        timestamp=None,
         start=None,
-        start_monotonic=None,
         end=None,
         log_json=False,
         iec=False,
@@ -530,18 +530,10 @@ class Archive:
         self.noflags = noflags
         self.noacls = noacls
         self.noxattrs = noxattrs
-        assert (start is None) == (
-            start_monotonic is None
-        ), "Logic error: if start is given, start_monotonic must be given as well and vice versa."
-        if start is None:
-            start = archive_ts_now()
-            start_monotonic = time.monotonic()
         self.chunker_params = chunker_params
-        self.start = start
-        self.start_monotonic = start_monotonic
-        if end is None:
-            end = archive_ts_now()
-        self.end = end
+        self.start = start if start is not None else archive_ts_now()
+        self.end = end if end is not None else self.start
+        self.timestamp = timestamp if timestamp is not None else self.start
         self.pipeline = DownloadPipeline(self.repository, self.repo_objs)
         self.create = create
         if self.create:
@@ -578,15 +570,22 @@ class Archive:
 
     @property
     def ts(self):
-        """Timestamp of archive creation (start) in UTC"""
+        """Nominal archive timestamp in UTC."""
         ts = self.metadata.time
         return parse_timestamp(ts)
 
     @property
+    def ts_start(self):
+        """Timestamp of archive operation start in UTC."""
+        # fall back to "time" in case "start" is not found
+        ts = self.metadata.get("start") or self.metadata.time
+        return parse_timestamp(ts)
+
+    @property
     def ts_end(self):
-        """Timestamp of archive creation (end) in UTC"""
-        # fall back to time if there is no time_end present in metadata
-        ts = self.metadata.get("time_end") or self.metadata.time
+        """Timestamp of archive operation end in UTC."""
+        # fall back to "time" in case "end" or "time_end" are not found
+        ts = self.metadata.get("end") or self.metadata.get("time_end") or self.metadata.time
         return parse_timestamp(ts)
 
     @property
@@ -604,15 +603,18 @@ class Archive:
     def info(self):
         if self.create:
             stats = self.stats
+            ts = self.timestamp
             start = self.start
             end = self.end
         else:
             stats = self.calc_stats(self.cache)
-            start = self.ts
+            ts = self.ts
+            start = self.ts_start
             end = self.ts_end
         info = {
             "name": self.name,
             "id": self.fpr,
+            "time": OutputTimestamp(ts),
             "start": OutputTimestamp(start),
             "end": OutputTimestamp(end),
             "duration": (end - start).total_seconds(),
@@ -637,11 +639,13 @@ class Archive:
 Repository: {location}
 Archive name: {0.name}
 Archive fingerprint: {0.fpr}
-Time (start): {start}
-Time (end):   {end}
+Time (nominal): {time}
+Time (start):   {start}
+Time (end):     {end}
 Duration: {0.duration}
 """.format(
             self,
+            time=OutputTimestamp(self.timestamp),
             start=OutputTimestamp(self.start),
             end=OutputTimestamp(self.end),
             location=self.repository._location.canonical_path(),
@@ -678,15 +682,10 @@ Duration: {0.duration}
         item_ptrs = archive_put_items(
             self.items_buffer.chunks, repo_objs=self.repo_objs, cache=self.cache, stats=self.stats
         )  # this adds the sizes of the item ptrs chunks to stats.osize
-        duration = timedelta(seconds=time.monotonic() - self.start_monotonic)
-        if timestamp is None:
-            end = archive_ts_now()
-            start = end - duration
-        else:
-            start = timestamp
-            end = start + duration
-        self.start = start
-        self.end = end
+        start = self.start
+        end = self.end = archive_ts_now()
+        nominal = start if timestamp is None else timestamp
+        self.timestamp = nominal
         metadata = {
             "version": 2,
             "name": name,
@@ -697,8 +696,9 @@ Duration: {0.duration}
             "cwd": self.cwd,
             "hostname": hostname,
             "username": getuser(),
-            "time": start.isoformat(timespec="microseconds"),
-            "time_end": end.isoformat(timespec="microseconds"),
+            "time": nominal.isoformat(timespec="microseconds"),
+            "start": start.isoformat(timespec="microseconds"),
+            "end": end.isoformat(timespec="microseconds"),
             "chunker_params": self.chunker_params,
         }
         # we always want to create archives with the addtl. metadata (nfiles, etc.),
@@ -2305,32 +2305,18 @@ class ArchiveRecreater:
             return
         if comment is None:
             comment = archive.metadata.get("comment", "")
-
-        # Keep for the statistics if necessary
-        if self.stats:
-            _start = target.start
-
+        additional_metadata = {
+            "command_line": archive.metadata.command_line,
+            # but also remember recreate metadata:
+            "recreate_command_line": join_cmd(sys.argv),
+        }
         if self.timestamp is None:
-            additional_metadata = {
-                "time": archive.metadata.time,
-                "time_end": archive.metadata.get("time_end") or archive.metadata.time,
-                "command_line": archive.metadata.command_line,
-                # but also remember recreate metadata:
-                "recreate_command_line": join_cmd(sys.argv),
-            }
-        else:
-            additional_metadata = {
-                "command_line": archive.metadata.command_line,
-                # but also remember recreate metadata:
-                "recreate_command_line": join_cmd(sys.argv),
-            }
-
+            # if no timestamp is specified, keep the original timestamp
+            additional_metadata["time"] = archive.metadata.time
         target.save(comment=comment, timestamp=self.timestamp, additional_metadata=additional_metadata)
         if delete_original:
             archive.delete()
         if self.stats:
-            target.start = _start
-            target.end = archive_ts_now()
             log_multi(str(target), str(target.stats))
 
     def matcher_add_tagged_dirs(self, archive):

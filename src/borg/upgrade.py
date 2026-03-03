@@ -31,7 +31,8 @@ class UpgraderNoOp:
             "hostname",
             "username",
             "time",
-            "time_end",
+            "start",
+            "end",
             "comment",
             "chunker_params",
             "recreate_command_line",
@@ -161,9 +162,9 @@ class UpgraderFrom12To20:
                     # this is a borg < 1.2 chunker_params tuple, no chunker algo specified, but we only had buzhash:
                     new_metadata["chunker_params"] = (CH_BUZHASH,) + chunker_params
         # old borg used UTC timestamps, but did not have the explicit tz offset in them.
-        for attr in ("time", "time_end"):
-            if hasattr(metadata, attr):
-                new_metadata[attr] = getattr(metadata, attr) + "+00:00"
+        # the only important timestamp is "time", which has the nominal timestamp of the archive.
+        if hasattr(metadata, "time"):
+            new_metadata["time"] = getattr(metadata, "time") + "+00:00"
         # borg 1: cmdline, recreate_cmdline: a copy of sys.argv
         # borg 2: command_line, recreate_command_line: a single string
         if hasattr(metadata, "cmdline"):

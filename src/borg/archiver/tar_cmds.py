@@ -4,7 +4,6 @@ import logging
 import os
 import stat
 import tarfile
-import time
 
 from ..archive import Archive, TarfileObjectProcessors, ChunksProcessor
 from ..compress import CompressionSpec
@@ -269,7 +268,6 @@ class TarMixIn:
 
     def _import_tar(self, args, repository, manifest, key, cache, tarstream):
         t0 = archive_ts_now()
-        t0_monotonic = time.monotonic()
 
         archive = Archive(
             manifest,
@@ -279,7 +277,6 @@ class TarMixIn:
             progress=args.progress,
             chunker_params=args.chunker_params,
             start=t0,
-            start_monotonic=t0_monotonic,
             log_json=args.log_json,
         )
         cp = ChunksProcessor(cache=cache, key=key, add_item=archive.add_item, rechunkify=False)

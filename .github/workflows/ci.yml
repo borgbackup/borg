@@ -328,13 +328,13 @@ jobs:
 
     - name: Attest binaries provenance (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@v4
       with:
         subject-path: 'artifacts/*'
 
     - name: Upload binaries (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ matrix.binary }}
         path: artifacts/*
@@ -590,7 +590,7 @@ jobs:
 
       - name: Upload artifacts
         if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_prefix }}
           path: artifacts/*
@@ -598,7 +598,7 @@ jobs:
 
       - name: Attest provenance
         if: startsWith(github.ref, 'refs/tags/') && matrix.do_binaries
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: 'artifacts/*'
 
@@ -648,7 +648,7 @@ jobs:
           # build sdist and wheel in dist/...
           python -m build
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: borg-windows
           path: dist/binary/borg.exe

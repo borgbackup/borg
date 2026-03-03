@@ -39,7 +39,7 @@ dependencies = [
   "argon2-cffi",
   "shtab>=1.8.0",
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
-  "jsonargparse @ git+https://github.com/omni-us/jsonargparse.git@main",
+  "jsonargparse @ git+https://github.com/omni-us/jsonargparse.git@shtab-completions-method",
   "PyYAML>=6.0.2",  # we need to register our types with yaml, jsonargparse uses yaml for config files
 ]
 

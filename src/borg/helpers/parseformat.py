@@ -765,10 +765,9 @@ class ArchiveFormatter(BaseFormatter):
         "name": 'alias of "archive"',
         "comment": "archive comment",
         "tags": "archive tags",
-        # *start* is the key used by borg-info for this timestamp, this makes the formats more compatible
-        "start": "time (start) of creation of the archive",
-        "time": 'alias of "start"',
-        "end": "time (end) of creation of the archive",
+        "time": "nominal time of the archive",
+        "start": "start time of the archive operation",
+        "end": "end time of the archive operation",
         "command_line": "command line which was used to create the archive",
         "id": "internal ID of the archive",
         "hostname": "hostname of host on which this archive was created",
@@ -778,7 +777,7 @@ class ArchiveFormatter(BaseFormatter):
     }
     KEY_GROUPS = (
         ("archive", "name", "comment", "id", "tags"),
-        ("start", "time", "end", "command_line"),
+        ("time", "start", "end", "command_line"),
         ("hostname", "username"),
         ("size", "nfiles"),
     )
@@ -802,6 +801,7 @@ class ArchiveFormatter(BaseFormatter):
             "command_line": partial(self.get_meta, "command_line", ""),
             "size": partial(self.get_meta, "size", 0),
             "nfiles": partial(self.get_meta, "nfiles", 0),
+            "start": self.get_ts_start,
             "end": self.get_ts_end,
             "tags": self.get_tags,
         }
@@ -817,7 +817,6 @@ class ArchiveFormatter(BaseFormatter):
             "archive": archive_info.name,
             "id": bin_to_hex(archive_info.id),
             "time": self.format_time(archive_info.ts),
-            "start": self.format_time(archive_info.ts),
         }
         for key in self.used_call_keys:
             item_data[key] = self.call_keys[key]()
@@ -840,6 +839,9 @@ class ArchiveFormatter(BaseFormatter):
 
     def get_meta(self, key, default=None):
         return self.archive.metadata.get(key, default)
+
+    def get_ts_start(self):
+        return self.format_time(self.archive.ts_start)
 
     def get_ts_end(self):
         return self.format_time(self.archive.ts_end)

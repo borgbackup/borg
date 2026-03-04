@@ -216,7 +216,6 @@ class CreateMixIn:
         dry_run = args.dry_run
         self.start_backup = time.time_ns()
         t0 = archive_ts_now()
-        t0_monotonic = time.monotonic()
         logger.info('Creating archive at "%s"' % args.location.processed)
         if not dry_run:
             with Cache(
@@ -238,7 +237,6 @@ class CreateMixIn:
                     progress=args.progress,
                     chunker_params=args.chunker_params,
                     start=t0,
-                    start_monotonic=t0_monotonic,
                     log_json=args.log_json,
                     iec=args.iec,
                 )

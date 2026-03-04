@@ -508,8 +508,10 @@ cdef class ArchiveItem(PropDict):
     command_line = PropDictProperty(str, 'surrogate-escaped str')
     hostname = PropDictProperty(str, 'surrogate-escaped str')
     username = PropDictProperty(str, 'surrogate-escaped str')
-    time = PropDictProperty(str)
-    time_end = PropDictProperty(str)
+    start = PropDictProperty(str)  # new in borg2 (was: time)
+    end = PropDictProperty(str)  # new in borg2 (was: time_end)
+    time = PropDictProperty(str)  # borg2: nominal archive time, borg 1.x: same + start time
+    time_end = PropDictProperty(str)  # legacy borg 1.x (now: end)
     comment = PropDictProperty(str, 'surrogate-escaped str')
     tags = PropDictProperty(list)  # list of s-e-str
     chunker_params = PropDictProperty(tuple)
@@ -533,7 +535,7 @@ cdef class ArchiveItem(PropDict):
                 assert isinstance(v, int)
             if k in ('name', 'hostname', 'username', 'comment', 'cwd'):
                 v = fix_str_value(d, k)
-            if k in ('time', 'time_end'):
+            if k in ('start', 'end', 'time', 'time_end'):
                 v = fix_str_value(d, k, 'replace')
             if k == 'chunker_params':
                 v = fix_tuple_of_str_and_int(v)

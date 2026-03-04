@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from datetime import datetime
 
 import pytest
@@ -186,17 +187,37 @@ def test_recreate_no_rechunkify(archivers, request):
     assert num_chunks == num_chunks_after_recreate
 
 
-def test_recreate_timestamp(archivers, request):
+def test_recreate_keep_original_timestamp(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test0", "input")
+    info_orig = cmd(archiver, "info", "-a", "test0").splitlines()
+    # this shall recreate the archive and keep the nominal timestamp
+    time.sleep(1)
+    cmd(archiver, "recreate", "test0", "--comment", "test")
+    info_recreated = cmd(archiver, "info", "-a", "test0").splitlines()
+    nominal_orig = next(item for item in info_orig if item.startswith("Time (nominal):"))
+    nominal_recreated = next(item for item in info_recreated if item.startswith("Time (nominal):"))
+    assert nominal_orig == nominal_recreated
+
+
+def test_recreate_with_given_timestamp(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test0", "input")
+    # this shall recreate the archive with a different nominal timestamp
     cmd(archiver, "recreate", "test0", "--timestamp", "1970-01-02T00:00:00", "--comment", "test")
     info = cmd(archiver, "info", "-a", "test0").splitlines()
     dtime = datetime(1970, 1, 2, 0, 0, 0).astimezone()  # local time in local timezone
     s_time = dtime.strftime("%Y-%m-%d %H:%M:.. %z").replace("+", r"\+")
-    assert any([re.search(r"Time \(start\).+ %s" % s_time, item) for item in info])
+    assert any([re.search(r"Time \(nominal\).+ %s" % s_time, item) for item in info])
+    # start/end time are just from the recreate operation
+    dtime = datetime.now().astimezone()  # current local time
+    s_time = dtime.strftime("%Y-%m-%d %H:%M:.. %z").replace("+", r"\+")
     assert any([re.search(r"Time \(end\).+ %s" % s_time, item) for item in info])
+    assert any([re.search(r"Time \(start\).+ %s" % s_time, item) for item in info])
 
 
 def test_recreate_dry_run(archivers, request):

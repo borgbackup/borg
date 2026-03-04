@@ -42,6 +42,7 @@ class InfoMixIn:
                 Hostname: {hostname}
                 Username: {username}
                 Tags: {tags}
+                Time (nominal): {time}
                 Time (start): {start}
                 Time (end): {end}
                 Duration: {duration}

@@ -168,10 +168,22 @@ above.
 
 New features:
 
-- ...
+- prune -v: now displays archive counts (total, kept, pruned), #9262
+- create: implement "file changed while backup" detection on Windows, #9382
+- benchmark crud: add --json-lines output option, #9165
+- list --format: added fingerprint placeholder (fast!)
 
 Fixes:
 
+- prune: fix Archive.DoesNotExist when using --list, #9416
+- remove_dotdot_prefixes: remove bad assert, #9406
+- create --compress: expose Padmé size obfuscation (250) via cli, #9286
+- debug format-obj: support all repo object types, #9391
+- remote: fix StoreObjectNotFound exception lost over RPC, #9380
+- benchmark crud: suppress compact warnings during benchmark runs, #9365
+- passphrase: fail if multiple passphrase env vars are set, #8834
+- cockpit: fix subprocess invocation in frozen binaries
+- cockpit: start the Borg runner after all widgets are mounted
 - fix file: URL parsing for windows
 
   - Linux: /abs/path -> file:///abs/path
@@ -184,18 +196,70 @@ Other changes:
   fish completions are kept until shtab gains fish support.
 - mount: warn about symlinks pointing outside of the mountpoint, #9254
 - Version: do not access private attributes, #9263
-- tests / CI:
+- extract: do not delete existing directory if possible, #4233
+- extract --continue: optimize processing of already existing dirs
+- use zstd from python lib or backports.zstd (python<'3.14'), #9261
+- mount: fuse fs performance fix
+- prune: print hint to run compact to free space
+- prune: use same method to delete archives as delete subcommand, #9424
+- swidth: use cross platform implementation, #7493
+- platform: use F_FULLSYNC on macOS for SyncFile data durability, #9383
+- cache: add seek()/tell() to SyncFile, use SaveFile in _write_files_cache, #9390
+- cache: remove try_upgrade_to_b14() legacy migration, #9371
+- remove unnecessary checks: API_VERSION, check_python
+- ruff: update, migrate config to tool.ruff.lint, #9305
+- windows platform (win32):
 
-  - completion: focused tests for auto-generated shell completions
-    (syntax validation, size sanity, borg-specific preamble behavior)
-  - fix and re-enable Windows CI (some tests are skipped on Windows)
-  - CI: faster with borg-dir/borg.exe, #9236
-  - fix mismatch in xattr test, #9238
+  - normalize drive letters, #9279
+  - path sep: internally always use "/", accept also "\" for cli args
+  - map_chars: deal with invalid chars in paths on windows
+- binary build:
+
+  - use pyinstaller 6.18.0 for Python 3.14 compatibility
+  - do not exclude ssl, needed for pyfuse3/trio, #9196
+  - build with cockpit,s3,sftp extras installed
+  - add tcss file, add unicode data for cockpit feature
+  - build linux binaries with pyfuse3
 - docs:
 
   - fix S3 url description, #9249
   - add a note that you need to install boto3 if you want to use S3/B2 URLs
   - man pages: fix broken :ref: references (e.g. borg_patterns), #7239
+  - rename BORG_RLIST_FORMAT to BORG_REPO_LIST_FORMAT, #9411
+  - document platformdirs change and platform-specific directory paths, #7332
+  - move RTD version selector to sidebar top-left, #8204
+  - update SECURITY.md version table, #9346
+  - fuse: add thread/async safety warning
+  - upgrade http:// URLs to https:// and remove dead librelist.com link, #9342, #9302
+  - fix broken :ref: references in man pages, #7239
+  - update deprecated pypi.python.org URLs to pypi.org, #9337
+  - consolidate key backup info in borg key export, #6204
+  - fix typos found by codespell, #9295
+  - github: enhance pull request template, #9334
+- testing / CI:
+
+  - scripts/linux-run: run commands (e.g. tox) in a podman linux container,
+    very useful when developing on macOS to test under Linux.
+  - add testing on omniOS ("OpenSolaris")
+  - fix and re-enable Windows CI (some tests are skipped on Windows)
+  - add dependabot, #9308, #9349
+  - completion: focused tests for auto-generated shell completions
+    (syntax validation, size sanity, borg-specific preamble behavior)
+  - CI: faster with borg-dir/borg.exe, #9236
+  - fix mismatch in xattr test, #9238
+  - Speed up benchmark cpu tests with _BORG_BENCHMARK_CPU_TEST env var, #9414
+  - xattr: document fakeroot xattr as Linux-only, add missing fakeroot skip on FreeBSD, #9394
+  - testsuite: remove deprecated manual cleanup in create_cmd_test
+  - add top-level permissions for least-privilege security, #9344
+  - add borg.exe to PATH
+  - fix tmpdir check on netbsd
+  - enable Codecov Test Analytics, upgrade to codecov-action@v5
+  - codecov: nothing to do for mypy and docs envs
+  - add missing timeout-minutes to codeql, backport, and lint workflows, #9298
+  - add path filters to lint and codeql workflows, #9328
+  - cache tox environments
+  - remove redundant tox runs, parallelize better, avoid unnecessary steps
+  - add concurrency groups to cancel stale workflow runs, #9310
 
 
 Version 2.0.0b20 (2025-12-24)

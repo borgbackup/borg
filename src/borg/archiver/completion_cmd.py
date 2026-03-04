@@ -66,7 +66,7 @@ from ..helpers import (
     parse_file_size,
 )
 from ..helpers.argparsing import ArgumentParser
-from ..helpers.argparsing import _ActionSubCommands
+from ..helpers.argparsing import ActionSubCommands
 from ..helpers.time import timestamp
 from ..helpers.parseformat import partial_format
 from ..manifest import AI_HUMAN_SORT_KEYS
@@ -631,7 +631,7 @@ def _attach_completion(parser: ArgumentParser, type_class, completion_dict: dict
     """Tag all arguments with type `type_class` with completion choices from `completion_dict`."""
 
     for action in parser._actions:
-        if isinstance(action, _ActionSubCommands):
+        if isinstance(action, ActionSubCommands):
             for sub in action.choices.values():
                 _attach_completion(sub, type_class, completion_dict)
             continue
@@ -643,7 +643,7 @@ def _attach_completion(parser: ArgumentParser, type_class, completion_dict: dict
 def _attach_help_completion(parser: ArgumentParser, completion_dict: dict):
     """Tag the 'topic' argument of the 'help' command with static completion choices."""
     for action in parser._actions:
-        if isinstance(action, _ActionSubCommands):
+        if isinstance(action, ActionSubCommands):
             for sub in action.choices.values():
                 _attach_help_completion(sub, completion_dict)
             continue
@@ -690,7 +690,7 @@ class CompletionMixIn:
         # Collect all commands and help topics for "borg help" completion
         help_choices = list(self.helptext.keys())
         for action in parser._actions:
-            if isinstance(action, _ActionSubCommands):
+            if isinstance(action, ActionSubCommands):
                 help_choices.extend(action.choices.keys())
 
         help_completion_fn = "_borg_help_topics"

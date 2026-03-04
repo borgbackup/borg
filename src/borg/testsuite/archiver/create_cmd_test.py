@@ -223,7 +223,7 @@ def test_nobirthtime(archivers, request):
     assert same_ts_ns(sti.st_birthtime * 1e9, birthtime * 1e9)
     assert same_ts_ns(sto.st_birthtime * 1e9, mtime * 1e9)
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
-    assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
+    assert same_ts_ns(sto.st_mtime_ns, mtime * 10**9)
 
 
 def test_create_stdin(archivers, request):

@@ -153,13 +153,13 @@ def test_atime(archivers, request):
     sti = os.stat("input/file1")
     sto = os.stat("output/input/file1")
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
-    assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
+    assert same_ts_ns(sto.st_mtime_ns, mtime * 10**9)
     if have_noatime:
         assert same_ts_ns(sti.st_atime_ns, sto.st_atime_ns)
-        assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
+        assert same_ts_ns(sto.st_atime_ns, atime * 10**9)
     else:
         # it touched the input file's atime while backing it up
-        assert same_ts_ns(sto.st_atime_ns, atime * 1e9)
+        assert same_ts_ns(sto.st_atime_ns, atime * 10**9)
 
 
 @pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot setup and execute test without utime")
@@ -179,7 +179,7 @@ def test_birthtime(archivers, request):
     assert same_ts_ns(sti.st_birthtime * 1e9, sto.st_birthtime * 1e9)
     assert same_ts_ns(sto.st_birthtime * 1e9, birthtime * 1e9)
     assert same_ts_ns(sti.st_mtime_ns, sto.st_mtime_ns)
-    assert same_ts_ns(sto.st_mtime_ns, mtime * 1e9)
+    assert same_ts_ns(sto.st_mtime_ns, mtime * 10**9)
 
 
 @pytest.mark.skipif(is_win32, reason="frequent test failures on github CI on win32")
@@ -825,3 +825,19 @@ def test_extract_existing_directory(archivers, request):
         cmd(archiver, "extract", "test")
         st2 = os.stat("input/dir")
     assert st1.st_ino == st2.st_ino
+
+
+@pytest.mark.skipif(not is_utime_fully_supported(), reason="cannot properly setup and execute test without utime")
+def test_extract_y2261(archivers, request):
+    # test if roundtripping of timestamps well beyond y2038 works
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file_y2261", contents=b"post y2038 test")
+    # 2261-01-01 00:00:00 UTC as a Unix timestamp (seconds).
+    time_y2261 = 9183110400
+    os.utime("input/file_y2261", (time_y2261, time_y2261))
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test", "input")
+    with changedir("output"):
+        cmd(archiver, "extract", "test")
+    sto = os.stat("output/input/file_y2261")
+    assert same_ts_ns(sto.st_mtime_ns, time_y2261 * 10**9)

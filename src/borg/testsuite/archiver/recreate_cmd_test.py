@@ -215,7 +215,7 @@ def test_recreate_with_given_timestamp(archivers, request):
     assert any([re.search(r"Time \(nominal\).+ %s" % s_time, item) for item in info])
     # start/end time are just from the recreate operation
     dtime = datetime.now().astimezone()  # current local time
-    s_time = dtime.strftime("%Y-%m-%d %H:%M:.. %z").replace("+", r"\+")
+    s_time = dtime.strftime("%Y-%m-%d %H:..:.. %z").replace("+", r"\+")
     assert any([re.search(r"Time \(end\).+ %s" % s_time, item) for item in info])
     assert any([re.search(r"Time \(start\).+ %s" % s_time, item) for item in info])
 

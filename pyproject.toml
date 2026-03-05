@@ -286,10 +286,7 @@ omit = [
     "*/borg/__init__.py",
     "*/borg/__main__.py",
     "*/borg/_version.py",
-    "*/borg/fuse.py",
-    "*/borg/support/*",
     "*/borg/testsuite/*",
-    "*/borg/hash_sizes.py",
 ]
 
 [tool.coverage.report]

@@ -346,7 +346,7 @@ jobs:
         #sudo -E bash -c "tox -e py"
         # Ensure locally built binary in ./dist/binary/borg-dir is found during tests
         export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
-        tox --skip-missing-interpreters -- --junitxml=test-results.xml
+        tox --skip-missing-interpreters
 
     - name: Upload test results to Codecov
       if: ${{ !cancelled() && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
@@ -370,6 +370,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         report_type: coverage
         env_vars: OS,python
+        files: coverage.xml
 
   vm_tests:
     permissions:
@@ -584,7 +585,7 @@ jobs:
                 pip install -e .
 
                 # troubles with either tox or pytest xdist, so we run pytest manually:
-                pytest -v -rs --benchmark-skip -k "not remote and not socket"
+                pytest -v -n auto -rs --cov=borg --cov-config=pyproject.toml --cov-report=xml --junitxml=test-results.xml --benchmark-skip -k "not remote and not socket"
                 ;;
             esac
 
@@ -601,6 +602,28 @@ jobs:
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: 'artifacts/*'
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        env:
+          OS: ${{ matrix.os }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          env_vars: OS
+          files: test-results.xml
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
+        env:
+          OS: ${{ matrix.os }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: coverage
+          env_vars: OS
+          files: coverage.xml
 
   windows_tests:
 
@@ -659,7 +682,7 @@ jobs:
           export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
           borg.exe -V
           . env/bin/activate
-          python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote" --cov=borg --cov-config=pyproject.toml --junitxml=test-results.xml
+          python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote" --cov=borg --cov-config=pyproject.toml --cov-report=xml --junitxml=test-results.xml
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -683,3 +706,4 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: coverage
           env_vars: OS,python
+          files: coverage.xml

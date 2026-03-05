@@ -29,5 +29,7 @@ src/borg/_version.py
 borg.exe
 .coverage
 .coverage.*
+coverage.xml
+test-results.xml
 .vagrant
 

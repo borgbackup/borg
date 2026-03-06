@@ -143,7 +143,7 @@ class Statistics:
 
     PROGRESS_FMT = '{0.osize_fmt} O {0.csize_fmt} C {0.usize_fmt} D {0.nfiles} N '
 
-    def show_progress(self, item=None, final=False, stream=None, dt=None):
+    def show_progress(self, item=None, final=False, stream=None, dt=None, override_time=None):
         now = time.monotonic()
         if dt is None or now - self.last_progress > dt:
             stream = stream or sys.stderr
@@ -155,7 +155,7 @@ class Statistics:
                 else:
                     data = {}
                 data.update({
-                    'time': time.time(),
+                    'time': override_time if override_time is not None else time.time(),
                     'type': 'archive_progress',
                     'finished': final,
                 })

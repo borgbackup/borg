@@ -39,7 +39,7 @@ dependencies = [
   "argon2-cffi",
   "shtab>=1.8.0",
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
-  "xxhash",
+  "xxhash>=2.0.0",
 ]
 
 [project.optional-dependencies]

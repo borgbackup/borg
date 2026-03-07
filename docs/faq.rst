@@ -619,6 +619,14 @@ Please disclose security issues responsibly.
 Common issues
 #############
 
+Command error: ... needed to match precisely one archive, but matched N.
+------------------------------------------------------------------------
+
+The command wanted one archive to work with. But the parameters you gave either
+didn't match anything or they matched multiple archives.
+
+See :ref:`archive_specification` about how to refer to an archive.
+
 /path/to/repo is not a valid repository. Check repo config.
 -----------------------------------------------------------
 

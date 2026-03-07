@@ -4,6 +4,8 @@
 
 .. include:: general/repository-locations.rst.inc
 
+.. include:: general/archive-specification.rst.inc
+
 .. include:: general/logging.rst.inc
 
 .. include:: general/return-codes.rst.inc

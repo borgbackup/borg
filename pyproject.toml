@@ -254,7 +254,7 @@ labels = ["lint"]
 [tool.coverage.run]
 branch = true
 disable_warnings = ["module-not-measured", "no-ctracer"]
-patch = ["subprocess", "fork", "_exit"]
+patch = ["subprocess", "_exit"]
 parallel = true
 sigterm = true
 source = ["src/borg"]

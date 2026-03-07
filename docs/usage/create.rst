@@ -89,6 +89,9 @@ Examples
     $ find ~ -size -1000k | borg create --paths-from-stdin small-files-only
     # Use --paths-from-command with find to back up files from only a given user
     $ borg create --paths-from-command joes-files -- find /srv/samba/shared -user joe
+    # Use --paths-from-shell-command with find to back up a few files from only a given user -
+    # BE VERY CAREFUL AND ONLY USE TRUSTED INPUT FOR THE SHELL COMMAND!
+    $ borg create --paths-from-shell-command some-of-joes-files -- "find /srv/samba/shared -user joe | head"
     # Use --paths-from-stdin with --paths-delimiter (for example, for filenames with newlines in them)
     $ find ~ -size -1000k -print0 | borg create \
         --paths-from-stdin \

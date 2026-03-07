@@ -91,13 +91,24 @@ class CreateMixIn:
                 else:
                     status = "+"  # included
                 self.print_file_status(status, path)
-            elif args.paths_from_command or args.paths_from_stdin:
+            elif args.paths_from_command or args.paths_from_shell_command or args.paths_from_stdin:
                 paths_sep = eval_escapes(args.paths_delimiter) if args.paths_delimiter is not None else "\n"
-                if args.paths_from_command:
+                if args.paths_from_command or args.paths_from_shell_command:
                     try:
                         env = prepare_subprocess_env(system=True)
-                        proc = subprocess.Popen(  # nosec B603
-                            args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=None if is_win32 else ignore_sigint
+                        if args.paths_from_shell_command:
+                            # Use shell=True to support pipes, redirection, etc.
+                            shell = True
+                            cmd = " ".join(args.paths)
+                        else:
+                            shell = False
+                            cmd = args.paths
+                        proc = subprocess.Popen(
+                            cmd,
+                            stdout=subprocess.PIPE,
+                            env=env,
+                            shell=shell,  # nosec B602
+                            preexec_fn=None if is_win32 else ignore_sigint,
                         )
                     except (FileNotFoundError, PermissionError) as e:
                         raise CommandError(f"Failed to execute command: {e}")
@@ -131,7 +142,7 @@ class CreateMixIn:
                     self.print_file_status(status, path)
                     if not dry_run and status is not None:
                         fso.stats.files_stats[status] += 1
-                if args.paths_from_command:
+                if args.paths_from_command or args.paths_from_shell_command:
                     rc = proc.wait()
                     if rc != 0:
                         raise CommandError(f"Command {args.paths[0]!r} exited with status {rc}")
@@ -762,8 +773,8 @@ class CreateMixIn:
 
         If you need more control and you want to give every single fs object path
         to borg (maybe implementing your own recursion or your own rules), you can use
-        ``--paths-from-stdin`` or ``--paths-from-command`` (with the latter, borg will
-        fail to create an archive should the command fail).
+        ``--paths-from-stdin``, ``--paths-from-command`` or ``--paths-from-shell-command``
+        (with the latter two, borg will fail to create an archive should the command fail).
 
         Borg supports paths with the slashdot hack to strip path prefixes here also.
         So, be careful not to unintentionally trigger that.
@@ -841,6 +852,11 @@ class CreateMixIn:
             "--paths-from-command",
             action="store_true",
             help="interpret PATH as command and treat its output as ``--paths-from-stdin``",
+        )
+        subparser.add_argument(
+            "--paths-from-shell-command",
+            action="store_true",
+            help="interpret PATH as shell command and treat its output as ``--paths-from-stdin``",
         )
         subparser.add_argument(
             "--paths-delimiter",

@@ -2,28 +2,29 @@ import json
 import os
 
 from ...constants import *  # NOQA
-from . import cmd, checkts, create_src_archive, create_regular_file, src_dir, generate_archiver_tests, RK_ENCRYPTION
+from . import cmd, checkts, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
+from .prune_cmd_test import _create_archive_ts
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
-def test_repo_list_glob(archivers, request):
+def test_repo_list_glob(archivers, request, backup_files):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "test-1", src_dir)
-    cmd(archiver, "create", "something-else-than-test-1", src_dir)
-    cmd(archiver, "create", "test-2", src_dir)
+    cmd(archiver, "create", "test-1", backup_files)
+    cmd(archiver, "create", "something-else-than-test-1", backup_files)
+    cmd(archiver, "create", "test-2", backup_files)
     output = cmd(archiver, "repo-list", "--match-archives=sh:test-*")
     assert "test-1" in output
     assert "test-2" in output
     assert "something-else" not in output
 
 
-def test_archives_format(archivers, request):
+def test_archives_format(archivers, request, backup_files):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "--comment", "comment 1", "test-1", src_dir)
-    cmd(archiver, "create", "--comment", "comment 2", "test-2", src_dir)
+    cmd(archiver, "create", "--comment", "comment 1", "test-1", backup_files)
+    cmd(archiver, "create", "--comment", "comment 2", "test-2", backup_files)
     output_1 = cmd(archiver, "repo-list")
     output_2 = cmd(
         archiver,
@@ -54,13 +55,13 @@ def test_size_nfiles(archivers, request):
     assert 123456 <= int(o_t[2]) < 123999  # There is some metadata overhead
 
 
-def test_date_matching(archivers, request):
+def test_date_matching(archivers, request, backup_files):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
 
-    create_src_archive(archiver, "archive-2022-11-20", ts="2022-11-20T23:59:59")
-    create_src_archive(archiver, "archive-2022-12-18", ts="2022-12-18T23:59:59")
-    create_src_archive(archiver, "archive-now")
+    _create_archive_ts(archiver, backup_files, "archive-2022-11-20", 2022, 11, 20, 23, 59, 59)
+    _create_archive_ts(archiver, backup_files, "archive-2022-12-18", 2022, 12, 18, 23, 59, 59)
+    cmd(archiver, "create", "archive-now", backup_files)
 
     cmd(archiver, "check", "-v", "--oldest=23e", exit_code=2)
 
@@ -150,13 +151,13 @@ def test_repo_list_json(archivers, request):
     checkts(archive0["time"])
 
 
-def test_repo_list_deleted(archivers, request):
+def test_repo_list_deleted(archivers, request, backup_files):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "normal1", src_dir)
-    cmd(archiver, "create", "deleted1", src_dir)
-    cmd(archiver, "create", "normal2", src_dir)
-    cmd(archiver, "create", "deleted2", src_dir)
+    cmd(archiver, "create", "normal1", backup_files)
+    cmd(archiver, "create", "deleted1", backup_files)
+    cmd(archiver, "create", "normal2", backup_files)
+    cmd(archiver, "create", "deleted2", backup_files)
     cmd(archiver, "delete", "-a", "sh:deleted*")
     output = cmd(archiver, "repo-list")
     assert "normal1" in output

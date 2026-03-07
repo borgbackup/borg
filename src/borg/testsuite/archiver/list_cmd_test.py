@@ -3,15 +3,15 @@ import os
 import pytest
 
 from ...constants import *  # NOQA
-from . import src_dir, cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION, requires_hardlinks
+from . import cmd, create_regular_file, generate_archiver_tests, RK_ENCRYPTION, requires_hardlinks
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
 
-def test_list_format(archivers, request):
+def test_list_format(archivers, request, backup_files):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    cmd(archiver, "create", "test", src_dir)
+    cmd(archiver, "create", "test", backup_files)
     output_1 = cmd(archiver, "list", "test")
     output_2 = cmd(
         archiver, "list", "test", "--format", "{mode} {user:6} {group:6} {size:8d} {mtime} {path}{extra}{NEWLINE}"

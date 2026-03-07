@@ -36,6 +36,8 @@ RK_ENCRYPTION = "--encryption=repokey-aes-ocb"
 KF_ENCRYPTION = "--encryption=keyfile-chacha20-poly1305"
 
 # This points to the ``src/borg/archiver`` directory (small, with only a few files).
+# There are quite a lot of files in there, because there is a __pycache__ subdirectory.
+# Consider rather using the backup_files fixtures, which only has a few small files/dirs.
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "archiver"))
 src_file = "archiver/__init__.py"  # relative path of one file in src_dir
 

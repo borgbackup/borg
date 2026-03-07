@@ -1,10 +1,10 @@
-import argparse
 import subprocess
 
 from ._common import with_repository
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..helpers import prepare_subprocess_env, set_ec, CommandError, ThreadRunner
+from ..helpers.argparsing import ArgumentParser, REMAINDER
 
 from ..logger import create_logger
 
@@ -45,16 +45,10 @@ class LocksMixIn:
         trying to access the cache or the repository.
         """
         )
-        subparser = subparsers.add_parser(
-            "break-lock",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_break_lock.__doc__,
-            epilog=break_lock_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="break the repository and cache locks",
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_break_lock.__doc__, epilog=break_lock_epilog
         )
-        subparser.set_defaults(func=self.do_break_lock)
+        subparsers.add_subcommand("break-lock", subparser, help="break the repository and cache locks")
 
         with_lock_epilog = process_epilog(
             """
@@ -77,15 +71,9 @@ class LocksMixIn:
             Borg is cautious and does not automatically remove stale locks made by a different host.
         """
         )
-        subparser = subparsers.add_parser(
-            "with-lock",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_with_lock.__doc__,
-            epilog=with_lock_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="run a user command with the lock held",
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_with_lock.__doc__, epilog=with_lock_epilog
         )
-        subparser.set_defaults(func=self.do_with_lock)
+        subparsers.add_subcommand("with-lock", subparser, help="run a user command with the lock held")
         subparser.add_argument("command", metavar="COMMAND", help="command to run")
-        subparser.add_argument("args", metavar="ARGS", nargs=argparse.REMAINDER, help="command arguments")
+        subparser.add_argument("args", metavar="ARGS", nargs=REMAINDER, help="command arguments")

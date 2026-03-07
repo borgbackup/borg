@@ -1,7 +1,6 @@
-import argparse
-
 from .. import __version__
 from ..constants import *  # NOQA
+from ..helpers.argparsing import ArgumentParser
 from ..remote import RemoteRepository
 
 from ..logger import create_logger
@@ -51,13 +50,5 @@ class VersionMixIn:
         You can also use ``borg --version`` to display a potentially more precise client version.
         """
         )
-        subparser = subparsers.add_parser(
-            "version",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_version.__doc__,
-            epilog=version_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="display the Borg client and server versions",
-        )
-        subparser.set_defaults(func=self.do_version)
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_version.__doc__, epilog=version_epilog)
+        subparsers.add_subcommand("version", subparser, help="display the Borg client and server versions")

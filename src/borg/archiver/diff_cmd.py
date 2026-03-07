@@ -1,4 +1,3 @@
-import argparse
 import textwrap
 import json
 import sys
@@ -9,6 +8,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import BaseFormatter, DiffFormatter, archivename_validator, PathSpec, BorgJsonEncoder
 from ..helpers import IncludePatternNeverMatchedWarning, remove_surrogates
+from ..helpers.argparsing import ArgumentParser, ArgumentTypeError
 from ..item import ItemDiff
 from ..manifest import Manifest
 from ..logger import create_logger
@@ -84,6 +84,7 @@ class DiffMixIn:
                 wc=None,
             )
 
+        # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
 
         diffs_iter = Archive.compare_archives_iter(
@@ -203,7 +204,6 @@ class DiffMixIn:
 
         The following keys are always available:
 
-
         """
             )
             + BaseFormatter.keys_help()
@@ -268,7 +268,7 @@ class DiffMixIn:
 
         def diff_sort_spec_validator(s):
             if not isinstance(s, str):
-                raise argparse.ArgumentTypeError("unsupported sort field (not a string)")
+                raise ArgumentTypeError("unsupported sort field (not a string)")
             allowed = {
                 "path",
                 "size_added",
@@ -286,23 +286,15 @@ class DiffMixIn:
             }
             parts = [p.strip() for p in s.split(",") if p.strip()]
             if not parts:
-                raise argparse.ArgumentTypeError("unsupported sort field: empty spec")
+                raise ArgumentTypeError("unsupported sort field: empty spec")
             for spec in parts:
                 field = spec[1:] if spec and spec[0] in (">", "<") else spec
                 if field not in allowed:
-                    raise argparse.ArgumentTypeError(f"unsupported sort field: {field}")
+                    raise ArgumentTypeError(f"unsupported sort field: {field}")
             return ",".join(parts)
 
-        subparser = subparsers.add_parser(
-            "diff",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_diff.__doc__,
-            epilog=diff_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="find differences in archive contents",
-        )
-        subparser.set_defaults(func=self.do_diff)
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_diff.__doc__, epilog=diff_epilog)
+        subparsers.add_subcommand("diff", subparser, help="find differences in archive contents")
         subparser.add_argument(
             "--numeric-ids",
             dest="numeric_ids",

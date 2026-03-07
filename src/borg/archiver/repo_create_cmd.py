@@ -1,11 +1,10 @@
-import argparse
-
 from ._common import with_repository, with_other_repository, Highlander
 from ..cache import Cache
 from ..constants import *  # NOQA
 from ..crypto.key import key_creator, key_argument_names
 from ..helpers import CancelledByUser
 from ..helpers import location_validator, Location
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -190,16 +189,10 @@ class RepoCreateMixIn:
         Then use ``borg transfer --other-repo ORIG_REPO --from-borg1 ...`` to transfer the archives.
         """
         )
-        subparser = subparsers.add_parser(
-            "repo-create",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_repo_create.__doc__,
-            epilog=repo_create_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="create a new, empty repository",
+        subparser = ArgumentParser(
+            parents=[common_parser], description=self.do_repo_create.__doc__, epilog=repo_create_epilog
         )
-        subparser.set_defaults(func=self.do_repo_create)
+        subparsers.add_subcommand("repo-create", subparser, help="create a new, empty repository")
         subparser.add_argument(
             "--other-repo",
             metavar="SRC_REPOSITORY",

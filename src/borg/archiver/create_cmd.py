@@ -1,6 +1,5 @@
 import errno
 import sys
-import argparse
 import logging
 import os
 import posixpath
@@ -16,9 +15,8 @@ from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io,
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..compress import CompressionSpec
-from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec
-from ..helpers import archivename_validator, FilesCacheMode
+from ..helpers import comment_validator, ChunkerParams, FilesystemPathSpec, CompressionSpec
+from ..helpers import archivename_validator, FilesCacheMode, octal_int
 from ..helpers import eval_escapes
 from ..helpers import timestamp, archive_ts_now
 from ..helpers import get_cache_dir, os_stat, get_strip_prefix, slashify
@@ -31,6 +29,7 @@ from ..helpers import sig_int, ignore_sigint
 from ..helpers import iter_separated
 from ..helpers import MakePathSafeAction
 from ..helpers import Error, CommandError, BackupWarning, FileChangedWarning
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 from ..patterns import PatternMatcher
 from ..platform import is_win32
@@ -92,13 +91,24 @@ class CreateMixIn:
                 else:
                     status = "+"  # included
                 self.print_file_status(status, path)
-            elif args.paths_from_command or args.paths_from_stdin:
+            elif args.paths_from_command or args.paths_from_shell_command or args.paths_from_stdin:
                 paths_sep = eval_escapes(args.paths_delimiter) if args.paths_delimiter is not None else "\n"
-                if args.paths_from_command:
+                if args.paths_from_command or args.paths_from_shell_command:
                     try:
                         env = prepare_subprocess_env(system=True)
-                        proc = subprocess.Popen(  # nosec B603
-                            args.paths, stdout=subprocess.PIPE, env=env, preexec_fn=None if is_win32 else ignore_sigint
+                        if args.paths_from_shell_command:
+                            # Use shell=True to support pipes, redirection, etc.
+                            shell = True
+                            cmd = " ".join(args.paths)
+                        else:
+                            shell = False
+                            cmd = args.paths
+                        proc = subprocess.Popen(
+                            cmd,
+                            stdout=subprocess.PIPE,
+                            env=env,
+                            shell=shell,  # nosec B602
+                            preexec_fn=None if is_win32 else ignore_sigint,
                         )
                     except (FileNotFoundError, PermissionError) as e:
                         raise CommandError(f"Failed to execute command: {e}")
@@ -132,12 +142,13 @@ class CreateMixIn:
                     self.print_file_status(status, path)
                     if not dry_run and status is not None:
                         fso.stats.files_stats[status] += 1
-                if args.paths_from_command:
+                if args.paths_from_command or args.paths_from_shell_command:
                     rc = proc.wait()
                     if rc != 0:
                         raise CommandError(f"Command {args.paths[0]!r} exited with status {rc}")
             else:
-                for path in args.paths:
+                paths = list(args.pattern_roots) + list(args.paths)
+                for path in paths:
                     if path == "":  # issue #5637
                         self.print_warning("An empty string was given as PATH, ignoring.")
                         continue
@@ -678,7 +689,6 @@ class CreateMixIn:
         macOS examples are the apfs mounts of a typical macOS installation.
         Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
 
-
         .. _list_item_flags:
 
         Item flags
@@ -763,24 +773,16 @@ class CreateMixIn:
 
         If you need more control and you want to give every single fs object path
         to borg (maybe implementing your own recursion or your own rules), you can use
-        ``--paths-from-stdin`` or ``--paths-from-command`` (with the latter, borg will
-        fail to create an archive should the command fail).
+        ``--paths-from-stdin``, ``--paths-from-command`` or ``--paths-from-shell-command``
+        (with the latter two, borg will fail to create an archive should the command fail).
 
         Borg supports paths with the slashdot hack to strip path prefixes here also.
         So, be careful not to unintentionally trigger that.
         """
         )
 
-        subparser = subparsers.add_parser(
-            "create",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_create.__doc__,
-            epilog=create_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="create a backup",
-        )
-        subparser.set_defaults(func=self.do_create)
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_create.__doc__, epilog=create_epilog)
+        subparsers.add_subcommand("create", subparser, help="create a backup")
 
         # note: --dry-run and --stats are mutually exclusive, but we do not want to abort when
         #  parsing, but rather proceed with the dry-run, but without stats (see run() method).
@@ -830,7 +832,7 @@ class CreateMixIn:
             "--stdin-mode",
             metavar="M",
             dest="stdin_mode",
-            type=lambda s: int(s, 8),
+            type=octal_int,
             default=STDIN_MODE_DEFAULT,
             action=Highlander,
             help="set mode to M in archive for stdin data (default: %(default)04o)",
@@ -850,6 +852,11 @@ class CreateMixIn:
             "--paths-from-command",
             action="store_true",
             help="interpret PATH as command and treat its output as ``--paths-from-stdin``",
+        )
+        subparser.add_argument(
+            "--paths-from-shell-command",
+            action="store_true",
+            help="interpret PATH as shell command and treat its output as ``--paths-from-stdin``",
         )
         subparser.add_argument(
             "--paths-delimiter",

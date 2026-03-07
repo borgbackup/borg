@@ -284,3 +284,29 @@ Please note:
 .. _INI: https://docs.python.org/3/library/logging.config.html#configuration-file-format
 
 .. _tempfile: https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir
+
+
+Automatically generated Environment Variables (jsonargparse)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Borg uses jsonargparse_ with ``default_env=True``, which means that every
+command-line option can also be set via an environment variable.
+
+The environment variable name is derived from the program name (``borg``),
+the subcommand (if any), and the option name, all converted to uppercase
+with dashes replaced by underscores.
+
+For **top-level options** (not specific to a subcommand), the pattern is::
+
+    BORG_<OPTION>
+
+For example, ``--lock-wait`` can be set via ``BORG_LOCK_WAIT``.
+
+For **subcommand options**, the subcommand and option are separated by a
+double underscore::
+
+    BORG_<SUBCOMMAND>__<OPTION>
+
+For example, ``borg create --comment`` can be set via ``BORG_CREATE__COMMENT``.
+
+.. _jsonargparse: https://jsonargparse.readthedocs.io/

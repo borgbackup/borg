@@ -1,4 +1,3 @@
-import argparse
 from collections import defaultdict
 import os
 
@@ -7,6 +6,7 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..helpers import bin_to_hex, Error
 from ..helpers import ProgressIndicatorPercent
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 from ..remote import RemoteRepository
 from ..repository import Repository
@@ -126,14 +126,6 @@ class AnalyzeMixIn:
             to recreate existing archives without them.
             """
         )
-        subparser = subparsers.add_parser(
-            "analyze",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_analyze.__doc__,
-            epilog=analyze_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="analyze archives",
-        )
-        subparser.set_defaults(func=self.do_analyze)
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_analyze.__doc__, epilog=analyze_epilog)
+        subparsers.add_subcommand("analyze", subparser, help="analyze archives")
         define_archive_filters_group(subparser)

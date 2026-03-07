@@ -1,4 +1,3 @@
-import argparse
 import fnmatch
 import posixpath
 import re
@@ -8,6 +7,7 @@ from collections import namedtuple
 from enum import Enum
 
 from .helpers import clean_lines, shellpattern
+from .helpers.argparsing import Action, ArgumentTypeError
 from .helpers.errors import Error
 
 
@@ -36,15 +36,15 @@ def load_exclude_file(fileobj, patterns):
         patterns.append(parse_exclude_pattern(patternstr))
 
 
-class ArgparsePatternAction(argparse.Action):
+class ArgparsePatternAction(Action):
     def __init__(self, nargs=1, **kw):
         super().__init__(nargs=nargs, **kw)
 
     def __call__(self, parser, args, values, option_string=None):
-        parse_patternfile_line(values[0], args.paths, args.patterns, ShellPattern)
+        parse_patternfile_line(values[0], args.pattern_roots, args.patterns, ShellPattern)
 
 
-class ArgparsePatternFileAction(argparse.Action):
+class ArgparsePatternFileAction(Action):
     def __init__(self, nargs=1, **kw):
         super().__init__(nargs=nargs, **kw)
 
@@ -60,7 +60,7 @@ class ArgparsePatternFileAction(argparse.Action):
             raise Error(str(e))
 
     def parse(self, fobj, args):
-        load_pattern_file(fobj, args.paths, args.patterns)
+        load_pattern_file(fobj, args.pattern_roots, args.patterns)
 
 
 class ArgparseExcludeFileAction(ArgparsePatternFileAction):
@@ -357,16 +357,16 @@ def parse_inclexcl_command(cmd_line_str, fallback=ShellPattern):
         "p": IECommand.PatternStyle,
     }
     if not cmd_line_str:
-        raise argparse.ArgumentTypeError("A pattern/command must not be empty.")
+        raise ArgumentTypeError("A pattern/command must not be empty.")
 
     cmd = cmd_prefix_map.get(cmd_line_str[0])
     if cmd is None:
-        raise argparse.ArgumentTypeError("A pattern/command must start with any of: %s" % ", ".join(cmd_prefix_map))
+        raise ArgumentTypeError("A pattern/command must start with any of: %s" % ", ".join(cmd_prefix_map))
 
     # remaining text on command-line following the command character
     remainder_str = cmd_line_str[1:].lstrip()
     if not remainder_str:
-        raise argparse.ArgumentTypeError("A pattern/command must have a value part.")
+        raise ArgumentTypeError("A pattern/command must have a value part.")
 
     if cmd is IECommand.RootPath:
         # TODO: validate string?
@@ -376,7 +376,7 @@ def parse_inclexcl_command(cmd_line_str, fallback=ShellPattern):
         try:
             val = get_pattern_class(remainder_str)
         except ValueError:
-            raise argparse.ArgumentTypeError(f"Invalid pattern style: {remainder_str}")
+            raise ArgumentTypeError(f"Invalid pattern style: {remainder_str}")
     else:
         # determine recurse_dir based on command type
         recurse_dir = command_recurses_dir(cmd)

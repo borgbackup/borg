@@ -7,8 +7,9 @@ from ..archive import Archive
 from ..constants import *  # NOQA
 from ..cache import Cache, assert_secure
 from ..helpers import Error
-from ..helpers import SortBySpec, positive_int_validator, location_validator, Location, relative_time_marker_validator
-from ..helpers import Highlander
+from ..helpers import SortBySpec, location_validator, Location, relative_time_marker_validator
+from ..helpers import Highlander, octal_int
+from ..helpers.argparsing import SUPPRESS, PositiveInt
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
@@ -268,6 +269,8 @@ def process_epilog(epilog):
 
 
 def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components=False):
+    add_option("--pattern-roots-internal", dest="pattern_roots", action="append", default=[], help=SUPPRESS)
+    add_option("--patterns-internal", dest="patterns", action="append", default=[], help=SUPPRESS)
     add_option(
         "-e",
         "--exclude",
@@ -275,6 +278,7 @@ def define_exclude_and_patterns(add_option, *, tag_files=False, strip_components
         dest="patterns",
         type=parse_exclude_pattern,
         action="append",
+        default=[],
         help="exclude paths matching PATTERN",
     )
     add_option(
@@ -371,8 +375,7 @@ def define_archive_filters_group(
             "--first",
             metavar="N",
             dest="first",
-            type=positive_int_validator,
-            default=0,
+            type=PositiveInt,
             action=Highlander,
             help="consider the first N archives after other filters are applied",
         )
@@ -380,8 +383,7 @@ def define_archive_filters_group(
             "--last",
             metavar="N",
             dest="last",
-            type=positive_int_validator,
-            default=0,
+            type=PositiveInt,
             action=Highlander,
             help="consider the last N archives after other filters are applied",
         )
@@ -508,7 +510,7 @@ def define_common_options(add_common_option):
         "--umask",
         metavar="M",
         dest="umask",
-        type=lambda s: int(s, 8),
+        type=octal_int,
         default=UMASK_DEFAULT,
         action=Highlander,
         help="set umask to M (local only, default: %(default)04o)",
@@ -574,10 +576,11 @@ def define_common_options(add_common_option):
     )
 
 
-def build_matcher(inclexcl_patterns, include_paths):
+def build_matcher(inclexcl_patterns, include_paths, pattern_roots=()):
     matcher = PatternMatcher()
     matcher.add_inclexcl(inclexcl_patterns)
-    matcher.add_includepaths(include_paths)
+    paths = list(pattern_roots) + list(include_paths)
+    matcher.add_includepaths(paths)
     return matcher
 
 

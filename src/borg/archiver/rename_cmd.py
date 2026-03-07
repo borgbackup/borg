@@ -1,8 +1,7 @@
-import argparse
-
 from ._common import with_repository, with_archive
 from ..constants import *  # NOQA
 from ..helpers import archivename_validator
+from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
 from ..logger import create_logger
@@ -28,16 +27,8 @@ class RenameMixIn:
         This results in a different archive ID.
         """
         )
-        subparser = subparsers.add_parser(
-            "rename",
-            parents=[common_parser],
-            add_help=False,
-            description=self.do_rename.__doc__,
-            epilog=rename_epilog,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            help="rename an archive",
-        )
-        subparser.set_defaults(func=self.do_rename)
+        subparser = ArgumentParser(parents=[common_parser], description=self.do_rename.__doc__, epilog=rename_epilog)
+        subparsers.add_subcommand("rename", subparser, help="rename an archive")
         subparser.add_argument(
             "name", metavar="OLDNAME", type=archivename_validator, help="specify the current archive name"
         )

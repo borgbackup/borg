@@ -367,7 +367,12 @@ def test_verify_data(archivers, request, init_args):
     # note: it only works like tested here for a highly engineered data corruption attack,
     # because with accidental corruption, usually already the xxh64 low-level check fails.
     def fake_xxh64(data, seed=0):
-        return b"fakefake"
+        # xxhash.xxh64.digest() returns -> bytes
+        class FakeDigest:
+            def digest(self):
+                return b"fakefake"
+
+        return FakeDigest()
 
     import borg.repoobj
     import borg.repository

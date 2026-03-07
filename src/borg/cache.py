@@ -8,6 +8,8 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from time import perf_counter
 
+from xxhash import xxh64
+
 from borgstore.backends.errors import PermissionDenied
 
 from .logger import create_logger
@@ -19,7 +21,6 @@ files_cache_logger = create_logger("borg.debug.files_cache")
 from borgstore.store import ItemInfo
 
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
-from .checksums import xxh64
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Error
 from .helpers import get_cache_dir, get_security_dir
@@ -52,7 +53,7 @@ def files_cache_name(archive_name, files_cache_name="files"):
     # when not, the user may manually do that by using the env var.
     if not suffix:
         # avoid issues with too complex or long archive_name by hashing it:
-        suffix = bin_to_hex(xxh64(archive_name.encode()))
+        suffix = xxh64(archive_name.encode()).hexdigest()
     return files_cache_name + "." + suffix
 
 
@@ -745,7 +746,7 @@ def write_chunkindex_to_repo_cache(
     if clear:
         # if we don't need the in-memory chunks index anymore:
         chunks.clear()  # free memory, immediately
-    new_hash = bin_to_hex(xxh64(data, seed=CHUNKINDEX_HASH_SEED))
+    new_hash = xxh64(data, seed=CHUNKINDEX_HASH_SEED).hexdigest()
     cached_hashes = list_chunkindex_hashes(repository)
     if force_write or new_hash not in cached_hashes:
         # when an updated chunks index is stored into the cache, we also store its hash as part of the name.
@@ -786,7 +787,7 @@ def read_chunkindex_from_repo_cache(repository, hash):
     except StoreObjectNotFound:
         logger.debug(f"{cache_name} not found in the repository.")
     else:
-        if xxh64(chunks_data, seed=CHUNKINDEX_HASH_SEED) == hex_to_bin(hash):
+        if xxh64(chunks_data, seed=CHUNKINDEX_HASH_SEED).digest() == hex_to_bin(hash):
             logger.debug(f"{cache_name} is valid.")
             with io.BytesIO(chunks_data) as f:
                 chunks = ChunkIndex.read(f)

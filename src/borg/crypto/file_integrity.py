@@ -5,9 +5,10 @@ from hmac import compare_digest
 from collections.abc import Callable
 from pathlib import Path
 
+from xxhash import xxh64
+
 from ..helpers import IntegrityError
 from ..logger import create_logger
-from ..checksums import StreamingXXH64
 
 logger = create_logger()
 
@@ -112,7 +113,7 @@ class SHA512FileHashingWrapper(FileHashingWrapper):
 
 class XXH64FileHashingWrapper(FileHashingWrapper):
     ALGORITHM = "XXH64"
-    FACTORY = StreamingXXH64
+    FACTORY = xxh64
 
 
 SUPPORTED_ALGORITHMS = {

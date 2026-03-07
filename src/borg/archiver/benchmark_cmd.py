@@ -216,14 +216,15 @@ class BenchmarkMixIn:
             else:
                 print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
 
-        from ..checksums import crc32, xxh64
+        from xxhash import xxh64
+        from ..checksums import crc32
 
         if not args.json:
             print("Non-cryptographic checksums / hashes ===========================")
         else:
             result["checksums"] = []
         size = 1000000000
-        tests = [("xxh64", lambda: xxh64(random_10M)), ("crc32 (zlib)", lambda: crc32(random_10M))]
+        tests = [("xxh64", lambda: xxh64(random_10M).digest()), ("crc32 (zlib)", lambda: crc32(random_10M))]
         for spec, func in tests:
             dt = timeit(func, number=number_default)
             if args.json:

@@ -163,11 +163,7 @@ if not on_rtd:
         dict(extra_compile_args=cflags),
     )
 
-    checksums_ext_kwargs = members_appended(
-        dict(sources=[checksums_source]),
-        lib_ext_kwargs(pc, "BORG_LIBXXHASH_PREFIX", "xxhash", "libxxhash", ">= 0.7.3"),
-        dict(extra_compile_args=cflags),
-    )
+    checksums_ext_kwargs = members_appended(dict(sources=[checksums_source]), dict(extra_compile_args=cflags))
 
     if sys.platform == "linux":
         linux_ext_kwargs = members_appended(

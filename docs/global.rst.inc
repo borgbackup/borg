@@ -28,3 +28,4 @@
 .. _userspace filesystems: https://en.wikipedia.org/wiki/Filesystem_in_Userspace
 .. _Cython: https://cython.org/
 .. _virtualenv: https://pypi.org/project/virtualenv/
+.. _python-xxhash: https://github.com/ifduyue/python-xxhash/

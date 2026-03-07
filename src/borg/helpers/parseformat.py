@@ -899,11 +899,11 @@ class ItemFormatter(BaseFormatter):
         return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
     def __init__(self, archive, format):
-        from ..checksums import StreamingXXH64
+        from xxhash import xxh64
 
         static_data = {"archivename": archive.name, "archiveid": archive.fpr} | self.FIXED_KEYS
         super().__init__(format, static_data)
-        self.xxh64 = StreamingXXH64
+        self.xxh64 = xxh64
         self.archive = archive
         # track which keys were requested in the format string
         self.format_keys = {f[1] for f in Formatter().parse(format)}

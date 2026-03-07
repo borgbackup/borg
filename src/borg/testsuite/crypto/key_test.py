@@ -4,12 +4,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey
-from ...crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey
+from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKeyLegacy
+from ...crypto.key import RepoKey, KeyfileKey, Blake2RepoKeyLegacy, Blake2KeyfileKeyLegacy
 from ...crypto.key import AEADKeyBase
 from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey
 from ...crypto.key import Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey
-from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
+from ...crypto.key import Blake2AuthenticatedKey
+from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE2b_256_legacy
 from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
 from ...crypto.key import identify_key
 from ...crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -40,7 +41,7 @@ class TestKey:
     )
     keyfile2_id = hex_to_bin("c3fbf14bc001ebcc3cd86e696c13482ed071740927cd7cbe1b01b4bfcee49314")
 
-    keyfile_blake2_key_file = """
+    keyfile_blake2_key_file_legacy = """
         BORG_KEY 0000000000000000000000000000000000000000000000000000000000000000
         hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaAZ7VCsTjbLhC1ipXOyhcGn7YnROEhP24UQvOCi
         Oar1G+JpwgO9BIYaiCODUpzPuDQEm6WxyTwEneJ3wsuyeqyh7ru2xo9FAUKRf6jcqqZnan
@@ -54,17 +55,17 @@ class TestKey:
         UTHFJg343jqml0ZXJhdGlvbnPOAAGGoKRzYWx02gAgz3YaUZZ/s+UWywj97EY5b4KhtJYi
         qkPqtDDxs2j/T7+ndmVyc2lvbgE=""".strip()
 
-    keyfile_blake2_cdata = hex_to_bin(
+    keyfile_blake2_cdata_legacy = hex_to_bin(
         "04d6040f5ef80e0a8ac92badcbe3dee83b7a6b53d5c9a58c4eed14964cb10ef591040404040404040d1e65cc1f435027"
     )
     # Verified against b2sum. Entire string passed to BLAKE2, including the padded 64 byte key contained in
-    # keyfile_blake2_key_file above is
+    # keyfile_blake2_key_file_legacy above is
     # 19280471de95185ec27ecb6fc9edbb4f4db26974c315ede1cd505fab4250ce7cd0d081ea66946c
     # 95f0db934d5f616921efbd869257e8ded2bd9bd93d7f07b1a30000000000000000000000000000
     # 000000000000000000000000000000000000000000000000000000000000000000000000000000
     # 00000000000000000000007061796c6f6164
     #                       p a y l o a d
-    keyfile_blake2_id = hex_to_bin("d8bc68e961c79f99be39061589e5179b2113cd9226e07b08ddd4a1fef7ce93fb")
+    keyfile_blake2_id_legacy = hex_to_bin("d8bc68e961c79f99be39061589e5179b2113cd9226e07b08ddd4a1fef7ce93fb")
 
     @pytest.fixture
     def keys_dir(self, request, monkeypatch, tmpdir):
@@ -76,13 +77,14 @@ class TestKey:
             # not encrypted
             PlaintextKey,
             AuthenticatedKey,
-            Blake2AuthenticatedKey,
             # legacy crypto
+            Blake2AuthenticatedKeyLegacy,
             KeyfileKey,
-            Blake2KeyfileKey,
+            Blake2KeyfileKeyLegacy,
             RepoKey,
-            Blake2RepoKey,
+            Blake2RepoKeyLegacy,
             # new crypto
+            Blake2AuthenticatedKey,
             AESOCBKeyfileKey,
             AESOCBRepoKey,
             Blake2AESOCBKeyfileKey,
@@ -176,12 +178,12 @@ class TestKey:
         key = KeyfileKey.detect(self.MockRepository(), self.keyfile2_cdata)
         assert key.decrypt(self.keyfile2_id, self.keyfile2_cdata) == b"payload"
 
-    def test_keyfile_blake2(self, monkeypatch, keys_dir):
+    def test_keyfile_blake2_legacy(self, monkeypatch, keys_dir):
         with keys_dir.join("keyfile").open("w") as fd:
-            fd.write(self.keyfile_blake2_key_file)
+            fd.write(self.keyfile_blake2_key_file_legacy)
         monkeypatch.setenv("BORG_PASSPHRASE", "passphrase")
-        key = Blake2KeyfileKey.detect(self.MockRepository(), self.keyfile_blake2_cdata)
-        assert key.decrypt(self.keyfile_blake2_id, self.keyfile_blake2_cdata) == b"payload"
+        key = Blake2KeyfileKeyLegacy.detect(self.MockRepository(), self.keyfile_blake2_cdata_legacy)
+        assert key.decrypt(self.keyfile_blake2_id_legacy, self.keyfile_blake2_cdata_legacy) == b"payload"
 
     def _corrupt_byte(self, key, data, offset):
         data = bytearray(data)
@@ -243,16 +245,27 @@ class TestKey:
         # 0x07 is the key TYPE.
         assert authenticated == b"\x07" + plaintext
 
-    def test_blake2_authenticated_encrypt(self, monkeypatch):
+    def test_blake2_authenticated_encrypt_legacy(self, monkeypatch):
         monkeypatch.setenv("BORG_PASSPHRASE", "test")
-        key = Blake2AuthenticatedKey.create(self.MockRepository(), self.MockArgs())
-        assert Blake2AuthenticatedKey.id_hash is ID_BLAKE2b_256.id_hash
+        key = Blake2AuthenticatedKeyLegacy.create(self.MockRepository(), self.MockArgs())
+        assert Blake2AuthenticatedKeyLegacy.id_hash is ID_BLAKE2b_256_legacy.id_hash
         assert len(key.id_key) == 128
         plaintext = b"123456789"
         id = key.id_hash(plaintext)
         authenticated = key.encrypt(id, plaintext)
         # 0x06 is the key TYPE.
         assert authenticated == b"\x06" + plaintext
+
+    def test_blake2_authenticated_encrypt(self, monkeypatch):
+        monkeypatch.setenv("BORG_PASSPHRASE", "test")
+        key = Blake2AuthenticatedKey.create(self.MockRepository(), self.MockArgs())
+        assert Blake2AuthenticatedKey.id_hash is ID_BLAKE2b_256.id_hash
+        assert len(key.id_key) == 64
+        plaintext = b"123456789"
+        id = key.id_hash(plaintext)
+        authenticated = key.encrypt(id, plaintext)
+        # 0x51 is the key TYPE.
+        assert authenticated == b"\x51" + plaintext
 
 
 class TestTAM:

@@ -66,6 +66,18 @@ def set_env_variables():
     os.environ["BORG_SELFTEST"] = "disabled"
 
 
+@pytest.fixture(scope="session")
+def backup_files(tmp_path_factory):
+    # create a relatively simple / minimal set of test files
+    path = tmp_path_factory.mktemp("backup")
+    (path / "empty").write_bytes(b"")
+    (path / "dir1").mkdir()
+    (path / "dir1" / "text.txt").write_text("text content")
+    (path / "dir2").mkdir()
+    (path / "dir2" / "binary.bin").write_bytes(b"\x00\x01\x02\x03")
+    return str(path)
+
+
 class ArchiverSetup:
     EXE: str = None  # python source based
     FORK_DEFAULT = False

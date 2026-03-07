@@ -1,6 +1,5 @@
 brew 'pkgconf'
 brew 'lz4'
-brew 'xxhash'
 brew 'openssl@3'
 
 # osxfuse (aka macFUSE) is only required for "borg mount",

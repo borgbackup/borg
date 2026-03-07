@@ -3,11 +3,12 @@ import json
 import random
 import time
 
+from xxhash import xxh64
+
 from borgstore.store import ObjectNotFound
 
 from . import platform
-from .checksums import xxh64
-from .helpers import Error, ErrorWithTraceback, bin_to_hex
+from .helpers import Error, ErrorWithTraceback
 from .logger import create_logger
 
 logger = create_logger(__name__)
@@ -100,7 +101,7 @@ class Lock:
         timestamp = now.isoformat(timespec="milliseconds")
         lock = dict(exclusive=exclusive, hostid=self.id[0], processid=self.id[1], threadid=self.id[2], time=timestamp)
         value = json.dumps(lock).encode("utf-8")
-        key = bin_to_hex(xxh64(value))
+        key = xxh64(value).hexdigest()
         logger.debug(f"LOCK-CREATE: creating lock in store. key: {key}, lock: {lock}.")
         self.store.store(f"locks/{key}", value)
         if update_last_refresh:

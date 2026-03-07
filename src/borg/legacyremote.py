@@ -14,6 +14,8 @@ import textwrap
 import time
 from subprocess import Popen, PIPE
 
+from xxhash import xxh64
+
 from . import __version__
 from .compress import Compressor
 from .constants import *  # NOQA
@@ -30,7 +32,6 @@ from .logger import create_logger
 from .helpers import msgpack
 from .legacyrepository import LegacyRepository
 from .version import parse_version, format_version
-from .checksums import xxh64
 from .helpers.datastruct import EfficientCollectionQueue
 from .platform import is_win32
 
@@ -911,13 +912,13 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
         def pack(data):
             csize, decrypted = data
             meta, compressed = compressor.compress({}, decrypted)
-            return cache_struct.pack(csize, xxh64(compressed), meta["ctype"], meta["clevel"]) + compressed
+            return cache_struct.pack(csize, xxh64(compressed).digest(), meta["ctype"], meta["clevel"]) + compressed
 
         def unpack(data):
             data = memoryview(data)
             csize, checksum, ctype, clevel = cache_struct.unpack(data[: cache_struct.size])
             compressed = data[cache_struct.size :]
-            if checksum != xxh64(compressed):
+            if checksum != xxh64(compressed).digest():
                 raise IntegrityError("detected corrupted data in metadata cache")
             meta = dict(ctype=ctype, clevel=clevel, csize=len(compressed))
             _, decrypted = compressor.decompress(meta, compressed)

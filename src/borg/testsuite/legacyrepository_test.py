@@ -1,11 +1,12 @@
 import logging
 import os
 import sys
+
 from unittest.mock import patch
 
 import pytest
+from xxhash import xxh64
 
-from ..checksums import xxh64
 from ..hashindex import NSIndex1
 from ..helpers import Location
 from ..helpers import IntegrityError
@@ -74,7 +75,7 @@ def get_path(repository):
 
 def fchunk(data, meta=b""):
     # Create a raw chunk that has a valid RepoObj layout but does not use encryption or compression.
-    hdr = RepoObj.obj_header.pack(len(meta), len(data), xxh64(meta), xxh64(data))
+    hdr = RepoObj.obj_header.pack(len(meta), len(data), xxh64(meta).digest(), xxh64(data).digest())
     assert isinstance(data, bytes)
     chunk = hdr + meta + data
     return chunk
@@ -149,7 +150,7 @@ def test_multiple_transactions(repo_fixtures, request):
 def test_read_data(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         meta, data = b"meta", b"data"
-        hdr = RepoObj.obj_header.pack(len(meta), len(data), xxh64(meta), xxh64(data))
+        hdr = RepoObj.obj_header.pack(len(meta), len(data), xxh64(meta).digest(), xxh64(data).digest())
         chunk_complete = hdr + meta + data
         chunk_short = hdr + meta
         repository.put(H(0), chunk_complete)

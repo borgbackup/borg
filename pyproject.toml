@@ -255,8 +255,6 @@ labels = ["lint"]
 branch = true
 disable_warnings = ["module-not-measured", "no-ctracer"]
 patch = ["subprocess", "_exit"]
-parallel = true
-sigterm = true
 source = ["src/borg"]
 omit = [
     "*/borg/__init__.py",

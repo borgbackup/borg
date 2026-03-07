@@ -418,6 +418,21 @@ def test_create_paths_from_command_missing_command(archivers, request):
     assert output.endswith("No command given." + os.linesep)
 
 
+@pytest.mark.skipif(is_win32, reason="shell patterns not supported on Windows")
+def test_create_paths_from_shell_command(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "file2", size=1024 * 80)
+    create_regular_file(archiver.input_path, "file3", size=1024 * 80)
+    input_data = "input/file1\ninput/file2\ninput/file3"
+    # Use a shell pipe to test that shell=True works correctly.
+    cmd(archiver, "create", "--paths-from-shell-command", "test", "--", f"echo '{input_data}' | head -n 2")
+    archive_list = cmd(archiver, "list", "test", "--json-lines")
+    paths = [json.loads(line)["path"] for line in archive_list.split("\n") if line]
+    assert paths == ["input/file1", "input/file2"]
+
+
 def test_create_without_root(archivers, request):
     """test create without a root"""
     archiver = request.getfixturevalue(archivers)

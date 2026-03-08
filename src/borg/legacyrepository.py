@@ -12,6 +12,8 @@ from functools import partial
 from itertools import islice
 from collections.abc import Callable
 
+import xxhash
+
 from .constants import *  # NOQA
 from .hashindex import NSIndex1Entry, NSIndex1
 from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
@@ -26,7 +28,7 @@ from .logger import create_logger
 from .manifest import Manifest, NoManifestError
 from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
 from .repoobj import RepoObj
-from .checksums import crc32, StreamingXXH64
+from .checksums import crc32
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 
 logger = create_logger(__name__)
@@ -1559,7 +1561,7 @@ class LoggedIO:
                         data.release()
 
     def entry_hash(self, *data):
-        h = StreamingXXH64()
+        h = xxhash.xxh64()
         for d in data:
             h.update(d)
         return h.digest()

@@ -8,7 +8,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
     libacl1-dev \
-    libxxhash-dev \
     liblz4-dev \
     libfuse3-dev \
     fuse3 \

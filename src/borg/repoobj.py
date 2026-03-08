@@ -1,8 +1,9 @@
 from collections import namedtuple
 from struct import Struct
 
+from xxhash import xxh64
+
 from .constants import *  # NOQA
-from .checksums import xxh64
 from .helpers import msgpack, workarounds
 from .helpers.errors import IntegrityError
 from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
@@ -66,7 +67,9 @@ class RepoObj:
         data_encrypted = self.key.encrypt(id, data_compressed)
         meta_packed = msgpack.packb(meta)
         meta_encrypted = self.key.encrypt(id, meta_packed)
-        hdr = self.ObjHeader(len(meta_encrypted), len(data_encrypted), xxh64(meta_encrypted), xxh64(data_encrypted))
+        hdr = self.ObjHeader(
+            len(meta_encrypted), len(data_encrypted), xxh64(meta_encrypted).digest(), xxh64(data_encrypted).digest()
+        )
         hdr_packed = self.obj_header.pack(*hdr)
         return hdr_packed + meta_encrypted + data_encrypted
 

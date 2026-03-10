@@ -1,7 +1,7 @@
-import argparse
 import pytest
 
 from . import Archiver, RK_ENCRYPTION, cmd
+from ...helpers.argparsing import ArgumentParser, flatten_namespace
 
 
 def test_bad_filters(archiver):
@@ -93,45 +93,35 @@ class TestCommonOptions:
 
     @pytest.fixture
     def basic_parser(self):
-        parser = argparse.ArgumentParser(prog="test", description="test parser", add_help=False)
-        parser.common_options = Archiver.CommonOptions(
-            self.define_common_options, suffix_precedence=("_level0", "_level1")
-        )
+        parser = ArgumentParser(prog="test", description="test parser")
+        parser.common_options = Archiver.CommonOptions(self.define_common_options)
         return parser
 
     @pytest.fixture
-    def subparsers(self, basic_parser):
-        return basic_parser.add_subparsers(title="required arguments", metavar="<command>")
+    def subcommands(self, basic_parser):
+        return basic_parser.add_subcommands(required=False, title="required arguments", metavar="<command>")
 
     @pytest.fixture
     def parser(self, basic_parser):
-        basic_parser.common_options.add_common_group(basic_parser, "_level0", provide_defaults=True)
+        basic_parser.common_options.add_common_group(basic_parser, provide_defaults=True)
         return basic_parser
 
     @pytest.fixture
     def common_parser(self, parser):
-        common_parser = argparse.ArgumentParser(add_help=False, prog="test")
-        parser.common_options.add_common_group(common_parser, "_level1")
+        common_parser = ArgumentParser(prog="test")
+        parser.common_options.add_common_group(common_parser)
         return common_parser
 
     @pytest.fixture
-    def parse_vars_from_line(self, parser, subparsers, common_parser):
-        subparser = subparsers.add_parser(
-            "subcommand",
-            parents=[common_parser],
-            add_help=False,
-            description="foo",
-            epilog="bar",
-            help="baz",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
-        subparser.set_defaults(func=1234)
+    def parse_vars_from_line(self, parser, subcommands, common_parser):
+        subparser = ArgumentParser(parents=[common_parser], description="foo", epilog="bar")
         subparser.add_argument("--foo-bar", dest="foo_bar", action="store_true")
+        subcommands.add_subcommand("subcmd", subparser, help="baz")
 
         def parse_vars_from_line(*line):
             print(line)
             args = parser.parse_args(line)
-            parser.common_options.resolve(args)
+            args = flatten_namespace(args)
             return vars(args)
 
         return parse_vars_from_line
@@ -144,25 +134,25 @@ class TestCommonOptions:
             "progress": False,
         }
 
-        assert parse_vars_from_line("--error", "subcommand", "--critical") == {
+        assert parse_vars_from_line("--error", "subcmd", "--critical") == {
             "append": [],
             "lock_wait": 1,
             "log_level": "critical",
             "progress": False,
             "foo_bar": False,
-            "func": 1234,
+            "subcommand": "subcmd",
         }
 
         with pytest.raises(SystemExit):
-            parse_vars_from_line("--foo-bar", "subcommand")
+            parse_vars_from_line("--foo-bar", "subcmd")
 
-        assert parse_vars_from_line("--append=foo", "--append", "bar", "subcommand", "--append", "baz") == {
+        assert parse_vars_from_line("--append=foo", "--append", "bar", "subcmd", "--append", "baz") == {
             "append": ["foo", "bar", "baz"],
             "lock_wait": 1,
             "log_level": "warning",
             "progress": False,
             "foo_bar": False,
-            "func": 1234,
+            "subcommand": "subcmd",
         }
 
     @pytest.mark.parametrize("position", ("before", "after", "both"))
@@ -171,7 +161,7 @@ class TestCommonOptions:
         line = []
         if position in ("before", "both"):
             line.append(flag)
-        line.append("subcommand")
+        line.append("subcmd")
         if position in ("after", "both"):
             line.append(flag)
 
@@ -181,7 +171,7 @@ class TestCommonOptions:
             "log_level": "warning",
             "progress": False,
             "foo_bar": False,
-            "func": 1234,
+            "subcommand": "subcmd",
             args_key: args_value,
         }
 

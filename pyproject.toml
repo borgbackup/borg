@@ -40,6 +40,8 @@ dependencies = [
   "shtab>=1.8.0",
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
   "xxhash>=2.0.0",
+  "jsonargparse @ https://github.com/omni-us/jsonargparse/zipball/main",  # pull it from there until it is on pypi
+  "PyYAML>=6.0.2",  # we need to register our types with yaml, jsonargparse uses yaml for config files
 ]
 
 [project.optional-dependencies]
@@ -259,7 +261,7 @@ deps = ["ruff"]
 commands = [["ruff", "check", "."]]
 
 [tool.tox.env.mypy]
-deps = ["pytest", "mypy", "pkgconfig"]
+deps = ["pytest", "mypy", "pkgconfig", "types-PyYAML"]
 commands = [["mypy", "--ignore-missing-imports"]]
 
 [tool.tox.env.docs]

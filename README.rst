@@ -213,3 +213,4 @@ see ``docs/support.rst`` in the source distribution).
         :target: https://bestpractices.coreinfrastructure.org/projects/271
 
 .. end-badges
+Update for issue 9409

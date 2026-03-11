@@ -285,6 +285,7 @@ commands = [["bandit", "-r", "src/borg", "-c", "pyproject.toml"]]
 branch = true
 disable_warnings = ["module-not-measured", "no-ctracer"]
 patch = ["subprocess", "_exit"]
+sigterm = true
 source = ["src/borg"]
 omit = [
     "*/borg/__init__.py",

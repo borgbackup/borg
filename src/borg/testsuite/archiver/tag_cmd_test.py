@@ -1,8 +1,5 @@
-import pytest
-
 from ...constants import *  # NOQA
 from . import cmd, generate_archiver_tests, RK_ENCRYPTION
-from ...helpers import Error
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local")  # NOQA
 
@@ -17,7 +14,7 @@ def test_tag_set(archivers, request):
     assert "tags: bb." in output
     output = cmd(archiver, "tag", "-a", "archive", "--set", "bb", "aa")
     assert "tags: aa,bb." in output  # sorted!
-    output = cmd(archiver, "tag", "-a", "archive", "--set", "")
+    output = cmd(archiver, "tag", "-a", "archive", "--set")
     assert "tags: ." in output  # no tags!
 
 
@@ -55,9 +52,6 @@ def test_tag_only_known_special(archivers, request):
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "archive", archiver.input_path)
     # user can't set / add / remove unknown special tags
-    with pytest.raises(Error):
-        cmd(archiver, "tag", "-a", "archive", "--set", "@UNKNOWN")
-    with pytest.raises(Error):
-        cmd(archiver, "tag", "-a", "archive", "--add", "@UNKNOWN")
-    with pytest.raises(Error):
-        cmd(archiver, "tag", "-a", "archive", "--remove", "@UNKNOWN")
+    cmd(archiver, "tag", "-a", "archive", "--set", "@UNKNOWN", exit_code=EXIT_ERROR)
+    cmd(archiver, "tag", "-a", "archive", "--add", "@UNKNOWN", exit_code=EXIT_ERROR)
+    cmd(archiver, "tag", "-a", "archive", "--remove", "@UNKNOWN", exit_code=EXIT_ERROR)

@@ -15,7 +15,7 @@ from ...constants import zeros
 from ...manifest import Manifest
 from ...platform import is_win32
 from ...repository import Repository
-from ...helpers import CommandError, BackupPermissionError, Error
+from ...helpers import CommandError, BackupPermissionError
 from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
@@ -696,12 +696,8 @@ def test_create_invalid_tags(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_test_files(archiver.input_path)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    if archiver.FORK_DEFAULT:
-        output = cmd(archiver, "create", "--tags", "@INVALID", "--", "test", "input", exit_code=EXIT_ERROR)
-        assert "Unknown special tags given" in output
-    else:
-        with pytest.raises(Error):
-            cmd(archiver, "create", "--tags", "@INVALID", "--", "test", "input")
+    output = cmd(archiver, "create", "--tags", "@INVALID", "--", "test", "input", exit_code=EXIT_ERROR)
+    assert "Unknown special tags given" in output
 
 
 @pytest.mark.skipif(

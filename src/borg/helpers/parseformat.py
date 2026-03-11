@@ -765,7 +765,14 @@ def text_validator(*, name, max_length, min_length=0, invalid_ctrl_chars="\0", i
 
 
 comment_validator = text_validator(name="comment", max_length=10000)
-tag_validator = text_validator(name="tag", min_length=0, max_length=10, invalid_chars=" ,$")
+validate_tag_text = text_validator(name="tag", min_length=1, max_length=10, invalid_chars=" ,$")
+
+
+def tag_validator(text):
+    validated_text = validate_tag_text(text)
+    if validated_text.startswith("@") and validated_text not in SPECIAL_TAGS:
+        raise ArgumentTypeError("Unknown special tags given.")
+    return validated_text
 
 
 def archivename_validator(text):

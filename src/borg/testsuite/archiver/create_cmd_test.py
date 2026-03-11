@@ -15,7 +15,7 @@ from ...constants import zeros
 from ...manifest import Manifest
 from ...platform import is_win32
 from ...repository import Repository
-from ...helpers import CommandError, BackupPermissionError
+from ...helpers import CommandError, BackupPermissionError, Error
 from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
@@ -682,6 +682,28 @@ def test_file_status(archivers, request):
     assert "A input/file2" in output
 
 
+def test_create_tags(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--tags", "foo", "bar", "baz", "--", "test", "input")
+    info = cmd(archiver, "info", "--json", "test")
+    info = json.loads(info)
+    assert sorted(info["archives"][0]["tags"]) == ["bar", "baz", "foo"]
+
+
+def test_create_invalid_tags(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, "create", "--tags", "@INVALID", "--", "test", "input", exit_code=EXIT_ERROR)
+        assert "Unknown special tags given" in output
+    else:
+        with pytest.raises(Error):
+            cmd(archiver, "create", "--tags", "@INVALID", "--", "test", "input")
+
+
 @pytest.mark.skipif(
     is_win32, reason="ctime attribute is file creation time on Windows"
 )  # see https://docs.python.org/3/library/os.html#os.stat_result.st_ctime
@@ -827,6 +849,17 @@ def test_create_json(archivers, request):
     assert isinstance(archive["duration"], float)
     assert len(archive["id"]) == 64
     assert "stats" in archive
+
+
+def test_explicit_hostname_and_username(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--hostname", "foo_host", "--username", "bar_user", "test", "input")
+    info = json.loads(cmd(archiver, "info", "--json", "test"))
+    archive = info["archives"][0]
+    assert archive["hostname"] == "foo_host"
+    assert archive["username"] == "bar_user"
 
 
 def test_create_topical(archivers, request):

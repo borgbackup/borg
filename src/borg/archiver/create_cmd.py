@@ -211,6 +211,14 @@ class CreateMixIn:
                     # do not save the archive if the user ctrl-c-ed.
                     raise Error("Got Ctrl-C / SIGINT.")
                 else:
+                    # deal with tags
+                    if args.tags is not None:
+                        tags = {tag for tag in args.tags if tag}
+                        special = {tag for tag in tags if tag.startswith("@")}
+                        if not special.issubset(SPECIAL_TAGS):
+                            raise Error("Unknown special tags given.")
+                        archive.tags = tags
+
                     archive.save(comment=args.comment, timestamp=args.timestamp)
                     args.stats |= args.json
                     if args.stats:
@@ -250,6 +258,8 @@ class CreateMixIn:
                     start=t0,
                     log_json=args.log_json,
                     iec=args.iec,
+                    hostname=args.hostname,
+                    username=args.username,
                 )
                 metadata_collector = MetadataCollector(
                     noatime=not args.atime,
@@ -592,6 +602,8 @@ class CreateMixIn:
 
         The archive will consume almost no disk space for files or parts of files that
         have already been stored in other archives.
+
+        The ``--tags`` option can be used to add a list of tags to the new archive.
 
         The archive name does not need to be unique; you can and should use the same
         name for a series of archives. The unique archive identifier is its ID (hash),
@@ -974,6 +986,32 @@ class CreateMixIn:
             default=CompressionSpec("lz4"),
             action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+        )
+        archive_group.add_argument(
+            "--hostname",
+            metavar="HOSTNAME",
+            dest="hostname",
+            type=str,
+            default=None,
+            action=Highlander,
+            help="explicitly set hostname for the archive",
+        )
+        archive_group.add_argument(
+            "--username",
+            metavar="USERNAME",
+            dest="username",
+            type=str,
+            default=None,
+            action=Highlander,
+            help="explicitly set username for the archive",
+        )
+        archive_group.add_argument(
+            "--tags",
+            metavar="TAG",
+            dest="tags",
+            type=helpers.tag_validator,
+            nargs="+",
+            help="add tags to archive (comma-separated or multiple arguments)",
         )
 
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")

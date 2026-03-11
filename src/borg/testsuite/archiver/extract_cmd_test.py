@@ -182,7 +182,6 @@ def test_birthtime(archivers, request):
     assert same_ts_ns(sto.st_mtime_ns, mtime * 10**9)
 
 
-@pytest.mark.skipif(is_win32, reason="frequent test failures on github CI on win32")
 def test_sparse_file(archivers, request):
     archiver = request.getfixturevalue(archivers)
 

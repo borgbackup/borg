@@ -829,6 +829,17 @@ def test_create_json(archivers, request):
     assert "stats" in archive
 
 
+def test_explicit_hostname_and_username(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--hostname", "foo_host", "--username", "bar_user", "test", "input")
+    info = json.loads(cmd(archiver, "info", "--json", "test"))
+    archive = info["archives"][0]
+    assert archive["hostname"] == "foo_host"
+    assert archive["username"] == "bar_user"
+
+
 def test_create_topical(archivers, request):
     archiver = request.getfixturevalue(archivers)
     create_regular_file(archiver.input_path, "file1", size=1024 * 80)

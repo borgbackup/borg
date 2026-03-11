@@ -250,6 +250,8 @@ class CreateMixIn:
                     start=t0,
                     log_json=args.log_json,
                     iec=args.iec,
+                    hostname=args.hostname,
+                    username=args.username,
                 )
                 metadata_collector = MetadataCollector(
                     noatime=not args.atime,
@@ -974,6 +976,24 @@ class CreateMixIn:
             default=CompressionSpec("lz4"),
             action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+        )
+        archive_group.add_argument(
+            "--hostname",
+            metavar="HOSTNAME",
+            dest="hostname",
+            type=str,
+            default=None,
+            action=Highlander,
+            help="explicitly set hostname for the archive",
+        )
+        archive_group.add_argument(
+            "--username",
+            metavar="USERNAME",
+            dest="username",
+            type=str,
+            default=None,
+            action=Highlander,
+            help="explicitly set username for the archive",
         )
 
         subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")

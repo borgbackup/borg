@@ -15,7 +15,7 @@ from ...constants import zeros
 from ...manifest import Manifest
 from ...platform import is_win32
 from ...repository import Repository
-from ...helpers import CommandError, BackupPermissionError
+from ...helpers import CommandError, BackupPermissionError, Error
 from .. import has_lchflags, has_mknod
 from .. import changedir
 from .. import (
@@ -680,6 +680,28 @@ def test_file_status(archivers, request):
     # although surprising, this is expected. For why, see:
     # https://borgbackup.readthedocs.org/en/latest/faq.html#i-am-seeing-a-added-status-for-a-unchanged-file
     assert "A input/file2" in output
+
+
+def test_create_tags(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "--tags", "foo", "bar", "baz", "--", "test", "input")
+    info = cmd(archiver, "info", "--json", "test")
+    info = json.loads(info)
+    assert sorted(info["archives"][0]["tags"]) == ["bar", "baz", "foo"]
+
+
+def test_create_invalid_tags(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    create_test_files(archiver.input_path)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    if archiver.FORK_DEFAULT:
+        output = cmd(archiver, "create", "--tags", "@INVALID", "--", "test", "input", exit_code=EXIT_ERROR)
+        assert "Unknown special tags given" in output
+    else:
+        with pytest.raises(Error):
+            cmd(archiver, "create", "--tags", "@INVALID", "--", "test", "input")
 
 
 @pytest.mark.skipif(

@@ -865,6 +865,7 @@ Duration: {0.duration}
                 with backup_io("open"):
                     fd = open(path, "wb")
                 with fd:
+                    trailing_hole = False
                     for data in self.pipeline.fetch_many(item.chunks, is_preloaded=True, ro_type=ROBJ_FILE_STREAM):
                         if pi:
                             pi.show(increase=len(data), info=[remove_surrogates(item.path)])
@@ -872,10 +873,18 @@ Duration: {0.duration}
                             if sparse and zeros.startswith(data):
                                 # all-zero chunk: create a hole in a sparse file
                                 fd.seek(len(data), 1)
+                                trailing_hole = True
                             else:
                                 fd.write(data)
+                                trailing_hole = False
                     with backup_io("truncate_and_attrs"):
                         pos = item_chunks_size = fd.tell()
+                        if is_win32 and trailing_hole and pos > 0:
+                            # Windows: truncate() does not zero-fill properly (no VDL update).
+                            # Writing a single zero at the end forces NTFS to zero-fill the hole
+                            # and update valid data length.
+                            fd.seek(pos - 1)
+                            fd.write(b"\0")
                         fd.truncate(pos)
                         fd.flush()
                         self.restore_attrs(path, item, fd=fd.fileno())

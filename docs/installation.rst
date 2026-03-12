@@ -446,7 +446,7 @@ manually using the ``SETUPTOOLS_SCM_PRETEND_VERSION`` environment variable.
 
     # install borg dependencies into virtualenv
     cd borg
-    pip install -r requirements.d/development.txt
+    pip install -r requirements.d/development.lock.txt
     pip install -r requirements.d/docs.txt  # optional, to build the docs
 
     # set a borg version if setuptools-scm fails to do so automatically

@@ -400,7 +400,7 @@ jobs:
             do_binaries: false
 
           - os: openbsd
-            version: '7.7'
+            version: '7.8'
             display_name: OpenBSD
             do_binaries: false
 
@@ -529,10 +529,10 @@ jobs:
               openbsd)
                 sudo -E pkg_add lz4 git
                 sudo -E pkg_add rust
-                sudo -E pkg_add openssl%3.4
+                sudo -E pkg_add openssl%3.5
                 sudo -E pkg_add py3-pip py3-virtualenv py3-tox
 
-                export BORG_OPENSSL_NAME=eopenssl34
+                export BORG_OPENSSL_NAME=eopenssl35
                 tox -e py312-none
                 ;;
 

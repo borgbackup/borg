@@ -284,7 +284,7 @@ commands = [["bandit", "-r", "src/borg", "-c", "pyproject.toml"]]
 [tool.coverage.run]
 branch = true
 disable_warnings = ["module-not-measured", "no-ctracer"]
-patch = ["subprocess", "_exit"]
+patch = ["subprocess"]
 parallel = true
 sigterm = true
 source = ["src/borg"]

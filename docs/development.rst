@@ -271,7 +271,7 @@ First, just install borg into a virtual env :ref:`as described before <git-insta
 To install some additional packages needed for running the tests, activate your
 virtual env and run::
 
-  pip install -r requirements.d/development.txt
+  pip install -r requirements.d/development.lock.txt
 
 
 This project utilizes pre-commit to format and lint code before it is committed.

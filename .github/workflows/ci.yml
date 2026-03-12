@@ -84,7 +84,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.d/development.txt
+        pip install -r requirements.d/development.lock.txt
 
     - name: Build Borg with ASan/UBSan
       # Build the C/Cython extensions with AddressSanitizer and UndefinedBehaviorSanitizer enabled.
@@ -182,7 +182,7 @@ jobs:
       uses: actions/cache@v5
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.d/development.txt') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.d/development.lock.txt') }}
         restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-pip-
             ${{ runner.os }}-${{ runner.arch }}-
@@ -191,7 +191,7 @@ jobs:
       uses: actions/cache@v5
       with:
         path: .tox
-        key: ${{ runner.os }}-${{ runner.arch }}-tox-${{ matrix.toxenv }}-${{ hashFiles('requirements.d/development.txt', 'pyproject.toml') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-tox-${{ matrix.toxenv }}-${{ hashFiles('requirements.d/development.lock.txt', 'pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-tox-${{ matrix.toxenv }}-
           ${{ runner.os }}-${{ runner.arch }}-tox-
@@ -276,7 +276,7 @@ jobs:
     - name: Install Python requirements
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        pip install -r requirements.d/development.txt
+        pip install -r requirements.d/development.lock.txt
 
     - name: Install borgbackup
       run: |
@@ -460,7 +460,7 @@ jobs:
                 python -V
                 pip -V
                 python -m pip install --upgrade pip wheel
-                pip install -r requirements.d/development.txt
+                pip install -r requirements.d/development.lock.txt
                 pip install -e ".[mfusepy,cockpit,s3,sftp]"
                 tox -e py311-mfusepy
 
@@ -548,7 +548,7 @@ jobs:
                 python -V
                 pip -V
                 python -m pip install --upgrade pip wheel
-                pip install -r requirements.d/development.txt
+                pip install -r requirements.d/development.lock.txt
                 # no fuse support on omnios in our tests usually
                 pip install -e .
 
@@ -573,7 +573,7 @@ jobs:
                 export PKG_CONFIG_PATH="/system/develop/lib/pkgconfig:/system/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
                 export BORG_LIBLZ4_PREFIX=/system/develop
                 export BORG_OPENSSL_PREFIX=/system/develop
-                pip install -r requirements.d/development.txt
+                pip install -r requirements.d/development.lock.txt
                 pip install -e .
 
                 # troubles with either tox or pytest xdist, so we run pytest manually:

@@ -211,14 +211,7 @@ class CreateMixIn:
                     # do not save the archive if the user ctrl-c-ed.
                     raise Error("Got Ctrl-C / SIGINT.")
                 else:
-                    # deal with tags
-                    if args.tags is not None:
-                        tags = {tag for tag in args.tags if tag}
-                        special = {tag for tag in tags if tag.startswith("@")}
-                        if not special.issubset(SPECIAL_TAGS):
-                            raise Error("Unknown special tags given.")
-                        archive.tags = tags
-
+                    archive.tags = set(args.tags or [])
                     archive.save(comment=args.comment, timestamp=args.timestamp)
                     args.stats |= args.json
                     if args.stats:

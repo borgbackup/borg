@@ -1,7 +1,7 @@
 from ._common import with_repository, define_archive_filters_group
 from ..archive import Archive
 from ..constants import *  # NOQA
-from ..helpers import bin_to_hex, archivename_validator, tag_validator, Error
+from ..helpers import bin_to_hex, archivename_validator, tag_validator
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
@@ -15,39 +15,23 @@ class TagMixIn:
     def do_tag(self, args, repository, manifest, cache):
         """Manage tags."""
 
-        def tags_set(tags):
-            """Return a set of tags, removing empty tags."""
-            return {tag for tag in tags if tag}
-
         if args.name:
             archive_infos = [manifest.archives.get_one([args.name])]
         else:
             archive_infos = manifest.archives.list_considering(args)
 
-        def check_special(tags):
-            if tags:
-                special = {tag for tag in tags_set(tags) if tag.startswith("@")}
-                if not special.issubset(SPECIAL_TAGS):
-                    raise Error("Unknown special tags given.")
-
-        check_special(args.set_tags)
-        check_special(args.add_tags)
-        check_special(args.remove_tags)
-
         for archive_info in archive_infos:
             archive = Archive(manifest, archive_info.id, cache=cache)
-            if args.set_tags:
+            if args.set_tags is not None:
                 # avoid that --set (accidentally) erases existing special tags,
                 # but allow --set if the existing special tags are also given.
-                new_tags = tags_set(args.set_tags)
+                new_tags = set(args.set_tags)
                 existing_special = {tag for tag in archive.tags if tag.startswith("@")}
                 clobber = not existing_special.issubset(new_tags)
                 if not clobber:
                     archive.tags = new_tags
-            if args.add_tags:
-                archive.tags |= tags_set(args.add_tags)
-            if args.remove_tags:
-                archive.tags -= tags_set(args.remove_tags)
+            archive.tags |= set(args.add_tags or [])
+            archive.tags -= set(args.remove_tags or [])
             old_id = archive.id
             archive.set_meta("tags", list(sorted(archive.tags)))
             if old_id != archive.id:
@@ -81,10 +65,10 @@ class TagMixIn:
         )
         subparser = ArgumentParser(parents=[common_parser], description=self.do_tag.__doc__, epilog=tag_epilog)
         subparsers.add_subcommand("tag", subparser, help="tag archives")
-        subparser.add_argument("--set", dest="set_tags", metavar="TAG", type=tag_validator, nargs="+", help="set tags")
-        subparser.add_argument("--add", dest="add_tags", metavar="TAG", type=tag_validator, nargs="+", help="add tags")
+        subparser.add_argument("--set", dest="set_tags", metavar="TAG", type=tag_validator, nargs="*", help="set tags")
+        subparser.add_argument("--add", dest="add_tags", metavar="TAG", type=tag_validator, nargs="*", help="add tags")
         subparser.add_argument(
-            "--remove", dest="remove_tags", metavar="TAG", type=tag_validator, nargs="+", help="remove tags"
+            "--remove", dest="remove_tags", metavar="TAG", type=tag_validator, nargs="*", help="remove tags"
         )
         define_archive_filters_group(subparser)
         subparser.add_argument(

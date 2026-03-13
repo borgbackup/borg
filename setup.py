@@ -145,7 +145,7 @@ if not on_rtd:
         # it statically to avoid conflicting with shared libcrypto from the base
         # OS pulled in via dependencies.
         openssl_prefix = os.environ.get("BORG_OPENSSL_PREFIX", "/usr/local")
-        openssl_name = os.environ.get("BORG_OPENSSL_NAME", "eopenssl33")
+        openssl_name = os.environ.get("BORG_OPENSSL_NAME", "eopenssl35")
         crypto_ext_lib = dict(
             include_dirs=[os.path.join(openssl_prefix, "include", openssl_name)],
             extra_objects=[os.path.join(openssl_prefix, "lib", openssl_name, "libcrypto.a")],

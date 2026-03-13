@@ -168,89 +168,101 @@ above.
 
 New features:
 
-- prune -v: now displays archive counts (total, kept, pruned), #9262
+- use jsonargparse as CLI argument/option parser, also supporting YAML configs
+  for defaults and auto-generated environment variables to override defaults, #6551
+- create --paths-from-shell-command, #5968
+- create: add --tags/--hostname/--username, #9401, #9402
 - create: implement "file changed while backup" detection on Windows, #9382
+- prune -v: now displays archive counts (total, kept, pruned), #9262
+- list --format: add fingerprint placeholder (fast!)
+- archive: use 3 timestamps (cleanly separate nominal archive timestamp from
+  borg operation start/end info), #9400
 - benchmark crud: add --json-lines output option, #9165
-- list --format: added fingerprint placeholder (fast!)
 
 Fixes:
 
 - prune: fix Archive.DoesNotExist when using --list, #9416
 - remove_dotdot_prefixes: remove bad assert, #9406
-- create --compress: expose Padmé size obfuscation (250) via cli, #9286
-- debug format-obj: support all repo object types, #9391
+- create --compress: expose Padmé size obfuscation (250) via CLI, #9286
 - remote: fix StoreObjectNotFound exception lost over RPC, #9380
-- benchmark crud: suppress compact warnings during benchmark runs, #9365
-- passphrase: fail if multiple passphrase env vars are set, #8834
+- passphrase: fail if multiple passphrase environment variables are set, #8834
 - cockpit: fix subprocess invocation in frozen binaries
 - cockpit: start the Borg runner after all widgets are mounted
-- fix file: URL parsing for windows
+- debug format-obj: support all repository object types, #9391
+- benchmark crud: suppress compact warnings during benchmark runs, #9365
+- fix file: URL parsing for Windows
 
   - Linux: /abs/path -> file:///abs/path
   - Windows: c:/abs/path -> file:///c:/abs/path
 
 Other changes:
 
+- y2038: SUPPORT_32BIT_PLATFORMS = False, #9429.
+  Not as bad as it sounds: 32bit platforms with 64bit time_t will still work.
+  As of 2026, this is pretty much every platform that can run Borg reasonably well.
 - remove handwritten bash and zsh shell completions, #9178.
   these are now auto-generated via ``borg completion bash/zsh`` (using shtab).
   fish completions are kept until shtab gains fish support.
 - mount: warn about symlinks pointing outside of the mountpoint, #9254
-- Version: do not access private attributes, #9263
+- use FILE_FLAG_WRITE_THROUGH on Windows for SyncFile data durability, #9388
 - extract: do not delete existing directory if possible, #4233
 - extract --continue: optimize processing of already existing dirs
-- use zstd from python lib or backports.zstd (python<'3.14'), #9261
-- mount: fuse fs performance fix
+- mount: FUSE FS performance fix
 - prune: print hint to run compact to free space
 - prune: use same method to delete archives as delete subcommand, #9424
-- swidth: use cross platform implementation, #7493
+- use xxhash from PyPI, #6535
+- use zstd from python lib or backports.zstd (python<'3.14'), #9261
+- swidth: use cross-platform implementation, #7493
 - platform: use F_FULLSYNC on macOS for SyncFile data durability, #9383
 - cache: add seek()/tell() to SyncFile, use SaveFile in _write_files_cache, #9390
 - cache: remove try_upgrade_to_b14() legacy migration, #9371
 - remove unnecessary checks: API_VERSION, check_python
-- ruff: update, migrate config to tool.ruff.lint, #9305
-- windows platform (win32):
+- time calculations: avoid floating point
+- Version: do not access private attributes, #9263
+- Windows platform (win32):
 
   - normalize drive letters, #9279
-  - path sep: internally always use "/", accept also "\" for cli args
-  - map_chars: deal with invalid chars in paths on windows
+  - Path separator: internally always use "/", accept also "\" for CLI arguments
+  - map_chars: deal with invalid chars in paths on Windows
 - binary build:
 
   - use pyinstaller 6.18.0 for Python 3.14 compatibility
   - do not exclude ssl, needed for pyfuse3/trio, #9196
-  - build with cockpit,s3,sftp extras installed
-  - add tcss file, add unicode data for cockpit feature
-  - build linux binaries with pyfuse3
-- docs:
+  - build with cockpit,s3,sftp extras installed, #9241
+  - build Linux binaries with pyfuse3, #9196
+- Documentation:
 
-  - fix S3 url description, #9249
+  - jsonargparse: update docs about configs, auto-generated environment variables, precedence
+  - fix S3 URL description, #9249
   - add a note that you need to install boto3 if you want to use S3/B2 URLs
-  - man pages: fix broken :ref: references (e.g. borg_patterns), #7239
   - rename BORG_RLIST_FORMAT to BORG_REPO_LIST_FORMAT, #9411
   - document platformdirs change and platform-specific directory paths, #7332
-  - move RTD version selector to sidebar top-left, #8204
+  - borgbackup.org: move RTD version selector to sidebar top-left, #8204
   - update SECURITY.md version table, #9346
   - fuse: add thread/async safety warning
   - upgrade http:// URLs to https:// and remove dead librelist.com link, #9342, #9302
-  - fix broken :ref: references in man pages, #7239
+  - man pages: fix broken :ref: references (e.g. borg_patterns), #7239
   - update deprecated pypi.python.org URLs to pypi.org, #9337
   - consolidate key backup info in borg key export, #6204
   - fix typos found by codespell, #9295
-  - github: enhance pull request template, #9334
+  - GitHub: enhance pull request template, #9334
+  - archive specification, FAQ, #9248, #9053
 - testing / CI:
 
   - scripts/linux-run: run commands (e.g. tox) in a podman linux container,
     very useful when developing on macOS to test under Linux.
-  - add testing on omniOS ("OpenSolaris")
-  - fix and re-enable Windows CI (some tests are skipped on Windows)
+  - CI: add testing on omniOS ("OpenSolaris")
+  - CI: use OpenBSD 7.8
+  - CI: fix and re-enable Windows testing
+  - CI: faster with borg-dir/borg.exe, #9236
   - add dependabot, #9308, #9349
+  - add top-level permissions for least-privilege security, #9344
   - completion: focused tests for auto-generated shell completions
     (syntax validation, size sanity, borg-specific preamble behavior)
-  - CI: faster with borg-dir/borg.exe, #9236
+  - Speed up benchmark CPU tests with _BORG_BENCHMARK_CPU_TEST env var, #9414
   - fix mismatch in xattr test, #9238
-  - Speed up benchmark cpu tests with _BORG_BENCHMARK_CPU_TEST env var, #9414
-  - xattr: document fakeroot xattr as Linux-only, add missing fakeroot skip on FreeBSD, #9394
+  - xattr: document fakeroot xattr as Linux-only, add missing fakeroot skipping on FreeBSD, #9394
   - testsuite: remove deprecated manual cleanup in create_cmd_test
-  - add top-level permissions for least-privilege security, #9344
   - add borg.exe to PATH
   - fix tmpdir check on netbsd
   - enable Codecov Test Analytics, upgrade to codecov-action@v5
@@ -260,6 +272,13 @@ Other changes:
   - cache tox environments
   - remove redundant tox runs, parallelize better, avoid unnecessary steps
   - add concurrency groups to cancel stale workflow runs, #9310
+  - improve collecting coverage information, improve coverage, #9448
+  - use locked requirements, add canary job, #9361
+  - fix spurious sparse test fail on win32, #7616
+  - fix race condition in test_with_lock, #8810
+  - speed up prune/list/repo-list tests, #9324
+  - add test for cockpit feature
+  - add a borg create/extract timestamp test for y2261.
 
 
 Version 2.0.0b20 (2025-12-24)

@@ -14,7 +14,7 @@ from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
-from .helpers import bin_to_hex, hex_to_bin
+from .helpers import bin_to_hex, hex_to_bin, ProgressIndicatorObjectCounter
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
@@ -317,7 +317,7 @@ class Repository:
             else:
                 log_error("too small.")
 
-        # TODO: progress indicator, ...
+        pi = ProgressIndicatorObjectCounter(step=1000, msg="Checking objects: %d", msgid="repository.check")
         partial = bool(max_duration)
         assert not (repair and partial)
         mode = "partial" if partial else "full"
@@ -364,6 +364,7 @@ class Repository:
                 obj_corrupted = False
                 check_object(obj)
                 objs_checked += 1
+                pi.show(objs_checked)
                 if obj_corrupted:
                     objs_errors += 1
                     if repair:
@@ -397,6 +398,7 @@ class Repository:
                     self.store.store(LAST_KEY_CHECKED, key.encode())
                     break
             else:
+                pi.finish()
                 logger.info("Finished repository check.")
                 try:
                     self.store.delete(LAST_KEY_CHECKED)
@@ -411,6 +413,7 @@ class Repository:
                     )
         except StoreObjectNotFound:
             # it can be that there is no "data/" at all, then it crashes when iterating infos.
+            pi.finish()
             pass
         logger.info(f"Checked {objs_checked} repository objects, {objs_errors} errors.")
         if objs_errors == 0:

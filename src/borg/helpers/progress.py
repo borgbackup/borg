@@ -9,7 +9,7 @@ logger = create_logger()
 
 class ProgressIndicatorBase:
     LOGGER = "borg.output.progress"
-    JSON_TYPE: str = None
+    JSON_TYPE: str = None  # type: ignore[assignment]
 
     operation_id_counter = 0
 
@@ -38,6 +38,38 @@ class ProgressIndicatorMessage(ProgressIndicatorBase):
 
     def output(self, msg):
         j = self.make_json(message=msg)
+        self.logger.info(j)
+
+
+class ProgressIndicatorObjectCounter(ProgressIndicatorBase):
+    JSON_TYPE = "progress_message"
+
+    def __init__(self, step=1000, msg="%d objects", msgid=None):
+        """
+        Activity-based progress indicator, simply tracking a changing count.
+
+        :param step: step size
+        :param msg: output message; must contain one %d placeholder for the count.
+        """
+        self.step = step
+        self.msg = msg
+        self.trigger_at = step
+        super().__init__(msgid=msgid)
+
+    def show(self, current=None):
+        """
+        Show and output the progress message if the step condition is met.
+
+        :param current: Set the current counter value.
+        """
+        if current is not None and current >= self.trigger_at:
+            # adjust trigger_at to the next step threshold
+            while self.trigger_at <= current:
+                self.trigger_at += self.step
+            return self.output(self.msg % current)
+
+    def output(self, message):
+        j = self.make_json(message=message)
         self.logger.info(j)
 
 

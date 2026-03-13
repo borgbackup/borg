@@ -552,6 +552,17 @@ class Location:
         re.VERBOSE,
     )
 
+    # BorgStore REST server
+    # (http|https)://user:pass@host:port/
+    http_re = re.compile(
+        r"(?P<proto>http|https)://"
+        + r"((?P<user>[^:@]+):(?P<pass>[^@]+)@)?"
+        + host_re
+        + optional_port_re
+        + r"(?P<path>/)",
+        re.VERBOSE,
+    )
+
     # (s3|b2):[(profile|(access_key_id:access_key_secret))@][scheme://hostname[:port]]/bucket/path
     s3_re = re.compile(
         r"""
@@ -620,6 +631,15 @@ class Location:
             self.port = m.group("port") and int(m.group("port")) or None
             self.path = os.path.normpath(m.group("path"))
             return True
+        m = self.http_re.match(text)
+        if m:
+            self.proto = m.group("proto")
+            self.user = m.group("user")
+            self._pass = True if m.group("pass") else False
+            self._host = m.group("host")
+            self.port = m.group("port") and int(m.group("port")) or None
+            self.path = m.group("path")
+            return True
         m = self.rclone_re.match(text)
         if m:
             self.proto = m.group("proto")
@@ -683,7 +703,7 @@ class Location:
             return self.path
         if self.proto == "rclone":
             return f"{self.proto}:{self.path}"
-        if self.proto in ("sftp", "ssh", "s3", "b2"):
+        if self.proto in ("sftp", "ssh", "s3", "b2", "http", "https"):
             return (
                 f"{self.proto}://"
                 f"{(self.user + '@') if self.user else ''}"

@@ -194,6 +194,14 @@ class TestLocationWithoutEnv:
         )
         assert Location("sftp://user@host:1234//abs/path").to_key_filename() == keys_dir + "host___abs_path"
 
+    def test_http(self, monkeypatch, keys_dir):
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        assert (
+            repr(Location("http://user:pass@host:1234/"))
+            == "Location(proto='http', user='user', pass='REDACTED', host='host', port=1234, path='/')"
+        )
+        assert Location("http://user:pass@host:1234/").to_key_filename() == keys_dir + "host__"
+
     def test_socket(self, monkeypatch, keys_dir):
         monkeypatch.delenv("BORG_REPO", raising=False)
         url = "socket:///c:/repo/path" if is_win32 else "socket:///repo/path"

@@ -31,7 +31,7 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE", "AUTHORS"]
 dependencies = [
   "borghash ~= 0.1.0",
-  "borgstore ~= 0.3.0",
+  "borgstore ~= 0.4.0",
   "msgpack >=1.0.3, <=1.1.2",
   "packaging",
   "platformdirs >=3.0.0, <5.0.0; sys_platform == 'darwin'",  # for macOS: breaking changes in 3.0.0.
@@ -51,8 +51,10 @@ mfusepy = ["mfusepy >= 3.1.0, <4.0.0"]  # fuse 2+3, high-level
 # a pypi release of borgbackup can't contain a dependency on github!
 # mfusepym = ["mfusepy @ git+https://github.com/mxmlnkn/mfusepy.git@master"]
 nofuse = []
-s3 = ["borgstore[s3] ~= 0.3.0"]
-sftp = ["borgstore[sftp] ~= 0.3.0"]
+s3 = ["borgstore[s3] ~= 0.4.0"]
+sftp = ["borgstore[sftp] ~= 0.4.0"]
+rclone = ["borgstore[rclone] ~= 0.4.0"]
+rest = ["borgstore[rest] ~= 0.4.0"]
 cockpit = ["textual>=6.8.0"]  # might also work with older versions, untested
 
 [project.urls]
@@ -189,71 +191,71 @@ pass_env = ["*"]  # needed by tox4, so env vars are visible for building borg
 
 [tool.tox.env.py310-llfuse]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
-extras = ["llfuse", "sftp", "s3"]
+extras = ["llfuse", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py310-pyfuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
-extras = ["pyfuse3", "sftp", "s3"]
+extras = ["pyfuse3", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py310-mfusepy]
 set_env = {BORG_FUSE_IMPL = "mfusepy"}
-extras = ["mfusepy", "sftp", "s3"]
+extras = ["mfusepy", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py311-none]
 
 [tool.tox.env.py311-llfuse]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
-extras = ["llfuse", "sftp", "s3"]
+extras = ["llfuse", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py311-pyfuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
-extras = ["pyfuse3", "sftp", "s3"]
+extras = ["pyfuse3", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py311-mfusepy]
 set_env = {BORG_FUSE_IMPL = "mfusepy"}
-extras = ["mfusepy", "sftp", "s3"]
+extras = ["mfusepy", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py312-none]
 
 [tool.tox.env.py312-llfuse]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
-extras = ["llfuse", "sftp", "s3"]
+extras = ["llfuse", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py312-pyfuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
-extras = ["pyfuse3", "sftp", "s3"]
+extras = ["pyfuse3", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py312-mfusepy]
 set_env = {BORG_FUSE_IMPL = "mfusepy"}
-extras = ["mfusepy", "sftp", "s3"]
+extras = ["mfusepy", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py313-none]
 
 [tool.tox.env.py313-llfuse]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
-extras = ["llfuse", "sftp", "s3"]
+extras = ["llfuse", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py313-pyfuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
-extras = ["pyfuse3", "sftp", "s3"]
+extras = ["pyfuse3", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py313-mfusepy]
 set_env = {BORG_FUSE_IMPL = "mfusepy"}
-extras = ["mfusepy", "sftp", "s3"]
+extras = ["mfusepy", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py314-none]
 
 [tool.tox.env.py314-llfuse]
 set_env = {BORG_FUSE_IMPL = "llfuse"}
-extras = ["llfuse", "sftp", "s3"]
+extras = ["llfuse", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py314-pyfuse3]
 set_env = {BORG_FUSE_IMPL = "pyfuse3"}
-extras = ["pyfuse3", "sftp", "s3"]
+extras = ["pyfuse3", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.py314-mfusepy]
 set_env = {BORG_FUSE_IMPL = "mfusepy"}
-extras = ["mfusepy", "sftp", "s3"]
+extras = ["mfusepy", "sftp", "s3", "rest", "rclone"]
 
 [tool.tox.env.ruff]
 skip_install = true

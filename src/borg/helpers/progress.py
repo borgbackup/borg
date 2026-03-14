@@ -41,8 +41,8 @@ class ProgressIndicatorMessage(ProgressIndicatorBase):
         self.logger.info(j)
 
 
-class ProgressIndicatorObjectCounter(ProgressIndicatorBase):
-    JSON_TYPE = "progress_message"
+class ProgressIndicatorCounter(ProgressIndicatorBase):
+    JSON_TYPE = "progress_counter"
 
     def __init__(self, step=1000, msg="%d objects", msgid=None):
         """

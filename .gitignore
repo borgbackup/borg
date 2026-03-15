@@ -32,4 +32,4 @@ borg.exe
 coverage.xml
 test-results.xml
 .vagrant
-
+.DS_Store

@@ -2246,15 +2246,22 @@ class ArchiveRecreater:
         self.stats = stats
         self.progress = progress
         self.print_file_status = file_status_printer or (lambda *args: None)
-
+        
     def recreate(self, archive_id, target_name, delete_original, comment=None):
         archive = self.open_archive(archive_id)
+
+        if archive is None:
+            raise ValueError("Archive could not be opened")
+
         target = self.create_target(archive, target_name)
+
         if self.exclude_if_present or self.exclude_caches:
             self.matcher_add_tagged_dirs(archive)
+
         if self.matcher.empty() and not target.recreate_rechunkify and comment is None:
             # nothing to do
             return False
+
         self.process_items(archive, target)
         self.save(archive, target, comment, delete_original=delete_original)
         return True

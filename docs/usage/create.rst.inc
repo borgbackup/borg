@@ -45,6 +45,8 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--paths-from-command``                          | interpret PATH as command and treat its output as ``--paths-from-stdin``                                                                                                                          |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--paths-from-shell-command``                    | interpret PATH as shell command and treat its output as ``--paths-from-stdin``                                                                                                                    |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--paths-delimiter DELIM``                       | set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\n``)                                                                                                      |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                |
@@ -89,7 +91,7 @@ borg create
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--files-cache MODE``                            | operate files cache in MODE. default: ctime,size,inode                                                                                                                                            |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-    |                                                       | ``--files-changed MODE``                          | specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime                                                                                                |
+    |                                                       | ``--files-changed MODE``                          | specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime (on Windows: mtime, because ctime is file creation time there).                                |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--read-special``                                | open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.                                                 |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -102,6 +104,12 @@ borg create
     |                                                       | ``--chunker-params PARAMS``                       | specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095                                                             |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``-C COMPRESSION``, ``--compression COMPRESSION`` | select compression algorithm, see the output of the "borg help compression" command for details.                                                                                                  |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--hostname HOSTNAME``                           | explicitly set hostname for the archive                                                                                                                                                           |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--username USERNAME``                           | explicitly set username for the archive                                                                                                                                                           |
+    +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--tags TAG``                                    | add tags to archive (comma-separated or multiple arguments)                                                                                                                                       |
     +-------------------------------------------------------+---------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
     .. raw:: html
@@ -133,6 +141,7 @@ borg create
         --content-from-command    interpret PATH as a command and store its stdout. See also the section 'Reading from stdin' below.
         --paths-from-stdin    read DELIM-separated list of paths to back up from stdin. All control is external: it will back up all files given - no more, no less.
         --paths-from-command    interpret PATH as command and treat its output as ``--paths-from-stdin``
+        --paths-from-shell-command    interpret PATH as shell command and treat its output as ``--paths-from-stdin``
         --paths-delimiter DELIM    set path delimiter for ``--paths-from-stdin`` and ``--paths-from-command`` (default: ``\n``) 
 
 
@@ -160,7 +169,7 @@ borg create
         --noxattrs                do not read and store xattrs into archive
         --sparse                  detect sparse holes in input (supported only by fixed chunker)
         --files-cache MODE        operate files cache in MODE. default: ctime,size,inode
-        --files-changed MODE      specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime
+        --files-changed MODE      specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime (on Windows: mtime, because ctime is file creation time there).
         --read-special            open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
 
 
@@ -169,6 +178,9 @@ borg create
         --timestamp TIMESTAMP                         manually specify the archive creation date/time (yyyy-mm-ddThh:mm:ss[(+|-)HH:MM] format, (+|-)HH:MM is the UTC offset, default: local time zone). Alternatively, give a reference file/directory.
         --chunker-params PARAMS                       specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE). default: buzhash,19,23,21,4095
         -C COMPRESSION, --compression COMPRESSION     select compression algorithm, see the output of the "borg help compression" command for details.
+        --hostname HOSTNAME                           explicitly set hostname for the archive
+        --username USERNAME                           explicitly set username for the archive
+        --tags TAG                                    add tags to archive (comma-separated or multiple arguments)
 
 
 Description
@@ -191,6 +203,8 @@ below for details.
 
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
+
+The ``--tags`` option can be used to add a list of tags to the new archive.
 
 The archive name does not need to be unique; you can and should use the same
 name for a series of archives. The unique archive identifier is its ID (hash),
@@ -236,8 +250,9 @@ ctime vs. mtime: safety vs. speed
   well-meant, but in both cases mtime-based cache modes can be problematic.
 
 The ``--files-changed`` option controls how Borg detects if a file has changed during backup:
- - ctime (default): Use ctime to detect changes. This is the safest option.
- - mtime: Use mtime to detect changes.
+ - ctime (default on POSIX): Use ctime to detect changes. This is the safest option.
+   Not supported on Windows (ctime is file creation time there).
+ - mtime (default on Windows): Use mtime to detect changes.
  - disabled: Disable the "file has changed while we backed it up" detection completely.
    This is not recommended unless you know what you're doing, as it could lead to
    inconsistent backups if files change during the backup process.
@@ -286,7 +301,6 @@ Linux examples for this are bind mounts (possibly same device number, but always
 subvolumes of a btrfs (different device number from parent but not necessarily a mountpoint).
 macOS examples are the apfs mounts of a typical macOS installation.
 Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
-
 
 .. _list_item_flags:
 
@@ -372,8 +386,8 @@ there (optionally considering include/exclude rules).
 
 If you need more control and you want to give every single fs object path
 to borg (maybe implementing your own recursion or your own rules), you can use
-``--paths-from-stdin`` or ``--paths-from-command`` (with the latter, borg will
-fail to create an archive should the command fail).
+``--paths-from-stdin``, ``--paths-from-command`` or ``--paths-from-shell-command``
+(with the latter two, borg will fail to create an archive should the command fail).
 
 Borg supports paths with the slashdot hack to strip path prefixes here also.
 So, be careful not to unintentionally trigger that.

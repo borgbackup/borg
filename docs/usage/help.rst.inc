@@ -157,7 +157,6 @@ Examples::
     # not '/home/user/importantjunk' or '/etc/junk':
     $ borg create -e 'home/*/junk' archive /
 
-
     # The contents of directories in '/home' are not backed up when their name
     # ends in '.tmp'
     $ borg create --exclude 're:^home/[^/]+\.tmp/' archive /

@@ -1,5 +1,6 @@
 '\" t
-.\" Man page generated from reStructuredText.
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
 .
 .
 .nr rst2man-indent-level 0
@@ -28,8 +29,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" "1" "2025-12-23" "" "borg backup tool"
-.SH NAME
+.TH "borg" "1" "2026-03-15" "" "borg backup tool"
+.SH Name
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
 .sp
@@ -167,7 +168,7 @@ $ borg \-r /path/to/repo compact \-v
 .UNINDENT
 .UNINDENT
 .sp
-\fBNOTE:\fP
+\fBNote:\fP
 .INDENT 0.0
 .INDENT 3.5
 Borg is quiet by default (it defaults to WARNING log level).
@@ -195,7 +196,7 @@ borg create archive \-s \-\-progress path  # BAD
 .UNINDENT
 .UNINDENT
 .sp
-This is due to a problem in the argparse module:  <https://bugs.python.org/issue15112> 
+This is due to a problem in the argparse module: \%<https://\:bugs\:.python\:.org/\:issue15112>
 .SS Repository URLs
 .sp
 \fBLocal filesystem\fP (or locally mounted network filesystem):
@@ -209,7 +210,7 @@ expanded by your shell).
 .sp
 Note: You may also prepend \fBfile://\fP to a filesystem path to use URL style.
 .sp
-\fBRemote repositories\fP accessed via SSH  <user@host> :
+\fBRemote repositories\fP accessed via SSH \%<user@\:host>:
 .sp
 \fBssh://user@host:port//abs/path/to/repo\fP — absolute path
 .sp
@@ -229,9 +230,10 @@ For SSH and SFTP URLs, the \fBuser@\fP and \fB:port\fP parts are optional.
 .sp
 \fBRemote repositories\fP accessed via S3:
 .sp
-\fB(s3|b2):[profile|(access_key_id:access_key_secret)@][schema://hostname[:port]]/bucket/path\fP — see the boto3 docs for more details about credentials.
+\fB(s3|b2):[(profile|(access_key_id:access_key_secret))@][scheme://hostname[:port]]/bucket/path\fP — see the boto3 docs for more details about credentials.
 .sp
 If you are connecting to AWS S3, \fB[schema://hostname[:port]]\fP is optional, but \fBbucket\fP and \fBpath\fP are always required.
+\fIscheme\fP is usually \fIhttps\fP here, hostname and optional port refer to your S3/B2 server, if that is not Amazon\(aqs.
 .sp
 Note: There is a known issue with some S3\-compatible services, e.g., Backblaze B2. If you encounter problems, try using \fBb2:\fP instead of \fBs3:\fP in the URL.
 .sp
@@ -304,7 +306,7 @@ this prints only critical messages.
 While you can set miscellaneous log levels, do not expect every command to
 produce different output at different log levels — it\(aqs merely a possibility.
 .sp
-\fBWARNING:\fP
+\fBWarning:\fP
 .INDENT 0.0
 .INDENT 3.5
 Options \fB\-\-critical\fP and \fB\-\-error\fP are provided for completeness,
@@ -427,15 +429,14 @@ a unique id based on the MAC address of the network interface. Except if that MA
 that case it returns a random value, which is not what we want (because it kills automatic stale lock removal).
 So, if you have an all\-zero MAC address or other reasons to better control the host id externally, just set this
 environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
-use  <FQDN@uniqueid> \&.
+use \%<FQDN@\:uniqueid>\&.
 .TP
 .B BORG_LOCK_WAIT
 You can set the default value for the \fB\-\-lock\-wait\fP option with this, so
 you do not need to give it as a command line option.
 .TP
 .B BORG_LOGGING_CONF
-When set, use the given filename as INI <https://docs.python.org/3/library/logging.config.html#configuration-file-format>
-\-style logging configuration.
+When set, use the given filename as INI \%<https://\:docs\:.python\:.org/\:3/\:library/\:logging\:.config\:.html#\:configuration-file-format>\-style logging configuration.
 A basic example conf can be found at \fBdocs/misc/logging.conf\fP\&.
 .TP
 .B BORG_RSH
@@ -555,9 +556,9 @@ Now you can init a fresh repo. Make sure you do not use the workaround any more.
 .INDENT 7.0
 .TP
 .B BORG_LIST_FORMAT
-Giving the default value for \fBborg repo\-list \-\-format=X\fP\&.
+Giving the default value for \fBborg list \-\-format=X\fP\&.
 .TP
-.B BORG_RLIST_FORMAT
+.B BORG_REPO_LIST_FORMAT
 Giving the default value for \fBborg repo\-list \-\-format=X\fP\&.
 .TP
 .B BORG_PRUNE_FORMAT
@@ -584,10 +585,109 @@ Note: answers are case sensitive. setting an invalid answer value might either g
 answer or ask you interactively, depending on whether retries are allowed (they by default are
 allowed). So please test your scripts interactively before making them a non\-interactive script.
 .UNINDENT
+.sp
+Directories and files:
 .INDENT 0.0
-.TP
-.B Directories and files:
-.INDENT 7.0
+.INDENT 3.5
+.sp
+\fBNote:\fP
+.INDENT 0.0
+.INDENT 3.5
+Borg 2 uses the platformdirs \%<https://\:pypi\:.org/\:project/\:platformdirs/> library to determine
+default directory locations. This means that default paths are \fBplatform\-specific\fP:
+.INDENT 0.0
+.IP \(bu 2
+\fBLinux\fP: Uses XDG Base Directory Specification paths (e.g., \fB~/.config/borg\fP,
+\fB~/.cache/borg\fP, \fB~/.local/share/borg\fP). XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> variables are honoured.
+.IP \(bu 2
+\fBmacOS\fP: Uses native macOS directories (e.g., \fB~/Library/Application Support/borg\fP,
+\fB~/Library/Caches/borg\fP). XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> variables are \fBnot\fP honoured.
+.IP \(bu 2
+\fBWindows\fP: Uses Windows AppData directories (e.g., \fBC:\eUsers\e<user>\eAppData\eRoaming\eborg\fP,
+\fBC:\eUsers\e<user>\eAppData\eLocal\eborg\fP). XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> variables are \fBnot\fP honoured.
+.UNINDENT
+.sp
+On all platforms, you can override each directory individually using the specific environment
+variables described below. You can also set \fBBORG_BASE_DIR\fP to force borg to use
+\fBBORG_BASE_DIR/.config/borg\fP, \fBBORG_BASE_DIR/.cache/borg\fP, etc., regardless of the platform.
+.UNINDENT
+.UNINDENT
+.sp
+Default directory locations by platform (when no \fBBORG_*\fP environment variables are set):
+.TS
+box center;
+l|l|l|l.
+T{
+Directory
+T}	T{
+Linux
+T}	T{
+macOS
+T}	T{
+Windows
+T}
+_
+T{
+Config
+T}	T{
+\fB~/.config/borg\fP
+T}	T{
+\fB~/Library/Application Support/borg\fP
+T}	T{
+\fB%APPDATA%\eborg\fP
+T}
+_
+T{
+Cache
+T}	T{
+\fB~/.cache/borg\fP
+T}	T{
+\fB~/Library/Caches/borg\fP
+T}	T{
+\fB%LOCALAPPDATA%\eborg\eCache\fP
+T}
+_
+T{
+Data
+T}	T{
+\fB~/.local/share/borg\fP
+T}	T{
+\fB~/Library/Application Support/borg\fP
+T}	T{
+\fB%LOCALAPPDATA%\eborg\fP
+T}
+_
+T{
+Runtime
+T}	T{
+\fB/run/user/<uid>/borg\fP
+T}	T{
+\fB~/Library/Caches/TemporaryItems/borg\fP
+T}	T{
+\fB%TEMP%\eborg\fP
+T}
+_
+T{
+Keys
+T}	T{
+\fB<config_dir>/keys\fP
+T}	T{
+\fB<config_dir>/keys\fP
+T}	T{
+\fB<config_dir>\ekeys\fP
+T}
+_
+T{
+Security
+T}	T{
+\fB<data_dir>/security\fP
+T}	T{
+\fB<data_dir>/security\fP
+T}	T{
+\fB<data_dir>\esecurity\fP
+T}
+.TE
+.INDENT 0.0
 .TP
 .B BORG_BASE_DIR
 Defaults to \fB$HOME\fP or \fB~$USER\fP or \fB~\fP (in that order).
@@ -596,31 +696,31 @@ to modify \fBBORG_BASE_DIR\fP: the other paths for cache, config etc. will adapt
 (assuming you didn\(aqt set them to a different custom value).
 .TP
 .B BORG_CACHE_DIR
-Defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
-XDG env var <https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html>
- \fBXDG_CACHE_HOME\fP is set, then \fB$XDG_CACHE_HOME/borg\fP is being used instead.
+Defaults to the platform\-specific cache directory (see table above).
+If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&.
+On Linux, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_CACHE_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains the local cache and might need a lot
 of space for dealing with big repositories. Make sure you\(aqre aware of the associated
 security aspects of the cache location: \fIcache_security\fP
 .TP
 .B BORG_CONFIG_DIR
-Defaults to \fB$BORG_BASE_DIR/.config/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
-XDG env var <https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html>
- \fBXDG_CONFIG_HOME\fP is set, then \fB$XDG_CONFIG_HOME/borg\fP is being used instead.
+Defaults to the platform\-specific config directory (see table above).
+If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.config/borg\fP\&.
+On Linux, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_CONFIG_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains all borg configuration directories, see the FAQ
 for a security advisory about the data in this directory: \fIhome_config_borg\fP
 .TP
 .B BORG_DATA_DIR
-Defaults to \fB$BORG_BASE_DIR/.local/share/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
-XDG env var <https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html>
- \fBXDG_DATA_HOME\fP is set, then \fB$XDG_DATA_HOME/borg\fP is being used instead.
+Defaults to the platform\-specific data directory (see table above).
+If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.local/share/borg\fP\&.
+On Linux, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_DATA_HOME\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains all borg data directories, see the FAQ
 for a security advisory about the data in this directory: \fIhome_data_borg\fP
 .TP
 .B BORG_RUNTIME_DIR
-Defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
-XDG env var <https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html>
- \fBXDG_RUNTIME_DIR\fP is set, then \fB$XDG_RUNTIME_DIR/borg\fP is being used instead.
+Defaults to the platform\-specific runtime directory (see table above).
+If \fBBORG_BASE_DIR\fP is set, defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&.
+On Linux, XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_RUNTIME_DIR\fP is also honoured if \fBBORG_BASE_DIR\fP is not set.
 This directory contains borg runtime files, like e.g. the socket file.
 .TP
 .B BORG_SECURITY_DIR
@@ -653,9 +753,11 @@ you need to point to the correct key file matching the repository the command wi
 .TP
 .B TMPDIR
 This is where temporary files are stored (might need a lot of temporary space for some
-operations), see tempfile <https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir>
- for details.
+operations), see tempfile \%<https://\:docs\:.python\:.org/\:3/\:library/\:tempfile\:.html#\:tempfile\:.gettempdir> for details.
 .UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
 .TP
 .B Building:
 .INDENT 7.0
@@ -673,10 +775,6 @@ Borg will be linked against the system libacl instead of a bundled implementatio
 .B BORG_LIBLZ4_PREFIX
 Adds given prefix directory to the default locations. If a \(aqinclude/lz4.h\(aq is found Borg
 will be linked against the system liblz4 instead of a bundled implementation. (setup.py)
-.TP
-.B BORG_LIBZSTD_PREFIX
-Adds given prefix directory to the default locations. If a \(aqinclude/zstd.h\(aq is found Borg
-will be linked against the system libzstd instead of a bundled implementation. (setup.py)
 .UNINDENT
 .UNINDENT
 .sp
@@ -688,6 +786,39 @@ Be very careful when using the \(dqyes\(dq sayers, the warnings with prompt exis
 Also be very careful when putting your passphrase into a script, make sure it has appropriate file permissions (e.g.
 mode 600, root:root).
 .UNINDENT
+.SS Automatically generated Environment Variables (jsonargparse)
+.sp
+Borg uses jsonargparse \%<https://\:jsonargparse\:.readthedocs\:.io/> with \fBdefault_env=True\fP, which means that every
+command\-line option can also be set via an environment variable.
+.sp
+The environment variable name is derived from the program name (\fBborg\fP),
+the subcommand (if any), and the option name, all converted to uppercase
+with dashes replaced by underscores.
+.sp
+For \fBtop\-level options\fP (not specific to a subcommand), the pattern is:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+BORG_<OPTION>
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+For example, \fB\-\-lock\-wait\fP can be set via \fBBORG_LOCK_WAIT\fP\&.
+.sp
+For \fBsubcommand options\fP, the subcommand and option are separated by a
+double underscore:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.EX
+BORG_<SUBCOMMAND>__<OPTION>
+.EE
+.UNINDENT
+.UNINDENT
+.sp
+For example, \fBborg create \-\-comment\fP can be set via \fBBORG_CREATE__COMMENT\fP\&.
 .SS File systems
 .sp
 We recommend using a reliable, scalable journaling filesystem for the
@@ -736,19 +867,16 @@ Sometimes slower, due to less sequential and more random access operations.
 .SS Units
 .sp
 To display quantities, Borg takes care of respecting the
-usual conventions of scale. Disk sizes are displayed in decimal <https://en.wikipedia.org/wiki/Decimal>
-, using powers of ten (so
-\fBkB\fP means 1000 bytes). For memory usage, binary prefixes <https://en.wikipedia.org/wiki/Binary_prefix>
- are used, and are
-indicated using the IEC binary prefixes <https://en.wikipedia.org/wiki/IEC_80000-13#Prefixes_for_binary_multiples>
-,
+usual conventions of scale. Disk sizes are displayed in decimal \%<https://\:en\:.wikipedia\:.org/\:wiki/\:Decimal>, using powers of ten (so
+\fBkB\fP means 1000 bytes). For memory usage, binary prefixes \%<https://\:en\:.wikipedia\:.org/\:wiki/\:Binary_prefix> are used, and are
+indicated using the IEC binary prefixes \%<https://\:en\:.wikipedia\:.org/\:wiki/\:IEC_80000-13#\:Prefixes_for_binary_multiples>,
 using powers of two (so \fBKiB\fP means 1024 bytes).
 .SS Date and Time
 .sp
 We format date and time in accordance with ISO 8601, that is: YYYY\-MM\-DD and
 HH:MM:SS (24\-hour clock).
 .sp
-For more information, see:  <https://xkcd.com/1179/> 
+For more information, see: \%<https://\:xkcd\:.com/\:1179/>
 .sp
 Unless otherwise noted, we display local date and time.
 Internally, we store and process date and time as UTC.
@@ -1022,19 +1150,18 @@ The BSDs define additional flags.
 \fIborg\-compression(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP
 .INDENT 0.0
 .IP \(bu 2
-Main web site  <https://www.borgbackup.org/> 
+Main web site \%<https://\:www\:.borgbackup\:.org/>
 .IP \(bu 2
-Releases  <https://github.com/borgbackup/borg/releases> 
+Releases \%<https://\:github\:.com/\:borgbackup/\:borg/\:releases>
 .IP \(bu 2
-Changelog  <https://github.com/borgbackup/borg/blob/master/docs/changes.rst> 
+Changelog \%<https://\:github\:.com/\:borgbackup/\:borg/\:blob/\:master/\:docs/\:changes\:.rst>
 .IP \(bu 2
-GitHub  <https://github.com/borgbackup/borg> 
+GitHub \%<https://\:github\:.com/\:borgbackup/\:borg>
 .IP \(bu 2
-Security contact  <https://borgbackup.readthedocs.io/en/latest/support.html#security\-contact> 
+Security contact \%<https://\:borgbackup\:.readthedocs\:.io/\:en/\:latest/\:support\:.html#\:security-contact>
 .UNINDENT
-.SH AUTHOR
+.SH Author
 The Borg Collective
 
 orphan: 
-.\" Generated by docutils manpage writer.
-.
+.\" End of generated man page.

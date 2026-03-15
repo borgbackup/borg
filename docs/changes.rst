@@ -156,8 +156,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b21 (not released yet)
------------------------------------
+Version 2.0.0b21 (2026-03-16)
+-----------------------------
 
 Please note:
 
@@ -168,6 +168,7 @@ above.
 
 New features:
 
+- support https/http (REST) repositories via borgstore, #9480
 - use jsonargparse as CLI argument/option parser, also supporting YAML configs
   for defaults and auto-generated environment variables to override defaults, #6551
 - create --paths-from-shell-command, #5968

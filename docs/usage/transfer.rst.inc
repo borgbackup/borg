@@ -123,7 +123,6 @@ Transfer borg2 archives into a related other borg2 repository::
     borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
     borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
 
-
 Data migration / upgrade from borg 1.x
 ++++++++++++++++++++++++++++++++++++++
 
@@ -143,4 +142,3 @@ to the above, but you need the ``--from-borg1`` option::
     # to re-chunk using different chunker parameters:
     borg --repo=DST_REPO transfer --other-repo=SRC_REPO \
          --chunker-params=buzhash,19,23,21,4095
-

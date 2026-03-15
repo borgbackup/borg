@@ -1,4 +1,5 @@
-.\" Man page generated from reStructuredText.
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
 .
 .
 .nr rst2man-indent-level 0
@@ -27,8 +28,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-CREATE" "1" "2025-12-23" "" "borg backup tool"
-.SH NAME
+.TH "borg-create" "1" "2026-03-15" "" "borg backup tool"
+.SH Name
 borg-create \- Creates a new archive.
 .SH SYNOPSIS
 .sp
@@ -52,6 +53,8 @@ below for details.
 .sp
 The archive will consume almost no disk space for files or parts of files that
 have already been stored in other archives.
+.sp
+The \fB\-\-tags\fP option can be used to add a list of tags to the new archive.
 .sp
 The archive name does not need to be unique; you can and should use the same
 name for a series of archives. The unique archive identifier is its ID (hash),
@@ -111,9 +114,10 @@ well\-meant, but in both cases mtime\-based cache modes can be problematic.
 .B The \fB\-\-files\-changed\fP option controls how Borg detects if a file has changed during backup:
 .INDENT 7.0
 .IP \(bu 2
-ctime (default): Use ctime to detect changes. This is the safest option.
+ctime (default on POSIX): Use ctime to detect changes. This is the safest option.
+Not supported on Windows (ctime is file creation time there).
 .IP \(bu 2
-mtime: Use mtime to detect changes.
+mtime (default on Windows): Use mtime to detect changes.
 .IP \(bu 2
 disabled: Disable the \(dqfile has changed while we backed it up\(dq detection completely.
 This is not recommended unless you know what you\(aqre doing, as it could lead to
@@ -190,6 +194,9 @@ read DELIM\-separated list of paths to back up from stdin. All control is extern
 .B  \-\-paths\-from\-command
 interpret PATH as command and treat its output as \fB\-\-paths\-from\-stdin\fP
 .TP
+.B  \-\-paths\-from\-shell\-command
+interpret PATH as shell command and treat its output as \fB\-\-paths\-from\-stdin\fP
+.TP
 .BI \-\-paths\-delimiter \ DELIM
 set path delimiter for \fB\-\-paths\-from\-stdin\fP and \fB\-\-paths\-from\-command\fP (default: \fB\en\fP)
 .UNINDENT
@@ -209,7 +216,7 @@ include/exclude paths matching PATTERN
 read include/exclude patterns from PATTERNFILE, one per line
 .TP
 .B  \-\-exclude\-caches
-exclude directories that contain a CACHEDIR.TAG file ( <http://www.bford.info/cachedir/spec.html> )
+exclude directories that contain a CACHEDIR.TAG file (\%<https://\:www\:.bford\:.info/\:cachedir/\:spec\:.html>)
 .TP
 .BI \-\-exclude\-if\-present \ NAME
 exclude directories that are tagged by containing a filesystem object with the given NAME
@@ -251,7 +258,7 @@ detect sparse holes in input (supported only by fixed chunker)
 operate files cache in MODE. default: ctime,size,inode
 .TP
 .BI \-\-files\-changed \ MODE
-specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime
+specify how to detect if a file has changed during backup (ctime, mtime, disabled). default: ctime (on Windows: mtime, because ctime is file creation time there).
 .TP
 .B  \-\-read\-special
 open and read block and char device files as well as FIFOs as if they were regular files. Also follows symlinks pointing to these kinds of files.
@@ -270,10 +277,19 @@ specify the chunker parameters (ALGO, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BI
 .TP
 .BI \-C \ COMPRESSION\fR,\fB \ \-\-compression \ COMPRESSION
 select compression algorithm, see the output of the \(dqborg help compression\(dq command for details.
+.TP
+.BI \-\-hostname \ HOSTNAME
+explicitly set hostname for the archive
+.TP
+.BI \-\-username \ USERNAME
+explicitly set username for the archive
+.TP
+.BI \-\-tags \ TAG
+add tags to archive (comma\-separated or multiple arguments)
 .UNINDENT
 .SH EXAMPLES
 .sp
-\fBNOTE:\fP
+\fBNote:\fP
 .INDENT 0.0
 .INDENT 3.5
 Archive series and performance: In Borg 2, archives that share the same NAME form an \(dqarchive series\(dq.
@@ -364,6 +380,9 @@ $ borg create \(aqdaily\-projectA\(aq projectA
 $ find ~ \-size \-1000k | borg create \-\-paths\-from\-stdin small\-files\-only
 # Use \-\-paths\-from\-command with find to back up files from only a given user
 $ borg create \-\-paths\-from\-command joes\-files \-\- find /srv/samba/shared \-user joe
+# Use \-\-paths\-from\-shell\-command with find to back up a few files from only a given user \-
+# BE VERY CAREFUL AND ONLY USE TRUSTED INPUT FOR THE SHELL COMMAND!
+$ borg create \-\-paths\-from\-shell\-command some\-of\-joes\-files \-\- \(dqfind /srv/samba/shared \-user joe | head\(dq
 # Use \-\-paths\-from\-stdin with \-\-paths\-delimiter (for example, for filenames with newlines in them)
 $ find ~ \-size \-1000k \-print0 | borg create \e
     \-\-paths\-from\-stdin \e
@@ -504,15 +523,14 @@ there (optionally considering include/exclude rules).
 .sp
 If you need more control and you want to give every single fs object path
 to borg (maybe implementing your own recursion or your own rules), you can use
-\fB\-\-paths\-from\-stdin\fP or \fB\-\-paths\-from\-command\fP (with the latter, borg will
-fail to create an archive should the command fail).
+\fB\-\-paths\-from\-stdin\fP, \fB\-\-paths\-from\-command\fP or \fB\-\-paths\-from\-shell\-command\fP
+(with the latter two, borg will fail to create an archive should the command fail).
 .sp
 Borg supports paths with the slashdot hack to strip path prefixes here also.
 So, be careful not to unintentionally trigger that.
 .SH SEE ALSO
 .sp
 \fIborg\-common(1)\fP, \fIborg\-delete(1)\fP, \fIborg\-prune(1)\fP, \fIborg\-check(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP, \fIborg\-compression(1)\fP, \fIborg\-repo\-create(1)\fP
-.SH AUTHOR
+.SH Author
 The Borg Collective
-.\" Generated by docutils manpage writer.
-.
+.\" End of generated man page.

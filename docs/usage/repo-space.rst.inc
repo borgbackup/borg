@@ -75,5 +75,4 @@ Examples::
     $ borg compact -v  # only this actually frees space of deleted archives
     $ borg repo-space --reserve 1G  # reserve space again for next time
 
-
 Reserved space is always rounded up to full reservation blocks of 64 MiB.

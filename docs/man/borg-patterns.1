@@ -1,4 +1,5 @@
-.\" Man page generated from reStructuredText.
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
 .
 .
 .nr rst2man-indent-level 0
@@ -27,8 +28,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG-PATTERNS" "1" "2025-12-23" "" "borg backup tool"
-.SH NAME
+.TH "borg-patterns" "1" "2026-03-15" "" "borg backup tool"
+.SH Name
 borg-patterns \- Details regarding patterns
 .SH DESCRIPTION
 .sp
@@ -67,6 +68,8 @@ start with \fBsrc\fP\&.
 .IP \(bu 2
 When you back up relative paths like \fB\&../../src\fP, the archived paths
 start with \fBsrc\fP\&.
+.IP \(bu 2
+On native Windows, archived absolute paths look like \fBC/Windows/System32\fP\&.
 .UNINDENT
 .UNINDENT
 .sp
@@ -74,18 +77,19 @@ Borg supports different pattern styles. To define a non\-default
 style for a specific pattern, prefix it with two characters followed
 by a colon \(aq:\(aq (i.e. \fBfm:path/*\fP, \fBsh:path/**\fP).
 .sp
+Note: Windows users must only use forward slashes in patterns, not backslashes.
+.sp
 The default pattern style for \fB\-\-exclude\fP differs from \fB\-\-pattern\fP, see below.
 .INDENT 0.0
 .TP
-.B Fnmatch <https://docs.python.org/3/library/fnmatch.html>
-, selector \fBfm:\fP
+.B Fnmatch \%<https://\:docs\:.python\:.org/\:3/\:library/\:fnmatch\:.html>, selector \fBfm:\fP
 This is the default style for \fB\-\-exclude\fP and \fB\-\-exclude\-from\fP\&.
 These patterns use a variant of shell pattern syntax, with \(aq*\(aq matching
 any number of characters, \(aq?\(aq matching any single character, \(aq[...]\(aq
 matching any single character specified, including ranges, and \(aq[!...]\(aq
 matching any character not specified. For the purpose of these patterns,
-the path separator (backslash for Windows and \(aq/\(aq on other systems) is not
-treated specially. Wrap meta\-characters in brackets for a literal
+the path separator (forward slash \(aq/\(aq) is not treated specially.
+Wrap meta\-characters in brackets for a literal
 match (i.e. \fB[?]\fP to match the literal character \(aq?\(aq). For a path
 to match a pattern, the full path must match, or it must match
 from the start of the full path to just before a path separator. Except
@@ -102,13 +106,10 @@ levels, \fB*\fP for matching zero or more arbitrary characters with the
 exception of any path separator, \fB{}\fP containing comma\-separated
 alternative patterns. A leading path separator is always removed.
 .TP
-.B Regular expressions <https://docs.python.org/3/library/re.html>
-, selector \fBre:\fP
+.B Regular expressions \%<https://\:docs\:.python\:.org/\:3/\:library/\:re\:.html>, selector \fBre:\fP
 Unlike shell patterns, regular expressions are not required to match the full
 path and any substring match is sufficient. It is strongly recommended to
-anchor patterns to the start (\(aq^\(aq), to the end (\(aq$\(aq) or both. Path
-separators (backslash for Windows and \(aq/\(aq on other systems) in paths are
-always normalized to a forward slash \(aq/\(aq before applying a pattern.
+anchor patterns to the start (\(aq^\(aq), to the end (\(aq$\(aq) or both.
 .TP
 .B Path prefix, selector \fBpp:\fP
 This pattern style is useful to match whole subdirectories. The pattern
@@ -132,7 +133,7 @@ Other include/exclude patterns that would normally match will be ignored.
 Same logic applies for exclude.
 .UNINDENT
 .sp
-\fBNOTE:\fP
+\fBNote:\fP
 .INDENT 0.0
 .INDENT 3.5
 \fBre:\fP, \fBsh:\fP and \fBfm:\fP patterns are all implemented on top of
@@ -141,6 +142,26 @@ of these types which requires an inordinate amount of time to match
 paths. If untrusted users are able to supply patterns, ensure they
 cannot supply \fBre:\fP patterns. Further, ensure that \fBsh:\fP and
 \fBfm:\fP patterns only contain a handful of wildcards at most.
+.UNINDENT
+.UNINDENT
+.sp
+\fBNote:\fP
+.INDENT 0.0
+.INDENT 3.5
+\fBWindows path handling\fP: All paths in Borg archives use forward slashes (\fB/\fP)
+as path separators, regardless of the platform. When creating archives on Windows,
+backslashes from filesystem paths are automatically converted to forward slashes.
+.UNINDENT
+.UNINDENT
+.sp
+\fBNote:\fP
+.INDENT 0.0
+.INDENT 3.5
+\fBWindows reserved characters\fP: On Windows, when extracting archives created on
+POSIX systems, paths may contain characters that are reserved from being used in
+file or directory names (like: \fB< > : \(dq \e | ? *\fP).
+These are replaced by characters in the unicode private use area (\fBU+F0xx\fP) like
+the CIFS mapchars feature also does it. It won\(aqt be pretty, but at least it works.
 .UNINDENT
 .UNINDENT
 .sp
@@ -189,7 +210,6 @@ $ borg create \-e \(aq*.o\(aq archive /
 # Exclude \(aq/home/user/junk\(aq and \(aq/home/user/subdir/junk\(aq but
 # not \(aq/home/user/importantjunk\(aq or \(aq/etc/junk\(aq:
 $ borg create \-e \(aqhome/*/junk\(aq archive /
-
 
 # The contents of directories in \(aq/home\(aq are not backed up when their name
 # ends in \(aq.tmp\(aq
@@ -289,7 +309,7 @@ This will list the considered files one per line, prefixed with a
 character that indicates the action (e.g. \(aqx\(aq for excluding, see
 \fBItem flags\fP in \fIborg create\fP usage docs).
 .sp
-\fBNOTE:\fP
+\fBNote:\fP
 .INDENT 0.0
 .INDENT 3.5
 It is possible that a subdirectory or file is matched while its parent
@@ -372,7 +392,6 @@ R /home/susan
 .sp
 This allows you to share the same patterns between multiple repositories
 without needing to specify them on the command line.
-.SH AUTHOR
+.SH Author
 The Borg Collective
-.\" Generated by docutils manpage writer.
-.
+.\" End of generated man page.

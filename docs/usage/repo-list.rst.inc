@@ -108,7 +108,6 @@ Examples:
     ...
 
 The following keys are always available:
-
 - NEWLINE: OS dependent line separator
 - NL: alias of NEWLINE
 - NUL: NUL character for creating print0 / xargs -0 like output
@@ -126,9 +125,9 @@ Keys available only when listing archives in a repository:
 - id: internal ID of the archive
 - tags: archive tags
 
-- start: time (start) of creation of the archive
-- time: alias of "start"
-- end: time (end) of creation of the archive
+- time: nominal time of the archive
+- start: start time of the archive operation
+- end: end time of the archive operation
 - command_line: command line which was used to create the archive
 
 - hostname: hostname of host on which this archive was created

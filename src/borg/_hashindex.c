@@ -111,7 +111,7 @@ static int hash_sizes[] = {
 #define EPRINTF_PATH(path, msg, ...) fprintf(stderr, "hashindex: %s: " msg " (%s)\n", path, ##__VA_ARGS__, strerror(errno))
 
 #ifndef BORG_NO_PYTHON
-static HashIndex *hashindex_read(PyObject *file_py, int permit_compact);
+static HashIndex *hashindex_read(PyObject *file_py, int permit_compact, int expected_key_size, int expected_value_size);
 static void hashindex_write(HashIndex *index, PyObject *file_py);
 #endif
 
@@ -293,7 +293,7 @@ count_empty(HashIndex *index)
 
 #ifndef BORG_NO_PYTHON
 static HashIndex *
-hashindex_read(PyObject *file_py, int permit_compact)
+hashindex_read(PyObject *file_py, int permit_compact, int expected_key_size, int expected_value_size)
 {
     Py_ssize_t length, buckets_length, bytes_read;
     Py_buffer header_buffer;
@@ -368,6 +368,36 @@ hashindex_read(PyObject *file_py, int permit_compact)
     if(memcmp(header->magic, MAGIC, MAGIC_LEN)) {
         PyErr_Format(PyExc_ValueError, "Unknown MAGIC in header");
         goto fail_release_header_buffer;
+    }
+
+    // check if key / value sizes match the expected sizes.
+    if (expected_key_size != -1 && header->key_size != expected_key_size) {
+        PyErr_Format(PyExc_ValueError, "Expected key size %d, got %d.",
+                     expected_key_size, header->key_size);
+        goto fail_decref_header;
+    }
+    if (expected_value_size != -1 && header->value_size != expected_value_size) {
+        PyErr_Format(PyExc_ValueError, "Expected value size %d, got %d.",
+                     expected_value_size, header->value_size);
+        goto fail_decref_header;
+    }
+    // in any case, the key and value sizes must be both >= 4, the code assumes this.
+    if (header->key_size < 4) {
+        PyErr_Format(PyExc_ValueError, "Expected key size >= 4, got %d.", header->key_size);
+        goto fail_decref_header;
+    }
+    if (header->value_size < 4) {
+        PyErr_Format(PyExc_ValueError, "Expected value size >= 4, got %d.", header->value_size);
+        goto fail_decref_header;
+    }
+    // sanity check for num_buckets and num_entries.
+    if (header->num_buckets < 1) {
+        PyErr_Format(PyExc_ValueError, "Expected num_buckets >= 1, got %d.", header->num_buckets);
+        goto fail_decref_header;
+    }
+    if ((header->num_entries < 0) || (header->num_entries > header->num_buckets)) {
+        PyErr_Format(PyExc_ValueError, "Expected 0 <= num_entries <= num_buckets, got %d.", header->num_entries);
+        goto fail_decref_header;
     }
 
     buckets_length = (Py_ssize_t)_le32toh(header->num_buckets) * (header->key_size + header->value_size);

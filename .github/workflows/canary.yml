@@ -2,7 +2,7 @@ name: Canary (Unlocked Requirements)
 
 on:
   schedule:
-    - cron: '0 9 * * 0'  # Run weekly on Sunday at 09:00 UTC
+    - cron: '0 7 * * *'  # Run at 07:00 UTC
   workflow_dispatch:      # Allow manual trigger
 
 permissions:
@@ -47,6 +47,7 @@ jobs:
 
     - name: Install Linux packages
       if: ${{ runner.os == 'Linux' }}
+      shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install -y pkg-config build-essential
@@ -59,16 +60,19 @@ jobs:
 
     - name: Install macOS packages
       if: ${{ runner.os == 'macOS' }}
+      shell: bash
       run: |
         brew bundle install || true
 
     - name: Install Python requirements (UNLOCKED)
+      shell: bash
       run: |
         python -m pip install --upgrade pip setuptools wheel
         # Use UNLOCKED requirements to catch upstream breakages
         pip install -r requirements.d/development.txt
 
     - name: Install borgbackup
+      shell: bash
       run: |
         if [[ "${{ matrix.toxenv }}" == *"llfuse"* ]]; then
           pip install -e ".[llfuse,cockpit]"
@@ -87,7 +91,7 @@ jobs:
           python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote" --cov=borg --cov-config=pyproject.toml --cov-report=xml --junitxml=test-results.xml
         else
           # Force tox to use the unlocked requirements in its environment creation
-          # by overriding the deps if possible, or just trusting it uses development.txt 
+          # by overriding the deps if possible, or just trusting it uses development.txt
           # which we already installed in the root. Actually tox creates its own venv.
           # We need to tell tox to use the unlocked file.
           tox -e ${{ matrix.toxenv }} --override "env_run_base.deps=[-rrequirements.d/development.txt]"

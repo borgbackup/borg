@@ -57,7 +57,7 @@ from ..logger import setup_logging
 from ..remote import RemoteRepository, PathNotAllowed
 from ..repository import Repository
 from . import has_lchflags, has_mknod, llfuse
-from . import BaseTestCase, changedir, environment_variable, no_selinux, same_ts_ns, granularity_sleep
+from . import BaseTestCase, changedir, environment_variable, filter_xattrs, same_ts_ns, granularity_sleep
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
 from .platform import fakeroot_detected, is_darwin, is_freebsd, is_netbsd, is_win32
 from .upgrader import make_attic_repo
@@ -2890,11 +2890,11 @@ class ArchiverTestCase(ArchiverTestCaseBase):
                 in_fn = 'input/fusexattr'
                 out_fn = os.fsencode(os.path.join(mountpoint, 'input', 'fusexattr'))
                 if not xattr.XATTR_FAKEROOT and xattr.is_enabled(self.input_path):
-                    assert sorted(no_selinux(xattr.listxattr(out_fn))) == [b'user.empty', b'user.foo', ]
+                    assert sorted(filter_xattrs(xattr.listxattr(out_fn))) == [b'user.empty', b'user.foo', ]
                     assert xattr.getxattr(out_fn, b'user.foo') == b'bar'
                     assert xattr.getxattr(out_fn, b'user.empty') == b''
                 else:
-                    assert no_selinux(xattr.listxattr(out_fn)) == []
+                    assert filter_xattrs(xattr.listxattr(out_fn)) == []
                     try:
                         xattr.getxattr(out_fn, b'user.foo')
                     except OSError as e:

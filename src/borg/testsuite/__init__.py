@@ -199,13 +199,14 @@ def is_birthtime_fully_supported():
         return False
 
 
-def no_selinux(x):
-    # SELinux fails our FUSE tests; thus, ignore SELinux xattrs
-    SELINUX_KEY = b'security.selinux'
+def filter_xattrs(x):
+    # selinux and com.apple.provenance fail our FUSE tests, thus ignore them
+    UNWANTED_KEYS = {b"security.selinux", b"com.apple.provenance"}
     if isinstance(x, dict):
-        return {k: v for k, v in x.items() if k != SELINUX_KEY}
+        return {k: v for k, v in x.items() if k not in UNWANTED_KEYS}
     if isinstance(x, list):
-        return [k for k in x if k != SELINUX_KEY]
+        return [k for k in x if k not in UNWANTED_KEYS]
+    raise ValueError("Unsupported type: %s" % type(x))
 
 
 class BaseTestCase(unittest.TestCase):
@@ -279,8 +280,8 @@ class BaseTestCase(unittest.TestCase):
                     d1.append(round(s1.st_mtime_ns, st_mtime_ns_round))
                     d2.append(round(s2.st_mtime_ns, st_mtime_ns_round))
             if not ignore_xattrs:
-                d1.append(no_selinux(get_all(path1, follow_symlinks=False)))
-                d2.append(no_selinux(get_all(path2, follow_symlinks=False)))
+                d1.append(filter_xattrs(get_all(path1, follow_symlinks=False)))
+                d2.append(filter_xattrs(get_all(path2, follow_symlinks=False)))
             self.assert_equal(d1, d2)
         for sub_diff in diff.subdirs.values():
             self._assert_dirs_equal_cmp(sub_diff, ignore_flags=ignore_flags, ignore_xattrs=ignore_xattrs, ignore_ns=ignore_ns)

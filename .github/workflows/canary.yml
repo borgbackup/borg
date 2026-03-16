@@ -30,9 +30,6 @@ jobs:
           - os: macos-15
             python-version: '3.14'
             toxenv: py314-none
-          - os: windows-latest
-            python-version: '3.14'
-            toxenv: py314-windows
 
     steps:
     - uses: actions/checkout@v6
@@ -96,3 +93,57 @@ jobs:
           # We need to tell tox to use the unlocked file.
           tox -e ${{ matrix.toxenv }} --override "env_run_base.deps=[-rrequirements.d/development.txt]"
         fi
+
+  windows_canary:
+
+    if: true  # can be used to temporarily disable the build
+    name: Canary (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 180
+
+    env:
+      PY_COLORS: 1
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+
+      - name: Install system packages
+        run: ./scripts/msys2-install-deps development
+
+      - name: Build python venv
+        run: |
+          # building cffi / argon2-cffi in the venv fails, so we try to use the system packages
+          python -m venv --system-site-packages env
+          . env/bin/activate
+          # python -m pip install --upgrade pip
+          # pip install --upgrade setuptools build wheel
+          pip install -r requirements.d/pyinstaller.txt
+
+      - name: Build
+        run: |
+          # build borg.exe
+          . env/bin/activate
+          pip install -e ".[cockpit,s3,sftp,rest,rclone]"
+          mkdir -p dist/binary
+          pyinstaller -y --clean --distpath=dist/binary scripts/borg.exe.spec
+          # build sdist and wheel in dist/...
+          python -m build
+
+      - name: Run tests
+        run: |
+          # Ensure locally built binary in ./dist/binary/borg-dir is found during tests
+          export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
+          borg.exe -V
+          . env/bin/activate
+          python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote" --cov=borg --cov-config=pyproject.toml --cov-report=xml --junitxml=test-results.xml

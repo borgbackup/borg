@@ -1567,6 +1567,7 @@ class Archiver:
                 Time (end): {end}
                 Duration: {duration}
                 Number of files: {stats[nfiles]}
+                Working Directory: {cwd}
                 Command line: {command_line}
                 Utilization of maximum supported archive size: {limits[max_archive_size]:.0%}
                 ------------------------------------------------------------------------------

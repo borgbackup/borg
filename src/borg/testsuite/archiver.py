@@ -1710,6 +1710,16 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         info_repo = json.loads(self.cmd('info', '--json', '--last=1', self.repository_location))
         assert info_repo["archives"] == []
 
+    def test_info_working_directory(self):
+        # create a file in input and create the archive from inside the input directory
+        self.create_regular_file('file1', size=1)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        expected_cwd = os.path.abspath('input')
+        with changedir('input'):
+            self.cmd('create', self.repository_location + '::test', '.')
+        info_archive = self.cmd('info', self.repository_location + '::test')
+        assert f'Working Directory: {expected_cwd}' in info_archive
+
     def test_comment(self):
         self.create_regular_file('file1', size=1024 * 80)
         self.cmd('init', '--encryption=repokey', self.repository_location)

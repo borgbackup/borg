@@ -31,7 +31,7 @@ from ..helpers import dash_open
 from ..helpers import iter_separated
 from ..helpers import eval_escapes
 from ..helpers import classify_ec, max_ec
-from ..platform import is_win32, swidth
+from ..platform import is_win32, swidth, is_cygwin
 
 from . import BaseTestCase, FakeInputs
 
@@ -582,8 +582,9 @@ def test_get_base_dir(monkeypatch):
     monkeypatch.delenv('HOME', raising=False)
     monkeypatch.delenv('USER', raising=False)
     assert get_base_dir() == os.path.expanduser('~')
-    monkeypatch.setenv('USER', 'root')
-    assert get_base_dir() == os.path.expanduser('~root')
+    if not is_cygwin:
+        monkeypatch.setenv('USER', 'root')
+        assert get_base_dir() == os.path.expanduser('~root')
     monkeypatch.setenv('HOME', '/var/tmp/home')
     assert get_base_dir() == '/var/tmp/home'
     monkeypatch.setenv('BORG_BASE_DIR', '/var/tmp/base')

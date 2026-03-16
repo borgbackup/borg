@@ -7,6 +7,8 @@ Use these flags instead of sys.platform.startswith('<OS>') or try/except.
 import sys
 
 is_win32 = sys.platform.startswith('win32')
+is_cygwin = sys.platform.startswith('cygwin')
+
 is_linux = sys.platform.startswith('linux')
 is_freebsd = sys.platform.startswith('freebsd')
 is_netbsd = sys.platform.startswith('netbsd')

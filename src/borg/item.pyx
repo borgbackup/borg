@@ -390,6 +390,7 @@ class ArchiveItem(PropDict):
     size_parts = PropDict._make_property('size_parts', int)
     csize_parts = PropDict._make_property('csize_parts', int)
     nfiles_parts = PropDict._make_property('nfiles_parts', int)
+    cwd = PropDict._make_property('cwd', str, 'surrogate-escaped str', encode=safe_encode, decode=safe_decode)
 
 
 class ManifestItem(PropDict):

@@ -555,6 +555,7 @@ class Archive:
             cp = normalize_chunker_params(cp) if cp is not None else ''
             info.update({
                 'command_line': self.metadata.cmdline,
+                'cwd': self.metadata.get('cwd', ''),
                 'hostname': self.metadata.hostname,
                 'username': self.metadata.username,
                 'comment': self.metadata.get('comment', ''),
@@ -635,6 +636,7 @@ Utilization of max. archive size: {csize_max:.0%}
             'username': getuser(),
             'time': start.strftime(ISO_FORMAT),
             'time_end': end.strftime(ISO_FORMAT),
+            'cwd': self.cwd,
             'chunker_params': self.chunker_params,
         }
         # we always want to create archives with the addtl. metadata (nfiles, etc.),

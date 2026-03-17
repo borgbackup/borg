@@ -423,25 +423,35 @@ above.
 New features:
 
 - prune: added -v / --info output, #9262
-- mount: warn about symlinks pointing outside of the mountpoint, #9254    
+- mount: warn about symlinks pointing outside of the mountpoint, #9254
+- create/info: remember/show cwd at the time of backup creation, #6191
 
 Fixes:
 
+- hashindex_size: return int64_t, #9423
 - compress: make Padme size obfuscation usable ("obfuscate,250,...")
 
 Other changes:
 
 - pyinstaller binary: do not exclude ssl, needed for pyfuse3/trio, #9196
 - mount: fuse fs performance improvement
+- hashindex: fixed iteritems segfaulting with non-existent marker, #9368.
+  Never happened in borg, because borg always gives existing markers to iteritems.
 - CI / tests:
 
   - build linux binaries with pyfuse3
   - use macos-15 to build the binaries
   - tox: use pytest -n auto by default to speed up tests
   - scripts/linux-run: run commands (e.g. tox) in a podman linux container
+  - fix race condition in test_with_lock, #8810
+  - fix spurious sparse test fail on win32, #7616
+  - cygwin: skip ~root base dir test
+  - fix coverage collection for daemonized borg mount, #9448
 - docs:
+  - consolidate key backup info in "borg key export" help, #6204
   - fix typos found by codespell
   - update binary readme
+  - github: enhance pull request template
 
 
 Version 1.4.3 (2025-12-02)

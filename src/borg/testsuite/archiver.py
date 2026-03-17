@@ -59,7 +59,7 @@ from ..repository import Repository
 from . import has_lchflags, has_mknod, llfuse
 from . import BaseTestCase, changedir, environment_variable, filter_xattrs, same_ts_ns, granularity_sleep
 from . import are_symlinks_supported, are_hardlinks_supported, are_fifos_supported, is_utime_fully_supported, is_birthtime_fully_supported
-from .platform import fakeroot_detected, is_darwin, is_freebsd, is_netbsd, is_win32
+from .platform import fakeroot_detected, is_darwin, is_freebsd, is_netbsd, is_win32, is_haiku
 from .upgrader import make_attic_repo
 from . import key
 
@@ -3454,11 +3454,32 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         info_after = self.cmd('info', self.repository_location + '::test')
         assert info_before == info_after  # includes archive ID
 
+    @pytest.mark.skipif(is_haiku or is_win32, reason="does not find borg python module on Haiku OS and Windows")
     def test_with_lock(self):
-        self.cmd('init', '--encryption=repokey', self.repository_location)
-        lock_path = os.path.join(self.repository_path, 'lock.exclusive')
-        cmd = 'python3', '-c', 'import os, sys; sys.exit(42 if os.path.exists("%s") else 23)' % lock_path
-        self.cmd('with-lock', self.repository_location, *cmd, fork=True, exit_code=42)
+        env = os.environ.copy()
+        env["BORG_EXIT_CODES"] = "modern"
+        self.cmd('init', '--encryption=none', self.repository_location)
+        # Timings must be adjusted so that command1 keeps running while command2 tries to get the lock,
+        # so that lock acquisition for command2 fails as the test expects it.
+        lock_wait = 2
+        command1 = "python3", "-c", 'import sys; print("first command - acquires the lock", flush=True); sys.stdin.read()'
+        command2 = "python3", "-c", 'print("second command - should never get executed")'
+        borgwl = "python3", "-m", "borg.archiver", "with-lock", f"--lock-wait={lock_wait}", self.repository_location
+        popen_options = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+        p1_options = popen_options.copy()
+        p1_options["stdin"] = subprocess.PIPE
+        with subprocess.Popen([*borgwl, *command1], **p1_options) as p1:
+            line = p1.stdout.readline()
+            assert "first command" in line  # Wait until p1 is running and has acquired the lock
+            # Now try to acquire another lock on the same repository:
+            with subprocess.Popen([*borgwl, *command2], **popen_options) as p2:
+                out, err_out = p2.communicate()
+                assert "second command" not in out  # command2 is "locked out"
+                assert "Failed to create/acquire the lock" in err_out
+                assert p2.returncode == 73  # locked
+            out, err_out = p1.communicate(input="")  # Unblock command1 and read output
+            assert not err_out
+            assert p1.returncode == 0
 
     def test_with_lock_non_existent_command(self):
         self.cmd('init', '--encryption=repokey', self.repository_location)

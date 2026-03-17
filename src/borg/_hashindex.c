@@ -107,11 +107,13 @@ hashindex_free_buckets(HashIndex *index)
 #ifndef BORG_NO_PYTHON
     if(index->buckets_buffer.buf) {
         PyBuffer_Release(&index->buckets_buffer);
+        index->buckets_buffer.buf = NULL;
     } else
 #endif
     {
         free(index->buckets);
     }
+    index->buckets = NULL;
 }
 
 static int

@@ -370,26 +370,14 @@ For automated backups the passphrase can be specified using the
 .. warning:: The repository data is totally inaccessible without the key
     and the key passphrase.
 
-    Make a backup copy of the key file (``keyfile`` mode) or repo config
-    file (``repokey`` mode) and keep it at a safe place, so you still have
-    the key in case it gets corrupted or lost. Also keep your passphrase
-    at a safe place. You can make backups using :ref:`borg_key_export`
-    subcommand.
-
-    If you want to print a backup of your key to paper use the ``--paper``
-    option of this command and print the result, or print this `template`_
-    if you need a version with QR-Code.
-
-    A backup inside of the backup that is encrypted with that key/passphrase
-    won't help you with that, of course.
+    In any case, make a backup of the borg key, see :ref:`borg_key_export` for
+    more details.
 
     In case you lose your repository and the security information, but have an
     older copy of it to restore from, don't use that later for creating new
     backups – you would run into security issues (reuse of nonce counter
     values). It is better to initialize a new Borg repository. See also:
     :ref:`faq_corrupt_repo`
-
-.. _template: paperkey.html
 
 .. _remote_repos:
 

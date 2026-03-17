@@ -36,6 +36,7 @@ class UpgraderNoOp:
             "comment",
             "chunker_params",
             "recreate_command_line",
+            "cwd",
         ):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
@@ -149,7 +150,7 @@ class UpgraderFrom12To20:
         new_metadata = {}
         # keep all metadata except archive version and stats. also do not keep
         # recreate_source_id, recreate_args, recreate_partial_chunks which were used only in 1.1.0b1 .. b2.
-        for attr in ("hostname", "username", "comment", "chunker_params"):
+        for attr in ("hostname", "username", "comment", "chunker_params", "cwd"):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
         rechunking = self.args.chunker_params is not None

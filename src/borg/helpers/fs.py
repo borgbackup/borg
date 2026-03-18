@@ -7,6 +7,11 @@ import subprocess
 import sys
 import textwrap
 
+try:
+    import pwd  # POSIX only
+except ImportError:
+    pwd = None  # win32?
+
 from .errors import Error
 
 from .process import prepare_subprocess_env
@@ -40,21 +45,58 @@ def ensure_dir(path, mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO, pretty_dea
 
 
 def get_base_dir():
-    """Get home directory / base directory for borg:
+    """Get home directory / base directory for borg.
 
-    - BORG_BASE_DIR, if set
-    - HOME, if set
-    - ~$USER, if USER is set
-    - ~
+    Preference order (while being robust against misleading environment when invoked via mount helpers):
+
+    - BORG_BASE_DIR, if set.
+    - HOME, if it refers to the current (effective) user's home.
+    - ~$USER, if USER is set.
+    - The home directory of the current (effective) user from the password database (POSIX).
+    - ~ (platform default expansion).
     """
-    base_dir = os.environ.get('BORG_BASE_DIR') or os.environ.get('HOME')
-    # os.path.expanduser() behaves differently for '~' and '~someuser' as
-    # parameters: when called with an explicit username, the possibly set
-    # environment variable HOME is no longer respected. So we have to check if
-    # it is set and only expand the user's home directory if HOME is unset.
-    if not base_dir:
-        base_dir = os.path.expanduser('~%s' % os.environ.get('USER', ''))
-    return base_dir
+    # 1. Explicit override always wins.
+    base_dir = os.environ.get('BORG_BASE_DIR')
+    if base_dir:
+        return base_dir
+
+    # 2. Prefer HOME, but be robust against mount helpers that set HOME to root's home for non-root users.
+    home_env = os.environ.get('HOME')
+    if home_env and pwd is not None:  # POSIX only
+        try:
+            # If HOME points to root's home but we are not root, prefer the invoking user's home.
+            root_home = pwd.getpwuid(0).pw_dir
+            uid = getattr(os, 'geteuid', os.getuid)()
+            if uid != 0 and os.path.abspath(home_env) == os.path.abspath(root_home):
+                try:
+                    user_home = pwd.getpwuid(uid).pw_dir
+                except Exception:
+                    user_home = None
+                if user_home:
+                    return user_home
+                # if we couldn't figure out the user's home, ignore HOME and continue with fallbacks
+                home_env = None
+        except Exception:
+            # If anything goes wrong determining root's home, keep HOME as-is.
+            pass
+
+    if home_env:
+        return home_env
+
+    # 3. Fall back to ~$USER if set (keeps previous behaviour and existing tests).
+    user = os.environ.get('USER')
+    if user:
+        return os.path.expanduser('~%s' % user)
+
+    # 4. POSIX: use pw_home for current uid; otherwise final fallback to ~.
+    if pwd is not None:
+        try:
+            uid = getattr(os, 'geteuid', os.getuid)()
+            return pwd.getpwuid(uid).pw_dir
+        except Exception:
+            pass
+
+    return os.path.expanduser('~')
 
 
 def get_keys_dir():

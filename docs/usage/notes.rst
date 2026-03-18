@@ -208,6 +208,10 @@ A repository can be made "append-only", which means that Borg will never
 overwrite or delete committed data (append-only refers to the segment files,
 but borg will also reject to delete the repository completely).
 
+Please note that this only affects the low level structure of the repository,
+and running ``borg delete`` or `borg prune` or reading from the repository will
+still be allowed.
+
 If ``borg compact`` command is used on a repo in append-only mode, there
 will be no warning or error, but no compaction will happen.
 

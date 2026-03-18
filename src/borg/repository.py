@@ -925,6 +925,7 @@ class Repository:
         remember_exclusive = self.exclusive
         self.exclusive = None
         self.prepare_txn(index_transaction_id, do_cleanup=False)
+        logger.warning('Replaying segments. Please wait, this can take a while...')
         try:
             segment_count = sum(1 for _ in self.io.segment_iterator())
             pi = ProgressIndicatorPercent(total=segment_count, msg='Replaying segments %3.0f%%',

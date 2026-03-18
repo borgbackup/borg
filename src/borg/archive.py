@@ -712,7 +712,7 @@ Duration: {0.duration}
         metadata |= {"size": stats.osize, "nfiles": stats.nfiles}
         metadata |= additional_metadata or {}
         if metadata.get("cwd") is None:
-            del metadata["cwd"] 
+            del metadata["cwd"]
         metadata = ArchiveItem(metadata)
         data = self.key.pack_metadata(metadata.as_dict())
         self.id = self.repo_objs.id_hash(data)

@@ -5251,8 +5251,8 @@ class Archiver:
         subparser.add_argument('--append-only', dest='append_only', action='store_true',
                                help='only allow appending to repository segment files. Note that this only '
                                     'affects the low level structure of the repository, and running `delete` '
-                                    'or `prune` will still be allowed. See :ref:`append_only_mode` in Additional '
-                                    'Notes for more details.')
+                                    'or `prune` or reading from the repository will still be allowed. '
+                                    'See :ref:`append_only_mode` in Additional Notes for more details.')
         subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota',
                                type=parse_storage_quota, default=None,
                                help='Override storage quota of the repository (e.g. 5G, 1.5T). '

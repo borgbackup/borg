@@ -32,3 +32,4 @@ borg.exe
 .coverage.*
 .vagrant
 .eggs
+.DS_Store

@@ -1,5 +1,6 @@
 import functools
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -40,6 +41,7 @@ def bash_version():
 needs_bash4 = pytest.mark.skipif(bash_version() < 4, reason="Bash >= 4 not available")
 needs_zsh = pytest.mark.skipif(not cmd_available("zsh --version"), reason="Zsh not available")
 needs_fish = pytest.mark.skipif(not cmd_available("fish --version"), reason="Fish not available")
+needs_tcsh = pytest.mark.skipif(not cmd_available("tcsh --version"), reason="Tcsh not available")
 
 
 def _run_bash_completion_fn(completion_script, setup_code):
@@ -119,6 +121,42 @@ def test_fish_completion_nontrivial(archivers, request):
     assert output.count("\n") > 100, f"Fish completion suspiciously few lines: {output.count(chr(10))}"
 
 
+def test_tcsh_completion_nontrivial(archivers, request):
+    """Verify the generated Tcsh completion is non-trivially sized."""
+    archiver = request.getfixturevalue(archivers)
+    output = cmd(archiver, "completion", "tcsh")
+    assert len(output) > 1000, f"Tcsh completion suspiciously small: {len(output)} chars"
+    assert output.count("\n") > 20, f"Tcsh completion suspiciously few lines: {output.count(chr(10))}"
+
+
+def test_tcsh_completion_dynamic_helpers(archivers, request):
+    """Verify the tcsh script has the dynamic archive/tag helpers and uses them."""
+    archiver = request.getfixturevalue(archivers)
+    output = cmd(archiver, "completion", "tcsh")
+    assert "alias _borg_complete_archive " in output, "no archive completion helper"
+    assert "alias _borg_complete_tags " in output, "no tag completion helper"
+    # the helper scripts are single-quoted csh strings run by sh, see the tcsh preamble
+    helper = output.split("set _borg_sh_complete = '", 1)[1].split("'", 1)[0]
+    assert "aid:{id}{NL}" in helper and "{archive}{NL}" in helper and "{tags}{NL}" in helper
+    assert "`" not in helper, "backquotes in the helper would nest inside the completion rules"
+    assert "eval _borg_complete_archive" in output, "archive completion not used for ARCHIVE"
+    assert "'n/--tags/`_borg_complete_tags`/'" in output, "tag completion not used for --tags"
+
+
+def test_tcsh_completion_positional_patterns(archivers, request):
+    """Verify positionals of a subcommand get a rule tcsh can apply, e.g. the umount mountpoint."""
+    archiver = request.getfixturevalue(archivers)
+    output = cmd(archiver, "completion", "tcsh")
+    assert "'n/umount/d/'" in output, "no directory completion for the umount mountpoint"
+    assert "'n/export/f/'" in output, "no file completion for the key export path"
+    # such a pattern is useless inside a `p@N@` rule, tcsh runs those clauses as commands
+    for rule in re.findall(r"'p@\d+@`(.*?)`@'", output):
+        _setup, _, clauses = rule.partition("; ")  # drop the `set cmd=(...)` part
+        for clause in clauses.split("; "):
+            action = clause.rpartition(") ")[2]
+            assert action.startswith(("echo ", "eval ")), f"bare completion pattern in rule: {rule}"
+
+
 # -- syntax validation --------------------------------------------------------
 
 
@@ -159,6 +197,24 @@ def test_fish_completion_syntax(archivers, request):
     output = cmd(archiver, "completion", "fish")
     result = _check_shell_syntax(output, "fish", ".fish")
     assert result.returncode == 0, f"Generated Fish completion has syntax errors: {result.stderr.decode()}"
+
+
+@needs_tcsh
+def test_tcsh_completion_syntax(archivers, request):
+    """Verify the generated Tcsh completion script has valid syntax."""
+    archiver = request.getfixturevalue(archivers)
+    output = cmd(archiver, "completion", "tcsh")
+    # tcsh doesn't have -n for syntax check like bash/zsh, but we can try to source it
+    # and see if it fails. 'tcsh -f -c "source path"'
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".tcsh", delete=False) as f:
+        f.write(output)
+        script_path = f.name
+    try:
+        # -f: fast start (don't resource .tcshrc)
+        result = subprocess.run(["tcsh", "-f", "-c", f"source {script_path}"], capture_output=True)
+    finally:
+        os.unlink(script_path)
+    assert result.returncode == 0, f"Generated Tcsh completion has errors: {result.stderr.decode()}"
 
 
 # -- borg-specific preamble function behavior (bash) --------------------------

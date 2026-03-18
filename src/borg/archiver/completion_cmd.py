@@ -16,6 +16,7 @@ The following argument types have intelligent, context-aware completion:
    - Completes archive names by default (e.g., "my-backup-2024")
    - Completes archive IDs when prefixed with "aid:" (e.g., "aid:12345678")
    - In zsh and fish, shows archive metadata (name, timestamp, user@host) as descriptions
+     (tcsh has no completion descriptions)
    - Respects --repo/-r flags to query the correct repository
 
 2. Sort keys (SortBySpec):
@@ -53,6 +54,8 @@ The following argument types have intelligent, context-aware completion:
 11. File sizes (parse_file_size):
    - Suggests common file size values (500M, 1G, 10G, 100G, 1T, etc.)
 """
+
+import re
 
 import shtab
 
@@ -790,6 +793,103 @@ end
 """
 
 
+TCSH_PREAMBLE_TMPL = r"""
+# Dynamic completion helpers for tcsh
+
+alias _borg_complete_timestamp 'date +"%Y-%m-%dT%H:%M:%S"'
+
+
+alias _borg_complete_sortby "echo {SORT_KEYS}"
+alias _borg_complete_filescachemode "echo {FCM_KEYS}"
+alias _borg_help_topics "echo {HELP_CHOICES}"
+alias _borg_complete_compression_spec "echo {COMP_SPEC_CHOICES}"
+alias _borg_complete_chunker_params "echo {CHUNKER_PARAMS_CHOICES}"
+alias _borg_complete_relative_time "echo {RELATIVE_TIME_CHOICES}"
+alias _borg_complete_file_size "echo {FILE_SIZE_CHOICES}"
+
+# Complete archive names (archive IDs when the current token starts with "aid:") and tags.
+# These need the command line (for --repo/-r) and some logic, which tcsh cannot do itself:
+# it has no functions, and an alias cannot use backquotes here because the completion rule
+# calling the alias is backquoted already. So the work is done by a POSIX sh script, kept in
+# a variable (a single-quoted csh string, hence no single quotes in it) and run via "sh -c".
+set _borg_sh_complete = '{SH_COMPLETE}'
+
+alias _borg_complete_archive 'sh -c "$_borg_sh_complete" borg-completion archive "$COMMAND_LINE"'
+alias _borg_complete_tags 'sh -c "$_borg_sh_complete" borg-completion tags "$COMMAND_LINE"'
+"""
+
+# the sh script the tcsh preamble runs, as one line (`sh -c <script> borg-completion <mode> <line>`).
+# It must not contain single quotes (it goes into a single-quoted csh string) nor backquotes (the
+# completion rule invoking it is backquoted already).
+TCSH_SH_COMPLETE = (
+    "mode=$1; line=$2; "
+    # derive repo context from the command line: --repo=V, --repo V, -r=V, -rV, or -r V
+    "repo=; prev=; "
+    "for w in $line; do "
+    "case $w in --repo=*) repo=${w#--repo=};; -r=*) repo=${w#-r=};; -r?*) repo=${w#-r};; esac; "
+    "case $prev in --repo|-r) repo=$w;; esac; "
+    "prev=$w; "
+    "done; "
+    'set --; if [ -n "$repo" ]; then set -- --repo "$repo"; fi; '
+    # the token being completed: the last one, empty if the line ends with a space
+    "cur=${line##* }; "
+    # avoid prompts and suppress errors, the output is used as completion candidates
+    "if [ $mode = tags ]; then "
+    'borg repo-list "$@" --format "{tags}{NL}" 2>/dev/null </dev/null'
+    ' | tr , "\\n" | sed "s/^ *//;s/ *$//" | grep . | sort -u; '
+    'elif [ "${cur#aid:}" != "$cur" ]; then '
+    # print only the first 8 hex digits of the ID, like the other shells do
+    'borg repo-list "$@" --format "aid:{id}{NL}" 2>/dev/null </dev/null | cut -c1-12; '
+    "else "
+    'borg repo-list "$@" --format "{archive}{NL}" 2>/dev/null </dev/null; '
+    "fi"
+)
+
+
+# in a `p@N@`...`@` rule, one `if (...) <action>` clause, e.g.
+# `if ( $#cmd >= 3 && ("$cmd[2]" == "key") && ("$cmd[3]" == "export") ) f`
+TCSH_CLAUSE_RE = re.compile(r"if \( \$#cmd >= \d+ && (?P<checks>.*?) \) (?P<action>.*)")
+TCSH_CHECK_RE = re.compile(r'\("\$cmd\[\d+\]" == "(?P<word>[^"]+)"\)')
+# a `p@N@` rule as a whole
+TCSH_RULE_RE = re.compile(r"^(?P<indent>\s*)'p@(?P<idx>\d+)@`(?P<setup>set cmd=[^;]+; )(?P<clauses>.*)`@' \\$")
+
+
+def _tcsh_anchor_positional_patterns(script):
+    """
+    Complete files/dirs for positionals of a subcommand, e.g. `borg umount <MOUNTPOINT>`.
+
+    shtab puts such completions into the `p@N@` rule of that positional, as a bare completion
+    pattern (`f`, `d`, ...) in an `if (...) <action>` clause. But tcsh runs these clauses as
+    commands and only uses their *output*, so a pattern there does nothing. tcsh can only apply
+    a pattern via a rule of its own, keyed off the preceding word - which works whenever the
+    positional directly follows its (sub)command.
+
+    TODO: remove this once we require a shtab release that includes tqdm/shtab#241 - with such
+    a shtab, no clause has a bare pattern as its action and this is a no-op.
+    """
+    lines = []
+    for line in script.splitlines():
+        rule = TCSH_RULE_RE.match(line)
+        if not rule:
+            lines.append(line)
+            continue
+        keep = []
+        for clause in rule["clauses"].split("; "):
+            match = TCSH_CLAUSE_RE.fullmatch(clause)
+            action = match["action"] if match else None
+            if action is None or action.startswith(("echo ", "eval ")):
+                keep.append(clause)  # not a pattern, tcsh can run this
+                continue
+            words = TCSH_CHECK_RE.findall(match["checks"])
+            # the positional is at index `idx`, the (sub)command words are at 2..len(words) + 1
+            if words and int(rule["idx"]) == len(words) + 1:
+                lines.append(f"{rule['indent']}'n/{words[-1]}/{action}/' \\")
+            # else: the pattern is for a later positional, tcsh cannot express that - drop it
+        if keep:
+            lines.append(f"{rule['indent']}'p@{rule['idx']}@`{rule['setup']}{'; '.join(keep)}`@' \\")
+    return "\n".join(lines)
+
+
 def _attach_completion(parser: ArgumentParser, type_class, completion_dict: dict):
     """Tag all arguments with type `type_class` with completion choices from `completion_dict`."""
 
@@ -839,9 +939,9 @@ class CompletionMixIn:
             self.prog = prog
 
         def for_all_shells(fn_name):
-            # same-named completion function in the bash, zsh and fish preambles;
-            # fish needs a command substitution to call it
-            return {"bash": fn_name, "zsh": fn_name, "fish": f"({fn_name})"}
+            # same-named completion helper in the bash, zsh, tcsh and fish preambles;
+            # fish needs a command substitution to call it, tcsh backquotes
+            return {"bash": fn_name, "zsh": fn_name, "tcsh": f"`{fn_name}`", "fish": f"({fn_name})"}
 
         _attach_completion(parser, archivename_validator, for_all_shells("_borg_complete_archive"))
         _attach_completion(parser, SortBySpec, for_all_shells("_borg_complete_sortby"))
@@ -904,12 +1004,20 @@ class CompletionMixIn:
             "RELATIVE_TIME_CHOICES": relative_time_choices_str,
             "FILE_SIZE_CHOICES": file_size_choices_str,
             "HELP_CHOICES": help_choices,
+            "SH_COMPLETE": TCSH_SH_COMPLETE,
         }
-        preamble_templates = {"bash": BASH_PREAMBLE_TMPL, "zsh": ZSH_PREAMBLE_TMPL, "fish": FISH_PREAMBLE_TMPL}
+        preamble_templates = {
+            "bash": BASH_PREAMBLE_TMPL,
+            "zsh": ZSH_PREAMBLE_TMPL,
+            "tcsh": TCSH_PREAMBLE_TMPL,
+            "fish": FISH_PREAMBLE_TMPL,
+        }
         template = preamble_templates.get(args.shell)
         # Build the preamble using partial_format to avoid escaping braces etc.
         preambles = [partial_format(template, mapping)] if template else []
         script = parser.get_completion_script(f"shtab-{args.shell}", preambles=preambles)
+        if args.shell == "tcsh":
+            script = _tcsh_anchor_positional_patterns(script)
         print(script)
 
     def build_parser_completion(self, subparsers, common_parser, mid_common_parser):
@@ -923,6 +1031,10 @@ class CompletionMixIn:
         completion script will call borg to query the repository. This will work best
         if that call can be made without prompting for user input, so you may want to
         set BORG_REPO and BORG_PASSPHRASE environment variables.
+
+        In tcsh, completions for positional arguments are matched by word position, so
+        e.g. an archive name is only completed if no options precede it - one more
+        reason to use BORG_REPO there rather than --repo.
         """
         )
 

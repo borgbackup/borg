@@ -36,10 +36,10 @@ class UpgraderNoOp:
             "comment",
             "chunker_params",
             "recreate_command_line",
-            "cwd",
         ):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
+        new_metadata["cwd"] = getattr(metadata, "cwd", None)  # None signals save() to leave cwd unset
         rechunking = self.args.chunker_params is not None
         if rechunking:
             # if we are rechunking while transferring, we take the new chunker_params.
@@ -150,9 +150,11 @@ class UpgraderFrom12To20:
         new_metadata = {}
         # keep all metadata except archive version and stats. also do not keep
         # recreate_source_id, recreate_args, recreate_partial_chunks which were used only in 1.1.0b1 .. b2.
-        for attr in ("hostname", "username", "comment", "chunker_params", "cwd"):
+        for attr in ("hostname", "username", "comment", "chunker_params"):
             if hasattr(metadata, attr):
                 new_metadata[attr] = getattr(metadata, attr)
+        # if cwd is None, we want to drop it from metadata, so we set it to None here, and save() will drop it.
+        new_metadata["cwd"] = getattr(metadata, "cwd", None)
         rechunking = self.args.chunker_params is not None
         if rechunking:
             # if we are rechunking while transferring, we take the new chunker_params.

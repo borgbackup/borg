@@ -17,6 +17,7 @@
   {% if theme_touch_icon %}
   <link rel="apple-touch-icon" href="{{ pathto('_static/' ~ theme_touch_icon, 1) }}" />
   {% endif %}
+  <meta name="readthedocs-addons-api-version" content="1" />
   {{ super() }}
 {% endblock %}
 

@@ -178,6 +178,7 @@ class PruneMixIn:
         # set up counters for the progress display
         to_delete_len = len(to_delete)
         archives_deleted = 0
+        deleted_archive_counter = 0
         pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
         for archive_info in archives:
             if sig_int and sig_int.action_done():
@@ -199,13 +200,15 @@ class PruneMixIn:
                     archives_deleted += 1
                 if args.json:
                     archive_data["kept"] = False
+                    deleted_archive_counter += 1
+                    archive_data["deleted_archive_number"] = deleted_archive_counter
             else:
                 rule, num = kept_because[archive_info.id]
                 log_message = "Keeping archive (rule: {rule} #{num}):".format(rule=rule, num=num)
                 if args.json:
                     archive_data["kept"] = True
                     archive_data["keep_rule"] = rule
-                    archive_data["keep_rule_number"] = num
+                    archive_data["kept_archive_number"] = num
             if args.json:
                 if (
                     args.output_list

@@ -436,8 +436,12 @@ def test_prune_json(archivers, request, backup_files):
     assert len(pruned) == 1
     assert kept[0]["name"] == "test2"
     assert kept[0]["keep_rule"] == "daily"
-    assert kept[0]["keep_rule_number"] == 1
+    assert kept[0]["kept_archive_number"] == 1
+    assert "deleted_archive_number" not in kept[0]
     assert pruned[0]["name"] == "test1"
+    assert pruned[0]["deleted_archive_number"] == 1
+    assert "keep_rule" not in pruned[0]
+    assert "kept_archive_number" not in pruned[0]
     for archive in archives:
         assert "name" in archive
         assert "id" in archive
@@ -455,3 +459,4 @@ def test_prune_json_list_pruned(archivers, request, backup_files):
     assert len(archives) == 1
     assert archives[0]["name"] == "test1"
     assert archives[0]["kept"] is False
+    assert archives[0]["deleted_archive_number"] == 1

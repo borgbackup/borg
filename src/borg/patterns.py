@@ -295,7 +295,6 @@ class RegexPattern(PatternBase):
         self.regex = re.compile(pattern)
 
     def _match(self, path):
-        assert "\\" not in path
         return self.regex.search(path) is not None
 
 

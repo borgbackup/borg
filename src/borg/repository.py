@@ -317,7 +317,15 @@ class Repository:
             else:
                 log_error("too small.")
 
-        pi = ProgressIndicatorCounter(step=1000, msg="Checked objects: %d", msgid="repository.check") if progress else None
+        pi = (
+            ProgressIndicatorCounter(
+                step=1000,
+                msg="Checked objects: %d",
+                msgid="repository.check",
+            )
+            if progress
+            else None
+        )
         partial = bool(max_duration)
         assert not (repair and partial)
         mode = "partial" if partial else "full"

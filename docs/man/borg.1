@@ -1,5 +1,6 @@
 '\" t
-.\" Man page generated from reStructuredText.
+.\" Man page generated from reStructuredText
+.\" by the Docutils 0.22.4 manpage writer.
 .
 .
 .nr rst2man-indent-level 0
@@ -28,8 +29,8 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "BORG" "1" "2025-12-01" "" "borg backup tool"
-.SH NAME
+.TH "borg" "1" "2026-03-18" "" "borg backup tool"
+.SH Name
 borg \- deduplicating and encrypting backup tool
 .SH SYNOPSIS
 .sp
@@ -170,7 +171,7 @@ $ borg compact /path/to/repo
 .UNINDENT
 .UNINDENT
 .sp
-\fBNOTE:\fP
+\fBNote:\fP
 .INDENT 0.0
 .INDENT 3.5
 Borg is quiet by default (it works on WARNING log level).
@@ -198,7 +199,7 @@ borg create repo::archive \-s \-\-progress path  # BAD
 .UNINDENT
 .UNINDENT
 .sp
-This is due to a problem in the argparse module:  <https://bugs.python.org/issue15112> 
+This is due to a problem in the argparse module: \%<https://\:bugs\:.python\:.org/\:issue15112>
 .SS Repository URLs
 .sp
 \fBLocal filesystem\fP (or locally mounted network filesystem):
@@ -212,7 +213,7 @@ expanded by your shell).
 .sp
 Note: you may also prepend a \fBfile://\fP to a filesystem path to get URL style.
 .sp
-\fBRemote repositories\fP accessed via ssh  <user@host> :
+\fBRemote repositories\fP accessed via ssh \%<user@\:host>:
 .sp
 \fBssh://user@host:port/path/to/repo\fP \- remote repo, absolute path, port can be given
 .sp
@@ -309,7 +310,7 @@ to get critical level output.
 While you can set misc. log levels, do not expect that every command will
 give different output on different log levels \- it\(aqs just a possibility.
 .sp
-\fBWARNING:\fP
+\fBWarning:\fP
 .INDENT 0.0
 .INDENT 3.5
 Options \fB\-\-critical\fP and \fB\-\-error\fP are provided for completeness,
@@ -426,11 +427,10 @@ a unique id based on the MAC address of the network interface. Except if that MA
 that case it returns a random value, which is not what we want (because it kills automatic stale lock removal).
 So, if you have a all\-zero MAC address or other reasons to better externally control the host id, just set this
 environment variable to a unique value. If all your FQDNs are unique, you can just use the FQDN. If not,
-use  <fqdn@uniqueid> \&.
+use \%<fqdn@\:uniqueid>\&.
 .TP
 .B BORG_LOGGING_CONF
-When set, use the given filename as INI <https://docs.python.org/3/library/logging.config.html#configuration-file-format>
-\-style logging configuration.
+When set, use the given filename as INI \%<https://\:docs\:.python\:.org/\:3/\:library/\:logging\:.config\:.html#\:configuration-file-format>\-style logging configuration.
 A basic example conf can be found at \fBdocs/misc/logging.conf\fP\&.
 .TP
 .B BORG_RSH
@@ -583,16 +583,14 @@ to modify \fBBORG_BASE_DIR\fP: the other paths for cache, config etc. will adapt
 .TP
 .B BORG_CACHE_DIR
 Defaults to \fB$BORG_BASE_DIR/.cache/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
-XDG env var <https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html>
- \fBXDG_CACHE_HOME\fP is set, then \fB$XDG_CACHE_HOME/borg\fP is being used instead.
+XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_CACHE_HOME\fP is set, then \fB$XDG_CACHE_HOME/borg\fP is being used instead.
 This directory contains the local cache and might need a lot
 of space for dealing with big repositories. Make sure you\(aqre aware of the associated
 security aspects of the cache location: \fIcache_security\fP
 .TP
 .B BORG_CONFIG_DIR
 Defaults to \fB$BORG_BASE_DIR/.config/borg\fP\&. If \fBBORG_BASE_DIR\fP is not explicitly set while
-XDG env var <https://specifications.freedesktop.org/basedir-spec/0.6/ar01s03.html>
- \fBXDG_CONFIG_HOME\fP is set, then \fB$XDG_CONFIG_HOME/borg\fP is being used instead.
+XDG env var \%<https://\:specifications\:.freedesktop\:.org/\:basedir-spec/\:0\:.6/\:ar01s03\:.html> \fBXDG_CONFIG_HOME\fP is set, then \fB$XDG_CONFIG_HOME/borg\fP is being used instead.
 This directory contains all borg configuration directories, see the FAQ
 for a security advisory about the data in this directory: \fIhome_config_borg\fP
 .TP
@@ -627,8 +625,7 @@ you need to point to the correct key file matching the repository the command wi
 .TP
 .B TMPDIR
 This is where temporary files are stored (might need a lot of temporary space for some
-operations), see tempfile <https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir>
- for details.
+operations), see tempfile \%<https://\:docs\:.python\:.org/\:3/\:library/\:tempfile\:.html#\:tempfile\:.gettempdir> for details.
 .UNINDENT
 .TP
 .B Building:
@@ -694,19 +691,16 @@ config file), but the code tries to work also if hardlinks are not supported.
 .SS Units
 .sp
 To display quantities, Borg takes care of respecting the
-usual conventions of scale. Disk sizes are displayed in decimal <https://en.wikipedia.org/wiki/Decimal>
-, using powers of ten (so
-\fBkB\fP means 1000 bytes). For memory usage, binary prefixes <https://en.wikipedia.org/wiki/Binary_prefix>
- are used, and are
-indicated using the IEC binary prefixes <https://en.wikipedia.org/wiki/IEC_80000-13#Prefixes_for_binary_multiples>
-,
+usual conventions of scale. Disk sizes are displayed in decimal \%<https://\:en\:.wikipedia\:.org/\:wiki/\:Decimal>, using powers of ten (so
+\fBkB\fP means 1000 bytes). For memory usage, binary prefixes \%<https://\:en\:.wikipedia\:.org/\:wiki/\:Binary_prefix> are used, and are
+indicated using the IEC binary prefixes \%<https://\:en\:.wikipedia\:.org/\:wiki/\:IEC_80000-13#\:Prefixes_for_binary_multiples>,
 using powers of two (so \fBKiB\fP means 1024 bytes).
 .SS Date and Time
 .sp
 We format date and time conforming to ISO\-8601, that is: YYYY\-MM\-DD and
 HH:MM:SS (24h clock).
 .sp
-For more information about that, see:  <https://xkcd.com/1179/> 
+For more information about that, see: \%<https://\:xkcd\:.com/\:1179/>
 .sp
 Unless otherwise noted, we display local date and time.
 Internally, we store and process date and time as UTC.
@@ -753,7 +747,7 @@ borg check: the repository check computes the checksums of all chunks
 borg delete repo: low CPU usage
 .TP
 .B CPU (only for client/server operation):
-When using borg in a client/server way with a  <ssh:\-type>  repo, the ssh
+When using borg in a client/server way with a \%<ssh:-type> repo, the ssh
 processes used for the transport layer will need some CPU on the client and
 on the server due to the crypto they are doing \- esp. if you are pumping
 big amounts of data.
@@ -974,19 +968,18 @@ The BSDs define additional flags.
 \fIborg\-compression(1)\fP, \fIborg\-patterns(1)\fP, \fIborg\-placeholders(1)\fP
 .INDENT 0.0
 .IP \(bu 2
-Main web site  <https://www.borgbackup.org/> 
+Main web site \%<https://\:www\:.borgbackup\:.org/>
 .IP \(bu 2
-Releases  <https://github.com/borgbackup/borg/releases> 
+Releases \%<https://\:github\:.com/\:borgbackup/\:borg/\:releases>
 .IP \(bu 2
-Changelog  <https://github.com/borgbackup/borg/blob/master/docs/changes.rst> 
+Changelog \%<https://\:github\:.com/\:borgbackup/\:borg/\:blob/\:master/\:docs/\:changes\:.rst>
 .IP \(bu 2
-GitHub  <https://github.com/borgbackup/borg> 
+GitHub \%<https://\:github\:.com/\:borgbackup/\:borg>
 .IP \(bu 2
-Security contact  <https://borgbackup.readthedocs.io/en/latest/support.html#security\-contact> 
+Security contact \%<https://\:borgbackup\:.readthedocs\:.io/\:en/\:latest/\:support\:.html#\:security-contact>
 .UNINDENT
-.SH AUTHOR
+.SH Author
 The Borg Collective
 
 orphan: 
-.\" Generated by docutils manpage writer.
-.
+.\" End of generated man page.

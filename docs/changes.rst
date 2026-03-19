@@ -414,44 +414,50 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.4 (not yet released)
---------------------------------
+Version 1.4.4 (2026-03-19)
+--------------------------
 
 For upgrade and compatibility hints, please also read the "Upgrade Notes" section
 above.
 
 New features:
 
-- prune: added -v / --info output, #9262
-- mount: warn about symlinks pointing outside of the mountpoint, #9254
-- create/info: remember/show cwd at the time of backup creation, #6191
+- prune: added -v / --info output, #9262.
+- mount: warn about symlinks pointing outside of the mount point, #9254.
+- create/info: remember/show cwd at the time of archive creation, #6191.
 
 Fixes:
 
-- hashindex_size: return int64_t, #9423
-- compress: make Padme size obfuscation usable ("obfuscate,250,...")
+- hashindex: fix memory leak, #9497.
+- hashindex: check values in read HashHeader, #9485.
+- hashindex_size: return int64_t, #9423.
+- hashindex: fix iteritems segfaulting with non-existent marker, #9368.
+  Never happened in borg, because borg always gives existing markers to iteritems.
+- compress: make Padme size obfuscation usable ("obfuscate,250,...").
+- borgfs/mount: get_base_dir: avoid using incorrect HOME, #3395.
 
 Other changes:
 
-- pyinstaller binary: do not exclude ssl, needed for pyfuse3/trio, #9196
-- mount: fuse fs performance improvement
-- hashindex: fixed iteritems segfaulting with non-existent marker, #9368.
-  Never happened in borg, because borg always gives existing markers to iteritems.
+- PyInstaller binary: do not exclude SSL, needed for pyfuse3/trio, #9196.
+- mount: FUSE FS performance improvement.
+- warn when replaying segments, #9233.
 - CI / tests:
 
-  - build linux binaries with pyfuse3
-  - use macos-15 to build the binaries
-  - tox: use pytest -n auto by default to speed up tests
-  - scripts/linux-run: run commands (e.g. tox) in a podman linux container
-  - fix race condition in test_with_lock, #8810
-  - fix spurious sparse test fail on win32, #7616
-  - cygwin: skip ~root base dir test
-  - fix coverage collection for daemonized borg mount, #9448
+  - build Linux binaries with pyfuse3.
+  - use macOS 15 to build the binaries.
+  - scripts/linux-run: run commands (e.g. tox) in a Podman Linux container.
+  - fix race condition in test_with_lock, #8810.
+  - fix spurious sparse test failure on Win32, #7616.
+  - Cygwin: skip ~root base dir test.
+  - fix coverage collection for daemonized `borg mount`, #9448.
 - docs:
-  - consolidate key backup info in "borg key export" help, #6204
-  - fix typos found by codespell
-  - update binary readme
-  - github: enhance pull request template
+
+  - move RTD version selector to sidebar top-left, #8204.
+  - consolidate key backup info in `borg key export` help, #6204.
+  - clarify append-only != write-only, #9304.
+  - fix typos found by codespell.
+  - update binary README.
+  - GitHub: enhance pull request template.
 
 
 Version 1.4.3 (2025-12-02)

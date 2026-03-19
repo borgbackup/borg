@@ -363,6 +363,7 @@ def test_transfer_archive_metadata(archivers, request, monkeypatch):
     assert dest_archive["hostname"] == source_archive["hostname"]
     assert dest_archive["username"] == source_archive["username"]
     assert dest_archive["command_line"] == source_archive["command_line"]
+    assert dest_archive["cwd"] == source_archive["cwd"]
     assert dest_archive["duration"] == source_archive["duration"]
     assert dest_archive["start"] == source_archive["start"]
     assert dest_archive["end"] == source_archive["end"]

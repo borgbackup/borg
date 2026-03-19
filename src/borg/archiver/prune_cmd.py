@@ -198,14 +198,14 @@ class PruneMixIn:
                     manifest.archives.delete_by_id(archive_info.id)
                     archives_deleted += 1
                 if args.json:
-                    archive_data["pruned"] = True
+                    archive_data["kept"] = False
             else:
                 rule, num = kept_because[archive_info.id]
                 log_message = "Keeping archive (rule: {rule} #{num}):".format(rule=rule, num=num)
                 if args.json:
-                    archive_data["pruned"] = False
-                    archive_data["rule"] = rule
-                    archive_data["rule_number"] = num
+                    archive_data["kept"] = True
+                    archive_data["keep_rule"] = rule
+                    archive_data["keep_rule_number"] = num
             if args.json:
                 if (
                     args.output_list

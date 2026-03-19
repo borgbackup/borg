@@ -337,6 +337,9 @@ hashindex_read(PyObject *file_py, int permit_compact, int expected_key_size, int
     }
 
     // check if key / value sizes match the expected sizes.
+    int header_num_buckets = _le32toh(header->num_buckets);
+    int header_num_entries = _le32toh(header->num_entries);
+
     if (expected_key_size != -1 && header->key_size != expected_key_size) {
         PyErr_Format(PyExc_ValueError, "Expected key size %d, got %d.",
                      expected_key_size, header->key_size);
@@ -357,24 +360,24 @@ hashindex_read(PyObject *file_py, int permit_compact, int expected_key_size, int
         goto fail_decref_header;
     }
     // sanity check for num_buckets and num_entries.
-    if (header->num_buckets < 1) {
-        PyErr_Format(PyExc_ValueError, "Expected num_buckets >= 1, got %d.", header->num_buckets);
+    if (header_num_buckets < 1) {
+        PyErr_Format(PyExc_ValueError, "Expected num_buckets >= 1, got %d.", header_num_buckets);
         goto fail_decref_header;
     }
-    if ((header->num_entries < 0) || (header->num_entries > header->num_buckets)) {
-        PyErr_Format(PyExc_ValueError, "Expected 0 <= num_entries <= num_buckets, got %d.", header->num_entries);
+    if ((header_num_entries < 0) || (header_num_entries > header_num_buckets)) {
+        PyErr_Format(PyExc_ValueError, "Expected 0 <= num_entries <= num_buckets, got %d.", header_num_entries);
         goto fail_decref_header;
     }
 
-    buckets_length = (Py_ssize_t)_le32toh(header->num_buckets) * (header->key_size + header->value_size);
+    buckets_length = (Py_ssize_t)header_num_buckets * (header->key_size + header->value_size);
     if((Py_ssize_t)length != (Py_ssize_t)sizeof(HashHeader) + buckets_length) {
         PyErr_Format(PyExc_ValueError, "Incorrect file length (expected %zd, got %zd)",
                      sizeof(HashHeader) + buckets_length, length);
         goto fail_release_header_buffer;
     }
 
-    index->num_entries = _le32toh(header->num_entries);
-    index->num_buckets = _le32toh(header->num_buckets);
+    index->num_entries = header_num_entries;
+    index->num_buckets = header_num_buckets;
     index->key_size = header->key_size;
     index->value_size = header->value_size;
     index->bucket_size = index->key_size + index->value_size;

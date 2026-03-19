@@ -51,27 +51,27 @@ jobs:
     strategy:
       matrix:
         include:
-            - os: ubuntu-20.04
+            - os: ubuntu-22.04
               python-version: '3.5'
               toxenv: py35
-            - os: ubuntu-20.04
+            - os: ubuntu-22.04
               python-version: '3.6'
               toxenv: py36
-            - os: ubuntu-20.04
+            - os: ubuntu-22.04
               python-version: '3.7'
               toxenv: py37
-            - os: ubuntu-20.04
+            - os: ubuntu-22.04
               python-version: '3.8'
               toxenv: py38
-            - os: ubuntu-20.04
+            - os: ubuntu-22.04
               python-version: '3.9'
               toxenv: py39
-            - os: ubuntu-20.04
+            - os: ubuntu-22.04
               python-version: '3.10'
               toxenv: py310
-            - os: macos-11
-              python-version: '3.7'
-              toxenv: py37
+            - os: macos-15
+              python-version: '3.10'
+              toxenv: py310
 
     env:
       # Configure pkg-config to use OpenSSL from Homebrew

@@ -178,7 +178,6 @@ class PruneMixIn:
         # set up counters for the progress display
         to_delete_len = len(to_delete)
         archives_deleted = 0
-        deleted_archive_counter = 0
         pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
         for archive_info in archives:
             if sig_int and sig_int.action_done():
@@ -192,16 +191,15 @@ class PruneMixIn:
             if archive_info in to_delete:
                 if not args.json:
                     pi.show()
+                archives_deleted += 1
                 if args.dry_run:
                     log_message = "Would prune:"
                 else:
                     log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
                     manifest.archives.delete_by_id(archive_info.id)
-                    archives_deleted += 1
                 if args.json:
                     archive_data["kept"] = False
-                    deleted_archive_counter += 1
-                    archive_data["deleted_archive_number"] = deleted_archive_counter
+                    archive_data["deleted_archive_number"] = archives_deleted
             else:
                 rule, num = kept_because[archive_info.id]
                 log_message = "Keeping archive (rule: {rule} #{num}):".format(rule=rule, num=num)
@@ -227,7 +225,7 @@ class PruneMixIn:
             pi.finish()
         if args.json:
             json_print(basic_json_data(manifest, extra={"archives": output_data}))
-        if archives_deleted > 0:
+        if archives_deleted > 0 and not args.dry_run:
             manifest.write()
             self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         if sig_int:

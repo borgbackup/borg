@@ -55,11 +55,8 @@ jobs:
       matrix:
         include:
             - os: ubuntu-22.04
-              python-version: '3.8'
-              toxenv: py38-fuse2
-            - os: ubuntu-22.04
               python-version: '3.9'
-              toxenv: py39-fuse3
+              toxenv: py39-fuse2
             - os: ubuntu-22.04
               python-version: '3.10'
               toxenv: py310-fuse3

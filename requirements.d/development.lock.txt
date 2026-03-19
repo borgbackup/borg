@@ -4,6 +4,7 @@ pip==20.3.4
 virtualenv==20.13.1
 tox==3.24.5
 pytest==6.1.2; python_version < '3.10'
+pytest==8.4.2; python_version >= '3.10'
 pytest-xdist==2.2.1
 pytest-cov==2.12.1
 pytest-benchmark==3.4.1

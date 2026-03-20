@@ -8,6 +8,7 @@ from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, interval, sig_int, ProgressIndicatorPercent, CommandError, Error
 from ..helpers import archivename_validator
+from ..helpers import json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
@@ -168,8 +169,11 @@ class PruneMixIn:
                 keep += prune_split(archives, rule, num, kept_because)
 
         to_delete = set(archives) - set(keep)
-        logger.info("Found %d archives.", len(archives))
-        logger.info("Keeping %d archives, pruning %d archives.", len(keep), len(to_delete))
+        if not args.json:
+            logger.info("Found %d archives.", len(archives))
+            logger.info("Keeping %d archives, pruning %d archives.", len(keep), len(to_delete))
+        if args.json:
+            output_data = []
         list_logger = logging.getLogger("borg.output.list")
         # set up counters for the progress display
         to_delete_len = len(to_delete)
@@ -178,29 +182,50 @@ class PruneMixIn:
         for archive_info in archives:
             if sig_int and sig_int.action_done():
                 break
-            # format_item may internally load the archive from the repository,
+            # get_item_data/format_item may internally load the archive from the repository,
             # so we must call it before deleting the archive.
-            archive_formatted = formatter.format_item(archive_info, jsonline=False)
+            if args.json:
+                archive_data = formatter.get_item_data(archive_info, jsonline=True)
+            else:
+                archive_formatted = formatter.format_item(archive_info, jsonline=False)
             if archive_info in to_delete:
-                pi.show()
+                if not args.json:
+                    pi.show()
+                archives_deleted += 1
                 if args.dry_run:
                     log_message = "Would prune:"
                 else:
                     log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
                     manifest.archives.delete_by_id(archive_info.id)
-                    archives_deleted += 1
+                if args.json:
+                    archive_data["kept"] = False
+                    archive_data["deleted_archive_number"] = archives_deleted
             else:
-                log_message = "Keeping archive (rule: {rule} #{num}):".format(
-                    rule=kept_because[archive_info.id][0], num=kept_because[archive_info.id][1]
-                )
-            if (
+                rule, num = kept_because[archive_info.id]
+                log_message = "Keeping archive (rule: {rule} #{num}):".format(rule=rule, num=num)
+                if args.json:
+                    archive_data["kept"] = True
+                    archive_data["keep_rule"] = rule
+                    archive_data["kept_archive_number"] = num
+            if args.json:
+                if (
+                    args.output_list
+                    or not (args.list_pruned or args.list_kept)
+                    or (args.list_pruned and archive_info in to_delete)
+                    or (args.list_kept and archive_info not in to_delete)
+                ):
+                    output_data.append(archive_data)
+            elif (
                 args.output_list
                 or (args.list_pruned and archive_info in to_delete)
                 or (args.list_kept and archive_info not in to_delete)
             ):
                 list_logger.info(f"{log_message:<44} {archive_formatted}")
-        pi.finish()
-        if archives_deleted > 0:
+        if not args.json:
+            pi.finish()
+        if args.json:
+            json_print(basic_json_data(manifest, extra={"archives": output_data}))
+        if archives_deleted > 0 and not args.dry_run:
             manifest.write()
             self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         if sig_int:
@@ -294,6 +319,14 @@ class PruneMixIn:
             dest="format",
             action=Highlander,
             help="specify format for the archive part " '(default: "{archive:<36} {time} [{id}]")',
+        )
+        subparser.add_argument(
+            "--json",
+            action="store_true",
+            help="Format output as JSON. "
+            "The form of ``--format`` is ignored, "
+            "but keys used in it are added to the JSON output. "
+            "Some keys are always present. Note: JSON can only represent text.",
         )
         subparser.add_argument(
             "--keep-within",

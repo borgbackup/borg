@@ -1,3 +1,4 @@
+import json
 import re
 from datetime import datetime, timezone, timedelta
 
@@ -416,3 +417,46 @@ def test_prune_list_with_metadata_format(archivers, request, backup_files):
     output = cmd(archiver, "prune", "--list", "--keep-daily=1", "--format={name} {hostname}{NL}")
     assert "test1" in output
     assert "test2" in output
+
+
+def test_prune_json(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", backup_files)
+    cmd(archiver, "create", "test2", backup_files)
+    prune_result = json.loads(cmd(archiver, "prune", "--json", "--dry-run", "--keep-daily=1"))
+    assert "repository" in prune_result
+    assert "encryption" in prune_result
+    assert len(prune_result["repository"]["id"]) == 64
+    archives = prune_result["archives"]
+    assert len(archives) == 2
+    kept = [a for a in archives if a["kept"]]
+    pruned = [a for a in archives if not a["kept"]]
+    assert len(kept) == 1
+    assert len(pruned) == 1
+    assert kept[0]["name"] == "test2"
+    assert kept[0]["keep_rule"] == "daily"
+    assert kept[0]["kept_archive_number"] == 1
+    assert "deleted_archive_number" not in kept[0]
+    assert pruned[0]["name"] == "test1"
+    assert pruned[0]["deleted_archive_number"] == 1
+    assert "keep_rule" not in pruned[0]
+    assert "kept_archive_number" not in pruned[0]
+    for archive in archives:
+        assert "name" in archive
+        assert "id" in archive
+        assert "time" in archive
+        assert "kept" in archive
+
+
+def test_prune_json_list_pruned(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "test1", backup_files)
+    cmd(archiver, "create", "test2", backup_files)
+    prune_result = json.loads(cmd(archiver, "prune", "--json", "--dry-run", "--list-pruned", "--keep-daily=1"))
+    archives = prune_result["archives"]
+    assert len(archives) == 1
+    assert archives[0]["name"] == "test1"
+    assert archives[0]["kept"] is False
+    assert archives[0]["deleted_archive_number"] == 1

@@ -14,7 +14,7 @@ from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Error, ErrorWithTraceback, IntegrityError
 from .helpers import Location
-from .helpers import bin_to_hex, hex_to_bin, ProgressIndicatorCounter
+from .helpers import bin_to_hex, hex_to_bin
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
@@ -317,15 +317,12 @@ class Repository:
             else:
                 log_error("too small.")
 
-        pi = (
-            ProgressIndicatorCounter(
-                step=1000,
-                msg="Checked objects: %d",
-                msgid="repository.check",
-            )
-            if progress
-            else None
-        )
+        if progress:
+            from .helpers.progress import ProgressIndicatorCounter
+
+            pi = ProgressIndicatorCounter(step=1000, msg="Checked objects: %d", msgid="repository.check")
+        else:
+            pi = None
         partial = bool(max_duration)
         assert not (repair and partial)
         mode = "partial" if partial else "full"

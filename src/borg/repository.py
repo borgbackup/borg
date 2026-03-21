@@ -12,7 +12,7 @@ from borgstore.backends.errors import BackendAlreadyExists as StoreBackendAlread
 
 from .constants import *  # NOQA
 from .hashindex import ChunkIndex, ChunkIndexEntry
-from .helpers import Error, ErrorWithTraceback, IntegrityError
+from .helpers import Error, ErrorWithTraceback, IntegrityError, ProgressIndicatorCounter
 from .helpers import Location
 from .helpers import bin_to_hex, hex_to_bin
 from .storelocking import Lock
@@ -290,7 +290,7 @@ class Repository:
         info = dict(id=self.id, version=self.version)
         return info
 
-    def check(self, repair=False, max_duration=0):
+    def check(self, repair=False, max_duration=0, progress=False):
         """Check repository consistency"""
 
         def log_error(msg):
@@ -317,7 +317,7 @@ class Repository:
             else:
                 log_error("too small.")
 
-        # TODO: progress indicator, ...
+        pi = ProgressIndicatorCounter(step=1000, msg="Checked objects: %d", msgid="repository.check")
         partial = bool(max_duration)
         assert not (repair and partial)
         mode = "partial" if partial else "full"
@@ -364,6 +364,8 @@ class Repository:
                 obj_corrupted = False
                 check_object(obj)
                 objs_checked += 1
+                if progress:
+                    pi.show(objs_checked)
                 if obj_corrupted:
                     objs_errors += 1
                     if repair:
@@ -393,10 +395,14 @@ class Repository:
                     logger.info(f"Checkpointing at key {key}.")
                     self.store.store(LAST_KEY_CHECKED, key.encode())
                 if partial and now > t_start + max_duration:
+                    if progress:
+                        pi.finish()
                     logger.info(f"Finished partial repository check, last key checked is {key}.")
                     self.store.store(LAST_KEY_CHECKED, key.encode())
                     break
             else:
+                if progress:
+                    pi.finish()
                 logger.info("Finished repository check.")
                 try:
                     self.store.delete(LAST_KEY_CHECKED)
@@ -411,6 +417,8 @@ class Repository:
                     )
         except StoreObjectNotFound:
             # it can be that there is no "data/" at all, then it crashes when iterating infos.
+            if progress:
+                pi.finish()
             pass
         logger.info(f"Checked {objs_checked} repository objects, {objs_errors} errors.")
         if objs_errors == 0:

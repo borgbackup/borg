@@ -919,8 +919,10 @@ class CreateMixIn:
             dest="files_cache_mode",
             action=Highlander,
             type=FilesCacheMode,
-            default=FILES_CACHE_MODE_UI_DEFAULT,
-            help="operate files cache in MODE. default: %s" % FILES_CACHE_MODE_UI_DEFAULT,
+            default=FILES_CACHE_MODE_UI_DEFAULT_WIN32 if is_win32 else FILES_CACHE_MODE_UI_DEFAULT,
+            help=("operate files cache in MODE. default: %s"
+             % (FILES_CACHE_MODE_UI_DEFAULT_WIN32 if is_win32 else FILES_CACHE_MODE_UI_DEFAULT)
+),
         )
         fs_group.add_argument(
             "--files-changed",

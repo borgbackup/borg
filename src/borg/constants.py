@@ -118,6 +118,7 @@ CH_DATA, CH_ALLOC, CH_HOLE = 0, 1, 2
 
 # operating mode of the files cache (for fast skipping of unchanged files)
 FILES_CACHE_MODE_UI_DEFAULT = "ctime,size,inode"  # default for "borg create" command (CLI UI)
+FILES_CACHE_MODE_UI_DEFAULT_WIN32 = "mtime,size,inode" # default for "borg create" on win32
 FILES_CACHE_MODE_DISABLED = "d"  # most borg commands do not use the files cache at all (disable)
 
 # account for clocks being slightly out-of-sync, timestamps granularity.

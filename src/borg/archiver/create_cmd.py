@@ -226,6 +226,11 @@ class CreateMixIn:
         self.noacls = args.noacls
         self.noxattrs = args.noxattrs
         dry_run = args.dry_run
+        if is_win32 and "ctime" in str(args.files_cache_mode):
+            logger.warning(
+        "Using ctime on Windows may not detect file changes correctly. "
+        "Consider using mtime-based cache mode."
+    )
         self.start_backup = time.time_ns()
         t0 = archive_ts_now()
         logger.info('Creating archive at "%s"' % args.location.processed)
@@ -919,7 +924,7 @@ class CreateMixIn:
             dest="files_cache_mode",
             action=Highlander,
             type=FilesCacheMode,
-            default=FILES_CACHE_MODE_UI_DEFAULT,
+            default=FilesCacheMode("mtime,size") if is_win32 else FILES_CACHE_MODE_UI_DEFAULT,
             help="operate files cache in MODE. default: %s" % FILES_CACHE_MODE_UI_DEFAULT,
         )
         fs_group.add_argument(

@@ -90,7 +90,7 @@ class CreateMixIn:
                         raise Error(f"{path!r}: {e}")
                 else:
                     status = "+"  # included
-                self.print_file_status(status, path)
+                self.print_file_status(status, path, phase="end")
             elif args.paths_from_command or args.paths_from_shell_command or args.paths_from_stdin:
                 paths_sep = eval_escapes(args.paths_delimiter) if args.paths_delimiter is not None else "\n"
                 if args.paths_from_command or args.paths_from_shell_command:
@@ -139,7 +139,7 @@ class CreateMixIn:
                         status = "E"
                     if status == "C":
                         self.print_warning_instance(FileChangedWarning(path))
-                    self.print_file_status(status, path)
+                    self.print_file_status(status, path, phase="end")
                     if not dry_run and status is not None:
                         fso.stats.files_stats[status] += 1
                 if args.paths_from_command or args.paths_from_shell_command:
@@ -167,7 +167,7 @@ class CreateMixIn:
                                 status = "E"
                         else:
                             status = "+"  # included
-                        self.print_file_status(status, path)
+                        self.print_file_status(status, path, phase="end")
                         if not dry_run and status is not None:
                             fso.stats.files_stats[status] += 1
                         continue
@@ -296,11 +296,31 @@ class CreateMixIn:
 
         if dry_run:
             return "+"  # included
+        # Types not archived: no list start/end pair (matches prior behavior of no status line).
+        if stat.S_ISSOCK(st.st_mode):
+            return
+        elif stat.S_ISDOOR(st.st_mode):
+            return
+        elif stat.S_ISPORT(st.st_mode):
+            return
+        m = st.st_mode
+        if not (
+            stat.S_ISREG(m)
+            or stat.S_ISDIR(m)
+            or stat.S_ISLNK(m)
+            or stat.S_ISFIFO(m)
+            or stat.S_ISCHR(m)
+            or stat.S_ISBLK(m)
+        ):
+            self.print_warning("Unknown file type: %s", path)
+            return
         MAX_RETRIES = 10  # count includes the initial try (initial try == "retry 0")
         for retry in range(MAX_RETRIES):
             last_try = retry == MAX_RETRIES - 1
             try:
                 if stat.S_ISREG(st.st_mode):
+                    if retry == 0:
+                        self.print_file_status(None, path, phase="start")
                     return fso.process_file(
                         path=path,
                         parent_fd=parent_fd,
@@ -311,9 +331,13 @@ class CreateMixIn:
                         strip_prefix=strip_prefix,
                     )
                 elif stat.S_ISDIR(st.st_mode):
+                    if retry == 0:
+                        self.print_file_status(None, path, phase="start")
                     return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
                 elif stat.S_ISLNK(st.st_mode):
                     if not read_special:
+                        if retry == 0:
+                            self.print_file_status(None, path, phase="start")
                         return fso.process_symlink(
                             path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
                         )
@@ -341,6 +365,8 @@ class CreateMixIn:
                             )
                 elif stat.S_ISFIFO(st.st_mode):
                     if not read_special:
+                        if retry == 0:
+                            self.print_file_status(None, path, phase="start")
                         return fso.process_fifo(
                             path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
                         )
@@ -357,6 +383,8 @@ class CreateMixIn:
                         )
                 elif stat.S_ISCHR(st.st_mode):
                     if not read_special:
+                        if retry == 0:
+                            self.print_file_status(None, path, phase="start")
                         return fso.process_dev(
                             path=path, parent_fd=parent_fd, name=name, st=st, dev_type="c", strip_prefix=strip_prefix
                         )
@@ -373,6 +401,8 @@ class CreateMixIn:
                         )
                 elif stat.S_ISBLK(st.st_mode):
                     if not read_special:
+                        if retry == 0:
+                            self.print_file_status(None, path, phase="start")
                         return fso.process_dev(
                             path=path, parent_fd=parent_fd, name=name, st=st, dev_type="b", strip_prefix=strip_prefix
                         )
@@ -387,15 +417,6 @@ class CreateMixIn:
                             last_try=last_try,
                             strip_prefix=strip_prefix,
                         )
-                elif stat.S_ISSOCK(st.st_mode):
-                    # Ignore unix sockets
-                    return
-                elif stat.S_ISDOOR(st.st_mode):
-                    # Ignore Solaris doors
-                    return
-                elif stat.S_ISPORT(st.st_mode):
-                    # Ignore Solaris event ports
-                    return
                 else:
                     self.print_warning("Unknown file type: %s", path)
                     return
@@ -456,7 +477,7 @@ class CreateMixIn:
                 with backup_io("stat"):
                     st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
             else:
-                self.print_file_status("-", path)  # excluded
+                self.print_file_status("-", path, phase="end")  # excluded
                 # get out here as quickly as possible:
                 # we only need to continue if we shall recurse into an excluded directory.
                 # if we shall not recurse, then do not even touch (stat()) the item, it
@@ -527,7 +548,7 @@ class CreateMixIn:
                                             dry_run=dry_run,
                                             strip_prefix=strip_prefix,
                                         )
-                                self.print_file_status("-", path)  # excluded
+                                self.print_file_status("-", path, phase="end")  # excluded
                             return
                     if not recurse_excluded_dir:
                         if not dry_run:
@@ -568,7 +589,7 @@ class CreateMixIn:
         if status == "C":
             self.print_warning_instance(FileChangedWarning(path))
         if not recurse_excluded_dir:
-            self.print_file_status(status, path)
+            self.print_file_status(status, path, phase="end")
             if not dry_run and status is not None:
                 fso.stats.files_stats[status] += 1
 

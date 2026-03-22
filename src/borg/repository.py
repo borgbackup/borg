@@ -317,7 +317,8 @@ class Repository:
             else:
                 log_error("too small.")
 
-        pi = ProgressIndicatorCounter(step=1000, msg="Checked objects: %d", msgid="repository.check")
+        if progress:
+            pi = ProgressIndicatorCounter(step=1, msg="Checked objects: %d", msgid="repository.check")
         partial = bool(max_duration)
         assert not (repair and partial)
         mode = "partial" if partial else "full"
@@ -419,7 +420,6 @@ class Repository:
             # it can be that there is no "data/" at all, then it crashes when iterating infos.
             if progress:
                 pi.finish()
-            pass
         logger.info(f"Checked {objs_checked} repository objects, {objs_errors} errors.")
         if objs_errors == 0:
             logger.info(f"Finished {mode} repository check, no problems found.")

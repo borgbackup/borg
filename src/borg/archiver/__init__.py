@@ -156,7 +156,7 @@ class Archiver(
         self.print_warning(msg, *args, wc=wc, wt="curly", msgid=msgid)
 
     def print_file_status(self, status, path, *, phase=None, error=None):
-        # START lifecycle event (JSON only)
+        # START lifecycle event
         if self.output_list and self.log_json and phase == "start" and status is None:
             json_data = {"type": "file_status", "phase": "start"}
             json_data |= text_to_json("path", path)
@@ -164,7 +164,8 @@ class Archiver(
                 json_data["error"] = error
             print(json.dumps(json_data), file=sys.stderr)
             return
-        # END lifecycle event (JSON only)
+
+        # END lifecycle event
         if self.output_list and self.log_json and phase == "end" and status is None:
             json_data = {"type": "file_status", "phase": "end"}
             json_data |= text_to_json("path", path)
@@ -172,6 +173,7 @@ class Archiver(
                 json_data["error"] = error
             print(json.dumps(json_data), file=sys.stderr)
             return
+
         # regular status event (A, M, U, -, d, s, etc.)
         if self.output_list and status is not None and (self.output_filter is None or status in self.output_filter):
             if self.log_json:
@@ -182,7 +184,7 @@ class Archiver(
                 if error is not None:
                     json_data["error"] = error
                 print(json.dumps(json_data), file=sys.stderr)
-            elif not self.log_json and status is not None:
+            else:
                 logging.getLogger("borg.output.list").info("%1s %s", status, remove_surrogates(path))
 
     def preprocess_args(self, args):

@@ -560,6 +560,16 @@ class Repository:
         self._lock_refresh()
         return self.store.store(name, value)
 
+    def store_get_size(self, name):
+        self._lock_refresh()
+        data = self.store.load(name)
+        return len(data)
+
+    def store_load_chunk(self, name, offset, size):
+        self._lock_refresh()
+        data = self.store.load(name)
+        return data[offset : offset + size]
+
     def store_delete(self, name, *, deleted=False):
         self._lock_refresh()
         return self.store.delete(name, deleted=deleted)

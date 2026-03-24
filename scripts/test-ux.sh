@@ -1,4 +1,8 @@
 set -x
+# Stable argparse usage() wrapping when comparing to test-ux.sh.blessed_stderr.
+export COLUMNS="${COLUMNS:-80}"
+# Fixed paths; remove leftovers so each run matches test-ux.sh.blessed_stderr.
+rm -rf /tmp/demo-repo
 #errors that should be have helpful help
 
 borg --repo /tmp/demo-repo init -e repokey-aes-ocb
@@ -21,7 +25,6 @@ borg --repo /tmp/demo-repo repo-create
 
 #repo::archive migration help (BORG_REPO / --repo guidance)
 
-borg --repo /tmp/demo-repo::test1 repo-info
 borg --repo /tmp/demo-repo::test1 list
 
 #Missing repo recovery hint (includes repo-create example + -e modes)

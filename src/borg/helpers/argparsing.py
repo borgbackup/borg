@@ -236,6 +236,24 @@ def _argv_tail_after_invalid_choice(invalid: str) -> list[str]:
     return sys.argv[idx + 1 :]
 
 
+def _repo_path_from_argv() -> str | None:
+    """Return the path/URL after ``-r``/``--repo`` in ``sys.argv``, if present."""
+    argv = sys.argv
+    for i, a in enumerate(argv):
+        if a in ("--repo", "-r") and i + 1 < len(argv):
+            return argv[i + 1]
+    return None
+
+
+def _local_repo_path_missing(repo_path: str) -> bool:
+    """True if *repo_path* looks like a local filesystem path and does not exist."""
+    if not repo_path or "://" in repo_path:
+        return False
+    if repo_path.startswith("/") or (len(repo_path) > 2 and repo_path[1] == ":"):
+        return not os.path.exists(repo_path)
+    return False
+
+
 def _argv_display_for_hint(argv: list[str]) -> list[str]:
     """Normalize argv to a readable `borg ...` line when launched via python -m or a borg binary."""
     if (
@@ -312,10 +330,9 @@ class ArgumentParser(_ArgumentParser):
             hints.append(f"Put subcommand-specific options after `<command>`: {reorder}")
         if "missing repository" in message.lower():
             hints.append("Set the repository via --repo REPO or BORG_REPO.")
-        if "list.name is none" in message.lower() or ("list.name" in message and "is None" in message):
+        list_name_missing = "list.name is none" in message.lower() or ("list.name" in message and "is None" in message)
+        if list_name_missing:
             hints.append("For 'borg list', set repository via -r/--repo or BORG_REPO and pass an archive name.")
-        if "repo::archive" in message or "::archive" in message:
-            hints.append("Borg 2 uses --repo/BORG_REPO and separate archive arguments.")
         if "invalid choice" in message and "<command>" in message:
             cmd_hint = self._top_command_choice_hint(message)
             if cmd_hint:
@@ -336,12 +353,37 @@ class ArgumentParser(_ArgumentParser):
                 f"Available encryption modes: {mode_list}"
             )
         if "Option 'list.paths' is required but not provided" in message:
+            repo_path = _repo_path_from_argv()
+            if repo_path and _local_repo_path_missing(repo_path):
+                from ..crypto.key import key_argument_names
+
+                mode_list = ", ".join(key_argument_names())
+                message = (
+                    f"{message}\n\n"
+                    "Common fixes:\n"
+                    f'- "{repo_path}" does not exist, pick a repository that exists or create one:\n'
+                    f"\tborg repo-create --repo {repo_path} -e repokey-aes-ocb\n"
+                    f"Available -e modes: {mode_list}"
+                )
+            else:
+                message = (
+                    f"{message}\n"
+                    "borg list requires an archive NAME to list contents.\n"
+                    "Common fixes:\n"
+                    "- Provide archive name: borg list NAME\n"
+                    "- To list archives in a repository, use: borg -r REPO repo-list"
+                )
+        loc_match = re.search(r'Invalid location format: "([^"]+)"', message)
+        if loc_match and "::" in loc_match.group(1):
+            repo, archive = loc_match.group(1).split("::", 1)
             message = (
-                f"{message}\n"
-                "borg list requires an archive NAME to list contents.\n"
+                f"{message}\n\n"
                 "Common fixes:\n"
-                "- Provide archive name: borg list NAME\n"
-                "- To list archives in a repository, use: borg -r REPO repo-list"
+                " * Borg 2 does not accept repo::archive syntax. Corrected command lines:\n"
+                f"\tborg list --repo {repo} list ::{archive}\n"
+                f"\t\tOR\n"
+                f"\texport BORG_REPO={repo}\n"
+                f"\tborg list ::{archive}"
             )
         common_hints = self._common_fix_hints(message)
         if common_hints:

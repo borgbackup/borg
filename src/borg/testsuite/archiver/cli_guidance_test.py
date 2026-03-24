@@ -145,9 +145,8 @@ def test_repo_double_colon_syntax_shows_migration_hint(cmd_fixture, tmp_path):
     exit_code, output = cmd_fixture("--repo", repo, "repo-info")
     assert exit_code == 2
     assert "does not accept repo::archive syntax" in output
-    assert "borg -r" in output
-    assert "borg list archive" in output
-    assert "borg repo-info" in output
+    assert "borg list --repo" in output
+    assert "\t\tOR\n" in output
     assert "export BORG_REPO=" in output
 
 
@@ -182,9 +181,20 @@ def test_list_name_none_common_fix_hint():
     assert "For 'borg list', set repository via -r/--repo or BORG_REPO and pass an archive name." in hints
 
 
-def test_list_paths_required_shows_path_and_repo_creation_hints(cmd_fixture, tmp_path):
+def test_list_paths_required_shows_repo_create_when_repo_path_missing(cmd_fixture, tmp_path):
     repo = os.fspath(tmp_path / "does-not-exist")
     exit_code, output = cmd_fixture("--repo", repo, "list")
+    assert exit_code == 2
+    assert "Option 'list.paths' is required but not provided" in output
+    assert f'"{repo}" does not exist, pick a repository that exists or create one:' in output
+    assert f"borg repo-create --repo {repo} -e repokey-aes-ocb" in output
+    assert "Available -e modes:" in output
+
+
+def test_list_paths_required_shows_path_and_repo_creation_hints(cmd_fixture, tmp_path):
+    repo = os.fspath(tmp_path / "repo")
+    repo.mkdir()
+    exit_code, output = cmd_fixture("--repo", os.fspath(repo), "list")
     assert exit_code == 2
     assert "Option 'list.paths' is required but not provided" in output
     assert "borg list requires an archive NAME to list contents." in output

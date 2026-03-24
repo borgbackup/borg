@@ -617,18 +617,8 @@ class Location:
         self.raw = text  # as given by user, might contain placeholders
         self.processed = replace_placeholders(self.raw, overrides)  # after placeholder replacement
         if "::" in self.processed:
-            repo, archive = self.processed.split("::", 1)
-            raise ValueError(
-                f'Invalid location format: "{self.processed}". '
-                "Borg 2 does not accept repo::archive syntax. "
-                "Corrected command lines:\n"
-                f"borg -r {repo} list {archive}\n"
-                f"export BORG_REPO={repo}\n"
-                f"borg list {archive}\n"
-                f"borg -r {repo} repo-info\n"
-                f"export BORG_REPO={repo}\n"
-                f"borg repo-info"
-            )
+            # Keep this message short; ArgumentParser.error() adds Common fixes with examples.
+            raise ValueError(f'Invalid location format: "{self.processed}".')
         valid = self._parse(self.processed)
         if valid:
             self.valid = True

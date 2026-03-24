@@ -300,11 +300,24 @@ def ChunkerParams(s):
 def FilesCacheMode(s):
     ENTRIES_MAP = dict(ctime="c", mtime="m", size="s", inode="i", rechunk="r", disabled="d")
     VALID_MODES = ("cis", "ims", "cs", "ms", "cr", "mr", "d", "s")  # letters in alpha order
+    WIN32_INVALID_MODES = ("cis", "cs", "cr")  # modes containing ctime, invalid on Windows
     if s in VALID_MODES:
+        if is_win32 and s in WIN32_INVALID_MODES:
+            raise ArgumentTypeError(
+                "ctime is not supported in files-cache mode on Windows "
+                "(ctime means file creation time on Windows, not inode change time). "
+                "Use an mtime-based mode instead."
+            )
         return s
     entries = set(s.strip().split(","))
     if not entries <= set(ENTRIES_MAP):
         raise ArgumentTypeError("cache mode must be a comma-separated list of: %s" % ",".join(sorted(ENTRIES_MAP)))
+    if is_win32 and "ctime" in entries:
+        raise ArgumentTypeError(
+            "ctime is not supported in files-cache mode on Windows "
+            "(ctime means file creation time on Windows, not inode change time). "
+            "Use an mtime-based mode instead."
+        )
     short_entries = {ENTRIES_MAP[entry] for entry in entries}
     mode = "".join(sorted(short_entries))
     if mode not in VALID_MODES:

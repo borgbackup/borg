@@ -161,6 +161,8 @@ class RepositoryServer:  # pragma: no cover
         "put_manifest",
         "store_list",
         "store_load",
+        "store_load_chunk",
+        "store_get_size",
         "store_store",
         "store_delete",
         "store_move",
@@ -1049,9 +1051,16 @@ class RemoteRepository:
     def store_list(self, name, *, deleted=False):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version("2.0.0b8"))
     def store_load(self, name):
-        """actual remoting is done via self.call in the @api decorator"""
+        # chunked fetch to avoid msgpack BufferFull on large repositories
+        total_size = self.call("store_get_size", {"name": name})
+        data = bytearray()
+        offset = 0
+        while offset < total_size:
+            chunk = self.call("store_load_chunk", {"name": name, "offset": offset, "size": MAX_DATA_SIZE})
+            data += chunk
+            offset += len(chunk)
+        return bytes(data)
 
     @api(since=parse_version("2.0.0b8"))
     def store_store(self, name, value):

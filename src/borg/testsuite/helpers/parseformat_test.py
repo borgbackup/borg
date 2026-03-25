@@ -642,3 +642,25 @@ def test_valid_chunkerparams(chunker_params, expected_return):
 def test_invalid_chunkerparams(invalid_chunker_params):
     with pytest.raises(ArgumentTypeError):
         ChunkerParams(invalid_chunker_params)
+def test_files_cache_mode_win32_restriction(monkeypatch):
+    from borg.helpers import parseformat
+    from borg.helpers.parseformat import FilesCacheMode, ArgumentTypeError
+    import pytest
+
+    # 1. Simulate being on a Windows system
+    monkeypatch.setattr(parseformat, 'is_win32', True)
+    
+    # 2. Test that 'cis' (contains ctime) raises the error
+    with pytest.raises(ArgumentTypeError, match="ctime is not supported"):
+        FilesCacheMode("cis")
+    
+    # 3. Test that comma-separated 'ctime,size' also raises the error
+    with pytest.raises(ArgumentTypeError, match="ctime is not supported"):
+        FilesCacheMode("ctime,size")
+        
+    # 4. Ensure a non-ctime mode still works on 'Windows'
+    assert FilesCacheMode("ims") == "ims"
+
+    # 5. Switch back to non-Windows and ensure 'cis' works again
+    monkeypatch.setattr(parseformat, 'is_win32', False)
+    assert FilesCacheMode("cis") == "cis"

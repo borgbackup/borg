@@ -1408,7 +1408,13 @@ class FilesystemObjectProcessors:
             item.uid = uid
         if gid is not None:
             item.gid = gid
-        self.process_file_chunks(item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd)))
+        self.print_file_status(None, path, phase="start")
+        try:
+            self.process_file_chunks(
+                item, cache, self.stats, self.show_progress, backup_io_iter(self.chunker.chunkify(fd))
+            )
+        finally:
+            self.print_file_status(None, path, phase="end")
         item.get_size(memorize=True)
         self.stats.nfiles += 1
         self.add_item(item, stats=self.stats)
@@ -1475,17 +1481,21 @@ class FilesystemObjectProcessors:
                     # Only chunkify the file if needed
                     changed_while_backup = False
                     if "chunks" not in item:
-                        start_reading = time.time_ns()
-                        with backup_io("read"):
-                            self.process_file_chunks(
-                                item,
-                                cache,
-                                self.stats,
-                                self.show_progress,
-                                backup_io_iter(self.chunker.chunkify(None, fd)),
-                            )
-                            self.stats.chunking_time = self.chunker.chunking_time
-                        end_reading = time.time_ns()
+                        self.print_file_status(None, path, phase="start")
+                        try:
+                            start_reading = time.time_ns()
+                            with backup_io("read"):
+                                self.process_file_chunks(
+                                    item,
+                                    cache,
+                                    self.stats,
+                                    self.show_progress,
+                                    backup_io_iter(self.chunker.chunkify(None, fd)),
+                                )
+                                self.stats.chunking_time = self.chunker.chunking_time
+                            end_reading = time.time_ns()
+                        finally:
+                            self.print_file_status(None, path, phase="end")
                         with backup_io("fstat2"):
                             st2 = os.fstat(fd)
                         if self.files_changed == "disabled" or is_special_file:

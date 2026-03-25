@@ -671,9 +671,6 @@ jobs:
           path: dist/binary/borg.exe
 
       - name: Run tests
-        env:
-          MSYS2_ARG_CONV_EXCL: "*"
-          MSYS2_ENV_CONV_EXCL: "*"
         run: |
           # Ensure locally built binary in ./dist/binary/borg-dir is found during tests
           export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"

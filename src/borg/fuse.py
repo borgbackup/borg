@@ -482,7 +482,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
         llfuse.Operations.__init__(self)
         FuseBackend.__init__(self, manifest, args, decrypted_repository)
         self.decrypted_repository = decrypted_repository
-        data_cache_capacity = int(os.environ.get("BORG_MOUNT_DATA_CACHE_ENTRIES", os.cpu_count() or 1))
+        data_cache_capacity = int(os.environ.get("BORG_MOUNT_DATA_CACHE_ENTRIES", (os.cpu_count() or 1) * 8))
         logger.debug("mount data cache capacity: %d chunks", data_cache_capacity)
         self.data_cache = LRUCache(capacity=data_cache_capacity)
         self._last_pos = LRUCache(capacity=FILES)
@@ -716,9 +716,6 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             n = min(size, s - offset)
             if id in self.data_cache:
                 data = self.data_cache[id]
-                if offset + n == len(data):
-                    # evict fully read chunk from cache
-                    del self.data_cache[id]
             else:
                 try:
                     cdata = self.repository_uncached.get(id)
@@ -730,9 +727,7 @@ class FuseOperations(llfuse.Operations, FuseBackend):
                         raise llfuse.FUSEError(errno.EIO) from None
                 else:
                     _, data = self.repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
-                if offset + n < len(data):
-                    # chunk was only partially read, cache it
-                    self.data_cache[id] = data
+                self.data_cache[id] = data
             parts.append(data[offset : offset + n])
             offset = 0
             size -= n

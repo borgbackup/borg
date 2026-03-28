@@ -41,7 +41,8 @@ dependencies = [
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
   "xxhash>=2.0.0",
   "jsonargparse>=4.47.0",
-  "PyYAML>=6.0.2",  # we need to register our types with yaml, jsonargparse uses yaml for config files
+  "PyYAML>=6.0.2",
+  "structlog",
 ]
 
 [project.optional-dependencies]

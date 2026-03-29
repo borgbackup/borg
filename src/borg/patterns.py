@@ -3,8 +3,10 @@ import posixpath
 import re
 import sys
 import unicodedata
+import warnings
 from collections import namedtuple
 from enum import Enum
+from pathlib import Path
 
 from .helpers import clean_lines, shellpattern
 from .helpers.argparsing import Action, ArgumentTypeError
@@ -89,14 +91,12 @@ class PatternMatcher:
         # False when calling match().
         self.recurse_dir = None
 
-        # whether to recurse into directories when no match is found
-        # TODO: allow modification as a config option?
+        # Whether to recurse into directories when no match is found.
+        # This must be True so that include patterns inside excluded directories
+        # work correctly (e.g. "+ /excluded_dir/important" inside "- /excluded_dir").
         self.recurse_dir_default = True
 
         self.include_patterns = []
-
-        # TODO: move this info to parse_inclexcl_command and store in PatternBase subclass?
-        self.is_include_cmd = {IECommand.Exclude: False, IECommand.ExcludeNoRecurse: False, IECommand.Include: True}
 
     def empty(self):
         return not len(self._items) and not len(self._path_full_patterns)
@@ -150,13 +150,13 @@ class PatternMatcher:
         if value is not non_existent:
             # we have a full path match!
             self.recurse_dir = command_recurses_dir(value)
-            return self.is_include_cmd[value]
+            return value.is_include
 
         # this is the slow way, if we have many patterns in self._items:
         for pattern, cmd in self._items:
             if pattern.match(path, normalize=False):
                 self.recurse_dir = pattern.recurse_dir
-                return self.is_include_cmd[cmd]
+                return cmd.is_include
 
         # by default we will recurse if there is no match
         self.recurse_dir = self.recurse_dir_default
@@ -314,10 +314,17 @@ class IECommand(Enum):
     Exclude = 4
     ExcludeNoRecurse = 5
 
+    @property
+    def is_include(self):
+        return self is IECommand.Include
+
 
 def command_recurses_dir(cmd):
-    # TODO?: raise error or return None if *cmd* is RootPath or PatternStyle
-    return cmd not in [IECommand.ExcludeNoRecurse]
+    if cmd is IECommand.ExcludeNoRecurse:
+        return False
+    if cmd is IECommand.Include or cmd is IECommand.Exclude:
+        return True
+    raise ValueError(f"command_recurses_dir: unexpected command: {cmd!r}")
 
 
 def get_pattern_class(prefix):
@@ -368,7 +375,14 @@ def parse_inclexcl_command(cmd_line_str, fallback=ShellPattern):
         raise ArgumentTypeError("A pattern/command must have a value part.")
 
     if cmd is IECommand.RootPath:
-        # TODO: validate string?
+        if not Path(remainder_str).is_absolute():
+            warnings.warn(
+                f"Root path {remainder_str!r} is not absolute, it is recommended to use an absolute path",
+                UserWarning,
+                stacklevel=2,
+            )
+        if not Path(remainder_str).exists():
+            warnings.warn(f"Root path {remainder_str!r} does not exist", UserWarning, stacklevel=2)
         val = remainder_str
     elif cmd is IECommand.PatternStyle:
         # then remainder_str is something like 're' or 'sh'

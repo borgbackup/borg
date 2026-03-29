@@ -1,13 +1,14 @@
 import io
 import os.path
 import sys
+import warnings
 
 import pytest
 
 from ..helpers.argparsing import ArgumentTypeError
 from ..patterns import PathFullPattern, PathPrefixPattern, FnmatchPattern, ShellPattern, RegexPattern
-from ..patterns import load_exclude_file, load_pattern_file
-from ..patterns import parse_pattern, PatternMatcher
+from ..patterns import IECommand, load_exclude_file, load_pattern_file
+from ..patterns import command_recurses_dir, parse_inclexcl_command, parse_pattern, PatternMatcher
 from ..patterns import get_regex_from_pattern
 
 
@@ -605,23 +606,51 @@ def test_pattern_matcher():
     for i in ["", "foo", "bar"]:
         assert pm.match(i) is None
 
-    # add extra entries to aid in testing
-    for target in ["A", "B", "Empty", "FileNotFound"]:
-        pm.is_include_cmd[target] = target
+    pm.add([RegexPattern("^a")], IECommand.Include)
+    pm.add([RegexPattern("^b"), RegexPattern("^z")], IECommand.Exclude)
+    pm.add([RegexPattern("^$")], IECommand.ExcludeNoRecurse)
+    pm.fallback = False
 
-    pm.add([RegexPattern("^a")], "A")
-    pm.add([RegexPattern("^b"), RegexPattern("^z")], "B")
-    pm.add([RegexPattern("^$")], "Empty")
-    pm.fallback = "FileNotFound"
-
-    assert pm.match("") == "Empty"
-    assert pm.match("aaa") == "A"
-    assert pm.match("bbb") == "B"
-    assert pm.match("ccc") == "FileNotFound"
-    assert pm.match("xyz") == "FileNotFound"
-    assert pm.match("z") == "B"
+    assert pm.match("") is False  # ExcludeNoRecurse -> not include
+    assert pm.match("aaa") is True  # Include
+    assert pm.match("bbb") is False  # Exclude
+    assert pm.match("ccc") is False  # fallback
+    assert pm.match("xyz") is False  # fallback
+    assert pm.match("z") is False  # Exclude (matches ^z)
 
     assert PatternMatcher(fallback="hey!").fallback == "hey!"
+
+
+def test_command_recurses_dir():
+    assert command_recurses_dir(IECommand.Include) is True
+    assert command_recurses_dir(IECommand.Exclude) is True
+    assert command_recurses_dir(IECommand.ExcludeNoRecurse) is False
+    with pytest.raises(ValueError, match="unexpected command"):
+        command_recurses_dir(IECommand.RootPath)
+    with pytest.raises(ValueError, match="unexpected command"):
+        command_recurses_dir(IECommand.PatternStyle)
+
+
+def test_root_path_validation(tmp_path):
+    # absolute path that exists: no warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        parse_inclexcl_command(f"R {tmp_path}")
+
+    # absolute path that doesn't exist: only "does not exist" warning
+    nonexistent = str(tmp_path / "nonexistent_subdir_12345")
+    with pytest.warns(UserWarning) as warning_list:
+        parse_inclexcl_command(f"R {nonexistent}")
+    messages = [str(w.message) for w in warning_list]
+    assert any("does not exist" in m for m in messages)
+    assert not any("absolute" in m for m in messages)
+
+    # relative path that doesn't exist: warns about both
+    with pytest.warns(UserWarning) as warning_list:
+        parse_inclexcl_command("R relative/nonexistent/path/xyz123")
+    messages = [str(w.message) for w in warning_list]
+    assert any("absolute" in m for m in messages)
+    assert any("does not exist" in m for m in messages)
 
 
 @pytest.mark.parametrize(

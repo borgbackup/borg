@@ -13,7 +13,7 @@ from ... import platform
 from ...constants import *  # NOQA
 from ...constants import zeros
 from ...manifest import Manifest
-from ...platform import is_win32
+from ...platform import is_win32, is_cygwin
 from ...platformflags import is_msystem
 from ...repository import Repository
 from ...helpers import CommandError, BackupPermissionError
@@ -923,8 +923,7 @@ def test_create_topical(archivers, request):
     assert "file1" in output
 
 
-# @pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason="FIFOs not supported, hangs on cygwin")
-@pytest.mark.skip(reason="This test is problematic and should be skipped")
+@pytest.mark.skipif(not are_fifos_supported() or is_cygwin, reason="FIFOs not supported, hangs on cygwin")
 def test_create_read_special_symlink(archivers, request):
     archiver = request.getfixturevalue(archivers)
     from threading import Thread

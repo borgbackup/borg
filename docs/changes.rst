@@ -124,7 +124,7 @@ Compatibility notes:
 
 - use platformdirs 3.x.x instead of home-grown code. Due to that:
 
-  - XDG_*_HOME is not honoured on macOS and on Windows.
+  - XDG_*_HOME is not honoured on Windows.
   - BORG_BASE_DIR can still be used to enforce some base dir + .config/ or .cache/.
   - on macOS, the default directories move to native locations:
     config/data: ``~/Library/Application Support/borg/``,

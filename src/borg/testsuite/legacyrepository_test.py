@@ -13,9 +13,9 @@ from ..helpers import IntegrityError
 from ..helpers import msgpack
 from ..fslocking import Lock, LockFailed
 from ..platformflags import is_win32
-from ..legacyremote import LegacyRemoteRepository, InvalidRPCMethod, PathNotAllowed
-from ..legacyrepository import LegacyRepository, LoggedIO
-from ..legacyrepository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
+from ..legacy.remote import LegacyRemoteRepository, InvalidRPCMethod, PathNotAllowed
+from ..legacy.repository import LegacyRepository, LoggedIO
+from ..legacy.repository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
 from ..repoobj import RepoObj
 from .hashindex_test import H
 
@@ -664,7 +664,7 @@ def test_subtly_corrupted_hints_without_integrity(repository, caplog):
         repository.put(H(3), fchunk(b"1234"))
         # Do a compaction run.
         # The corrupted refcount is detected and logged as a warning, but compaction proceeds.
-        caplog.set_level(logging.WARNING, logger="borg.legacyrepository")
+        caplog.set_level(logging.WARNING, logger="borg.legacy.repository")
         repository.commit(compact=True)
         assert "Corrupted segment reference count" in caplog.text
         # We verify that the repository is still consistent.

@@ -1,5 +1,5 @@
 """
-Borg Legacy Package \u2014 Borg 1.x compatibility layer.
+Borg Legacy Package — Borg 1.x compatibility layer.
 
 This package contains all code specific to reading/writing Borg 1.x repositories.
 It is required for ``borg transfer --from-borg1`` and ``borg serve`` (serving v1 clients).

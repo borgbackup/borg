@@ -13,11 +13,12 @@ from ..helpers.argparsing import SUPPRESS, PositiveInt
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
-from ..legacyremote import LegacyRemoteRepository
+from ..legacy.remote import LegacyRemoteRepository
 from ..remote import RemoteRepository
-from ..legacyrepository import LegacyRepository
+from ..legacy.repository import LegacyRepository
 from ..repository import Repository
-from ..repoobj import RepoObj, RepoObj1
+from ..repoobj import RepoObj
+from ..legacy.repoobj import RepoObj1
 from ..patterns import (
     ArgparsePatternAction,
     ArgparseExcludeFileAction,

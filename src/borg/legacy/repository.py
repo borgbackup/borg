@@ -14,22 +14,22 @@ from collections.abc import Callable
 
 import xxhash
 
-from .constants import *  # NOQA
-from .hashindex import NSIndex1Entry, NSIndex1
-from .helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
-from .helpers import Location
-from .helpers import ProgressIndicatorPercent
-from .helpers import bin_to_hex, hex_to_bin
-from .helpers import secure_erase, safe_unlink
-from .helpers import msgpack
-from .helpers.lrucache import LRUCache
-from .fslocking import Lock, LockError, LockErrorT
-from .logger import create_logger
-from .manifest import Manifest, NoManifestError
-from .platform import SaveFile, SyncFile, sync_dir, safe_fadvise
-from .repoobj import RepoObj
-from .checksums import crc32
-from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
+from ..constants import *  # NOQA
+from ..hashindex import NSIndex1Entry, NSIndex1
+from ..helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
+from ..helpers import Location
+from ..helpers import ProgressIndicatorPercent
+from ..helpers import bin_to_hex, hex_to_bin
+from ..helpers import secure_erase, safe_unlink
+from ..helpers import msgpack
+from ..helpers.lrucache import LRUCache
+from ..fslocking import Lock, LockError, LockErrorT
+from ..logger import create_logger
+from ..manifest import Manifest, NoManifestError
+from ..platform import SaveFile, SyncFile, sync_dir, safe_fadvise
+from ..repoobj import RepoObj
+from ..checksums import crc32
+from ..crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 
 logger = create_logger(__name__)
 

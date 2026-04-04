@@ -1155,6 +1155,133 @@ def test_create_with_compression_algorithms(archivers, request):
                 assert_dirs_equal(archiver.input_path, os.path.join(extract_path, "input"))
 
 
+def test_file_status_phase_regular_file(archivers, request):
+    """Test that start/end lifecycle events are emitted for regular files."""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    log = cmd(archiver, "create", "test", "input", "--log-json", "--list")
+    events = [json.loads(line) for line in log.splitlines() if line.startswith("{")]
+    file_events = [
+        e for e in events
+        if e.get("type") == "file_status" and e.get("path", "").endswith("file1")
+    ]
+    phases = [e.get("phase") for e in file_events]
+    # start must come before end, and both must be present
+    assert "start" in phases
+    assert "end" in phases
+    assert phases.index("start") < phases.index("end")
+    # end must be the last event for this file
+    assert phases[-1] == "end"
+
+
+def test_file_status_phase_symlink(archivers, request):
+    """Test that start/end lifecycle events are emitted for symlinks."""
+    if not are_symlinks_supported():
+        pytest.skip("symlinks not supported")
+    archiver = request.getfixturevalue(archivers)
+    os.symlink("file1", os.path.join(archiver.input_path, "link1"))
+    create_regular_file(archiver.input_path, "file1", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    log = cmd(archiver, "create", "test", "input", "--log-json", "--list")
+    events = [json.loads(line) for line in log.splitlines() if line.startswith("{")]
+    link_events = [
+        e for e in events
+        if e.get("type") == "file_status" and e.get("path", "").endswith("link1")
+    ]
+    phases = [e.get("phase") for e in link_events]
+    assert "start" in phases
+    assert "end" in phases
+    assert phases.index("start") < phases.index("end")
+
+
+def test_file_status_phase_read_special(archivers, request):
+    """Test that start/end lifecycle events are emitted for --read-special paths.
+    
+    This is the critical regression test: previously --read-special file types
+    (symlinks, FIFOs, char/block devices) did NOT emit start/end events.
+    """
+    if not are_symlinks_supported():
+        pytest.skip("symlinks not supported")
+    archiver = request.getfixturevalue(archivers)
+    # create a regular file and a symlink pointing to it
+    create_regular_file(archiver.input_path, "target", size=1024)
+    os.symlink(
+        os.path.join(archiver.input_path, "target"),
+        os.path.join(archiver.input_path, "link_to_target")
+    )
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    log = cmd(archiver, "create", "test", "input", "--read-special", "--log-json", "--list")
+    events = [json.loads(line) for line in log.splitlines() if line.startswith("{")]
+    link_events = [
+        e for e in events
+        if e.get("type") == "file_status" and e.get("path", "").endswith("link_to_target")
+    ]
+    phases = [e.get("phase") for e in link_events]
+    # This would fail before the fix: --read-special symlinks got no start event
+    assert "start" in phases, "start event missing for --read-special symlink"
+    assert "end" in phases, "end event missing for --read-special symlink"
+    assert phases.index("start") < phases.index("end")
+
+
+def test_file_status_phase_no_orphan_events(archivers, request):
+    """Test that every start event has a matching end event and vice versa.
+    
+    No file should have an end without a start (orphan end),
+    or a start without an end (orphan start).
+    """
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "file2", size=1024 * 80)
+    create_regular_file(archiver.input_path, "dir1/file3", size=1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    log = cmd(archiver, "create", "test", "input", "--log-json", "--list")
+    events = [json.loads(line) for line in log.splitlines() if line.startswith("{")]
+    file_events = [e for e in events if e.get("type") == "file_status"]
+
+    # Group events by path
+    from collections import defaultdict
+    events_by_path = defaultdict(list)
+    for e in file_events:
+        path = e.get("path")
+        phase = e.get("phase")
+        if phase in ("start", "end"):
+            events_by_path[path].append(phase)
+
+    for path, phases in events_by_path.items():
+        starts = phases.count("start")
+        ends = phases.count("end")
+        assert starts == ends, (
+            f"{path}: mismatched lifecycle events — {starts} start(s), {ends} end(s)"
+        )
+        assert starts == 1, (
+            f"{path}: expected exactly 1 start/end pair, got {starts}"
+        )
+        assert phases[0] == "start", f"{path}: first event is not 'start'"
+        assert phases[-1] == "end", f"{path}: last event is not 'end'"
+
+
+def test_file_status_phase_excluded_no_lifecycle(archivers, request):
+    """Test that excluded files do not emit start/end lifecycle events."""
+    archiver = request.getfixturevalue(archivers)
+    create_regular_file(archiver.input_path, "file1", size=1024 * 80)
+    create_regular_file(archiver.input_path, "excluded_file", size=1024 * 80)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    log = cmd(
+        archiver, "create", "test", "input",
+        "--log-json", "--list", "--exclude", "*/excluded_file"
+    )
+    events = [json.loads(line) for line in log.splitlines() if line.startswith("{")]
+    excluded_events = [
+        e for e in events
+        if e.get("type") == "file_status" and e.get("path", "").endswith("excluded_file")
+    ]
+    phases = [e.get("phase") for e in excluded_events]
+    # excluded files must not have lifecycle events
+    assert "start" not in phases, "excluded file should not emit start event"
+    assert "end" not in phases, "excluded file should not emit end event"
+
+
 def test_exclude_nodump_dir_with_file(archivers, request):
     """A directory flagged NODUMP and its contents must not be archived."""
     archiver = request.getfixturevalue(archivers)

@@ -133,7 +133,21 @@ def archiver(tmp_path, set_env_variables):
     os.chdir(archiver.tmpdir)
     yield archiver
     os.chdir(old_wd)
-    shutil.rmtree(archiver.tmpdir, ignore_errors=True)  # clean up
+
+    def maybe_clear_flags_and_retry(func, path, _exc_info):
+        if has_lchflags:
+            # Clear any BSD flags (e.g. UF_APPEND) that may have prevented removal, then retry once.
+            try:
+                os.lchflags(path, 0)
+                func(path)
+            except OSError:
+                pass
+        else:
+            # Do nothing (equivalent to `ignore_errors=True`) if flags aren't supported on this platform.
+            pass
+
+    # Clean up archiver temp files
+    shutil.rmtree(archiver.tmpdir, onerror=maybe_clear_flags_and_retry)
 
 
 @pytest.fixture()

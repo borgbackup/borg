@@ -1,4 +1,4 @@
-import logging
+import structlog
 import json
 import os
 import os.path
@@ -62,7 +62,7 @@ def yes(
     """
 
     def output(msg, msg_type, is_prompt=False, **kwargs):
-        json_output = getattr(logging.getLogger("borg"), "json", False)
+        json_output = getattr(structlog.get_logger("borg"), "json", False)
         if json_output:
             kwargs |= dict(type="question_%s" % msg_type, msgid=msgid, message=msg)
             print(json.dumps(kwargs), file=sys.stderr)

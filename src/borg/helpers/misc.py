@@ -1,4 +1,3 @@
-import logging
 import io
 import os
 import platform  # python stdlib import - if this fails, check that cwd != src/borg/
@@ -58,7 +57,7 @@ def sysinfo():
     return "\n".join(info)
 
 
-def log_multi(*msgs, level=logging.INFO, logger=logger):
+def log_multi(*msgs, level=20, logger=logger):
     """
     Log multiple lines of text, emitting each line via a separate logging call for cosmetic reasons.
 

@@ -8,7 +8,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from .. import are_symlinks_supported, are_hardlinks_supported, granularity_sleep
-from ...platformflags import is_win32, is_freebsd, is_netbsd
+from ...platformflags import is_win32, is_freebsd, is_netbsd, is_openbsd
 from . import (
     cmd,
     create_regular_file,
@@ -513,10 +513,11 @@ def test_hard_link_deletion_and_replacement(archivers, request):
     # From test1 to test2's POV, the a/hardlink file is a fresh new file.
     assert_line_exists(lines, "added.*B.*input/a/hardlink")
     # On Linux/macOS: b/hardlink was not touched at all — must not appear in diff.
-    # On BSD: creating a new file at a previously hard-linked path can cause a
-    # POSIX-valid sub-second ctime update on surviving hard links. If b/hardlink
-    # appears, it must be a ctime-only change — no content, mode, or mtime changes.
-    if is_freebsd or is_netbsd:
+    # On BSD (FreeBSD, NetBSD, OpenBSD): creating a new file at a previously
+    # hard-linked path can cause a POSIX-valid sub-second ctime update on surviving
+    # hard links. If b/hardlink appears, it must be a ctime-only change — no content,
+    # mode, or mtime changes.
+    if is_freebsd or is_netbsd or is_openbsd:
         # BSD may show a sub-second ctime change on b/hardlink (POSIX-valid).
         # If it appears, verify the diff output actually shows distinguishable timestamps
         # (i.e. the format_timestamp_pair fix is working), and no other changes.

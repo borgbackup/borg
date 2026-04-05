@@ -25,8 +25,10 @@ from ...helpers.parseformat import (
     swidth_slice,
     eval_escapes,
     ChunkerParams,
+    DiffFormatter,
 )
 from ...helpers.time import format_timedelta, parse_timestamp
+from ...item import ItemDiff, Item
 from ...platformflags import is_win32
 
 
@@ -642,3 +644,44 @@ def test_valid_chunkerparams(chunker_params, expected_return):
 def test_invalid_chunkerparams(invalid_chunker_params):
     with pytest.raises(ArgumentTypeError):
         ChunkerParams(invalid_chunker_params)
+
+
+def _make_item_with_ctime(ctime_ns: int) -> Item:
+    """Helper: create a minimal Item with the given ctime nanoseconds.
+    Item.ctime is a PropDictProperty(int, encode=int_to_timestamp) — set via
+    attribute assignment, not dict subscript.
+    """
+    return Item(path="test/file", mode=0o100644, mtime=0, ctime=ctime_ns)
+
+
+def test_diff_formatter_format_time_shows_microseconds_when_same_second():
+    """DiffFormatter.format_time() must use microsecond precision when
+    two ctimes differ only at sub-second level (the BSD hardlink issue)."""
+    # Two nanosecond timestamps that are the same second but different microsecond
+    # 2025-11-05 17:45:53.000123 UTC  →  1746467153000123000 ns
+    # 2025-11-05 17:45:53.000456 UTC  →  1746467153000456000 ns
+    ctime1_ns = 1746467153_000123_000
+    ctime2_ns = 1746467153_000456_000
+
+    item1 = _make_item_with_ctime(ctime1_ns)
+    item2 = _make_item_with_ctime(ctime2_ns)
+
+    diff = ItemDiff(
+        path="test/file",
+        item1=item1,
+        item2=item2,
+        chunk_1=iter([]),
+        chunk_2=iter([]),
+        can_compare_chunk_ids=True,
+    )
+
+    fmt = DiffFormatter("{ctime} {path}{NL}", content_only=False)
+    result = fmt.format_item(diff)
+
+    # Must contain a dot — microseconds visible
+    assert "." in result, f"Expected microseconds in output, got: {result!r}"
+    # Must not look like [ctime: X -> X] (same string both sides)
+    import re
+    m = re.search(r"\[ctime: (.+?) -> (.+?)\]", result)
+    assert m is not None
+    assert m.group(1) != m.group(2), "Timestamps should differ in output"

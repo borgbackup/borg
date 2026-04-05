@@ -1,5 +1,6 @@
 import base64
 import os
+import re
 
 from datetime import datetime, timezone
 
@@ -681,7 +682,40 @@ def test_diff_formatter_format_time_shows_microseconds_when_same_second():
     # Must contain a dot — microseconds visible
     assert "." in result, f"Expected microseconds in output, got: {result!r}"
     # Must not look like [ctime: X -> X] (same string both sides)
-    import re
     m = re.search(r"\[ctime: (.+?) -> (.+?)\]", result)
     assert m is not None
     assert m.group(1) != m.group(2), "Timestamps should differ in output"
+
+
+def test_diff_formatter_format_time_no_microseconds_for_different_seconds():
+    """DiffFormatter.format_time() must use second precision (no dot) when
+    timestamps differ by more than one second."""
+    # Two nanosecond timestamps that differ by a whole second
+    # 2025-11-05 17:45:53 UTC  →  1746467153000000000 ns
+    # 2025-11-05 17:45:54 UTC  →  1746467154000000000 ns
+    ctime1_ns = 1746467153_000000_000
+    ctime2_ns = 1746467154_000000_000
+
+    item1 = _make_item_with_ctime(ctime1_ns)
+    item2 = _make_item_with_ctime(ctime2_ns)
+
+    diff = ItemDiff(
+        path="test/file",
+        item1=item1,
+        item2=item2,
+        chunk_1=iter([]),
+        chunk_2=iter([]),
+        can_compare_chunk_ids=True,
+    )
+
+    fmt = DiffFormatter("{ctime} {path}{NL}", content_only=False)
+    result = fmt.format_item(diff)
+
+    # Must NOT contain a dot — second-precision only
+    m = re.search(r"\[ctime: (.+?) -> (.+?)\]", result)
+    assert m is not None
+    assert "." not in m.group(1), f"Unexpected microseconds in output: {result!r}"
+    assert "." not in m.group(2), f"Unexpected microseconds in output: {result!r}"
+    # Timestamps must differ
+    assert m.group(1) != m.group(2), "Different-second timestamps should differ in output"
+

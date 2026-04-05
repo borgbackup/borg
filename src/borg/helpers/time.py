@@ -109,7 +109,7 @@ def format_timestamp_pair(ts1: datetime, ts2: datetime) -> "tuple[str, str]":
     """
     Format two timestamps for diff display.
 
-    If the timestamps appear equal when rounded to seconds but differ at the
+    If the timestamps appear equal when truncated to seconds but differ at the
     microsecond level, use microsecond precision so the difference is visible
     to the user. Otherwise use second precision (existing behavior).
 
@@ -122,12 +122,9 @@ def format_timestamp_pair(ts1: datetime, ts2: datetime) -> "tuple[str, str]":
     t2_local = ts2.astimezone()
 
     # Only use microsecond format when timestamps differ at sub-second level
-    # (i.e. they look equal at second resolution but are actually different).
+    # (i.e. they are identical when truncated to seconds but actually different).
     # Identical timestamps or timestamps differing by >= 1 second use second format.
-    are_equal = t1_local == t2_local
-    same_at_seconds = (not are_equal) and (
-        t1_local.strftime(fmt_seconds) == t2_local.strftime(fmt_seconds)
-    )
+    same_at_seconds = t1_local != t2_local and t1_local.replace(microsecond=0) == t2_local.replace(microsecond=0)
     fmt = fmt_microseconds if same_at_seconds else fmt_seconds
 
     return t1_local.strftime(fmt), t2_local.strftime(fmt)

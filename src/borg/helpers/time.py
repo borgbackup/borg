@@ -105,6 +105,34 @@ def format_time(ts: datetime, format_spec=""):
     return ts.astimezone().strftime("%a, %Y-%m-%d %H:%M:%S %z" if format_spec == "" else format_spec)
 
 
+def format_timestamp_pair(ts1: datetime, ts2: datetime) -> "tuple[str, str]":
+    """
+    Format two timestamps for diff display.
+
+    If the timestamps appear equal when rounded to seconds but differ at the
+    microsecond level, use microsecond precision so the difference is visible
+    to the user. Otherwise use second precision (existing behavior).
+
+    Returns a tuple (formatted_ts1, formatted_ts2).
+    """
+    fmt_seconds = "%a, %Y-%m-%d %H:%M:%S %z"
+    fmt_microseconds = "%a, %Y-%m-%d %H:%M:%S.%f %z"
+
+    t1_local = ts1.astimezone()
+    t2_local = ts2.astimezone()
+
+    # Only use microsecond format when timestamps differ at sub-second level
+    # (i.e. they look equal at second resolution but are actually different).
+    # Identical timestamps or timestamps differing by >= 1 second use second format.
+    are_equal = t1_local == t2_local
+    same_at_seconds = (not are_equal) and (
+        t1_local.strftime(fmt_seconds) == t2_local.strftime(fmt_seconds)
+    )
+    fmt = fmt_microseconds if same_at_seconds else fmt_seconds
+
+    return t1_local.strftime(fmt), t2_local.strftime(fmt)
+
+
 def format_timedelta(td):
     """Format a timedelta in a human-friendly format."""
     ts = td.total_seconds()

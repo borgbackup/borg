@@ -573,6 +573,8 @@ jobs:
                 export PKG_CONFIG_PATH="/system/develop/lib/pkgconfig:/system/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
                 export BORG_LIBLZ4_PREFIX=/system/develop
                 export BORG_OPENSSL_PREFIX=/system/develop
+                # rsync into the Haiku VM changes file ownership; tell git to trust the workdir
+                git config --global --add safe.directory "$(pwd)"
                 pip install -r requirements.d/development.lock.txt
                 pip install -e .
 

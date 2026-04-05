@@ -668,12 +668,7 @@ def test_diff_formatter_format_time_shows_microseconds_when_same_second():
     item2 = _make_item_with_ctime(ctime2_ns)
 
     diff = ItemDiff(
-        path="test/file",
-        item1=item1,
-        item2=item2,
-        chunk_1=iter([]),
-        chunk_2=iter([]),
-        can_compare_chunk_ids=True,
+        path="test/file", item1=item1, item2=item2, chunk_1=iter([]), chunk_2=iter([]), can_compare_chunk_ids=True
     )
 
     fmt = DiffFormatter("{ctime} {path}{NL}", content_only=False)
@@ -700,12 +695,7 @@ def test_diff_formatter_format_time_no_microseconds_for_different_seconds():
     item2 = _make_item_with_ctime(ctime2_ns)
 
     diff = ItemDiff(
-        path="test/file",
-        item1=item1,
-        item2=item2,
-        chunk_1=iter([]),
-        chunk_2=iter([]),
-        can_compare_chunk_ids=True,
+        path="test/file", item1=item1, item2=item2, chunk_1=iter([]), chunk_2=iter([]), can_compare_chunk_ids=True
     )
 
     fmt = DiffFormatter("{ctime} {path}{NL}", content_only=False)

@@ -429,8 +429,7 @@ def test_sort_by_all_keys_with_directions(archivers, request, sort_key):
 
 
 @pytest.mark.skipif(
-    not are_hardlinks_supported() or is_win32,
-    reason="hardlinks not supported or not available on windows",
+    not are_hardlinks_supported() or is_win32, reason="hardlinks not supported or not available on windows"
 )
 def test_hard_link_deletion_and_replacement(archivers, request):
     archiver = request.getfixturevalue(archivers)

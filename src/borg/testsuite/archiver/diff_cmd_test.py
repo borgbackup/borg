@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import time
 import pytest
@@ -428,8 +429,8 @@ def test_sort_by_all_keys_with_directions(archivers, request, sort_key):
 
 
 @pytest.mark.skipif(
-    not are_hardlinks_supported() or is_freebsd or is_netbsd or is_win32,
-    reason="hardlinks not supported or test failing on freebsd, netbsd and windows",
+    not are_hardlinks_supported() or is_win32,
+    reason="hardlinks not supported or not available on windows",
 )
 def test_hard_link_deletion_and_replacement(archivers, request):
     archiver = request.getfixturevalue(archivers)
@@ -511,5 +512,25 @@ def test_hard_link_deletion_and_replacement(archivers, request):
     assert_line_exists(lines, "[cm]time:.*[cm]time:.*input/a$")
     # From test1 to test2's POV, the a/hardlink file is a fresh new file.
     assert_line_exists(lines, "added.*B.*input/a/hardlink")
-    # But the b/hardlink file was not modified at all.
-    assert_line_not_exists(lines, ".*input/b/hardlink")
+    # On Linux/macOS: b/hardlink was not touched at all — must not appear in diff.
+    # On BSD: creating a new file at a previously hard-linked path can cause a
+    # POSIX-valid sub-second ctime update on surviving hard links. If b/hardlink
+    # appears, it must be a ctime-only change — no content, mode, or mtime changes.
+    if is_freebsd or is_netbsd:
+        # BSD may show a sub-second ctime change on b/hardlink (POSIX-valid).
+        # If it appears, verify the diff output actually shows distinguishable timestamps
+        # (i.e. the format_timestamp_pair fix is working), and no other changes.
+        bsd_ctime_lines = [l for l in lines if re.search(r"input/b/hardlink", l)]
+        for line in bsd_ctime_lines:
+            # Must have a ctime entry with different-looking timestamps
+            m = re.search(r"\[ctime: (.+?) -> (.+?)\]", line)
+            assert m is not None, f"b/hardlink line missing ctime entry: {line!r}"
+            assert m.group(1) != m.group(2), (
+                f"b/hardlink ctime looks identical in output: {line!r} — "
+                "format_timestamp_pair fix may not be working"
+            )
+        assert_line_not_exists(lines, r"mtime:.*input/b/hardlink")
+        assert_line_not_exists(lines, r"modified.*input/b/hardlink")
+        assert_line_not_exists(lines, r"-[r-][w-][x-].*input/b/hardlink")
+    else:
+        assert_line_not_exists(lines, r".*input/b/hardlink")

@@ -36,7 +36,7 @@ from .fslocking import LockTimeout, NotLocked, NotMyLock, LockFailed
 from .logger import create_logger, borg_serve_log_queue
 from .manifest import NoManifestError
 from .helpers import msgpack
-from .legacyrepository import LegacyRepository
+from .legacy.repository import LegacyRepository
 from .repository import Repository, StoreObjectNotFound
 from .version import parse_version, format_version
 from .helpers.datastruct import EfficientCollectionQueue

@@ -16,24 +16,24 @@ from subprocess import Popen, PIPE
 
 from xxhash import xxh64
 
-from . import __version__
-from .compress import Compressor
-from .constants import *  # NOQA
-from .helpers import Error, ErrorWithTraceback, IntegrityError
-from .helpers import bin_to_hex
-from .helpers import get_limited_unpacker
-from .helpers import replace_placeholders
-from .helpers import format_file_size
-from .helpers import safe_unlink
-from .helpers import prepare_subprocess_env, ignore_sigint
-from .helpers import get_socket_filename
-from .fslocking import LockTimeout, NotLocked, NotMyLock, LockFailed
-from .logger import create_logger
-from .helpers import msgpack
-from .legacyrepository import LegacyRepository
-from .version import parse_version, format_version
-from .helpers.datastruct import EfficientCollectionQueue
-from .platform import is_win32
+from .. import __version__
+from ..compress import Compressor
+from ..constants import *  # NOQA
+from ..helpers import Error, ErrorWithTraceback, IntegrityError
+from ..helpers import bin_to_hex
+from ..helpers import get_limited_unpacker
+from ..helpers import replace_placeholders
+from ..helpers import format_file_size
+from ..helpers import safe_unlink
+from ..helpers import prepare_subprocess_env, ignore_sigint
+from ..helpers import get_socket_filename
+from ..fslocking import LockTimeout, NotLocked, NotMyLock, LockFailed
+from ..logger import create_logger
+from ..helpers import msgpack
+from .repository import LegacyRepository
+from ..version import parse_version, format_version
+from ..helpers.datastruct import EfficientCollectionQueue
+from ..platform import is_win32
 
 logger = create_logger(__name__)
 

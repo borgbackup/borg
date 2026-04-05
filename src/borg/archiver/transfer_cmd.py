@@ -10,7 +10,7 @@ from ..helpers import ChunkerParams, ChunkIteratorFileWrapper, CompressionSpec
 from ..helpers.argparsing import ArgumentParser, ArgumentTypeError
 from ..item import ChunkListEntry
 from ..manifest import Manifest
-from ..legacyrepository import LegacyRepository
+from ..legacy.repository import LegacyRepository
 from ..repository import Repository
 
 from ..logger import create_logger

@@ -4,7 +4,8 @@ from ..constants import ROBJ_FILE_STREAM, ROBJ_MANIFEST, ROBJ_ARCHIVE_META
 from ..crypto.key import PlaintextKey
 from ..helpers.errors import IntegrityError
 from ..repository import Repository
-from ..repoobj import RepoObj, RepoObj1
+from ..repoobj import RepoObj
+from ..legacy.repoobj import RepoObj1
 from ..compress import LZ4
 
 

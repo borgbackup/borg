@@ -1335,9 +1335,9 @@ def ellipsis_truncate(msg, space):
 
 class BorgJsonEncoder(json.JSONEncoder):
     def default(self, o):
-        from ..legacyrepository import LegacyRepository
+        from ..legacy.repository import LegacyRepository
         from ..repository import Repository
-        from ..legacyremote import LegacyRemoteRepository
+        from ..legacy.remote import LegacyRemoteRepository
         from ..remote import RemoteRepository
         from ..archive import Archive
         from ..cache import AdHocWithFilesCache

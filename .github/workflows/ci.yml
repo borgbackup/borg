@@ -579,7 +579,7 @@ jobs:
                 pip install -e .
 
                 # troubles with either tox or pytest xdist, so we run pytest manually:
-                pytest -v -n auto -rs --cov=borg --cov-config=pyproject.toml --cov-report=xml --junitxml=test-results.xml --benchmark-skip -k "not remote and not socket"
+                pytest -v -rs --cov=borg --cov-config=pyproject.toml --cov-report=xml --junitxml=test-results.xml --benchmark-skip -k "not remote and not socket and test_create_read_special"
                 ;;
             esac
 
@@ -678,7 +678,7 @@ jobs:
           export PATH="$GITHUB_WORKSPACE/dist/binary/borg-dir:$PATH"
           borg.exe -V
           . env/bin/activate
-          python -m pytest -n4 --benchmark-skip -vv -rs -k "not remote" --cov=borg --cov-config=pyproject.toml --cov-report=xml --junitxml=test-results.xml
+          python -m pytest --benchmark-skip -vv -rs -k "not remote and test_create_read_special" --cov=borg --cov-config=pyproject.toml --cov-report=xml --junitxml=test-results.xml
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}

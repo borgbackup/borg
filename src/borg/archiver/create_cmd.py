@@ -90,7 +90,7 @@ class CreateMixIn:
                         raise Error(f"{path!r}: {e}")
                 else:
                     status = "+"  # included
-                self.print_file_status(status, path)
+                self.print_file_status(status, path, phase="end")
             elif args.paths_from_command or args.paths_from_shell_command or args.paths_from_stdin:
                 paths_sep = eval_escapes(args.paths_delimiter) if args.paths_delimiter is not None else "\n"
                 if args.paths_from_command or args.paths_from_shell_command:
@@ -139,7 +139,7 @@ class CreateMixIn:
                         status = "E"
                     if status == "C":
                         self.print_warning_instance(FileChangedWarning(path))
-                    self.print_file_status(status, path)
+                    self.print_file_status(status, path, phase="end")
                     if not dry_run and status is not None:
                         fso.stats.files_stats[status] += 1
                 if args.paths_from_command or args.paths_from_shell_command:
@@ -167,7 +167,7 @@ class CreateMixIn:
                                 status = "E"
                         else:
                             status = "+"  # included
-                        self.print_file_status(status, path)
+                        self.print_file_status(status, path, phase="end")
                         if not dry_run and status is not None:
                             fso.stats.files_stats[status] += 1
                         continue
@@ -293,134 +293,147 @@ class CreateMixIn:
         """
         Call the right method on the given FilesystemObjectProcessor.
         """
-
         if dry_run:
             return "+"  # included
-        MAX_RETRIES = 10  # count includes the initial try (initial try == "retry 0")
-        for retry in range(MAX_RETRIES):
-            last_try = retry == MAX_RETRIES - 1
-            try:
-                if stat.S_ISREG(st.st_mode):
-                    return fso.process_file(
-                        path=path,
-                        parent_fd=parent_fd,
-                        name=name,
-                        st=st,
-                        cache=cache,
-                        last_try=last_try,
-                        strip_prefix=strip_prefix,
-                    )
-                elif stat.S_ISDIR(st.st_mode):
-                    return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
-                elif stat.S_ISLNK(st.st_mode):
-                    if not read_special:
-                        return fso.process_symlink(
-                            path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
+
+        # Types not archived: no list start/end pair (matches prior behavior of no status line).
+        if stat.S_ISSOCK(st.st_mode):
+            return
+        elif stat.S_ISDOOR(st.st_mode):
+            return
+        elif stat.S_ISPORT(st.st_mode):
+            return
+
+        m = st.st_mode
+        if not (
+            stat.S_ISREG(m)
+            or stat.S_ISDIR(m)
+            or stat.S_ISLNK(m)
+            or stat.S_ISFIFO(m)
+            or stat.S_ISCHR(m)
+            or stat.S_ISBLK(m)
+        ):
+            self.print_warning("Unknown file type: %s", path)
+            return
+
+        # Emit START once, before any processing, before the retry loop.
+        self.print_file_status(None, path, phase="start")
+
+        try:
+            MAX_RETRIES = 10  # count includes the initial try (initial try == "retry 0")
+            for retry in range(MAX_RETRIES):
+                last_try = retry == MAX_RETRIES - 1
+                try:
+                    if stat.S_ISREG(st.st_mode):
+                        return fso.process_file(
+                            path=path,
+                            parent_fd=parent_fd,
+                            name=name,
+                            st=st,
+                            cache=cache,
+                            last_try=last_try,
+                            strip_prefix=strip_prefix,
                         )
-                    else:
-                        try:
-                            st_target = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=True)
-                        except OSError:
-                            special = False
+                    elif stat.S_ISDIR(st.st_mode):
+                        return fso.process_dir(path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix)
+                    elif stat.S_ISLNK(st.st_mode):
+                        if not read_special:
+                            return fso.process_symlink(
+                                path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
+                            )
                         else:
-                            special = is_special(st_target.st_mode)
-                        if special:
+                            try:
+                                st_target = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=True)
+                            except OSError:
+                                special = False
+                            else:
+                                special = is_special(st_target.st_mode)
+                            if special:
+                                return fso.process_file(
+                                    path=path,
+                                    parent_fd=parent_fd,
+                                    name=name,
+                                    st=st_target,
+                                    cache=cache,
+                                    flags=flags_special_follow,
+                                    last_try=last_try,
+                                    strip_prefix=strip_prefix,
+                                )
+                            else:
+                                return fso.process_symlink(
+                                    path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
+                                )
+                    elif stat.S_ISFIFO(st.st_mode):
+                        if not read_special:
+                            return fso.process_fifo(
+                                path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
+                            )
+                        else:
                             return fso.process_file(
                                 path=path,
                                 parent_fd=parent_fd,
                                 name=name,
-                                st=st_target,
+                                st=st,
                                 cache=cache,
-                                flags=flags_special_follow,
+                                flags=flags_special,
                                 last_try=last_try,
                                 strip_prefix=strip_prefix,
                             )
-                        else:
-                            return fso.process_symlink(
-                                path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
+                    elif stat.S_ISCHR(st.st_mode):
+                        if not read_special:
+                            return fso.process_dev(
+                                path=path, parent_fd=parent_fd, name=name, st=st, dev_type="c", strip_prefix=strip_prefix
                             )
-                elif stat.S_ISFIFO(st.st_mode):
-                    if not read_special:
-                        return fso.process_fifo(
-                            path=path, parent_fd=parent_fd, name=name, st=st, strip_prefix=strip_prefix
+                        else:
+                            return fso.process_file(
+                                path=path,
+                                parent_fd=parent_fd,
+                                name=name,
+                                st=st,
+                                cache=cache,
+                                flags=flags_special,
+                                last_try=last_try,
+                                strip_prefix=strip_prefix,
+                            )
+                    elif stat.S_ISBLK(st.st_mode):
+                        if not read_special:
+                            return fso.process_dev(
+                                path=path, parent_fd=parent_fd, name=name, st=st, dev_type="b", strip_prefix=strip_prefix
+                            )
+                        else:
+                            return fso.process_file(
+                                path=path,
+                                parent_fd=parent_fd,
+                                name=name,
+                                st=st,
+                                cache=cache,
+                                flags=flags_special,
+                                last_try=last_try,
+                                strip_prefix=strip_prefix,
+                            )
+                    else:
+                        self.print_warning("Unknown file type: %s", path)
+                        return
+                except BackupItemExcluded:
+                    return "-"
+                except BackupError as err:
+                    if isinstance(err, BackupOSError):
+                        if err.errno in (errno.EPERM, errno.EACCES):
+                            raise
+                    sleep_s = 1000.0 / 1e6 * 10 ** (retry / 2)
+                    time.sleep(sleep_s)
+                    if retry < MAX_RETRIES - 1:
+                        logger.warning(
+                            f"{path}: {err}, slept {sleep_s:.3f}s, next: retry: {retry + 1} of {MAX_RETRIES - 1}..."
                         )
                     else:
-                        return fso.process_file(
-                            path=path,
-                            parent_fd=parent_fd,
-                            name=name,
-                            st=st,
-                            cache=cache,
-                            flags=flags_special,
-                            last_try=last_try,
-                            strip_prefix=strip_prefix,
-                        )
-                elif stat.S_ISCHR(st.st_mode):
-                    if not read_special:
-                        return fso.process_dev(
-                            path=path, parent_fd=parent_fd, name=name, st=st, dev_type="c", strip_prefix=strip_prefix
-                        )
-                    else:
-                        return fso.process_file(
-                            path=path,
-                            parent_fd=parent_fd,
-                            name=name,
-                            st=st,
-                            cache=cache,
-                            flags=flags_special,
-                            last_try=last_try,
-                            strip_prefix=strip_prefix,
-                        )
-                elif stat.S_ISBLK(st.st_mode):
-                    if not read_special:
-                        return fso.process_dev(
-                            path=path, parent_fd=parent_fd, name=name, st=st, dev_type="b", strip_prefix=strip_prefix
-                        )
-                    else:
-                        return fso.process_file(
-                            path=path,
-                            parent_fd=parent_fd,
-                            name=name,
-                            st=st,
-                            cache=cache,
-                            flags=flags_special,
-                            last_try=last_try,
-                            strip_prefix=strip_prefix,
-                        )
-                elif stat.S_ISSOCK(st.st_mode):
-                    # Ignore unix sockets
-                    return
-                elif stat.S_ISDOOR(st.st_mode):
-                    # Ignore Solaris doors
-                    return
-                elif stat.S_ISPORT(st.st_mode):
-                    # Ignore Solaris event ports
-                    return
-                else:
-                    self.print_warning("Unknown file type: %s", path)
-                    return
-            except BackupItemExcluded:
-                return "-"
-            except BackupError as err:
-                if isinstance(err, BackupOSError):
-                    if err.errno in (errno.EPERM, errno.EACCES):
-                        # Do not try again, such errors can not be fixed by retrying.
                         raise
-                # sleep a bit, so temporary problems might go away...
-                sleep_s = 1000.0 / 1e6 * 10 ** (retry / 2)  # retry 0: 1ms, retry 6: 1s, ...
-                time.sleep(sleep_s)
-                if retry < MAX_RETRIES - 1:
-                    logger.warning(
-                        f"{path}: {err}, slept {sleep_s:.3f}s, next: retry: {retry + 1} of {MAX_RETRIES - 1}..."
-                    )
-                else:
-                    # giving up with retries, error will be dealt with (logged) by upper error handler
-                    raise
-                # we better do a fresh stat on the file, just to make sure to get the current file
-                # mode right (which could have changed due to a race condition and is important for
-                # dispatching) and also to get current inode number of that file.
-                with backup_io("stat"):
-                    st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
+                    with backup_io("stat"):
+                        st = os_stat(path=path, parent_fd=parent_fd, name=name, follow_symlinks=False)
+        finally:
+            # END is always emitted here — after ALL processing including chunked I/O,
+            # even on exception, even on retry exhaustion.
+            self.print_file_status(None, path, phase="end")
 
     def _rec_walk(
         self,

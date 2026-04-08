@@ -1,0 +1,263 @@
++ export COLUMNS=80
++ COLUMNS=80
++ rm -rf /tmp/demo-repo
++ borg --repo /tmp/demo-repo init -e repokey-aes-ocb
+usage: borg [--config CONFIG] [--print_config [=flags]] [-V] [--cockpit] [-h]
+            [--critical] [--error] [--warning] [--info] [--debug]
+            [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M]
+            [--remote-path PATH] [--upload-ratelimit RATE]
+            [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: argument <command>: invalid choice: 'init' (choose from 'analyze', 'benchmark', 'check', 'compact', 'completion', 'create', 'debug', 'delete', 'diff', 'extract', 'help', 'info', 'key', 'list', 'break-lock', 'with-lock', 'mount', 'umount', 'prune', 'repo-compress', 'repo-create', 'repo-delete', 'repo-info', 'repo-list', 'recreate', 'rename', 'repo-space', 'serve', 'tag', 'export-tar', 'import-tar', 'transfer', 'undelete', 'version')
+Common fixes:
+- Maybe you meant `repo-create` not `init`:
+	borg --repo /tmp/demo-repo repo-create -e repokey-aes-ocb
+- Run 'borg help' to list valid borg2 commands.
++ borg --repo /tmp/demo-repo rcreate -e repokey-aes-ocb
+usage: borg [--config CONFIG] [--print_config [=flags]] [-V] [--cockpit] [-h]
+            [--critical] [--error] [--warning] [--info] [--debug]
+            [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M]
+            [--remote-path PATH] [--upload-ratelimit RATE]
+            [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: argument <command>: invalid choice: 'rcreate' (choose from 'analyze', 'benchmark', 'check', 'compact', 'completion', 'create', 'debug', 'delete', 'diff', 'extract', 'help', 'info', 'key', 'list', 'break-lock', 'with-lock', 'mount', 'umount', 'prune', 'repo-compress', 'repo-create', 'repo-delete', 'repo-info', 'repo-list', 'recreate', 'rename', 'repo-space', 'serve', 'tag', 'export-tar', 'import-tar', 'transfer', 'undelete', 'version')
+Common fixes:
+- Maybe you meant `repo-create` not `rcreate`:
+	borg --repo /tmp/demo-repo repo-create -e repokey-aes-ocb
+- Run 'borg help' to list valid borg2 commands.
++ borg repo-creat
+usage: borg [--config CONFIG] [--print_config [=flags]] [-V] [--cockpit] [-h]
+            [--critical] [--error] [--warning] [--info] [--debug]
+            [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M]
+            [--remote-path PATH] [--upload-ratelimit RATE]
+            [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: argument <command>: invalid choice: 'repo-creat' (choose from 'analyze', 'benchmark', 'check', 'compact', 'completion', 'create', 'debug', 'delete', 'diff', 'extract', 'help', 'info', 'key', 'list', 'break-lock', 'with-lock', 'mount', 'umount', 'prune', 'repo-compress', 'repo-create', 'repo-delete', 'repo-info', 'repo-list', 'recreate', 'rename', 'repo-space', 'serve', 'tag', 'export-tar', 'import-tar', 'transfer', 'undelete', 'version')
+Common fixes:
+- Maybe you meant `repo-create` not `repo-creat`:
+	borg repo-create
+- Run 'borg help' to list valid borg2 commands.
++ borg repoo-list
+usage: borg [--config CONFIG] [--print_config [=flags]] [-V] [--cockpit] [-h]
+            [--critical] [--error] [--warning] [--info] [--debug]
+            [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M]
+            [--remote-path PATH] [--upload-ratelimit RATE]
+            [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: argument <command>: invalid choice: 'repoo-list' (choose from 'analyze', 'benchmark', 'check', 'compact', 'completion', 'create', 'debug', 'delete', 'diff', 'extract', 'help', 'info', 'key', 'list', 'break-lock', 'with-lock', 'mount', 'umount', 'prune', 'repo-compress', 'repo-create', 'repo-delete', 'repo-info', 'repo-list', 'recreate', 'rename', 'repo-space', 'serve', 'tag', 'export-tar', 'import-tar', 'transfer', 'undelete', 'version')
+Common fixes:
+- Maybe you meant `repo-list` not `repoo-list`:
+	borg repo-list
+- Run 'borg help' to list valid borg2 commands.
++ Borg1 - option hints
+./scripts/test-ux.sh: line 15: Borg1: command not found
++ borg --repo /tmp/demo-repo list --glob-archives 'my*'
+Common fixes:
+- borg1 option "--glob-archives" is not used in borg2. Use "--match-archives 'sh:PATTERN'" instead.
+- Example: borg list ARCHIVE --match-archives 'sh:old-*'
+usage: borg [options] list [-h] [--critical] [--error] [--warning] [--info]
+                           [--debug] [--debug-topic TOPIC] [-p] [--iec]
+                           [--log-json] [--lock-wait SECONDS] [--show-version]
+                           [--show-rc] [--umask M] [--remote-path PATH]
+                           [--upload-ratelimit RATE]
+                           [--upload-buffer UPLOAD_BUFFER]
+                           [--debug-profile FILE] [--rsh RSH]
+                           [--socket [PATH]] [-r REPO] [--short]
+                           [--format FORMAT] [--json-lines] [--depth N]
+                           [-e PATTERN] [--exclude-from EXCLUDEFILE]
+                           [--pattern PATTERN] [--patterns-from PATTERNFILE]
+                           NAME [PATH ...]
+tip: For details of accepted options run: borg list --help
+error: argument NAME: Invalid archive name: "my*" [invalid chars detected matching "/\"<|>?*"]
++ borg --repo /tmp/demo-repo create --numeric-owner test /root/data
+Common fixes:
+- borg1 option "--numeric-owner" is not used in borg2. Use "--numeric-ids" instead.
+usage: borg [options] create [-h] [--critical] [--error] [--warning] [--info]
+                             [--debug] [--debug-topic TOPIC] [-p] [--iec]
+                             [--log-json] [--lock-wait SECONDS]
+                             [--show-version] [--show-rc] [--umask M]
+                             [--remote-path PATH] [--upload-ratelimit RATE]
+                             [--upload-buffer UPLOAD_BUFFER]
+                             [--debug-profile FILE] [--rsh RSH]
+                             [--socket [PATH]] [-r REPO] [-n] [-s] [--list]
+                             [--filter STATUSCHARS] [--json]
+                             [--stdin-name NAME] [--stdin-user USER]
+                             [--stdin-group GROUP] [--stdin-mode M]
+                             [--content-from-command] [--paths-from-stdin]
+                             [--paths-from-command]
+                             [--paths-from-shell-command]
+                             [--paths-delimiter DELIM] [-e PATTERN]
+                             [--exclude-from EXCLUDEFILE] [--pattern PATTERN]
+                             [--patterns-from PATTERNFILE] [--exclude-caches]
+                             [--exclude-if-present NAME] [--keep-exclude-tags]
+                             [-x] [--numeric-ids] [--atime] [--noctime]
+                             [--nobirthtime] [--noflags] [--noacls]
+                             [--noxattrs] [--sparse] [--files-cache MODE]
+                             [--files-changed MODE] [--read-special]
+                             [--comment COMMENT] [--timestamp TIMESTAMP]
+                             [--chunker-params PARAMS] [-C COMPRESSION]
+                             [--hostname HOSTNAME] [--username USERNAME]
+                             [--tags TAG [TAG ...]]
+                             NAME [PATH ...]
+tip: For details of accepted options run: borg create --help
+error: Unrecognized arguments: --numeric-owner
++ borg --repo /tmp/demo-repo create --nobsdflags test /root/data
+Common fixes:
+- borg1 option "--nobsdflags" is not used in borg2. Use "--noflags" instead.
+usage: borg [options] create [-h] [--critical] [--error] [--warning] [--info]
+                             [--debug] [--debug-topic TOPIC] [-p] [--iec]
+                             [--log-json] [--lock-wait SECONDS]
+                             [--show-version] [--show-rc] [--umask M]
+                             [--remote-path PATH] [--upload-ratelimit RATE]
+                             [--upload-buffer UPLOAD_BUFFER]
+                             [--debug-profile FILE] [--rsh RSH]
+                             [--socket [PATH]] [-r REPO] [-n] [-s] [--list]
+                             [--filter STATUSCHARS] [--json]
+                             [--stdin-name NAME] [--stdin-user USER]
+                             [--stdin-group GROUP] [--stdin-mode M]
+                             [--content-from-command] [--paths-from-stdin]
+                             [--paths-from-command]
+                             [--paths-from-shell-command]
+                             [--paths-delimiter DELIM] [-e PATTERN]
+                             [--exclude-from EXCLUDEFILE] [--pattern PATTERN]
+                             [--patterns-from PATTERNFILE] [--exclude-caches]
+                             [--exclude-if-present NAME] [--keep-exclude-tags]
+                             [-x] [--numeric-ids] [--atime] [--noctime]
+                             [--nobirthtime] [--noflags] [--noacls]
+                             [--noxattrs] [--sparse] [--files-cache MODE]
+                             [--files-changed MODE] [--read-special]
+                             [--comment COMMENT] [--timestamp TIMESTAMP]
+                             [--chunker-params PARAMS] [-C COMPRESSION]
+                             [--hostname HOSTNAME] [--username USERNAME]
+                             [--tags TAG [TAG ...]]
+                             NAME [PATH ...]
+tip: For details of accepted options run: borg create --help
+error: Unrecognized arguments: --nobsdflags
++ borg --repo /tmp/demo-repo create --remote-ratelimit 1000 test /root/data
+Common fixes:
+- borg1 option "--remote-ratelimit" is not used in borg2. Use "--upload-ratelimit" instead.
+usage: borg [options] create [-h] [--critical] [--error] [--warning] [--info]
+                             [--debug] [--debug-topic TOPIC] [-p] [--iec]
+                             [--log-json] [--lock-wait SECONDS]
+                             [--show-version] [--show-rc] [--umask M]
+                             [--remote-path PATH] [--upload-ratelimit RATE]
+                             [--upload-buffer UPLOAD_BUFFER]
+                             [--debug-profile FILE] [--rsh RSH]
+                             [--socket [PATH]] [-r REPO] [-n] [-s] [--list]
+                             [--filter STATUSCHARS] [--json]
+                             [--stdin-name NAME] [--stdin-user USER]
+                             [--stdin-group GROUP] [--stdin-mode M]
+                             [--content-from-command] [--paths-from-stdin]
+                             [--paths-from-command]
+                             [--paths-from-shell-command]
+                             [--paths-delimiter DELIM] [-e PATTERN]
+                             [--exclude-from EXCLUDEFILE] [--pattern PATTERN]
+                             [--patterns-from PATTERNFILE] [--exclude-caches]
+                             [--exclude-if-present NAME] [--keep-exclude-tags]
+                             [-x] [--numeric-ids] [--atime] [--noctime]
+                             [--nobirthtime] [--noflags] [--noacls]
+                             [--noxattrs] [--sparse] [--files-cache MODE]
+                             [--files-changed MODE] [--read-special]
+                             [--comment COMMENT] [--timestamp TIMESTAMP]
+                             [--chunker-params PARAMS] [-C COMPRESSION]
+                             [--hostname HOSTNAME] [--username USERNAME]
+                             [--tags TAG [TAG ...]]
+                             NAME [PATH ...]
+tip: For details of accepted options run: borg create --help
+error: Unrecognized arguments: --remote-ratelimit
++ borg --repo /tmp/demo-repo repo-create
+usage: borg [--config CONFIG] [--print_config [=flags]] [-V] [--cockpit] [-h]
+            [--critical] [--error] [--warning] [--info] [--debug]
+            [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M]
+            [--remote-path PATH] [--upload-ratelimit RATE]
+            [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: Option 'repo-create.encryption' is required but not provided or its value is None.
+Use -e/--encryption to choose a mode, for example: -e repokey-aes-ocb
+Available encryption modes: none, authenticated, authenticated-blake2, keyfile-aes-ocb, repokey-aes-ocb, keyfile-chacha20-poly1305, repokey-chacha20-poly1305, keyfile-blake2-aes-ocb, repokey-blake2-aes-ocb, keyfile-blake2-chacha20-poly1305, repokey-blake2-chacha20-poly1305
++ borg --repo /tmp/demo-repo::test1 list
+usage: borg [--config CONFIG] [--print_config [=flags]] [-V] [--cockpit] [-h]
+            [--critical] [--error] [--warning] [--info] [--debug]
+            [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M]
+            [--remote-path PATH] [--upload-ratelimit RATE]
+            [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: argument -r/--repo: Invalid location format: "/tmp/demo-repo::test1".
+
+Common fixes:
+ * Borg 2 does not accept repo::archive syntax. Corrected command lines:
+	borg list --repo /tmp/demo-repo list ::test1
+		OR
+	export BORG_REPO=/tmp/demo-repo
+	borg list ::test1
++ borg --repo /tmp/does-not-exist repo-info
+Repository /tmp/does-not-exist does not exist.
+Common fixes:
+- Specify Correct Path ("/tmp/does-not-exist" does not exist).
+- Create repository (-r): borg repo-create -r "/tmp/does-not-exist" -e repokey-aes-ocb
+- Create repository (BORG_REPO):
+  export BORG_REPO=/tmp/does-not-exist
+  borg repo-create -e repokey-aes-ocb
+Available -e modes: none, authenticated, authenticated-blake2, keyfile-aes-ocb, repokey-aes-ocb, keyfile-chacha20-poly1305, repokey-chacha20-poly1305, keyfile-blake2-aes-ocb, repokey-blake2-aes-ocb, keyfile-blake2-chacha20-poly1305, repokey-blake2-chacha20-poly1305
++ borg --repo /tmp/does-not-exist list
+usage: borg [--config CONFIG] [--print_config [=flags]] [-V] [--cockpit] [-h]
+            [--critical] [--error] [--warning] [--info] [--debug]
+            [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M]
+            [--remote-path PATH] [--upload-ratelimit RATE]
+            [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: Option 'list.paths' is required but not provided or its value is None.
+
+Common fixes:
+- "/tmp/does-not-exist" does not exist, pick a repository that exists or create one:
+	borg repo-create --repo /tmp/does-not-exist -e repokey-aes-ocb
+Available -e modes: none, authenticated, authenticated-blake2, keyfile-aes-ocb, repokey-aes-ocb, keyfile-chacha20-poly1305, repokey-chacha20-poly1305, keyfile-blake2-aes-ocb, repokey-blake2-aes-ocb, keyfile-blake2-chacha20-poly1305, repokey-blake2-chacha20-poly1305
++ borg list
+usage: borg [--config CONFIG] [--print_config [=flags]] [-V] [--cockpit] [-h]
+            [--critical] [--error] [--warning] [--info] [--debug]
+            [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M]
+            [--remote-path PATH] [--upload-ratelimit RATE]
+            [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: Option 'list.paths' is required but not provided or its value is None.
+borg list requires an archive NAME to list contents.
+Common fixes:
+- Provide archive name: borg list NAME
+- To list archives in a repository, use: borg -r REPO repo-list
++ borg frobnicate
+usage: borg [--config CONFIG] [--print_config [=flags]] [-V] [--cockpit] [-h]
+            [--critical] [--error] [--warning] [--info] [--debug]
+            [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M]
+            [--remote-path PATH] [--upload-ratelimit RATE]
+            [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: argument <command>: invalid choice: 'frobnicate' (choose from 'analyze', 'benchmark', 'check', 'compact', 'completion', 'create', 'debug', 'delete', 'diff', 'extract', 'help', 'info', 'key', 'list', 'break-lock', 'with-lock', 'mount', 'umount', 'prune', 'repo-compress', 'repo-create', 'repo-delete', 'repo-info', 'repo-list', 'recreate', 'rename', 'repo-space', 'serve', 'tag', 'export-tar', 'import-tar', 'transfer', 'undelete', 'version')
+Common fixes:
+- Run 'borg help' to list valid borg2 commands.

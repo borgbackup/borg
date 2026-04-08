@@ -954,8 +954,13 @@ class RemoteRepository:
     def info(self):
         """actual remoting is done via self.call in the @api decorator"""
 
-    @api(since=parse_version("1.0.0"), max_duration={"since": parse_version("1.2.0a4"), "previously": 0})
-    def check(self, repair=False, max_duration=0):
+    @api(
+        since=parse_version("1.0.0"),
+        max_duration={"since": parse_version("1.2.0a4"), "previously": 0},
+        # NOTE: update version when next beta is released
+        progress={"since": parse_version("2.0.0b21"), "dontcare": True},
+    )
+    def check(self, repair=False, max_duration=0, progress=False):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(

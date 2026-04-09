@@ -137,8 +137,11 @@ class FileFMAPReader:
         if self.try_sparse:
             try:
                 fmap = list(sparsemap(self.fd, self.fh))
-            except OSError as err:
-                # seeking did not work
+            except (OSError, ValueError) as err:
+                # Building a sparse map failed:
+                # - OSError: low-level lseek with SEEK_HOLE/SEEK_DATA not supported by FS/OS.
+                # - ValueError: high-level file objects (e.g. io.BytesIO or some fd wrappers)
+                #   don't accept SEEK_HOLE/SEEK_DATA as a valid "whence" and raise ValueError.
                 pass
 
         if fmap is None:
@@ -170,6 +173,9 @@ class FileFMAPReader:
                     # read block from the range
                     data = dread(offset, wanted, self.fd, self.fh)
                     got = len(data)
+                    # Detect zero-filled blocks regardless of sparse mode.
+                    # Zero detection is important to avoid reading/storing allocated zeros
+                    # even when we are not using sparse file handling based on SEEK_HOLE/SEEK_DATA.
                     if zeros.startswith(data):
                         data = None
                         allocation = CH_ALLOC

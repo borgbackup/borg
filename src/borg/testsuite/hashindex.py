@@ -493,7 +493,8 @@ class HashIndexCompactTestCase(HashIndexDataTestCase):
 
         compact_index = self.index_from_data_compact_to_data()
 
-        self.index(num_entries=0, num_buckets=0)
+        self.index(num_entries=0, num_buckets=1)
+        self.write_empty(b'\0' * 32)
         assert compact_index == self.index_data.getvalue()
 
     def test_merge(self):

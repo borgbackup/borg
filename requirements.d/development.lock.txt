@@ -3,7 +3,7 @@ setuptools-scm==9.2.2
 pip==26.0.1
 wheel==0.46.3
 virtualenv==20.39.1
-build==1.4.2
+build==1.4.3
 pkgconfig==1.6.0
 tox==4.48.1
 pytest==9.0.3
@@ -13,4 +13,4 @@ pytest-cov==7.0.0
 pytest-benchmark==5.2.3
 Cython==3.2.4
 pre-commit==4.5.1
-types-PyYAML==6.0.12.20250915
+types-PyYAML==6.0.12.20260408

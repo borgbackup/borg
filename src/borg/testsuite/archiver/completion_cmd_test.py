@@ -22,6 +22,7 @@ def cmd_available(cmd):
 
 needs_bash = pytest.mark.skipif(not cmd_available("bash --version"), reason="Bash not available")
 needs_zsh = pytest.mark.skipif(not cmd_available("zsh --version"), reason="Zsh not available")
+needs_tcsh = pytest.mark.skipif(not cmd_available("tcsh --version"), reason="Tcsh not available")
 
 
 def _run_bash_completion_fn(completion_script, setup_code):
@@ -57,6 +58,14 @@ def test_zsh_completion_nontrivial(archivers, request):
     assert output.count("\n") > 100, f"Zsh completion suspiciously few lines: {output.count(chr(10))}"
 
 
+def test_tcsh_completion_nontrivial(archivers, request):
+    """Verify the generated Tcsh completion is non-trivially sized."""
+    archiver = request.getfixturevalue(archivers)
+    output = cmd(archiver, "completion", "tcsh")
+    assert len(output) > 1000, f"Tcsh completion suspiciously small: {len(output)} chars"
+    assert output.count("\n") > 20, f"Tcsh completion suspiciously few lines: {output.count(chr(10))}"
+
+
 # -- syntax validation --------------------------------------------------------
 
 
@@ -88,6 +97,24 @@ def test_zsh_completion_syntax(archivers, request):
     output = cmd(archiver, "completion", "zsh")
     result = _check_shell_syntax(output, "zsh", ".zsh")
     assert result.returncode == 0, f"Generated Zsh completion has syntax errors: {result.stderr.decode()}"
+
+
+@needs_tcsh
+def test_tcsh_completion_syntax(archivers, request):
+    """Verify the generated Tcsh completion script has valid syntax."""
+    archiver = request.getfixturevalue(archivers)
+    output = cmd(archiver, "completion", "tcsh")
+    # tcsh doesn't have -n for syntax check like bash/zsh, but we can try to source it
+    # and see if it fails. 'tcsh -f -c "source path"'
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".tcsh", delete=False) as f:
+        f.write(output)
+        script_path = f.name
+    try:
+        # -f: fast start (don't resource .tcshrc)
+        result = subprocess.run(["tcsh", "-f", "-c", f"source {script_path}"], capture_output=True)
+    finally:
+        os.unlink(script_path)
+    assert result.returncode == 0, f"Generated Tcsh completion has errors: {result.stderr.decode()}"
 
 
 # -- borg-specific preamble function behavior (bash) --------------------------

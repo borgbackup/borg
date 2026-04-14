@@ -423,7 +423,7 @@ jobs:
 
       - name: Test on ${{ matrix.display_name }}
         id: cross_os
-        uses: cross-platform-actions/action@v0.32.0
+        uses: cross-platform-actions/action@v1.0.0
         env:
           DO_BINARIES: ${{ matrix.do_binaries }}
         with:

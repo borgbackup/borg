@@ -19,6 +19,11 @@ class ListMixIn:
     @with_repository(compatibility=(Manifest.Operation.READ,))
     def do_list(self, args, repository, manifest):
         """List archive contents."""
+        if args.name is None:
+            self.parser.error(
+                "borg list requires an archive NAME.\n"
+                "To list the archives in a repository, use: borg repo-list"
+            )
         # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
         if args.format is not None:
@@ -126,7 +131,7 @@ class ListMixIn:
         subparser.add_argument(
             "--depth", metavar="N", dest="depth", type=int, help="only list files up to the specified directory depth"
         )
-        subparser.add_argument("name", metavar="NAME", type=archivename_validator, help="specify the archive name")
+        subparser.add_argument("name", metavar="NAME", nargs="?", default=None, type=archivename_validator, help="specify the archive name")
         subparser.add_argument(
             "paths", metavar="PATH", nargs="*", type=PathSpec, help="paths to list; patterns are supported"
         )

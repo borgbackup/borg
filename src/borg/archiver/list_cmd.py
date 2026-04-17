@@ -20,9 +20,12 @@ class ListMixIn:
     def do_list(self, args, repository, manifest):
         """List archive contents."""
         if args.name is None:
-            self.parser.error(
-                "borg list requires an archive NAME.\nTo list the archives in a repository, use: borg repo-list"
+            print(
+                "Error: borg list requires an archive NAME.\n"
+                "To list the archives in a repository, use: borg repo-list",
+                file=sys.stderr,
             )
+            return 2
         # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
         if args.format is not None:

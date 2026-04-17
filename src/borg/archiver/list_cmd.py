@@ -6,7 +6,7 @@ from ._common import with_repository, build_matcher, Highlander
 from ..archive import Archive
 from ..cache import Cache
 from ..constants import *  # NOQA
-from ..helpers import ItemFormatter, BaseFormatter, archivename_validator, PathSpec
+from ..helpers import ItemFormatter, BaseFormatter, archivename_validator, PathSpec, set_ec
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
 
@@ -25,7 +25,8 @@ class ListMixIn:
                 "To list the archives in a repository, use: borg repo-list",
                 file=sys.stderr,
             )
-            return 2
+            set_ec(EXIT_ERROR)
+            return
         # omitting args.pattern_roots here, restricting to paths only by cli args.paths:
         matcher = build_matcher(args.patterns, args.paths)
         if args.format is not None:

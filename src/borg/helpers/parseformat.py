@@ -27,7 +27,7 @@ from .errors import Error
 from .fs import get_keys_dir, make_path_safe, slashify
 from .argparsing import Action, ArgumentError, ArgumentTypeError, register_type
 from .msgpack import Timestamp
-from .time import OutputTimestamp, format_time, safe_timestamp
+from .time import OutputTimestamp, format_time, format_timestamp_pair, safe_timestamp
 from .. import __version__ as borg_version
 from .. import __version_tuple__ as borg_version_tuple
 from ..constants import *  # NOQA
@@ -1235,7 +1235,12 @@ class DiffFormatter(BaseFormatter):
 
     def format_time(self, key, diff: "ItemDiff"):
         change = diff.changes().get(key)
-        return f"[{key}: {change.diff_data['item1']} -> {change.diff_data['item2']}]" if change else ""
+        if not change:
+            return ""
+        ts1 = change.diff_data["item1"].ts
+        ts2 = change.diff_data["item2"].ts
+        s1, s2 = format_timestamp_pair(ts1, ts2)
+        return f"[{key}: {s1} -> {s2}]"
 
     def format_iso_time(self, key, diff: "ItemDiff"):
         change = diff.changes().get(key)

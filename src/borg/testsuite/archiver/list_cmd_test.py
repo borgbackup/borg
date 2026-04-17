@@ -259,3 +259,11 @@ def test_fingerprint(archivers, request):
 
     # Even unmodified files should have different fingerprints because conditions_hash changed
     assert fingerprints1["input/file2"] != fingerprints5["input/file2"]
+
+
+def test_list_without_archive_name_shows_helpful_error(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "list", exit_code=2)
+    assert "borg list requires an archive NAME" in output
+    assert "borg repo-list" in output

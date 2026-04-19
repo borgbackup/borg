@@ -117,7 +117,7 @@ class Archives:
 
     def _get_archive_meta(self, id: bytes) -> dict:
         # get all metadata directly from the ArchiveItem in the repo.
-        from .legacyrepository import LegacyRepository
+        from .legacy.repository import LegacyRepository
         from .repository import Repository
 
         try:

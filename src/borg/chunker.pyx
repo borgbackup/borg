@@ -247,6 +247,8 @@ cdef class Chunker:
         assert hash_window_size + min_size + 1 <= max_size, "too small max_size"
         hash_mask = (1 << hash_mask_bits) - 1
         self.chunker = chunker_init(hash_window_size, hash_mask, min_size, max_size, seed & 0xffffffff)
+        if not self.chunker:
+            raise MemoryError('chunker_init failed')
 
     def chunkify(self, fd, fh=-1):
         """

@@ -87,6 +87,9 @@ buzhash(const unsigned char *data, size_t len, const uint32_t *h)
 {
     uint32_t i;
     uint32_t sum = 0, imod;
+    if (len == 0) {
+        return 0;
+    }
     for(i = len - 1; i > 0; i--)
     {
         imod = i & 0x1f;
@@ -219,7 +222,9 @@ chunker_fill(Chunker *c)
             overshoot = 0;
         }
 
-        posix_fadvise(c->fh, offset & ~pagemask, length - overshoot, POSIX_FADV_DONTNEED);
+        if (length - overshoot > 0 || length == 0) {
+            posix_fadvise(c->fh, offset & ~pagemask, length - overshoot, POSIX_FADV_DONTNEED);
+        }
         #endif
 
         PyEval_RestoreThread(thread_state);
@@ -230,15 +235,21 @@ chunker_fill(Chunker *c)
         if(!data) {
             return 0;
         }
-        n = PyBytes_Size(data);
+        ssize_t read_bytes = PyBytes_Size(data);
         if(PyErr_Occurred()) {
             // we wanted bytes(), but got something else
+            Py_DECREF(data);
             return 0;
         }
-        if(n) {
-            memcpy(c->data + c->position + c->remaining, PyBytes_AsString(data), n);
-            c->remaining += n;
-            c->bytes_read += n;
+        if(read_bytes > n) {
+            Py_DECREF(data);
+            PyErr_SetString(PyExc_ValueError, "read() returned too many bytes");
+            return 0;
+        }
+        if(read_bytes) {
+            memcpy(c->data + c->position + c->remaining, PyBytes_AsString(data), read_bytes);
+            c->remaining += read_bytes;
+            c->bytes_read += read_bytes;
         }
         else {
             c->eof = 1;

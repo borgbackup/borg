@@ -1,3 +1,4 @@
+import fcntl
 import os
 
 from libc.stdint cimport uint32_t
@@ -259,3 +260,30 @@ def set_flags(path, bsd_flags, fd=None):
         path_bytes = os.fsencode(path)
         if lchflags(path_bytes, c_flags) == -1:
             raise OSError(errno.errno, os.strerror(errno.errno), os.fsdecode(path_bytes))
+
+
+def fdatasync(fd):
+    """macOS fdatasync using F_FULLFSYNC for true data durability.
+
+    os.fsync() is an OS-level flush (kernel page cache -> drive write buffer).
+    F_FULLFSYNC additionally issues a HW-level flush (drive write buffer -> persistent storage).
+    Falls back to os.fsync() if F_FULLFSYNC is not supported (e.g. network fs).
+    """
+    try:
+        fcntl.fcntl(fd, fcntl.F_FULLFSYNC)
+    except OSError:
+        os.fsync(fd)
+
+
+def sync_dir(path):
+    """Sync a directory to persistent storage on macOS using F_FULLFSYNC."""
+    if isinstance(path, str):
+        path = os.fsencode(path)
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        fdatasync(fd)
+    except OSError as os_error:
+        if os_error.errno != errno.EINVAL:
+            raise
+    finally:
+        os.close(fd)

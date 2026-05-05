@@ -459,6 +459,37 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         # the interesting parts of info_output2 and info_output should be same
         self.assert_equal(filter(info_output), filter(info_output2))
 
+    def test_create_quick_stats(self):
+        self.create_regular_file('file1', size=1024)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        output = self.cmd('create', '--quick-stats', self.repository_location + '::test', 'input')
+        self.assert_in('Archive name: test', output)
+        self.assert_in('This archive:', output)
+        assert 'All archives:' not in output
+        assert 'Chunk index:' not in output
+
+    def test_create_quick_stats_json(self):
+        self.create_regular_file('file1', size=1024)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        create_json = json.loads(self.cmd('create', '--json', '--quick-stats',
+                                          self.repository_location + '::test', 'input'))
+        assert 'archive' in create_json
+        assert 'stats' in create_json['archive']
+        assert 'cache' not in create_json
+
+    def test_create_stats_and_quick_stats_are_mutually_exclusive(self):
+        output = self.cmd('create', '--stats', '--quick-stats',
+                          self.repository_location + '::test', 'input', exit_code=2)
+        self.assert_in('--stats and --quick-stats are mutually exclusive', output)
+
+    def test_create_dry_run_ignores_quick_stats(self):
+        self.create_regular_file('file1', size=1024)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        output = self.cmd('create', '--dry-run', '--quick-stats',
+                          self.repository_location + '::test', 'input')
+        self.assert_in('Ignoring --quick-stats', output)
+        assert 'This archive:' not in output
+
     @requires_hardlinks
     def test_create_duplicate_root(self):
         # setup for #5603
@@ -3913,6 +3944,28 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         with changedir(self.output_path):
             self.cmd('extract', self.repository_location + '::dst')
         self.assert_dirs_equal('input', 'output/input', ignore_ns=True, ignore_xattrs=True)
+
+    def test_import_tar_quick_stats(self):
+        self.create_regular_file('file1', size=1024)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar')
+        output = self.cmd('import-tar', '--quick-stats', self.repository_location + '::dst', 'simple.tar')
+        self.assert_in('Archive name: dst', output)
+        self.assert_in('This archive:', output)
+        assert 'All archives:' not in output
+        assert 'Chunk index:' not in output
+
+    def test_import_tar_quick_stats_json(self):
+        self.create_regular_file('file1', size=1024)
+        self.cmd('init', '--encryption=none', self.repository_location)
+        self.cmd('create', self.repository_location + '::src', 'input')
+        self.cmd('export-tar', self.repository_location + '::src', 'simple.tar')
+        import_json = json.loads(self.cmd('import-tar', '--json', '--quick-stats',
+                                          self.repository_location + '::dst', 'simple.tar'))
+        assert 'archive' in import_json
+        assert 'stats' in import_json['archive']
+        assert 'cache' not in import_json
 
     @requires_gzip
     def test_import_tar_gz(self):

@@ -283,6 +283,25 @@ class Archiver:
                 logging.getLogger('borg.output.list').info("%1s %s", status, remove_surrogates(path))
 
     @staticmethod
+    def print_archive_stats(manifest, cache, archive, *, output_json, quick_stats):
+        if output_json:
+            json_print(basic_json_data(manifest, cache=None if quick_stats else cache, extra={
+                'archive': archive,
+            }))
+        else:
+            parts = [
+                DASHES,
+                str(archive),
+                DASHES,
+                STATS_HEADER,
+                str(archive.stats),
+            ]
+            if not quick_stats:
+                parts.append(str(cache))
+            parts.append(DASHES)
+            log_multi(*parts, logger=logging.getLogger('borg.output.stats'))
+
+    @staticmethod
     def build_matcher(inclexcl_patterns, include_paths):
         matcher = PatternMatcher()
         matcher.add_inclexcl(inclexcl_patterns)
@@ -648,20 +667,9 @@ class Archiver:
                     raise Error("Got Ctrl-C / SIGINT.")
                 else:
                     archive.save(comment=args.comment, timestamp=args.timestamp)
-                    args.stats |= args.json
-                    if args.stats:
-                        if args.json:
-                            json_print(basic_json_data(manifest, cache=cache, extra={
-                                'archive': archive,
-                            }))
-                        else:
-                            log_multi(DASHES,
-                                      str(archive),
-                                      DASHES,
-                                      STATS_HEADER,
-                                      str(archive.stats),
-                                      str(cache),
-                                      DASHES, logger=logging.getLogger('borg.output.stats'))
+                    if args.stats or args.quick_stats or args.json:
+                        self.print_archive_stats(manifest, cache, archive,
+                                                 output_json=args.json, quick_stats=args.quick_stats)
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -1937,20 +1945,9 @@ class Archiver:
             archive.stats.show_progress(final=True)
         archive.stats += tfo.stats
         archive.save(comment=args.comment, timestamp=args.timestamp)
-        args.stats |= args.json
-        if args.stats:
-            if args.json:
-                json_print(basic_json_data(archive.manifest, cache=archive.cache, extra={
-                    'archive': archive,
-                }))
-            else:
-                log_multi(DASHES,
-                          str(archive),
-                          DASHES,
-                          STATS_HEADER,
-                          str(archive.stats),
-                          str(archive.cache),
-                          DASHES, logger=logging.getLogger('borg.output.stats'))
+        if args.stats or args.quick_stats or args.json:
+            self.print_archive_stats(archive.manifest, archive.cache, archive,
+                                     output_json=args.json, quick_stats=args.quick_stats)
 
     @with_repository(manifest=False, exclusive=True)
     def do_with_lock(self, args, repository):
@@ -3706,7 +3703,9 @@ class Archiver:
         When using ``--stats``, you will get some statistics about how much data was
         added - the "This Archive" deduplicated size there is most interesting as that is
         how much your repository will grow. Please note that the "All archives" stats refer to
-        the state after creation. Also, the ``--stats`` and ``--dry-run`` options are mutually
+        the state after creation. ``--stats`` can be slow - if you want something faster, use
+        ``--quick-stats`` (this skips the repository-wide "All archives" and chunk index statistics).
+        The ``--stats`` / ``--quick-stats`` and ``--dry-run`` options are mutually
         exclusive because the data is not actually compressed and deduplicated during a dry run.
 
         For more help on include/exclude patterns, see the :ref:`borg_patterns` command output.
@@ -3844,6 +3843,8 @@ class Archiver:
                                help='do not create a backup archive')
         subparser.add_argument('-s', '--stats', dest='stats', action='store_true',
                                help='print statistics for the created archive')
+        subparser.add_argument('--quick-stats', dest='quick_stats', action='store_true',
+                               help='print only archive statistics, skipping repository-wide statistics')
 
         subparser.add_argument('--list', dest='output_list', action='store_true',
                                help='output verbose list of items (files, dirs, ...)')
@@ -5483,6 +5484,8 @@ class Archiver:
         subparser.add_argument('-s', '--stats', dest='stats',
                                action='store_true', default=False,
                                help='print statistics for the created archive')
+        subparser.add_argument('--quick-stats', dest='quick_stats', action='store_true',
+                               help='print only archive statistics, skipping repository-wide statistics')
         subparser.add_argument('--list', dest='output_list',
                                action='store_true', default=False,
                                help='output verbose list of items (files, dirs, ...)')
@@ -5588,6 +5591,8 @@ class Archiver:
                 raise Error('Not allowed to bypass locking mechanism for chosen command')
         if getattr(args, 'timestamp', None):
             args.location = args.location.with_timestamp(args.timestamp)
+        if getattr(args, 'stats', False) and getattr(args, 'quick_stats', False):
+            parser.error('--stats and --quick-stats are mutually exclusive.')
         return args
 
     def prerun_checks(self, logger, is_serve):
@@ -5610,6 +5615,8 @@ class Archiver:
         for option, logger_name in option_logger.items():
             option_set = args.get(option, False)
             logging.getLogger(logger_name).setLevel('INFO' if option_set else 'WARN')
+        if args.get('quick_stats', False):
+            logging.getLogger('borg.output.stats').setLevel('INFO')
 
     def _setup_topic_debugging(self, args):
         """Turn on DEBUG level logging for specified --debug-topics."""
@@ -5630,11 +5637,17 @@ class Archiver:
         args.progress |= is_serve
         self._setup_implied_logging(vars(args))
         self._setup_topic_debugging(args)
-        if getattr(args, 'stats', False) and getattr(args, 'dry_run', False):
-            # the data needed for --stats is not computed when using --dry-run, so we can't do it.
-            # for ease of scripting, we just ignore --stats when given with --dry-run.
-            logger.warning("Ignoring --stats. It is not supported when using --dry-run.")
-            args.stats = False
+        if getattr(args, 'dry_run', False):
+            if getattr(args, 'stats', False):
+                # the data needed for --stats is not computed when using --dry-run, so we can't do it.
+                # for ease of scripting, we just ignore --stats when given with --dry-run.
+                logger.warning("Ignoring --stats. It is not supported when using --dry-run.")
+                args.stats = False
+            if getattr(args, 'quick_stats', False):
+                # the data needed for --quick-stats is not computed when using --dry-run, so we can't do it.
+                # for ease of scripting, we just ignore --quick-stats when given with --dry-run.
+                logger.warning("Ignoring --quick-stats. It is not supported when using --dry-run.")
+                args.quick_stats = False
         if args.show_version:
             logging.getLogger('borg.output.show-version').info('borgbackup version %s' % __version__)
         self.prerun_checks(logger, is_serve)

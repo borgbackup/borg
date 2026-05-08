@@ -181,7 +181,7 @@ def test_remote_rpc_exception_transport(remote_repository):
             remote_repository.call("inject_exception", {"kind": "DoesNotExist"})
         except Repository.DoesNotExist as e:
             assert len(e.args) == 1
-            assert e.args[0] == remote_repository.location.processed
+            assert remote_repository.location.processed in e.args[0]
 
         try:
             remote_repository.call("inject_exception", {"kind": "AlreadyExists"})

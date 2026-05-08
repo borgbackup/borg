@@ -166,9 +166,28 @@ class Archiver(
                 logging.getLogger("borg.output.list").info("%1s %s", status, remove_surrogates(path))
 
     def preprocess_args(self, args):
+        borg1_option_equivalents = {
+            "--glob-archives": "--match-archives 'sh:PATTERN'",
+            "--numeric-owner": "--numeric-ids",
+            "--nobsdflags": "--noflags",
+            "--remote-ratelimit": "--upload-ratelimit",
+        }
         deprecations = [
             # ('--old', '--new' or None, 'Warning: "--old" has been deprecated. Use "--new" instead.'),
         ]
+        seen_borg1_options = []
+        for arg in args:
+            if arg in borg1_option_equivalents and arg not in seen_borg1_options:
+                seen_borg1_options.append(arg)
+        if seen_borg1_options:
+            print("Common fixes:", file=sys.stderr)
+            for arg in seen_borg1_options:
+                print(
+                    f'- borg1 option "{arg}" is not used in borg2. ' f'Use "{borg1_option_equivalents[arg]}" instead.',
+                    file=sys.stderr,
+                )
+            if "--glob-archives" in seen_borg1_options:
+                print("- Example: borg list ARCHIVE --match-archives 'sh:old-*'", file=sys.stderr)
         for i, arg in enumerate(args[:]):
             for old_name, new_name, warning in deprecations:
                 # either --old_name or --old_name=...

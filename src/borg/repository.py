@@ -52,6 +52,26 @@ class Repository:
 
         exit_mcode = 13
 
+        def __init__(self, location):
+            from .crypto.key import key_argument_names
+
+            mode_list = ", ".join(key_argument_names())
+            location = str(location)
+            guidance = (
+                f"Repository {location} does not exist.\n"
+                "Common fixes:\n"
+                f'- Specify Correct Path ("{location}" does not exist).\n'
+                f'- Create repository (-r): borg repo-create -r "{location}" -e repokey-aes-ocb\n'
+                f"- Create repository (BORG_REPO):\n"
+                f"  export BORG_REPO={location}\n"
+                f"  borg repo-create -e repokey-aes-ocb\n"
+                f"Available -e modes: {mode_list}"
+            )
+            super().__init__(guidance)
+
+        def get_message(self):
+            return self.args[0]
+
     class InsufficientFreeSpaceError(Error):
         """Insufficient free space to complete the transaction (required: {}, available: {})."""
 
@@ -61,6 +81,26 @@ class Repository:
         """{} is not a valid repository. Check the repository config."""
 
         exit_mcode = 15
+
+        def __init__(self, location):
+            from .crypto.key import key_argument_names
+
+            mode_list = ", ".join(key_argument_names())
+            location = str(location)
+            guidance = (
+                f"{location} is not a valid repository. Check the repository config.\n"
+                "Common fixes:\n"
+                f'- Specify Correct Path ("{location}" is not a Borg repository).\n'
+                f'- Create repository (-r): borg repo-create -r "{location}" -e repokey-aes-ocb\n'
+                f"- Create repository (BORG_REPO):\n"
+                f"  export BORG_REPO={location}\n"
+                f"  borg repo-create -e repokey-aes-ocb\n"
+                f"Available -e modes: {mode_list}"
+            )
+            super().__init__(guidance)
+
+        def get_message(self):
+            return self.args[0]
 
     class InvalidRepositoryConfig(Error):
         """{} does not have a valid config. Check the repository config [{}]."""
@@ -253,13 +293,13 @@ class Repository:
         try:
             self.store.open()
         except StoreBackendDoesNotExist:
-            raise self.DoesNotExist(str(self._location)) from None
+            raise self.DoesNotExist(self._location.processed) from None
         else:
             self.store_opened = True
         try:
             readme = self.store.load("config/readme").decode()
         except StoreObjectNotFound:
-            raise self.DoesNotExist(str(self._location)) from None
+            raise self.DoesNotExist(self._location.processed) from None
         if readme != REPOSITORY_README:
             raise self.InvalidRepository(str(self._location))
         self.version = int(self.store.load("config/version").decode())

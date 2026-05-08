@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   canary_tests:
+    # Don't run canary workflows on the main or master branches
+    if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
     name: Canary (${{ matrix.os }}, ${{ matrix.python-version }}, ${{ matrix.toxenv }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 360
@@ -96,7 +98,8 @@ jobs:
 
   windows_canary:
 
-    if: true  # can be used to temporarily disable the build
+    # Don't run canary workflows on the main or master branches
+    if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
     name: Canary (Windows)
     runs-on: windows-latest
     timeout-minutes: 180

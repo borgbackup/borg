@@ -616,6 +616,9 @@ class Location:
 
         self.raw = text  # as given by user, might contain placeholders
         self.processed = replace_placeholders(self.raw, overrides)  # after placeholder replacement
+        if "::" in self.processed:
+            # Keep this message short; ArgumentParser.error() adds Common fixes with examples.
+            raise ValueError(f'Invalid location format: "{self.processed}".')
         valid = self._parse(self.processed)
         if valid:
             self.valid = True

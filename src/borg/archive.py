@@ -1353,12 +1353,16 @@ class FilesystemObjectProcessors:
     def create_helper(self, path, st, status=None, hardlinkable=True, strip_prefix=None):
         if strip_prefix is not None:
             assert not path.endswith(os.sep)
-            if strip_prefix.startswith(path + os.sep):
+            if path + os.sep == strip_prefix:
+                # this is the directory the slashdot hack points to - archive it as the root.
+                path = "."
+            elif strip_prefix.startswith(path + os.sep):
                 # still on a directory level that shall be stripped - do not create an item for this!
                 yield None, 'x', False, False
                 return
-            # adjust path, remove stripped directory levels
-            path = path.removeprefix(strip_prefix)
+            else:
+                # adjust path, remove stripped directory levels
+                path = path.removeprefix(strip_prefix)
 
         safe_path = make_path_safe(path)
         item = Item(path=safe_path)

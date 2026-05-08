@@ -43,6 +43,7 @@ elif is_darwin:  # pragma: darwin only
     from .darwin import acl_get, acl_set
     from .darwin import is_darwin_feature_64_bit_inode, _get_birthtime_ns
     from .darwin import set_flags
+    from .darwin import fdatasync, sync_dir  # type: ignore[no-redef]
 
 
 def get_birthtime_ns(st, path, fd=None):

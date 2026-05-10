@@ -414,11 +414,61 @@ Compatibility notes:
 Change Log
 ==========
 
-Version 1.4.4 (2026-03-19)
---------------------------
+Version 1.4.5 (not released yet)
+--------------------------------
 
 For upgrade and compatibility hints, please also read the "Upgrade Notes" section
 above.
+
+New features:
+
+- create/import-tar --quick-stats: faster than --stats by omitting "All archives"
+  and repository chunks statistics, #9579
+
+Fixes:
+
+- hashindex: fix new checks for big endian archs, #9521
+
+Note: Many of the fixed issues below here relate to rather rare or theoretical
+      issues and were found by automated code checking.
+
+- LRUCache: resolve KeyError and memory leaks, #9587
+- crypto.low_level: fix freeing of memory, #9585
+- extract: resolve memory leak on abandoned async requests in RemoteRepository, #9588.
+  This can happen if borg fails to extract a file due to permission or other errors
+  or if the archived file had all-zero replacement chunks or inconsistent size.
+- Chunker fixes, #9586:
+
+  - Better check the return value of fd.read(n) and reject if it returns more
+    bytes than requested.
+  - Avoid giving len <= 0 to posix_fadvise(), which could drop the rest of the
+    file from the cache.
+  - buzhash: check for len == 0 edge case
+  - Correctly Py_DECREF in cases of errors.
+  - Check for malloc/calloc failures.
+- Hashindex fixes, #9575:
+
+  - Make it possible to lookup in compacted hashtables.
+  - Avoid buckets_length integer overflow on 32-bit systems via huge num_buckets.
+  - Deal safely with empty index: we must use num_buckets = 1 to avoid division
+    by zero and sanity check in hashindex_read.
+  - Always initialize min_empty and num_empty.
+  - Reinitialize upper/lower limit and min_empty after compact.
+  - Fix size_idx / fit_size / grow_size / shrink_size (mind array bounds).
+  - Deal with growing when already at max capacity.
+  - hashindex_resize: replace num_entries assertion, rather return error.
+  - Correctly free memory when header validation fails.
+  - BaseIndex.clear: always stay in valid state.
+    Do not free the old index before we successfully have allocated a new one.
+
+Other changes:
+
+- use F_FULLFSYNC on macOS for SyncFile data durability, #9383
+- mount: improve error msg when uid/gid cannot be resolved, #9574
+
+
+Version 1.4.4 (2026-03-19)
+--------------------------
 
 New features:
 

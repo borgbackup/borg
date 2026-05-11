@@ -1669,7 +1669,16 @@ class Archiver:
         to_delete = (set(archives) | checkpoints) - (set(keep) | set(keep_checkpoints))
         pruned_checkpoints_len = len(set(checkpoints) - set(keep_checkpoints))
         pruned_archives_len = len(to_delete) - pruned_checkpoints_len
-        logger.info('Found %d normal archives and %d checkpoint archives.',
+        total_archives_count = 0
+        total_checkpoints_count = 0
+        for name in manifest.archives:
+            if is_checkpoint(name):
+                total_checkpoints_count += 1
+            else:
+                total_archives_count += 1
+        logger.info('Repository contains %d normal archives and %d checkpoint archives.',
+                    total_archives_count, total_checkpoints_count)
+        logger.info('Applying rules to the matching %d archives and %d checkpoints...',
                     len(archives), len(checkpoints))
         logger.info('Keeping %d archives and %d checkpoints, pruning %d archives and %d checkpoints.',
                     len(keep), len(keep_checkpoints), pruned_archives_len, pruned_checkpoints_len)

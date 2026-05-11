@@ -564,8 +564,7 @@ jobs:
                 pkgman install -y openssl3
                 pkgman install -y rust_bin
                 pkgman install -y python3.11
-                pkgman install -y cffi
-                pkgman install -y lz4_devel openssl3_devel libffi_devel
+                pkgman install -y lz4_devel openssl3_devel
 
                 # there is no pkgman package for tox, so we install it into a venv
                 python3 -m ensurepip --upgrade
@@ -651,7 +650,7 @@ jobs:
 
       - name: Build python venv
         run: |
-          # building cffi / argon2-cffi in the venv fails, so we try to use the system packages
+          # building native extensions in the venv fails, so we try to use the system packages
           python -m venv --system-site-packages env
           . env/bin/activate
           # python -m pip install --upgrade pip

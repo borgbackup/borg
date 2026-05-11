@@ -12,7 +12,6 @@ from ..logger import create_logger
 logger = create_logger()
 
 from blake3 import blake3
-import argon2.low_level
 
 from ..constants import *  # NOQA
 from ..helpers import StableDict
@@ -508,17 +507,9 @@ class FlexiKey:
             parallelism = 1
             # 8 is the smallest value that avoids the "Memory cost is too small" exception
             memory_cost = 8
-        type_map = {"i": argon2.low_level.Type.I, "d": argon2.low_level.Type.D, "id": argon2.low_level.Type.ID}
-        key = argon2.low_level.hash_secret_raw(
-            secret=passphrase.encode("utf-8"),
-            hash_len=output_len_in_bytes,
-            salt=salt,
-            time_cost=time_cost,
-            memory_cost=memory_cost,
-            parallelism=parallelism,
-            type=type_map[type],
+        return low_level.argon2_hash(
+            passphrase.encode("utf-8"), salt, time_cost, memory_cost, parallelism, output_len_in_bytes, type
         )
-        return key
 
     def decrypt_key_file_argon2(self, encrypted_key, passphrase):
         key = self.argon2(

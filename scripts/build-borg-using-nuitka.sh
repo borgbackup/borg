@@ -12,7 +12,6 @@ echo "Building single-file binary of borgbackup..."
 # Run Nuitka compilation
 # We use --assume-yes-for-downloads to avoid interactive prompts in automated runs.
 # We set PYTHONPATH=src to ensure the local version of borg is used.
-# We include cffi to avoid runtime ModuleNotFoundError in argon2-cffi.
 mkdir -p $OUTPUT_DIR
 PYTHONPATH=src python -m nuitka \
     --mode=onefile \
@@ -20,7 +19,6 @@ PYTHONPATH=src python -m nuitka \
     --include-package=borg \
     --include-package=borghash \
     --include-package=borgstore \
-    --include-package=cffi \
     --output-dir="$OUTPUT_DIR" \
     --output-filename="$OUTPUT_FILENAME" \
     "$SRC_DIR"

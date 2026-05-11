@@ -392,11 +392,11 @@ jobs:
       matrix:
         include:
           - os: freebsd
-            version: '14.3'
+            version: '15.0'
             display_name: FreeBSD
             # Controls binary build and provenance attestation on tags
             do_binaries: true
-            artifact_prefix: borg-freebsd-14-x86_64-gh
+            artifact_prefix: borg-freebsd-15-x86_64-gh
 
           - os: netbsd
             version: '10.1'

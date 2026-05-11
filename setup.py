@@ -142,7 +142,7 @@ if not on_rtd:
         )
 
     if is_win32:
-        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "libcrypto", "libcrypto", ">=1.1.1", lib_subdir="")
+        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "libcrypto", "libcrypto", ">=3.2.0", lib_subdir="")
     elif is_openbsd:
         # Use OpenSSL (not LibreSSL) because we need AES-OCB via the EVP API. Link
         # it statically to avoid conflicting with shared libcrypto from the base
@@ -154,7 +154,7 @@ if not on_rtd:
             extra_objects=[os.path.join(openssl_prefix, "lib", openssl_name, "libcrypto.a")],
         )
     else:
-        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "crypto", "libcrypto", ">=1.1.1")
+        crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "crypto", "libcrypto", ">=3.2.0")
 
     crypto_ext_kwargs = members_appended(
         dict(sources=[crypto_ll_source]), crypto_ext_lib, dict(extra_compile_args=cflags)

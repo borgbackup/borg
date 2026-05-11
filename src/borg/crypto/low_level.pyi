@@ -1,7 +1,7 @@
 # Type stubs for borg.crypto.low_level
 # This file provides type hints for the Cython extension module
 
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 # Module-level functions
 def num_cipher_blocks(length: int, blocksize: int = 16) -> int:
@@ -14,6 +14,15 @@ def long_to_bytes(x: int) -> bytes: ...
 def hmac_sha256(key: bytes, data: bytes) -> bytes: ...
 def blake2b_256(key: bytes, data: bytes) -> bytes: ...
 def blake2b_128(data: bytes) -> bytes: ...
+def argon2_hash(
+    secret: bytes,
+    salt: bytes,
+    time_cost: int,
+    memory_cost: int,
+    parallelism: int,
+    hash_len: int,
+    type: Literal["i", "d", "id"],
+) -> bytes: ...
 
 # Exception classes
 class CryptoError(Exception):

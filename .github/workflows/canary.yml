@@ -154,7 +154,7 @@ jobs:
 
       - name: Build python venv
         run: |
-          # building cffi / argon2-cffi in the venv fails, so we try to use the system packages
+          # building some packages in the venv fails, so we try to use the system packages
           python -m venv --system-site-packages env
           . env/bin/activate
           # python -m pip install --upgrade pip

@@ -29,6 +29,7 @@ sys.path += [os.path.dirname(__file__)]
 
 is_win32 = sys.platform.startswith("win32")
 is_openbsd = sys.platform.startswith("openbsd")
+is_netbsd = sys.platform.startswith("netbsd")
 
 # Number of threads to use for cythonize, not used on Windows
 cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing.get_start_method() != "spawn" else None
@@ -154,6 +155,14 @@ if not on_rtd:
         crypto_ext_lib = dict(
             include_dirs=[os.path.join(openssl_prefix, "include", openssl_name)],
             extra_objects=[os.path.join(openssl_prefix, "lib", openssl_name, "libcrypto.a")],
+        )
+    elif is_netbsd and os.environ.get("BORG_OPENSSL_PREFIX"):
+        # Similarly for NetBSD, if we built a custom OpenSSL, link it statically
+        # to avoid dynamic linker conflicts with the system OpenSSL loaded by Python.
+        openssl_prefix = os.environ.get("BORG_OPENSSL_PREFIX")
+        crypto_ext_lib = dict(
+            include_dirs=[os.path.join(openssl_prefix, "include")],
+            extra_objects=[os.path.join(openssl_prefix, "lib", "libcrypto.a")],
         )
     else:
         crypto_ext_lib = lib_ext_kwargs(pc, "BORG_OPENSSL_PREFIX", "crypto", "libcrypto", ">=3.2.0")

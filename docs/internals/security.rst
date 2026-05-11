@@ -268,7 +268,7 @@ on widely used libraries providing them:
 - BLAKE3 is used via the blake3_ package (new repos, ``--id-hash blake3``).
 - BLAKE2b from Python's hashlib_ is only used to read legacy (borg < 2.0) repos.
 - HMAC and a constant-time comparison from Python's hmac_ standard library module are used.
-- argon2 is used via argon2-cffi.
+- argon2 is used from OpenSSL (>= 3.2).
 
 .. _Horton principle: https://en.wikipedia.org/wiki/Horton_Principle
 .. _length extension: https://en.wikipedia.org/wiki/Length_extension_attack

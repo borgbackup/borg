@@ -3,7 +3,6 @@
 
 from io import BytesIO
 
-from ...chunkers import get_chunker
 from ...chunkers.buzhash64 import buzhash64, buzhash64_update, ChunkerBuzHash64
 from ...constants import *  # NOQA
 from ...helpers import hex_to_bin
@@ -78,6 +77,10 @@ class ChunkerBuzHash64TestCase(BaseTestCase):
                 self.input = self.input[:-1]
                 return self.input[:1]
 
-        chunker = get_chunker(*CHUNKER64_PARAMS, sparse=False)
+        # Explicitly create the chunker with the same parameters as CHUNKER64_PARAMS
+        # but also specify do_encrypt=True.
+        chunker = ChunkerBuzHash64(
+            b"0" * 32, CHUNK_MIN_EXP, CHUNK_MAX_EXP, HASH_MASK_BITS, HASH_WINDOW_SIZE, sparse=False, do_encrypt=True
+        )
         reconstructed = b"".join(cf(chunker.chunkify(SmallReadFile())))
         assert reconstructed == b"a" * 20

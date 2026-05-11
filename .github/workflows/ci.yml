@@ -520,6 +520,30 @@ jobs:
                 touch ${TMPDIR}/testfile
                 lsextattr user ${TMPDIR}/testfile && echo "[xattr] *** xattrs SUPPORTED on ${TMPDIR}! ***"
 
+                # NetBSD 10 has a too old OpenSSL, build a fresher one.
+                VERSION="3.5.6"
+                echo "--- Building OpenSSL ${VERSION} ---"
+                PREFIX="/usr/local"
+                JOBS=$(sysctl -n hw.ncpu)
+
+                pushd /tmp
+                ftp -o "openssl-${VERSION}.tar.gz" "https://www.openssl.org/source/openssl-${VERSION}.tar.gz"
+                tar xzf "openssl-${VERSION}.tar.gz"
+                pushd "openssl-${VERSION}"
+
+                ./Configure --prefix="${PREFIX}" --openssldir="${PREFIX}/etc/ssl" --libdir=lib \
+                            -Wl,-rpath,${PREFIX}/lib shared threads no-tests no-docs
+                export LD_LIBRARY_PATH="/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+                make -j"${JOBS}"
+                sudo -E make install
+                popd
+                rm -rf "/tmp/openssl-${VERSION}" "/tmp/openssl-${VERSION}.tar.gz"
+                popd
+
+                "${PREFIX}/bin/openssl" version
+                export BORG_OPENSSL_PREFIX="${PREFIX}"
+                export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+
                 tox3 -e py311-none
                 ;;
 

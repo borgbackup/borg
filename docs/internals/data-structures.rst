@@ -237,7 +237,7 @@ Storage quotas
 ~~~~~~~~~~~~~~
 
 Quotas are implemented at the Repository level. The active quota of a repository
-is determined by the ``storage_quota`` `config` entry or a run-time override (via :ref:`borg_serve`).
+is determined by the ``storage_quota`` `config` entry or a run-time setting (via :ref:`borg_serve`, which has priority over the config entry).
 The currently used quota is stored in the hints file. Operations (PUT and DELETE) during
 a transaction modify the currently used quota:
 

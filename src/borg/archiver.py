@@ -4742,7 +4742,7 @@ class Archiver:
         compatible with Borg 1.1 and later.
 
         ``none`` mode uses no encryption and no authentication. It uses SHA256
-        (default) or BLAKE2b as a chunk ID hash. This mode is not recommended
+        as chunk ID hash. This mode is not recommended
         as it is vulnerable to DoS attacks by an attacker (for example,
         crafting content that causes hash index collisions). Do not use it if
         untrusted clients use the repository. See :ref:`internals_hashindex` for

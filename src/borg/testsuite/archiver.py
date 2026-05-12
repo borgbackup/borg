@@ -2297,6 +2297,24 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert 'secondB' in output
         assert 'secondB/thirdB' in output
 
+    def test_create_dotslash_hack_root_metadata(self):
+        """Test that the slashdot hack archives the source directory metadata as the archive root."""
+        os.makedirs(os.path.join(self.input_path, "first", "subdir"))
+        self.create_regular_file("first/file1", contents=b"hello")
+        self.cmd('init', '--encryption=none', self.repository_location)
+        archive = self.repository_location + '::test'
+        self.cmd('create', archive, 'input/first/./')  # slashdot hack
+        output = self.cmd('list', archive)
+        # the root directory "." must be in the archive (this was the bug in #9534).
+        lines = output.splitlines()
+        assert lines[0].endswith(" .")
+        # children of the slashdot target must be archived.
+        assert "subdir" in output
+        assert "file1" in output
+        # parent directories must NOT be in the archive.
+        assert "input" not in output
+        assert "first" not in output
+
     # def test_cmdline_compatibility(self):
     #    self.create_regular_file('file1', size=1024 * 80)
     #    self.cmd('init', '--encryption=repokey', self.repository_location)

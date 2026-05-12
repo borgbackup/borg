@@ -19,7 +19,7 @@ Examples
     # make a repo append-only
     $ borg config /path/to/repo append_only 1
 
-    # set maximum segment size (see "Adjusting segment size" in Usage Notes)
+    # set maximum segment size to 100 MiB (see "Adjusting segment size" in Usage Notes)
     $ borg config /path/to/repo max_segment_size 104857600
 
 

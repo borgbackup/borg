@@ -199,6 +199,36 @@ This has some notable consequences:
 
 You can manually run compaction by invoking the ``borg compact`` command.
 
+See :ref:`rollback_transaction` for how to undo changes if you have not run
+compaction yet.
+
+.. _adjusting_segment_size:
+
+Adjusting segment size
+~~~~~~~~~~~~~~~~~~~~~~
+
+By default, Borg uses a maximum segment file size of 500 MB. This is a good balance
+for many use cases, but you can adjust it to better suit your environment:
+
+- **Smaller segments (e.g., 50 MB or 100 MB)**:
+  Recommended if you use tools like ``rsync`` or ``rclone`` to sync your
+  repository to another location. Smaller segments result in less data being
+  re-transmitted when a segment is updated (e.g., during compaction).
+- **Larger segments**:
+  Might slightly improve performance on some filesystems, but usually not
+  necessary.
+
+You can change this setting for an existing repository:
+
+::
+
+    # Set maximum segment size to 100 MB (in bytes)
+    borg config /path/to/repo max_segment_size 104857600
+
+Note that changing this setting **only affects new segments** created after the
+change. Already existing segments will only be rewritten to the new size when
+they are picked up by ``borg compact``.
+
 .. _append_only_mode:
 
 Append-only mode (forbid compaction)

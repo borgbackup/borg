@@ -199,6 +199,9 @@ This has some notable consequences:
 
 You can manually run compaction by invoking the ``borg compact`` command.
 
+See :ref:`rollback_transaction` for how to undo changes if you have not run
+compaction yet.
+
 .. _append_only_mode:
 
 Append-only mode (forbid compaction)
@@ -231,6 +234,9 @@ Note that you can go back-and-forth between normal and append-only operation wit
 In append-only mode Borg will create a transaction log in the ``transactions`` file,
 where each line is a transaction and a UTC timestamp.
 
+See :ref:`rollback_transaction` for how to use this log to roll back the
+repository to an earlier state.
+
 In addition, ``borg serve`` can act as if a repository is in append-only mode with
 its option ``--append-only``. This can be very useful for fine-tuning access control
 in ``.ssh/authorized_keys``:
@@ -243,6 +249,26 @@ in ``.ssh/authorized_keys``:
 Running ``borg init`` via a ``borg serve --append-only`` server will *not* create
 an append-only repository. Running ``borg init --append-only`` creates an append-only
 repository regardless of server settings.
+
+.. _rollback_transaction:
+
+Rolling back a transaction
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Borg repositories are transactional. A command either succeeds completely and
+commits its changes, or it fails (or is interrupted) and the changes are
+not committed.
+
+Furthermore, since Borg 1.2.0, repository space is not freed immediately when
+data is deleted or archives are pruned, because compaction is a separate step
+(see :ref:`separate_compaction`). This means that even after a successful
+commit that deleted data, the old data might still be present in the
+repository's segment files.
+
+If you accidentally ran a command that caused data loss (like an incorrect
+``borg recreate`` or ``borg prune``), or if your repository was compromised
+while in append-only mode, you can roll back the repository to a previous state,
+**provided that** ``borg compact`` has not been run since then.
 
 Example
 +++++++

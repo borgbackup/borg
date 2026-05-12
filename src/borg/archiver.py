@@ -4742,11 +4742,11 @@ class Archiver:
         compatible with Borg 1.1 and later.
 
         ``none`` mode uses no encryption and no authentication. It uses SHA256
-        as chunk ID hash. This mode is not recommended. You should instead
-        consider using an authenticated or authenticated/encrypted mode. This
-        mode has possible denial-of-service issues when running ``borg create``
-        on contents controlled by an attacker. See above for alternatives.
-        This mode is compatible with all Borg versions.
+        (default) or BLAKE2b as a chunk ID hash. This mode is not recommended
+        as it is vulnerable to DoS attacks by an attacker (for example,
+        crafting content that causes hash index collisions). Do not use it if
+        untrusted clients use the repository. See :ref:`internals_hashindex` for
+        details. This mode is compatible with all Borg versions.
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
                                           description=self.do_init.__doc__, epilog=init_epilog,

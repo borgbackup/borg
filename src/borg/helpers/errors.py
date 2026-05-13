@@ -153,6 +153,7 @@ class BackupOSError(BackupError):
     exit_mcode = 104
 
     def __init__(self, op, os_error):
+        super().__init__(op, os_error)
         self.op = op
         self.os_error = os_error
         self.errno = os_error.errno

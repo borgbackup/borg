@@ -322,8 +322,8 @@ storage systems. To detect such issues, you should:
 
 - Use reliable hardware (ECC RAM is recommended).
 - Periodically run ``borg check --verify-data REPO`` to verify that the
-  stored data still matches its checksums. Note that this cannot detect
-  if the data was already "garbage" when it was first stored.
+  stored data still matches its MAC (chunk id). Note that this cannot detect
+  if the data was already "garbage" when it was first processed and stored.
 
 Can I use Borg on SMR hard drives?
 ----------------------------------

@@ -163,6 +163,33 @@ Are there other known limitations?
   remove files which are in the destination, but not in the archive.
   See :issue:`4598` for a workaround and more details.
 
+Is Borg recommended for large amounts of data?
+----------------------------------------------
+
+Borg is generally capable of handling large amounts of data. However, there are
+several things to keep in mind for scalability:
+
+- **Large datasets:** Success depends on the number of files, system resources
+  (RAM, CPU), and network performance. For very large datasets, ensure you have
+  enough RAM for the repository index, chunks cache and files cache.
+- **Multiple repositories:** If you have multiple clients or a huge amount of
+  data, it is often better to use one repository per client or per data set.
+  This avoids lock contention and can improve performance, especially if
+  deduplication across clients or data sets is not a priority.
+- **Archive count:** Avoid having a very large number of archives in a single
+  repository, as some operations (like ``borg check`` or ``borg mount``) may become
+  slow or memory-intensive when they need to read metadata for all archives.
+- **Concurrency:** Borg uses a repository-wide lock. Only one process can have
+  write access at a time. If multiple backups are triggered simultaneously, they
+  will wait for the lock (see ``--lock-wait``) or fail.
+- **Network filesystems:** For best performance and reliability, run the Borg
+  client on the machine where the source data is local, and the Borg server
+  (via ``borg serve`` over SSH) on the machine where the repository storage is
+  local. Avoid using NFS or other network filesystems for repository storage if
+  possible.
+- **Incremental backups:** Borg always creates a new full archive, but only
+  transfers and stores new/changed chunks.
+
 .. _checkpoints_parts:
 
 If a backup stops mid-way, does the already-backed-up data stay there?

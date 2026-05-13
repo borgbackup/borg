@@ -146,8 +146,8 @@ How can I restore huge file(s) over an unstable connection?
 Try using ``borg mount`` and ``rsync`` (or a similar tool that supports
 resuming a partial file copy from what's already copied).
 
-My SSH connection breaks during a long backup or prune operation. What now?
----------------------------------------------------------------------------
+My SSH connection breaks during a long borg operation. What now?
+----------------------------------------------------------------
 
 See the `Vorta documentation <https://docs.borgbase.com/faq/#my-ssh-connection-breaks-after-a-long-backup-or-prune-operation>`_.
 

@@ -19,4 +19,7 @@ Examples
     # make a repo append-only
     $ borg config /path/to/repo append_only 1
 
+    # set storage quota to 50 GB
+    $ borg config /path/to/repo storage_quota 50G
+
 

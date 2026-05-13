@@ -5280,7 +5280,8 @@ class Archiver:
                                     'See :ref:`append_only_mode` in Additional Notes for more details.')
         subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota',
                                type=parse_storage_quota, default=None,
-                               help='Override storage quota of the repository (e.g. 5G, 1.5T). '
+                               help='Set storage quota of the repository (has priority over the '
+                                    'repository\'s own quota setting) (e.g. 5G, 1.5T). '
                                     'When a new repository is initialized, sets the storage quota on the new '
                                     'repository as well. Default: no quota.')
 

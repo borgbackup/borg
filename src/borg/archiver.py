@@ -3754,10 +3754,9 @@ class Archiver:
         When Borg encounters a file or directory it cannot read (e.g., due to permission
         denied, or another process holding an exclusive lock on Windows), it will:
  
-        - Emit a warning message to stderr.
+        - Log a warning message.
         - Skip that file or directory and continue backing up the remaining files.
-        - Exit with return code 1 (Warning) at the end of the operation, instead of 0
-          (Success).
+        - Exit with a Warning RC at the end of the operation.
  
         This ensures that a single problematic file does not abort your entire backup.
         You should check your logs for these warnings to ensure that all important data

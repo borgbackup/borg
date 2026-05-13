@@ -30,6 +30,7 @@ This includes:
 - Verifying the correctness and security of any AI-generated code.
 - Ensuring that new or modified code is covered by correct tests.
 - Proofreading and refining any AI-generated documentation or comments.
+- Being able to explain, debug, and maintain the code you submit.
 
 Always be aware of the limitations and the ecological footprint of AI tools and act accordingly:
 - Do not just believe what AI tells you, but verify it critically. AI is known to hallucinate, to be over-confident and to always tell you that you are right, even when you are not.

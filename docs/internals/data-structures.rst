@@ -805,6 +805,8 @@ b) with ``create --chunker-params buzhash,19,23,21,4095`` (default):
    You'll save some memory, but it will need to read / chunk all the files as
    it can not skip unmodified files then.
 
+.. _internals_hashindex:
+ 
 HashIndex
 ---------
 

@@ -634,14 +634,24 @@ Using ``BORG_PASSCOMMAND`` with macOS Keychain
   the built-in ``security`` command, you can access it from the command line,
   making it useful for ``BORG_PASSCOMMAND``.
 
-  First generate a passphrase and use ``security`` to save it to your login
-  (default) keychain::
+  To store an existing passphrase in your login (default) keychain::
 
-    security add-generic-password -D secret -U -a $USER -s borg-passphrase -w $(head -c 32 /dev/urandom | base64 -w 0)
+    security add-generic-password -a $USER -s borg-passphrase -w YOUR_PASSPHRASE
+
+  Alternatively, to generate a new random passphrase and store it::
+
+    security add-generic-password -a $USER -s borg-passphrase -w $(head -c 32 /dev/urandom | base64 -w 0)
 
   In your backup script retrieve it in the ``BORG_PASSCOMMAND``::
 
     export BORG_PASSCOMMAND="security find-generic-password -a $USER -s borg-passphrase -w"
+
+  .. note::
+    If you run ``borg`` using ``sudo``, you must use the ``-E`` (preserve environment)
+    flag to ensure ``BORG_PASSCOMMAND`` is available and executed as the correct
+    user to access the keychain::
+
+      sudo -E borg create ...
 
 Using ``BORG_PASSCOMMAND`` with GNOME Keyring
   GNOME also has a keyring daemon that can be used to store a Borg passphrase.

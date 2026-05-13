@@ -225,6 +225,29 @@ ssh keys and different entries in ``authorized_keys`` is much easier and also
 maybe has less potential of things going wrong somehow.
 
 
+My SSH connection breaks during a long backup or prune operation. What now?
+---------------------------------------------------------------------------
+
+Some ISPs or routers terminate idle SSH connections after a certain period of
+inactivity. This can happen during long-running Borg operations like ``create``
+(while chunking large files) or ``prune`` (while processing the repository),
+where Borg might be busy locally for a long time without sending or receiving
+data over the network.
+
+To prevent this, you should configure your SSH client to send "keep-alive"
+packets periodically. Add the following to your ``~/.ssh/config`` (or to
+the ``BORG_RSH`` environment variable)::
+
+    Host *
+        ServerAliveInterval 60
+        ServerAliveCountMax 30
+
+This configuration sends a packet every 60 seconds and allows up to 30 missed
+packets before closing the connection.
+
+For more detailed information and alternative solutions, see the
+`BorgBase/Vorta FAQ <https://docs.borgbase.com/faq/#my-ssh-connection-breaks-after-a-long-backup-or-prune-operation>`_.
+
 My machine goes to sleep causing `Broken pipe`
 ----------------------------------------------
 

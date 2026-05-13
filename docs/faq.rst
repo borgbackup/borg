@@ -166,28 +166,6 @@ then use ``tar`` to perform the comparison:
 
     borg export-tar archive-name - | tar --compare -f - -C /path/to/compare/to
 
-.. _faq_corrupt_repo:
-
-My repository is corrupt, how can I restore from an older copy of it?
----------------------------------------------------------------------
-
-If your repositories are encrypted and have the same ID, the recommended method
-is to delete the corrupted repository, but keep its security info, and then copy
-the working repository to the same location:
-
-::
-
-    borg delete --keep-security-info /path/to/repo
-    rsync -aH /path/to/repo-working/ /path/to/repo  # Note the trailing slash.
-
-A plain delete command would remove the security info in
-``~/.config/borg/security``, including the nonce value. In BorgBackup
-:ref:`security_encryption` is AES-CTR, where the nonce is a counter. When the
-working repo was used later for creating new archives, Borg would re-use nonce
-values due to starting from a lower counter value given by the older copy of the
-repository. To prevent this, the ``keep-security-info`` option is applied so
-that the client-side nonce counter is kept.
-
 Repository filesystem is full. What now?
 ----------------------------------------
 
@@ -218,28 +196,26 @@ Freeing space using Borg
 
 If you want to free space by deleting Borg archives, keep in mind that
 ``borg delete`` and ``borg compact`` need some free space themselves to work,
-as they write new (journaling) segment files before deleting old ones.
+as they write new data before deleting old data.
 
 If you have really zero bytes free and ``borg delete`` fails:
 
-1. **Delete the last segment file(s) manually**: In your repository directory,
-   look into the ``data/`` directory. Find the highest numbered subdirectory
-   and delete the highest numbered segment file(s) in it. This will remove
-   data from your latest (likely incomplete) backup attempt.
-2. **Repair the repository**: Run ``borg check --repair REPO`` to bring the
-   repository back into a consistent state.
-3. **Prune/Delete and Compact**: Now that you have some space, use
+1. **Free reserved space**: If you have previously reserved space via
+   ``borg repo-space --reserve``, you can now free it::
+
+    borg repo-space --free
+
+2. **Prune/Delete and Compact**: Now that you have some space, use
    ``borg prune`` or ``borg delete`` to remove unneeded archives, and
-   **must** run ``borg compact REPO`` to actually free up the space.
+   **must** run ``borg compact`` to actually free up the space.
 
 How to avoid that it happens again?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **Reserve space via Borg**: You can configure Borg to stop before the disk is
-  completely full by setting the ``additional_free_space`` repository
-  configuration. For example, to stop when less than 2 GB is free::
+- **Reserve space via Borg**: You can reserve space for emergencies by using the
+  ``borg repo-space --reserve`` command. For example, to reserve 2 GB::
 
-    borg config REPO additional_free_space 2G
+    borg repo-space --reserve 2G
 
 - **Emergency space file**: Manually create a large "space reserve" file in the
   repository filesystem that you can delete if you ever run out of space again.

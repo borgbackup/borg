@@ -225,6 +225,11 @@ ssh keys and different entries in ``authorized_keys`` is much easier and also
 maybe has less potential of things going wrong somehow.
 
 
+My SSH connection breaks during a long borg operation. What now?
+----------------------------------------------------------------
+
+See the `Vorta documentation <https://docs.borgbase.com/faq/#my-ssh-connection-breaks-after-a-long-backup-or-prune-operation>`_.
+
 My machine goes to sleep causing `Broken pipe`
 ----------------------------------------------
 

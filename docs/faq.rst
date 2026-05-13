@@ -393,6 +393,62 @@ storage systems. To avoid or detect such issues, you should:
   stored data still matches its MAC (chunk id). Note that this cannot detect
   if the data was already "garbage" when it was first processed and stored.
 
+How can I mount a Borg repository via /etc/fstab or systemd?
+------------------------------------------------------------
+
+Mounting via ``/etc/fstab`` directly is difficult because Borg usually
+requires a passphrase and environment variables. A better approach is to use
+a systemd unit, which allows you to specify the passphrase safely and manage
+automounting.
+
+**Option 1: Systemd Mount Unit**
+
+Create a file named ``mnt-borg.mount`` (the name must match the mount point path,
+e.g., for ``/mnt/borg``) in ``/etc/systemd/system/``::
+
+    [Unit]
+    Description=Borg Backup Mount
+    After=network-online.target
+    Wants=network-online.target
+
+    [Mount]
+    What=USER@HOST:REPO
+    Where=/mnt/borg
+    Type=fuse.borgfs
+    Options=_netdev,allow_other,default_permissions,ro
+    Environment="BORG_PASSPHRASE=your_passphrase"
+    # Or use a file for the passphrase:
+    # Environment="BORG_PASSCOMMAND=cat /path/to/passphrase_file"
+
+    [Install]
+    WantedBy=multi-user.target
+
+**Option 2: Systemd Automount Unit**
+
+To mount the repository only when it's accessed, create ``mnt-borg.automount``::
+
+    [Unit]
+    Description=Borg Backup Automount
+
+    [Automount]
+    Where=/mnt/borg
+    TimeoutIdleSec=600
+
+    [Install]
+    WantedBy=multi-user.target
+
+Then enable and start the automount unit::
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now mnt-borg.automount
+
+**Option 3: FSTAB with a wrapper script**
+
+If you must use ``/etc/fstab``, you can create a wrapper script that sets the
+environment variables and then calls ``borgfs``.
+
+For more details and discussion, see :issue:`6804`.
+
 Can I use Borg on SMR hard drives?
 ----------------------------------
 

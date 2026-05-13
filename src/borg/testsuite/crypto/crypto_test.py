@@ -282,7 +282,10 @@ def test_repo_key_detect_does_not_raise_integrity_error(getpass, monkeypatch):
 class TestDeriveKey(BaseTestCase):
     # Create a simple KeyBase subclass with a non-empty crypt_key
     class CustomKey(KeyBase):
+        TYPE = 0x42
+
         def __init__(self, crypt_key, id_key):
+            super().__init__(None)
             self.crypt_key = crypt_key
             self.id_key = id_key
 

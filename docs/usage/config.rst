@@ -21,5 +21,8 @@ Examples
 
     # set storage quota to 50 GB
     $ borg config /path/to/repo storage_quota 50G
+ 
+    # set maximum segment size to 100 MiB (see "Adjusting segment size" in Usage Notes)
+    $ borg config /path/to/repo max_segment_size 104857600
 
 

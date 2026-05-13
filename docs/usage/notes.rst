@@ -401,3 +401,30 @@ When running Borg using an automated script, ``ssh`` might still ask for a passw
 even if there is an SSH key for the target server. Use this to make scripts more robust::
 
     export BORG_RSH='ssh -oBatchMode=yes'
+
+.. _adjusting_segment_size:
+
+Adjusting segment size
+~~~~~~~~~~~~~~~~~~~~~~
+
+By default, Borg uses a maximum segment file size of 500 MiB. This is a good
+balance for many use cases, but you can adjust it to better suit your
+environment:
+
+- **Smaller segments (e.g., 50 MiB or 100 MiB)**:
+  Recommended if you use tools like ``rsync`` or ``rclone`` to sync your
+  repository to another location. Smaller segments result in less data being
+  re-transmitted when a segment is updated (e.g., during compaction).
+- **Larger segments**:
+  Usually not necessary, as 500 MiB is already quite large.
+
+You can change this setting for an existing repository:
+
+::
+
+    # Set maximum segment size to 100 MiB (in bytes)
+    borg config /path/to/repo max_segment_size 104857600
+
+Note that changing this setting **only affects new segments** created after the
+change. Already existing segments will only be rewritten to the new size when
+they are picked up by ``borg compact``.

@@ -3058,6 +3058,7 @@ class Archiver:
             'borg_key_export': 'borg key export --help',
             'borg_key_change-passphrase': 'borg key change-passphrase',
             'environment-variables': 'Environment Variables',
+            'internals_hashindex': 'Internals -> Data structures and file formats -> HashIndex',
         }
 
         def process_epilog(epilog):

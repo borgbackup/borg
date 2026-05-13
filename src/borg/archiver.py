@@ -3748,6 +3748,21 @@ class Archiver:
         Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
 
 
+        Error handling
+        ++++++++++++++
+ 
+        When Borg encounters a file or directory it cannot read (e.g., due to permission
+        denied, or another process holding an exclusive lock on Windows), it will:
+ 
+        - Emit a warning message to stderr.
+        - Skip that file or directory and continue backing up the remaining files.
+        - Exit with return code 1 (Warning) at the end of the operation, instead of 0
+          (Success).
+ 
+        This ensures that a single problematic file does not abort your entire backup.
+        You should check your logs for these warnings to ensure that all important data
+        is being backed up.
+ 
         .. _list_item_flags:
 
         Item flags

@@ -281,6 +281,69 @@ values due to starting from a lower counter value given by the older copy of the
 repository. To prevent this, the ``keep-security-info`` option is applied so
 that the client-side nonce counter is kept.
 
+Repository filesystem is full. What now?
+----------------------------------------
+
+If your repository filesystem is full (ENOSPC error), don't panic. Borg is
+designed to be robust and usually doesn't corrupt data in this situation.
+
+To fix this, you need to free up some space on that filesystem.
+
+Increasing available space
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **Delete unrelated files**: If there are other files on the same filesystem
+  (e.g., temporary files, logs), delete them to get some free space.
+- **Reserved space (ext2/3/4)**: On Linux ext-filesystems, some space (usually 5%)
+  is reserved for the root user. If you run borg as a normal user, you might hit
+  this limit while root could still write. You can reduce this reserve to 1% to
+  gain some space for Borg::
+
+    sudo tune2fs -m 1 /dev/sdXN  # Replace with your device
+
+- **Increase filesystem size**: If you're using LVM, cloud volumes, or a virtual
+  disk, increasing the partition and filesystem size is the easiest way.
+- **Move to a larger disk**: Move the entire repository to a larger disk
+  (e.g., using ``rsync -aH /old/repo /new/repo``) and perform the cleanup there.
+
+Freeing space using Borg
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you want to free space by deleting Borg archives, keep in mind that
+``borg delete`` and ``borg compact`` need some free space themselves to work,
+as they write new (journaling) segment files before deleting old ones.
+
+If you have really zero bytes free and ``borg delete`` fails:
+
+1. **Delete the last segment file(s) manually**: In your repository directory,
+   look into the ``data/`` directory. Find the highest numbered subdirectory
+   and delete the highest numbered segment file(s) in it. This will remove
+   data from your latest (likely incomplete) backup attempt.
+2. **Repair the repository**: Run ``borg check --repair REPO`` to bring the
+   repository back into a consistent state.
+3. **Prune/Delete and Compact**: Now that you have some space, use
+   ``borg prune`` or ``borg delete`` to remove unneeded archives, and
+   **must** run ``borg compact REPO`` to actually free up the space.
+
+How to avoid that it happens again?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **Reserve space via Borg**: You can configure Borg to stop before the disk is
+  completely full by setting the ``additional_free_space`` repository
+  configuration. For example, to stop when less than 2 GB is free::
+
+    borg config REPO additional_free_space 2G
+
+- **Emergency space file**: Manually create a large "space reserve" file in the
+  repository filesystem that you can delete if you ever run out of space again.
+  This ensures you have enough room for ``borg delete`` and ``borg compact`` to
+  function::
+
+    dd if=/dev/zero of=/path/to/repo/reserve_file bs=1M count=2048
+
+- **Monitoring**: Set up disk space monitoring and alerts for your backup
+  storage to be notified before it runs out of space.
+
 Can Borg add redundancy to the backup data to deal with hardware malfunction?
 -----------------------------------------------------------------------------
 

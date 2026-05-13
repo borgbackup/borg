@@ -297,6 +297,32 @@ Yes, if you want to detect accidental data damage (like bit rot), use the
 If you want to be able to detect malicious tampering also, use an encrypted
 repo. It will then be able to check using CRCs and HMACs.
 
+Can a previous bad backup spoil future backups?
+-----------------------------------------------
+
+In general, no. If a backup was interrupted or failed for some reason, Borg's
+transactional nature and journaling system ensure that the repository remains
+consistent. Data that was successfully stored in a partial backup
+(checkpoints) will even be reused to speed up the next attempt.
+
+However, there is one specific case where a past "bad" backup can affect
+future ones due to how deduplication works:
+
+If data was corrupted **before** reaching Borg or while being processed by
+Borg (for example, due to a hardware failure like bad RAM), and this
+corrupted data was successfully stored in the repository with a valid
+checksum (MAC), Borg will assume this is the correct data for that chunk ID.
+Any future backup of the same content will then deduplicate against this
+corrupted version.
+
+This is not a Borg-specific issue, but a general property of deduplicating
+storage systems. To detect such issues, you should:
+
+- Use reliable hardware (ECC RAM is recommended).
+- Periodically run ``borg check --verify-data REPO`` to verify that the
+  stored data still matches its checksums. Note that this cannot detect
+  if the data was already "garbage" when it was first stored.
+
 Can I use Borg on SMR hard drives?
 ----------------------------------
 

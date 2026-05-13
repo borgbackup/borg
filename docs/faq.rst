@@ -318,7 +318,7 @@ case the past bad backup affects the current or future backup due to
 deduplication.
 
 This is not a Borg-specific issue, but a general property of deduplicating
-storage systems. To detect such issues, you should:
+storage systems. To avoid or detect such issues, you should:
 
 - Use reliable hardware (ECC RAM is recommended).
 - Periodically run ``borg check --verify-data REPO`` to verify that the

@@ -3058,6 +3058,7 @@ class Archiver:
             'borg_key_export': 'borg key export --help',
             'borg_key_change-passphrase': 'borg key change-passphrase',
             'environment-variables': 'Environment Variables',
+            'internals_hashindex': 'Internals -> Data structures and file formats -> HashIndex',
         }
 
         def process_epilog(epilog):
@@ -3748,6 +3749,20 @@ class Archiver:
         Therefore, when using ``--one-file-system``, you should double-check that the backup works as intended.
 
 
+        Error handling
+        ++++++++++++++
+ 
+        When Borg encounters a file or directory it cannot read (e.g., due to permission
+        denied, or another process holding an exclusive lock on Windows), it will:
+ 
+        - Log a warning message.
+        - Skip that file or directory and continue backing up the remaining files.
+        - Exit with a Warning RC at the end of the operation.
+ 
+        This ensures that a single problematic file does not abort your entire backup.
+        You should check your logs for these warnings to ensure that all important data
+        is being backed up.
+ 
         .. _list_item_flags:
 
         Item flags
@@ -4742,11 +4757,11 @@ class Archiver:
         compatible with Borg 1.1 and later.
 
         ``none`` mode uses no encryption and no authentication. It uses SHA256
-        as chunk ID hash. This mode is not recommended. You should instead
-        consider using an authenticated or authenticated/encrypted mode. This
-        mode has possible denial-of-service issues when running ``borg create``
-        on contents controlled by an attacker. See above for alternatives.
-        This mode is compatible with all Borg versions.
+        as chunk ID hash. This mode is not recommended
+        as it is vulnerable to DoS attacks by an attacker (for example,
+        crafting content that causes hash index collisions). Do not use it if
+        untrusted clients use the repository. See :ref:`internals_hashindex` for
+        details. This mode is compatible with all Borg versions.
         """)
         subparser = subparsers.add_parser('init', parents=[common_parser], add_help=False,
                                           description=self.do_init.__doc__, epilog=init_epilog,
@@ -5265,7 +5280,8 @@ class Archiver:
                                     'See :ref:`append_only_mode` in Additional Notes for more details.')
         subparser.add_argument('--storage-quota', metavar='QUOTA', dest='storage_quota',
                                type=parse_storage_quota, default=None,
-                               help='Override storage quota of the repository (e.g. 5G, 1.5T). '
+                               help='Set storage quota of the repository (has priority over the '
+                                    'repository\'s own quota setting) (e.g. 5G, 1.5T). '
                                     'When a new repository is initialized, sets the storage quota on the new '
                                     'repository as well. Default: no quota.')
 

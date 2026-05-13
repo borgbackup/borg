@@ -237,7 +237,7 @@ Storage quotas
 ~~~~~~~~~~~~~~
 
 Quotas are implemented at the Repository level. The active quota of a repository
-is determined by the ``storage_quota`` `config` entry or a run-time override (via :ref:`borg_serve`).
+is determined by the ``storage_quota`` `config` entry or a run-time setting (via :ref:`borg_serve`, which has priority over the config entry).
 The currently used quota is stored in the hints file. Operations (PUT and DELETE) during
 a transaction modify the currently used quota:
 
@@ -805,6 +805,8 @@ b) with ``create --chunker-params buzhash,19,23,21,4095`` (default):
    You'll save some memory, but it will need to read / chunk all the files as
    it can not skip unmodified files then.
 
+.. _internals_hashindex:
+ 
 HashIndex
 ---------
 

@@ -308,12 +308,14 @@ consistent. Data that was successfully stored in a partial backup
 However, there is one specific case where a past "bad" backup can affect
 future ones due to how deduplication works:
 
-If data was corrupted **before** reaching Borg or while being processed by
-Borg (for example, due to a hardware failure like bad RAM), and this
-corrupted data was successfully stored in the repository with a valid
-checksum (MAC), Borg will assume this is the correct data for that chunk ID.
-Any future backup of the same content will then deduplicate against this
-corrupted version.
+E.g. one could imagine that after computing the MAC (chunk id) of the correct
+chunk content data that data gets corrupted (e.g. due to a RAM issue). This
+issue will go unnoticed until the MAC is compared to the data again (e.g. when
+reading the data from the repo or doing a repo check with ``--verify-data``).
+As the MAC is correct, the deduplication "thinks" it already has the correct
+data while in fact it only has the corrupted version of that data. In that
+case the past bad backup affects the current or future backup due to
+deduplication.
 
 This is not a Borg-specific issue, but a general property of deduplicating
 storage systems. To detect such issues, you should:

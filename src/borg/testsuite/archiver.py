@@ -3646,7 +3646,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
             repo_key2 = RepoKey(repository)
             repo_key2.load(None, Passphrase.env_passphrase())
 
-        assert repo_key2.enc_key == repo_key2.enc_key
+        assert repo_key2.enc_key == repo_key.enc_key
 
     def test_key_export_qr(self):
         export_file = self.output_path + '/exported.html'

@@ -432,6 +432,9 @@ class FakeInputs:
     def __init__(self, inputs):
         self.inputs = inputs
 
+    def available(self):
+        return bool(self.inputs)
+
     def __call__(self, prompt=None):
         if prompt is not None:
             print(prompt, end='')

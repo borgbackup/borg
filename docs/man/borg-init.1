@@ -29,7 +29,7 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.TH "borg-init" "1" "2026-03-18" "" "borg backup tool"
+.TH "borg-init" "1" "2026-05-15" "" "borg backup tool"
 .SH Name
 borg-init \- Initialize an empty repository
 .SH SYNOPSIS
@@ -276,11 +276,11 @@ BLAKE2b\-256 hash from the other BLAKE2b modes. This mode is only
 compatible with Borg 1.1 and later.
 .sp
 \fBnone\fP mode uses no encryption and no authentication. It uses SHA256
-as chunk ID hash. This mode is not recommended. You should instead
-consider using an authenticated or authenticated/encrypted mode. This
-mode has possible denial\-of\-service issues when running \fBborg create\fP
-on contents controlled by an attacker. See above for alternatives.
-This mode is compatible with all Borg versions.
+as chunk ID hash. This mode is not recommended
+as it is vulnerable to DoS attacks by an attacker (for example,
+crafting content that causes hash index collisions). Do not use it if
+untrusted clients use the repository. See \fIinternals_hashindex\fP for
+details. This mode is compatible with all Borg versions.
 .SH OPTIONS
 .sp
 See \fIborg\-common(1)\fP for common options of Borg commands.
@@ -304,6 +304,9 @@ Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
 .TP
 .B  \-\-make\-parent\-dirs
 create the parent directories of the repository directory, if they are missing.
+.TP
+.BI \-\-import\-related\-secrets \ PATH
+import related secrets from PATH
 .UNINDENT
 .SH EXAMPLES
 .INDENT 0.0

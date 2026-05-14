@@ -134,13 +134,22 @@ class KeyBlobStorage:
     REPO = 'repository'
 
 
-def key_creator(repository, args):
+def key_creator(repository, args, related_secrets=None):
     for key in AVAILABLE_KEY_TYPES:
         if key.ARG_NAME == args.encryption:
             assert key.ARG_NAME is not None
-            return key.create(repository, args)
+            return key.create(repository, args, related_secrets=related_secrets)
     else:
         raise ValueError('Invalid encryption mode "%s"' % args.encryption)
+
+
+def uses_same_id_hash(other_key_name, key):
+    """is the id hash the same?"""
+    # avoid breaking the deduplication by changing the id hash
+    hmac_sha256_names = ('repokey', 'key file', 'authenticated')
+    blake2_names = ('repokey BLAKE2b', 'key file BLAKE2b', 'authenticated BLAKE2b')
+    return (other_key_name in hmac_sha256_names and key.NAME in hmac_sha256_names or
+            other_key_name in blake2_names and key.NAME in blake2_names)
 
 
 def key_argument_names():
@@ -355,7 +364,7 @@ class PlaintextKey(KeyBase):
         self.tam_required = False
 
     @classmethod
-    def create(cls, repository, args):
+    def create(cls, repository, args, related_secrets=None):
         logger.info('Encryption NOT enabled.\nUse the "--encryption=repokey|keyfile" to enable encryption.')
         return cls(repository)
 
@@ -622,11 +631,13 @@ class PassphraseKey(ID_HMAC_SHA_256, AESKeyBase):
     iterations = 100000  # must not be changed ever!
 
     @classmethod
-    def create(cls, repository, args):
+    def create(cls, repository, args, related_secrets=None):
         key = cls(repository)
         logger.warning('WARNING: "passphrase" mode is unsupported since borg 1.0.')
         passphrase = Passphrase.new(allow_empty=False)
         key.init(repository, passphrase)
+        if related_secrets:
+             raise Error('Importing related secrets is not supported for "passphrase" mode.')
         return key
 
     @classmethod
@@ -762,11 +773,16 @@ class KeyfileKeyBase(AESKeyBase):
         self.save(self.target, passphrase)
 
     @classmethod
-    def create(cls, repository, args):
+    def create(cls, repository, args, related_secrets=None):
         passphrase = Passphrase.new(allow_empty=True)
         key = cls(repository)
         key.repository_id = repository.id
         key.init_from_random_data()
+        if related_secrets:
+            if not uses_same_id_hash(related_secrets['key_name'], key):
+                raise Error('You must keep the same ID hash (HMAC-SHA256 or BLAKE2b) or deduplication will break.')
+            key.id_key = related_secrets['id_key']
+            key.chunk_seed = related_secrets['chunk_seed']
         key.init_ciphers()
         target = key.get_new_target(args)
         key.save(target, passphrase, create=True)

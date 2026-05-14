@@ -3209,7 +3209,7 @@ class ArchiverTestCase(ArchiverTestCaseBase):
         assert "is invalid" in output
 
     def test_init_interrupt(self):
-        def raise_eof(*args):
+        def raise_eof(*args, **kwargs):
             raise EOFError
 
         with patch.object(KeyfileKeyBase, 'create', raise_eof):
@@ -4217,6 +4217,76 @@ id: 2 / e29442 3506da 4e1ea7 / 25f62a 5a3d41 - 02
         self.cmd('recreate', '--chunker-params=10,12,11,63', self.repository_location + '::archive')
         assert original_size('archive') == sum(sizes)
 
+    def test_related_repos_deduplication(self):
+        CHUNKER_PARAMS = 'buzhash,10,18,14,4095'  # ~16kiB chunks
+        # 1. Create repo1
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        self.create_regular_file('file1', contents=os.urandom(128 * 1024))
+        self.cmd('create', f'--chunker-params={CHUNKER_PARAMS}', self.repository_location + '::archive1', 'input')
+
+        # 2. Export related secrets
+        secrets_path = os.path.join(self.tmpdir, 'secrets.json')
+        self.cmd('key', 'export-related-secrets', self.repository_location, secrets_path)
+
+        with open(secrets_path, 'r') as f:
+            secrets = json.load(f)
+        assert secrets['version'] == 1
+        assert 'id_key' in secrets
+        assert 'chunk_seed' in secrets
+        assert 'key_name' in secrets
+
+        # 3. Create repo2 using imported secrets
+        repo2_path = os.path.join(self.tmpdir, 'repo2')
+        repo2_location = self.prefix + repo2_path
+        self.cmd('init', '--encryption=repokey', '--import-related-secrets', secrets_path, repo2_location)
+
+        # 4. Create backup in repo2 with same data
+        self.cmd('create', f'--chunker-params={CHUNKER_PARAMS}', repo2_location + '::archive2', 'input')
+
+        # 5. Verify chunk IDs are identical
+        def get_chunk_ids(repo_path, archive_name):
+            with Repository(repo_path) as repository:
+                manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+                archive = Archive(repository, key, manifest, archive_name)
+                ids = []
+                for item in archive.iter_items():
+                    chunks = getattr(item, 'chunks', None)
+                    if chunks:
+                        ids.extend(c.id for c in chunks)
+                return ids
+
+        ids1 = get_chunk_ids(self.repository_path, 'archive1')
+        ids2 = get_chunk_ids(repo2_path, 'archive2')
+
+        assert ids1 == ids2
+        assert len(ids1) > 3
+
+        # 6. Verify encryption keys are different, but id_key and chunk_seed are same
+        def get_keys(repo_path):
+            with Repository(repo_path) as repository:
+                manifest, key = Manifest.load(repository, Manifest.NO_OPERATION_CHECK)
+                return key.enc_key, key.enc_hmac_key, key.id_key, key.chunk_seed
+
+        enc_key1, hmac_key1, id_key1, chunk_seed1 = get_keys(self.repository_path)
+        enc_key2, hmac_key2, id_key2, chunk_seed2 = get_keys(repo2_path)
+
+        assert enc_key1 != enc_key2
+        assert hmac_key1 != hmac_key2
+        assert id_key1 == id_key2
+        assert chunk_seed1 == chunk_seed2
+
+    def test_related_repos_incompatible_key_name(self):
+        # Create repo1 with default (HMAC-SHA256)
+        self.cmd('init', '--encryption=repokey', self.repository_location)
+        secrets_path = os.path.join(self.tmpdir, 'secrets.json')
+        self.cmd('key', 'export-related-secrets', self.repository_location, secrets_path)
+ 
+        # Try to create repo2 with BLAKE2b (incompatible)
+        repo2_path = os.path.join(self.tmpdir, 'repo2')
+        repo2_location = self.prefix + repo2_path
+        # This should fail
+        out = self.cmd('init', '--encryption=repokey-blake2', '--import-related-secrets', secrets_path, repo2_location, exit_code=2, fork=True)
+        assert 'deduplication will break' in out
 
 @unittest.skipUnless('binary' in BORG_EXES, 'no borg.exe available')
 class ArchiverTestCaseBinary(ArchiverTestCase):

@@ -27,6 +27,8 @@ borg init
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     |                                                       | ``--make-parent-dirs``             | create the parent directories of the repository directory, if they are missing.                                                                                                                                                        |
     +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |                                                       | ``--import-related-secrets PATH``  | import related secrets from PATH                                                                                                                                                                                                       |
+    +-------------------------------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
     | .. class:: borg-common-opt-ref                                                                                                                                                                                                                                                                                                      |
     |                                                                                                                                                                                                                                                                                                                                     |
     | :ref:`common_options`                                                                                                                                                                                                                                                                                                               |
@@ -51,6 +53,7 @@ borg init
         --append-only                  create an append-only mode repository. Note that this only affects the low level structure of the repository, and running `delete` or `prune` will still be allowed. See :ref:`append_only_mode` in Additional Notes for more details.
         --storage-quota QUOTA          Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.
         --make-parent-dirs             create the parent directories of the repository directory, if they are missing.
+        --import-related-secrets PATH    import related secrets from PATH
 
 
     :ref:`common_options`
@@ -265,8 +268,8 @@ BLAKE2b-256 hash from the other BLAKE2b modes. This mode is only
 compatible with Borg 1.1 and later.
 
 ``none`` mode uses no encryption and no authentication. It uses SHA256
-as chunk ID hash. This mode is not recommended. You should instead
-consider using an authenticated or authenticated/encrypted mode. This
-mode has possible denial-of-service issues when running ``borg create``
-on contents controlled by an attacker. See above for alternatives.
-This mode is compatible with all Borg versions.
+as chunk ID hash. This mode is not recommended
+as it is vulnerable to DoS attacks by an attacker (for example,
+crafting content that causes hash index collisions). Do not use it if
+untrusted clients use the repository. See :ref:`internals_hashindex` for
+details. This mode is compatible with all Borg versions.

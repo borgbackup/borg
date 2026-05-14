@@ -99,6 +99,18 @@ Also, you must not run borg against multiple instances of the same repo
 
 See also: :ref:`faq_corrupt_repo`
 
+Prepare for borg2 "Related repositories" and borg transfer
+----------------------------------------------------------
+
+A related repository is a repository that shares the same deduplication
+secrets (``id_key`` and ``chunk_seed``) as another repository, but uses
+its own independent encryption keys.
+
+This will allow archives to be transferred between related repositories (e.g.
+using ``borg transfer`` in Borg 2.0) without breaking deduplication.
+
+For more information and detailed instructions, see :ref:`borg_key_export-related-secrets`.
+
 "this is either an attack or unsafe" warning
 --------------------------------------------
 

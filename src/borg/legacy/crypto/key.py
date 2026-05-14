@@ -3,8 +3,8 @@ import os
 from hashlib import pbkdf2_hmac
 
 from ...constants import *  # NOQA
-from ...crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, hmac_sha256
-from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, AESKeyBase, FlexiKey, UnsupportedKeyFormatError
+from ...crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, hmac_sha256, blake2b_256
+from ...crypto.key import ID_HMAC_SHA_256, AESKeyBase, FlexiKey, AuthenticatedKeyBase, UnsupportedKeyFormatError
 from ...helpers import get_limited_unpacker, msgpack
 from ...item import EncryptedKey
 from .low_level import AES
@@ -53,6 +53,45 @@ class Pbkdf2FileMixin:
         return msgpack.packb(enc_key.as_dict())
 
 
+def random_blake2b_256_key():
+    # This might look a bit curious, but is the same construction used in the keyed mode of BLAKE2b.
+    # Why limit the key to 64 bytes and pad it with 64 nulls nonetheless? The answer is that BLAKE2b
+    # has a 128 byte block size, but only 64 bytes of internal state (this is also referred to as a
+    # "local wide pipe" design, because the compression function transforms (block, state) => state,
+    # and len(block) >= len(state), hence wide.)
+    # In other words, a key longer than 64 bytes would have simply no advantage, since the function
+    # has no way of propagating more than 64 bytes of entropy internally.
+    # It's padded to a full block so that the key is never buffered internally by blake2b_update, ie.
+    # it remains in a single memory location that can be tracked and could be erased securely, if we
+    # wanted to.
+    return os.urandom(64) + bytes(64)
+
+
+class ID_BLAKE2b_256:
+    """
+    Key mix-in class for using BLAKE2b-256 for the id key.
+
+    The id_key length must be 32 bytes.
+    """
+
+    def id_hash(self, data):
+        return blake2b_256(self.id_key, data)
+
+    def init_from_random_data(self):
+        super().init_from_random_data()
+        enc_key = os.urandom(32)
+        enc_hmac_key = random_blake2b_256_key()
+        self.crypt_key = enc_key + enc_hmac_key
+        self.id_key = random_blake2b_256_key()
+
+
+class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):  # type: ignore[misc]
+    TYPE = KeyType.BLAKE2AUTHENTICATED
+    TYPES_ACCEPTABLE = {TYPE}
+    NAME = "authenticated BLAKE2b"
+    ARG_NAME = "authenticated-blake2"
+
+
 class KeyfileKey(Pbkdf2FileMixin, ID_HMAC_SHA_256, AESKeyBase, FlexiKey):  # type: ignore[misc]
     TYPES_ACCEPTABLE = {KeyType.KEYFILE, KeyType.REPO, KeyType.PASSPHRASE}
     TYPE = KeyType.KEYFILE
@@ -89,4 +128,4 @@ class Blake2RepoKey(Pbkdf2FileMixin, ID_BLAKE2b_256, AESKeyBase, FlexiKey):  # t
     CIPHERSUITE = AES256_CTR_BLAKE2b
 
 
-LEGACY_KEY_TYPES = (KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey)
+LEGACY_KEY_TYPES = (KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey)

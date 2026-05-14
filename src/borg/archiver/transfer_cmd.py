@@ -135,12 +135,11 @@ class TransferMixIn:
         """archives transfer from other repository, optionally upgrade data format"""
         key = manifest.key
         other_key = other_manifest.key
-        if not uses_same_id_hash(other_key, key):
-            raise Error(
-                "You must keep the same ID hash ([HMAC-]SHA256 or BLAKE2b) or deduplication will break. "
-                "Use a related repository!"
-            )
-        if not uses_same_chunker_secret(other_key, key):
+        using_same_id_hash = uses_same_id_hash(other_key, key)
+        rechunking = args.chunker_params is not None
+        if not using_same_id_hash and not rechunking:
+            raise Error("You must either keep the same ID hash or use --chunker-params.")
+        if not rechunking and not uses_same_chunker_secret(other_key, key):
             raise Error(
                 "You must use the same chunker secret or deduplication will break. " "Use a related repository!"
             )

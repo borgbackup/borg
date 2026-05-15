@@ -15,9 +15,9 @@ locations and passphrases first:
 
 ::
 
-    # borg 1.x repo -> borg 2.0 repo (hmac-sha256 -> hmac-sha256, keeping same chunk ID algorithm)
+    # Borg 1.x repository -> Borg 2.0 repository (hmac-sha256 -> hmac-sha256, keeping the same chunk ID algorithm)
 
-    # 0. Have Borg 2.0 installed on the client AND server; have a b1x repository copy for testing.
+    # 0. Have Borg 2.0 installed on the client AND server; have a Borg 1.x repository copy for testing.
 
     # 1. Create a new "related" repository:
     # Here, the existing Borg 1.x repository used repokey (and AES-CTR mode),
@@ -40,9 +40,9 @@ locations and passphrases first:
 
 ::
 
-    # borg 1.x repo -> borg 2.0 repo (blake2 -> blake3, changing chunk ID algorithm)
+    # Borg 1.x repository -> Borg 2.0 repository (blake2 -> blake3, changing the chunk ID algorithm)
 
-    # 0. Have Borg 2.0 installed on the client AND server; have a b1x repository copy for testing.
+    # 0. Have Borg 2.0 installed on the client AND server; have a Borg 1.x repository copy for testing.
 
     # 1. Create a new "related" repository:
     # Here, the existing Borg 1.x repository used repokey-blake2 (and AES-CTR mode),
@@ -66,24 +66,24 @@ locations and passphrases first:
     # 4. Check whether we have everything (same as step 2):
     $ borg transfer --from-borg1 --chunker-params=$CHUNKER_PARAMS --dry-run
 
-Keyfile considerations when upgrading from borg 1.x
+Keyfile considerations when upgrading from Borg 1.x
 ++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-If you are using a ``keyfile`` encryption mode (not ``repokey``), borg 2
-may not automatically find your borg 1.x key file, because the default
+If you are using a ``keyfile`` encryption mode (not ``repokey``), Borg 2
+may not automatically find your Borg 1.x key file, because the default
 key file directory has changed on some platforms due to the switch to
 the `platformdirs <https://pypi.org/project/platformdirs/>`_ library.
 
-On **Linux**, there is typically no change -- both borg 1.x and borg 2
+On **Linux**, there is typically no change -- both Borg 1.x and Borg 2
 use ``~/.config/borg/keys/``.
 
-On **macOS**, borg 1.x stored key files in ``~/.config/borg/keys/``,
-but borg 2 defaults to ``~/Library/Application Support/borg/keys/``.
+On **macOS**, Borg 1.x stored key files in ``~/.config/borg/keys/``,
+but Borg 2 defaults to ``~/Library/Application Support/borg/keys/``.
 
-On **Windows**, borg 1.x used XDG-style paths (e.g. ``~/.config/borg/keys/``),
-while borg 2 defaults to ``C:\Users\<user>\AppData\Roaming\borg\keys\``.
+On **Windows**, Borg 1.x used XDG-style paths (e.g. ``~/.config/borg/keys/``),
+while Borg 2 defaults to ``C:\Users\<user>\AppData\Roaming\borg\keys\``.
 
-If borg 2 cannot find your key file, you have several options:
+If Borg 2 cannot find your key file, you have several options:
 
 1. **Copy the key file** from the old location to the new one.
 2. **Set BORG_KEYS_DIR** to point to the old key file directory::
@@ -94,13 +94,13 @@ If borg 2 cannot find your key file, you have several options:
 
        export BORG_KEY_FILE=~/.config/borg/keys/your_key_file
 
-4. **Set BORG_BASE_DIR** to force borg 2 to use the same base directory
-   as borg 1.x::
+4. **Set BORG_BASE_DIR** to force Borg 2 to use the same base directory
+   as Borg 1.x::
 
        export BORG_BASE_DIR=$HOME
 
-   This makes borg 2 use ``$HOME/.config/borg``, ``$HOME/.cache/borg``,
-   etc., matching borg 1.x behaviour on all platforms.
+   This makes Borg 2 use ``$HOME/.config/borg``, ``$HOME/.cache/borg``,
+   etc., matching Borg 1.x behavior on all platforms.
 
 See :ref:`env_vars` for more details on directory environment variables.
 

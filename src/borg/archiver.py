@@ -333,8 +333,21 @@ class Archiver:
         """Initialize an empty repository"""
         path = args.location.canonical_path()
         logger.info('Initializing repository at "%s"' % path)
+        related_secrets = None
+        if args.import_related_secrets:
+            with dash_open(args.import_related_secrets, 'r') as fd:
+                try:
+                    related_secrets = json.load(fd)
+                except ValueError:
+                    raise CommandError(f"Invalid JSON in related secrets file: {args.import_related_secrets}")
+            if related_secrets.get('version') != 1:
+                raise CommandError(f"Unsupported related secrets version: {related_secrets.get('version')}")
+            try:
+                related_secrets['id_key'] = hex_to_bin(related_secrets['id_key'])
+            except (KeyError, ValueError):
+                raise CommandError(f"Invalid id_key in related secrets file: {args.import_related_secrets}")
         try:
-            key = key_creator(repository, args)
+            key = key_creator(repository, args, related_secrets=related_secrets)
         except (EOFError, KeyboardInterrupt):
             repository.destroy()
             raise CancelledByUser()
@@ -412,6 +425,19 @@ class Archiver:
         if hasattr(key, 'find_key'):
             # print key location to make backing it up easier
             logger.info('Key location: %s', key.find_key())
+
+    @with_repository(manifest=True, compatibility=(Manifest.Operation.READ,))
+    def do_key_export_related_secrets(self, args, repository, manifest, key):
+        """Export secrets for creating related repositories"""
+        secrets = {
+            'version': 1,
+            'id_key': bin_to_hex(key.id_key),
+            'chunk_seed': key.chunk_seed,
+            'key_name': key.NAME,
+        }
+        with dash_open(args.path, 'w') as fd:
+            json.dump(secrets, fd, indent=4)
+            fd.write('\n')
 
     @with_repository(lock=False, exclusive=False, manifest=False, cache=False)
     def do_key_export(self, args, repository):
@@ -4784,6 +4810,8 @@ class Archiver:
                                help='Set storage quota of the new repository (e.g. 5G, 1.5T). Default: no quota.')
         subparser.add_argument('--make-parent-dirs', dest='make_parent_dirs', action='store_true',
                                help='create the parent directories of the repository directory, if they are missing.')
+        subparser.add_argument('--import-related-secrets', metavar='PATH', dest='import_related_secrets',
+                               type=PathSpec, help='import related secrets from PATH')
 
         # borg key
         subparser = subparsers.add_parser('key', parents=[mid_common_parser], add_help=False,
@@ -4850,6 +4878,54 @@ class Archiver:
                                help='Create an export suitable for printing and later type-in')
         subparser.add_argument('--qr-html', dest='qr', action='store_true',
                                help='Create an html file suitable for printing and later type-in or qr scan')
+
+        export_related_secrets_epilog = process_epilog("""
+        This command exports the deduplication secrets (``id_key`` and ``chunk_seed``)
+        of a repository. These secrets can be used to initialize a **related repository**.
+
+        Related repositories share the same deduplication metadata but have their own
+        independent encryption keys. This is useful for:
+
+        1. Creating independent backup targets that still benefit from being
+           "compatible" for future archive transfers.
+        2. Preparing for a migration to Borg 2.0, where archives can be transferred
+           between related repositories using ``borg transfer``.
+
+        The exported secrets are stored in a JSON file. This file contains sensitive
+        information and should be deleted immediately after usage.
+
+        Examples::
+
+            # Export secrets from an existing repository
+            $ borg key export-related-secrets /path/to/repo1 secrets.json
+
+            # Initialize a new related repository using these secrets
+            $ borg init --import-related-secrets=secrets.json --encryption=repokey /path/to/repo2
+            $ rm secrets.json
+
+        .. IMPORTANT::
+           When initializing a related repository using ``borg init --import-related-secrets``,
+           the new repository must use the same ID hash algorithm (either both HMAC-SHA256
+           or both BLAKE2) as the original repository.
+
+           - HMAC-SHA256: ``repokey``, ``keyfile``, ``authenticated``
+           - BLAKE2: ``repokey-blake2``, ``keyfile-blake2``, ``authenticated-blake2``
+
+        .. WARNING::
+           Please note that future Borg 2.0 versions might remove support for BLAKE2
+           in new repositories (see :issue:`8867`).
+        """)
+
+        subparser = key_parsers.add_parser('export-related-secrets', parents=[common_parser], add_help=False,
+                                          description=self.do_key_export_related_secrets.__doc__,
+                                          epilog=export_related_secrets_epilog,
+                                          formatter_class=argparse.RawDescriptionHelpFormatter,
+                                          help='export related secrets for related repositories')
+        subparser.set_defaults(func=self.do_key_export_related_secrets)
+        subparser.add_argument('location', metavar='REPOSITORY', nargs='?', default='',
+                               type=location_validator(archive=False))
+        subparser.add_argument('path', metavar='PATH', nargs='?', type=PathSpec,
+                               help='where to store the secrets')
 
         key_import_epilog = process_epilog("""
         This command restores a key previously backed up with the export command.

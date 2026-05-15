@@ -44,3 +44,7 @@ Fully automated using environment variables:
 .. include:: key_export.rst.inc
 
 .. include:: key_import.rst.inc
+
+This command can be used to create a related repository:
+
+.. include:: key_export-related-secrets.rst.inc

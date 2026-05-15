@@ -2445,6 +2445,10 @@ class Archiver:
           - When you back up relative paths like ``../../src``, the archived paths
             start with ``src``.
 
+        - When using the slashdot hack, patterns match against the unstripped path,
+          i.e., when you back up ``/this/gets/stripped/./this/gets/archived``,
+          patterns must match ``this/gets/stripped/this/gets/archived``.
+
         A directory exclusion pattern can end either with or without a slash ('/').
         If it ends with a slash, such as `some/path/`, the directory will be
         included but not its content. If it does not end with a slash, such as

@@ -423,13 +423,22 @@ above.
 New features:
 
 - create/import-tar --quick-stats: faster than --stats by omitting "All archives"
-  and repository chunks statistics, #9579
+  and repository chunk statistics, #9579
+- prune: show total vs matching archives in output, #9262
+- Minimal implementation of "related repositories", #9645
+
+  This feature allows multiple repositories to share deduplication-relevant secrets (id_key and chunk_seed) while maintaining secure, independent encryption keys.
+
+  - borg key export-related-secrets <REPO> <SPATH>
+  - borg init --import-related-secrets <SPATH> <REPO>
+
 
 Fixes:
 
 - hashindex: fix new checks for big endian archs, #9521
+- slashdot hack: fix exclusion of source directory metadata, #9534
 
-Note: Many of the fixed issues below here relate to rather rare or theoretical
+Note: Many of the fixed issues listed below relate to rather rare or theoretical
       issues and were found by automated code checking.
 
 - LRUCache: resolve KeyError and memory leaks, #9587
@@ -439,7 +448,7 @@ Note: Many of the fixed issues below here relate to rather rare or theoretical
   or if the archived file had all-zero replacement chunks or inconsistent size.
 - Chunker fixes, #9586:
 
-  - Better check the return value of fd.read(n) and reject if it returns more
+  - Strictly check the return value of fd.read(n) and reject if it returns more
     bytes than requested.
   - Avoid giving len <= 0 to posix_fadvise(), which could drop the rest of the
     file from the cache.
@@ -448,7 +457,7 @@ Note: Many of the fixed issues below here relate to rather rare or theoretical
   - Check for malloc/calloc failures.
 - Hashindex fixes, #9575:
 
-  - Make it possible to lookup in compacted hashtables.
+  - Make it possible to look up in compacted hashtables.
   - Avoid buckets_length integer overflow on 32-bit systems via huge num_buckets.
   - Deal safely with empty index: we must use num_buckets = 1 to avoid division
     by zero and sanity check in hashindex_read.
@@ -456,7 +465,7 @@ Note: Many of the fixed issues below here relate to rather rare or theoretical
   - Reinitialize upper/lower limit and min_empty after compact.
   - Fix size_idx / fit_size / grow_size / shrink_size (mind array bounds).
   - Deal with growing when already at max capacity.
-  - hashindex_resize: replace num_entries assertion, rather return error.
+  - hashindex_resize: replace num_entries assertion, return an error instead.
   - Correctly free memory when header validation fails.
   - BaseIndex.clear: always stay in valid state.
     Do not free the old index before we successfully have allocated a new one.
@@ -465,6 +474,20 @@ Other changes:
 
 - use F_FULLFSYNC on macOS for SyncFile data durability, #9383
 - mount: improve error msg when uid/gid cannot be resolved, #9574
+- docs:
+  - impact of the slashdot hack on pattern matching, #9647
+  - pull-backup.rst minor fixes
+  - sshfs + chroot does not support different CPU architectures, #6878
+  - document max_segment_size adjustment, #7858
+  - add section about rolling back a transaction, #9270
+  - clarify storage quota run-time settings, #3948
+  - add FAQ entry about scalability, #4742
+  - add FAQ entry for full repository filesystem, #9573
+  - add FAQ entry for bad backups and deduplication, #4744
+  - add FAQ entry for SSH connection timeouts, #5629
+  - improve macOS Keychain instructions, #5156
+  - add DoS warning for none encryption mode, #6715
+  - document error handling in borg create, #4912
 
 
 Version 1.4.4 (2026-03-19)

@@ -13,12 +13,9 @@ from ..helpers.argparsing import SUPPRESS, PositiveInt
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
-from ..legacy.remote import LegacyRemoteRepository
 from ..remote import RemoteRepository
-from ..legacy.repository import LegacyRepository
 from ..repository import Repository
 from ..repoobj import RepoObj
-from ..legacy.repoobj import RepoObj1
 from ..patterns import (
     ArgparsePatternAction,
     ArgparseExcludeFileAction,
@@ -34,7 +31,12 @@ logger = create_logger(__name__)
 
 def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_or_v2):
     if location.proto in ("ssh", "socket"):
-        RemoteRepoCls = LegacyRemoteRepository if v1_or_v2 else RemoteRepository
+        if v1_or_v2:
+            from ..legacy.remote import LegacyRemoteRepository
+
+            RemoteRepoCls = LegacyRemoteRepository
+        else:
+            RemoteRepoCls = RemoteRepository
         repository = RemoteRepoCls(
             location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, args=args
         )
@@ -45,7 +47,12 @@ def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_or_
         repository = Repository(location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
 
     else:
-        RepoCls = LegacyRepository if v1_or_v2 else Repository
+        if v1_or_v2:
+            from ..legacy.repository import LegacyRepository
+
+            RepoCls = LegacyRepository
+        else:
+            RepoCls = Repository
         repository = RepoCls(location.path, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
     return repository
 
@@ -195,9 +202,13 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
                     )
                 kwargs["other_repository"] = repository
                 if manifest or cache:
-                    manifest_ = Manifest.load(
-                        repository, compatibility, other=True, ro_cls=RepoObj if repository.version > 1 else RepoObj1
-                    )
+                    if repository.version > 1:
+                        ro_cls = RepoObj
+                    else:
+                        from ..legacy.repoobj import RepoObj1
+
+                        ro_cls = RepoObj1
+                    manifest_ = Manifest.load(repository, compatibility, other=True, ro_cls=ro_cls)
                     assert_secure(repository, manifest_)
                     if manifest:
                         kwargs["other_manifest"] = manifest_

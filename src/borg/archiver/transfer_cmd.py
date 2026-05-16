@@ -10,7 +10,6 @@ from ..helpers import ChunkerParams, ChunkIteratorFileWrapper, CompressionSpec
 from ..helpers.argparsing import ArgumentParser, ArgumentTypeError
 from ..item import ChunkListEntry
 from ..manifest import Manifest
-from ..legacy.repository import LegacyRepository
 from ..repository import Repository
 
 from ..logger import create_logger
@@ -35,6 +34,8 @@ def transfer_chunks(
 
     If chunker_params is provided, the chunks will be re-chunked using the specified parameters.
     """
+    from ..legacy.repository import LegacyRepository
+
     transfer = 0
     present = 0
     chunks = []

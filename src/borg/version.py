@@ -17,7 +17,7 @@ def parse_version(version):
     """
     version_re = r"""
         (?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)   # version, e.g. 1.2.33
-        (?P<prerelease>(?P<ptype>a|b|rc)(?P<pnum>\d+))?  # optional prerelease, e.g. a1 or b2 or rc33
+        (?P<prerelease>\.?(?P<ptype>a|b|rc|dev)(?P<pnum>\d+))?  # optional prerelease, e.g. a1 or b2 or rc33 or .dev1
     """
     m = re.match(version_re, version, re.VERBOSE)
     if m is None:
@@ -25,7 +25,7 @@ def parse_version(version):
     gd = m.groupdict()
     version = [int(gd['major']), int(gd['minor']), int(gd['patch'])]
     if m.lastgroup == 'prerelease':
-        p_type = {'a': -4, 'b': -3, 'rc': -2}[gd['ptype']]
+        p_type = {'a': -4, 'b': -3, 'rc': -2, 'dev': -9}[gd['ptype']]
         p_num = int(gd['pnum'])
         version += [p_type, p_num]
     else:
@@ -44,6 +44,6 @@ def format_version(version):
         elif part == -1:
             break
         else:
-            f[-1] = f[-1] + {-2: 'rc', -3: 'b', -4: 'a'}[part] + str(next(it))
+            f[-1] = f[-1] + {-2: 'rc', -3: 'b', -4: 'a', -9: '.dev'}[part] + str(next(it))
             break
     return '.'.join(f)

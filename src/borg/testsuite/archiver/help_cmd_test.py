@@ -85,6 +85,42 @@ def test_borg1_glob_archives_shows_match_archives_hint(archiver):
     assert "tip: For details of accepted options run: borg list --help" in output
 
 
+def test_borg1_repo_archive_in_repo_shows_borg2_forms(archiver):
+    ret, output = exec_cmd(
+        "--repo",
+        f"{archiver.repository_location}::test1",
+        "list",
+        archiver=archiver.archiver,
+        fork=archiver.FORK_DEFAULT,
+        exe=archiver.EXE,
+    )
+
+    assert ret == 2
+    assert "Borg2 does not accept repo::archive in --repo." in output
+    assert "Use one of these borg2 forms instead:" in output
+    assert f"borg --repo {archiver.repository_location} list ::test1" in output
+    assert f"export BORG_REPO={archiver.repository_location}" in output
+    assert "borg list ::test1" in output
+    assert "tip: For details of accepted options run: borg list --help" in output
+
+
+def test_borg1_repo_archive_in_repo_shows_borg2_forms_when_repo_is_after_command(archiver):
+    ret, output = exec_cmd(
+        "list",
+        "--repo",
+        f"{archiver.repository_location}::test1",
+        archiver=archiver.archiver,
+        fork=archiver.FORK_DEFAULT,
+        exe=archiver.EXE,
+    )
+
+    assert ret == 2
+    assert "Borg2 does not accept repo::archive in --repo." in output
+    assert f"borg --repo {archiver.repository_location} list ::test1" in output
+    assert f"export BORG_REPO={archiver.repository_location}" in output
+    assert "borg list ::test1" in output
+
+
 @pytest.mark.parametrize("command, parser", list(get_all_parsers().items()))
 def test_help_formatting(command, parser):
     if isinstance(parser.epilog, RstToTextLazy):

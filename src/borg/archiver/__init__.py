@@ -384,6 +384,44 @@ class Archiver(
             ]
         )
 
+    @staticmethod
+    def _option_value(args, option_strings):
+        for i, arg in enumerate(args):
+            for option_string in option_strings:
+                if arg == option_string:
+                    return args[i + 1] if i + 1 < len(args) else None
+                if arg.startswith(option_string + "="):
+                    return arg.split("=", 1)[1]
+        return None
+
+    def _legacy_repo_archive_hint(self, args, parser):
+        command_index = self._first_toplevel_command_index(args, parser)
+        if command_index is None or args[command_index] != "list":
+            return None
+
+        repo_value = self._option_value(args, ("-r", "--repo"))
+        if not repo_value or "::" not in repo_value:
+            return None
+
+        repo, archive = repo_value.split("::", 1)
+        if not repo or not archive:
+            return None
+
+        prog = self.prog or "borg"
+        corrected = shlex.join([prog, "--repo", repo, "list", f"::{archive}"])
+        export_cmd = f"export BORG_REPO={shlex.quote(repo)}"
+        positional = shlex.join([prog, "list", f"::{archive}"])
+        return "\n".join(
+            [
+                "Borg2 does not accept repo::archive in --repo.",
+                "Use one of these borg2 forms instead:",
+                corrected,
+                export_cmd,
+                positional,
+                f"tip: For details of accepted options run: {prog} list --help",
+            ]
+        )
+
     def get_args(self, argv, cmd):
         """Usually just returns argv, except when dealing with an SSH forced command for borg serve."""
         result = self.parse_args(argv[1:])
@@ -426,6 +464,9 @@ class Archiver(
             if legacy_hint:
                 parser.exit(EXIT_ERROR, legacy_hint + "\n")
             legacy_hint = self._legacy_option_hint(args, parser)
+            if legacy_hint:
+                parser.exit(EXIT_ERROR, legacy_hint + "\n")
+            legacy_hint = self._legacy_repo_archive_hint(args, parser)
             if legacy_hint:
                 parser.exit(EXIT_ERROR, legacy_hint + "\n")
         args = parser.parse_args(args or ["-h"])

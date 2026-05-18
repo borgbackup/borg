@@ -121,6 +121,33 @@ def test_borg1_repo_archive_in_repo_shows_borg2_forms_when_repo_is_after_command
     assert "borg list ::test1" in output
 
 
+def test_list_without_name_suggests_repo_list(archiver):
+    ret, output = exec_cmd("list", archiver=archiver.archiver, fork=archiver.FORK_DEFAULT, exe=archiver.EXE)
+
+    assert ret == 2
+    assert "borg list NAME lists contents of an archive and needs an archive NAME." in output
+    assert "If you meant to list archives in a repository, use repo-list:" in output
+    assert "borg -r REPO repo-list" in output
+    assert "tip: For details of accepted options run: borg list --help" in output
+
+
+def test_list_without_name_with_repo_suggests_repo_list(archiver):
+    ret, output = exec_cmd(
+        "--repo",
+        archiver.repository_location,
+        "list",
+        archiver=archiver.archiver,
+        fork=archiver.FORK_DEFAULT,
+        exe=archiver.EXE,
+    )
+
+    assert ret == 2
+    assert "borg list NAME lists contents of an archive and needs an archive NAME." in output
+    assert "If you meant to list archives in a repository, use repo-list:" in output
+    assert f"borg -r {archiver.repository_location} repo-list" in output
+    assert "tip: For details of accepted options run: borg list --help" in output
+
+
 @pytest.mark.parametrize("command, parser", list(get_all_parsers().items()))
 def test_help_formatting(command, parser):
     if isinstance(parser.epilog, RstToTextLazy):

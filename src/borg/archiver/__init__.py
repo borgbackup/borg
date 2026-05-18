@@ -309,7 +309,7 @@ class Archiver(
         return parser
 
     @staticmethod
-    def _first_toplevel_command_index(args, parser):
+    def _first_positional_index(args, parser):
         option_actions = {}
         for action in parser._actions:
             for option_string in getattr(action, "option_strings", ()):
@@ -319,7 +319,7 @@ class Archiver(
         while i < len(args):
             token = args[i]
             if token == "--":
-                return None
+                return i + 1 if i + 1 < len(args) else len(args)
             if not token.startswith("-") or token == "-":
                 return i
 
@@ -344,7 +344,14 @@ class Archiver(
             else:
                 i += 2
 
-        return None
+        return len(args)
+
+    @staticmethod
+    def _first_toplevel_command_index(args, parser):
+        index = Archiver._first_positional_index(args, parser)
+        if index is None or index == len(args):
+            return None
+        return index
 
     def _legacy_command_hint(self, args, parser):
         command_index = self._first_toplevel_command_index(args, parser)
@@ -422,6 +429,34 @@ class Archiver(
             ]
         )
 
+    def _missing_list_name_hint(self, args, parser):
+        command_index = self._first_toplevel_command_index(args, parser)
+        if command_index is None or args[command_index] != "list":
+            return None
+
+        commands = getattr(parser, "_subcommands_action", None)
+        commands = commands._name_parser_map if commands else {}
+        list_parser = commands.get("list")
+        if list_parser is None:
+            return None
+
+        subcommand_args = args[command_index + 1 :]
+        positional_index = self._first_positional_index(subcommand_args, list_parser)
+        if positional_index is None or positional_index != len(subcommand_args):
+            return None
+
+        prog = self.prog or "borg"
+        repo_value = self._option_value(args, ("-r", "--repo")) or "REPO"
+        repo_list_command = shlex.join([prog, "-r", repo_value, "repo-list"])
+        return "\n".join(
+            [
+                "borg list NAME lists contents of an archive and needs an archive NAME.",
+                "If you meant to list archives in a repository, use repo-list:",
+                repo_list_command,
+                f"tip: For details of accepted options run: {prog} list --help",
+            ]
+        )
+
     def get_args(self, argv, cmd):
         """Usually just returns argv, except when dealing with an SSH forced command for borg serve."""
         result = self.parse_args(argv[1:])
@@ -467,6 +502,9 @@ class Archiver(
             if legacy_hint:
                 parser.exit(EXIT_ERROR, legacy_hint + "\n")
             legacy_hint = self._legacy_repo_archive_hint(args, parser)
+            if legacy_hint:
+                parser.exit(EXIT_ERROR, legacy_hint + "\n")
+            legacy_hint = self._missing_list_name_hint(args, parser)
             if legacy_hint:
                 parser.exit(EXIT_ERROR, legacy_hint + "\n")
         args = parser.parse_args(args or ["-h"])

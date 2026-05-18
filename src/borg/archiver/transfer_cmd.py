@@ -172,6 +172,7 @@ class TransferMixIn:
             raise Error("\n".join(ac_errors))
 
         from .. import upgrade as upgrade_mod
+        from ..legacy import upgrade as legacy_upgrade_mod
 
         v1_or_v2 = getattr(args, "v1_or_v2", False)
         upgrader = args.upgrader
@@ -179,11 +180,13 @@ class TransferMixIn:
             upgrader = "From12To20"
 
         try:
-            UpgraderCls = getattr(upgrade_mod, f"Upgrader{upgrader}")
+            UpgraderCls = getattr(upgrade_mod, f"Upgrader{upgrader}", None) or getattr(
+                legacy_upgrade_mod, f"Upgrader{upgrader}"
+            )
         except AttributeError:
             raise Error(f"No such upgrader: {upgrader}")
 
-        if UpgraderCls is not upgrade_mod.UpgraderFrom12To20 and other_manifest.repository.version == 1:
+        if UpgraderCls is not legacy_upgrade_mod.UpgraderFrom12To20 and other_manifest.repository.version == 1:
             raise Error("To transfer from a borg 1.x repo, you need to use: --upgrader=From12To20")
 
         upgrader = UpgraderCls(cache=cache, args=args)

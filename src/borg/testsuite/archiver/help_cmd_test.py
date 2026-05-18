@@ -62,6 +62,29 @@ def test_borg1_init_shows_repo_create_hint(archiver):
     assert "Use `borg help` to see the list of valid commands." in output
 
 
+def test_borg1_glob_archives_shows_match_archives_hint(archiver):
+    ret, output = exec_cmd(
+        "--repo",
+        archiver.repository_location,
+        "list",
+        "--glob-archives",
+        "my*",
+        archiver=archiver.archiver,
+        fork=archiver.FORK_DEFAULT,
+        exe=archiver.EXE,
+    )
+
+    assert ret == 2
+    assert "--glob-archives is a borg1 option and is not used in borg2." in output
+    assert (
+        "Use --match-archives in borg2. It defaults to exact `id:` matching, "
+        "so use `sh:` for borg1-style globbing." in output
+    )
+    assert "Example:" in output
+    assert "borg list ARCHIVE --match-archives 'sh:my*'" in output
+    assert "tip: For details of accepted options run: borg list --help" in output
+
+
 @pytest.mark.parametrize("command, parser", list(get_all_parsers().items()))
 def test_help_formatting(command, parser):
     if isinstance(parser.epilog, RstToTextLazy):

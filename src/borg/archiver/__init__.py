@@ -363,6 +363,27 @@ class Archiver(
             ]
         )
 
+    def _legacy_option_hint(self, args, parser):
+        command_index = self._first_toplevel_command_index(args, parser)
+        if command_index is None or args[command_index] != "list":
+            return None
+
+        if not any(arg == "--glob-archives" or arg.startswith("--glob-archives=") for arg in args[command_index + 1 :]):
+            return None
+
+        prog = self.prog or "borg"
+        example = shlex.join([prog, "list", "ARCHIVE", "--match-archives", "sh:my*"])
+        return "\n".join(
+            [
+                "--glob-archives is a borg1 option and is not used in borg2.",
+                "Use --match-archives in borg2. It defaults to exact `id:` matching, "
+                "so use `sh:` for borg1-style globbing.",
+                "Example:",
+                example,
+                f"tip: For details of accepted options run: {prog} list --help",
+            ]
+        )
+
     def get_args(self, argv, cmd):
         """Usually just returns argv, except when dealing with an SSH forced command for borg serve."""
         result = self.parse_args(argv[1:])
@@ -402,6 +423,9 @@ class Archiver(
         parser = self.build_parser()
         if args:
             legacy_hint = self._legacy_command_hint(args, parser)
+            if legacy_hint:
+                parser.exit(EXIT_ERROR, legacy_hint + "\n")
+            legacy_hint = self._legacy_option_hint(args, parser)
             if legacy_hint:
                 parser.exit(EXIT_ERROR, legacy_hint + "\n")
         args = parser.parse_args(args or ["-h"])

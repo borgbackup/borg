@@ -308,6 +308,61 @@ class Archiver(
         self.build_parser_version(subparsers, common_parser, mid_common_parser)
         return parser
 
+    @staticmethod
+    def _first_toplevel_command_index(args, parser):
+        option_actions = {}
+        for action in parser._actions:
+            for option_string in getattr(action, "option_strings", ()):
+                option_actions[option_string] = action
+
+        i = 0
+        while i < len(args):
+            token = args[i]
+            if token == "--":
+                return None
+            if not token.startswith("-") or token == "-":
+                return i
+
+            option_name, has_value, _ = token.partition("=")
+            action = option_actions.get(option_name)
+            if action is None:
+                return None
+            if has_value:
+                i += 1
+                continue
+
+            nargs = getattr(action, "nargs", None)
+            if nargs in (0, "0"):
+                i += 1
+            elif nargs == "?":
+                if i + 1 < len(args) and not args[i + 1].startswith("-"):
+                    i += 2
+                else:
+                    i += 1
+            elif isinstance(nargs, int):
+                i += 1 + nargs
+            else:
+                i += 2
+
+        return None
+
+    def _legacy_command_hint(self, args, parser):
+        command_index = self._first_toplevel_command_index(args, parser)
+        if command_index is None or args[command_index] != "init":
+            return None
+
+        corrected_args = list(args)
+        corrected_args[command_index] = "repo-create"
+        corrected_command = shlex.join([self.prog or "borg", *corrected_args])
+        return "\n".join(
+            [
+                "init is not a borg2 command; use repo-create.",
+                "Corrected command:",
+                corrected_command,
+                "Use `borg help` to see the list of valid commands.",
+            ]
+        )
+
     def get_args(self, argv, cmd):
         """Usually just returns argv, except when dealing with an SSH forced command for borg serve."""
         result = self.parse_args(argv[1:])
@@ -345,6 +400,10 @@ class Archiver(
         if args:
             args = self.preprocess_args(args)
         parser = self.build_parser()
+        if args:
+            legacy_hint = self._legacy_command_hint(args, parser)
+            if legacy_hint:
+                parser.exit(EXIT_ERROR, legacy_hint + "\n")
         args = parser.parse_args(args or ["-h"])
         args = flatten_namespace(args)
 

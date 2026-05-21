@@ -36,7 +36,6 @@ from .fslocking import LockTimeout, NotLocked, NotMyLock, LockFailed
 from .logger import create_logger, borg_serve_log_queue
 from .manifest import NoManifestError
 from .helpers import msgpack
-from .legacy.repository import LegacyRepository
 from .repository import Repository, StoreObjectNotFound
 from .version import parse_version, format_version
 from .helpers.datastruct import EfficientCollectionQueue
@@ -358,7 +357,12 @@ class RepositoryServer:  # pragma: no cover
         return path
 
     def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, v1_or_v2=False):
-        self.RepoCls = LegacyRepository if v1_or_v2 else Repository
+        if v1_or_v2:
+            from .legacy.repository import LegacyRepository
+
+            self.RepoCls = LegacyRepository
+        else:
+            self.RepoCls = Repository
         self.rpc_methods = self._legacy_rpc_methods if v1_or_v2 else self._rpc_methods
         logging.debug("Resolving repository path %r", path)
         path = self._resolve_path(path)

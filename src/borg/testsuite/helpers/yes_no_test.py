@@ -6,30 +6,30 @@ from .. import FakeInputs
 
 def test_yes_input():
     inputs = list(TRUISH)
-    input = FakeInputs(inputs)
-    while input.available():
-        assert yes(input=input)
+    fake_input = FakeInputs(inputs)
+    while fake_input.available():
+        assert yes(input=fake_input)
     inputs = list(FALSISH)
-    input = FakeInputs(inputs)
-    while input.available():
-        assert not yes(input=input)
+    fake_input = FakeInputs(inputs)
+    while fake_input.available():
+        assert not yes(input=fake_input)
 
 
 def test_yes_input_defaults():
     inputs = list(DEFAULTISH)
-    input = FakeInputs(inputs)
-    while input.available():
-        assert yes(default=True, input=input)
-    input = FakeInputs(inputs)
-    while input.available():
-        assert not yes(default=False, input=input)
+    fake_input = FakeInputs(inputs)
+    while fake_input.available():
+        assert yes(default=True, input=fake_input)
+    fake_input = FakeInputs(inputs)
+    while fake_input.available():
+        assert not yes(default=False, input=fake_input)
 
 
 def test_yes_input_custom():
-    input = FakeInputs(["YES", "SURE", "NOPE"])
-    assert yes(truish=("YES",), input=input)
-    assert yes(truish=("SURE",), input=input)
-    assert not yes(falsish=("NOPE",), input=input)
+    fake_input = FakeInputs(["YES", "SURE", "NOPE"])
+    assert yes(truish=("YES",), input=fake_input)
+    assert yes(truish=("SURE",), input=fake_input)
+    assert not yes(falsish=("NOPE",), input=fake_input)
 
 
 def test_yes_env(monkeypatch):
@@ -49,26 +49,26 @@ def test_yes_env_default(monkeypatch):
 
 
 def test_yes_defaults():
-    input = FakeInputs(["invalid", "", " "])
-    assert not yes(input=input)  # default=False
-    assert not yes(input=input)
-    assert not yes(input=input)
-    input = FakeInputs(["invalid", "", " "])
-    assert yes(default=True, input=input)
-    assert yes(default=True, input=input)
-    assert yes(default=True, input=input)
-    input = FakeInputs([])
-    assert yes(default=True, input=input)
-    assert not yes(default=False, input=input)
+    fake_input = FakeInputs(["invalid", "", " "])
+    assert not yes(input=fake_input)  # default=False
+    assert not yes(input=fake_input)
+    assert not yes(input=fake_input)
+    fake_input = FakeInputs(["invalid", "", " "])
+    assert yes(default=True, input=fake_input)
+    assert yes(default=True, input=fake_input)
+    assert yes(default=True, input=fake_input)
+    fake_input = FakeInputs([])
+    assert yes(default=True, input=fake_input)
+    assert not yes(default=False, input=fake_input)
     with pytest.raises(ValueError):
         yes(default=None)
 
 
 def test_yes_retry():
-    input = FakeInputs(["foo", "bar", TRUISH[0]])
-    assert yes(retry_msg="Retry: ", input=input)
-    input = FakeInputs(["foo", "bar", FALSISH[0]])
-    assert not yes(retry_msg="Retry: ", input=input)
+    fake_input = FakeInputs(["foo", "bar", TRUISH[0]])
+    assert yes(retry_msg="Retry: ", input=fake_input)
+    fake_input = FakeInputs(["foo", "bar", FALSISH[0]])
+    assert not yes(retry_msg="Retry: ", input=fake_input)
 
 
 def test_yes_no_retry():
@@ -79,14 +79,14 @@ def test_yes_no_retry():
 
 
 def test_yes_output(capfd):
-    input = FakeInputs(["invalid", "y", "n"])
-    assert yes(msg="intro-msg", false_msg="false-msg", true_msg="true-msg", retry_msg="retry-msg", input=input)
+    fake_input = FakeInputs(["invalid", "y", "n"])
+    assert yes(msg="intro-msg", false_msg="false-msg", true_msg="true-msg", retry_msg="retry-msg", input=fake_input)
     out, err = capfd.readouterr()
     assert out == ""
     assert "intro-msg" in err
     assert "retry-msg" in err
     assert "true-msg" in err
-    assert not yes(msg="intro-msg", false_msg="false-msg", true_msg="true-msg", retry_msg="retry-msg", input=input)
+    assert not yes(msg="intro-msg", false_msg="false-msg", true_msg="true-msg", retry_msg="retry-msg", input=fake_input)
     out, err = capfd.readouterr()
     assert out == ""
     assert "intro-msg" in err

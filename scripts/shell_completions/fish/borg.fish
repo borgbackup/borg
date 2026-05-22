@@ -20,7 +20,6 @@ complete -c borg -f -n __fish_is_first_token -a 'compact' -d 'Free repository sp
 complete -c borg -f -n __fish_is_first_token -a 'info' -d 'Show archive details'
 complete -c borg -f -n __fish_is_first_token -a 'mount' -d 'Mount archive or a repository'
 complete -c borg -f -n __fish_is_first_token -a 'umount' -d 'Unmount the mounted archive'
-complete -c borg -f -n __fish_is_first_token -a 'repo-compress' -d 'Repository (re-)compression'
 complete -c borg -f -n __fish_is_first_token -a 'repo-create' -d 'Create a new, empty repository'
 complete -c borg -f -n __fish_is_first_token -a 'repo-delete' -d 'Delete a repository'
 complete -c borg -f -n __fish_is_first_token -a 'repo-info' -d 'Show repository information'
@@ -105,12 +104,6 @@ complete -c borg -f      -l 'oldest'                -d 'Consider archives within
 complete -c borg -f      -l 'newest'                -d 'Consider archives within TIMESPAN from newest' -n "__fish_seen_subcommand_from analyze"
 complete -c borg -f      -l 'older'                 -d 'Consider archives older than TIMESPAN'      -n "__fish_seen_subcommand_from analyze"
 complete -c borg -f      -l 'newer'                 -d 'Consider archives newer than TIMESPAN'      -n "__fish_seen_subcommand_from analyze"
-
-# borg repo-compress options
-# Define compression methods once at the top
-set -l compression_methods "none auto lz4 zstd,1 zstd,2 zstd,3 zstd,4 zstd,5 zstd,6 zstd,7 zstd,8 zstd,9 zstd,10 zstd,11 zstd,12 zstd,13 zstd,14 zstd,15 zstd,16 zstd,17 zstd,18 zstd,19 zstd,20 zstd,21 zstd,22 zlib,1 zlib,2 zlib,3 zlib,4 zlib,5 zlib,6 zlib,7 zlib,8 zlib,9 lzma,0 lzma,1 lzma,2 lzma,3 lzma,4 lzma,5 lzma,6 lzma,7 lzma,8 lzma,9"
-complete -c borg -f -s C -l 'compression'           -d 'Select compression ALGORITHM,LEVEL [lz4]' -a "$compression_methods" -n "__fish_seen_subcommand_from repo-compress"
-complete -c borg -f -s s -l 'stats'                 -d 'Print statistics'                            -n "__fish_seen_subcommand_from repo-compress"
 
 # borg create options
 complete -c borg -f -s n -l 'dry-run'               -d 'Do not create a backup archive'                 -n "__fish_seen_subcommand_from create"

@@ -38,12 +38,19 @@ def format_version(version):
     f = []
     it = iter(version)
     while True:
-        part = next(it)
+        try:
+            part = next(it)
+        except StopIteration:
+            raise ValueError("Invalid version tuple %r" % (version,))
         if part >= 0:
             f.append(str(part))
         elif part == -1:
             break
         else:
-            f[-1] = f[-1] + {-2: "rc", -3: "b", -4: "a", -9: ".dev"}[part] + str(next(it))
+            try:
+                pnum = next(it)
+            except StopIteration:
+                raise ValueError("Invalid prerelease version tuple %r" % (version,))
+            f[-1] = f[-1] + {-2: "rc", -3: "b", -4: "a", -9: ".dev"}[part] + str(pnum)
             break
     return ".".join(f)

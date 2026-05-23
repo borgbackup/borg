@@ -50,6 +50,7 @@ cflags = ["-Wall", "-Wextra", "-Wpointer-arith", "-Wno-unreachable-code-fallthro
 
 compress_source = "src/borg/compress.pyx"
 crypto_ll_source = "src/borg/crypto/low_level.pyx"
+crypto_legacy_ll_source = "src/borg/legacy/crypto/low_level.pyx"
 buzhash_source = "src/borg/chunkers/buzhash.pyx"
 buzhash64_source = "src/borg/chunkers/buzhash64.pyx"
 reader_source = "src/borg/chunkers/reader.pyx"
@@ -66,6 +67,7 @@ platform_windows_source = "src/borg/platform/windows.pyx"
 cython_sources = [
     compress_source,
     crypto_ll_source,
+    crypto_legacy_ll_source,
     buzhash_source,
     buzhash64_source,
     reader_source,
@@ -155,6 +157,10 @@ if not on_rtd:
         dict(sources=[crypto_ll_source]), crypto_ext_lib, dict(extra_compile_args=cflags)
     )
 
+    crypto_legacy_ext_kwargs = members_appended(
+        dict(sources=[crypto_legacy_ll_source]), crypto_ext_lib, dict(extra_compile_args=cflags)
+    )
+
     compress_ext_kwargs = members_appended(
         dict(sources=[compress_source]),
         lib_ext_kwargs(pc, "BORG_LIBLZ4_PREFIX", "lz4", "liblz4", ">= 1.7.0"),
@@ -174,6 +180,7 @@ if not on_rtd:
 
     ext_modules += [
         Extension("borg.crypto.low_level", **crypto_ext_kwargs),
+        Extension("borg.legacy.crypto.low_level", **crypto_legacy_ext_kwargs),
         Extension("borg.compress", **compress_ext_kwargs),
         Extension("borg.hashindex", [hashindex_source], extra_compile_args=cflags),
         Extension("borg.item", [item_source], extra_compile_args=cflags),

@@ -167,6 +167,7 @@ module = [
     "pyfuse3",
     "trio",
     "borg.crypto.low_level",
+    "borg.legacy.crypto.low_level",
     "borg.platform.*",
 ]
 ignore_missing_imports = true

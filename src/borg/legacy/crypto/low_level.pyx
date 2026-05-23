@@ -1,9 +1,6 @@
 from cpython cimport PyMem_Malloc, PyMem_Free
 from cpython.buffer cimport PyBUF_SIMPLE, PyObject_GetBuffer, PyBuffer_Release
 
-from ..crypto.low_level import num_cipher_blocks
-
-
 cdef extern from "openssl/evp.h":
     ctypedef struct EVP_CIPHER:
         pass
@@ -136,7 +133,7 @@ cdef class AES:
                 PyBuffer_Release(&idata)
 
     def block_count(self, length):
-        return num_cipher_blocks(length, self.cipher_blk_len)
+        return (length + self.cipher_blk_len - 1) // self.cipher_blk_len
 
     def set_iv(self, iv):
         if isinstance(iv, int):

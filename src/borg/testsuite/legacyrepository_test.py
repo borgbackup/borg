@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from xxhash import xxh64
 
-from ..hashindex import NSIndex1
+from ..legacy.hashindex import NSIndex1
 from ..helpers import Location
 from ..helpers import IntegrityError
 from ..helpers import msgpack

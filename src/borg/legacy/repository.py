@@ -16,7 +16,7 @@ from zlib import crc32
 import xxhash
 
 from ..constants import *  # NOQA
-from ..hashindex import NSIndex1Entry, NSIndex1
+from .hashindex import NSIndex1Entry, NSIndex1
 from ..helpers import Error, ErrorWithTraceback, IntegrityError, format_file_size, parse_file_size
 from ..helpers import Location
 from ..helpers import ProgressIndicatorPercent

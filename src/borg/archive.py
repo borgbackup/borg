@@ -1231,7 +1231,7 @@ def maybe_exclude_by_attr(item):
     if xattrs := item.get("xattrs"):
         apple_excluded = xattrs.get(b"com.apple.metadata:com_apple_backup_excludeItem")
         linux_excluded = xattrs.get(b"user.xdg.robots.backup")
-        if apple_excluded is not None or linux_excluded == b"true":
+        if apple_excluded is not None or linux_excluded == b"false":
             raise BackupItemExcluded
 
     if flags := item.get("bsdflags"):

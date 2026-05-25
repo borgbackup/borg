@@ -8,7 +8,7 @@ from itertools import count, combinations
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
-from ..helpers import archivename_validator, interval, int_or_interval, sig_int
+from ..helpers import archivename_validator, interval, int_or_interval, sig_int, timestamp
 from ..helpers import json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import ArchiveInfo, Manifest
@@ -109,6 +109,9 @@ PRUNE_QUARTERLY_13WEEKLY = PruningRule("quarterly_13weekly", quarterly_13weekly_
 PRUNE_QUARTERLY_3MONTHLY = PruningRule("quarterly_3monthly", quarterly_3monthly_period_func)
 PRUNE_YEARLY = PruningRule("yearly", pattern_period_func("%Y"))
 
+# Fake rule used to indicate archives skipped by --since
+PRUNE_SINCE = PruningRule("skip", unique_period_func())
+
 PRUNING_RULES = [
     PRUNE_WITHIN,
     PRUNE_LAST,
@@ -129,7 +132,7 @@ def prune(
     archives: list[ArchiveInfo],
     rule: PruningRule,
     n_or_interval: int | timedelta,
-    base_timestamp: datetime | None,
+    since_timestamp: datetime | None,
     keep_oldest: bool,
     previously_kept: dict[ArchiveInfo, KeepResult] = {},
 ) -> dict[ArchiveInfo, KeepResult]:
@@ -139,9 +142,9 @@ def prune(
     if isinstance(n_or_interval, int):
         n, earliest_timestamp = n_or_interval, None
     else:
-        if base_timestamp is None:
-            raise ValueError("base_timestamp is required when using interval-based pruning")
-        n, earliest_timestamp = None, base_timestamp - n_or_interval
+        if since_timestamp is None:
+            raise ValueError("since_timestamp is required when using interval-based pruning")
+        n, earliest_timestamp = None, since_timestamp - n_or_interval
 
     keep: dict[ArchiveInfo, KeepResult] = {}
 
@@ -176,6 +179,44 @@ class PruneMixIn:
         """Prune archives according to specified rules."""
         self._validate_prune_args(args)
 
+        match = [args.name] if args.name else args.match_archives
+        archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
+        archives = [ai for ai in archives if "@PROT" not in ai.tags]
+
+        # Archives to keep along with the rule that ensured them being kept
+        keep = {}
+
+        since = getattr(args, PRUNE_SINCE.key)
+        candidate_archives = archives
+
+        if since is not None:
+            # Prefilter: Archives from _after_ the `prune_since` time are skipped entirely.
+            for archive in archives:
+                if archive.ts <= since:
+                    break
+                keep[archive] = KeepResult(rule=PRUNE_SINCE, idx=len(keep))
+            candidate_archives = archives[len(keep) :]
+
+        # Apply each retention rule to all candidate archives. The
+        # `previously_kept` parameter prevents later (coarser-grained) rules
+        # from double-counting archives already retained by earlier rules.
+        active_rules = [
+            (rule, getattr(args, rule.key)) for rule in PRUNING_RULES if getattr(args, rule.key) is not None
+        ]
+        for rule, n_or_interval in active_rules:
+            keep |= prune(
+                archives=candidate_archives,
+                rule=rule,
+                n_or_interval=n_or_interval,
+                since_timestamp=(since if since is not None else datetime.now().astimezone()),
+                keep_oldest=(
+                    rule == active_rules[-1][0]
+                ),  # Activate keep_oldest rule only for the largest active interval
+                previously_kept=keep,
+            )
+
+        archives_to_prune = set(archives) - set(keep)
+
         if args.format is not None:
             format = args.format
         elif args.short:
@@ -184,37 +225,17 @@ class PruneMixIn:
             format = os.environ.get("BORG_PRUNE_FORMAT", "{archive:<36} {time} [{id}]")
         formatter = ArchiveFormatter(format, repository, manifest, manifest.key, iec=args.iec)
 
-        match = [args.name] if args.name else args.match_archives
-        archives = manifest.archives.list(match=match, sort_by=["ts"], reverse=True)
-        archives = [ai for ai in archives if "@PROT" not in ai.tags]
-
-        # Archives to keep along with the rule that ensured them being kept
-        keep = {}
-
-        base_timestamp = datetime.now().astimezone()
-        active_rules = {rule: getattr(args, rule.key) for rule in PRUNING_RULES if getattr(args, rule.key) is not None}
-        for i, (rule, n_or_interval) in enumerate(active_rules.items(), 1):
-            keep |= prune(
-                archives=archives,
-                rule=rule,
-                n_or_interval=n_or_interval,
-                base_timestamp=base_timestamp,
-                keep_oldest=i == len(active_rules),  # Activate keep_oldest rule only for the largest active interval
-                previously_kept=keep,
-            )
-
-        to_delete = set(archives) - set(keep)
-        if not args.json:
-            logger.info("Repository contains %d archives.", manifest.archives.count())
-            logger.info("Applying rules to the matching %d archives...", len(archives))
-            logger.info("Keeping %d archives, pruning %d archives.", len(keep), len(to_delete))
         if args.json:
             output_data = []
+        else:
+            logger.info("Repository contains %d archives.", manifest.archives.count())
+            logger.info("Applying rules to the matching %d archives...", len(archives))
+            logger.info("Keeping %d archives, pruning %d archives.", len(keep), len(archives_to_prune))
+
         list_logger = logging.getLogger("borg.output.list")
         # set up counters for the progress display
-        to_delete_len = len(to_delete)
-        archives_deleted = 0
-        pi = ProgressIndicatorPercent(total=len(to_delete), msg="Pruning archives %3.0f%%", msgid="prune")
+        num_archives_deleted = 0
+        pi = ProgressIndicatorPercent(total=len(archives_to_prune), msg="Pruning archives %3.0f%%", msgid="prune")
         for archive_info in archives:
             if sig_int and sig_int.action_done():
                 break
@@ -224,18 +245,18 @@ class PruneMixIn:
                 archive_data = formatter.get_item_data(archive_info, jsonline=True)
             else:
                 archive_formatted = formatter.format_item(archive_info, jsonline=False)
-            if archive_info in to_delete:
+            if archive_info in archives_to_prune:
                 if not args.json:
                     pi.show()
-                archives_deleted += 1
+                num_archives_deleted += 1
                 if args.dry_run:
                     log_message = "Would prune:"
                 else:
-                    log_message = "Pruning archive (%d/%d):" % (archives_deleted, to_delete_len)
+                    log_message = f"Pruning archive ({num_archives_deleted}/{len(archives_to_prune)}):"
                     manifest.archives.delete_by_id(archive_info.id)
                 if args.json:
                     archive_data["kept"] = False
-                    archive_data["deleted_archive_number"] = archives_deleted
+                    archive_data["deleted_archive_number"] = num_archives_deleted
             else:
                 result = keep[archive_info]
                 result_message = f"{result.rule.key}{'[oldest]' if result.oldest else ''} #{result.idx + 1}"
@@ -249,21 +270,21 @@ class PruneMixIn:
                 if (
                     args.output_list
                     or not (args.list_pruned or args.list_kept)
-                    or (args.list_pruned and archive_info in to_delete)
-                    or (args.list_kept and archive_info not in to_delete)
+                    or (args.list_pruned and archive_info in archives_to_prune)
+                    or (args.list_kept and archive_info not in archives_to_prune)
                 ):
                     output_data.append(archive_data)
             elif (
                 args.output_list
-                or (args.list_pruned and archive_info in to_delete)
-                or (args.list_kept and archive_info not in to_delete)
+                or (args.list_pruned and archive_info in archives_to_prune)
+                or (args.list_kept and archive_info not in archives_to_prune)
             ):
                 list_logger.info(f"{log_message:<44} {archive_formatted}")
         if not args.json:
             pi.finish()
         if args.json:
             json_print(basic_json_data(manifest, extra={"archives": output_data}))
-        if archives_deleted > 0 and not args.dry_run:
+        if num_archives_deleted > 0 and not args.dry_run:
             manifest.write()
             self.print_warning('Done. Run "borg compact" to free space.', wc=None)
         if sig_int:
@@ -408,6 +429,14 @@ class PruneMixIn:
             "The form of ``--format`` is ignored, "
             "but keys used in it are added to the JSON output. "
             "Some keys are always present. Note: JSON can only represent text.",
+        )
+        subparser.add_argument(
+            "--since",
+            metavar="TIMESTAMP",
+            dest=PRUNE_SINCE.key,
+            type=timestamp,
+            action=Highlander,
+            help="only consider archives older than this for pruning",
         )
         subparser.add_argument(
             "--keep-within",

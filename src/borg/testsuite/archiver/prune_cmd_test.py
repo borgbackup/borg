@@ -27,7 +27,7 @@ pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds
 def _create_archive_dt(archiver, backup_files, name, dt, tzinfo=timezone.utc):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=tzinfo)
-    cmd(archiver, "create", "--timestamp", dt.strftime(ISO_FORMAT_ZONE), name, backup_files)
+    cmd(archiver, "create", "--timestamp", dt.isoformat(timespec="microseconds"), name, backup_files)
 
 
 def _create_archive_ts(archiver, backup_files, name, y, m, d, H=0, M=0, S=0, us=0, tzinfo=timezone.utc):

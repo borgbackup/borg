@@ -47,7 +47,8 @@ def test_prune_repository(archivers, request, backup_files):
     output = cmd(archiver, "repo-list")
     assert "test1" in output
     assert "test2" in output
-    cmd(archiver, "prune", "--keep-daily=1")
+    output = cmd(archiver, "prune", "--list", "--keep-daily=1")
+    assert re.search(r"Pruning archive \(1/1\):\s+test1", output)
     output = cmd(archiver, "repo-list")
     assert "test1" not in output
     # The latest archive must still be there:

@@ -2,7 +2,7 @@ import binascii
 import hmac
 import os
 import textwrap
-from hashlib import sha256, pbkdf2_hmac
+from hashlib import sha256
 from pathlib import Path
 from typing import Literal, ClassVar
 from collections.abc import Callable
@@ -442,12 +442,6 @@ class FlexiKey:
                 return self.decrypt_key_file_argon2(encrypted_key, passphrase)
             else:
                 raise UnsupportedKeyFormatError()
-
-    @staticmethod
-    def pbkdf2(passphrase, salt, iterations, output_len_in_bytes):
-        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") == "1":
-            iterations = 1
-        return pbkdf2_hmac("sha256", passphrase.encode("utf-8"), salt, iterations, output_len_in_bytes)
 
     @staticmethod
     def argon2(

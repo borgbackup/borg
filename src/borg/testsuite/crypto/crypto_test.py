@@ -9,7 +9,7 @@ from ...crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
 from ...crypto.low_level import hmac_sha256
 from ...legacy.crypto.low_level import AES
 from hashlib import sha256
-from ...crypto.key import CHPOKeyfileKey, AESOCBRepoKey, FlexiKey, KeyBase, PlaintextKey
+from ...crypto.key import CHPOKeyfileKey, AESOCBRepoKey, KeyBase, PlaintextKey
 from ...legacy.crypto.key import KeyfileKey as LegacyKeyfileKey
 from ...helpers import msgpack, bin_to_hex
 
@@ -228,7 +228,7 @@ def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256():
     plain = b"hello"
     salt = b"salt" * 4
     passphrase = "hello, pass phrase"
-    key = FlexiKey.pbkdf2(passphrase, salt, 1, 32)
+    key = LegacyKeyfileKey.pbkdf2(passphrase, salt, 1, 32)
     hash = hmac_sha256(key, plain)
     data = AES(key, b"\0" * 16).encrypt(plain)
     encrypted = msgpack.packb(

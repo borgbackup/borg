@@ -1,5 +1,6 @@
 import hmac
 import os
+from hashlib import pbkdf2_hmac
 
 from ...constants import *  # NOQA
 from ...crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_CTR_BLAKE2b, hmac_sha256
@@ -11,6 +12,12 @@ from .low_level import AES
 
 class Pbkdf2FileMixin:
     """Mixin for borg 1.x key files encrypted with PBKDF2 + AES-CTR."""
+
+    @staticmethod
+    def pbkdf2(passphrase, salt, iterations, output_len_in_bytes):
+        if os.environ.get("BORG_TESTONLY_WEAKEN_KDF") == "1":
+            iterations = 1
+        return pbkdf2_hmac("sha256", passphrase.encode("utf-8"), salt, iterations, output_len_in_bytes)
 
     def decrypt_key_file(self, data, passphrase):
         unpacker = get_limited_unpacker("key")

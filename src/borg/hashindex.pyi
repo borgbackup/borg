@@ -1,6 +1,8 @@
-from typing import NamedTuple, Tuple, Type, IO, Iterator, Any
+from typing import NamedTuple, Tuple, Type, IO, Iterator, Any, MutableMapping
 
 PATH_OR_FILE = str | IO
+
+class HTProxyMixin(MutableMapping): ...
 
 class ChunkIndexEntry(NamedTuple):
     flags: int
@@ -21,16 +23,6 @@ class ChunkIndex:
     def __contains__(self, key: bytes) -> bool: ...
     def __getitem__(self, key: bytes) -> Type[ChunkIndexEntry]: ...
     def __setitem__(self, key: bytes, value: CIE) -> None: ...
-
-class NSIndex1Entry(NamedTuple):
-    segment: int
-    offset: int
-
-class NSIndex1:  # legacy
-    def iteritems(self, *args, **kwargs) -> Iterator: ...
-    def __contains__(self, key: bytes) -> bool: ...
-    def __getitem__(self, key: bytes) -> Any: ...
-    def __setitem__(self, key: bytes, value: Any) -> None: ...
 
 class FuseVersionsIndexEntry(NamedTuple):
     version: int

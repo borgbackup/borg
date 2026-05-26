@@ -6,9 +6,11 @@ import unittest
 
 from ...crypto.low_level import AES256_CTR_HMAC_SHA256, AES256_OCB, CHACHA20_POLY1305, UNENCRYPTED, IntegrityError
 from ...crypto.low_level import bytes_to_long, bytes_to_int, long_to_bytes
-from ...crypto.low_level import AES, hmac_sha256
+from ...crypto.low_level import hmac_sha256
+from ...legacy.crypto.low_level import AES
 from hashlib import sha256
 from ...crypto.key import CHPOKeyfileKey, AESOCBRepoKey, FlexiKey, KeyBase, PlaintextKey
+from ...legacy.crypto.key import KeyfileKey as LegacyKeyfileKey
 from ...helpers import msgpack, bin_to_hex
 
 from .. import BaseTestCase
@@ -232,7 +234,7 @@ def test_decrypt_key_file_pbkdf2_sha256_aes256_ctr_hmac_sha256():
     encrypted = msgpack.packb(
         {"version": 1, "algorithm": "sha256", "iterations": 1, "salt": salt, "data": data, "hash": hash}
     )
-    key = CHPOKeyfileKey(None)
+    key = LegacyKeyfileKey(None)
 
     decrypted = key.decrypt_key_file(encrypted, passphrase)
 

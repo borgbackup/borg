@@ -28,7 +28,7 @@ from ..platform import SaveFile
 from ..repoobj import RepoObj
 
 
-from .low_level import AES, bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256
+from .low_level import bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256
 from .low_level import AES256_OCB, CHACHA20_POLY1305
 from . import low_level
 
@@ -438,9 +438,7 @@ class FlexiKey:
             raise UnsupportedKeyFormatError()
         else:
             self._encrypted_key_algorithm = encrypted_key.algorithm
-            if encrypted_key.algorithm == "sha256":
-                return self.decrypt_key_file_pbkdf2(encrypted_key, passphrase)
-            elif encrypted_key.algorithm == "argon2 chacha20-poly1305":
+            if encrypted_key.algorithm == "argon2 chacha20-poly1305":
                 return self.decrypt_key_file_argon2(encrypted_key, passphrase)
             else:
                 raise UnsupportedKeyFormatError()
@@ -478,13 +476,6 @@ class FlexiKey:
         )
         return key
 
-    def decrypt_key_file_pbkdf2(self, encrypted_key, passphrase):
-        key = self.pbkdf2(passphrase, encrypted_key.salt, encrypted_key.iterations, 32)
-        data = AES(key, b"\0" * 16).decrypt(encrypted_key.data)
-        if hmac.compare_digest(hmac_sha256(key, data), encrypted_key.hash):
-            return data
-        return None
-
     def decrypt_key_file_argon2(self, encrypted_key, passphrase):
         key = self.argon2(
             passphrase,
@@ -502,21 +493,10 @@ class FlexiKey:
             return None
 
     def encrypt_key_file(self, data, passphrase, algorithm):
-        if algorithm == "sha256":
-            return self.encrypt_key_file_pbkdf2(data, passphrase)
-        elif algorithm == "argon2 chacha20-poly1305":
+        if algorithm == "argon2 chacha20-poly1305":
             return self.encrypt_key_file_argon2(data, passphrase)
         else:
             raise ValueError(f"Unexpected algorithm: {algorithm}")
-
-    def encrypt_key_file_pbkdf2(self, data, passphrase):
-        salt = os.urandom(32)
-        iterations = PBKDF2_ITERATIONS
-        key = self.pbkdf2(passphrase, salt, iterations, 32)
-        hash = hmac_sha256(key, data)
-        cdata = AES(key, b"\0" * 16).encrypt(data)
-        enc_key = EncryptedKey(version=1, salt=salt, iterations=iterations, algorithm="sha256", hash=hash, data=cdata)
-        return msgpack.packb(enc_key.as_dict())
 
     def encrypt_key_file_argon2(self, data, passphrase):
         salt = os.urandom(ARGON2_SALT_BYTES)

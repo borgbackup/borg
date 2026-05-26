@@ -442,15 +442,6 @@ class HardLinkManager:
         self.id_type = id_type
         self.info_type = info_type  # can be a single type or a tuple of types
 
-    def borg1_hardlinkable(self, mode):  # legacy
-        return stat.S_ISREG(mode) or stat.S_ISBLK(mode) or stat.S_ISCHR(mode) or stat.S_ISFIFO(mode)
-
-    def borg1_hardlink_master(self, item):  # legacy
-        return item.get("hardlink_master", False) and "source" not in item and self.borg1_hardlinkable(item.mode)
-
-    def borg1_hardlink_slave(self, item):  # legacy
-        return "source" in item and self.borg1_hardlinkable(item.mode)
-
     def hardlink_id_from_path(self, path):
         """compute a hard link id from a path"""
         assert isinstance(path, str)

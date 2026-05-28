@@ -1,9 +1,8 @@
 import datetime
+import hashlib
 import json
 import random
 import time
-
-from xxhash import xxh64
 
 from borgstore.store import ObjectNotFound
 
@@ -101,7 +100,7 @@ class Lock:
         timestamp = now.isoformat(timespec="milliseconds")
         lock = dict(exclusive=exclusive, hostid=self.id[0], processid=self.id[1], threadid=self.id[2], time=timestamp)
         value = json.dumps(lock).encode("utf-8")
-        key = xxh64(value).hexdigest()
+        key = hashlib.sha256(value).hexdigest()
         logger.debug(f"LOCK-CREATE: creating lock in store. key: {key}, lock: {lock}.")
         self.store.store(f"locks/{key}", value)
         if update_last_refresh:

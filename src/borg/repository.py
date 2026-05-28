@@ -117,13 +117,13 @@ class Repository:
         self.url = url
         # lots of stuff in data: use 2 levels by default (data/00/00/ .. data/ff/ff/ dirs)!
         data_levels = int(os.environ.get("BORG_STORE_DATA_LEVELS", "2"))
-        levels_config = {
-            "archives/": [0],
-            "cache/": [0],
-            "config/": [0],
-            "data/": [data_levels],
-            "keys/": [0],
-            "locks/": [0],
+        ns_config = {
+            "archives/": {"levels": [0]},
+            "cache/": {"levels": [0]},
+            "config/": {"levels": [0]},
+            "data/": {"levels": [data_levels]},
+            "keys/": {"levels": [0]},
+            "locks/": {"levels": [0]},
         }
         # Get permissions from parameter or environment variable
         permissions = permissions if permissions is not None else os.environ.get("BORG_REPO_PERMISSIONS", "all")
@@ -159,7 +159,7 @@ class Repository:
             )
 
         try:
-            self.store = Store(url, levels=levels_config, permissions=permissions)
+            self.store = Store(url, config=ns_config, permissions=permissions)
         except StoreBackendError as e:
             raise Error(str(e))
         self.store_opened = False

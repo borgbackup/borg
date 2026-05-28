@@ -1,4 +1,5 @@
 import configparser
+import hashlib
 import io
 import os
 import shutil
@@ -7,8 +8,6 @@ from collections import namedtuple
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from time import perf_counter
-
-from xxhash import xxh64
 
 from borgstore.backends.errors import PermissionDenied
 
@@ -51,7 +50,7 @@ def files_cache_name(archive_name, files_cache_name="files"):
     # when not, the user may manually do that by using the env var.
     if not suffix:
         # avoid issues with too complex or long archive_name by hashing it:
-        suffix = xxh64(archive_name.encode()).hexdigest()
+        suffix = hashlib.sha256(archive_name.encode()).hexdigest()
     return files_cache_name + "." + suffix
 
 
@@ -539,7 +538,7 @@ def delete_chunkindex_cache(repository):
     logger.debug(f"cached chunk indexes deleted: {hashes}")
 
 
-CHUNKINDEX_HASH_SEED = 3
+CHUNKINDEX_HASH_SEED = b"0001"  # increment seed to invalidate old chunk indexes
 
 
 def write_chunkindex_to_repo_cache(
@@ -564,11 +563,11 @@ def write_chunkindex_to_repo_cache(
     if clear:
         # if we don't need the in-memory chunks index anymore:
         chunks.clear()  # free memory, immediately
-    new_hash = xxh64(data, seed=CHUNKINDEX_HASH_SEED).hexdigest()
+    new_hash = hashlib.sha256(data + CHUNKINDEX_HASH_SEED).hexdigest()
     cached_hashes = list_chunkindex_hashes(repository)
     if force_write or new_hash not in cached_hashes:
         # when an updated chunks index is stored into the cache, we also store its hash as part of the name.
-        # when a client is loading the chunks index from a cache, it has to compare its xxh64
+        # when a client is loading the chunks index from a cache, it has to compare its content
         # hash against the hash in its name. if it is the same, the cache is valid.
         # if it is different, the cache is either corrupted or out of date and has to be discarded.
         # when some functionality is DELETING chunks from the repository, it has to delete
@@ -605,7 +604,7 @@ def read_chunkindex_from_repo_cache(repository, hash):
     except StoreObjectNotFound:
         logger.debug(f"{cache_name} not found in the repository.")
     else:
-        if xxh64(chunks_data, seed=CHUNKINDEX_HASH_SEED).digest() == hex_to_bin(hash):
+        if hashlib.sha256(chunks_data + CHUNKINDEX_HASH_SEED).digest() == hex_to_bin(hash):
             logger.debug(f"{cache_name} is valid.")
             with io.BytesIO(chunks_data) as f:
                 chunks = ChunkIndex.read(f)

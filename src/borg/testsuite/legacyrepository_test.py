@@ -15,7 +15,7 @@ from ..fslocking import Lock, LockFailed
 from ..platformflags import is_win32
 from ..legacy.remote import LegacyRemoteRepository, InvalidRPCMethod, PathNotAllowed
 from ..legacy.repository import LegacyRepository, LoggedIO
-from ..legacy.repository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT2, TAG_PUT, TAG_COMMIT
+from ..legacy.repository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT, TAG_COMMIT
 from ..repoobj import RepoObj
 from .hashindex_test import H
 
@@ -110,7 +110,7 @@ def repo_dump(repository, label=None):
     label = label + ": " if label is not None else ""
     H_trans = {H(i): i for i in range(10)}
     H_trans[None] = -1  # key == None appears in commits
-    tag_trans = {TAG_PUT2: "put2", TAG_PUT: "put", TAG_DELETE: "del", TAG_COMMIT: "comm"}
+    tag_trans = {TAG_PUT: "put", TAG_DELETE: "del", TAG_COMMIT: "comm"}
     for segment, fn in repository.io.segment_iterator():
         for tag, key, offset, size, _ in repository.io.iter_objects(segment):
             print("%s%s H(%d) -> %s[%d..+%d]" % (label, tag_trans[tag], H_trans[key], fn, offset, size))
@@ -152,12 +152,11 @@ def test_read_data(repo_fixtures, request):
         meta, data = b"meta", b"data"
         hdr = RepoObj.obj_header.pack(len(meta), len(data), xxh64(meta).digest(), xxh64(data).digest())
         chunk_complete = hdr + meta + data
-        chunk_short = hdr + meta
         repository.put(H(0), chunk_complete)
         repository.commit(compact=False)
         assert repository.get(H(0)) == chunk_complete
         assert repository.get(H(0), read_data=True) == chunk_complete
-        assert repository.get(H(0), read_data=False) == chunk_short
+        assert repository.get(H(0), read_data=False) is None
 
 
 def test_consistency(repo_fixtures, request):
@@ -235,13 +234,13 @@ def test_max_data_size(repo_fixtures, request):
 
 def _assert_sparse(repository):
     # the superseded 123456... PUT
-    assert repository.compact[0] == 41 + 8 + 0  # len(fchunk(b"123456789"))
+    assert repository.compact[0] == 41 + 0  # len(fchunk(b"123456789"))
     # a COMMIT
     assert repository.compact[1] == 9
     # the DELETE issued by the superseding PUT (or issued directly)
     assert repository.compact[2] == 41
     repository._rebuild_sparse(0)
-    assert repository.compact[0] == 41 + 8 + len(fchunk(b"123456789"))  # 9 is chunk or commit?
+    assert repository.compact[0] == 41 + len(fchunk(b"123456789"))  # 9 is chunk or commit?
 
 
 def test_sparse1(repository):
@@ -269,10 +268,10 @@ def test_sparse_delete(repository):
         repository.delete(H(0))
         repository.io._write_fd.sync()
         # the on-line tracking works on a per-object basis...
-        assert repository.compact[0] == 41 + 8 + 41 + 0  # len(chunk0) information is lost
+        assert repository.compact[0] == 41 + 41 + 0  # len(chunk0) information is lost
         repository._rebuild_sparse(0)
         # ...while _rebuild_sparse can mark whole segments as completely sparse (which then includes the segment magic)
-        assert repository.compact[0] == 41 + 8 + 41 + len(chunk0) + len(MAGIC)
+        assert repository.compact[0] == 41 + 41 + len(chunk0) + len(MAGIC)
         repository.commit(compact=True)
         assert 0 not in [segment for segment, _ in repository.io.segment_iterator()]
 

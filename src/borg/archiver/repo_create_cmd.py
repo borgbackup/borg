@@ -204,7 +204,7 @@ class RepoCreateMixIn:
             help="reuse the key material from the other repository",
         )
         subparser.add_argument(
-            "--from-borg1", dest="v1_or_v2", action="store_true", help="other repository is Borg 1.x"
+            "--from-borg1", dest="v1_legacy", action="store_true", help="other repository is Borg 1.x"
         )
         subparser.add_argument(
             "-e",

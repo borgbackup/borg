@@ -356,14 +356,14 @@ class RepositoryServer:  # pragma: no cover
         path = os.path.realpath(path)
         return path
 
-    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, v1_or_v2=False):
-        if v1_or_v2:
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, v1_legacy=False):
+        if v1_legacy:
             from .legacy.repository import LegacyRepository
 
             self.RepoCls = LegacyRepository
         else:
             self.RepoCls = Repository
-        self.rpc_methods = self._legacy_rpc_methods if v1_or_v2 else self._rpc_methods
+        self.rpc_methods = self._legacy_rpc_methods if v1_legacy else self._rpc_methods
         logging.debug("Resolving repository path %r", path)
         path = self._resolve_path(path)
         logging.debug("Resolved repository path to %r", path)
@@ -386,7 +386,7 @@ class RepositoryServer:  # pragma: no cover
             else:
                 raise PathNotAllowed(path)
         kwargs = dict(lock_wait=lock_wait, lock=lock, exclusive=exclusive, send_log_cb=self.send_queued_log)
-        if not v1_or_v2:
+        if not v1_legacy:
             kwargs["permissions"] = self.permissions
         self.repository = self.RepoCls(path, create, **kwargs)
         self.repository.__enter__()  # clean exit handled by serve() method
@@ -957,8 +957,8 @@ class RemoteRepository:
                     if chunkid in self.chunkid_to_msgids:
                         self.ignore_responses.add(pop_preload_msgid(chunkid))
 
-    @api(since=parse_version("1.0.0"), v1_or_v2={"since": parse_version("2.0.0b9"), "previously": True})
-    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, v1_or_v2=False):
+    @api(since=parse_version("1.0.0"), v1_legacy={"since": parse_version("2.0.0b21"), "previously": True})
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, v1_legacy=False):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("2.0.0a3"))

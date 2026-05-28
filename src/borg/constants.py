@@ -51,10 +51,8 @@ ROBJ_DONTCARE = "*"  # used to parse without type assertion (= accept any type)
 # the header, and the total size was set to precisely 20 MiB for borg < 1.3).
 MAX_DATA_SIZE = 20971479
 
-# MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT2 header)
-# note: for borg >= 1.3, this makes the MAX_OBJECT_SIZE grow slightly over the precise 20 MiB used by
-# borg < 1.3, but this is not expected to cause any issues.
-MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41 + 8  # see assertion at end of repository module
+# MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT header)
+MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see assertion at end of repository module
 
 # How many segment files Borg puts into a single directory by default.
 DEFAULT_SEGMENTS_PER_DIR = 1000

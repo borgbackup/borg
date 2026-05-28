@@ -175,9 +175,9 @@ class TransferMixIn:
         from .. import upgrade as upgrade_mod
         from ..legacy import upgrade as legacy_upgrade_mod
 
-        v1_or_v2 = getattr(args, "v1_or_v2", False)
+        v1_legacy = getattr(args, "v1_legacy", False)
         upgrader = args.upgrader
-        if upgrader == "NoOp" and v1_or_v2:
+        if upgrader == "NoOp" and v1_legacy:
             upgrader = "From12To20"
 
         try:
@@ -350,7 +350,7 @@ class TransferMixIn:
             help="transfer archives from the other repository",
         )
         subparser.add_argument(
-            "--from-borg1", dest="v1_or_v2", action="store_true", help="other repository is borg 1.x"
+            "--from-borg1", dest="v1_legacy", action="store_true", help="other repository is borg 1.x"
         )
         subparser.add_argument(
             "--upgrader",

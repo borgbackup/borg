@@ -337,7 +337,7 @@ class LegacyRemoteRepository:
                 lock_wait=lock_wait,
                 lock=lock,
                 exclusive=exclusive,
-                v1_or_v2=True,  # make remote use LegacyRepository
+                v1_legacy=True,  # make remote use LegacyRepository
             )
             info = self.info()
             self.version = info["version"]
@@ -636,8 +636,8 @@ class LegacyRemoteRepository:
                     if chunkid in self.chunkid_to_msgids:
                         self.ignore_responses.add(pop_preload_msgid(chunkid))
 
-    @api(since=parse_version("1.0.0"), v1_or_v2={"since": parse_version("2.0.0b10"), "previously": True})
-    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, v1_or_v2=False):
+    @api(since=parse_version("1.0.0"), v1_legacy={"since": parse_version("2.0.0b21"), "previously": True})
+    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, v1_legacy=False):
         """actual remoting is done via self.call in the @api decorator"""
 
     @api(since=parse_version("2.0.0a3"))

@@ -52,7 +52,7 @@ class CheckMixIn:
             except IntegrityError:
                 pass  # will try to make key later again
         if not args.archives_only:
-            if not repository.check(repair=args.repair, max_duration=args.max_duration):
+            if not repository.check(repair=args.repair, max_duration=args.max_duration, progress=args.progress):
                 set_ec(EXIT_WARNING)
         if not args.repo_only and not archive_checker.check(
             repository,

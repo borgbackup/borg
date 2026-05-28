@@ -178,11 +178,6 @@ cite {
 #common-options .option {
     white-space: nowrap;
 }
-/* Extra vertical breathing room for figures that need it. */
-.figure-padded {
-    margin-top: 1.5em;
-    margin-bottom: 1.5em;
-}
 
 /* Remove the right-column max-width cap so content fills the full available width. */
 #right-column {

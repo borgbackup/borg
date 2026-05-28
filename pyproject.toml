@@ -31,7 +31,7 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE", "AUTHORS"]
 dependencies = [
   "borghash ~= 0.1.0",
-  "borgstore ~= 0.4.0",
+  "borgstore ~= 0.5.0",
   "msgpack >=1.0.3, <=1.1.2",
   "packaging",
   "platformdirs >=3.0.0, <5.0.0; sys_platform == 'darwin'",  # for macOS: breaking changes in 3.0.0.
@@ -51,10 +51,10 @@ mfusepy = ["mfusepy >= 3.1.0, <4.0.0"]  # fuse 2+3, high-level
 # a pypi release of borgbackup can't contain a dependency on github!
 # mfusepym = ["mfusepy @ git+https://github.com/mxmlnkn/mfusepy.git@master"]
 nofuse = []
-s3 = ["borgstore[s3] ~= 0.4.0"]
-sftp = ["borgstore[sftp] ~= 0.4.0"]
-rclone = ["borgstore[rclone] ~= 0.4.0"]
-rest = ["borgstore[rest] ~= 0.4.0"]
+s3 = ["borgstore[s3] ~= 0.5.0"]
+sftp = ["borgstore[sftp] ~= 0.5.0"]
+rclone = ["borgstore[rclone] ~= 0.5.0"]
+rest = ["borgstore[rest] ~= 0.5.0"]
 cockpit = ["textual>=6.8.0"]  # might also work with older versions, untested
 
 [project.urls]

@@ -968,9 +968,9 @@ class ArchiveFormatter(BaseFormatter):
 
 
 class ItemFormatter(BaseFormatter):
-    # we provide the hash algos from python stdlib (except shake_*) and additionally xxh64.
+    # we provide the hash algos from python stdlib (except shake_*).
     # shake_* is not provided because it uses an incompatible .digest() method to support variable length.
-    hash_algorithms = set(hashlib.algorithms_guaranteed).union({"xxh64"}).difference({"shake_128", "shake_256"})
+    hash_algorithms = set(hashlib.algorithms_guaranteed).difference({"shake_128", "shake_256"})
     KEY_DESCRIPTIONS = {
         "type": "file type (file, dir, symlink, ...)",
         "mode": "file mode (as in stat)",
@@ -992,7 +992,6 @@ class ItemFormatter(BaseFormatter):
         "isomtime": "file modification time (ISO 8601 format)",
         "isoctime": "file change time (ISO 8601 format)",
         "isoatime": "file access time (ISO 8601 format)",
-        "xxh64": "XXH64 checksum of this file (note: this is NOT a cryptographic hash!)",
         "fingerprint": "Fingerprint of the file content (may have false negatives), format: H(conditions)-H(chunk_ids)",
         "archiveid": "internal ID of the archive",
         "archivename": "name of the archive",
@@ -1013,11 +1012,8 @@ class ItemFormatter(BaseFormatter):
         return any(key in cls.KEYS_REQUIRING_CACHE for key in format_keys)
 
     def __init__(self, archive, format):
-        from xxhash import xxh64
-
         static_data = {"archivename": archive.name, "archiveid": archive.fpr} | self.FIXED_KEYS
         super().__init__(format, static_data)
-        self.xxh64 = xxh64
         self.archive = archive
         # track which keys were requested in the format string
         self.format_keys = {f[1] for f in Formatter().parse(format)}
@@ -1104,9 +1100,7 @@ class ItemFormatter(BaseFormatter):
     def hash_item(self, hash_function, item):
         if "chunks" not in item:
             return ""
-        if hash_function == "xxh64":
-            hash = self.xxh64()
-        elif hash_function in self.hash_algorithms:
+        if hash_function in self.hash_algorithms:
             hash = hashlib.new(hash_function)
         for data in self.archive.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
             hash.update(data)

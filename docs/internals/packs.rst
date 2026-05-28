@@ -22,7 +22,7 @@ one-per-pack.
 Pack File Format
 ----------------
 
-There is no separate file header. Each blob starts with an 8-byte ``BORGPACK``
+There is no separate file header. Each blob starts with an 8-byte ``BORGOBJ``
 magic, so a forward scanner can locate blob boundaries and identify each chunk
 using only the pack file bytes with no external index.
 
@@ -33,7 +33,7 @@ Each blob is a self-contained unit::
 
     Offset (relative to blob start)  Size        Type     Field
     --------------------------------  ----------  -------  -----
-    0                                 8           bytes    Magic: ASCII b"BORGPACK"
+    0                                 8           bytes    Magic: ASCII b"BORGOBJ"
     8                                 1           uint8    Format version: 0x01
     9                                 32          bytes    chunk_id
     41                                4           uint32le meta_size
@@ -41,22 +41,31 @@ Each blob is a self-contained unit::
     49                                meta_size   bytes    encrypted_meta
     49 + meta_size                    data_size   bytes    encrypted_data
 
-``chunk_id`` is the keyed MAC of the plaintext data (``id_hash(plaintext_data)``).
+``chunk_id`` is the ID hash of the plaintext data (``id_hash(plaintext_data)``).
 Storing it in the unencrypted header lets a scanner rebuild the
 ``chunk_id → location`` index without decrypting any blob.
 
+``chunk_id`` is also written into ``encrypted_meta`` (the meta dict). The header
+copy enables key-free scanning and recovery; the meta copy lets future code read
+``chunk_id`` through the normal meta dict API without parsing the raw header layout.
+
+The fixed part of each blob header is 49 bytes (``REPOOBJ_HEADER_SIZE``):
+8 magic + 1 version + 32 chunk_id + 4 meta_size + 4 data_size.
+``REPOOBJ_HEADER_SIZE = 8 + 1 + 32 + 4 + 4 = 49``
+
 A reader locates the next blob by advancing::
 
-    next_blob_offset = current_blob_offset + 49 + meta_size + data_size
+    next_blob_offset = current_blob_offset + REPOOBJ_HEADER_SIZE + meta_size + data_size
 
-The per-blob magic limits corruption blast radius: a damaged blob causes the
-scanner to lose at most one chunk. Once it finds the next ``BORGPACK`` sequence
-it resumes.
+The per-blob magic limits the blast radius of corrupted length fields: if
+``meta_size`` or ``data_size`` is damaged, the scanner loses at most one blob.
+Once it finds the next ``BORGOBJ`` sequence it resumes. Other corruption
+(payload bit flips) is caught by AEAD on that blob without losing position.
 
 Blobs follow one another contiguously with no padding::
 
-    [BORGPACK_0: 8B][0x01: 1B][chunk_id_0: 32B][meta_size_0: 4B][data_size_0: 4B][encrypted_meta_0][encrypted_data_0]
-    [BORGPACK_1: 8B][0x01: 1B][chunk_id_1: 32B][meta_size_1: 4B][data_size_1: 4B][encrypted_meta_1][encrypted_data_1]
+    [BORGOBJ_0: 8B][0x01: 1B][chunk_id_0: 32B][meta_size_0: 4B][data_size_0: 4B][encrypted_meta_0][encrypted_data_0]
+    [BORGOBJ_1: 8B][0x01: 1B][chunk_id_1: 32B][meta_size_1: 4B][data_size_1: 4B][encrypted_meta_1][encrypted_data_1]
     ...
 
 Pack ID
@@ -66,7 +75,7 @@ The pack ID equals the ``chunk_id`` of the blob it contains::
 
     pack_id = chunk_id
 
-Since ``chunk_id`` is a keyed MAC of the plaintext, the filename commits to the
+Since ``chunk_id`` is the ID hash of the plaintext, the filename commits to the
 content. ``borg check`` can detect silent corruption without decrypting any blob.
 
 Namespace
@@ -79,9 +88,6 @@ single directory level keyed on the first byte of the pack ID (hex-encoded)::
       00/ .. ff/
         <pack_id_hex>
 
-The nesting depth is controlled by the ``packs/`` entry in the repository's
-``levels_config``, the same mechanism used by the ``data/`` namespace.
-
 
 .. _pack-index-entry:
 
@@ -90,14 +96,15 @@ Pack Index Entry
 
 Each pack contains one blob. The pack for a given chunk is always at::
 
-    packs/<hex(chunk_id)>
+    packs/<hex(pack_id)>
 
-A PackIndex entry records the pack and byte range needed to read a blob::
+A ChunkIndex entry maps a chunk to its pack::
 
-    chunk_id  →  (pack_id = chunk_id, offset, length)
+    chunk_id  →  pack_id
 
-``offset`` is the position of the blob's size fields within the pack file.
-``length`` covers those size fields plus the encrypted meta and data payloads.
+Since each pack holds exactly one blob, the blob is always at offset 0 and
+its length is the full file size. No offset or length field is stored in the
+index for this phase.
 
 .. _pack-write-order:
 
@@ -137,7 +144,11 @@ Chunk-to-location mappings are stored as a separate set of encrypted partial ind
 files under the ``index/`` namespace.
 
 Each partial index file covers the packs written in one backup session. Its name is
-the SHA-256 digest of its own content::
+the SHA-256 digest of its own content. A first backup of a large dataset may produce
+a large partial index file; using the same medium-sized file writer as compact for
+``borg create`` would bound that. That is the intended direction.
+
+::
 
     index/
       <sha256_of_content_hex>
@@ -148,7 +159,7 @@ a no-op.
 
 Partial index files are write-once. A session stores new partial index files via
 borgstore; existing files are never modified. On repository open all files under
-``index/`` are loaded via borgstore, decrypted, and merged into the in-memory PackIndex
+``index/`` are loaded via borgstore, decrypted, and merged into the in-memory ChunkIndex
 (a ``borghash`` ``HashTableNT`` keyed on ``chunk_id``). The merge is commutative and
 idempotent; order does not matter.
 
@@ -159,7 +170,7 @@ Medium-sized files keep the open-time merge cost bounded while avoiding the
 cache-invalidation traffic on other clients that a single all-in-one index would
 cause.
 
-If the entire ``index/`` namespace is lost or corrupt, the PackIndex can be rebuilt
+If the entire ``index/`` namespace is lost or corrupt, the ChunkIndex can be rebuilt
 by scanning pack files directly; see :ref:`pack-recovery`.
 
 
@@ -168,10 +179,10 @@ by scanning pack files directly; see :ref:`pack-recovery`.
 Recovery Path
 -------------
 
-When ``borg check --repair`` detects a missing or incomplete PackIndex it rebuilds
+When ``borg check --repair`` detects a missing or incomplete ChunkIndex it rebuilds
 it by forward-scanning all pack files in ``packs/``.
 
-Each blob's unencrypted header supplies the ``BORGPACK`` magic (for re-sync after
+Each blob's unencrypted header supplies the ``BORGOBJ`` magic (for re-sync after
 corruption), the ``chunk_id``, and the size fields needed to locate the next blob.
 The scan produces a complete ``chunk_id → (pack_id, offset, length)`` mapping
 without decrypting any blob and without the repository key.

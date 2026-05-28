@@ -1,5 +1,6 @@
 from ._common import with_repository
-from ..cache import Cache, SecurityManager
+from ..cache import Cache
+from ..security import SecurityManager
 from ..constants import *  # NOQA
 from ..helpers import CancelledByUser
 from ..helpers import format_archive

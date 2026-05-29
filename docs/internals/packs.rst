@@ -22,24 +22,24 @@ one-per-pack.
 Pack File Format
 ----------------
 
-There is no separate file header. Each blob starts with an 8-byte ``BORGOBJ``
-magic, so a forward scanner can locate blob boundaries and identify each chunk
-using only the pack file bytes with no external index.
+There is no separate file header. Each blob starts with the 8-byte ``OBJ_MAGIC``
+(``BORG_OBJ``), so a forward scanner can locate blob boundaries and identify
+each chunk using only the pack file bytes with no external index.
 
 Per-blob layout
 ~~~~~~~~~~~~~~~
 
 Each blob is a self-contained unit::
 
-    Offset (relative to blob start)  Size        Type     Field
-    --------------------------------  ----------  -------  -----
-    0                                 8           bytes    Magic: ASCII b"BORGOBJ"
-    8                                 1           uint8    Format version: 0x01
-    9                                 32          bytes    chunk_id
-    41                                4           uint32le meta_size
-    45                                4           uint32le data_size
-    49                                meta_size   bytes    encrypted_meta
-    49 + meta_size                    data_size   bytes    encrypted_data
+    Offset (relative to blob start)  Size              Type     Field
+    --------------------------------  ----------------  -------  -----
+    0                                 len(OBJ_MAGIC)    bytes    OBJ_MAGIC = ASCII b"BORG_OBJ"
+    8                                 1                 uint8    Format version: 0x01
+    9                                 32                bytes    chunk_id
+    41                                4                 uint32le meta_size
+    45                                4                 uint32le data_size
+    49                                meta_size         bytes    encrypted_meta
+    49 + meta_size                    data_size         bytes    encrypted_data
 
 ``chunk_id`` is the ID hash of the plaintext data (``id_hash(plaintext_data)``).
 Storing it in the unencrypted header lets a scanner rebuild the
@@ -50,8 +50,8 @@ copy enables key-free scanning and recovery; the meta copy lets future code read
 ``chunk_id`` through the normal meta dict API without parsing the raw header layout.
 
 The fixed part of each blob header is 49 bytes (``REPOOBJ_HEADER_SIZE``):
-8 magic + 1 version + 32 chunk_id + 4 meta_size + 4 data_size.
-``REPOOBJ_HEADER_SIZE = 8 + 1 + 32 + 4 + 4 = 49``
+``len(OBJ_MAGIC)`` + 1 version + 32 chunk_id + 4 meta_size + 4 data_size.
+``REPOOBJ_HEADER_SIZE = len(OBJ_MAGIC) + 1 + 32 + 4 + 4 = 49``
 
 A reader locates the next blob by advancing::
 
@@ -59,13 +59,13 @@ A reader locates the next blob by advancing::
 
 The per-blob magic limits the blast radius of corrupted length fields: if
 ``meta_size`` or ``data_size`` is damaged, the scanner loses at most one blob.
-Once it finds the next ``BORGOBJ`` sequence it resumes. Other corruption
+Once it finds the next ``OBJ_MAGIC`` sequence it resumes. Other corruption
 (payload bit flips) is caught by AEAD on that blob without losing position.
 
 Blobs follow one another contiguously with no padding::
 
-    [BORGOBJ_0: 8B][0x01: 1B][chunk_id_0: 32B][meta_size_0: 4B][data_size_0: 4B][encrypted_meta_0][encrypted_data_0]
-    [BORGOBJ_1: 8B][0x01: 1B][chunk_id_1: 32B][meta_size_1: 4B][data_size_1: 4B][encrypted_meta_1][encrypted_data_1]
+    OBJ_MAGIC | version=0x01 | chunk_id_0 | meta_size_0 | data_size_0 | encrypted_meta_0 | encrypted_data_0
+    OBJ_MAGIC | version=0x01 | chunk_id_1 | meta_size_1 | data_size_1 | encrypted_meta_1 | encrypted_data_1
     ...
 
 Pack ID
@@ -182,7 +182,7 @@ Recovery Path
 When ``borg check --repair`` detects a missing or incomplete ChunkIndex it rebuilds
 it by forward-scanning all pack files in ``packs/``.
 
-Each blob's unencrypted header supplies the ``BORGOBJ`` magic (for re-sync after
+Each blob's unencrypted header supplies the ``OBJ_MAGIC`` (for re-sync after
 corruption), the ``chunk_id``, and the size fields needed to locate the next blob.
 The scan produces a complete ``chunk_id → (pack_id, offset, length)`` mapping
 without decrypting any blob and without the repository key.

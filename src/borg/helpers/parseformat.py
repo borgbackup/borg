@@ -552,6 +552,19 @@ class Location:
         re.VERBOSE,
     )
 
+    # REST http via stdio (via ssh, if host given):
+    rest_re = re.compile(
+        r"(?P<proto>(rest))://"
+        + r"("
+        + optional_user_re
+        + host_re
+        + optional_port_re
+        + r")?"
+        + r"/"  # this is the separator, not part of the path!
+        + abs_or_rel_path_re,
+        re.VERBOSE,
+    )
+
     # BorgStore REST server
     # (http|https)://user:pass@host:port/
     http_re = re.compile(
@@ -631,6 +644,14 @@ class Location:
             self.port = m.group("port") and int(m.group("port")) or None
             self.path = os.path.normpath(m.group("path"))
             return True
+        m = self.rest_re.match(text)
+        if m:
+            self.proto = m.group("proto")
+            self.user = m.group("user")
+            self._host = m.group("host")
+            self.port = m.group("port") and int(m.group("port")) or None
+            self.path = os.path.normpath(m.group("path"))
+            return True
         m = self.http_re.match(text)
         if m:
             self.proto = m.group("proto")
@@ -692,7 +713,7 @@ class Location:
             return self.path
         if self.proto == "rclone":
             return f"{self.proto}:{self.path}"
-        if self.proto in ("sftp", "ssh", "s3", "b2", "http", "https"):
+        if self.proto in ("rest", "sftp", "ssh", "s3", "b2", "http", "https"):
             return (
                 f"{self.proto}://"
                 f"{(self.user + '@') if self.user else ''}"

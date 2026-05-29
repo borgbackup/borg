@@ -133,6 +133,71 @@ class TestLocationWithoutEnv:
             "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='relative/path')"
         )
 
+    def test_rest(self, monkeypatch):
+        monkeypatch.delenv("BORG_REPO", raising=False)
+        assert (
+            repr(Location("rest://user@host:1234//absolute/path"))
+            == "Location(proto='rest', user='user', pass=None, host='host', port=1234, path='/absolute/path')"
+        )
+        assert (
+            repr(Location("rest://user@host:1234/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, host='host', port=1234, path='relative/path')"
+        )
+        assert (
+            repr(Location("rest://user@host/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, host='host', port=None, path='relative/path')"
+        )
+        assert (
+            repr(Location("rest://user@[::]:1234/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, host='::', port=1234, path='relative/path')"
+        )
+        assert (
+            repr(Location("rest://user@[::]/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, host='::', port=None, path='relative/path')"
+        )
+        assert (
+            repr(Location("rest://user@[2001:db8::]:1234/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, host='2001:db8::', port=1234, path='relative/path')"
+        )
+        assert (
+            repr(Location("rest://user@[2001:db8::]/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, host='2001:db8::', port=None, path='relative/path')"
+        )
+        assert (
+            repr(Location("rest://user@[2001:db8::c0:ffee]:1234/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, host='2001:db8::c0:ffee', port=1234, path='relative/path')"  # noqa: E501
+        )
+        assert (
+            repr(Location("rest://user@[2001:db8::c0:ffee]/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, host='2001:db8::c0:ffee', port=None, path='relative/path')"  # noqa: E501
+        )
+        assert (
+            repr(Location("rest://user@[2001:db8::192.0.2.1]:1234/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, host='2001:db8::192.0.2.1', port=1234, path='relative/path')"  # noqa: E501
+        )
+        assert (
+            repr(Location("rest://user@[2001:db8::192.0.2.1]/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, host='2001:db8::192.0.2.1', port=None, path='relative/path')"  # noqa: E501
+        )
+        assert (
+            repr(Location("rest://user@[2a02:0001:0002:0003:0004:0005:0006:0007]/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, "
+            "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=None, path='relative/path')"
+        )
+        assert (
+            repr(Location("rest://user@[2a02:0001:0002:0003:0004:0005:0006:0007]:1234/relative/path"))
+            == "Location(proto='rest', user='user', pass=None, "
+            "host='2a02:0001:0002:0003:0004:0005:0006:0007', port=1234, path='relative/path')"
+        )
+        assert (
+            repr(Location("rest:///relative/path"))
+            == "Location(proto='rest', user=None, pass=None, host=None, port=None, path='relative/path')"
+        )
+        assert (
+            repr(Location("rest:////absolute/path"))
+            == "Location(proto='rest', user=None, pass=None, host=None, port=None, path='/absolute/path')"
+        )
+
     def test_s3(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)
         assert (

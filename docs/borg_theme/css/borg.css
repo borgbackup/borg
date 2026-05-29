@@ -178,6 +178,7 @@ cite {
 #common-options .option {
     white-space: nowrap;
 }
+
 /* Remove the right-column max-width cap so content fills the full available width. */
 #right-column {
     max-width: none;

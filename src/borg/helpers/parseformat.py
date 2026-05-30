@@ -708,7 +708,7 @@ class Location:
                 f"{self.proto}://"
                 f"{(self.user + '@') if self.user else ''}"
                 f"{self._host if self._host else ''}"
-                f"{self.port if self.port else ''}/"
+                f"{(':' + str(self.port)) if self.port else ''}/"
                 f"{self.path}"
             )
         raise NotImplementedError(self.proto)

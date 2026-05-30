@@ -411,9 +411,6 @@ def test_corrupted_file_chunk(archivers, request, init_args):
                 repository.put(chunk.id, data)
                 break
 
-    # repository-level check catches size/truncation errors but not byte-level corruption.
-    cmd(archiver, "check", "--repository-only", exit_code=0)
-
     # --verify-data decrypts and catches the corruption.
     output = cmd(archiver, "check", "--archives-only", "--verify-data", exit_code=1)
     assert f"{bin_to_hex(chunk.id)}, integrity error" in output

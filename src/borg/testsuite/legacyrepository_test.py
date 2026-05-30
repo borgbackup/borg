@@ -14,6 +14,7 @@ from ..platformflags import is_win32
 from ..legacy.remote import LegacyRemoteRepository, InvalidRPCMethod, PathNotAllowed
 from ..legacy.repository import LegacyRepository, LoggedIO
 from ..legacy.repository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT, TAG_COMMIT
+from ..compress import CNONE
 from .hashindex_test import H
 
 
@@ -71,15 +72,15 @@ def get_path(repository):
 
 
 def fchunk(data, meta=b""):
-    # RepoObj1 blobs are raw bytes with no header; meta is unused in the borg 1.x format.
+    # simplified borg 1.x format: 1-byte ctype header (CNONE = no compression) followed by payload.
     assert isinstance(data, bytes)
     assert meta == b""
-    return data
+    return bytes([CNONE.ID]) + data
 
 
 def pchunk(chunk):
-    # RepoObj1 blobs are raw bytes; meta is always empty in the borg 1.x format.
-    return chunk, b""
+    # strip the 1-byte ctype header; meta is always empty in the borg 1.x format.
+    return chunk[1:], b""
 
 
 def pdchunk(chunk):
@@ -213,7 +214,7 @@ def test_list(repo_fixtures, request):
 
 def test_max_data_size(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
-        max_data = b"x" * MAX_DATA_SIZE
+        max_data = b"x" * (MAX_DATA_SIZE - 1)
         repository.put(H(0), fchunk(max_data))
         assert pdchunk(repository.get(H(0))) == max_data
         with pytest.raises(IntegrityError):

@@ -91,30 +91,20 @@ def test_hardlink_master_gets_hlid_and_strips_hardlink_master_key():
     assert d["chunks"] == [[CHUNK_ID, CHUNK_SIZE]]
 
 
-def test_hardlink_slave_resolves_hlid_and_reuses_chunks():
+def test_hardlink_slave_gets_master_hlid_and_chunks():
     u, cache, archive = _upgrader()
-    master = _item(hardlink_master=True, chunks=[[CHUNK_ID, CHUNK_SIZE]])
-    u.upgrade_item(item=master)
-
-    slave = _item(path="dir/link2", source="dir/file")
-    result = u.upgrade_item(item=slave)
-
-    d = result.as_dict()
-    assert "hlid" in d
-    assert "source" not in d
-    assert d["chunks"] == [[CHUNK_ID, CHUNK_SIZE]]
-    cache.reuse_chunk.assert_called_once_with(CHUNK_ID, CHUNK_SIZE, archive.stats)
-
-
-def test_master_and_slave_share_the_same_hlid():
-    u, _, _ = _upgrader()
     master = _item(hardlink_master=True, chunks=[[CHUNK_ID, CHUNK_SIZE]])
     master_result = u.upgrade_item(item=master)
 
     slave = _item(path="dir/link2", source="dir/file")
     slave_result = u.upgrade_item(item=slave)
 
-    assert master_result.hlid == slave_result.hlid
+    d = slave_result.as_dict()
+    assert "hlid" in d
+    assert "source" not in d
+    assert d["chunks"] == [[CHUNK_ID, CHUNK_SIZE]]
+    assert slave_result.hlid == master_result.hlid
+    cache.reuse_chunk.assert_called_once_with(CHUNK_ID, CHUNK_SIZE, archive.stats)
 
 
 def test_required_item_keys_always_present():
@@ -214,8 +204,10 @@ def test_non_zlib_two_prefix_bytes_stripped():
 
 
 def test_obfuscate_old_big_endian_csize_is_upgraded():
-    # Borg 1.x ObfuscateSize used big-endian csize; borg 2 uses little-endian.
-    # The upgrader must re-parse the header and preserve the inner payload + padding.
+    # Borg 1.x ObfuscateSize stored csize as a 4-byte big-endian field directly in the
+    # chunk header (bytes 2-5), followed by the compressed payload and zero padding.
+    # Borg 2 has no inline csize field; chunk sizing lives in the msgpack metadata dict.
+    # The upgrader extracts csize from the fixed header and promotes it to metadata.
     inner = zlib.compress(b"secret data")
     csize = len(inner)
     big_endian_csize = Struct(">I").pack(csize)

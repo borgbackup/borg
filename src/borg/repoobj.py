@@ -1,8 +1,6 @@
 from collections import namedtuple
 from struct import Struct
 
-from xxhash import xxh64
-
 from .constants import *  # NOQA
 from .helpers import msgpack, workarounds
 from .helpers.errors import IntegrityError
@@ -13,10 +11,9 @@ AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 
 class RepoObj:
-    # Object header format includes size information for parsing the object into meta and data,
-    # as well as hashes to enable checking consistency without having the borg key.
-    obj_header = Struct("<II8s8s")  # meta size (32b), data size (32b), meta hash (64b), data hash (64b)
-    ObjHeader = namedtuple("ObjHeader", "meta_size data_size meta_hash data_hash")
+    # Object header: sizes of the encrypted meta and data sections.
+    obj_header = Struct("<II")  # meta size (32b), data size (32b)
+    ObjHeader = namedtuple("ObjHeader", "meta_size data_size")
 
     @classmethod
     def extract_crypted_data(cls, data: bytes) -> bytes:
@@ -67,9 +64,7 @@ class RepoObj:
         data_encrypted = self.key.encrypt(id, data_compressed)
         meta_packed = msgpack.packb(meta)
         meta_encrypted = self.key.encrypt(id, meta_packed)
-        hdr = self.ObjHeader(
-            len(meta_encrypted), len(data_encrypted), xxh64(meta_encrypted).digest(), xxh64(data_encrypted).digest()
-        )
+        hdr = self.ObjHeader(len(meta_encrypted), len(data_encrypted))
         hdr_packed = self.obj_header.pack(*hdr)
         return hdr_packed + meta_encrypted + data_encrypted
 

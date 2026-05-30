@@ -2,8 +2,6 @@ import os
 import time
 from pathlib import Path
 
-from xxhash import xxh64
-
 from borgstore.store import Store
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
 from borgstore.backends.errors import BackendError as StoreBackendError
@@ -307,13 +305,9 @@ class Repository:
                 meta = obj[hdr_size : hdr_size + hdr.meta_size]
                 if hdr.meta_size != len(meta):
                     log_error("metadata size incorrect.")
-                elif hdr.meta_hash != xxh64(meta).digest():
-                    log_error("metadata does not match checksum.")
                 data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
                 if hdr.data_size != len(data):
                     log_error("data size incorrect.")
-                elif hdr.data_hash != xxh64(data).digest():
-                    log_error("data does not match checksum.")
             else:
                 log_error("too small.")
 

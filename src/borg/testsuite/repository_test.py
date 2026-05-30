@@ -8,7 +8,7 @@ from ..helpers import IntegrityError
 from ..platformflags import is_win32
 from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed
 from ..repository import Repository, StoreObjectNotFound, MAX_DATA_SIZE
-from ..repoobj import RepoObj
+from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
 
 
@@ -55,7 +55,7 @@ def reopen(repository, exclusive: bool | None = True, create=False):
 
 def fchunk(data, meta=b""):
     # Format chunk: create a raw chunk that has a valid RepoObj layout, but does not use encryption or compression.
-    hdr = RepoObj.obj_header.pack(len(meta), len(data))
+    hdr = RepoObj.obj_header.pack(OBJ_MAGIC, OBJ_VERSION, len(meta), len(data))
     assert isinstance(data, bytes)
     chunk = hdr + meta + data
     return chunk
@@ -65,7 +65,7 @@ def pchunk(chunk):
     # Parse chunk: extract data and metadata from a raw chunk made by fchunk.
     hdr_size = RepoObj.obj_header.size
     hdr = chunk[:hdr_size]
-    meta_size, data_size = RepoObj.obj_header.unpack(hdr)[0:2]
+    meta_size, data_size = RepoObj.obj_header.unpack(hdr)[2:4]
     meta = chunk[hdr_size : hdr_size + meta_size]
     data = chunk[hdr_size + meta_size : hdr_size + meta_size + data_size]
     return data, meta
@@ -97,7 +97,7 @@ def test_basic_operations(repo_fixtures, request):
 def test_read_data(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         meta, data = b"meta", b"data"
-        hdr = RepoObj.obj_header.pack(len(meta), len(data))
+        hdr = RepoObj.obj_header.pack(OBJ_MAGIC, OBJ_VERSION, len(meta), len(data))
         chunk_complete = hdr + meta + data
         chunk_short = hdr + meta
         repository.put(H(0), chunk_complete)

@@ -16,7 +16,7 @@ from .helpers import bin_to_hex, hex_to_bin
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
-from .repoobj import RepoObj
+from .repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 
 logger = create_logger(__name__)
 
@@ -302,12 +302,17 @@ class Repository:
             obj_size = len(obj)
             if obj_size >= hdr_size:
                 hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
-                meta = obj[hdr_size : hdr_size + hdr.meta_size]
-                if hdr.meta_size != len(meta):
-                    log_error("metadata size incorrect.")
-                data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
-                if hdr.data_size != len(data):
-                    log_error("data size incorrect.")
+                if hdr.magic != OBJ_MAGIC:
+                    log_error("invalid object magic.")
+                elif hdr.version != OBJ_VERSION:
+                    log_error(f"unsupported object version: {hdr.version}.")
+                else:
+                    meta = obj[hdr_size : hdr_size + hdr.meta_size]
+                    if hdr.meta_size != len(meta):
+                        log_error("metadata size incorrect.")
+                    data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
+                    if hdr.data_size != len(data):
+                        log_error("data size incorrect.")
             else:
                 log_error("too small.")
 
@@ -460,7 +465,7 @@ class Repository:
                 hdr = obj[0:hdr_size]
                 if len(hdr) != hdr_size:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {hdr_size}, got {len(hdr)} bytes")
-                meta_size = RepoObj.obj_header.unpack(hdr)[0]
+                meta_size = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(hdr)).meta_size
                 if meta_size > extra_size:
                     # we did not get enough, need to load more, but not all.
                     # this should be rare, as chunk metadata is rather small usually.

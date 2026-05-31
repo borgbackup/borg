@@ -1,13 +1,14 @@
 import binascii
+import os
 import pkgutil
 import textwrap
 from hashlib import sha256
 
-from ..helpers import Error, yes, bin_to_hex, hex_to_bin, dash_open
+from ..helpers import Error, yes, bin_to_hex, hex_to_bin, dash_open, get_keys_dir
 from ..repoobj import RepoObj
 
 
-from .key import CHPOKeyfileKey, RepoKeyNotFoundError, KeyBlobStorage, identify_key
+from .key import CHPOKeyfileKey, RepoKeyNotFoundError, KeyBlobStorage, identify_key, keyfile_name_for
 
 
 class NotABorgKeyFile(Error):
@@ -72,8 +73,11 @@ class KeyManager:
         if self.keyblob_storage == KeyBlobStorage.KEYFILE:
             k = CHPOKeyfileKey(self.repository)
             target = k.get_existing_or_new_target(args)
-
-            self.store_keyfile(target)
+            keyfile_data = self.get_keyfile_data()
+            if not os.environ.get("BORG_KEY_FILE") and os.path.samefile(target, get_keys_dir()):
+                target = os.path.join(target, keyfile_name_for(keyfile_data.encode()))
+            with dash_open(target, "w") as fd:
+                fd.write(keyfile_data)
         elif self.keyblob_storage == KeyBlobStorage.REPO:
             self.repository.save_key(self.keyblob.encode("utf-8"))
 

@@ -1,5 +1,6 @@
 import binascii
 import os
+from hashlib import sha256
 
 import pytest
 
@@ -64,6 +65,43 @@ def test_change_location_to_b2repokey(archivers, request):
     cmd(archiver, "key", "change-location", "repokey")
     log = cmd(archiver, "repo-info")
     assert "(repokey BLAKE2b" in log
+
+
+def test_keyfile_name_is_content_sha256(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    [key_filename] = os.listdir(archiver.keys_path)
+    key_path = os.path.join(archiver.keys_path, key_filename)
+    with open(key_path, "rb") as fd:
+        key_content = fd.read()
+    assert key_filename == sha256(key_content).hexdigest()
+
+
+def test_change_passphrase_renames_keyfile_to_new_sha256(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    [old_key_filename] = os.listdir(archiver.keys_path)
+    old_key_path = os.path.join(archiver.keys_path, old_key_filename)
+    os.environ["BORG_NEW_PASSPHRASE"] = "newpassphrase"
+    cmd(archiver, "key", "change-passphrase")
+    os.environ["BORG_PASSPHRASE"] = "newpassphrase"
+    [new_key_filename] = os.listdir(archiver.keys_path)
+    new_key_path = os.path.join(archiver.keys_path, new_key_filename)
+    assert old_key_filename != new_key_filename
+    assert not os.path.exists(old_key_path)
+    with open(new_key_path, "rb") as fd:
+        key_content = fd.read()
+    assert new_key_filename == sha256(key_content).hexdigest()
+    cmd(archiver, "repo-list")
+
+
+def test_borg_key_file_env_keeps_explicit_path(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    explicit_key_path = os.path.join(archiver.output_path, "explicit-key")
+    monkeypatch.setenv("BORG_KEY_FILE", explicit_key_path)
+    cmd(archiver, "repo-create", KF_ENCRYPTION)
+    assert os.path.isfile(explicit_key_path)
+    assert os.listdir(archiver.keys_path) == []
 
 
 def test_key_export_keyfile(archivers, request):

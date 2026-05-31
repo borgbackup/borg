@@ -122,13 +122,10 @@ class Repository:
             location = Location(url)
         self._location = location
         self.url = url
-        # lots of stuff in data: use 2 levels by default (data/00/00/ .. data/ff/ff/ dirs)!
-        data_levels = int(os.environ.get("BORG_STORE_DATA_LEVELS", "2"))
         ns_config = {
             "archives/": {"levels": [0]},
             "cache/": {"levels": [0]},
             "config/": {"levels": [0]},
-            "data/": {"levels": [data_levels]},
             "keys/": {"levels": [0]},
             "locks/": {"levels": [0]},
             "packs/": {"levels": [1]},
@@ -144,7 +141,6 @@ class Repository:
                 "archives": "lrw",
                 "cache": "lrwWD",  # WD for chunks.<HASH>, last-key-checked, ...
                 "config": "lrW",  # W for manifest
-                "data": "lrw",
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
                 "packs": "lrw",
@@ -155,7 +151,6 @@ class Repository:
                 "archives": "lw",
                 "cache": "lrwWD",  # read allowed, e.g. for chunks.<HASH> cache
                 "config": "lrW",  # W for manifest
-                "data": "lw",  # no r!
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
                 "packs": "lw",  # no r!
@@ -359,8 +354,6 @@ class Repository:
                 log_error("invalid object magic.")
             elif hdr.version != OBJ_VERSION:
                 log_error(f"unsupported object version: {hdr.version}.")
-            elif hdr.chunk_id != hex_to_bin(info.name):
-                log_error("chunk_id mismatch in header.")
             else:
                 meta = blob[hdr_size : hdr_size + hdr.meta_size]
                 if hdr.meta_size != len(meta):
@@ -437,8 +430,9 @@ class Repository:
                     # add all existing objects to the index.
                     # borg check: the index may have corrupted objects (we did not delete them)
                     # borg check --repair: the index will only have non-corrupted objects.
-                    pack_id = hex_to_bin(info.name)  # N=1: pack_id == chunk_id
-                    chunks[pack_id] = init_entry
+                    pack_id = hex_to_bin(info.name)
+                    chunk_id = pack_id  # N=1: chunk_id == pack_id
+                    chunks[chunk_id] = init_entry
                 now = time.monotonic()
                 if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
                     t_last_checkpoint = now
@@ -462,7 +456,7 @@ class Repository:
                         self, chunks, incremental=False, clear=True, force_write=True, delete_other=True
                     )
         except StoreObjectNotFound:
-            # it can be that there is no "data/" at all, then it crashes when iterating infos.
+            # it can be that there is no "packs/" at all, then it crashes when iterating infos.
             pass
         logger.info(f"Checked {objs_checked} repository objects, {objs_errors} errors.")
         if objs_errors == 0:
@@ -491,12 +485,13 @@ class Repository:
             except StopIteration:
                 break
             else:
-                pack_id = hex_to_bin(info.name)  # N=1: pack_id == chunk_id
+                pack_id = hex_to_bin(info.name)
+                chunk_id = pack_id  # N=1: chunk_id == pack_id
                 if collect:
-                    result.append((pack_id, info.size))
+                    result.append((chunk_id, info.size))
                     if len(result) == limit:
                         break
-                elif pack_id == marker:
+                elif chunk_id == marker:
                     collect = True
                     # note: do not collect the marker id
         return result

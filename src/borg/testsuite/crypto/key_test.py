@@ -318,3 +318,13 @@ def test_key_file_roundtrip(monkeypatch):
 
     assert to_dict(load_me) == to_dict(save_me)
     assert msgpack.unpackb(a2b_base64(saved))["algorithm"] == KEY_ALGORITHMS["argon2"]
+
+
+def test_argon2_wrong_passphrase_returns_none(monkeypatch):
+    # a wrong passphrase derives a different key, so the Argon2 integrity check fails;
+    # decrypt_key_file signals this by returning None, not by raising (refs #8036)
+    repository = MagicMock(id=b"repository_id")
+    monkeypatch.setenv("BORG_PASSPHRASE", "correct passphrase")
+    key = AESOCBRepoKey.create(repository, args=MagicMock(key_algorithm="argon2"))
+    saved = repository.save_key.call_args.args[0]
+    assert key.decrypt_key_file(a2b_base64(saved), "wrong passphrase") is None

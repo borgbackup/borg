@@ -117,6 +117,67 @@ def test_prune_repository_example(archivers, request, backup_files):
         assert "test%02d" % i not in output
 
 
+# This test must match docs/misc/prune-example-interval.txt
+def test_prune_repository_example_interval(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    # All timestamps are at exactly 16:00 UTC.
+    # This models the example: backups on most days from 2025-11-15 to
+    # 2026-06-04, with skips on 2026-03-31 and 2026-06-03. Of these only
+    # 2026-05-28 should be pruned after today's pruning.
+    archive_dates = [
+        (2025, 11, 15),
+        (2025, 12, 31),
+        (2026, 1, 31),
+        (2026, 2, 28),
+        (2026, 3, 30),
+        (2026, 4, 30),
+        (2026, 5, 28),
+        (2026, 5, 29),
+        (2026, 5, 30),
+        (2026, 5, 31),
+        (2026, 6, 1),
+        (2026, 6, 2),
+        (2026, 6, 4),
+    ]
+
+    names = [f"backup_{y:04d}-{m:02d}-{d:02d}" for y, m, d in archive_dates]
+    for (y, m, d), name in zip(archive_dates, names):
+        _create_archive_ts(archiver, backup_files, name, y, m, d)
+
+    output = cmd(
+        archiver,
+        "prune",
+        "--list",
+        "--dry-run",
+        "--since=2026-06-04T16:00:00+00:00",
+        "--keep-daily=1w",
+        "--keep-monthly=5m",
+        "--keep-yearly=2",
+    )
+
+    daily_kept = [
+        "backup_2026-06-04",
+        "backup_2026-06-02",
+        "backup_2026-06-01",
+        "backup_2026-05-31",
+        "backup_2026-05-30",
+        "backup_2026-05-29",
+    ]
+    for i, name in enumerate(daily_kept, 1):
+        assert re.search(rf"Keeping archive \(rule: daily #{i}\):\s+{name}", output)
+
+    monthly_kept = ["backup_2026-04-30", "backup_2026-03-30", "backup_2026-02-28", "backup_2026-01-31"]
+    for i, name in enumerate(monthly_kept, 1):
+        assert re.search(rf"Keeping archive \(rule: monthly #{i}\):\s+{name}", output)
+
+    assert re.search(r"Keeping archive \(rule: yearly #1\):\s+backup_2025-12-31", output)
+    assert re.search(r"Keeping archive \(rule: yearly\[oldest\] #2\):\s+backup_2025-11-15", output)
+
+    assert re.search(r"Would prune:\s+backup_2026-05-28", output)
+
+
 def test_prune_quarterly(archivers, request, backup_files):
     # Example worked through by hand when developing the quarterly
     # strategy, based on existing backups where the quarterly strategy

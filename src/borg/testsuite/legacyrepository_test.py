@@ -14,7 +14,7 @@ from ..platformflags import is_win32
 from ..legacy.remote import LegacyRemoteRepository, InvalidRPCMethod, PathNotAllowed
 from ..legacy.repository import LegacyRepository, LoggedIO
 from ..legacy.repository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT, TAG_COMMIT
-from ..repoobj import RepoObj
+from ..compress import CNONE
 from .hashindex_test import H
 
 
@@ -72,21 +72,15 @@ def get_path(repository):
 
 
 def fchunk(data, meta=b""):
-    # Create a raw chunk that has a valid RepoObj layout but does not use encryption or compression.
-    hdr = RepoObj.obj_header.pack(len(meta), len(data))
+    # simplified borg 1.x format: 1-byte ctype header (CNONE = no compression) followed by payload.
     assert isinstance(data, bytes)
-    chunk = hdr + meta + data
-    return chunk
+    assert meta == b""
+    return bytes([CNONE.ID]) + data
 
 
 def pchunk(chunk):
-    # Parse data and meta from a raw chunk made by fchunk.
-    hdr_size = RepoObj.obj_header.size
-    hdr = chunk[:hdr_size]
-    meta_size, data_size = RepoObj.obj_header.unpack(hdr)[0:2]
-    meta = chunk[hdr_size : hdr_size + meta_size]
-    data = chunk[hdr_size + meta_size : hdr_size + meta_size + data_size]
-    return data, meta
+    # strip the 1-byte ctype header; meta is always empty in the borg 1.x format.
+    return chunk[1:], b""
 
 
 def pdchunk(chunk):
@@ -147,13 +141,11 @@ def test_multiple_transactions(repo_fixtures, request):
 
 def test_read_data(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
-        meta, data = b"meta", b"data"
-        hdr = RepoObj.obj_header.pack(len(meta), len(data))
-        chunk_complete = hdr + meta + data
-        repository.put(H(0), chunk_complete)
+        data = b"somedata"
+        repository.put(H(0), data)
         repository.commit(compact=False)
-        assert repository.get(H(0)) == chunk_complete
-        assert repository.get(H(0), read_data=True) == chunk_complete
+        assert repository.get(H(0)) == data
+        assert repository.get(H(0), read_data=True) == data
         assert repository.get(H(0), read_data=False) is None
 
 
@@ -222,7 +214,7 @@ def test_list(repo_fixtures, request):
 
 def test_max_data_size(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
-        max_data = b"x" * (MAX_DATA_SIZE - RepoObj.obj_header.size)
+        max_data = b"x" * (MAX_DATA_SIZE - 1)
         repository.put(H(0), fchunk(max_data))
         assert pdchunk(repository.get(H(0))) == max_data
         with pytest.raises(IntegrityError):

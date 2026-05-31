@@ -142,10 +142,10 @@ def test_multiple_transactions(repo_fixtures, request):
 def test_read_data(repo_fixtures, request):
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         data = b"somedata"
-        repository.put(H(0), data)
+        repository.put(H(0), fchunk(data))
         repository.commit(compact=False)
-        assert repository.get(H(0)) == data
-        assert repository.get(H(0), read_data=True) == data
+        assert pdchunk(repository.get(H(0))) == data
+        assert pdchunk(repository.get(H(0), read_data=True)) == data
         assert repository.get(H(0), read_data=False) is None
 
 

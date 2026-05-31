@@ -351,8 +351,9 @@ def test_extra_chunks(archivers, request):
     check_cmd_setup(archiver)
     cmd(archiver, "check", exit_code=0)
     with Repository(archiver.repository_location, exclusive=True) as repository:
-        chunk = fchunk(b"xxxx")
-        repository.put(b"01234567890123456789012345678901", chunk)
+        key = b"01234567890123456789012345678901"
+        chunk = fchunk(b"xxxx", chunk_id=key)
+        repository.put(key, chunk)
     cmd(archiver, "check", "-v", exit_code=0)  # check does not deal with orphans anymore
 
 

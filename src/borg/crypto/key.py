@@ -706,8 +706,9 @@ class FlexiKey:
                 # keyfile key repo is not accidentally overwritten by careless use of the BORG_KEY_FILE env var.
                 # see issue #6036
                 raise Error('Aborting because key in "%s" already exists.' % target)
-            with SaveFile(target) as fd:
-                fd.write(keyfile_data)
+            # use binary mode so line endings are NOT translated to CRLF on Windows
+            with SaveFile(target, binary=True) as fd:
+                fd.write(keyfile_data.encode())
             if auto_named and isinstance(old_target, str) and old_target != target:
                 try:
                     in_keys_dir = os.path.samefile(os.path.dirname(old_target), keys_dir)

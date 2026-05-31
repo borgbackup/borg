@@ -82,10 +82,15 @@ Notes
 2015-12-31 is kept due to the --keep-daily 14 rule (because it is applied
 first), not due to the --keep-monthly or --keep-yearly rule.
 
+Rules are applied in the order given: archives already kept by an earlier
+rule are excluded from consideration by later rules.
+
 The --keep-yearly 1 rule does not consider the December 31st backup because it
-has already been kept due to the daily rule. There are no backups available
-from previous years, so the --keep-yearly target of 1 backup is not satisfied.
-Because of this, the 2015-01-01 archive (the oldest archive available) is kept.
+has already been kept due to the daily rule. There are no backups from
+previous years, so there are no "true" yearly candidates. The oldest archive
+at 2015-01-01 fills the remaining slot and will be kept until the rolling
+backup scheme reaches "steady state" (when all retention rules are fully
+satisfied).
 
 The --keep-monthly 6 rule keeps Nov, Oct, Sep, Aug, Jul and Jun. December is
 not considered for this rule, because that backup was already kept because of

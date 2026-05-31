@@ -124,6 +124,7 @@ class Repository:
             "data/": {"levels": [data_levels]},
             "keys/": {"levels": [0]},
             "locks/": {"levels": [0]},
+            "packs/": {"levels": [1]},
         }
         # Get permissions from parameter or environment variable
         permissions = permissions if permissions is not None else os.environ.get("BORG_REPO_PERMISSIONS", "all")
@@ -139,6 +140,7 @@ class Repository:
                 "data": "lrw",
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
+                "packs": "lrw",
             }
         elif permissions == "write-only":  # mostly no reading
             permissions = {
@@ -149,6 +151,7 @@ class Repository:
                 "data": "lw",  # no r!
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
+                "packs": "lw",  # no r!
             }
         elif permissions == "read-only":  # mostly r/o
             permissions = {"": "lr", "locks": "lrwD"}
@@ -334,6 +337,8 @@ class Repository:
                     log_error("invalid object magic.")
                 elif hdr.version != OBJ_VERSION:
                     log_error(f"unsupported object version: {hdr.version}.")
+                elif hdr.chunk_id != hex_to_bin(info.name):
+                    log_error("chunk_id mismatch in header.")
                 else:
                     meta = obj[hdr_size : hdr_size + hdr.meta_size]
                     if hdr.meta_size != len(meta):
@@ -376,11 +381,11 @@ class Repository:
         # As we don't do garbage collection here, this is not a problem.
         # We also don't know the plaintext size, so we set it to 0.
         init_entry = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0)
-        infos = self.store.list("data")
+        infos = self.store.list("packs")
         try:
             for info in infos:
                 self._lock_refresh()
-                key = "data/%s" % info.name
+                key = "packs/%s" % info.name
                 if key <= last_key_checked:  # needs sorted keys
                     continue
                 try:
@@ -412,8 +417,8 @@ class Repository:
                     # add all existing objects to the index.
                     # borg check: the index may have corrupted objects (we did not delete them)
                     # borg check --repair: the index will only have non-corrupted objects.
-                    id = hex_to_bin(info.name)
-                    chunks[id] = init_entry
+                    pack_id = hex_to_bin(info.name)  # N=1: pack_id == chunk_id
+                    chunks[pack_id] = init_entry
                 now = time.monotonic()
                 if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
                     t_last_checkpoint = now
@@ -456,30 +461,31 @@ class Repository:
         """
         collect = True if marker is None else False
         result = []
-        infos = self.store.list("data")  # generator yielding ItemInfos
+        infos = self.store.list("packs")  # generator yielding ItemInfos
         while True:
             self._lock_refresh()
             try:
                 info = next(infos)
             except StoreObjectNotFound:
-                break  # can happen e.g. if "data" does not exist, pointless to continue in that case
+                break  # can happen e.g. if "packs" does not exist, pointless to continue in that case
             except StopIteration:
                 break
             else:
-                id = hex_to_bin(info.name)
+                pack_id = hex_to_bin(info.name)  # N=1: pack_id == chunk_id
                 if collect:
-                    result.append((id, info.size))
+                    result.append((pack_id, info.size))
                     if len(result) == limit:
                         break
-                elif id == marker:
+                elif pack_id == marker:
                     collect = True
                     # note: do not collect the marker id
         return result
 
     def get(self, id, read_data=True, raise_missing=True):
         self._lock_refresh()
+        pack_id = id  # N=1: pack_id == chunk_id
         id_hex = bin_to_hex(id)
-        key = "data/" + id_hex
+        key = "packs/" + bin_to_hex(pack_id)
         try:
             if read_data:
                 # read everything
@@ -523,7 +529,8 @@ class Repository:
         if data_size > MAX_DATA_SIZE:
             raise IntegrityError(f"More than allowed put data [{data_size} > {MAX_DATA_SIZE}]")
 
-        key = "data/" + bin_to_hex(id)
+        pack_id = id  # N=1: pack_id == chunk_id
+        key = "packs/" + bin_to_hex(pack_id)
         self.store.store(key, data)
 
     def delete(self, id, wait=True):
@@ -533,7 +540,8 @@ class Repository:
               deal with async results / exceptions later.
         """
         self._lock_refresh()
-        key = "data/" + bin_to_hex(id)
+        pack_id = id  # N=1: pack_id == chunk_id
+        key = "packs/" + bin_to_hex(pack_id)
         try:
             self.store.delete(key)
         except StoreObjectNotFound:

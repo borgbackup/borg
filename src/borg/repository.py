@@ -309,10 +309,10 @@ class Repository:
                 else:
                     meta = obj[hdr_size : hdr_size + hdr.meta_size]
                     if hdr.meta_size != len(meta):
-                        log_error("metadata size incorrect.")
+                        log_error("metadata size mismatch.")
                     data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
                     if hdr.data_size != len(data):
-                        log_error("data size incorrect.")
+                        log_error("data size mismatch.")
             else:
                 log_error("too small.")
 

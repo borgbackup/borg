@@ -1,18 +1,17 @@
 borg prune visualized
 =====================
 
-Assume it is 2016-01-01. Today's backup has not yet been made. You have
-created at least one backup on each day in 2015 except on 2015-12-19 (no
+Assume it is 2016-01-01. Today's archive has not yet been made. You have
+created at least one archive on each day in 2015 except on 2015-12-19 (no
 backup was made on that day), and you started backing up with Borg on
 2015-01-01.
 
 This is what borg prune --keep-daily 14 --keep-monthly 6 --keep-yearly 1
 would keep.
 
-Backups kept by the --keep-daily rule are marked by a "d" to the right,
-backups kept by the --keep-monthly rule are marked by a "m" to the right,
-and backups kept by the --keep-yearly rule are marked by a "y" to the
-right.
+Archives kept by the --keep-daily rule are marked by a "d" to the right,
+archives kept by the --keep-monthly rule are marked by a "m" to the right, and
+archives kept by the --keep-yearly rule are marked by a "y" to the right.
 
 Calendar view
 -------------
@@ -71,7 +70,7 @@ List view
 10. 2015-12-22
 11. 2015-12-21
 12. 2015-12-20
-    (no backup made on 2015-12-19)
+    (no archive made on 2015-12-19)
 13. 2015-12-18
 14. 2015-12-17
 
@@ -85,20 +84,19 @@ first), not due to the --keep-monthly or --keep-yearly rule.
 Rules are applied in the order given: archives already kept by an earlier
 rule are excluded from consideration by later rules.
 
-The --keep-yearly 1 rule does not consider the December 31st backup because it
-has already been kept due to the daily rule. There are no backups from
-previous years, so there are no "true" yearly candidates. The oldest archive
-at 2015-01-01 fills the remaining slot and will be kept until the rolling
-backup scheme reaches "steady state" (when all retention rules are fully
-satisfied).
+The --keep-yearly 1 rule does not consider the December 31st archive because it
+has already been kept due to the daily rule. There are no archives from
+previous years, so there are no "true" yearly candidates. The oldest archive at
+2015-01-01 fills the remaining slot and will be kept until the rolling backup
+scheme reaches "steady state" (when all retention rules are fully satisfied).
 
 The --keep-monthly 6 rule keeps Nov, Oct, Sep, Aug, Jul and Jun. December is
-not considered for this rule, because that backup was already kept because of
+not considered for this rule, because that archive was already kept because of
 the daily rule.
 
-2015-12-17 is kept to satisfy the --keep-daily 14 rule, because no backup was
-made on 2015-12-19. If a backup had been made on that day, it would not keep
-the one from 2015-12-17.
+2015-12-17 is kept to satisfy the --keep-daily 14 rule, because no archive was
+made on 2015-12-19. If an archive had been made on that day, it would not keep
+the archive from 2015-12-17.
 
 We did not include weekly, hourly, minutely, or secondly rules to keep this
 example simple. They all work in basically the same way.
@@ -106,26 +104,26 @@ example simple. They all work in basically the same way.
 The weekly rule is easy to understand roughly, but hard to understand in all
 details. If you are interested, read "ISO 8601:2000 standard week-based year".
 
-The 13weekly and 3monthly rules are two different strategies for keeping one backup
-every quarter of a year. There are `multiple ways` to define a quarter-year;
-borg prune recognizes two:
+The 13weekly and 3monthly rules are two different strategies for keeping one
+archive every quarter of a year. There are `multiple ways` to define a
+quarter-year; borg prune recognizes two:
 
-* --keep-13weekly keeps one backup every 13 weeks using ISO 8601:2000's
+* --keep-13weekly keeps one archive every 13 weeks using ISO 8601:2000's
   definition of the week-based year. January 4th is always included in the
   first week of a year, and January 1st to 3rd may be in week 52 or 53 of the
   previous year. Week 53 is also in the fourth quarter of the year.
-* --keep-3monthly keeps one backup every 3 months. January 1st to
-  March 31, April 1st to June 30th, July 1st to September 30th, and October 1st
-  to December 31st form the quarters.
+* --keep-3monthly keeps one archive every 3 months. January 1st to March 31,
+  April 1st to June 30th, July 1st to September 30th, and October 1st to
+  December 31st form the quarters.
 
 If the subtleties of the definition of a quarter-year don't matter to you, a
 short summary of behavior is:
 
-* --keep-13weekly favors keeping backups at the beginning of Jan, Apr, Jul,
+* --keep-13weekly favors keeping archives at the beginning of Jan, Apr, Jul,
   and Oct.
-* --keep-3monthly favors keeping backups at the end of Dec, Mar, Jun, and Sep.
-* Both strategies will have some overlap in which backups are kept.
-* The differences are negligible unless backups considered for deletion were
+* --keep-3monthly favors keeping archives at the end of Dec, Mar, Jun, and Sep.
+* Both strategies will have some overlap in which archives are kept.
+* The differences are negligible unless archives considered for deletion were
   created weekly or more frequently.
 
 .. _multiple ways: https://en.wikipedia.org/wiki/Calendar_year#Quarter_year

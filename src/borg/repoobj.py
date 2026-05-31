@@ -10,16 +10,24 @@ from .compress import Compressor, LZ4_COMPRESSOR
 AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 
+OBJ_MAGIC = b"BORG_OBJ"
+OBJ_VERSION = 0x01
+
+
 class RepoObj:
-    # Object header: sizes of the encrypted meta and data sections.
-    obj_header = Struct("<II")  # meta size (32b), data size (32b)
-    ObjHeader = namedtuple("ObjHeader", "meta_size data_size")
+    # Object header: magic (8b), format version (1b), meta size (4b), data size (4b).
+    obj_header = Struct("<8sBII")
+    ObjHeader = namedtuple("ObjHeader", "magic version meta_size data_size")
 
     @classmethod
     def extract_crypted_data(cls, data: bytes) -> bytes:
         # used for crypto type detection
         hdr_size = cls.obj_header.size
         hdr = cls.ObjHeader(*cls.obj_header.unpack(data[:hdr_size]))
+        if hdr.magic != OBJ_MAGIC:
+            raise IntegrityError("invalid object magic")
+        if hdr.version != OBJ_VERSION:
+            raise IntegrityError(f"unsupported object version: {hdr.version}")
         return data[hdr_size + hdr.meta_size :]
 
     def __init__(self, key):
@@ -64,7 +72,7 @@ class RepoObj:
         data_encrypted = self.key.encrypt(id, data_compressed)
         meta_packed = msgpack.packb(meta)
         meta_encrypted = self.key.encrypt(id, meta_packed)
-        hdr = self.ObjHeader(len(meta_encrypted), len(data_encrypted))
+        hdr = self.ObjHeader(OBJ_MAGIC, OBJ_VERSION, len(meta_encrypted), len(data_encrypted))
         hdr_packed = self.obj_header.pack(*hdr)
         return hdr_packed + meta_encrypted + data_encrypted
 
@@ -77,6 +85,10 @@ class RepoObj:
         obj = memoryview(cdata)
         hdr_size = self.obj_header.size
         hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
+        if hdr.magic != OBJ_MAGIC:
+            raise IntegrityError("invalid object magic")
+        if hdr.version != OBJ_VERSION:
+            raise IntegrityError(f"unsupported object version: {hdr.version}")
         assert hdr_size + hdr.meta_size <= len(obj)
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted)
@@ -105,6 +117,10 @@ class RepoObj:
         obj = memoryview(cdata)
         hdr_size = self.obj_header.size
         hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
+        if hdr.magic != OBJ_MAGIC:
+            raise IntegrityError("invalid object magic")
+        if hdr.version != OBJ_VERSION:
+            raise IntegrityError(f"unsupported object version: {hdr.version}")
         assert hdr_size + hdr.meta_size <= len(obj)
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted)

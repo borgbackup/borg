@@ -367,33 +367,82 @@ class PruneMixIn:
         from different machines) in one shared repository, use one prune call per
         series.
 
-        The ``--keep-within`` option takes an argument of the form "<int><char>",
-        where char is "y", "m", "w", "d", "H", "M", or "S".  For example,
-        ``--keep-within 2d`` means to keep all archives that were created within
-        the past 2 days.  "1m" is taken to mean "31d". The archives kept with
-        this option do not count towards the totals specified by any other options.
+        The ``--keep`` option is the simplest way to specify a basic retention
+        policy. It accepts a count or a time interval for retention (e.g.
+        ``10`` or ``7d``, ``4w``). With a count it keeps at most that many
+        recent archives; with an interval it keeps all archives created within
+        that time window. When ``--since`` is given together with an interval
+        retention, the interval is measured backwards from that timestamp
+        instead of from the current time. See ``Date and Time`` docs for exact
+        INTERVAL format.
 
-        A good procedure is to thin out more and more the older your backups get.
-        As an example, ``--keep-daily 7`` means to keep the latest backup on each day,
-        up to 7 most recent days with backups (days without backups do not count).
-        The rules are applied from secondly to yearly, and backups selected by previous
-        rules do not count towards those of later rules. The time that each backup
-        starts is used for pruning purposes. Dates and times are interpreted in the local
-        timezone of the system where borg prune runs, and weeks go from Monday to Sunday.
-        Specifying a negative number of archives to keep means that there is no limit.
+        The ``--keep-last N`` and ``--keep-within INTERVAL`` options are
+        alternatives with equivalent functionality to ``--keep`` with a count
+        or interval respectively. ``--keep`` cannot be used together with
+        ``--keep-last`` or ``--keep-within``.
 
-        Borg will retain the oldest archive if any of the secondly, minutely, hourly,
-        daily, weekly, monthly, quarterly, or yearly rules was not otherwise able to
-        meet its retention target. This enables the first chronological archive to
-        continue aging until it is replaced by a newer archive that meets the retention
-        criteria.
+        The ``--keep-secondly``, ``--keep-minutely``, ``--keep-hourly``,
+        ``--keep-daily``, ``--keep-weekly``, ``--keep-monthly``,
+        ``--keep-13weekly``, ``--keep-3monthly``, and ``--keep-yearly`` options
+        specify time period retention policies. They accept either a count N for
+        retention or a time interval INTERVAL for retention, same as for ``--keep``.
+        With a retention count, they keep at most that many archives (one per
+        period, e.g. one per day or one per month until the retention count is
+        met). With a retention interval, they keep one archive per period
+        within that time span (e.g. at most one per day in a span of seven
+        days, even if some days had none) -- measured from ``--since`` if given,
+        otherwise from the current time. Specifying a count of ``-1`` (or the
+        word ``all``) means no limit. A zero count or zero-length interval
+        keeps nothing.
+
+        The ``--since`` option restricts pruning to archives older than the given
+        TIMESTAMP. Archives newer than this timestamp are kept unconditionally
+        as a pre-filter. When ``--since`` is used together with interval-based
+        ``--keep-*`` options (e.g. ``--keep-daily 7d``), the interval is
+        measured backwards from the given timestamp rather than from the
+        current time. Count-based retention is unaffected.
 
         The ``--keep-13weekly`` and ``--keep-3monthly`` rules are two different
         strategies for keeping archives every quarter year.
 
-        The ``--keep-last N`` option is doing the same as ``--keep-secondly N`` (and it will
-        keep the last N archives under the assumption that you do not create more than one
-        backup archive in the same second).
+        The oldest archive is always kept. This is useful for rolling tiered backup
+        schemes, where the earliest backup in a retention window should survive until
+        the next tier's interval naturally replaces it.
+
+        When using interval-based pruning with multiple ``--keep-*`` options,
+        the intervals must be specified in increasing order of coarseness.
+        For example, ``--keep-daily 7d --keep-weekly 4w`` is valid, but
+        ``--keep-daily 30d --keep-weekly 7d`` is not, because the weekly
+        interval is already covered by the daily one.
+
+
+        A practical approach for recurring backups is to use rules
+        with increasing coarseness so that most of recent history is kept and
+        older history gradually thins out with time. For example,
+        ``--keep-daily 7d --keep-weekly 4w --keep-monthly 6`` keeps an
+        archive per day for the past week, per week for the past month, and
+        one per month for six months after that. Combine this with ``--since``
+        to align time windows to calendar boundaries rather than the exact
+        moment you run prune for more predictable behavior of coarser rules:
+        ``--keep-daily 7d --keep-weekly 4w --since $(date +%F)``.
+
+        Count-based retention keeps archives less bound to time. For instance,
+        ``--keep-yearly 3`` retains 3 yearly archives however far back they
+        span and ``--keep-daily 20`` keeps 20 archives no matter if you missed
+        a week in between. This can be useful for less regular archive
+        creation, or if your use case does not map well to specific time
+        intervals, or if you simply prefer to think of archive retention in
+        numbers rather than intervals.
+
+        For count-based retention, backups selected by more granular rules do
+        not count towards those of coarser rules. ``--keep 3 --keep-monthly 2``
+        will first keep the 3 latest archives and then keep 2 monthly archives,
+        skipping ones that were already kept by ``--keep 3``.
+
+        The time that each archive creation started is used to match archives
+        to pruning periods. Dates and times are interpreted in the local
+        timezone of your system. Weeks go from Monday to Sunday.
+
 
         You can influence how the ``--list`` output is formatted by using the ``--short``
         option (less wide output) or by giving a custom format using ``--format`` (see

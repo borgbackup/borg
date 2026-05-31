@@ -1,3 +1,4 @@
+import os
 import tempfile
 from binascii import a2b_base64
 from unittest.mock import MagicMock
@@ -182,6 +183,15 @@ class TestKey:
         monkeypatch.setenv("BORG_PASSPHRASE", "passphrase")
         key = Blake2KeyfileKey.detect(self.MockRepository(), self.keyfile_blake2_cdata)
         assert key.decrypt(self.keyfile_blake2_id, self.keyfile_blake2_cdata) == b"payload"
+
+    def test_legacy_named_keyfile_still_loads(self, monkeypatch, keys_dir):
+        monkeypatch.setenv("BORG_PASSPHRASE", "test")
+        key = CHPOKeyfileKey.create(self.MockRepository(), self.MockArgs())
+        hashed_keyfile = key.target
+        legacy_keyfile = str(keys_dir.join("legacy-name"))
+        os.replace(hashed_keyfile, legacy_keyfile)
+        key2 = CHPOKeyfileKey.detect(self.MockRepository(), key.encrypt(b"", b"payload"))
+        assert key2.target == legacy_keyfile
 
     def _corrupt_byte(self, key, data, offset):
         data = bytearray(data)

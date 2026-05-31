@@ -16,7 +16,7 @@ import argon2.low_level
 from ..constants import *  # NOQA
 from ..helpers import StableDict
 from ..helpers import Error, IntegrityError
-from ..helpers import get_keys_dir
+from ..helpers import get_keys_dir, secure_erase
 from ..helpers import get_limited_unpacker
 from ..helpers import bin_to_hex
 from ..helpers.passphrase import Passphrase, PasswordRetriesExceeded, PassphraseWrong
@@ -31,6 +31,11 @@ from ..repoobj import RepoObj
 from .low_level import bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256
 from .low_level import AES256_OCB, CHACHA20_POLY1305
 from . import low_level
+
+
+def keyfile_name_for(content: bytes) -> str:
+    return sha256(content).hexdigest()
+
 
 # workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
 AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
@@ -547,7 +552,7 @@ class FlexiKey:
         key.init_ciphers()
         target = key.get_new_target(args)
         key.save(target, passphrase, create=True, algorithm=KEY_ALGORITHMS["argon2"])
-        logger.info('Key in "%s" created.' % target)
+        logger.info('Key in "%s" created.' % key.target)
         logger.info("Keep this key safe. Your data will be inaccessible without it.")
         return key
 
@@ -613,7 +618,7 @@ class FlexiKey:
         keyfile = self._find_key_in_keys_dir()
         if keyfile is not None:
             return keyfile
-        return self._get_new_target_in_keys_dir(args)
+        return get_keys_dir()
 
     def _find_key_in_keys_dir(self):
         id = self.repository.id
@@ -630,7 +635,7 @@ class FlexiKey:
             keyfile = self._find_key_file_from_environment()
             if keyfile is not None:
                 return keyfile
-            return self._get_new_target_in_keys_dir(args)
+            return get_keys_dir()
         elif self.STORAGE == KeyBlobStorage.REPO:
             return self.repository
         else:
@@ -640,15 +645,6 @@ class FlexiKey:
         keyfile = os.environ.get("BORG_KEY_FILE")
         if keyfile:
             return os.path.abspath(keyfile)
-
-    def _get_new_target_in_keys_dir(self, args):
-        filename = args.location.to_key_filename()
-        path = Path(filename)
-        i = 1
-        while path.exists():
-            i += 1
-            path = Path(filename + ".%d" % i)
-        return str(path)
 
     def load(self, target, passphrase):
         if self.STORAGE == KeyBlobStorage.KEYFILE:
@@ -677,15 +673,30 @@ class FlexiKey:
     def save(self, target, passphrase, algorithm, create=False):
         key_data = self._save(passphrase, algorithm)
         if self.STORAGE == KeyBlobStorage.KEYFILE:
+            old_target = getattr(self, "target", None)
+            keys_dir = get_keys_dir()
+            keyfile_data = f"{self.FILE_ID} {bin_to_hex(self.repository_id)}\n{key_data}\n"
+            target_dir = target if os.path.isdir(target) else os.path.dirname(target)
+            auto_named = not os.environ.get("BORG_KEY_FILE") and os.path.samefile(target_dir, keys_dir)
+            if auto_named:
+                target = os.path.join(keys_dir, keyfile_name_for(keyfile_data.encode()))
             if create and os.path.isfile(target):
                 # if a new keyfile key repository is created, ensure that an existing keyfile of another
                 # keyfile key repo is not accidentally overwritten by careless use of the BORG_KEY_FILE env var.
                 # see issue #6036
                 raise Error('Aborting because key in "%s" already exists.' % target)
             with SaveFile(target) as fd:
-                fd.write(f"{self.FILE_ID} {bin_to_hex(self.repository_id)}\n")
-                fd.write(key_data)
-                fd.write("\n")
+                fd.write(keyfile_data)
+            if auto_named and isinstance(old_target, str) and old_target != target:
+                try:
+                    in_keys_dir = os.path.samefile(os.path.dirname(old_target), keys_dir)
+                except OSError:
+                    in_keys_dir = False
+                if in_keys_dir:
+                    try:
+                        secure_erase(old_target, avoid_collateral_damage=True)
+                    except OSError as exc:
+                        logger.debug('Could not remove previous keyfile "%s": %s', old_target, exc)
         elif self.STORAGE == KeyBlobStorage.REPO:
             self.logically_encrypted = passphrase != ""  # nosec B105
             key_data = key_data.encode("utf-8")  # remote repo: msgpack issue #99, giving bytes

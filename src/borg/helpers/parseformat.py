@@ -24,7 +24,7 @@ logger = create_logger()
 import yaml
 
 from .errors import Error
-from .fs import get_keys_dir, make_path_safe, slashify
+from .fs import make_path_safe, slashify
 from .argparsing import Action, ArgumentError, ArgumentTypeError, register_type
 from .msgpack import Timestamp
 from .time import OutputTimestamp, format_time, safe_timestamp
@@ -677,17 +677,6 @@ class Location:
             "path=%r" % self.path,
         ]
         return ", ".join(items)
-
-    def to_key_filename(self):
-        name = re.sub(r"[^\w]", "_", self.path.rstrip("/"))
-        if self.proto not in ("file", "socket", "rclone"):
-            name = re.sub(r"[^\w]", "_", self.host) + "__" + name
-        if len(name) > 120:
-            # Limit file names to some reasonable length. Most file systems
-            # limit them to 255 [unit of choice]; due to variations in unicode
-            # handling we truncate to 100 *characters*.
-            name = name[:120]
-        return os.path.join(get_keys_dir(), name)
 
     def __repr__(self):
         return "Location(%s)" % self

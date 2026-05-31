@@ -4,7 +4,7 @@ import os
 import textwrap
 from hashlib import sha256
 from pathlib import Path
-from typing import Literal, ClassVar
+from typing import Literal, ClassVar, Optional
 from collections.abc import Callable
 
 from ..logger import create_logger
@@ -35,6 +35,39 @@ from . import low_level
 
 def keyfile_name_for(content: bytes) -> str:
     return sha256(content).hexdigest()
+
+
+KEYFILE_ID = "BORG_KEY"
+
+
+def is_keyfile(data: str | bytes, repoid: Optional[str] = None) -> bool:
+    # repoid is a hex str, if given. if given, we only accept keyfiles for that repo.
+    header = f"{KEYFILE_ID} {repoid or ''}"
+    if isinstance(data, str):
+        return data.startswith(header)
+    elif isinstance(data, bytes):
+        # data can be given as bytes to avoid decoding issues for invalid files.
+        return data.startswith(header.encode())
+    else:
+        raise TypeError(f"Expected str or bytes, got {type(data)}")
+
+
+def keyfile_format(repoid: str, b64data: str) -> str:
+    return f"{KEYFILE_ID} {repoid}\n{b64data}\n"
+
+
+def keyfile_parse(data: str | bytes, repoid: Optional[str] = None) -> tuple[str, str]:
+    if repoid is None:
+        if not is_keyfile(data):
+            raise ValueError("Not a keyfile")
+    else:
+        if not is_keyfile(data, repoid):
+            raise ValueError("Not a keyfile for repo %s" % repoid)
+    if isinstance(data, bytes):
+        data = data.decode()
+    header, b64data = data.split("\n", 1)
+    repoid = header[len(KEYFILE_ID) + 1 :]
+    return repoid, b64data
 
 
 # workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
@@ -386,7 +419,7 @@ class AESKeyBase(KeyBase):
 
 
 class FlexiKey:
-    FILE_ID = "BORG_KEY"
+    FILE_ID = KEYFILE_ID
     STORAGE: ClassVar[str] = KeyBlobStorage.NO_STORAGE  # override in subclass
 
     @classmethod
@@ -557,38 +590,23 @@ class FlexiKey:
         return key
 
     def sanity_check(self, filename, id):
-        file_id = self.FILE_ID.encode() + b" "
-        repo_id = bin_to_hex(id).encode("ascii")
+        repo_id_hex = bin_to_hex(id)
         with open(filename, "rb") as fd:
             # we do the magic / id check in binary mode to avoid stumbling over
             # decoding errors if somebody has binary files in the keys dir for some reason.
-            if fd.read(len(file_id)) != file_id:
-                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
-            if fd.read(len(repo_id)) != repo_id:
-                raise KeyfileMismatchError(self.repository._location.canonical_path(), filename)
+            data = fd.read(10000)
+        if not is_keyfile(data):
+            raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
+        if not is_keyfile(data, repo_id_hex):
+            raise KeyfileMismatchError(self.repository._location.canonical_path(), filename)
         # we get here if it really looks like a borg key for this repo,
         # do some more checks that are close to how borg reads/parses the key.
-        with open(filename) as fd:
-            lines = fd.readlines()
-            if len(lines) < 2:
-                logger.warning(f"borg key sanity check: expected 2+ lines total. [{filename}]")
-                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
-            if len(lines[0].rstrip()) > len(file_id) + len(repo_id):
-                logger.warning(f"borg key sanity check: key line 1 seems too long. [{filename}]")
-                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
-            key_b64 = "".join(lines[1:])
-            try:
-                key = binascii.a2b_base64(key_b64)
-            except (ValueError, binascii.Error):
-                logger.warning(f"borg key sanity check: key line 2+ does not look like base64. [{filename}]")
-                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename) from None
-            if len(key) < 20:
-                # this is in no way a precise check, usually we have about 400b key data.
-                logger.warning(
-                    f"borg key sanity check: binary encrypted key data from key line 2+ suspiciously short."
-                    f" [{filename}]"
-                )
-                raise KeyfileInvalidError(self.repository._location.canonical_path(), filename)
+        _, key_b64 = keyfile_parse(data, repo_id_hex)
+        try:
+            binascii.a2b_base64(key_b64)
+        except (ValueError, binascii.Error):
+            logger.warning(f"borg key sanity check: key line 2+ does not look like base64. [{filename}]")
+            raise KeyfileInvalidError(self.repository._location.canonical_path(), filename) from None
         # looks good!
         return filename
 
@@ -649,7 +667,8 @@ class FlexiKey:
     def load(self, target, passphrase):
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             with open(target) as fd:
-                key_data = "".join(fd.readlines()[1:])
+                key_data = fd.read()
+            _, key_data = keyfile_parse(key_data, bin_to_hex(self.repository.id))
         elif self.STORAGE == KeyBlobStorage.REPO:
             # While the repository is encrypted, we consider a repokey repository with a blank
             # passphrase an unencrypted repository.
@@ -663,6 +682,8 @@ class FlexiKey:
                 loc = target._location.canonical_path()
                 raise RepoKeyNotFoundError(loc) from None
             key_data = key_data.decode("utf-8")  # remote repo: msgpack issue #99, getting bytes
+            if is_keyfile(key_data):
+                _, key_data = keyfile_parse(key_data, bin_to_hex(self.repository.id))
         else:
             raise TypeError("Unsupported borg key storage type")
         success = self._load(key_data, passphrase)
@@ -675,7 +696,7 @@ class FlexiKey:
         if self.STORAGE == KeyBlobStorage.KEYFILE:
             old_target = getattr(self, "target", None)
             keys_dir = get_keys_dir()
-            keyfile_data = f"{self.FILE_ID} {bin_to_hex(self.repository_id)}\n{key_data}\n"
+            keyfile_data = keyfile_format(bin_to_hex(self.repository_id), key_data)
             target_dir = target if os.path.isdir(target) else os.path.dirname(target)
             auto_named = not os.environ.get("BORG_KEY_FILE") and os.path.samefile(target_dir, keys_dir)
             if auto_named:
@@ -699,6 +720,7 @@ class FlexiKey:
                         logger.debug('Could not remove previous keyfile "%s": %s', old_target, exc)
         elif self.STORAGE == KeyBlobStorage.REPO:
             self.logically_encrypted = passphrase != ""  # nosec B105
+            key_data = keyfile_format(bin_to_hex(self.repository_id), key_data)
             key_data = key_data.encode("utf-8")  # remote repo: msgpack issue #99, giving bytes
             target.save_key(key_data)
         else:

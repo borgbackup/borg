@@ -51,9 +51,9 @@ data/
       0000... .. ffff...
 
 keys/
-  repokey
     When using encryption in repokey mode, the encrypted, passphrase protected
-    key is stored here as a base64 encoded text.
+    key is stored here as a base64 encoded text. The sha256 content hash is
+    used for the name.
 
 locks/
   used by the locking system to manage shared and exclusive locks.
@@ -615,7 +615,7 @@ b) with ``create --chunker-params buzhash,19,23,21,4095`` (default):
    it can not skip unmodified files then.
 
 .. _internals_hashindex:
- 
+
 HashIndex
 ---------
 
@@ -721,8 +721,10 @@ removed in a future release.
 Both modes
 ~~~~~~~~~~
 
-Encryption keys (and other secrets) are kept either in a key file on the client
-('keyfile' mode) or in the repository under keys/repokey ('repokey' mode).
+Encryption keys (and other secrets) are kept either in the keys directory on
+the client ('keyfile' mode) or under the keys/ namespace in the repository
+('repokey' mode) using the sha256 of the file content as the name.
+
 In both cases, the secrets are generated from random and then encrypted by a
 key derived from your passphrase (this happens on the client before the key
 is stored into the keyfile or as repokey).

@@ -1,6 +1,7 @@
 import os
 import time
 from pathlib import Path
+from hashlib import sha256
 
 from borgstore.store import Store
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
@@ -17,6 +18,7 @@ from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
 from .repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
+from .crypto.key import is_keyfile
 
 logger = create_logger(__name__)
 
@@ -233,13 +235,39 @@ class Repository:
             self.lock.refresh()
 
     def save_key(self, keydata):
-        # note: saving an empty key means that there is no repokey anymore
-        self.store.store("keys/repokey", keydata)
+        # currently, there is only one repokey,
+        # thus we delete all old/outdated keys stored in this repository.
+        try:
+            infos = list(self.store.list("keys"))
+        except StoreObjectNotFound:
+            pass
+        else:
+            for info in infos:
+                try:
+                    self.store.delete(f"keys/{info.name}")
+                except StoreObjectNotFound:
+                    pass
+        # note: saving an empty key means that there is no repokey for this repo anymore.
+        if keydata:
+            digest = sha256(keydata).hexdigest()
+            self.store.store(f"keys/{digest}", keydata)
 
     def load_key(self):
-        keydata = self.store.load("keys/repokey")
-        # note: if we return an empty string, it means there is no repo key
-        return keydata
+        repo_id_hex = bin_to_hex(self.id)
+        # search for a key matching this repository's ID in the keys/ namespace
+        try:
+            infos = list(self.store.list("keys"))
+        except StoreObjectNotFound:
+            pass
+        else:
+            for info in infos:
+                try:
+                    keydata = self.store.load(f"keys/{info.name}")
+                    if is_keyfile(keydata, repo_id_hex):
+                        return keydata
+                except StoreObjectNotFound:
+                    pass
+        return b""
 
     def destroy(self):
         """Destroy the repository"""

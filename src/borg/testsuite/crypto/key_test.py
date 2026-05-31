@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey
+from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey, keyfile_parse
 from ...crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey
 from ...crypto.key import AEADKeyBase
 from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey
@@ -105,9 +105,11 @@ class TestKey:
             def canonical_path(self):
                 return self.processed
 
+        def __init__(self, id=bytes(32)):
+            self.id = id
+            self.id_str = bin_to_hex(id)
+
         _location = _Location()
-        id = bytes(32)
-        id_str = bin_to_hex(id)
         version = 2
 
         def save_key(self, data):
@@ -327,7 +329,8 @@ def test_key_file_roundtrip(monkeypatch):
     load_me = AESOCBRepoKey.detect(repository, manifest_data=None)
 
     assert to_dict(load_me) == to_dict(save_me)
-    assert msgpack.unpackb(a2b_base64(saved))["algorithm"] == KEY_ALGORITHMS["argon2"]
+    _, saved_b64 = keyfile_parse(saved)
+    assert msgpack.unpackb(a2b_base64(saved_b64))["algorithm"] == KEY_ALGORITHMS["argon2"]
 
 
 def test_argon2_wrong_passphrase_returns_none(monkeypatch):
@@ -337,4 +340,5 @@ def test_argon2_wrong_passphrase_returns_none(monkeypatch):
     monkeypatch.setenv("BORG_PASSPHRASE", "correct passphrase")
     key = AESOCBRepoKey.create(repository, args=MagicMock(key_algorithm="argon2"))
     saved = repository.save_key.call_args.args[0]
-    assert key.decrypt_key_file(a2b_base64(saved), "wrong passphrase") is None
+    _, saved_b64 = keyfile_parse(saved)
+    assert key.decrypt_key_file(a2b_base64(saved_b64), "wrong passphrase") is None

@@ -729,12 +729,19 @@ def test_prune_keep_yearly_int_or_interval(archivers, request, backup_files, kee
     assert re.search(r"Would prune:\s+test-5", output)
 
 
+def _cmd_prune_error(archiver, *args):
+    """Run prune expecting a CommandError. Returns error string for assertions."""
+    if archiver.FORK_DEFAULT:
+        return cmd(archiver, "prune", *args, exit_code=CommandError().exit_code)
+    with pytest.raises(CommandError) as error:
+        cmd(archiver, "prune", *args)
+    return str(error.value)
+
+
 def test_prune_no_args(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    with pytest.raises(CommandError) as error:
-        cmd(archiver, "prune")
-    output = str(error.value)
+    output = _cmd_prune_error(archiver)
     assert re.search(r"At least one of the .* settings must be specified.", output)
     assert re.search(r"keep(?!-)", output)
     flags = [
@@ -757,17 +764,15 @@ def test_prune_no_args(archivers, request):
 def test_prune_errors_on_keep_and_last(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    with pytest.raises(CommandError) as error:
-        cmd(archiver, "prune", "--dry-run", "--keep-last=5", "--keep=3")
-    assert 'Only one of the "keep" and "last" settings may be specified.' in str(error.value)
+    output = _cmd_prune_error(archiver, "--dry-run", "--keep-last=5", "--keep=3")
+    assert 'Only one of the "keep" and "last" settings may be specified.' in output
 
 
 def test_prune_errors_on_keep_and_within(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    with pytest.raises(CommandError) as error:
-        cmd(archiver, "prune", "--dry-run", "--keep-within=7d", "--keep=3")
-    assert 'Only one of the "keep" and "within" settings may be specified.' in str(error.value)
+    output = _cmd_prune_error(archiver, "--dry-run", "--keep-within=7d", "--keep=3")
+    assert 'Only one of the "keep" and "within" settings may be specified.' in output
 
 
 @pytest.mark.parametrize(
@@ -777,11 +782,10 @@ def test_prune_errors_on_keep_and_within(archivers, request):
 def test_prune_warns_on_redundant_interval_flags(archivers, request, lo_val, hi_val):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
-    with pytest.raises(CommandError) as error:
-        cmd(archiver, "prune", "--dry-run", f"--keep-hourly={lo_val}", f"--keep-daily={hi_val}")
-    assert "hourly=" in str(error.value)
-    assert "daily=" in str(error.value)
-    assert "effectively useless" in str(error.value)
+    output = _cmd_prune_error(archiver, "--dry-run", f"--keep-hourly={lo_val}", f"--keep-daily={hi_val}")
+    assert "hourly=" in output
+    assert "daily=" in output
+    assert "effectively useless" in output
 
 
 def test_prune_int_rolling_schedule_oldest_retention():

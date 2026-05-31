@@ -127,9 +127,9 @@ def with_repository(
             )
 
             with repository:
-                if repository.version not in (3,):
+                if repository.version not in (3, 4):
                     raise Error(
-                        f"This borg version only accepts version 3 repos for -r/--repo, "
+                        f"This borg version only accepts version 3 or 4 repos for -r/--repo, "
                         f"but not version {repository.version}. "
                         f"You can use 'borg transfer' to copy archives from old to new repos."
                     )

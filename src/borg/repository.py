@@ -467,7 +467,8 @@ class Repository:
                 pack_id = hex_to_bin(info.name)
                 chunk_id = pack_id  # N=1: chunk_id == pack_id
                 if collect:
-                    result.append((chunk_id, info.size))
+                    chunk_size = info.size  # only correct for N=1
+                    result.append((chunk_id, chunk_size))
                     if len(result) == limit:
                         break
                 elif chunk_id == marker:

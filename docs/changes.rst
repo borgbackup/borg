@@ -488,6 +488,7 @@ Other changes:
   - improve macOS Keychain instructions, #5156
   - add DoS warning for none encryption mode, #6715
   - document error handling in borg create, #4912
+  - Removed outdated "change-passphrase" docs, #9697
 
 
 Version 1.4.4 (2026-03-19)

@@ -461,7 +461,7 @@ def test_legacy_archives_satisfies_archives_interface():
 
 class _FakeLegacyRepo(LegacyRepository):
     def __init__(self):
-        pass
+        self.lock = None
 
 
 def test_manifest_creates_legacy_archives_for_legacy_repo():

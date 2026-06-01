@@ -194,7 +194,7 @@ def with_other_repository(manifest=False, cache=False, compatibility=None):
             )
 
             with repository:
-                acceptable_versions = (1,) if v1_legacy else (3, 4)
+                acceptable_versions = (1,) if v1_legacy else (4,)
                 if repository.version not in acceptable_versions:
                     raise Error(
                         f"This borg version only accepts version {' or '.join(str(v) for v in acceptable_versions)} "

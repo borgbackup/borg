@@ -17,15 +17,8 @@ from .helpers import bin_to_hex, hex_to_bin
 from .storelocking import Lock
 from .logger import create_logger
 from .manifest import NoManifestError
-from struct import Struct
-
 from .repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .crypto.key import is_keyfile
-
-PACK_MAGIC = b"BORGPACK"
-PACK_VERSION = 0x01
-_pack_header = Struct("<8sBI")  # magic(8) + version(1) + blob_len(4)
-PACK_HEADER_SIZE = _pack_header.size  # 13 bytes
 
 logger = create_logger(__name__)
 
@@ -331,34 +324,20 @@ class Repository:
 
         def check_object(obj):
             """Check if obj looks valid."""
-            if len(obj) < PACK_HEADER_SIZE:
-                log_error("too small.")
-                return
-            magic, version, blob_len = _pack_header.unpack(obj[:PACK_HEADER_SIZE])
-            if magic != PACK_MAGIC:
-                log_error("invalid pack magic.")
-                return
-            if version != PACK_VERSION:
-                log_error(f"unsupported pack version: {version}.")
-                return
-            blob = obj[PACK_HEADER_SIZE:]
-            if len(blob) != blob_len:
-                log_error(f"pack blob_len mismatch: header says {blob_len}, actual {len(blob)}.")
-                return
             hdr_size = RepoObj.obj_header.size
-            if len(blob) < hdr_size:
+            if len(obj) < hdr_size:
                 log_error("too small.")
                 return
-            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(blob[:hdr_size]))
+            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
             if hdr.magic != OBJ_MAGIC:
                 log_error("invalid object magic.")
             elif hdr.version != OBJ_VERSION:
                 log_error(f"unsupported object version: {hdr.version}.")
             else:
-                meta = blob[hdr_size : hdr_size + hdr.meta_size]
+                meta = obj[hdr_size : hdr_size + hdr.meta_size]
                 if hdr.meta_size != len(meta):
                     log_error("metadata size mismatch.")
-                data = blob[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
+                data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
                 if hdr.data_size != len(data):
                     log_error("data size mismatch.")
 
@@ -503,15 +482,13 @@ class Repository:
         key = "packs/" + bin_to_hex(pack_id)
         try:
             if read_data:
-                raw = self.store.load(key)
-                return raw[PACK_HEADER_SIZE:]
+                return self.store.load(key)
             else:
                 # RepoObj layout supports separately encrypted metadata and data.
                 # We return enough bytes so the client can decrypt the metadata.
                 hdr_size = RepoObj.obj_header.size
                 extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
-                raw = self.store.load(key, size=PACK_HEADER_SIZE + hdr_size + extra_size)
-                obj = raw[PACK_HEADER_SIZE:]
+                obj = self.store.load(key, size=hdr_size + extra_size)
                 hdr = obj[0:hdr_size]
                 if len(hdr) != hdr_size:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {hdr_size}, got {len(hdr)} bytes")
@@ -519,8 +496,7 @@ class Repository:
                 if meta_size > extra_size:
                     # we did not get enough, need to load more, but not all.
                     # this should be rare, as chunk metadata is rather small usually.
-                    raw = self.store.load(key, size=PACK_HEADER_SIZE + hdr_size + meta_size)
-                    obj = raw[PACK_HEADER_SIZE:]
+                    obj = self.store.load(key, size=hdr_size + meta_size)
                 meta = obj[hdr_size : hdr_size + meta_size]
                 if len(meta) != meta_size:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes")
@@ -548,21 +524,13 @@ class Repository:
 
         pack_id = id  # N=1: pack_id == chunk_id
         key = "packs/" + bin_to_hex(pack_id)
-        pack_hdr = _pack_header.pack(PACK_MAGIC, PACK_VERSION, data_size)
-        self.store.store(key, pack_hdr + data)
+        self.store.store(key, data)
 
     def delete(self, id, wait=True):
         """delete a repo object
 
         Note: when doing calls with wait=False this gets async and caller must
               deal with async results / exceptions later.
-
-        N=1: pack_id == chunk_id, so deleting the pack file is equivalent to
-             deleting the chunk. Hard delete is safe here.
-        N>1: a pack contains multiple chunks. Individual chunks cannot be deleted
-             from a pack without rewriting it. This method must become a soft-delete
-             (no-op) before N>1 is implemented; compact() will then be the sole
-             mechanism for reclaiming space based on live-ratio thresholds.
         """
         self._lock_refresh()
         pack_id = id  # N=1: pack_id == chunk_id

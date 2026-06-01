@@ -136,7 +136,7 @@ jobs:
         run: |
           # build borg.exe
           . env/bin/activate
-          pip install -e ".[cockpit,s3,sftp,rest,rclone]"
+          pip install -e ".[cockpit,s3,sftp,rclone]"
           mkdir -p dist/binary
           pyinstaller -y --clean --distpath=dist/binary scripts/borg.exe.spec
           # build sdist and wheel in dist/...

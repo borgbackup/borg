@@ -33,7 +33,7 @@ General:
         When set, use the value to answer the passphrase question when a **new** passphrase is asked for.
         This variable is checked first. If it is not set, BORG_PASSPHRASE and BORG_PASSCOMMAND will also
         be checked.
-        Main use case for this is to fully automate ``borg change-passphrase``.
+        Main use case for this is to fully automate ``borg key change-passphrase``.
     BORG_DISPLAY_PASSPHRASE
         When set, use the value to answer the "display the passphrase for verification" question when defining a new passphrase for encrypted repositories.
     BORG_DEBUG_PASSPHRASE

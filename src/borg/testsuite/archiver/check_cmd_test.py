@@ -225,7 +225,7 @@ def test_corrupted_manifest(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         manifest = repository.get_manifest()
-        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
+        corrupted_manifest = manifest[:250] + b"corrupted!" + manifest[250:]
         repository.put_manifest(corrupted_manifest)
     cmd(archiver, "check", exit_code=1)
     output = cmd(archiver, "check", "-v", "--repair", exit_code=0)
@@ -273,7 +273,7 @@ def test_manifest_rebuild_corrupted_chunk(archivers, request):
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
         manifest = repository.get_manifest()
-        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
+        corrupted_manifest = manifest[:250] + b"corrupted!" + manifest[250:]
         repository.put_manifest(corrupted_manifest)
         chunk = repository.get(archive.id)
         corrupted_chunk = chunk + b"corrupted!"
@@ -312,7 +312,7 @@ def test_spoofed_archive(archivers, request):
     with repository:
         # attacker would corrupt or delete the manifest to trigger a rebuild of it:
         manifest = repository.get_manifest()
-        corrupted_manifest = manifest[:123] + b"corrupted!" + manifest[123:]
+        corrupted_manifest = manifest[:250] + b"corrupted!" + manifest[250:]
         repository.put_manifest(corrupted_manifest)
         archive_dict = {
             "command_line": "",

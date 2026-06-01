@@ -8,7 +8,8 @@ from ..helpers import Error, yes, bin_to_hex, hex_to_bin, dash_open, get_keys_di
 from ..repoobj import RepoObj
 
 
-from .key import CHPOKeyfileKey, RepoKeyNotFoundError, KeyBlobStorage, identify_key, keyfile_name_for
+from .key import keyfile_format, keyfile_parse, is_keyfile
+from .key import RepoKeyNotFoundError, KeyBlobStorage, identify_key, keyfile_name_for
 
 
 class NotABorgKeyFile(Error):
@@ -56,10 +57,14 @@ class KeyManager:
 
     def load_keyblob(self):
         if self.keyblob_storage == KeyBlobStorage.KEYFILE:
+            from .key import CHPOKeyfileKey
+
             k = CHPOKeyfileKey(self.repository)
             target = k.find_key()
             with open(target) as fd:
-                self.keyblob = "".join(fd.readlines()[1:])
+                key_data = fd.read()
+            _, key_data = keyfile_parse(key_data, bin_to_hex(self.repository.id))
+            self.keyblob = key_data
 
         elif self.keyblob_storage == KeyBlobStorage.REPO:
             key_data = self.repository.load_key().decode()
@@ -67,10 +72,14 @@ class KeyManager:
                 # if we got an empty key, it means there is no key.
                 loc = self.repository._location.canonical_path()
                 raise RepoKeyNotFoundError(loc) from None
+            if is_keyfile(key_data):
+                _, key_data = keyfile_parse(key_data, bin_to_hex(self.repository.id))
             self.keyblob = key_data
 
     def store_keyblob(self, args):
         if self.keyblob_storage == KeyBlobStorage.KEYFILE:
+            from .key import CHPOKeyfileKey
+
             k = CHPOKeyfileKey(self.repository)
             target = k.get_existing_or_new_target(args)
             keyfile_data = self.get_keyfile_data()
@@ -79,14 +88,11 @@ class KeyManager:
             with dash_open(target, "w") as fd:
                 fd.write(keyfile_data)
         elif self.keyblob_storage == KeyBlobStorage.REPO:
-            self.repository.save_key(self.keyblob.encode("utf-8"))
+            key_data = keyfile_format(bin_to_hex(self.repository.id), self.keyblob.strip())
+            self.repository.save_key(key_data.encode("utf-8"))
 
     def get_keyfile_data(self):
-        data = f"{CHPOKeyfileKey.FILE_ID} {bin_to_hex(self.repository.id)}\n"
-        data += self.keyblob
-        if not self.keyblob.endswith("\n"):
-            data += "\n"
-        return data
+        return keyfile_format(bin_to_hex(self.repository.id), self.keyblob.strip())
 
     def store_keyfile(self, target):
         with dash_open(target, "w") as fd:
@@ -147,17 +153,15 @@ class KeyManager:
             fd.write(export)
 
     def import_keyfile(self, args):
-        file_id = CHPOKeyfileKey.FILE_ID
-        first_line = file_id + " " + bin_to_hex(self.repository.id) + "\n"
         with dash_open(args.path, "r") as fd:
-            file_first_line = fd.read(len(first_line))
-            if file_first_line != first_line:
-                if not file_first_line.startswith(file_id):
-                    raise NotABorgKeyFile()
-                else:
-                    raise RepoIdMismatch()
-            self.keyblob = fd.read()
-
+            key_data = fd.read()
+        try:
+            repoid, b64data = keyfile_parse(key_data, bin_to_hex(self.repository.id))
+        except ValueError:
+            if not is_keyfile(key_data):
+                raise NotABorgKeyFile() from None
+            raise RepoIdMismatch() from None
+        self.keyblob = b64data
         self.store_keyblob(args)
 
     def import_paperkey(self, args):

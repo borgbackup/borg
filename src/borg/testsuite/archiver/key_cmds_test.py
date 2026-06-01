@@ -5,7 +5,7 @@ from hashlib import sha256
 import pytest
 
 from ...constants import *  # NOQA
-from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPOKeyfileKey, Passphrase
+from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPOKeyfileKey, Passphrase, is_keyfile, keyfile_parse
 from ...crypto.keymanager import RepoIdMismatch, NotABorgKeyFile
 from ...helpers import CommandError
 from ...helpers import bin_to_hex, hex_to_bin
@@ -114,7 +114,7 @@ def test_key_export_keyfile(archivers, request):
     with open(export_file) as fd:
         export_contents = fd.read()
 
-    assert export_contents.startswith("BORG_KEY " + bin_to_hex(repo_id) + "\n")
+    assert is_keyfile(export_contents, bin_to_hex(repo_id))
 
     key_file = archiver.keys_path + "/" + os.listdir(archiver.keys_path)[0]
 
@@ -165,13 +165,13 @@ def test_key_export_repokey(archivers, request):
     with open(export_file) as fd:
         export_contents = fd.read()
 
-    assert export_contents.startswith("BORG_KEY " + bin_to_hex(repo_id) + "\n")
+    assert is_keyfile(export_contents, bin_to_hex(repo_id))
 
     with Repository(archiver.repository_path) as repository:
         repo_key = AESOCBRepoKey(repository)
         repo_key.load(None, Passphrase.env_passphrase())
 
-    backup_key = AESOCBKeyfileKey(TestKey.MockRepository())
+    backup_key = AESOCBKeyfileKey(TestKey.MockRepository(id=repo_id))
     backup_key.load(export_file, Passphrase.env_passphrase())
 
     assert repo_key.crypt_key == backup_key.crypt_key
@@ -341,7 +341,9 @@ def test_init_defaults_to_argon2(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     with Repository(archiver.repository_path) as repository:
-        key = msgpack.unpackb(binascii.a2b_base64(repository.load_key()))
+        key_data = repository.load_key()
+        _, key_data = keyfile_parse(key_data, bin_to_hex(repository.id))
+        key = msgpack.unpackb(binascii.a2b_base64(key_data))
         assert key["algorithm"] == "argon2 chacha20-poly1305"
 
 
@@ -352,7 +354,9 @@ def test_change_passphrase_does_not_change_algorithm_argon2(archivers, request):
     cmd(archiver, "key", "change-passphrase")
 
     with Repository(archiver.repository_path) as repository:
-        key = msgpack.unpackb(binascii.a2b_base64(repository.load_key()))
+        key_data = repository.load_key()
+        _, key_data = keyfile_parse(key_data, bin_to_hex(repository.id))
+        key = msgpack.unpackb(binascii.a2b_base64(key_data))
         assert key["algorithm"] == "argon2 chacha20-poly1305"
 
 
@@ -362,5 +366,8 @@ def test_change_location_does_not_change_algorithm_argon2(archivers, request):
     cmd(archiver, "key", "change-location", "repokey")
 
     with Repository(archiver.repository_path) as repository:
-        key = msgpack.unpackb(binascii.a2b_base64(repository.load_key()))
+        key_data = repository.load_key()
+        if is_keyfile(key_data):
+            _, key_data = keyfile_parse(key_data, bin_to_hex(repository.id))
+        key = msgpack.unpackb(binascii.a2b_base64(key_data))
         assert key["algorithm"] == "argon2 chacha20-poly1305"

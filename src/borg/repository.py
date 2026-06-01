@@ -115,15 +115,13 @@ class Repository:
             location = Location(url)
         self._location = location
         self.url = url
-        # lots of stuff in data: use 2 levels by default (data/00/00/ .. data/ff/ff/ dirs)!
-        data_levels = int(os.environ.get("BORG_STORE_DATA_LEVELS", "2"))
         ns_config = {
             "archives/": {"levels": [0]},
             "cache/": {"levels": [0]},
             "config/": {"levels": [0]},
-            "data/": {"levels": [data_levels]},
             "keys/": {"levels": [0]},
             "locks/": {"levels": [0]},
+            "packs/": {"levels": [1]},
         }
         # Get permissions from parameter or environment variable
         permissions = permissions if permissions is not None else os.environ.get("BORG_REPO_PERMISSIONS", "all")
@@ -136,9 +134,9 @@ class Repository:
                 "archives": "lrw",
                 "cache": "lrwWD",  # WD for chunks.<HASH>, last-key-checked, ...
                 "config": "lrW",  # W for manifest
-                "data": "lrw",
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
+                "packs": "lrw",
             }
         elif permissions == "write-only":  # mostly no reading
             permissions = {
@@ -146,9 +144,9 @@ class Repository:
                 "archives": "lw",
                 "cache": "lrwWD",  # read allowed, e.g. for chunks.<HASH> cache
                 "config": "lrW",  # W for manifest
-                "data": "lw",  # no r!
                 "keys": "lr",
                 "locks": "lrwD",  # borg needs to create/delete a shared lock here
+                "packs": "lw",  # no r!
             }
         elif permissions == "read-only":  # mostly r/o
             permissions = {"": "lr", "locks": "lrwD"}
@@ -171,7 +169,7 @@ class Repository:
         self._send_log = send_log_cb or (lambda: None)
         self.do_create = create
         self.created = False
-        self.acceptable_repo_versions = (3,)
+        self.acceptable_repo_versions = (4,)
         self.opened = False
         self.lock = None
         self.do_lock = lock
@@ -209,10 +207,10 @@ class Repository:
         self.store.open()
         try:
             self.store.store("config/readme", REPOSITORY_README.encode())
-            self.version = 3
+            self.version = 4
             self.store.store("config/version", str(self.version).encode())
             self.store.store("config/id", bin_to_hex(os.urandom(32)).encode())
-            # we know repo/data/ still does not have any chunks stored in it,
+            # we know repo/packs/ still does not have any chunks stored in it,
             # but for some stores, there might be a lot of empty directories and
             # listing them all might be rather slow, so we better cache an empty
             # ChunkIndex from here so that the first repo operation does not have
@@ -327,22 +325,21 @@ class Repository:
         def check_object(obj):
             """Check if obj looks valid."""
             hdr_size = RepoObj.obj_header.size
-            obj_size = len(obj)
-            if obj_size >= hdr_size:
-                hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
-                if hdr.magic != OBJ_MAGIC:
-                    log_error("invalid object magic.")
-                elif hdr.version != OBJ_VERSION:
-                    log_error(f"unsupported object version: {hdr.version}.")
-                else:
-                    meta = obj[hdr_size : hdr_size + hdr.meta_size]
-                    if hdr.meta_size != len(meta):
-                        log_error("metadata size mismatch.")
-                    data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
-                    if hdr.data_size != len(data):
-                        log_error("data size mismatch.")
-            else:
+            if len(obj) < hdr_size:
                 log_error("too small.")
+                return
+            hdr = RepoObj.ObjHeader(*RepoObj.obj_header.unpack(obj[:hdr_size]))
+            if hdr.magic != OBJ_MAGIC:
+                log_error("invalid object magic.")
+            elif hdr.version != OBJ_VERSION:
+                log_error(f"unsupported object version: {hdr.version}.")
+            else:
+                meta = obj[hdr_size : hdr_size + hdr.meta_size]
+                if hdr.meta_size != len(meta):
+                    log_error("metadata size mismatch.")
+                data = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
+                if hdr.data_size != len(data):
+                    log_error("data size mismatch.")
 
         # TODO: progress indicator, ...
         partial = bool(max_duration)
@@ -376,11 +373,11 @@ class Repository:
         # As we don't do garbage collection here, this is not a problem.
         # We also don't know the plaintext size, so we set it to 0.
         init_entry = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0)
-        infos = self.store.list("data")
+        infos = self.store.list("packs")
         try:
             for info in infos:
                 self._lock_refresh()
-                key = "data/%s" % info.name
+                key = "packs/%s" % info.name
                 if key <= last_key_checked:  # needs sorted keys
                     continue
                 try:
@@ -412,8 +409,9 @@ class Repository:
                     # add all existing objects to the index.
                     # borg check: the index may have corrupted objects (we did not delete them)
                     # borg check --repair: the index will only have non-corrupted objects.
-                    id = hex_to_bin(info.name)
-                    chunks[id] = init_entry
+                    pack_id = hex_to_bin(info.name)
+                    chunk_id = pack_id  # N=1: chunk_id == pack_id
+                    chunks[chunk_id] = init_entry
                 now = time.monotonic()
                 if now > t_last_checkpoint + 300:  # checkpoint every 5 mins
                     t_last_checkpoint = now
@@ -437,7 +435,7 @@ class Repository:
                         self, chunks, incremental=False, clear=True, force_write=True, delete_other=True
                     )
         except StoreObjectNotFound:
-            # it can be that there is no "data/" at all, then it crashes when iterating infos.
+            # it can be that there is no "packs/" at all, then it crashes when iterating infos.
             pass
         logger.info(f"Checked {objs_checked} repository objects, {objs_errors} errors.")
         if objs_errors == 0:
@@ -456,33 +454,35 @@ class Repository:
         """
         collect = True if marker is None else False
         result = []
-        infos = self.store.list("data")  # generator yielding ItemInfos
+        infos = self.store.list("packs")  # generator yielding ItemInfos
         while True:
             self._lock_refresh()
             try:
                 info = next(infos)
             except StoreObjectNotFound:
-                break  # can happen e.g. if "data" does not exist, pointless to continue in that case
+                break  # can happen e.g. if "packs" does not exist, pointless to continue in that case
             except StopIteration:
                 break
             else:
-                id = hex_to_bin(info.name)
+                pack_id = hex_to_bin(info.name)
+                chunk_id = pack_id  # N=1: chunk_id == pack_id
                 if collect:
-                    result.append((id, info.size))
+                    chunk_size = info.size  # only correct for N=1
+                    result.append((chunk_id, chunk_size))
                     if len(result) == limit:
                         break
-                elif id == marker:
+                elif chunk_id == marker:
                     collect = True
                     # note: do not collect the marker id
         return result
 
     def get(self, id, read_data=True, raise_missing=True):
         self._lock_refresh()
+        pack_id = id  # N=1: pack_id == chunk_id
         id_hex = bin_to_hex(id)
-        key = "data/" + id_hex
+        key = "packs/" + bin_to_hex(pack_id)
         try:
             if read_data:
-                # read everything
                 return self.store.load(key)
             else:
                 # RepoObj layout supports separately encrypted metadata and data.
@@ -523,7 +523,8 @@ class Repository:
         if data_size > MAX_DATA_SIZE:
             raise IntegrityError(f"More than allowed put data [{data_size} > {MAX_DATA_SIZE}]")
 
-        key = "data/" + bin_to_hex(id)
+        pack_id = id  # N=1: pack_id == chunk_id
+        key = "packs/" + bin_to_hex(pack_id)
         self.store.store(key, data)
 
     def delete(self, id, wait=True):
@@ -533,7 +534,8 @@ class Repository:
               deal with async results / exceptions later.
         """
         self._lock_refresh()
-        key = "data/" + bin_to_hex(id)
+        pack_id = id  # N=1: pack_id == chunk_id
+        key = "packs/" + bin_to_hex(pack_id)
         try:
             self.store.delete(key)
         except StoreObjectNotFound:

@@ -13,11 +13,14 @@ AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 OBJ_MAGIC = b"BORG_OBJ"
 OBJ_VERSION = 0x01
 
+# Fixed header size per blob: OBJ_MAGIC(8) + version(1) + chunk_id(32) + meta_size(4) + data_size(4)
+REPOOBJ_HEADER_SIZE = 49
+
 
 class RepoObj:
-    # Object header: magic (8b), format version (1b), meta size (4b), data size (4b).
-    obj_header = Struct("<8sBII")
-    ObjHeader = namedtuple("ObjHeader", "magic version meta_size data_size")
+    # Object header: magic (8b), format version (1b), chunk_id (32b), meta size (4b), data size (4b).
+    obj_header = Struct("<8sB32sII")
+    ObjHeader = namedtuple("ObjHeader", "magic version chunk_id meta_size data_size")
 
     @classmethod
     def extract_crypted_data(cls, data: bytes) -> bytes:
@@ -72,7 +75,7 @@ class RepoObj:
         data_encrypted = self.key.encrypt(id, data_compressed)
         meta_packed = msgpack.packb(meta)
         meta_encrypted = self.key.encrypt(id, meta_packed)
-        hdr = self.ObjHeader(OBJ_MAGIC, OBJ_VERSION, len(meta_encrypted), len(data_encrypted))
+        hdr = self.ObjHeader(OBJ_MAGIC, OBJ_VERSION, id, len(meta_encrypted), len(data_encrypted))
         hdr_packed = self.obj_header.pack(*hdr)
         return hdr_packed + meta_encrypted + data_encrypted
 

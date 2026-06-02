@@ -156,8 +156,8 @@ Compatibility notes:
 Change Log 2.x
 ==============
 
-Version 2.0.0b21 (2026-03-16)
------------------------------
+Version 2.0.0b22 (not released yet)
+-----------------------------------
 
 Please note:
 
@@ -165,6 +165,70 @@ Beta releases are only for testing on NEW repos - do not use for production.
 
 For upgrade and compatibility hints, please also read the section "Upgrade Notes"
 above.
+
+New features:
+
+- WIP packs project, major repo format changes, you must create new repos! #8572
+- rest:// repository URLs - connect via ssh to remote borgstore REST server,
+  talking http via stdio, #9593
+- prune: show total vs matching archives in output, #9262
+- prune: add --json option, #9222
+- archive: preserve cwd archive metadata, #9495
+
+Fixes:
+
+- fix canonical_path() missing ':' before port number
+- fix: xattr xdg backup exclusion should be on 'false'
+- fix slashdot hack excluding source directory metadata, #9534
+- macOS: fix TypeError when _get_birthtime_ns gets called with an FD
+- fix ChunkerFixed sparse handling and update tests
+- chunkers: check return value of malloc, raise MemoryError
+- crypto low_level: fix freeing of memory
+- extract: resolve memory leak on abandoned async requests in RemoteRepository
+- helpers: get_base_dir: avoid using HOME when it incorrectly points to root's home for non-root users (fstab borgfs), #3395
+- mount: improve error msg when uid/gid cannot be resolved, #9574
+- fix: properly handle invalid and dev versions in version parser, #9014
+- patterns: allow backslashes in paths, #9518
+
+Other changes:
+
+- keyfile: name key files by sha256(keyfile_contents).
+  Existing legacy-named keyfiles continue to work.
+- repokey: use same format as with external keyfile
+- repo-compress: remove this command for now
+- list: remove xxh64 hash support
+- benchmark: remove xxh64 and crc32 benchmarking
+- benchmark cpu: drop KDF section
+- separate a lot of legacy code into borg.legacy package, #9556
+- archiver: warn about MSYS2 path translation, #9339
+- tests / CI:
+
+  - remote archiver tests: use rest:/// rather than ssh://
+  - remove workaround for cross-platform-actions < v1.0.0, #9565
+  - CI: fix Haiku git safe.directory issue, #9562
+  - CI: canary: avoid MSYS2 arg/env conversions, #9513
+  - Fixes cleanup of append-only test tempfiles on macOS/BSD
+  - Fixes tests/docs assuming XDG_* vars not used on macOS
+  - add more tests
+- docs:
+
+  - add pack file format design and internals documentation, #8572
+  - update to 'borg key change-passphrase' in env help, #9697
+  - document the impact of the slashdot hack to pattern matching
+  - contributing guide incl. AI policy, #9409
+  - sshfs + chroot does not support different CPU architectures, #6878
+  - DoS warning for none mode, #6715
+  - error handling documentation for create, #4912
+  - FAQ entry for full repository filesystem, #9573
+  - FAQ entry for SSH connection timeouts, #5629
+  - FAQ entry for bad backups and deduplication, #4744
+  - FAQ entry about scalability, #4742
+  - improve macOS Keychain instructions, #5156
+  - pull-backup.rst minor fixes
+
+
+Version 2.0.0b21 (2026-03-16)
+-----------------------------
 
 New features:
 

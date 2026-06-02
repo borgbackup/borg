@@ -96,7 +96,7 @@ class ArchiverSetup:
         self.patterns_file_path: str | None = None
 
     def get_kind(self) -> str:
-        if self.repository_location.startswith("ssh://__testsuite__"):
+        if self.repository_location.startswith("ssh://__testsuite__") or self.repository_location.startswith("rest://"):
             return "remote"
         elif self.EXE == "borg.exe":
             return "binary"
@@ -152,7 +152,7 @@ def archiver(tmp_path, set_env_variables):
 
 @pytest.fixture()
 def remote_archiver(archiver):
-    archiver.repository_location = "ssh://__testsuite__/" + str(archiver.repository_path)
+    archiver.repository_location = "rest://" + "/" + str(archiver.repository_path)
     yield archiver
 
 

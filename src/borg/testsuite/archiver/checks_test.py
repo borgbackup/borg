@@ -278,6 +278,8 @@ def test_unknown_mandatory_feature_in_cache(archivers, request):
 
 # Begin Remote Tests
 def test_remote_repo_restrict_to_path(remote_archiver):
+    if remote_archiver.repository_location.startswith("rest://"):
+        pytest.skip("Not applicable for rest:// protocol")
     original_location, repo_path = remote_archiver.repository_location, remote_archiver.repository_path
     # restricted to repo directory itself:
     with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-path", repo_path]):
@@ -306,6 +308,8 @@ def test_remote_repo_restrict_to_path(remote_archiver):
 
 
 def test_remote_repo_restrict_to_repository(remote_archiver):
+    if remote_archiver.repository_location.startswith("rest://"):
+        pytest.skip("Not applicable for rest:// protocol")
     repo_path = remote_archiver.repository_path
     # restricted to repo directory itself:
     with patch.object(RemoteRepository, "extra_test_args", ["--restrict-to-repository", repo_path]):

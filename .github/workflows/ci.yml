@@ -243,8 +243,13 @@ jobs:
         # Start ssh-agent and add our key so paramiko can use the agent
         eval "$(ssh-agent -s)"
         ssh-add ~/.ssh/id_ed25519
+        sudo python3 -m venv /opt/borgstore-venv
+        sudo /opt/borgstore-venv/bin/pip install -U pip setuptools wheel
+        sudo /opt/borgstore-venv/bin/pip install "borgstore[rest]"
+        sudo ln -sf /opt/borgstore-venv/bin/borgstore-server-rest /usr/local/bin/borgstore-server-rest
         # Export SFTP test URL for tox via GITHUB_ENV
         echo "BORG_TEST_SFTP_REPO=sftp://sftpuser@localhost:22/borg/sftp-repo" >> $GITHUB_ENV
+        echo "BORG_TEST_REST_REPO=rest://sftpuser@localhost:22/borg/rest-repo" >> $GITHUB_ENV
 
     - name: Install and configure MinIO S3 server (test only)
       if: ${{ runner.os == 'Linux' && !contains(matrix.toxenv, 'mypy') && !contains(matrix.toxenv, 'docs') }}
@@ -281,13 +286,13 @@ jobs:
     - name: Install borgbackup
       run: |
         if [[ "$TOXENV" == *"llfuse"* ]]; then
-          pip install -ve ".[llfuse,cockpit,s3,sftp,rest,rclone]"
+          pip install -ve ".[llfuse,cockpit,s3,sftp,rclone]"
         elif [[ "$TOXENV" == *"pyfuse3"* ]]; then
-          pip install -ve ".[pyfuse3,cockpit,s3,sftp,rest,rclone]"
+          pip install -ve ".[pyfuse3,cockpit,s3,sftp,rclone]"
         elif [[ "$TOXENV" == *"mfusepy"* ]]; then
-          pip install -ve ".[mfusepy,cockpit,s3,sftp,rest,rclone]"
+          pip install -ve ".[mfusepy,cockpit,s3,sftp,rclone]"
         else
-          pip install -ve ".[cockpit,s3,sftp,rest,rclone]"
+          pip install -ve ".[cockpit,s3,sftp,rclone]"
         fi
 
     - name: Build Borg fat binaries (${{ matrix.binary }})
@@ -461,7 +466,7 @@ jobs:
                 pip -V
                 python -m pip install --upgrade pip wheel
                 pip install -r requirements.d/development.lock.txt
-                pip install -e ".[mfusepy,cockpit,s3,sftp,rest,rclone]"
+                pip install -e ".[mfusepy,cockpit,s3,sftp,rclone]"
                 tox -e py311-mfusepy
 
                 if [[ "${{ matrix.do_binaries }}" == "true" && "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
@@ -659,7 +664,7 @@ jobs:
         run: |
           # build borg.exe
           . env/bin/activate
-          pip install -e ".[cockpit,s3,sftp,rest,rclone]"
+          pip install -e ".[cockpit,s3,sftp,rclone]"
           mkdir -p dist/binary
           pyinstaller -y --clean --distpath=dist/binary scripts/borg.exe.spec
           # build sdist and wheel in dist/...

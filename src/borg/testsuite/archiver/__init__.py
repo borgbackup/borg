@@ -178,7 +178,10 @@ def open_archive(repo_path, name):
 
 def open_repository(archiver):
     if archiver.get_kind() == "remote":
-        return RemoteRepository(Location(archiver.repository_location))
+        location = Location(archiver.repository_location)
+        if location.proto == "rest":
+            return Repository(location, exclusive=True)
+        return RemoteRepository(location)
     else:
         return Repository(archiver.repository_path, exclusive=True)
 

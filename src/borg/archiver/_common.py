@@ -42,7 +42,7 @@ def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_leg
         )
 
     elif (
-        location.proto in ("sftp", "file", "http", "https", "rclone", "s3", "b2") and not v1_legacy
+        location.proto in ("rest", "sftp", "file", "http", "https", "rclone", "s3", "b2") and not v1_legacy
     ):  # stuff directly supported by borgstore
         repository = Repository(location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock)
 

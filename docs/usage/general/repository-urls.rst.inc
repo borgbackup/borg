@@ -12,7 +12,13 @@ expanded by your shell).
 
 Note: You may also prepend ``file://`` to a filesystem path to use URL style.
 
-**Remote repositories** accessed via SSH user@host:
+**Remote repositories** accessed via SSH user@host (REST http over stdio):
+
+``rest://user@host:port//abs/path/to/repo`` — absolute path
+
+``rest://user@host:port/rel/path/to/repo`` — path relative to the current directory
+
+**Remote repositories** accessed via SSH user@host (legacy borg RPC protocol):
 
 ``ssh://user@host:port//abs/path/to/repo`` — absolute path
 

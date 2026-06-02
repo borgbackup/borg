@@ -87,3 +87,9 @@ def _setxattr_inner(func, path, name, value):
     assert isinstance(name, bytes)
     assert isinstance(value, bytes)
     _check(func(path, name, value, len(value)), path, detect_buffer_too_small=False)
+
+
+def _removexattr_inner(func, path, name):
+    assert isinstance(path, (bytes, int))
+    assert isinstance(name, bytes)
+    _check(func(path, name), path, detect_buffer_too_small=False)

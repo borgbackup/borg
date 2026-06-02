@@ -15,7 +15,7 @@ from .logger import create_logger
 
 logger = create_logger()
 
-from .platform import listxattr, getxattr, setxattr, ENOATTR
+from .platform import listxattr, getxattr, setxattr, removexattr, ENOATTR
 
 # If we are running with fakeroot on Linux, then use the xattr functions of fakeroot. This is needed by
 # the 'test_extract_capabilities' test, but also allows xattrs to work with fakeroot on Linux in normal use.
@@ -130,3 +130,37 @@ def set_all(path, xattrs, follow_symlinks=False):
                 err_str = str(e)
             logger.warning("When setting extended attribute %s: %s", k.decode(errors="replace"), err_str)
     return warning
+
+
+def clear_all(path, follow_symlinks=False):
+    """
+    Remove all (removable) extended attributes from *path*.
+
+    *path* can either be a path (str or bytes) or an open file descriptor (int).
+    *follow_symlinks* indicates whether symlinks should be followed
+    and only applies when *path* is not an open file descriptor.
+
+    This is best-effort: xattrs that cannot be removed (e.g. attributes in a
+    protected namespace such as "security.selinux", or on filesystems without
+    xattr support) are silently skipped rather than raising. It is used to bring
+    an existing file to a "fresh" state before re-applying archived metadata.
+    """
+    if isinstance(path, str):
+        path = os.fsencode(path)
+    try:
+        names = listxattr(path, follow_symlinks=follow_symlinks)
+    except OSError as e:
+        if e.errno in (errno.ENOTSUP, errno.EOPNOTSUPP, errno.EPERM):
+            # xattrs not supported on this filesystem (or not permitted to list): nothing to clear.
+            return
+        raise
+    for name in names:
+        try:
+            removexattr(path, name, follow_symlinks=follow_symlinks)
+        except OSError as e:
+            # ENOATTR: race, the xattr was already removed between list and remove.
+            # ENOTSUP/EOPNOTSUPP: filesystem does not support xattrs.
+            # EPERM/EACCES: protected namespace (e.g. "security.*") we are not allowed to drop.
+            if e.errno in (ENOATTR, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EPERM, errno.EACCES):
+                continue
+            raise

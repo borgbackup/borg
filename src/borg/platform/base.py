@@ -69,6 +69,17 @@ def setxattr(path, name, value, *, follow_symlinks=False):
     """
 
 
+def removexattr(path, name, *, follow_symlinks=False):
+    """
+    Remove an xattr from *path*.
+
+    *path* can either be a path (bytes) or an open file descriptor (int).
+    *name* is the name of the xattr to remove (bytes).
+    *follow_symlinks* indicates whether symlinks should be followed
+    and only applies when *path* is not an open file descriptor.
+    """
+
+
 def acl_get(path, item, st, numeric_ids=False, fd=None):
     """
     Save ACL entries.

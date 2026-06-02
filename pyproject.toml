@@ -24,6 +24,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Security :: Cryptography",
     "Topic :: System :: Archiving :: Backup",
 ]
@@ -175,7 +176,7 @@ ignore_missing_imports = true
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
 # Important: when adding/removing Python versions here,
 #            also update the section "Test environments with different FUSE implementations" accordingly.
-env_list = ["py{310,311,312,313,314}-{none,llfuse,pyfuse3,mfusepy}", "docs", "ruff", "mypy", "bandit"]
+env_list = ["py{310,311,312,313,314,315}-{none,llfuse,pyfuse3,mfusepy}", "docs", "ruff", "mypy", "bandit"]
 
 [tool.tox.env_run_base]
 package = "editable-legacy"  # without this it does not find setup_docs when running under fakeroot
@@ -254,6 +255,20 @@ set_env = {BORG_FUSE_IMPL = "pyfuse3"}
 extras = ["pyfuse3", "sftp", "s3", "rclone"]
 
 [tool.tox.env.py314-mfusepy]
+set_env = {BORG_FUSE_IMPL = "mfusepy"}
+extras = ["mfusepy", "sftp", "s3", "rclone"]
+
+[tool.tox.env.py315-none]
+
+[tool.tox.env.py315-llfuse]
+set_env = {BORG_FUSE_IMPL = "llfuse"}
+extras = ["llfuse", "sftp", "s3", "rclone"]
+
+[tool.tox.env.py315-pyfuse3]
+set_env = {BORG_FUSE_IMPL = "pyfuse3"}
+extras = ["pyfuse3", "sftp", "s3", "rclone"]
+
+[tool.tox.env.py315-mfusepy]
 set_env = {BORG_FUSE_IMPL = "mfusepy"}
 extras = ["mfusepy", "sftp", "s3", "rclone"]
 

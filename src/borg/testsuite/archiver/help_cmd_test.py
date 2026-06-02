@@ -53,3 +53,12 @@ def test_help_formatting(command, parser):
 def test_help_formatting_helptexts(topic):
     helptext = Archiver.helptext[topic]
     assert str(rst_to_terminal(helptext))
+
+
+def test_main_help_epilog(archiver):
+    help_output = cmd(archiver, "-h")
+    assert "Description of additional help topics:" in help_output
+    assert "patterns" in help_output
+    assert "match-archives" in help_output
+    assert "placeholders" in help_output
+    assert "compression" in help_output

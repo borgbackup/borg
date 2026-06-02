@@ -1,5 +1,6 @@
 import json
 import os
+import stat
 from collections import OrderedDict
 from datetime import datetime, timezone
 from io import StringIO
@@ -10,9 +11,9 @@ import pytest
 from . import rejected_dotdot_paths
 from ..crypto.key import PlaintextKey
 from ..archive import Archive, CacheChunkBuffer, RobustUnpacker, valid_msgpacked_dict, ITEM_KEYS, Statistics
-from ..archive import BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
+from ..archive import BackupError, BackupOSError, backup_io, backup_io_iter, get_item_uid_gid
 from ..helpers import msgpack
-from ..item import Item, ArchiveItem
+from ..item import Item, ArchiveItem, ChunkListEntry
 from ..manifest import Archives, Manifest
 from ..platform import uid2user, gid2group, is_win32
 
@@ -435,3 +436,210 @@ def test_archives_get_by_id_missing_returns_none():
     manifest = Mock()
     archives = Archives(repo, manifest)
     assert archives.get_by_id(b"\x01" * 32) is None
+
+
+# ---- borg extract: in-place chunk comparison / selective extraction (#5638) ----
+
+CHUNK_SIZE = 4
+
+
+class FetchManyPipeline:
+    """Minimal pipeline stand-in that records which chunk ids fetch_many() requested."""
+
+    def __init__(self, objects):
+        self.objects = objects  # id -> data
+        self.fetched = []
+
+    def fetch_many(self, chunks, ro_type=None):
+        assert ro_type is not None
+        for chunk in chunks:
+            self.fetched.append(chunk.id)
+            yield self.objects[chunk.id]
+
+
+@pytest.fixture
+def extractor(tmpdir):
+    repository = Mock()
+    key = PlaintextKey(repository)
+    manifest = Manifest(key, repository)
+    archive = Archive(manifest=manifest, name="test", create=True)
+    archive.key = key
+    archive.cwd = str(tmpdir)
+    return archive
+
+
+def make_item(key, objects, data):
+    """Chunk *data* into CHUNK_SIZE pieces, register them in *objects*, return an Item."""
+    chunks = []
+    for i in range(0, len(data), CHUNK_SIZE):
+        piece = data[i : i + CHUNK_SIZE]
+        cid = key.id_hash(piece)
+        chunks.append(ChunkListEntry(id=cid, size=len(piece)))
+        objects[cid] = piece
+    item = Item(path="test", mode=stat.S_IFREG | 0o644, size=len(data))
+    item.chunks = chunks
+    return item
+
+
+@pytest.mark.parametrize(
+    "name, item_data, fs_data, expected_fetched",
+    [
+        ("no_change", b"11112222", b"11112222", 0),
+        ("first_chunk", b"11112222", b"33332222", 1),
+        ("second_chunk", b"11112222", b"11113333", 1),
+        ("both_chunks", b"11112222", b"33334444", 2),
+        ("cross_boundary", b"11112222", b"11333322", 2),
+        ("partial_last_chunk", b"1111222233", b"1111222244", 1),
+        ("fs_shorter", b"11112222", b"111122", 1),
+        ("fs_longer", b"11112222", b"1111222233", 0),
+        ("empty_item", b"", b"11112222", 0),
+        ("empty_fs", b"11112222", b"", 2),
+    ],
+)
+def test_compare_and_extract_chunks(extractor, tmpdir, name, item_data, fs_data, expected_fetched):
+    objects = {}
+    item = make_item(extractor.key, objects, item_data)
+    pipeline = FetchManyPipeline(objects)
+    extractor.pipeline = pipeline
+    # we only exercise the data path here; attribute (re)storing is covered elsewhere.
+    extractor.clear_attrs = Mock()
+    extractor.restore_attrs = Mock()
+
+    path = str(tmpdir.join("test"))
+    with open(path, "wb") as f:
+        f.write(fs_data)
+    st = os.stat(path)
+
+    assert extractor.compare_and_extract_chunks(item, path, st=st)
+    assert len(pipeline.fetched) == expected_fetched
+    with open(path, "rb") as f:
+        assert f.read() == item_data
+
+
+def test_compare_and_extract_chunks_fetches_only_differing(extractor, tmpdir):
+    objects = {}
+    item = make_item(extractor.key, objects, b"11112222")
+    pipeline = FetchManyPipeline(objects)
+    extractor.pipeline = pipeline
+    extractor.clear_attrs = Mock()
+    extractor.restore_attrs = Mock()
+
+    path = str(tmpdir.join("test"))
+    with open(path, "wb") as f:
+        f.write(b"1111XXXX")  # only the second chunk differs
+
+    extractor.compare_and_extract_chunks(item, path, st=os.stat(path))
+    # exactly the (differing) second chunk should have been fetched, not the first.
+    assert pipeline.fetched == [item.chunks[1].id]
+
+
+@pytest.mark.parametrize("st_is_none", [True, False])
+def test_compare_and_extract_chunks_skips_non_regular(extractor, tmpdir, st_is_none):
+    objects = {}
+    item = make_item(extractor.key, objects, b"11112222")
+    extractor.pipeline = FetchManyPipeline(objects)
+    if st_is_none:
+        st = None
+    else:
+        st = os.stat(str(tmpdir))  # a directory, not a regular file
+    assert extractor.compare_and_extract_chunks(item, str(tmpdir.join("test")), st=st) is False
+
+
+def test_compare_and_extract_chunks_size_inconsistency(extractor, tmpdir):
+    # if the archived item.size does not match the size implied by its chunks, we must raise
+    # rather than silently produce a wrong file (parity with the normal extraction path).
+    objects = {}
+    item = make_item(extractor.key, objects, b"11112222")
+    item.size = 9999  # deliberately wrong (the chunks add up to 8 bytes)
+    extractor.pipeline = FetchManyPipeline(objects)
+    extractor.clear_attrs = Mock()
+    extractor.restore_attrs = Mock()
+    path = str(tmpdir.join("test"))
+    with open(path, "wb") as f:
+        f.write(b"1111XXXX")
+    with pytest.raises(BackupError):
+        extractor.compare_and_extract_chunks(item, path, st=os.stat(path))
+
+
+def test_will_patch_in_place(extractor, tmpdir):
+    objects = {}
+
+    # no file at the destination yet -> normal extraction
+    item = make_item(extractor.key, objects, b"11112222")  # item.path == "test", regular file
+    assert extractor.will_patch_in_place(item) is False
+
+    # an existing regular file at the destination -> patch in place
+    with open(str(tmpdir.join("test")), "wb") as f:
+        f.write(b"11112222")
+    assert extractor.will_patch_in_place(item) is True
+
+    # a hard-linked archive item is never patched in place (even if the file exists)
+    hl_item = make_item(extractor.key, objects, b"11112222")
+    hl_item.hlid = b"\x00" * 32
+    assert extractor.will_patch_in_place(hl_item) is False
+
+    # a non-regular archive item (e.g. a directory) is never patched in place
+    dir_item = make_item(extractor.key, objects, b"11112222")
+    dir_item.mode = stat.S_IFDIR | 0o755
+    assert extractor.will_patch_in_place(dir_item) is False
+
+
+def test_compare_and_extract_chunks_skips_hardlinks(extractor, tmpdir):
+    objects = {}
+    item = make_item(extractor.key, objects, b"11112222")
+    item.hlid = b"\x00" * 32  # a hard link must use the normal (preloaded) extraction path
+    path = str(tmpdir.join("test"))
+    with open(path, "wb") as f:
+        f.write(b"11112222")
+    assert extractor.compare_and_extract_chunks(item, path, st=os.stat(path)) is False
+
+
+def test_compare_and_extract_chunks_skips_hardlinked_file(extractor, tmpdir):
+    # a destination file with other hard links (st_nlink > 1) must not be patched in place,
+    # as that would change the content seen through those other links.
+    # We synthesize st_nlink=2 instead of calling os.link(), because whether a hard link
+    # actually bumps st_nlink (or is supported at all) depends on the filesystem.
+    objects = {}
+    item = make_item(extractor.key, objects, b"11112222")
+    extractor.pipeline = FetchManyPipeline(objects)
+    path = str(tmpdir.join("test"))
+    with open(path, "wb") as f:
+        f.write(b"11112222")
+    fields = list(os.stat(path))  # the 10 standard stat fields
+    fields[3] = 2  # st_nlink
+    st = os.stat_result(fields)
+    assert extractor.compare_and_extract_chunks(item, path, st=st) is False
+
+
+def test_compare_and_extract_chunks_skips_file_with_extended_acl(extractor, tmpdir):
+    # a file carrying an extended ACL must not be patched in place, because clear_attrs() does
+    # not reset ACLs; such files fall back to normal extraction (fresh inode, clean metadata).
+    objects = {}
+    item = make_item(extractor.key, objects, b"11112222")
+    extractor.pipeline = FetchManyPipeline(objects)
+    extractor._fs_has_extended_acl = Mock(return_value=True)
+    path = str(tmpdir.join("test"))
+    with open(path, "wb") as f:
+        f.write(b"11112222")
+    assert extractor.compare_and_extract_chunks(item, path, st=os.stat(path)) is False
+
+
+@pytest.mark.skipif(is_win32, reason="xattrs/clear_attrs are POSIX-only")
+def test_compare_and_extract_chunks_clears_stale_xattr(extractor, tmpdir):
+    from .. import xattr as xattr_mod
+
+    path = str(tmpdir.join("test")).encode()
+    with open(path, "wb") as f:
+        f.write(b"oldcontent")
+    if not xattr_mod.is_enabled(str(tmpdir)):
+        pytest.skip("xattrs not supported on this filesystem")
+    xattr_mod.set_all(path, {b"user.stale": b"1"})
+
+    objects = {}
+    item = make_item(extractor.key, objects, b"11112222")
+    extractor.pipeline = FetchManyPipeline(objects)
+    extractor.restore_attrs = Mock()  # real clear_attrs, but skip restoring archived attrs
+
+    assert extractor.compare_and_extract_chunks(item, path.decode(), st=os.stat(path))
+    # the stale xattr that was not part of the archive item must be gone.
+    assert b"user.stale" not in xattr_mod.get_all(path)

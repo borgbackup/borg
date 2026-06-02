@@ -74,7 +74,14 @@ def compat_check(*, create, manifest, key, cache, compatibility, decorator_name)
 
 
 def with_repository(
-    create=False, lock=True, exclusive=False, manifest=True, cache=False, secure=True, compatibility=None
+    create=False,
+    lock=True,
+    exclusive=False,
+    manifest=True,
+    cache=False,
+    secure=True,
+    compatibility=None,
+    allow_v1=False,
 ):
     """
     Method decorator for subcommand-handling methods: do_XYZ(self, args, repository, …)
@@ -88,6 +95,7 @@ def with_repository(
     :param secure: do assert_secure after loading manifest
     :param compatibility: mandatory if not create and (manifest or cache), specifies mandatory
            feature categories to check
+    :param allow_v1: (bool) allow legacy Borg 1.x repositories
     """
     # Note: with_repository decorator does not have a "key" argument (yet?)
     compatibility = compat_check(
@@ -116,6 +124,8 @@ def with_repository(
             assert isinstance(exclusive, bool)
             lock = getattr(args, "lock", _lock)
 
+            v1_legacy = getattr(args, "v1_legacy", False) if allow_v1 else False
+
             repository = get_repository(
                 location,
                 create=create,
@@ -123,18 +133,25 @@ def with_repository(
                 lock_wait=self.lock_wait,
                 lock=lock,
                 args=args,
-                v1_legacy=False,
+                v1_legacy=v1_legacy,
             )
 
             with repository:
-                if repository.version not in (4,):
+                acceptable_versions = (1,) if v1_legacy else (4,)
+                if repository.version not in acceptable_versions:
                     raise Error(
-                        f"This borg version only accepts version 4 repos for -r/--repo, "
-                        f"but not version {repository.version}. "
+                        f"This borg version only accepts version {' or '.join(str(v) for v in acceptable_versions)} "
+                        f"repos for -r/--repo, but not version {repository.version}. "
                         f"You can use 'borg transfer' to copy archives from old to new repos."
                     )
                 if manifest or cache:
-                    manifest_ = Manifest.load(repository, compatibility, other=False)
+                    if repository.version > 1:
+                        ro_cls = RepoObj
+                    else:
+                        from ..legacy.repoobj import RepoObj1
+
+                        ro_cls = RepoObj1
+                    manifest_ = Manifest.load(repository, compatibility, other=False, ro_cls=ro_cls)
                     kwargs["manifest"] = manifest_
                     if "compression" in args:
                         manifest_.repo_objs.compressor = args.compression.compressor

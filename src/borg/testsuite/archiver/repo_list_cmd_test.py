@@ -1,6 +1,8 @@
 import json
 import os
 
+import pytest
+
 from ...constants import *  # NOQA
 from . import cmd, checkts, create_regular_file, generate_archiver_tests, RK_ENCRYPTION
 from .prune_cmd_test import _create_archive_ts
@@ -169,3 +171,29 @@ def test_repo_list_deleted(archivers, request, backup_files):
     assert "normal2" not in output
     assert "deleted1" in output
     assert "deleted2" in output
+
+
+def test_repo_list_from_borg1(archivers, request, monkeypatch):
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() in ["remote", "binary"]:
+        pytest.skip("only works locally")
+
+    import tarfile
+
+    repo12_tar = os.path.join(os.path.dirname(__file__), "repo12.tar.gz")
+    original_location = archiver.repository_location
+    extract_dir = f"{original_location}1"
+    os.makedirs(extract_dir)
+    with tarfile.open(repo12_tar) as tf:
+        tf.extractall(extract_dir)
+
+    monkeypatch.setenv("BORG_PASSPHRASE", "waytooeasyonlyfortests")
+    monkeypatch.setenv("BORG_TESTONLY_WEAKEN_KDF", "0")
+
+    # Set repository location to the extracted Borg 1.x repository
+    archiver.repository_location = extract_dir
+    archiver.repository_path = extract_dir
+
+    output = cmd(archiver, "repo-list", "--from-borg1")
+    assert "archive1" in output
+    assert "archive2" in output

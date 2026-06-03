@@ -244,14 +244,27 @@ class Archiver(
             self.define_common_options(add_argument)
 
     def build_parser(self):
-        from ._common import define_common_options
+        from ._common import define_common_options, process_epilog
 
+        additional_help = process_epilog(
+            """
+        Description of additional help topics:
+
+        Use ``borg help <topic>`` to get help on:
+
+          patterns            selection patterns for including/excluding paths
+          match-archives      selection patterns for matching archives
+          placeholders        placeholders in repository URLs, archive names, etc.
+          compression         options and specifications for data compression
+        """
+        )
         parser = ArgumentParser(
             prog=self.prog,
             description="Borg - Deduplicated Backups",
             default_config_files=[os.path.join(get_config_dir(), "default.yaml")],
             default_env=True,
             env_prefix="BORG",
+            epilog=additional_help,
         )
         parser.add_argument("--config", action="config")
         # paths and patterns must have an empty list as default everywhere

@@ -35,7 +35,7 @@ class ArchiveGarbageCollector:
     def repository_size(self):
         if self.chunks is None or not self.stats:
             return None
-        return sum(entry.size for id, entry in self.chunks.iteritems())  # sum of stored sizes
+        return sum(entry.obj_size for id, entry in self.chunks.iteritems())  # sum of stored sizes
 
     def garbage_collect(self):
         """Removes unused chunks from a repository."""
@@ -53,12 +53,14 @@ class ArchiveGarbageCollector:
         if self.stats:  # slow method: build a fresh chunks index, with stored chunk sizes.
             logger.info("Getting object IDs present in the repository...")
             chunks = ChunkIndex()
-            for id, stored_size in repo_lister(self.repository, limit=LIST_SCAN_LIMIT):
+            for pack_id, pack_size in repo_lister(self.repository, limit=LIST_SCAN_LIMIT):
                 # we add this id to the chunks index (as unused chunk), because
                 # we do not know yet whether it is actually referenced from some archives.
-                # we "abuse" the size field here. usually there is the plaintext size,
-                # but we use it for the size of the stored object here.
-                chunks[id] = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=stored_size)
+                chunk_id = pack_id  # N=1: chunk_id == pack_id
+                obj_size = pack_size  # true for N=1
+                chunks[chunk_id] = ChunkIndexEntry(
+                    flags=ChunkIndex.F_NONE, size=0, pack_id=pack_id, obj_offset=0, obj_size=obj_size
+                )
         else:  # faster: rely on existing chunks index (with flags F_NONE and size 0).
             logger.info("Getting object IDs from cached chunks index...")
             chunks = build_chunkindex_from_repo(self.repository, cache_immediately=True)

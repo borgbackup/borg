@@ -6,9 +6,12 @@ class HTProxyMixin(MutableMapping): ...
 
 class ChunkIndexEntry(NamedTuple):
     flags: int
-    size: int
+    size: int  # plaintext chunk size
+    pack_id: bytes
+    obj_offset: int
+    obj_size: int
 
-CIE = Tuple[int, int] | Type[ChunkIndexEntry]
+CIE = Tuple[int, int, bytes, int, int] | Type[ChunkIndexEntry]
 
 class ChunkIndex:
     F_NONE: int

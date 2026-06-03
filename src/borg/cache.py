@@ -544,8 +544,7 @@ CHUNKINDEX_HASH_SEED = b"0001"  # increment seed to invalidate old chunk indexes
 def write_chunkindex_to_repo_cache(
     repository, chunks, *, incremental=True, clear=False, force_write=False, delete_other=False, delete_these=None
 ):
-    # for now, we don't want to serialize the flags or the size, just the keys (chunk IDs):
-    cleaned_value = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=0)
+    # for now, we don't want to serialize the flags or the size:
     chunks_to_write = ChunkIndex()
     # incremental==True:
     # the borghash code has no means to only serialize the F_NEW table entries,
@@ -553,8 +552,8 @@ def write_chunkindex_to_repo_cache(
     # incremental==False:
     # maybe copying the stuff into a new ChunkIndex is not needed here,
     # but for simplicity, we do it anyway.
-    for key, _ in chunks.iteritems(only_new=incremental):
-        chunks_to_write[key] = cleaned_value
+    for key, existing in chunks.iteritems(only_new=incremental):
+        chunks_to_write[key] = existing._replace(flags=ChunkIndex.F_NONE, size=0)
     with io.BytesIO() as f:
         chunks_to_write.write(f)
         data = f.getvalue()
@@ -644,10 +643,13 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
     num_chunks = 0
     # The repo says it has these chunks, so we assume they are referenced/used chunks.
     # We do not know the plaintext size (!= stored_size), thus we set size = 0.
-    init_entry = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0)
-    for id, stored_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
+    for pack_id, pack_size in repo_lister(repository, limit=LIST_SCAN_LIMIT):
         num_chunks += 1
-        chunks[id] = init_entry
+        chunk_id = pack_id  # N=1: chunk_id == pack_id
+        obj_size = pack_size  # true for N=1
+        chunks[chunk_id] = ChunkIndexEntry(
+            flags=ChunkIndex.F_USED, size=0, pack_id=pack_id, obj_offset=0, obj_size=obj_size
+        )
     # Cache does not contain the manifest.
     if not isinstance(repository, (Repository, RemoteRepository)):
         del chunks[Manifest.MANIFEST_ID]

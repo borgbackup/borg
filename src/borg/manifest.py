@@ -448,9 +448,10 @@ class Manifest:
 
     def __init__(self, key, repository, item_keys=None, ro_cls=RepoObj):
         from .legacy.repository import LegacyRepository
+        from .legacy.remote import LegacyRemoteRepository
         from .legacy.archives import LegacyArchives
 
-        if isinstance(repository, LegacyRepository):
+        if isinstance(repository, (LegacyRepository, LegacyRemoteRepository)):
             self.archives: ArchivesInterface = LegacyArchives(repository, self)
         else:
             self.archives: ArchivesInterface = Archives(repository, self)

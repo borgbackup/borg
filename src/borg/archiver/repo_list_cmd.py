@@ -14,7 +14,7 @@ logger = create_logger()
 
 
 class RepoListMixIn:
-    @with_repository(compatibility=(Manifest.Operation.READ,))
+    @with_repository(compatibility=(Manifest.Operation.READ,), allow_v1=True)
     def do_repo_list(self, args, repository, manifest):
         """List the archives contained in a repository."""
         if args.format is not None:
@@ -91,6 +91,7 @@ class RepoListMixIn:
         subparser.add_argument(
             "--short", dest="short", action="store_true", help="only print the archive IDs, nothing else"
         )
+        subparser.add_argument("--from-borg1", dest="v1_legacy", action="store_true", help="repository is Borg 1.x")
         subparser.add_argument(
             "--format",
             metavar="FORMAT",

@@ -34,14 +34,14 @@ class HTProxyMixin:
         self.ht.clear()
 
 
-ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'flags size')
-ChunkIndexEntryFormatT = namedtuple('ChunkIndexEntryFormatT', 'flags size')
-ChunkIndexEntryFormat = ChunkIndexEntryFormatT(flags="I", size="I")
+ChunkIndexEntry = namedtuple('ChunkIndexEntry', 'flags size pack_id obj_offset obj_size')
+ChunkIndexEntryFormatT = namedtuple('ChunkIndexEntryFormatT', 'flags size pack_id obj_offset obj_size')
+ChunkIndexEntryFormat = ChunkIndexEntryFormatT(flags="I", size="I", pack_id="32s", obj_offset="I", obj_size="I")
 
 
 class ChunkIndex(HTProxyMixin, MutableMapping):
     """
-    Mapping from key256 to (flags32, size32) to track chunks in the repository.
+    Mapping from key256 to (flags32, size32, pack_id256, obj_offset32, obj_size32) to track chunks in the repository.
     """
     # .flags related values:
     F_NONE = 0  # all flags cleared
@@ -79,7 +79,8 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         else:
             flags = v.flags | self.F_USED
             assert v.size == 0 or v.size == size
-        self[key] = ChunkIndexEntry(flags=flags, size=size)
+        pack_id = key  # N=1: chunk_id == pack_id
+        self[key] = ChunkIndexEntry(flags=flags, size=size, pack_id=pack_id, obj_offset=0, obj_size=0)
 
     def __getitem__(self, key):
         """Specialized __getitem__ that hides system flags."""

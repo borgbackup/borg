@@ -20,11 +20,11 @@ def test_chunkindex_add():
     chunks = ChunkIndex()
     x = H2(1)
     chunks.add(x, 0)
-    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0)
+    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0, pack_id=x, obj_offset=0, obj_size=0)
     chunks.add(x, 2)  # updating size (we do not have a size yet)
-    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=2)
+    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=2, pack_id=x, obj_offset=0, obj_size=0)
     chunks.add(x, 2)
-    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=2)
+    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=2, pack_id=x, obj_offset=0, obj_size=0)
     with pytest.raises(AssertionError):
         chunks.add(x, 3)  # inconsistent size (we already have a different size)
 
@@ -35,7 +35,7 @@ def test_keyerror():
     with pytest.raises(KeyError):
         chunks[x]
     with pytest.raises(struct.error):
-        chunks[x] = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=2**33)
+        chunks[x] = ChunkIndexEntry(flags=ChunkIndex.F_NONE, size=2**33, pack_id=x, obj_offset=0, obj_size=0)
 
 
 def test_new():
@@ -43,8 +43,10 @@ def test_new():
         return list(chunks.iteritems(only_new=True))
 
     chunks = ChunkIndex()
-    key1, value1a = H2(1), ChunkIndexEntry(flags=ChunkIndex.F_USED, size=23)
-    key2, value2a = H2(2), ChunkIndexEntry(flags=ChunkIndex.F_USED, size=42)
+    key1 = H2(1)
+    value1a = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=23, pack_id=key1, obj_offset=0, obj_size=0)
+    key2 = H2(2)
+    value2a = ChunkIndexEntry(flags=ChunkIndex.F_USED, size=42, pack_id=key2, obj_offset=0, obj_size=0)
     # Tracking of new entries
     assert new_chunks() == []
     chunks[key1] = value1a

@@ -60,13 +60,14 @@ class FileHashingWrapper(FileLikeWrapper):
     ALGORITHM: str = None
     FACTORY: Callable = None
 
-    def __init__(self, backing_fd, write):
+    def __init__(self, backing_fd, write, *, pure_hash: bool = False):
         super().__init__(backing_fd)
         self.writing = write
         self.hash = self.FACTORY()
+        self.pure_hash = pure_hash  # if True, we don't hash the length of the file
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None:
+        if exc_type is None and not self.pure_hash:
             self.hash_length()
         super().__exit__(exc_type, exc_val, exc_tb)
 

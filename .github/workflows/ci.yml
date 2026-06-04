@@ -299,8 +299,7 @@ jobs:
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
       run: |
         pip install -r requirements.d/pyinstaller.txt
-        mkdir -p dist/binary
-        pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
+        ./scripts/build-borg-using-pyinstaller.sh
 
     - name: Smoke-test the built binary (${{ matrix.binary }})
       if: ${{ matrix.binary && startsWith(github.ref, 'refs/tags/') }}
@@ -471,8 +470,7 @@ jobs:
 
                 if [[ "${{ matrix.do_binaries }}" == "true" && "${{ startsWith(github.ref, 'refs/tags/') }}" == "true" ]]; then
                   python -m pip install -r requirements.d/pyinstaller.txt
-                  mkdir -p dist/binary
-                  pyinstaller --clean --distpath=dist/binary scripts/borg.exe.spec
+                  ./scripts/build-borg-using-pyinstaller.sh
                   pushd dist/binary
                   echo "single-file binary"
                   chmod +x borg.exe
@@ -665,8 +663,7 @@ jobs:
           # build borg.exe
           . env/bin/activate
           pip install -e ".[cockpit,s3,sftp,rclone]"
-          mkdir -p dist/binary
-          pyinstaller -y --clean --distpath=dist/binary scripts/borg.exe.spec
+          ./scripts/build-borg-using-pyinstaller.sh
           # build sdist and wheel in dist/...
           python -m build
 

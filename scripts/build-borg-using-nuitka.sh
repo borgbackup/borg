@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-OUTPUT_DIR="build"
+OUTPUT_DIR="dist/binary"
 OUTPUT_FILENAME="borg-nuitka.exe"  # .exe does NOT mean windows here
 SRC_DIR="src/borg"
 
@@ -13,6 +13,7 @@ echo "Building single-file binary of borgbackup..."
 # We use --assume-yes-for-downloads to avoid interactive prompts in automated runs.
 # We set PYTHONPATH=src to ensure the local version of borg is used.
 # We include cffi to avoid runtime ModuleNotFoundError in argon2-cffi.
+mkdir -p $OUTPUT_DIR
 PYTHONPATH=src python -m nuitka \
     --mode=onefile \
     --assume-yes-for-downloads \

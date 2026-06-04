@@ -36,3 +36,9 @@ def test_undefined_ref():
     with pytest.raises(ValueError) as exc_info:
         rst_to_text("See :ref:`foo`.")
     assert "Undefined reference" in str(exc_info.value)
+
+
+def test_code_block_end_of_string():
+    # check that there is no unexpected exception if a code block
+    # is not followed by blank lines, but the string just ends.
+    assert rst_to_text("This is a code block::\n\n    borg --help") == "This is a code block:\n\n    borg --help"

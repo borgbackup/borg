@@ -2,7 +2,7 @@ import pytest
 
 from ...constants import *  # NOQA
 from ...helpers.nanorst import RstToTextLazy, rst_to_terminal
-from . import Archiver, cmd
+from . import Archiver, cmd, exec_cmd
 
 
 def get_all_parsers():
@@ -14,7 +14,9 @@ def get_all_parsers():
     def discover_level(prefix, parser, Archiver, extra_choices=None):
         choices = {}
         for action in parser._actions:
-            if action.choices is not None and "SubParsersAction" in str(action.__class__):
+            if action.choices is not None and (
+                "SubParsersAction" in str(action.__class__) or "ActionSubCommands" in str(action.__class__)
+            ):
                 for command, parser in action.choices.items():
                     choices[prefix + command] = parser
         if extra_choices is not None:
@@ -62,3 +64,15 @@ def test_main_help_epilog(archiver):
     assert "match-archives" in help_output
     assert "placeholders" in help_output
     assert "compression" in help_output
+
+
+@pytest.mark.parametrize("command", list(get_all_parsers().keys()))
+def test_commands_help_invocation(archiver, command):
+    if command == "borgfs":
+        ret, output = exec_cmd("--help", archiver=Archiver(prog="borgfs"), fork=False)
+        assert ret == 0
+    else:
+        args = command.split()
+        output = cmd(archiver, *args, "--help", exit_code=0)
+    assert "usage:" in output
+    assert "Traceback (most recent call last):" not in output

@@ -1,6 +1,10 @@
+import hashlib
+import io
+
 import pytest
 
 from ...crypto.file_integrity import DetachedIntegrityCheckedFile, FileIntegrityError, IntegrityCheckedFile
+from ...crypto.file_integrity import SHA256FileHashingWrapper
 from ...platform import SyncFile
 
 
@@ -147,3 +151,29 @@ class TestIntegrityCheckedFileWithSyncFile:
         # verify the written data can be read back with integrity check
         with IntegrityCheckedFile(path=path, write=False, integrity_data=integrity_data) as fd:
             assert fd.read() == b"test data for integrity check"
+
+
+class TestSHA256FileHashingWrapper:
+    def test_pure_hash_write(self):
+        bio = io.BytesIO()
+        data = b"hello world"
+        with SHA256FileHashingWrapper(bio, write=True, pure_hash=True) as wrapper:
+            wrapper.write(data)
+            assert bio.getvalue() == data
+        assert wrapper.hexdigest() == hashlib.sha256(data).hexdigest()
+
+    def test_pure_hash_read(self):
+        data = b"hello world"
+        bio = io.BytesIO(data)
+        with SHA256FileHashingWrapper(bio, write=False, pure_hash=True) as wrapper:
+            assert wrapper.read() == data
+        assert wrapper.hexdigest() == hashlib.sha256(data).hexdigest()
+
+    def test_impure_hash_write(self):
+        bio = io.BytesIO()
+        data = b"hello world"
+        with SHA256FileHashingWrapper(bio, write=True, pure_hash=False) as wrapper:
+            wrapper.write(data)
+        # pure_hash=False appends the file length ("11" in this case) at exit
+        expected_hash = hashlib.sha256(data + b"11").hexdigest()
+        assert wrapper.hexdigest() == expected_hash

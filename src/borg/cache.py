@@ -730,9 +730,13 @@ class ChunksMixin:
         cdata = self.repo_objs.format(
             id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
         )
-        self.repository.put(id, cdata, wait=wait)
+        pack_results = self.repository.put(id, cdata, wait=wait)
         self.last_refresh_dt = now  # .put also refreshed the lock
         self.chunks.add(id, size)
+        # pack_results is non-empty when the PackWriter flushed (always at max_count=1).
+        # Update the index with real pack location so obj_size is not UNKNOWN_INT32.
+        for chunk_id, pack_id, obj_offset, obj_size in pack_results:
+            self.chunks.update_pack_info(chunk_id, pack_id, obj_offset, obj_size)
         stats.update(size, not exists)
         return ChunkListEntry(id, size)
 

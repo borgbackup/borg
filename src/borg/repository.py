@@ -99,6 +99,71 @@ def build_rest_backend(location):
     return REST(base_url="http://stdio-backend", command=rest_serve_command(location))
 
 
+class PackWriter:
+    """Buffers chunks into a pack file and writes to the store when full.
+
+    Collects (chunk_id, cdata) pairs in a list and flushes once max_count is
+    reached.  On flush it returns the location info for every chunk so the
+    caller can update the ChunkIndex with real values.
+
+    At max_count=1 (N=1 phase) each put() maps exactly one chunk to one pack,
+    so pack_id == chunk_id and the naming scheme is unchanged from before.
+    Raising max_count later (N>1 phase) enables real packing without touching
+    this class's interface.
+    """
+
+    def __init__(self, store, *, max_count=1):
+        self.store = store
+        self.max_count = max_count
+        self._pieces = []  # list of (chunk_id, cdata)
+
+    def add(self, chunk_id, cdata):
+        """Buffer a chunk.  Returns flush results if the pack is now full, else []."""
+        self._pieces.append((chunk_id, cdata))
+        if len(self._pieces) >= self.max_count:
+            return self.flush()
+        return []
+
+    def flush(self):
+        """Write the current pack to the store.
+
+        Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples —
+        one entry per chunk that was written.  Returns [] if there was nothing
+        to flush.
+        """
+        if not self._pieces:
+            return []
+
+        # Build the pack bytes once by joining all pieces (avoids O(n^2) copies
+        # that incremental string concatenation would cause in Python).
+        pack_data = b"".join(cdata for _, cdata in self._pieces)
+
+        # Determine pack_id.
+        # N=1: the pack contains exactly one chunk, so we keep pack_id == chunk_id
+        #      (backward-compatible file naming: packs/{chunk_id_hex}).
+        # N>1: the pack contains multiple chunks; use SHA256(pack_bytes) so the
+        #      file is content-addressed and borgstore can verify/cache it.
+        if len(self._pieces) == 1:
+            pack_id = self._pieces[0][0]  # N=1: pack_id == chunk_id
+        else:
+            pack_id = sha256(pack_data).digest()  # N>1: content-addressed
+
+        # Record (chunk_id, pack_id, obj_offset, obj_size) for every piece.
+        results = []
+        offset = 0
+        for chunk_id, cdata in self._pieces:
+            obj_size = len(cdata)
+            results.append((chunk_id, pack_id, offset, obj_size))
+            offset += obj_size
+
+        key = "packs/" + bin_to_hex(pack_id)
+        try:
+            self.store.store(key, pack_data)
+        finally:
+            self._pieces = []  # reset even on failure to prevent re-bundling a failed chunk
+        return results
+
+
 class Repository:
     """borgstore-based key/value store."""
 
@@ -219,6 +284,7 @@ class Repository:
         self.do_lock = lock
         self.lock_wait = lock_wait
         self.exclusive = exclusive
+        self._pack_writer = None
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self._location}>"
@@ -340,6 +406,7 @@ class Repository:
         # important: lock *after* making sure that there actually is an existing, supported repository.
         if lock:
             self.lock = Lock(self.store, exclusive, timeout=lock_wait).acquire()
+        self._pack_writer = PackWriter(self.store, max_count=1)
         self.opened = True
 
     def close(self):
@@ -564,15 +631,17 @@ class Repository:
 
         Note: when doing calls with wait=False this gets async and caller must
               deal with async results / exceptions later.
+
+        Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples for
+        every chunk written to disk this call.  At max_count=1 this is always
+        one entry.  Callers should pass these to ChunkIndex.update_pack_info()
+        so the index holds real location values rather than UNKNOWN_INT32 placeholders.
         """
         self._lock_refresh()
         data_size = len(data)
         if data_size > MAX_DATA_SIZE:
             raise IntegrityError(f"More than allowed put data [{data_size} > {MAX_DATA_SIZE}]")
-
-        pack_id = id  # N=1: pack_id == chunk_id
-        key = "packs/" + bin_to_hex(pack_id)
-        self.store.store(key, data)
+        return self._pack_writer.add(id, data)
 
     def delete(self, id, wait=True):
         """delete a repo object

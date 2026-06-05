@@ -3,6 +3,7 @@ import struct
 
 import pytest
 
+from ..constants import UNKNOWN_INT32
 from ..hashindex import ChunkIndex, ChunkIndexEntry
 
 
@@ -20,11 +21,17 @@ def test_chunkindex_add():
     chunks = ChunkIndex()
     x = H2(1)
     chunks.add(x, 0)
-    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=0, pack_id=x, obj_offset=0, obj_size=0)
+    assert chunks[x] == ChunkIndexEntry(
+        flags=ChunkIndex.F_USED, size=0, pack_id=x, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
+    )
     chunks.add(x, 2)  # updating size (we do not have a size yet)
-    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=2, pack_id=x, obj_offset=0, obj_size=0)
+    assert chunks[x] == ChunkIndexEntry(
+        flags=ChunkIndex.F_USED, size=2, pack_id=x, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
+    )
     chunks.add(x, 2)
-    assert chunks[x] == ChunkIndexEntry(flags=ChunkIndex.F_USED, size=2, pack_id=x, obj_offset=0, obj_size=0)
+    assert chunks[x] == ChunkIndexEntry(
+        flags=ChunkIndex.F_USED, size=2, pack_id=x, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
+    )
     with pytest.raises(AssertionError):
         chunks.add(x, 3)  # inconsistent size (we already have a different size)
 

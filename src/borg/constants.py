@@ -51,6 +51,10 @@ ROBJ_DONTCARE = "*"  # used to parse without type assertion (= accept any type)
 # the header, and the total size was set to precisely 20 MiB for borg < 1.3).
 MAX_DATA_SIZE = 20971479
 
+# Placeholder for pack location fields (obj_offset, obj_size) when the value is not yet known.
+# Grep for UNKNOWN_INT32 to find every site that still needs updating.
+UNKNOWN_INT32 = 0xFFFFFFFF
+
 # MAX_OBJECT_SIZE = MAX_DATA_SIZE + len(PUT header)
 MAX_OBJECT_SIZE = MAX_DATA_SIZE + 41  # see assertion at end of repository module
 

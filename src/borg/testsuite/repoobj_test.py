@@ -107,6 +107,38 @@ def test_borg1_borg2_transition(key):
     assert meta2["size"] == len_data
 
 
+def test_malformed_object_too_short(key):
+    # a malformed / truncated object (e.g. from a corrupted or malicious repo) must be
+    # rejected with a clean IntegrityError, not an uncaught struct.error / IndexError.
+    repo_objs = RepoObj(key)
+    id = repo_objs.id_hash(b"x")
+    hdr_size = RepoObj.obj_header.size
+    for blob in [b"", b"BORG_OBJ", b"\x00" * (hdr_size - 1)]:
+        with pytest.raises(IntegrityError):
+            RepoObj.extract_crypted_data(blob)
+        with pytest.raises(IntegrityError):
+            repo_objs.parse_meta(id, blob, ro_type=ROBJ_FILE_STREAM)
+        with pytest.raises(IntegrityError):
+            repo_objs.parse(id, blob, ro_type=ROBJ_FILE_STREAM)
+
+
+def test_malformed_object_inconsistent_sizes(key):
+    # a valid-looking header that claims more meta/data than the object actually contains
+    # must be rejected cleanly with IntegrityError.
+    from ..repoobj import OBJ_MAGIC, OBJ_VERSION
+
+    repo_objs = RepoObj(key)
+    id = repo_objs.id_hash(b"x")
+    # huge meta_size, but no actual meta/data bytes follow the header
+    hdr = RepoObj.obj_header.pack(OBJ_MAGIC, OBJ_VERSION, id, 0xFFFFFFFF, 0)
+    with pytest.raises(IntegrityError):
+        RepoObj.extract_crypted_data(hdr)
+    with pytest.raises(IntegrityError):
+        repo_objs.parse_meta(id, hdr, ro_type=ROBJ_FILE_STREAM)
+    with pytest.raises(IntegrityError):
+        repo_objs.parse(id, hdr, ro_type=ROBJ_FILE_STREAM)
+
+
 def test_spoof_manifest(key):
     repo_objs = RepoObj(key)
     data = b"fake or malicious manifest data"  # File content could be provided by an attacker.

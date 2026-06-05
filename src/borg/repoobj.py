@@ -26,12 +26,17 @@ class RepoObj:
     def extract_crypted_data(cls, data: bytes) -> bytes:
         # used for crypto type detection
         hdr_size = cls.obj_header.size
+        if len(data) < hdr_size:
+            raise IntegrityError(f"object too small: expected at least {hdr_size} header bytes, got {len(data)}")
         hdr = cls.ObjHeader(*cls.obj_header.unpack(data[:hdr_size]))
         if hdr.magic != OBJ_MAGIC:
             raise IntegrityError("invalid object magic")
         if hdr.version != OBJ_VERSION:
             raise IntegrityError(f"unsupported object version: {hdr.version}")
-        return data[hdr_size + hdr.meta_size :]
+        overall_expected_size = hdr_size + hdr.meta_size + hdr.data_size
+        if overall_expected_size != len(data):
+            raise IntegrityError(f"object size inconsistent: expected {overall_expected_size} bytes, got {len(data)}")
+        return data[hdr_size + hdr.meta_size :]  # crypted data
 
     def __init__(self, key):
         self.key = key
@@ -87,12 +92,17 @@ class RepoObj:
         assert isinstance(ro_type, str)
         obj = memoryview(cdata)
         hdr_size = self.obj_header.size
+        if len(obj) < hdr_size:
+            raise IntegrityError(f"object too small: expected at least {hdr_size} header bytes, got {len(obj)}")
         hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
         if hdr.magic != OBJ_MAGIC:
             raise IntegrityError("invalid object magic")
         if hdr.version != OBJ_VERSION:
             raise IntegrityError(f"unsupported object version: {hdr.version}")
-        assert hdr_size + hdr.meta_size <= len(obj)
+        if hdr_size + hdr.meta_size > len(obj):
+            raise IntegrityError(
+                f"object too small: expected at least {hdr_size + hdr.meta_size} bytes, got {len(obj)}"
+            )
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta = msgpack.unpackb(meta_packed)
@@ -119,18 +129,21 @@ class RepoObj:
         assert isinstance(cdata, bytes)
         obj = memoryview(cdata)
         hdr_size = self.obj_header.size
+        if len(obj) < hdr_size:
+            raise IntegrityError(f"object too small: expected at least {hdr_size} header bytes, got {len(obj)}")
         hdr = self.ObjHeader(*self.obj_header.unpack(obj[:hdr_size]))
         if hdr.magic != OBJ_MAGIC:
             raise IntegrityError("invalid object magic")
         if hdr.version != OBJ_VERSION:
             raise IntegrityError(f"unsupported object version: {hdr.version}")
-        assert hdr_size + hdr.meta_size <= len(obj)
+        overall_expected_size = hdr_size + hdr.meta_size + hdr.data_size
+        if overall_expected_size != len(obj):
+            raise IntegrityError(f"object size inconsistent: expected {overall_expected_size} bytes, got {len(obj)}")
         meta_encrypted = obj[hdr_size : hdr_size + hdr.meta_size]
         meta_packed = self.key.decrypt(id, meta_encrypted)
         meta_compressed = msgpack.unpackb(meta_packed)  # means: before adding more metadata in decompress block
         if ro_type != ROBJ_DONTCARE and meta_compressed["type"] != ro_type:
             raise IntegrityError(f"ro_type expected: {ro_type} got: {meta_compressed['type']}")
-        assert hdr_size + hdr.meta_size + hdr.data_size <= len(obj)
         data_encrypted = obj[hdr_size + hdr.meta_size : hdr_size + hdr.meta_size + hdr.data_size]
         data_compressed = self.key.decrypt(id, data_encrypted)  # does not include the type/level bytes
         if decompress:

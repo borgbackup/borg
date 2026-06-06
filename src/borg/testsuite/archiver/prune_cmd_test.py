@@ -14,10 +14,9 @@ from ...archiver.prune_cmd import (
     PRUNE_MONTHLY,
     PRUNE_SECONDLY,
     PRUNE_WEEKLY,
-    PRUNE_WITHIN,
     PRUNE_YEARLY,
 )
-from ...helpers import CommandError, interval
+from ...helpers import CommandError
 from ...manifest import ArchiveInfo
 from . import cmd, RK_ENCRYPTION, generate_archiver_tests
 
@@ -328,9 +327,9 @@ def test_prune_ignore_protected(archivers, request):
     cmd(archiver, "tag", "--set=@PROT", "archive1")  # do not delete archive1!
     cmd(archiver, "create", "archive2", archiver.input_path)
     cmd(archiver, "create", "archive3", archiver.input_path)
-    output = cmd(archiver, "prune", "--list", "--keep-last=1", "--match-archives=sh:archive*")
+    output = cmd(archiver, "prune", "--list", "--keep=1", "--match-archives=sh:archive*")
     assert "archive1" not in output  # @PROT archives are completely ignored.
-    assert re.search(r"Keeping archive \(rule: last #1\):\s+archive3", output)
+    assert re.search(r"Keeping archive \(rule: keep #1\):\s+archive3", output)
     assert re.search(r"Pruning archive \(.*?\):\s+archive2", output)
     output = cmd(archiver, "repo-list")
     assert "archive1" in output  # @PROT protected archive1 from deletion
@@ -347,39 +346,6 @@ def mock_archive(ts, id=None):
         id = mock_id
         mock_id += 1
     return ArchiveInfo(name="", id=id, ts=ts.replace(tzinfo=timezone.utc), tags=(), host="", user="")
-
-
-def test_prune_within():
-    test_deltas = [
-        timedelta(minutes=1),
-        timedelta(hours=1.5),
-        timedelta(hours=2.5),
-        timedelta(hours=3.5),
-        timedelta(hours=25),
-        timedelta(hours=49),
-    ]
-    now = datetime.now(timezone.utc)
-    test_dates = [now - d for d in test_deltas]
-    test_archives = [mock_archive(date) for date in test_dates]
-
-    def dotest(within, indices):
-        keep = prune(test_archives, PRUNE_WITHIN, interval(within), now, False)
-        assert set(keep) == {test_archives[i] for i in indices}
-        assert all(keep[a].rule.key == "within" for a in keep)
-
-    dotest("15S", [])
-    dotest("2M", [0])
-    dotest("1H", [0])
-    dotest("2H", [0, 1])
-    dotest("3H", [0, 1, 2])
-    dotest("24H", [0, 1, 2, 3])
-    dotest("26H", [0, 1, 2, 3, 4])
-    dotest("2d", [0, 1, 2, 3, 4])
-    dotest("50H", [0, 1, 2, 3, 4, 5])
-    dotest("3d", [0, 1, 2, 3, 4, 5])
-    dotest("1w", [0, 1, 2, 3, 4, 5])
-    dotest("1m", [0, 1, 2, 3, 4, 5])
-    dotest("1y", [0, 1, 2, 3, 4, 5])
 
 
 @pytest.mark.parametrize(
@@ -519,16 +485,16 @@ def test_prune_json_list_pruned(archivers, request, backup_files):
     assert archives[0]["deleted_archive_number"] == 1
 
 
-def test_prune_keep_last_same_second(archivers, request, backup_files):
+def test_prune_keep_same_second(archivers, request, backup_files):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test1", backup_files)
     cmd(archiver, "create", "test2", backup_files)
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep-last=2")
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--keep=2")
     # Both archives are kept even though they have the same timestamp to the second. Would previously have failed with
     # old behavior of --keep-last. Archives sorted on seconds, order is undefined.
-    assert re.search(r"Keeping archive \(rule: last #\d\):\s+test1", output)
-    assert re.search(r"Keeping archive \(rule: last #\d\):\s+test2", output)
+    assert re.search(r"Keeping archive \(rule: keep #\d\):\s+test1", output)
+    assert re.search(r"Keeping archive \(rule: keep #\d\):\s+test2", output)
 
 
 @pytest.mark.parametrize("keep_arg", ["--keep=2", "--keep=1S"])
@@ -734,37 +700,12 @@ def test_prune_no_args(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     output = _cmd_prune_error(archiver)
+
     assert re.search(r"At least one of the .* settings must be specified.", output)
     assert re.search(r"keep(?!-)", output)
-    flags = [
-        "last",
-        "within",
-        "secondly",
-        "minutely",
-        "hourly",
-        "daily",
-        "weekly",
-        "monthly",
-        "yearly",
-        "13weekly",
-        "3monthly",
-    ]
+    flags = ["secondly", "minutely", "hourly", "daily", "weekly", "monthly", "yearly", "13weekly", "3monthly"]
     for flag in flags:
         assert f"keep-{flag}" in output
-
-
-def test_prune_errors_on_keep_and_last(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    output = _cmd_prune_error(archiver, "--dry-run", "--keep-last=5", "--keep=3")
-    assert 'Only one of the "keep" and "last" settings may be specified.' in output
-
-
-def test_prune_errors_on_keep_and_within(archivers, request):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    output = _cmd_prune_error(archiver, "--dry-run", "--keep-within=7d", "--keep=3")
-    assert 'Only one of the "keep" and "within" settings may be specified.' in output
 
 
 @pytest.mark.parametrize("keep_arg,value", product([rule.key for rule in PRUNING_RULES], ["0", "0S"]))
@@ -783,7 +724,6 @@ def test_prune_all_zero_multiple_multiple(archivers, request):
 
     output = _cmd_prune_error(archiver, "--keep-secondly=0S", "--keep-daily=0")
     assert re.search(r"None of the .* settings have a positive value. At least one must be non-zero.", output)
-
 
 @pytest.mark.parametrize(
     "lo_val,hi_val",

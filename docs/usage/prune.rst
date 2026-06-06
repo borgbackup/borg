@@ -49,7 +49,7 @@ set the reference timestamp for interval calculation.
 
     # Keep all backups in the last 10 days, 4 additional end of week archives,
     # and an end of month archive for every month:
-    $ borg prune -v --list --keep-within=10d --keep-weekly=4 --keep-monthly=-1
+    $ borg prune -v --list --keep=10d --keep-weekly=4 --keep-monthly=-1
 
     # Keep daily archives from the last 7 days:
     $ borg prune -v --list --dry-run --keep-daily=7d
@@ -57,10 +57,10 @@ set the reference timestamp for interval calculation.
     # Same as above, but with a fixed reference timestamp:
     $ borg prune -v --list --dry-run --since 2025-12-01T00:00:00+02:00 --keep-daily=7d
 
-    # Keep the last 14 archives using `--keep` (same as `--keep-last 14`):
+    # Keep the last 14 archives using `--keep`:
     $ borg prune -v --list --dry-run --keep 14
 
-    # Keep all archives from the last 30 days using `--keep` (same as `--keep-within 30d`):
+    # Keep all archives from the last 30 days using `--keep`:
     $ borg prune -v --list --dry-run --keep 30d
 
 There are also visualized prune examples in ``docs/misc/prune-example.txt`` and

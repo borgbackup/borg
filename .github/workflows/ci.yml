@@ -48,7 +48,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        python-version: '3.10'
+        python-version: '3.11'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -141,9 +141,9 @@ jobs:
         ${{ fromJSON(
           github.event_name == 'pull_request' && '{
             "include": [
-              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "mypy"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "mypy"},
               {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-22.04", "python-version": "3.10", "toxenv": "py310-llfuse"},
+              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
               {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy"}
             ]
@@ -413,11 +413,6 @@ jobs:
             display_name: OmniOS
             do_binaries: false
 
-          - os: haiku
-            version: 'r1beta5'
-            display_name: Haiku
-            do_binaries: false
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -449,7 +444,6 @@ jobs:
                 sudo -E pkg install -y rust
                 sudo -E pkg install -y gmake
                 sudo -E pkg install -y git
-                sudo -E pkg install -y python310 py310-sqlite3
                 sudo -E pkg install -y python311 py311-sqlite3 py311-pip py311-virtualenv
                 sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python3
                 sudo ln -sf /usr/local/bin/python3.11 /usr/local/bin/python
@@ -563,7 +557,7 @@ jobs:
                 pkgman install -y git pkgconfig lz4
                 pkgman install -y openssl3
                 pkgman install -y rust_bin
-                pkgman install -y python3.10
+                pkgman install -y python3.11
                 pkgman install -y cffi
                 pkgman install -y lz4_devel openssl3_devel libffi_devel
 

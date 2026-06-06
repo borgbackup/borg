@@ -6,7 +6,7 @@ maintainers = [
     {name="Thomas Waldmann", email="tw@waldmann-edv.de"},
 ]
 description = "Deduplicated, encrypted, authenticated, and compressed backups"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 keywords = ["backup", "borgbackup"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -19,7 +19,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -97,7 +96,7 @@ skip-magic-trailing-comma = true
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -154,7 +153,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 markers = []
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 strict_optional = false
 local_partial_types = true
 show_error_codes = true
@@ -176,7 +175,7 @@ ignore_missing_imports = true
 requires = ["tox>=4.19", "pkgconfig", "cython", "wheel", "setuptools_scm"]
 # Important: when adding/removing Python versions here,
 #            also update the section "Test environments with different FUSE implementations" accordingly.
-env_list = ["py{310,311,312,313,314,315}-{none,llfuse,pyfuse3,mfusepy}", "docs", "ruff", "mypy", "bandit"]
+env_list = ["py{311,312,313,314,315}-{none,llfuse,pyfuse3,mfusepy}", "docs", "ruff", "mypy", "bandit"]
 
 [tool.tox.env_run_base]
 package = "editable-legacy"  # without this it does not find setup_docs when running under fakeroot
@@ -188,20 +187,6 @@ pass_env = ["*"]  # fakeroot -u needs some env vars
 pass_env = ["*"]  # needed by tox4, so env vars are visible for building borg
 
 # Test environments with different FUSE implementations
-[tool.tox.env.py310-none]
-
-[tool.tox.env.py310-llfuse]
-set_env = {BORG_FUSE_IMPL = "llfuse"}
-extras = ["llfuse", "sftp", "s3", "rclone"]
-
-[tool.tox.env.py310-pyfuse3]
-set_env = {BORG_FUSE_IMPL = "pyfuse3"}
-extras = ["pyfuse3", "sftp", "s3", "rclone"]
-
-[tool.tox.env.py310-mfusepy]
-set_env = {BORG_FUSE_IMPL = "mfusepy"}
-extras = ["mfusepy", "sftp", "s3", "rclone"]
-
 [tool.tox.env.py311-none]
 
 [tool.tox.env.py311-llfuse]

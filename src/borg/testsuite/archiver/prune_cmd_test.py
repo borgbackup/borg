@@ -756,6 +756,25 @@ def test_prune_int_rolling_schedule_oldest_retention():
     assert archives[-1].ts.strftime("%m-%d") == "01-31"
 
 
+def test_prune_since_prefiltered_archives_ignored_in_pruning(archivers, request, backup_files):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    dt = datetime(2024, 6, 6, 12, 0, 0, tzinfo=timezone.utc)
+
+    _create_archive_dt(archiver, backup_files, "test-a", dt + timedelta(hours=1))
+    _create_archive_dt(archiver, backup_files, "test-b", dt - timedelta(hours=1))
+    _create_archive_dt(archiver, backup_files, "test-c", dt - timedelta(days=1))
+
+    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), "--keep-daily=1")
+
+    # 'test-b' is kept, meaning 'test-a' was entirely skipped for pruning consideration.
+    # They would otherwise have occupied the same period.
+    assert re.search(r"Keeping archive \(rule: skip #1\):\s+test-a", output)
+    assert re.search(r"Keeping archive \(rule: daily #1\):\s+test-b", output)
+
+    assert re.search(r"Would prune:\s+test-c", output)
+
+
 def test_prune_interval_rolling_schedule_oldest_retention():
     daily_interval = timedelta(days=6)
     monthly_interval = timedelta(days=31 * 3)  # Matching --keep-monthly=3m after argument parsing

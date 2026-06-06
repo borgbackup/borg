@@ -186,7 +186,8 @@ class PruneMixIn:
         candidate_archives = archives
 
         if since is not None:
-            # Prefilter: Archives from _after_ the `prune_since` time are skipped entirely.
+            # `--since` is a prefilter: Archives from after this time are kept by default. They are not considered for
+            # pruning at all. They won't falsely occupy an active retention period.
             for archive in archives:
                 if archive.ts <= since:
                     break

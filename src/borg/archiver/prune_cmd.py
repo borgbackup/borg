@@ -403,10 +403,13 @@ class PruneMixIn:
         naturally replaces it.
 
         When using interval-based pruning with multiple ``--keep-*`` options,
-        the intervals must be specified in increasing order of coarseness.
-        For example, ``--keep-daily 7d --keep-weekly 4w`` is valid, but
-        ``--keep-daily 30d --keep-weekly 7d`` is not, because the weekly
-        interval is already covered by the daily one.
+        the intervals must be specified in increasing length matching the
+        periods chosen. For example, ``--keep-daily 7d --keep-weekly 4w`` is
+        valid, but ``--keep-daily 30d --keep-weekly 7d`` is not, because the
+        weekly interval is already covered by the daily one and so the weekly
+        interval is effectively useless. An error is emitted upon running
+        ``borg prune`` if such a combination of flags is given. The order of
+        flags on the command line is not significant.
 
 
         A practical approach for recurring backups is to use rules

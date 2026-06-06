@@ -311,7 +311,7 @@ class PruneMixIn:
             return (
                 f"The combination of \"{lo_arg}='{lo_val}'\" and \"{hi_arg}='{hi_val}'\" is invalid. It is effectively "
                 f"useless since every archive matched by {hi_arg} would have already been matched by {lo_arg} and may "
-                "have lead to undefined behavior were it allowed."
+                "have led to undefined behavior were it allowed."
             )
 
         prune_keys = {rule.key for rule in PRUNING_RULES if rule != PRUNE_LAST}

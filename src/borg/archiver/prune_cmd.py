@@ -311,6 +311,10 @@ class PruneMixIn:
             if arg in prune_keys and (isinstance(val, timedelta) or val == -1)
         ]
         for (lo_arg, lo_val), (hi_arg, hi_val) in combinations(interval_args, 2):
+            if hi_val == -1:
+                # 'Infinity' is always bigger
+                continue
+
             if lo_val == -1 or lo_val >= hi_val:
                 raise CommandError(lo_hi_mismatch_errmsg(lo_arg, lo_val, hi_arg, hi_val))
 

@@ -729,6 +729,14 @@ def test_prune_warns_on_redundant_interval_flags(archivers, request, lo_val, hi_
     assert "effectively useless" in output
 
 
+@pytest.mark.parametrize("lo_val,hi_val", [("7d", "14d"), ("7d", "-1"), ("1", "-1"), ("7d", "all"), ("1", "all")])
+def test_prune_does_not_warn_on_normal_interval_flags(archivers, request, lo_val, hi_val):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    output = cmd(archiver, "prune", "--dry-run", f"--keep-hourly={lo_val}", f"--keep-daily={hi_val}")
+    assert "effectively useless" not in output
+
+
 def test_prune_int_rolling_schedule_oldest_retention():
     daily_n = 6
     monthly_n = 3

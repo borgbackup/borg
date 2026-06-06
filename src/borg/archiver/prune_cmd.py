@@ -8,7 +8,7 @@ from itertools import count, combinations
 from ._common import with_repository, Highlander
 from ..constants import *  # NOQA
 from ..helpers import ArchiveFormatter, ProgressIndicatorPercent, CommandError, Error
-from ..helpers import archivename_validator, interval, int_or_interval, sig_int, timestamp
+from ..helpers import archivename_validator, int_or_interval, sig_int, timestamp
 from ..helpers import json_print, basic_json_data
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import ArchiveInfo, Manifest
@@ -95,8 +95,6 @@ def quarterly_3monthly_period_func(dt):
 
 
 # Each archive is considered for keeping
-PRUNE_WITHIN = PruningRule("within", unique_period_func())
-PRUNE_LAST = PruningRule("last", unique_period_func())
 PRUNE_KEEP = PruningRule("keep", unique_period_func())
 # Last archive (by creation timestamp) within period group is considered for keeping
 PRUNE_SECONDLY = PruningRule("secondly", pattern_period_func("%Y-%m-%d %H:%M:%S"))
@@ -113,8 +111,6 @@ PRUNE_YEARLY = PruningRule("yearly", pattern_period_func("%Y"))
 PRUNE_SINCE = PruningRule("skip", unique_period_func())
 
 PRUNING_RULES = [
-    PRUNE_WITHIN,
-    PRUNE_LAST,
     PRUNE_KEEP,
     PRUNE_SECONDLY,
     PRUNE_MINUTELY,
@@ -295,17 +291,10 @@ class PruneMixIn:
 
         if len(keep_args) == 0:
             raise CommandError(
-                'At least one of the "keep", "keep-within", "keep-last", '
-                '"keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
-                '"keep-weekly", "keep-monthly", "keep-13weekly", "keep-3monthly", '
-                'or "keep-yearly" settings must be specified.'
+                'At least one of the "keep" "keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
+                '"keep-weekly", "keep-monthly", "keep-13weekly", "keep-3monthly", or "keep-yearly" settings must be '
+                "specified."
             )
-
-        if PRUNE_KEEP.key in keep_args and PRUNE_LAST.key in keep_args:
-            raise CommandError('Only one of the "keep" and "last" settings may be specified.')
-
-        if PRUNE_KEEP.key in keep_args and PRUNE_WITHIN.key in keep_args:
-            raise CommandError('Only one of the "keep" and "within" settings may be specified.')
 
         def lo_hi_mismatch_errmsg(lo_arg, lo_val, hi_arg, hi_val):
             return (
@@ -314,7 +303,7 @@ class PruneMixIn:
                 "have led to undefined behavior were it allowed."
             )
 
-        prune_keys = {rule.key for rule in PRUNING_RULES if rule != PRUNE_LAST}
+        prune_keys = {rule.key for rule in PRUNING_RULES}
         interval_args = [
             (arg, val)
             for arg, val in keep_args.items()
@@ -375,11 +364,6 @@ class PruneMixIn:
         retention, the interval is measured backwards from that timestamp
         instead of from the current time. See ``Date and Time`` docs for exact
         INTERVAL format.
-
-        The ``--keep-last N`` and ``--keep-within INTERVAL`` options are
-        alternatives with equivalent functionality to ``--keep`` with a count
-        or interval respectively. ``--keep`` cannot be used together with
-        ``--keep-last`` or ``--keep-within``.
 
         The ``--keep-secondly``, ``--keep-minutely``, ``--keep-hourly``,
         ``--keep-daily``, ``--keep-weekly``, ``--keep-monthly``,
@@ -486,17 +470,6 @@ class PruneMixIn:
             type=timestamp,
             action=Highlander,
             help="only consider archives older than this for pruning",
-        )
-        subparser.add_argument(
-            "--keep-within",
-            metavar="INTERVAL",
-            dest=PRUNE_WITHIN.key,
-            type=interval,
-            action=Highlander,
-            help="keep all archives within this time interval",
-        )
-        subparser.add_argument(
-            "--keep-last", dest=PRUNE_LAST.key, type=int, action=Highlander, help="number of archives to keep"
         )
         subparser.add_argument(
             "--keep",

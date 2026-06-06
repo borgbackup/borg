@@ -304,12 +304,7 @@ class PruneMixIn:
                 "have led to undefined behavior were it allowed."
             )
 
-        prune_keys = {rule.key for rule in PRUNING_RULES}
-        interval_args = [
-            (arg, val)
-            for arg, val in keep_args.items()
-            if arg in prune_keys and (isinstance(val, timedelta) or val == -1)
-        ]
+        interval_args = [(arg, val) for arg, val in keep_args.items() if isinstance(val, timedelta) or val == -1]
         for (lo_arg, lo_val), (hi_arg, hi_val) in combinations(interval_args, 2):
             if hi_val == -1:
                 # 'Infinity' is always bigger
@@ -318,11 +313,7 @@ class PruneMixIn:
             if lo_val == -1 or lo_val >= hi_val:
                 raise CommandError(lo_hi_mismatch_errmsg(lo_arg, lo_val, hi_arg, hi_val))
 
-        int_args = [
-            (arg, val)
-            for arg, val in keep_args.items()
-            if any((arg == r.key for r in PRUNING_RULES)) and isinstance(val, int)
-        ]
+        int_args = [(arg, val) for arg, val in keep_args.items() if isinstance(val, int)]
         for (lo_arg, lo_val), (hi_arg, hi_val) in combinations(int_args, 2):
             if lo_val == -1:
                 raise CommandError(lo_hi_mismatch_errmsg(lo_arg, lo_val, hi_arg, hi_val))

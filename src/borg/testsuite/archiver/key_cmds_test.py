@@ -37,14 +37,14 @@ def test_change_location_to_keyfile(archivers, request):
     assert "(key file" in log
 
 
-def test_change_location_to_b2keyfile(archivers, request):
+def test_change_location_to_b3keyfile(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=repokey-blake2-aes-ocb")
+    cmd(archiver, "repo-create", "--encryption=repokey-blake3-aes-ocb")
     log = cmd(archiver, "repo-info")
-    assert "(repokey BLAKE2b" in log
+    assert "(repokey BLAKE3" in log
     cmd(archiver, "key", "change-location", "keyfile")
     log = cmd(archiver, "repo-info")
-    assert "(key file BLAKE2b" in log
+    assert "(key file BLAKE3" in log
 
 
 def test_change_location_to_repokey(archivers, request):
@@ -57,14 +57,14 @@ def test_change_location_to_repokey(archivers, request):
     assert "(repokey" in log
 
 
-def test_change_location_to_b2repokey(archivers, request):
+def test_change_location_to_b3repokey(archivers, request):
     archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", "--encryption=keyfile-blake2-aes-ocb")
+    cmd(archiver, "repo-create", "--encryption=keyfile-blake3-aes-ocb")
     log = cmd(archiver, "repo-info")
-    assert "(key file BLAKE2b" in log
+    assert "(key file BLAKE3" in log
     cmd(archiver, "key", "change-location", "repokey")
     log = cmd(archiver, "repo-info")
-    assert "(repokey BLAKE2b" in log
+    assert "(repokey BLAKE3" in log
 
 
 def test_keyfile_name_is_content_sha256(archivers, request):

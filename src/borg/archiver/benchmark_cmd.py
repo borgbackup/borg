@@ -214,16 +214,20 @@ class BenchmarkMixIn:
                 print(f"{spec:<24} {format_file_size(size):<10} {dt:.3f}s")
 
         from ..crypto.low_level import hmac_sha256, blake2b_256
+        import blake3
 
         if not args.json:
             print("Cryptographic hashes / MACs ====================================")
         else:
             result["hashes"] = []
         size = 1000000000
-        for spec, func in [
+        hashes_tests = [
             ("hmac-sha256", lambda: hmac_sha256(key_256, random_10M)),
             ("blake2b-256", lambda: blake2b_256(key_256, random_10M)),
-        ]:
+            ("blake3", lambda: blake3.blake3(random_10M, key=key_256).digest()),
+            ("blake3-mt", lambda: blake3.blake3(random_10M, key=key_256, max_threads=blake3.blake3.AUTO).digest()),
+        ]
+        for spec, func in hashes_tests:
             dt = timeit(func, number=number_default)
             if args.json:
                 result["hashes"].append({"algo": spec, "size": size, "time": dt})

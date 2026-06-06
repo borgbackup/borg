@@ -135,12 +135,11 @@ class TransferMixIn:
         """archives transfer from other repository, optionally upgrade data format"""
         key = manifest.key
         other_key = other_manifest.key
-        if not uses_same_id_hash(other_key, key):
-            raise Error(
-                "You must keep the same ID hash ([HMAC-]SHA256 or BLAKE2b) or deduplication will break. "
-                "Use a related repository!"
-            )
-        if not uses_same_chunker_secret(other_key, key):
+        using_same_id_hash = uses_same_id_hash(other_key, key)
+        rechunking = args.chunker_params is not None
+        if not using_same_id_hash and not rechunking:
+            raise Error("You must either keep the same ID hash or use --chunker-params.")
+        if not rechunking and not uses_same_chunker_secret(other_key, key):
             raise Error(
                 "You must use the same chunker secret or deduplication will break. " "Use a related repository!"
             )
@@ -311,13 +310,13 @@ class TransferMixIn:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO            # do it!
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --dry-run  # check! anything left?
 
-        Data migration / upgrade from borg 1.x
+        Data migration / upgrade from Borg 1.x
         ++++++++++++++++++++++++++++++++++++++
 
-        To migrate your borg 1.x archives into a related, new borg2 repository, usage is quite similar
+        To migrate your Borg 1.x archives into a related, new Borg 2 repository, usage is quite similar
         to the above, but you need the ``--from-borg1`` option::
 
-            borg --repo=DST_REPO repocreate --encryption=DST_ENC --other-repo=SRC_REPO --from-borg1
+            borg --repo=DST_REPO repo-create --encryption=DST_ENC --other-repo=SRC_REPO --from-borg1
 
             # to continue using lz4 compression as you did in SRC_REPO:
             borg --repo=DST_REPO transfer --other-repo=SRC_REPO --from-borg1 \\
@@ -336,7 +335,7 @@ class TransferMixIn:
         subparser = ArgumentParser(
             parents=[common_parser], description=self.do_transfer.__doc__, epilog=transfer_epilog
         )
-        subparsers.add_subcommand("transfer", subparser, help="transfer of archives from another repository")
+        subparsers.add_subcommand("transfer", subparser, help="Transfer of archives from another repository")
         subparser.add_argument(
             "-n", "--dry-run", dest="dry_run", action="store_true", help="do not change repository, just check"
         )

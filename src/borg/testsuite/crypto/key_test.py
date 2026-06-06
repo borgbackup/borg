@@ -9,8 +9,9 @@ from ...crypto.key import PlaintextKey, AuthenticatedKey, Blake2AuthenticatedKey
 from ...crypto.key import RepoKey, KeyfileKey, Blake2RepoKey, Blake2KeyfileKey
 from ...crypto.key import AEADKeyBase
 from ...crypto.key import AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey
-from ...crypto.key import Blake2AESOCBRepoKey, Blake2AESOCBKeyfileKey, Blake2CHPORepoKey, Blake2CHPOKeyfileKey
-from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256
+from ...crypto.key import Blake3AESOCBRepoKey, Blake3AESOCBKeyfileKey, Blake3CHPORepoKey, Blake3CHPOKeyfileKey
+from ...crypto.key import Blake3AuthenticatedKey
+from ...crypto.key import ID_HMAC_SHA_256, ID_BLAKE2b_256, ID_BLAKE3_256
 from ...crypto.key import UnsupportedManifestError, UnsupportedKeyFormatError
 from ...crypto.key import identify_key
 from ...crypto.low_level import IntegrityError as IntegrityErrorBase
@@ -77,21 +78,22 @@ class TestKey:
             # not encrypted
             PlaintextKey,
             AuthenticatedKey,
-            Blake2AuthenticatedKey,
+            Blake3AuthenticatedKey,
             # legacy crypto
             KeyfileKey,
             Blake2KeyfileKey,
             RepoKey,
             Blake2RepoKey,
+            Blake2AuthenticatedKey,
             # new crypto
             AESOCBKeyfileKey,
             AESOCBRepoKey,
-            Blake2AESOCBKeyfileKey,
-            Blake2AESOCBRepoKey,
+            Blake3AESOCBKeyfileKey,
+            Blake3AESOCBRepoKey,
             CHPOKeyfileKey,
             CHPORepoKey,
-            Blake2CHPOKeyfileKey,
-            Blake2CHPORepoKey,
+            Blake3CHPOKeyfileKey,
+            Blake3CHPORepoKey,
         )
     )
     def key(self, request, monkeypatch):
@@ -265,6 +267,17 @@ class TestKey:
         authenticated = key.encrypt(id, plaintext)
         # 0x06 is the key TYPE.
         assert authenticated == b"\x06" + plaintext
+
+    def test_blake3_authenticated_encrypt(self, monkeypatch):
+        monkeypatch.setenv("BORG_PASSPHRASE", "test")
+        key = Blake3AuthenticatedKey.create(self.MockRepository(), self.MockArgs())
+        assert Blake3AuthenticatedKey.id_hash is ID_BLAKE3_256.id_hash
+        assert len(key.id_key) == 32
+        plaintext = b"123456789"
+        id = key.id_hash(plaintext)
+        authenticated = key.encrypt(id, plaintext)
+        # 0x50 is the key TYPE.
+        assert authenticated == b"\x50" + plaintext
 
 
 class TestTAM:

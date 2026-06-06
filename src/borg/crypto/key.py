@@ -11,6 +11,7 @@ from ..logger import create_logger
 
 logger = create_logger()
 
+from blake3 import blake3
 import argon2.low_level
 
 from ..constants import *  # NOQA
@@ -28,7 +29,7 @@ from ..platform import SaveFile
 from ..repoobj import RepoObj
 
 
-from .low_level import bytes_to_int, num_cipher_blocks, hmac_sha256, blake2b_256
+from .low_level import bytes_to_int, num_cipher_blocks, hmac_sha256
 from .low_level import AES256_OCB, CHACHA20_POLY1305
 from . import low_level
 
@@ -70,7 +71,7 @@ def keyfile_parse(data: str | bytes, repoid: Optional[str] = None) -> tuple[str,
     return repoid, b64data
 
 
-# workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
+# workaround for lost passphrase or key in "authenticated*" modes
 AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
 
 
@@ -161,19 +162,19 @@ def uses_same_id_hash(other_key, key):
     new_sha256_ids = (PlaintextKey,)
     old_hmac_sha256_ids = (RepoKey, KeyfileKey, AuthenticatedKey)
     new_hmac_sha256_ids = (AESOCBRepoKey, AESOCBKeyfileKey, CHPORepoKey, CHPOKeyfileKey, AuthenticatedKey)
-    old_blake2_ids = (Blake2RepoKey, Blake2KeyfileKey, Blake2AuthenticatedKey)
-    new_blake2_ids = (
-        Blake2AESOCBRepoKey,
-        Blake2AESOCBKeyfileKey,
-        Blake2CHPORepoKey,
-        Blake2CHPOKeyfileKey,
-        Blake2AuthenticatedKey,
+    # note: we do not support blake2b for new repos, see #8867
+    new_blake3_ids = (
+        Blake3AESOCBRepoKey,
+        Blake3AESOCBKeyfileKey,
+        Blake3CHPORepoKey,
+        Blake3CHPOKeyfileKey,
+        Blake3AuthenticatedKey,
     )
     same_ids = (
         isinstance(other_key, old_hmac_sha256_ids + new_hmac_sha256_ids)
         and isinstance(key, new_hmac_sha256_ids)
-        or isinstance(other_key, old_blake2_ids + new_blake2_ids)
-        and isinstance(key, new_blake2_ids)
+        or isinstance(other_key, new_blake3_ids)
+        and isinstance(key, new_blake3_ids)
         or isinstance(other_key, old_sha256_ids + new_sha256_ids)
         and isinstance(key, new_sha256_ids)
     )
@@ -312,38 +313,6 @@ class PlaintextKey(KeyBase):
     def decrypt(self, id, data):
         self.assert_type(data[0], id)
         return memoryview(data)[1:]
-
-
-def random_blake2b_256_key():
-    # This might look a bit curious, but is the same construction used in the keyed mode of BLAKE2b.
-    # Why limit the key to 64 bytes and pad it with 64 nulls nonetheless? The answer is that BLAKE2b
-    # has a 128 byte block size, but only 64 bytes of internal state (this is also referred to as a
-    # "local wide pipe" design, because the compression function transforms (block, state) => state,
-    # and len(block) >= len(state), hence wide.)
-    # In other words, a key longer than 64 bytes would have simply no advantage, since the function
-    # has no way of propagating more than 64 bytes of entropy internally.
-    # It's padded to a full block so that the key is never buffered internally by blake2b_update, ie.
-    # it remains in a single memory location that can be tracked and could be erased securely, if we
-    # wanted to.
-    return os.urandom(64) + bytes(64)
-
-
-class ID_BLAKE2b_256:
-    """
-    Key mix-in class for using BLAKE2b-256 for the id key.
-
-    The id_key length must be 32 bytes.
-    """
-
-    def id_hash(self, data):
-        return blake2b_256(self.id_key, data)
-
-    def init_from_random_data(self):
-        super().init_from_random_data()
-        enc_key = os.urandom(32)
-        enc_hmac_key = random_blake2b_256_key()
-        self.crypt_key = enc_key + enc_hmac_key
-        self.id_key = random_blake2b_256_key()
 
 
 class ID_HMAC_SHA_256:
@@ -570,15 +539,18 @@ class FlexiKey:
             if isinstance(key, AESKeyBase):
                 # user must use an AEADKeyBase subclass (AEAD modes with session keys)
                 raise Error("Copying key material to an AES-CTR based mode is insecure and unsupported.")
-            if not uses_same_id_hash(other_key, key):
-                raise Error("You must keep the same ID hash (HMAC-SHA256 or BLAKE2b) or deduplication will break.")
             if other_key.copy_crypt_key:
                 # give the user the option to use the same authenticated encryption (AE) key
                 crypt_key = other_key.crypt_key
             else:
                 # borg transfer re-encrypts all data anyway, thus we can default to a new, random AE key
                 crypt_key = os.urandom(64)
-            key.init_from_given_data(crypt_key=crypt_key, id_key=other_key.id_key, chunk_seed=other_key.chunk_seed)
+            if len(other_key.id_key) == 128:  # blake2b id key from borg 1.x is not supported anymore
+                id_key = os.urandom(32)  # hmac-sha256 and blake3 use 32 bytes
+            else:
+                id_key = other_key.id_key
+            chunk_seed = other_key.chunk_seed
+            key.init_from_given_data(crypt_key=crypt_key, id_key=id_key, chunk_seed=chunk_seed)
         else:
             key.init_from_random_data()
         passphrase = Passphrase.new(allow_empty=True)
@@ -737,12 +709,6 @@ class FlexiKey:
             raise TypeError("Unsupported borg key storage type")
 
 
-# legacy imports placed after FlexiKey/AESKeyBase/KeyBase so those names are already
-# in the partial module when legacy/crypto/key.py imports them back during circular load
-from ..legacy.crypto.key import KeyfileKey, RepoKey, Blake2KeyfileKey, Blake2RepoKey  # noqa: E402
-from ..legacy.crypto.key import LEGACY_KEY_TYPES  # noqa: E402
-
-
 class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
     STORAGE = KeyBlobStorage.REPO
 
@@ -782,6 +748,14 @@ class AuthenticatedKeyBase(AESKeyBase, FlexiKey):
         return memoryview(data)[1:]
 
 
+# legacy imports placed after FlexiKey/AESKeyBase/KeyBase/AuthenticatedKeyBase so those names are already
+# in the partial module when legacy/crypto/key.py imports them back during circular load
+from ..legacy.crypto.key import KeyfileKey, RepoKey
+from ..legacy.crypto.key import Blake2KeyfileKey, Blake2RepoKey, Blake2AuthenticatedKey  # noqa: F401
+from ..legacy.crypto.key import LEGACY_KEY_TYPES  # noqa: E402
+from ..legacy.crypto.key import ID_BLAKE2b_256  # noqa: F401
+
+
 class AuthenticatedKey(ID_HMAC_SHA_256, AuthenticatedKeyBase):
     TYPE = KeyType.AUTHENTICATED
     TYPES_ACCEPTABLE = {TYPE}
@@ -789,14 +763,25 @@ class AuthenticatedKey(ID_HMAC_SHA_256, AuthenticatedKeyBase):
     ARG_NAME = "authenticated"
 
 
-class Blake2AuthenticatedKey(ID_BLAKE2b_256, AuthenticatedKeyBase):
-    TYPE = KeyType.BLAKE2AUTHENTICATED
-    TYPES_ACCEPTABLE = {TYPE}
-    NAME = "authenticated BLAKE2b"
-    ARG_NAME = "authenticated-blake2"
-
-
 # ------------ new crypto ------------
+
+
+class ID_BLAKE3_256:
+    """
+    Key mix-in class for using BLAKE3 for the id key.
+
+    The id_key length must be 32 bytes.
+    """
+
+    def id_hash(self, data):
+        return blake3(data, key=self.id_key).digest(length=32)
+
+
+class Blake3AuthenticatedKey(ID_BLAKE3_256, AuthenticatedKeyBase):
+    TYPE = KeyType.BLAKE3AUTHENTICATED
+    TYPES_ACCEPTABLE = {TYPE}
+    NAME = "authenticated BLAKE3"
+    ARG_NAME = "authenticated-blake3"
 
 
 class AEADKeyBase(KeyBase):
@@ -944,38 +929,38 @@ class CHPORepoKey(ID_HMAC_SHA_256, AEADKeyBase, FlexiKey):
     CIPHERSUITE = CHACHA20_POLY1305
 
 
-class Blake2AESOCBKeyfileKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.BLAKE2AESOCBKEYFILE, KeyType.BLAKE2AESOCBREPO}
-    TYPE = KeyType.BLAKE2AESOCBKEYFILE
-    NAME = "key file BLAKE2b AES-OCB"
-    ARG_NAME = "keyfile-blake2-aes-ocb"
+class Blake3AESOCBKeyfileKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE3AESOCBKEYFILE, KeyType.BLAKE3AESOCBREPO}
+    TYPE = KeyType.BLAKE3AESOCBKEYFILE
+    NAME = "key file BLAKE3 AES-OCB"
+    ARG_NAME = "keyfile-blake3-aes-ocb"
     STORAGE = KeyBlobStorage.KEYFILE
     CIPHERSUITE = AES256_OCB
 
 
-class Blake2AESOCBRepoKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.BLAKE2AESOCBKEYFILE, KeyType.BLAKE2AESOCBREPO}
-    TYPE = KeyType.BLAKE2AESOCBREPO
-    NAME = "repokey BLAKE2b AES-OCB"
-    ARG_NAME = "repokey-blake2-aes-ocb"
+class Blake3AESOCBRepoKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE3AESOCBKEYFILE, KeyType.BLAKE3AESOCBREPO}
+    TYPE = KeyType.BLAKE3AESOCBREPO
+    NAME = "repokey BLAKE3 AES-OCB"
+    ARG_NAME = "repokey-blake3-aes-ocb"
     STORAGE = KeyBlobStorage.REPO
     CIPHERSUITE = AES256_OCB
 
 
-class Blake2CHPOKeyfileKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.BLAKE2CHPOKEYFILE, KeyType.BLAKE2CHPOREPO}
-    TYPE = KeyType.BLAKE2CHPOKEYFILE
-    NAME = "key file BLAKE2b ChaCha20-Poly1305"
-    ARG_NAME = "keyfile-blake2-chacha20-poly1305"
+class Blake3CHPOKeyfileKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE3CHPOKEYFILE, KeyType.BLAKE3CHPOREPO}
+    TYPE = KeyType.BLAKE3CHPOKEYFILE
+    NAME = "key file BLAKE3 ChaCha20-Poly1305"
+    ARG_NAME = "keyfile-blake3-chacha20-poly1305"
     STORAGE = KeyBlobStorage.KEYFILE
     CIPHERSUITE = CHACHA20_POLY1305
 
 
-class Blake2CHPORepoKey(ID_BLAKE2b_256, AEADKeyBase, FlexiKey):
-    TYPES_ACCEPTABLE = {KeyType.BLAKE2CHPOKEYFILE, KeyType.BLAKE2CHPOREPO}
-    TYPE = KeyType.BLAKE2CHPOREPO
-    NAME = "repokey BLAKE2b ChaCha20-Poly1305"
-    ARG_NAME = "repokey-blake2-chacha20-poly1305"
+class Blake3CHPORepoKey(ID_BLAKE3_256, AEADKeyBase, FlexiKey):
+    TYPES_ACCEPTABLE = {KeyType.BLAKE3CHPOKEYFILE, KeyType.BLAKE3CHPOREPO}
+    TYPE = KeyType.BLAKE3CHPOREPO
+    NAME = "repokey BLAKE3 ChaCha20-Poly1305"
+    ARG_NAME = "repokey-blake3-chacha20-poly1305"
     STORAGE = KeyBlobStorage.REPO
     CIPHERSUITE = CHACHA20_POLY1305
 
@@ -985,14 +970,14 @@ AVAILABLE_KEY_TYPES = (
     # not encrypted modes
     PlaintextKey,
     AuthenticatedKey,
-    Blake2AuthenticatedKey,
     # new crypto
+    Blake3AuthenticatedKey,
     AESOCBKeyfileKey,
     AESOCBRepoKey,
     CHPOKeyfileKey,
     CHPORepoKey,
-    Blake2AESOCBKeyfileKey,
-    Blake2AESOCBRepoKey,
-    Blake2CHPOKeyfileKey,
-    Blake2CHPORepoKey,
+    Blake3AESOCBKeyfileKey,
+    Blake3AESOCBRepoKey,
+    Blake3CHPOKeyfileKey,
+    Blake3CHPORepoKey,
 )

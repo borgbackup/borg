@@ -145,7 +145,7 @@ jobs:
               {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
               {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy"}
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
             ]
           }' || '{
             "include": [
@@ -534,7 +534,7 @@ jobs:
                 ;;
 
               omnios)
-                sudo pkg install gcc14 git pkg-config python-313 gnu-make gnu-coreutils
+                sudo pkg install gcc14 git pkg-config python-313 gnu-make gnu-coreutils rust
                 sudo ln -sf /usr/bin/python3.13 /usr/bin/python3
                 sudo ln -sf /usr/bin/python3.13-config /usr/bin/python3-config
                 sudo python3 -m ensurepip

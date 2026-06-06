@@ -42,6 +42,7 @@ dependencies = [
   "xxhash>=2.0.0",
   "jsonargparse>=4.47.0",
   "PyYAML>=6.0.2",  # we need to register our types with yaml, jsonargparse uses yaml for config files
+  "blake3>=1.0.0",
 ]
 
 [project.optional-dependencies]

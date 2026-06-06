@@ -1,8 +1,8 @@
 import os
 
 from ..constants import *  # NOQA
-from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake2AESOCBRepoKey, Blake2CHPORepoKey
-from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake2AESOCBKeyfileKey, Blake2CHPOKeyfileKey
+from ..crypto.key import AESOCBRepoKey, CHPORepoKey, Blake3AESOCBRepoKey, Blake3CHPORepoKey
+from ..crypto.key import AESOCBKeyfileKey, CHPOKeyfileKey, Blake3AESOCBKeyfileKey, Blake3CHPOKeyfileKey
 from ..crypto.keymanager import KeyManager
 from ..helpers import PathSpec, CommandError
 from ..helpers.argparsing import ArgumentParser
@@ -40,10 +40,10 @@ class KeysMixIn:
                 key_new = AESOCBKeyfileKey(repository)
             elif isinstance(key, CHPORepoKey):
                 key_new = CHPOKeyfileKey(repository)
-            elif isinstance(key, Blake2AESOCBRepoKey):
-                key_new = Blake2AESOCBKeyfileKey(repository)
-            elif isinstance(key, Blake2CHPORepoKey):
-                key_new = Blake2CHPOKeyfileKey(repository)
+            elif isinstance(key, Blake3AESOCBRepoKey):
+                key_new = Blake3AESOCBKeyfileKey(repository)
+            elif isinstance(key, Blake3CHPORepoKey):
+                key_new = Blake3CHPOKeyfileKey(repository)
             else:
                 print("Change not needed or not supported.")
                 return
@@ -52,10 +52,10 @@ class KeysMixIn:
                 key_new = AESOCBRepoKey(repository)
             elif isinstance(key, CHPOKeyfileKey):
                 key_new = CHPORepoKey(repository)
-            elif isinstance(key, Blake2AESOCBKeyfileKey):
-                key_new = Blake2AESOCBRepoKey(repository)
-            elif isinstance(key, Blake2CHPOKeyfileKey):
-                key_new = Blake2CHPORepoKey(repository)
+            elif isinstance(key, Blake3AESOCBKeyfileKey):
+                key_new = Blake3AESOCBRepoKey(repository)
+            elif isinstance(key, Blake3CHPOKeyfileKey):
+                key_new = Blake3CHPORepoKey(repository)
             else:
                 print("Change not needed or not supported.")
                 return

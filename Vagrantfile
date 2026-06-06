@@ -43,7 +43,6 @@ def packages_freebsd
     pkg install -y fusefs-libs3 || true
     pkg install -y rust
     pkg install -y git bash  # fakeroot causes lots of troubles on freebsd
-    pkg install -y python310 py310-sqlite3
     pkg install -y python311 py311-sqlite3 py311-pip py311-virtualenv
     # make sure there is a python3/pip3/virtualenv command
     ln -sf /usr/local/bin/python3.11 /usr/local/bin/python3

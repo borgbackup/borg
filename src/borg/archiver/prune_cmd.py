@@ -394,9 +394,13 @@ class PruneMixIn:
         The ``--keep-13weekly`` and ``--keep-3monthly`` rules are two different
         strategies for keeping archives every quarter year.
 
-        The oldest archive is always kept. This is useful for rolling tiered backup
-        schemes, where the earliest backup in a retention window should survive until
-        the next tier's interval naturally replaces it.
+        The oldest archive is kept as long as the coarsest retention rule
+        covers it -- ``--keep-yearly=3`` will keep the oldest archive if it
+        couldn't otherwise find three candidates, ``--keep-yearly=5y` will keep
+        the oldest archive as long as it is within the 5y interval. This is
+        useful for rolling tiered backup schemes, where the earliest backup in
+        a retention window should survive until the next tier's interval
+        naturally replaces it.
 
         When using interval-based pruning with multiple ``--keep-*`` options,
         the intervals must be specified in increasing order of coarseness.

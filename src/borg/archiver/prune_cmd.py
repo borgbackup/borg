@@ -292,7 +292,7 @@ class PruneMixIn:
 
         if len(keep_args) == 0:
             raise CommandError(
-                'At least one of the "keep" "keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
+                'At least one of the "keep", "keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", '
                 '"keep-weekly", "keep-monthly", "keep-13weekly", "keep-3monthly", or "keep-yearly" settings must be '
                 "specified."
             )

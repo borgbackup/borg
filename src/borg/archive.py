@@ -2163,7 +2163,7 @@ class ArchiveChecker:
                 cdata = self.repository.get(archive_id)
                 try:
                     _, data = self.repo_objs.parse(archive_id, cdata, ro_type=ROBJ_ARCHIVE_META)
-                except IntegrityError as integrity_error:
+                except IntegrityErrorBase as integrity_error:
                     logger.error(f"Archive metadata block {archive_id_hex} is corrupted: {integrity_error}")
                     self.error_found = True
                     if self.repair:

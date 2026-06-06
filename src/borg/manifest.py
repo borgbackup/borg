@@ -17,6 +17,7 @@ from .helpers.datastruct import StableDict
 from .helpers.parseformat import bin_to_hex, hex_to_bin
 from .helpers.time import parse_timestamp, calculate_relative_offset, archive_ts_now
 from .helpers.errors import Error, CommandError
+from .crypto.low_level import IntegrityError as IntegrityErrorBase
 from .item import ArchiveItem
 from .patterns import get_regex_from_pattern
 from .repoobj import RepoObj
@@ -161,25 +162,37 @@ class Archives:
                 tags=(),
             )
         else:
-            _, data = self.manifest.repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
-            archive_dict = self.manifest.key.unpack_archive(data)
-            archive_item = ArchiveItem(internal_dict=archive_dict)
-            if archive_item.version not in (1, 2):  # legacy: still need to read v1 archives
-                raise Exception("Unknown archive metadata version")
-            # callers expect a dict with dict["key"] access, not ArchiveItem.key access.
-            # also, we need to put the id in there.
-            metadata = dict(
-                id=id,
-                name=archive_item.name,
-                time=archive_item.time,
-                exists=True,  # repo has a valid archive item
-                username=archive_item.username,
-                hostname=archive_item.hostname,
-                size=archive_item.get("size", 0),
-                nfiles=archive_item.get("nfiles", 0),
-                comment=archive_item.get("comment", ""),
-                tags=tuple(sorted(getattr(archive_item, "tags", []))),  # must be hashable
-            )
+            try:
+                _, data = self.manifest.repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
+            except IntegrityErrorBase:
+                metadata = dict(
+                    id=id,
+                    name="archive-metadata-has-integrity-error",
+                    time="1970-01-01T00:00:00.000000",
+                    exists=False,  # we have the pointer, but the repo does not have an archive item
+                    username="",
+                    hostname="",
+                    tags=(),
+                )
+            else:
+                archive_dict = self.manifest.key.unpack_archive(data)
+                archive_item = ArchiveItem(internal_dict=archive_dict)
+                if archive_item.version not in (1, 2):  # legacy: still need to read v1 archives
+                    raise Exception("Unknown archive metadata version")
+                # callers expect a dict with dict["key"] access, not ArchiveItem.key access.
+                # also, we need to put the id in there.
+                metadata = dict(
+                    id=id,
+                    name=archive_item.name,
+                    time=archive_item.time,
+                    exists=True,  # repo has a valid archive item
+                    username=archive_item.username,
+                    hostname=archive_item.hostname,
+                    size=archive_item.get("size", 0),
+                    nfiles=archive_item.get("nfiles", 0),
+                    comment=archive_item.get("comment", ""),
+                    tags=tuple(sorted(getattr(archive_item, "tags", []))),  # must be hashable
+                )
         return metadata
 
     def _infos(self, *, deleted=False):

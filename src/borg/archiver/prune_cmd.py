@@ -300,8 +300,7 @@ class PruneMixIn:
         def lo_hi_mismatch_errmsg(lo_arg, lo_val, hi_arg, hi_val):
             return (
                 f"The combination of \"{lo_arg}='{lo_val}'\" and \"{hi_arg}='{hi_val}'\" is invalid. It is effectively "
-                f"useless since every archive matched by {hi_arg} would have already been matched by {lo_arg} and may "
-                "have led to undefined behavior were it allowed."
+                f"useless since every archive matched by {hi_arg} would have already been matched by {lo_arg}."
             )
 
         interval_args = [(arg, val) for arg, val in keep_args.items() if isinstance(val, timedelta) or val == -1]

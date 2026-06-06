@@ -145,7 +145,7 @@ jobs:
               {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
               {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.15-dev", "toxenv": "py315-mfusepy"}
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
             ]
           }' || '{
             "include": [

@@ -134,7 +134,7 @@ def prune(
     n_or_interval: int | timedelta,
     since_timestamp: datetime | None,
     keep_oldest: bool,
-    previously_kept: dict[ArchiveInfo, KeepResult] = {},
+    previously_kept: frozenset[ArchiveInfo] = frozenset(),
 ) -> dict[ArchiveInfo, KeepResult]:
     if len(archives) == 0 or n_or_interval in (0, timedelta(0)):
         return {}
@@ -212,7 +212,7 @@ class PruneMixIn:
                 keep_oldest=(
                     rule == active_rules[-1][0]
                 ),  # Activate keep_oldest rule only for the largest active interval
-                previously_kept=keep,
+                previously_kept=frozenset(keep),
             )
 
         archives_to_prune = set(archives) - set(keep)

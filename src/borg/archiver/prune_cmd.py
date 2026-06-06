@@ -54,8 +54,7 @@ def archive_datetime_dispatch(func: Callable[[datetime], str]) -> Callable[[Arch
 
 # The *_period_func group of functions create period grouping keys to group
 # together archives falling within a certain period. Among archives in each of
-# these groups, only the latest (by creation timestamp) is kept. The values
-# returned by these functions MUST be ordered the same as the input timestamp.
+# these groups, only the latest (by creation timestamp) is kept.
 
 
 def unique_period_func():

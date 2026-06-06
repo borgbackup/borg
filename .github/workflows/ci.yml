@@ -413,11 +413,6 @@ jobs:
             display_name: OmniOS
             do_binaries: false
 
-          - os: haiku
-            version: 'r1beta5'
-            display_name: Haiku
-            do_binaries: false
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v6

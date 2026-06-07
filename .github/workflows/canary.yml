@@ -18,7 +18,7 @@ jobs:
       matrix:
         include:
           # A representative subset of environments
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             python-version: '3.11'
             toxenv: py311-llfuse
           - os: ubuntu-24.04

@@ -31,7 +31,7 @@ permissions:
 jobs:
   lint:
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -141,21 +141,21 @@ jobs:
         ${{ fromJSON(
           github.event_name == 'pull_request' && '{
             "include": [
-              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "mypy"},
-              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "docs"},
-              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
+              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "mypy"},
+              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "docs"},
+              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
               {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
               {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"}
             ]
           }' || '{
             "include": [
-              {"os": "ubuntu-22.04", "python-version": "3.11", "toxenv": "py311-pyfuse3", "binary": "borg-linux-glibc235-x86_64-gh"},
-              {"os": "ubuntu-22.04-arm", "python-version": "3.11", "toxenv": "py311-pyfuse3", "binary": "borg-linux-glibc235-arm64-gh"},
-              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-llfuse"},
-              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-pyfuse3"},
-              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-mfusepy"},
-              {"os": "macos-15", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-15-arm64-gh"},
-              {"os": "macos-15-intel", "python-version": "3.11", "toxenv": "py311-none", "binary": "borg-macos-15-x86_64-gh"}
+              {"os": "ubuntu-24.04", "python-version": "3.11", "toxenv": "py311-llfuse"},
+              {"os": "ubuntu-24.04", "python-version": "3.12", "toxenv": "py312-pyfuse3"},
+              {"os": "ubuntu-24.04", "python-version": "3.13", "toxenv": "py313-mfusepy"},
+              {"os": "ubuntu-24.04", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-x86_64-gh"},
+              {"os": "ubuntu-24.04-arm", "python-version": "3.14", "toxenv": "py314-pyfuse3", "binary": "borg-linux-glibc239-arm64-gh"},
+              {"os": "macos-15", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-arm64-gh"},
+              {"os": "macos-15-intel", "python-version": "3.14", "toxenv": "py314-none", "binary": "borg-macos-15-x86_64-gh"}
             ]
           }'
         ) }}

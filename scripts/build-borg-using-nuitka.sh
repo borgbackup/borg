@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/bin/sh
 # Generate a single-file binary of borgbackup using Nuitka.
 
-set -euo pipefail
+set -eu
 
 OUTPUT_DIR="dist/binary"
 OUTPUT_FILENAME="borg-nuitka.exe"  # .exe does NOT mean windows here

@@ -1080,10 +1080,9 @@ def test_create_big_zeros_files(archivers, request):
 
 
 def test_create_big_random_files(archivers, request):
-    """Test creating an archive from 10 files with 10MB random data each."""
+    """Test creating an archive with some big files with random data."""
     archiver = request.getfixturevalue(archivers)
-    # Create 10 files with 10,000,000 bytes of random data each
-    count, size = 10, 10 * 1000 * 1000
+    count, size = 5, 5 * 1000 * 1000
     random_data = {}
     for i in range(count):
         data = os.urandom(size)

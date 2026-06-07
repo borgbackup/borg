@@ -733,10 +733,7 @@ class ChunksMixin:
         pack_results = self.repository.put(id, cdata, wait=wait)
         self.last_refresh_dt = now  # .put also refreshed the lock
         self.chunks.add(id, size)
-        # pack_results is non-empty when the PackWriter flushed (always at max_count=1).
-        # Update the index with real pack location so obj_size is not UNKNOWN_INT32.
-        for chunk_id, pack_id, obj_offset, obj_size in pack_results:
-            self.chunks.update_pack_info(chunk_id, pack_id, obj_offset, obj_size)
+        self.chunks.update_pack_info(pack_results)
         stats.update(size, not exists)
         return ChunkListEntry(id, size)
 
@@ -834,6 +831,11 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def close(self):
         self.security_manager.save(self.manifest, self.key)
         pi = ProgressIndicatorMessage(msgid="cache.close")
+        # Flush any chunks still buffered in the pack writer and update the index
+        # so the last batch gets real pack location values instead of UNKNOWN_*.
+        if self._chunks is not None:
+            pack_results = self.repository.flush()
+            self._chunks.update_pack_info(pack_results)
         if self._files is not None:
             pi.output("Saving files cache")
             integrity_data = self._write_files_cache(self._files)

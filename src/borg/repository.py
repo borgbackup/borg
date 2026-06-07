@@ -118,21 +118,21 @@ class PackWriter:
         self._pieces = []  # list of (chunk_id, cdata)
 
     def add(self, chunk_id, cdata):
-        """Buffer a chunk.  Returns flush results if the pack is now full, else []."""
+        """Buffer a chunk.  Returns flush results if the pack is now full, else None."""
         self._pieces.append((chunk_id, cdata))
         if len(self._pieces) >= self.max_count:
             return self.flush()
-        return []
+        return None
 
     def flush(self):
         """Write the current pack to the store.
 
         Returns a list of (chunk_id, pack_id, obj_offset, obj_size) tuples —
-        one entry per chunk that was written.  Returns [] if there was nothing
+        one entry per chunk that was written.  Returns None if there was nothing
         to flush.
         """
         if not self._pieces:
-            return []
+            return None
 
         # Build the pack bytes once by joining all pieces (avoids O(n^2) copies
         # that incremental string concatenation would cause in Python).
@@ -143,7 +143,7 @@ class PackWriter:
         #      (backward-compatible file naming: packs/{chunk_id_hex}).
         # N>1: the pack contains multiple chunks; use SHA256(pack_bytes) so the
         #      file is content-addressed and borgstore can verify/cache it.
-        if len(self._pieces) == 1:
+        if self.max_count == 1:
             pack_id = self._pieces[0][0]  # N=1: pack_id == chunk_id
         else:
             pack_id = sha256(pack_data).digest()  # N>1: content-addressed
@@ -409,7 +409,20 @@ class Repository:
         self._pack_writer = PackWriter(self.store, max_count=1)
         self.opened = True
 
+    def flush(self):
+        """Flush any buffered pack writer chunks. Returns pack_results (or None).
+
+        Callers that maintain a ChunkIndex must call this and pass the result to
+        chunks.update_pack_info() before closing, so index entries for the last
+        batch of chunks get real pack location values instead of UNKNOWN_*.
+        """
+        if self._pack_writer is not None:
+            return self._pack_writer.flush()
+        return None
+
     def close(self):
+        if self._pack_writer is not None:
+            assert not self._pack_writer._pieces, "PackWriter has unflushed chunks; call flush() before close()"
         if self.lock:
             self.lock.release()
             self.lock = None

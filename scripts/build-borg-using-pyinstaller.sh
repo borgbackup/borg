@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/bin/sh
 # Generate a single-file binary of borgbackup using PyInstaller.
 
-set -euo pipefail
+set -eu
 
 OUTPUT_DIR="dist/binary"
 SPEC_FILE="scripts/borg.exe.spec"

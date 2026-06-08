@@ -339,7 +339,13 @@ class Archiver(
                 # everything else comes from the forced "borg serve" command (or the defaults).
                 # stuff from denylist must never be used from the client.
                 denylist = {"restrict_to_paths", "restrict_to_repositories", "umask", "permissions"}
-                allowlist = {"debug_topics", "lock_wait", "log_level"}
+                # "backend" is the rest:// repository the client wants to access (borg serve --rest
+                # --backend FILE:<path>). Like the legacy repo path (transmitted via the RPC protocol),
+                # the client chooses *which* repo; the forced command pins the restrictions, and
+                # do_serve_rest validates the client backend against restrict_to_paths/repositories.
+                # The --rest mode flag itself is intentionally NOT allowlisted, so the forced command
+                # keeps pinning the mode (legacy vs rest).
+                allowlist = {"debug_topics", "lock_wait", "log_level", "backend"}
                 not_present = object()
                 for attr_name in allowlist:
                     assert attr_name not in denylist, "allowlist has denylisted attribute name %s" % attr_name

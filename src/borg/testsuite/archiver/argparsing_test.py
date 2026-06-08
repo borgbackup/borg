@@ -1,6 +1,7 @@
 import pytest
 
 from . import Archiver, RK_ENCRYPTION, cmd
+from ...helpers import PathNotAllowed
 from ...helpers.argparsing import ArgumentParser, flatten_namespace
 
 
@@ -73,6 +74,45 @@ def test_get_args():
     # happen for forced commands - we get the verbatim command line and need to deal with env vars.
     args = archiver.get_args(["borg", "serve"], "BORG_FOO=bar borg serve --info")
     assert args.func == archiver.do_serve
+
+    # rest server: the client chooses the backend (which repo), the forced command pins the
+    # restriction and the rest mode. The client's --backend must survive the merge so that
+    # do_serve_rest can validate it against the forced restrictions.
+    args = archiver.get_args(
+        ["borg", "serve", "--rest", "--restrict-to-path=/p1"], "borg serve --rest --backend=FILE:/p1/myrepo"
+    )
+    assert args.func == archiver.do_serve
+    assert args.rest is True
+    assert args.restrict_to_paths == ["/p1"]
+    assert args.backend == "FILE:/p1/myrepo"
+    # the forced command pins the mode: a client cannot turn a forced legacy serve into a rest serve
+    args = archiver.get_args(["borg", "serve"], "borg serve --rest --backend=FILE:/p1/myrepo")
+    assert args.rest is False
+
+
+def test_check_rest_restrictions(tmp_path):
+    archiver = Archiver()
+    check = archiver.check_rest_restrictions
+    allowed = tmp_path / "allowed"
+    allowed.mkdir()
+    repo = allowed / "myrepo"
+
+    # no restrictions: anything is allowed
+    check(f"FILE:{repo}", None, None)
+
+    # restrict-to-path: a backend below the allowed path is fine, outside is rejected
+    check(f"FILE:{repo}", [str(allowed)], None)
+    with pytest.raises(PathNotAllowed):
+        check(f"FILE:{tmp_path / 'other' / 'repo'}", [str(allowed)], None)
+
+    # restrict-to-repository: only the exact repo path is allowed
+    check(f"FILE:{repo}", None, [str(repo)])
+    with pytest.raises(PathNotAllowed):
+        check(f"FILE:{allowed / 'evil'}", None, [str(repo)])
+
+    # a non-FILE: backend cannot be restricted
+    with pytest.raises(PathNotAllowed):
+        check("sftp://host/path", [str(allowed)], None)
 
 
 class TestCommonOptions:

@@ -284,6 +284,42 @@ def test_transfer_upgrade(archivers, request, monkeypatch):
             assert chunks1 == chunks2
 
 
+def test_transfer_from_borg1_ssh(archivers, request, monkeypatch):
+    """transfer --from-borg1 from a borg 1.x repo reached via ssh:// (LegacyRemoteRepository + borg serve)."""
+    archiver = request.getfixturevalue(archivers)
+    if archiver.get_kind() != "local" or is_win32:
+        pytest.skip("legacy ssh:// transfer is exercised only locally (non-win32)")
+
+    # borg 1.2 repo dir contents, created by: scripts/make-testdata/test_transfer_upgrade.sh
+    repo12_tar = os.path.join(os.path.dirname(__file__), "repo12.tar.gz")
+    original_location = archiver.repository_location
+    extract_dir = f"{original_location}1"
+    os.makedirs(extract_dir)
+    with tarfile.open(repo12_tar) as tf:
+        tf.extractall(extract_dir)
+
+    # Reach the borg 1.x source repo via ssh://. The special host __testsuite__ makes the legacy
+    # client spawn a local "borg serve" (RepositoryServer) instead of using a real ssh connection.
+    # extract_dir is absolute, so this yields ssh://__testsuite__//abs/path (absolute-path form).
+    other_repo1 = f"--other-repo=ssh://__testsuite__/{extract_dir}"
+    archiver.repository_location = f"{original_location}2"
+
+    monkeypatch.setenv("BORG_PASSPHRASE", "pw2")
+    monkeypatch.setenv("BORG_OTHER_PASSPHRASE", "waytooeasyonlyfortests")
+    # must use the strong kdf here or borg2 can't decrypt the borg1 key
+    monkeypatch.setenv("BORG_TESTONLY_WEAKEN_KDF", "0")
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION, other_repo1, "--from-borg1")
+    cmd(archiver, "transfer", other_repo1, "--from-borg1")
+    cmd(archiver, "check")
+
+    # The borg 1.2 testdata contains a known set of archives; ensure they all transferred.
+    with open(os.path.join(extract_dir, "test_meta", "repo_list.json")) as f:
+        expected_names = sorted(a["name"] for a in json.load(f)["archives"])
+    got_names = sorted(a["name"] for a in json.loads(cmd(archiver, "repo-list", "--json"))["archives"])
+    assert got_names == expected_names
+
+
 @contextmanager
 def setup_repos(archiver, mp):
     """

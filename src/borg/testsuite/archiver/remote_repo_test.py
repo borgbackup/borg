@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -59,9 +60,16 @@ def test_rclone_repo_basics(archiver, tmp_path):
 
 
 @pytest.mark.skipif(not REST_URL, reason="BORG_TEST_REST_REPO not set.")
-def test_rest_repo_basics(archiver):
+def test_rest_repo_basics(archiver, monkeypatch):
     create_regular_file(archiver.input_path, "file1", size=100 * 1024)
     create_regular_file(archiver.input_path, "file2", size=10 * 1024)
+    # A rest:// repo over ssh starts "borg serve --rest" on the remote. For this test the remote is
+    # localhost (see CI BORG_TEST_REST_REPO), so point BORG_REMOTE_PATH at the borg under test
+    # (an absolute path that is valid locally) unless the caller already set it.
+    if not os.environ.get("BORG_REMOTE_PATH"):
+        borg_path = shutil.which("borg") or os.path.join(os.path.dirname(sys.executable), "borg")
+        if os.path.exists(borg_path):
+            monkeypatch.setenv("BORG_REMOTE_PATH", borg_path)
     archiver.repository_location = REST_URL
     archive_name = "test-archive"
     cmd(archiver, "repo-create", RK_ENCRYPTION)

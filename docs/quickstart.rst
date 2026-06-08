@@ -364,8 +364,7 @@ Borg can initialize and access repositories on remote hosts if the
 host is accessible using SSH.  This is fastest and easiest when Borg
 is installed on the remote host, in which case a ``rest://`` repository URL is
 used. Borg connects via SSH and runs ``borg serve --rest`` on the remote host,
-which serves the repository talking HTTP over stdio (so the remote only needs
-``borg`` installed)::
+which serves the repository talking HTTP over stdio::
 
   $ borg -r rest://user@hostname:port/path/to/repo repo-create ...
 

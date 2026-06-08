@@ -5,26 +5,19 @@ import logging
 import os
 import select
 import shlex
-import shutil
 import socket
-import struct
 import sys
-import tempfile
 import textwrap
 import time
 from subprocess import Popen, PIPE
 
-from xxhash import xxh64
-
 from .. import __version__
-from ..compress import Compressor
 from ..constants import *  # NOQA
 from ..helpers import Error, ErrorWithTraceback, IntegrityError
 from ..helpers import bin_to_hex
 from ..helpers import get_limited_unpacker
 from ..helpers import replace_placeholders
 from ..helpers import format_file_size
-from ..helpers import safe_unlink
 from ..helpers import prepare_subprocess_env, ignore_sigint
 from ..helpers import get_socket_filename
 from ..fslocking import LockTimeout, NotLocked, NotMyLock, LockFailed
@@ -731,212 +724,3 @@ class LegacyRemoteRepository:
     @api(since=parse_version("2.0.0b8"))
     def put_manifest(self, data):
         """actual remoting is done via self.call in the @api decorator"""
-
-
-class RepositoryNoCache:
-    """A not caching Repository wrapper, passes through to repository.
-
-    Just to have same API (including the context manager) as RepositoryCache.
-
-    *transform* is a callable taking two arguments, key and raw repository data.
-    The return value is returned from get()/get_many(). By default, the raw
-    repository data is returned.
-    """
-
-    def __init__(self, repository, transform=None):
-        self.repository = repository
-        self.transform = transform or (lambda key, data: data)
-
-    def close(self):
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
-    def get(self, key, read_data=True, raise_missing=True):
-        return next(self.get_many([key], read_data=read_data, raise_missing=raise_missing, cache=False))
-
-    def get_many(self, keys, read_data=True, cache=True, raise_missing=True):
-        for key, data in zip(keys, self.repository.get_many(keys, read_data=read_data, raise_missing=raise_missing)):
-            yield self.transform(key, data)
-
-    def log_instrumentation(self):
-        pass
-
-
-class RepositoryCache(RepositoryNoCache):
-    """
-    A caching Repository wrapper.
-
-    Caches Repository GET operations locally.
-
-    *pack* and *unpack* complement *transform* of the base class.
-    *pack* receives the output of *transform* and should return bytes,
-    which are stored in the cache. *unpack* receives these bytes and
-    should return the initial data (as returned by *transform*).
-    """
-
-    def __init__(self, repository, pack=None, unpack=None, transform=None):
-        super().__init__(repository, transform)
-        self.pack = pack or (lambda data: data)
-        self.unpack = unpack or (lambda data: data)
-        self.cache = set()
-        self.basedir = tempfile.mkdtemp(prefix="borg-cache-")
-        self.query_size_limit()
-        self.size = 0
-        # Instrumentation
-        self.hits = 0
-        self.misses = 0
-        self.slow_misses = 0
-        self.slow_lat = 0.0
-        self.evictions = 0
-        self.enospc = 0
-
-    def query_size_limit(self):
-        available_space = shutil.disk_usage(self.basedir).free
-        self.size_limit = int(min(available_space * 0.25, 2**31))
-
-    def prefixed_key(self, key, complete):
-        # just prefix another byte telling whether this key refers to a complete chunk
-        # or a without-data-metadata-only chunk (see also read_data param).
-        prefix = b"\x01" if complete else b"\x00"
-        return prefix + key
-
-    def key_filename(self, key):
-        return os.path.join(self.basedir, bin_to_hex(key))
-
-    def backoff(self):
-        self.query_size_limit()
-        target_size = int(0.9 * self.size_limit)
-        while self.size > target_size and self.cache:
-            key = self.cache.pop()
-            file = self.key_filename(key)
-            self.size -= os.stat(file).st_size
-            os.unlink(file)
-            self.evictions += 1
-
-    def add_entry(self, key, data, cache, complete):
-        transformed = self.transform(key, data)
-        if not cache:
-            return transformed
-        packed = self.pack(transformed)
-        pkey = self.prefixed_key(key, complete=complete)
-        file = self.key_filename(pkey)
-        try:
-            with open(file, "wb") as fd:
-                fd.write(packed)
-        except OSError as os_error:
-            try:
-                safe_unlink(file)
-            except FileNotFoundError:
-                pass  # open() could have failed as well
-            if os_error.errno == errno.ENOSPC:
-                self.enospc += 1
-                self.backoff()
-            else:
-                raise
-        else:
-            self.size += len(packed)
-            self.cache.add(pkey)
-            if self.size > self.size_limit:
-                self.backoff()
-        return transformed
-
-    def log_instrumentation(self):
-        logger.debug(
-            "RepositoryCache: current items %d, size %s / %s, %d hits, %d misses, %d slow misses (+%.1fs), "
-            "%d evictions, %d ENOSPC hit",
-            len(self.cache),
-            format_file_size(self.size),
-            format_file_size(self.size_limit),
-            self.hits,
-            self.misses,
-            self.slow_misses,
-            self.slow_lat,
-            self.evictions,
-            self.enospc,
-        )
-
-    def close(self):
-        self.log_instrumentation()
-        self.cache.clear()
-        shutil.rmtree(self.basedir)
-
-    def get_many(self, keys, read_data=True, cache=True, raise_missing=True):
-        # It could use different cache keys depending on read_data and cache full vs. meta-only chunks.
-        unknown_keys = [key for key in keys if self.prefixed_key(key, complete=read_data) not in self.cache]
-        repository_iterator = zip(
-            unknown_keys, self.repository.get_many(unknown_keys, read_data=read_data, raise_missing=raise_missing)
-        )
-        for key in keys:
-            pkey = self.prefixed_key(key, complete=read_data)
-            if pkey in self.cache:
-                file = self.key_filename(pkey)
-                with open(file, "rb") as fd:
-                    self.hits += 1
-                    yield self.unpack(fd.read())
-            else:
-                for key_, data in repository_iterator:
-                    if key_ == key:
-                        transformed = self.add_entry(key, data, cache, complete=read_data)
-                        self.misses += 1
-                        yield transformed
-                        break
-                else:
-                    # slow path: eviction during this get_many removed this key from the cache
-                    t0 = time.perf_counter()
-                    data = self.repository.get(key, read_data=read_data, raise_missing=raise_missing)
-                    self.slow_lat += time.perf_counter() - t0
-                    transformed = self.add_entry(key, data, cache, complete=read_data)
-                    self.slow_misses += 1
-                    yield transformed
-        # Consume any pending requests
-        for _ in repository_iterator:
-            pass
-
-
-def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None, transform=None, force_cache=False):
-    """
-    Return a Repository(No)Cache for *repository*.
-
-    If *decrypted_cache* is a repo_objs object, then get and get_many will return a tuple
-    (csize, plaintext) instead of the actual data in the repository. The cache will
-    store decrypted data, which increases CPU efficiency (by avoiding repeatedly decrypting
-    and more importantly MAC and ID checking cached objects).
-    Internally, objects are compressed with LZ4.
-    """
-    if decrypted_cache and (pack or unpack or transform):
-        raise ValueError("decrypted_cache and pack/unpack/transform are incompatible")
-    elif decrypted_cache:
-        repo_objs = decrypted_cache
-        # 32 bit csize, 64 bit (8 byte) xxh64, 1 byte ctype, 1 byte clevel
-        cache_struct = struct.Struct("=I8sBB")
-        compressor = Compressor("lz4")
-
-        def pack(data):
-            csize, decrypted = data
-            meta, compressed = compressor.compress({}, decrypted)
-            return cache_struct.pack(csize, xxh64(compressed).digest(), meta["ctype"], meta["clevel"]) + compressed
-
-        def unpack(data):
-            data = memoryview(data)
-            csize, checksum, ctype, clevel = cache_struct.unpack(data[: cache_struct.size])
-            compressed = data[cache_struct.size :]
-            if checksum != xxh64(compressed).digest():
-                raise IntegrityError("detected corrupted data in metadata cache")
-            meta = dict(ctype=ctype, clevel=clevel, csize=len(compressed))
-            _, decrypted = compressor.decompress(meta, compressed)
-            return csize, decrypted
-
-        def transform(id_, data):
-            meta, decrypted = repo_objs.parse(id_, data, ro_type=ROBJ_DONTCARE)
-            csize = meta.get("csize", len(data))
-            return csize, decrypted
-
-    if isinstance(repository, LegacyRemoteRepository) or force_cache:
-        return RepositoryCache(repository, pack, unpack, transform)
-    else:
-        return RepositoryNoCache(repository, transform)

@@ -1,0 +1,31 @@
+<div class="borg-downloads" id="borg-downloads" style="display:none;">
+  <p class="caption"><span class="caption-text">Download docs</span></p>
+  <ul id="borg-downloads-list"></ul>
+</div>
+<script type="text/javascript">
+  // Populate offline download links (PDF, HTMLzip, ...) using ReadTheDocs data if available.
+  function borgInitDownloads(data) {
+    var downloads = data && data.versions && data.versions.current && data.versions.current.downloads;
+    if (!downloads) return;
+    var labels = {pdf: "PDF", htmlzip: "HTML (zip)", epub: "ePub"};
+    var list = document.getElementById("borg-downloads-list");
+    if (!list) return;
+    var count = 0;
+    Object.keys(downloads).forEach(function(fmt) {
+      var url = downloads[fmt];
+      if (!url) return;
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = url;
+      a.textContent = labels[fmt] || fmt;
+      li.appendChild(a);
+      list.appendChild(li);
+      count++;
+    });
+    if (count) document.getElementById("borg-downloads").style.display = "";
+  }
+
+  document.addEventListener("readthedocs-addons-data-ready", function(event) {
+    borgInitDownloads(event.detail.data());
+  });
+</script>

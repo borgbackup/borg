@@ -16,10 +16,10 @@ class ServeMixIn:
         if args.rest:
             self.do_serve_rest(args)
         else:
+            # note: legacy (borg 1.x) repositories have no permission system, so args.permissions
+            # is intentionally not forwarded here (it only applies to "borg serve --rest").
             RepositoryServer(
-                restrict_to_paths=args.restrict_to_paths,
-                restrict_to_repositories=args.restrict_to_repositories,
-                permissions=args.permissions,
+                restrict_to_paths=args.restrict_to_paths, restrict_to_repositories=args.restrict_to_repositories
             ).serve()
 
     def do_serve_rest(self, args):

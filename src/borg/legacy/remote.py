@@ -752,13 +752,15 @@ class RepositoryServer:  # pragma: no cover
         "get_manifest",  # borg2 LegacyRepository has this
     )
 
-    def __init__(self, restrict_to_paths, restrict_to_repositories, permissions=None):
+    def __init__(self, restrict_to_paths, restrict_to_repositories):
         self.repository = None
         self.RepoCls = None
         self.rpc_methods = ("open", "close", "negotiate")
         self.restrict_to_paths = restrict_to_paths
         self.restrict_to_repositories = restrict_to_repositories
-        self.permissions = permissions
+        # note: legacy (borg 1.x / v1) repositories have no permission system, so borg serve
+        # does not accept/forward permissions here (the --permissions option only applies to
+        # the non-legacy "borg serve --rest" path).
         self.client_version = None  # we update this after client sends version information
 
     def filter_args(self, f, kwargs):

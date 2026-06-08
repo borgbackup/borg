@@ -1,7 +1,7 @@
 import os
 
 from ..constants import *  # NOQA
-from ..helpers import Error
+from ..helpers import Error, PathNotAllowed
 from ..legacy.remote import RepositoryServer
 
 from ..logger import create_logger
@@ -38,8 +38,6 @@ class ServeMixIn:
 
     @staticmethod
     def check_rest_restrictions(backend, restrict_to_paths, restrict_to_repositories):
-        from ..legacy.remote import PathNotAllowed
-
         if not (restrict_to_paths or restrict_to_repositories):
             return
         if not backend.startswith("FILE:"):

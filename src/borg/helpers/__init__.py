@@ -13,7 +13,7 @@ from ..constants import *  # NOQA
 
 from .datastruct import StableDict, Buffer, EfficientCollectionQueue
 from .errors import Error, ErrorWithTraceback, IntegrityError, DecompressionError, CancelledByUser, CommandError
-from .errors import RTError, modern_ec
+from .errors import RTError, PathNotAllowed, modern_ec
 from .errors import BorgWarning, FileChangedWarning, BackupWarning, IncludePatternNeverMatchedWarning
 from .errors import BackupError, BackupOSError, BackupRaceConditionError, BackupItemExcluded
 from .errors import BackupPermissionError, BackupIOError, BackupFileNotFoundError

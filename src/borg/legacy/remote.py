@@ -16,7 +16,7 @@ from subprocess import Popen, PIPE
 import borg.logger
 from .. import __version__
 from ..constants import *  # NOQA
-from ..helpers import Error, ErrorWithTraceback, IntegrityError
+from ..helpers import Error, ErrorWithTraceback, IntegrityError, PathNotAllowed
 from ..helpers import bin_to_hex
 from ..helpers import get_limited_unpacker
 from ..helpers import replace_placeholders
@@ -53,12 +53,6 @@ class ConnectionClosedWithHint(ConnectionClosed):
     """Connection closed by remote host. {}"""
 
     exit_mcode = 81
-
-
-class PathNotAllowed(Error):
-    """Repository path not allowed: {}."""
-
-    exit_mcode = 83
 
 
 class InvalidRPCMethod(Error):

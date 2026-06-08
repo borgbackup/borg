@@ -7,7 +7,7 @@ from ..helpers import PathSpec
 from ..helpers import umount
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
-from ..remote import cache_if_remote
+from ..repository import cache_if_remote
 
 from ..logger import create_logger
 

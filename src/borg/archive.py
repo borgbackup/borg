@@ -50,8 +50,7 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from . import platform
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
-from .remote import RemoteRepository, cache_if_remote
-from .repository import Repository, NoManifestError
+from .repository import Repository, NoManifestError, cache_if_remote
 from .repoobj import RepoObj
 
 has_link = hasattr(os, "link")
@@ -1773,7 +1772,7 @@ class ArchiveChecker:
         :param oldest/newest: only check archives older/newer than timedelta from oldest/newest archive timestamp
         :param verify_data: integrity verification of data referenced by archives
         """
-        if not isinstance(repository, (Repository, RemoteRepository)):
+        if not isinstance(repository, Repository):
             logger.error("Checking legacy repositories is not supported.")
             return False
         logger.info("Starting archive consistency check...")

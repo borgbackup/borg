@@ -24,7 +24,6 @@ from ...helpers import init_ec_warnings
 from ...logger import flush_logging
 from ...manifest import Manifest
 from ...platform import get_flags
-from ...remote import RemoteRepository
 from ...repository import Repository
 from .. import has_lchflags, has_mknod, is_utime_fully_supported, have_fuse_mtime_ns, st_mtime_ns_round, filter_xattrs
 from .. import changedir, ENOATTR  # NOQA
@@ -178,10 +177,7 @@ def open_archive(repo_path, name):
 
 def open_repository(archiver):
     if archiver.get_kind() == "remote":
-        location = Location(archiver.repository_location)
-        if location.proto == "rest":
-            return Repository(location, exclusive=True)
-        return RemoteRepository(location)
+        return Repository(Location(archiver.repository_location), exclusive=True)
     else:
         return Repository(archiver.repository_path, exclusive=True)
 

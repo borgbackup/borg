@@ -600,7 +600,7 @@ class Location:
     rclone_re = re.compile(r"(?P<proto>rclone):(?P<path>(.*))", re.VERBOSE)
 
     sl = "/" if is_win32 else ""
-    file_or_socket_re = re.compile(r"(?P<proto>(file|socket))://" + sl + abs_path_re, re.VERBOSE)
+    file_re = re.compile(r"(?P<proto>file)://" + sl + abs_path_re, re.VERBOSE)
 
     local_re = re.compile(local_path_re, re.VERBOSE)
 
@@ -666,7 +666,7 @@ class Location:
             self.proto = m.group("proto")
             self.path = m.group("path")
             return True
-        m = self.file_or_socket_re.match(text)
+        m = self.file_re.match(text)
         if m:
             self.proto = m.group("proto")
             self.path = os.path.normpath(m.group("path"))
@@ -709,7 +709,7 @@ class Location:
             return self._host.lstrip("[").rstrip("]")
 
     def canonical_path(self):
-        if self.proto in ("file", "socket"):
+        if self.proto == "file":
             return self.path
         if self.proto == "rclone":
             return f"{self.proto}:{self.path}"
@@ -1342,11 +1342,10 @@ class BorgJsonEncoder(json.JSONEncoder):
         from ..legacy.repository import LegacyRepository
         from ..repository import Repository
         from ..legacy.remote import LegacyRemoteRepository
-        from ..remote import RemoteRepository
         from ..archive import Archive
         from ..cache import AdHocWithFilesCache
 
-        if isinstance(o, (LegacyRepository, LegacyRemoteRepository)) or isinstance(o, (Repository, RemoteRepository)):
+        if isinstance(o, (LegacyRepository, LegacyRemoteRepository)) or isinstance(o, Repository):
             return {"id": bin_to_hex(o.id), "location": o._location.canonical_path()}
         if isinstance(o, Archive):
             return o.info()

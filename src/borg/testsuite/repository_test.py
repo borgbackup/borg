@@ -1,15 +1,13 @@
-import logging
 import os
-import sys
 
 import pytest
-from ..helpers import Location
+from ..constants import ROBJ_FILE_STREAM
 from ..helpers import IntegrityError
-from ..platformflags import is_win32
-from ..remote import RemoteRepository, InvalidRPCMethod, PathNotAllowed
-from ..repository import Repository, StoreObjectNotFound, MAX_DATA_SIZE
+from ..repository import Repository, MAX_DATA_SIZE, cache_if_remote
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
+from ..crypto.key import PlaintextKey
 from .hashindex_test import H
+from .crypto.key_test import TestKey
 
 
 @pytest.fixture()
@@ -18,22 +16,14 @@ def repository(tmp_path):
     yield Repository(repository_location, exclusive=True, create=True)
 
 
-@pytest.fixture()
-def remote_repository(tmp_path):
-    if is_win32:
-        pytest.skip("Remote repository does not yet work on Windows.")
-    repository_location = Location("ssh://__testsuite__/" + os.fspath(tmp_path / "repository"))
-    yield RemoteRepository(repository_location, exclusive=True, create=True)
-
-
 def pytest_generate_tests(metafunc):
-    # Generate tests that run on both local and remote repositories.
+    # Generate tests that run on repositories.
     if "repo_fixtures" in metafunc.fixturenames:
-        metafunc.parametrize("repo_fixtures", ["repository", "remote_repository"])
+        metafunc.parametrize("repo_fixtures", ["repository"])
 
 
 def get_repository_from_fixture(repo_fixtures, request):
-    # Return the repository object from the fixture for tests that run on both local and remote repositories.
+    # Return the repository object from the fixture.
     return request.getfixturevalue(repo_fixtures)
 
 
@@ -43,14 +33,7 @@ def reopen(repository, exclusive: bool | None = True, create=False):
             raise RuntimeError("Repo must be closed before a reopen. Cannot support nested repository contexts.")
         return Repository(repository._location, exclusive=exclusive, create=create)
 
-    if isinstance(repository, RemoteRepository):
-        if repository.p is not None or repository.sock is not None:
-            raise RuntimeError("Remote repo must be closed before a reopen. Cannot support nested repository contexts.")
-        return RemoteRepository(repository.location, exclusive=exclusive, create=create)
-
-    raise TypeError(
-        f"Invalid argument type. Expected 'Repository' or 'RemoteRepository', received '{type(repository).__name__}'."
-    )
+    raise TypeError(f"Invalid argument type. Expected 'Repository', received '{type(repository).__name__}'.")
 
 
 def fchunk(data, meta=b"", chunk_id=b"\x00" * 32):
@@ -151,123 +134,51 @@ def check(repository, repo_path, repair=False, status=True):
     assert tmp_files == [], "Found tmp files"
 
 
-def _get_mock_args():
-    class MockArgs:
-        remote_path = "borg"
-        umask = 0o077
-        debug_topics = []
-        rsh = None
+class TestCacheIfRemote:
+    @pytest.fixture
+    def cache_repository(self, tmpdir):
+        repository_location = os.path.join(str(tmpdir), "repository")
+        with Repository(repository_location, exclusive=True, create=True) as repository:
+            repository.put(H(1), fchunk(b"1234"))
+            repository.put(H(2), fchunk(b"5678"))
+            repository.put(H(3), fchunk(bytes(100)))
+            yield repository
 
-        def __contains__(self, item):
-            # to behave like argparse.Namespace
-            return hasattr(self, item)
+    def test_passthrough(self, cache_repository):
+        # Without decrypted_cache, raw repository data is passed through unchanged.
+        with cache_if_remote(cache_repository) as cached:
+            assert pdchunk(cached.get(H(1))) == b"1234"
+            assert [pdchunk(ch) for ch in cached.get_many([H(1), H(2)])] == [b"1234", b"5678"]
 
-    return MockArgs()
+    @pytest.fixture
+    def key(self, cache_repository, monkeypatch):
+        monkeypatch.setenv("BORG_PASSPHRASE", "test")
+        return PlaintextKey.create(cache_repository, TestKey.MockArgs())
 
+    @pytest.fixture
+    def repo_objs(self, key):
+        return RepoObj(key)
 
-def test_remote_invalid_rpc(remote_repository):
-    with remote_repository:
-        with pytest.raises(InvalidRPCMethod):
-            remote_repository.call("__init__", {})
+    def _put_encrypted_object(self, repo_objs, repository, data):
+        id_ = repo_objs.id_hash(data)
+        repository.put(id_, repo_objs.format(id_, {}, data, ro_type=ROBJ_FILE_STREAM))
+        return id_
 
+    @pytest.fixture
+    def H1(self, repo_objs, cache_repository):
+        return self._put_encrypted_object(repo_objs, cache_repository, b"1234")
 
-def test_remote_rpc_exception_transport(remote_repository):
-    with remote_repository:
-        s1 = "test string"
+    @pytest.fixture
+    def H2(self, repo_objs, cache_repository):
+        return self._put_encrypted_object(repo_objs, cache_repository, b"5678")
 
-        try:
-            remote_repository.call("inject_exception", {"kind": "DoesNotExist"})
-        except Repository.DoesNotExist as e:
-            assert len(e.args) == 1
-            assert e.args[0] == remote_repository.location.processed
+    def test_decrypted_cache(self, repo_objs, cache_repository, H1, H2):
+        # With decrypted_cache, get/get_many return (csize, plaintext) tuples.
+        with cache_if_remote(cache_repository, decrypted_cache=repo_objs) as cached:
+            csize, plaintext = cached.get(H1)
+            assert plaintext == b"1234"
+            assert [pt for _csize, pt in cached.get_many([H1, H2])] == [b"1234", b"5678"]
 
-        try:
-            remote_repository.call("inject_exception", {"kind": "AlreadyExists"})
-        except Repository.AlreadyExists as e:
-            assert len(e.args) == 1
-            assert e.args[0] == remote_repository.location.processed
-
-        try:
-            remote_repository.call("inject_exception", {"kind": "CheckNeeded"})
-        except Repository.CheckNeeded as e:
-            assert len(e.args) == 1
-            assert e.args[0] == remote_repository.location.processed
-
-        try:
-            remote_repository.call("inject_exception", {"kind": "IntegrityError"})
-        except IntegrityError as e:
-            assert len(e.args) == 1
-            assert e.args[0] == s1
-
-        try:
-            remote_repository.call("inject_exception", {"kind": "PathNotAllowed"})
-        except PathNotAllowed as e:
-            assert len(e.args) == 1
-            assert e.args[0] == "foo"
-
-        try:
-            remote_repository.call("inject_exception", {"kind": "ObjectNotFound"})
-        except Repository.ObjectNotFound as e:
-            assert len(e.args) == 2
-            assert e.args[0] == s1
-            assert e.args[1] == remote_repository.location.processed
-
-        try:
-            remote_repository.call("inject_exception", {"kind": "StoreObjectNotFound"})
-        except StoreObjectNotFound as e:
-            assert len(e.args) == 1
-            assert e.args[0] == s1
-
-        try:
-            remote_repository.call("inject_exception", {"kind": "InvalidRPCMethod"})
-        except InvalidRPCMethod as e:
-            assert len(e.args) == 1
-            assert e.args[0] == s1
-
-        try:
-            remote_repository.call("inject_exception", {"kind": "divide"})
-        except RemoteRepository.RPCError as e:
-            assert e.unpacked
-            assert e.get_message().startswith("ZeroDivisionError:")
-            assert e.exception_class == "ZeroDivisionError"
-            assert len(e.exception_full) > 0
-
-
-def test_remote_ssh_cmd(remote_repository):
-    with remote_repository:
-        args = _get_mock_args()
-        remote_repository._args = args
-        assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "example.com"]
-        assert remote_repository.ssh_cmd(Location("ssh://user@example.com/foo")) == ["ssh", "user@example.com"]
-        assert remote_repository.ssh_cmd(Location("ssh://user@example.com:1234/foo")) == [
-            "ssh",
-            "-p",
-            "1234",
-            "user@example.com",
-        ]
-        os.environ["BORG_RSH"] = "ssh --foo"
-        assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "--foo", "example.com"]
-
-
-def test_remote_borg_cmd(remote_repository):
-    with remote_repository:
-        assert remote_repository.borg_cmd(None, testing=True) == [sys.executable, "-m", "borg", "serve"]
-        args = _get_mock_args()
-        # XXX without next line we get spurious test fails when using pytest-xdist, root cause unknown:
-        logging.getLogger().setLevel(logging.INFO)
-        # note: test logger is on info log level, so --info gets added automagically
-        assert remote_repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
-        args.remote_path = "borg-0.28.2"
-        assert remote_repository.borg_cmd(args, testing=False) == ["borg-0.28.2", "serve", "--info"]
-        args.debug_topics = ["something_client_side", "repository_compaction"]
-        assert remote_repository.borg_cmd(args, testing=False) == [
-            "borg-0.28.2",
-            "serve",
-            "--info",
-            "--debug-topic=borg.debug.repository_compaction",
-        ]
-        args = _get_mock_args()
-        assert remote_repository.borg_cmd(args, testing=False) == ["borg", "serve", "--info"]
-        args.rsh = "ssh -i foo"
-        remote_repository._args = args
-        assert remote_repository.ssh_cmd(Location("ssh://example.com/foo")) == ["ssh", "-i", "foo", "example.com"]
+    def test_decrypted_cache_and_transform_incompatible(self, cache_repository, repo_objs):
+        with pytest.raises(ValueError):
+            cache_if_remote(cache_repository, decrypted_cache=repo_objs, transform=lambda key, data: data)

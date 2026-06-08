@@ -1,5 +1,5 @@
 from ..constants import *  # NOQA
-from ..remote import RepositoryServer
+from ..legacy.remote import RepositoryServer
 
 from ..logger import create_logger
 from ..helpers.argparsing import ArgumentParser
@@ -13,7 +13,6 @@ class ServeMixIn:
         RepositoryServer(
             restrict_to_paths=args.restrict_to_paths,
             restrict_to_repositories=args.restrict_to_repositories,
-            use_socket=args.use_socket,
             permissions=args.permissions,
         ).serve()
 
@@ -24,15 +23,13 @@ class ServeMixIn:
             """
         This command starts a repository server process.
 
-        `borg serve` currently supports:
+        `borg serve` is only used to serve legacy (borg 1.x / v1) repositories over SSH, so that
+        such repositories can still be accessed remotely (e.g. for `borg transfer --from-borg1`).
+        Current repositories are accessed via a rest:// repository instead (which can itself tunnel
+        over SSH), so they do not use `borg serve`.
 
-        - Being automatically started via SSH when the borg client uses an ssh://...
-          remote repository. In this mode, `borg serve` will run until that SSH connection
-          is terminated.
-
-        - Being started by some other means (not by the borg client) as a long-running socket
-          server to be used for borg clients using a socket://... repository (see the `--socket`
-          option if you do not want to use the default path for the socket and PID file).
+        It is automatically started via SSH when a borg client uses an ssh://... repository.
+        In this mode, `borg serve` will run until that SSH connection is terminated.
 
         Please note that `borg serve` does not support providing a specific repository via the
         `--repo` option or the `BORG_REPO` environment variable. It is always the borg client that

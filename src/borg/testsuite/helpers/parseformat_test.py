@@ -246,12 +246,10 @@ class TestLocationWithoutEnv:
 
     def test_socket(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)
+        # socket:// is no longer supported and must be rejected as an invalid location.
         url = "socket:///c:/repo/path" if is_win32 else "socket:///repo/path"
-        path = "c:/repo/path" if is_win32 else "/repo/path"
-        assert (
-            repr(Location(url))
-            == f"Location(proto='socket', user=None, pass=None, host=None, port=None, path='{path}')"
-        )
+        with pytest.raises(ValueError):
+            Location(url)
 
     def test_file(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)
@@ -334,7 +332,6 @@ class TestLocationWithoutEnv:
         ]
         locations.insert(1, "c:/absolute/path" if is_win32 else "/absolute/path")
         locations.insert(2, "file:///c:/absolute/path" if is_win32 else "file:///absolute/path")
-        locations.insert(3, "socket:///c:/absolute/path" if is_win32 else "socket:///absolute/path")
         for location in locations:
             assert (
                 Location(location).canonical_path() == Location(Location(location).canonical_path()).canonical_path()

@@ -46,7 +46,10 @@ cpu_threads = multiprocessing.cpu_count() if multiprocessing and multiprocessing
 on_rtd = os.environ.get("READTHEDOCS")
 
 # Extra cflags for all extensions, usually just warnings we want to enable explicitly
-cflags = ["-Wall", "-Wextra", "-Wpointer-arith", "-Wno-unreachable-code-fallthrough"]
+cflags = ["-Wall", "-Wextra", "-Wpointer-arith"]
+
+if not is_win32:
+    cflags.extend(["-Wstrict-prototypes"])
 
 compress_source = "src/borg/compress.pyx"
 crypto_ll_source = "src/borg/crypto/low_level.pyx"
@@ -225,7 +228,8 @@ if not on_rtd:
     if cythonize and cythonizing:
         # 3str is the default in Cython3 and we do not support older Cython releases.
         # we only set this to avoid the related FutureWarning from Cython3.
-        cython_opts = dict(compiler_directives={"language_level": "3str"})
+        cython_opts = dict(compiler_directives={"language_level": "3str", "warn.unreachable": True})
+
         if not is_win32:
             # Compile .pyx extensions to .c in parallel; does not work on Windows
             cython_opts["nthreads"] = cpu_threads

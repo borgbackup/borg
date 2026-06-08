@@ -1,13 +1,31 @@
 import os
+import sys
 
 import pytest
 from ..constants import ROBJ_FILE_STREAM
-from ..helpers import IntegrityError
-from ..repository import Repository, MAX_DATA_SIZE, cache_if_remote
+from ..helpers import IntegrityError, Location
+from ..repository import Repository, MAX_DATA_SIZE, cache_if_remote, rest_serve_command
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from ..crypto.key import PlaintextKey
 from .hashindex_test import H
 from .crypto.key_test import TestKey
+
+
+def test_rest_serve_command_local():
+    # rest:// without a host runs "borg serve --rest" locally, talking over stdio.
+    cmd = rest_serve_command(Location("rest:////tmp/repo"))
+    assert "ssh" not in cmd
+    assert cmd[0] == sys.executable
+    assert cmd[-4:] == ["serve", "--rest", "--backend", "FILE:/tmp/repo"]
+
+
+def test_rest_serve_command_ssh(monkeypatch):
+    # rest:// with a host is reached via ssh, running "borg serve --rest" remotely.
+    monkeypatch.delenv("BORGSTORE_RSH", raising=False)
+    monkeypatch.delenv("BORG_REMOTE_PATH", raising=False)
+    cmd = rest_serve_command(Location("rest://user@host:2222/repo/path"))
+    assert cmd[:4] == ["ssh", "-p", "2222", "user@host"]
+    assert cmd[4:] == ["borg", "serve", "--rest", "--backend", "FILE:repo/path"]
 
 
 @pytest.fixture()

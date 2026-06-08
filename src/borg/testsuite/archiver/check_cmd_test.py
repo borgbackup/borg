@@ -9,7 +9,6 @@ from ...archive import ChunkBuffer
 from ...constants import *  # NOQA
 from ...helpers import bin_to_hex, msgpack
 from ...manifest import Manifest
-from ...remote import RemoteRepository
 from ...repository import Repository
 from ..repository_test import fchunk
 from . import cmd, src_file, create_src_archive, open_archive, generate_archiver_tests, RK_ENCRYPTION
@@ -208,7 +207,7 @@ def test_missing_manifest(archivers, request):
     check_cmd_setup(archiver)
     archive, repository = open_archive(archiver.repository_path, "archive1")
     with repository:
-        if isinstance(repository, (Repository, RemoteRepository)):
+        if isinstance(repository, Repository):
             repository.store_delete("config/manifest")
         else:
             repository.delete(Manifest.MANIFEST_ID)

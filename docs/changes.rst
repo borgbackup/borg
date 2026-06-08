@@ -171,6 +171,10 @@ New features:
 - WIP packs project, major repo format changes, you must create new repos! #8572
 - rest:// repository URLs - connect via ssh to remote borgstore REST server,
   talking http via stdio, #9593
+- removed ssh:// and socket:// support for current repositories; use a rest://
+  repository instead (it can tunnel over ssh). ssh:// and ``borg serve`` remain
+  available only for legacy (borg 1.x / v1) repositories, e.g. for
+  ``borg transfer --from-borg1 --other-repo ssh://...``.
 - prune: show total vs matching archives in output, #9262
 - prune: add --json option, #9222
 - archive: preserve cwd archive metadata, #9495

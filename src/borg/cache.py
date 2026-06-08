@@ -32,7 +32,6 @@ from .item import ChunkListEntry
 from .crypto.file_integrity import IntegrityCheckedFile, FileIntegrityError
 from .manifest import Manifest
 from .platform import SaveFile
-from .remote import RemoteRepository
 from .repository import LIST_SCAN_LIMIT, Repository, StoreObjectNotFound, repo_lister
 from .security import SecurityManager, assert_secure  # noqa: F401
 
@@ -651,7 +650,7 @@ def build_chunkindex_from_repo(repository, *, disable_caches=False, cache_immedi
             flags=ChunkIndex.F_USED, size=0, pack_id=pack_id, obj_offset=0, obj_size=obj_size
         )
     # Cache does not contain the manifest.
-    if not isinstance(repository, (Repository, RemoteRepository)):
+    if not isinstance(repository, Repository):
         del chunks[Manifest.MANIFEST_ID]
     duration = perf_counter() - t0 or 0.001
     # Chunk IDs in a list are encoded in 34 bytes: 1 byte msgpack header, 1 byte length, 32 ID bytes.

@@ -11,7 +11,6 @@ from ..hashindex import ChunkIndex, ChunkIndexEntry
 from ..helpers import set_ec, EXIT_ERROR, format_file_size, bin_to_hex
 from ..helpers import ProgressIndicatorPercent
 from ..manifest import Manifest
-from ..remote import RemoteRepository
 from ..repository import Repository, repo_lister
 
 from ..logger import create_logger
@@ -22,7 +21,7 @@ logger = create_logger()
 class ArchiveGarbageCollector:
     def __init__(self, repository, manifest, *, stats, iec):
         self.repository = repository
-        assert isinstance(repository, (Repository, RemoteRepository))
+        assert isinstance(repository, Repository)
         self.manifest = manifest
         self.chunks = None  # a ChunkIndex, here used for: id -> (is_used, stored_size)
         self.total_files = None  # overall number of source files written to all archives in this repo

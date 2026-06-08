@@ -1,7 +1,6 @@
 from .. import __version__
 from ..constants import *  # NOQA
 from ..helpers.argparsing import ArgumentParser
-from ..remote import RemoteRepository
 
 from ..logger import create_logger
 
@@ -14,8 +13,10 @@ class VersionMixIn:
         from borg.version import parse_version, format_version
 
         client_version = parse_version(__version__)
-        if args.location.proto in ("ssh", "socket"):
-            with RemoteRepository(args.location, lock=False, args=args) as repository:
+        if args.location.proto == "ssh" and getattr(args, "v1_legacy", False):
+            from ..legacy.remote import LegacyRemoteRepository
+
+            with LegacyRemoteRepository(args.location, lock=False, args=args) as repository:
                 server_version = repository.server_version
         else:
             server_version = client_version
@@ -28,11 +29,11 @@ class VersionMixIn:
             """
         This command displays the Borg client and server versions.
 
-        If a local repository is given, the client code directly accesses the repository,
-        so the client version is also shown as the server version.
+        For current repositories the client code directly accesses the repository (also for
+        rest:// repositories), so the client version is shown as the server version, too.
 
-        If a remote repository is given (e.g., ssh:), the remote Borg is queried, and
-        its version is displayed as the server version.
+        If a legacy (borg 1.x / v1) repository is given via ssh: together with --from-borg1,
+        the remote Borg is queried, and its version is displayed as the server version.
 
         Examples::
 
@@ -40,8 +41,8 @@ class VersionMixIn:
             $ borg version /mnt/backup
             1.4.0a / 1.4.0a
 
-            # remote repository (client uses 1.4.0 alpha, server uses 1.2.7 release)
-            $ borg version ssh://borg@borgbackup:repo
+            # legacy remote repository (client uses 1.4.0 alpha, server uses 1.2.7 release)
+            $ borg version --from-borg1 ssh://borg@borgbackup:repo
             1.4.0a / 1.2.7
 
         Due to the version tuple format used in Borg client/server negotiation, only

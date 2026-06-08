@@ -1,21 +1,15 @@
-import atexit
 import errno
-import functools
 import inspect
 import logging
 import os
 import queue
 import select
-import shlex
 import shutil
-import socket
 import struct
 import sys
 import tempfile
-import textwrap
 import time
 import traceback
-from subprocess import Popen, PIPE
 
 from xxhash import xxh64
 
@@ -23,44 +17,21 @@ import borg.logger
 from . import __version__
 from .compress import Compressor
 from .constants import *  # NOQA
-from .helpers import Error, ErrorWithTraceback, IntegrityError
+from .helpers import Error, IntegrityError
 from .helpers import bin_to_hex
 from .helpers import get_limited_unpacker
-from .helpers import replace_placeholders
 from .helpers import sysinfo
 from .helpers import format_file_size
 from .helpers import safe_unlink
-from .helpers import prepare_subprocess_env, ignore_sigint
-from .helpers import get_socket_filename
-from .fslocking import LockTimeout, NotLocked, NotMyLock, LockFailed
 from .logger import create_logger, borg_serve_log_queue
-from .manifest import NoManifestError
 from .helpers import msgpack
 from .repository import Repository, StoreObjectNotFound
-from .version import parse_version, format_version
-from .helpers.datastruct import EfficientCollectionQueue
-from .platform import is_win32
+from .version import parse_version
 
 logger = create_logger(__name__)
 
 BORG_VERSION = parse_version(__version__)
 MSGID, MSG, ARGS, RESULT, LOG = "i", "m", "a", "r", "l"
-
-MAX_INFLIGHT = 100
-
-RATELIMIT_PERIOD = 0.1
-
-
-class ConnectionClosed(Error):
-    """Connection closed by remote host"""
-
-    exit_mcode = 80
-
-
-class ConnectionClosedWithHint(ConnectionClosed):
-    """Connection closed by remote host. {}"""
-
-    exit_mcode = 81
 
 
 class PathNotAllowed(Error):
@@ -81,41 +52,10 @@ class UnexpectedRPCDataFormatFromClient(Error):
     exit_mcode = 85
 
 
-class UnexpectedRPCDataFormatFromServer(Error):
-    """Got unexpected RPC data format from server:\n{}"""
-
-    exit_mcode = 86
-
-    def __init__(self, data):
-        try:
-            data = data.decode()[:128]
-        except UnicodeDecodeError:
-            data = data[:128]
-            data = ["%02X" % byte for byte in data]
-            data = textwrap.fill(" ".join(data), 16 * 3)
-        super().__init__(data)
-
-
-class ConnectionBrokenWithHint(Error):
-    """Connection to remote host is broken. {}"""
-
-    exit_mcode = 87
-
-
 # Protocol compatibility:
-# In general the server is responsible for rejecting too old clients and the client it responsible for rejecting
-# too old servers. This ensures that the knowledge what is compatible is always held by the newer component.
-#
-# For the client the return of the negotiate method is a dict which includes the server version.
-#
-# All method calls on the remote repository object must be allowlisted in RepositoryServer.rpc_methods and have api
-# stubs in RemoteRepository*. The @api decorator on these stubs is used to set server version requirements.
-#
-# Method parameters are identified only by name and never by position. Unknown parameters are ignored by the server.
-# If a new parameter is important and may not be ignored, on the client a parameter specific version requirement needs
-# to be added.
-# When parameters are removed, they need to be preserved as defaulted parameters on the client stubs so that older
-# servers still get compatible input.
+# borg only serves legacy (borg 1.x / v1) repositories over ssh:// now (current repositories use rest://).
+# The legacy client lives in borg.legacy.remote (LegacyRemoteRepository); this server keeps the legacy
+# RPC method allowlist and opens repositories using LegacyRepository.
 
 
 class RepositoryServer:  # pragma: no cover
@@ -140,49 +80,14 @@ class RepositoryServer:  # pragma: no cover
         "get_manifest",  # borg2 LegacyRepository has this
     )
 
-    _rpc_methods = (  # Repository
-        "__len__",
-        "check",
-        "delete",
-        "destroy",
-        "get",
-        "list",
-        "negotiate",
-        "open",
-        "close",
-        "info",
-        "put",
-        "save_key",
-        "load_key",
-        "break_lock",
-        "inject_exception",
-        "get_manifest",
-        "put_manifest",
-        "store_list",
-        "store_load",
-        "store_store",
-        "store_delete",
-        "store_move",
-    )
-
-    def __init__(self, restrict_to_paths, restrict_to_repositories, use_socket, permissions=None):
+    def __init__(self, restrict_to_paths, restrict_to_repositories, permissions=None):
         self.repository = None
         self.RepoCls = None
         self.rpc_methods = ("open", "close", "negotiate")
         self.restrict_to_paths = restrict_to_paths
         self.restrict_to_repositories = restrict_to_repositories
         self.permissions = permissions
-        # This flag is parsed from the serve command line via Archiver.do_serve,
-        # i.e. it reflects local system policy and generally ranks higher than
-        # whatever the client wants, except when initializing a new repository
-        # (see RepositoryServer.open below).
         self.client_version = None  # we update this after client sends version information
-        if use_socket is False:
-            self.socket_path = None
-        elif use_socket is True:  # --socket
-            self.socket_path = get_socket_filename()
-        else:  # --socket=/some/path
-            self.socket_path = use_socket
 
     def filter_args(self, f, kwargs):
         """Remove unknown named parameters from call, because client did (implicitly) say it's ok."""
@@ -308,38 +213,10 @@ class RepositoryServer:  # pragma: no cover
                     shutdown_serve = True
                     continue
 
-        if self.socket_path:  # server for socket:// connections
-            try:
-                # remove any left-over socket file
-                os.unlink(self.socket_path)
-            except OSError:
-                if os.path.exists(self.socket_path):
-                    raise
-            sock_dir = os.path.dirname(self.socket_path)
-            os.makedirs(sock_dir, exist_ok=True)
-            pid_file = self.socket_path.removesuffix(".sock") + ".pid"
-            pid = os.getpid()
-            with open(pid_file, "w") as f:
-                f.write(str(pid))
-            atexit.register(functools.partial(os.remove, pid_file))
-            atexit.register(functools.partial(os.remove, self.socket_path))
-            sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
-            sock.bind(self.socket_path)  # this creates the socket file in the fs
-            sock.listen(0)  # no backlog
-            os.chmod(self.socket_path, mode=0o0770)  # group members may use the socket, too.
-            print(f"borg serve: PID {pid}, listening on socket {self.socket_path} ...", file=sys.stderr)
-
-            while True:
-                connection, client_address = sock.accept()
-                print(f"Accepted a connection on socket {self.socket_path} ...", file=sys.stderr)
-                self.stdin_fd = connection.makefile("rb").fileno()
-                self.stdout_fd = connection.makefile("wb").fileno()
-                inner_serve()
-                print(f"Finished with connection on socket {self.socket_path} .", file=sys.stderr)
-        else:  # server for one ssh:// connection
-            self.stdin_fd = sys.stdin.fileno()
-            self.stdout_fd = sys.stdout.fileno()
-            inner_serve()
+        # server for one ssh:// connection
+        self.stdin_fd = sys.stdin.fileno()
+        self.stdout_fd = sys.stdout.fileno()
+        inner_serve()
 
     def negotiate(self, client_data):
         if isinstance(client_data, dict):
@@ -357,13 +234,11 @@ class RepositoryServer:  # pragma: no cover
         return path
 
     def open(self, path, create=False, lock_wait=None, lock=True, exclusive=None, v1_legacy=False):
-        if v1_legacy:
-            from .legacy.repository import LegacyRepository
+        # borg only serves legacy (v1) repositories now; current repositories are accessed via rest://.
+        from .legacy.repository import LegacyRepository
 
-            self.RepoCls = LegacyRepository
-        else:
-            self.RepoCls = Repository
-        self.rpc_methods = self._legacy_rpc_methods if v1_legacy else self._rpc_methods
+        self.RepoCls = LegacyRepository
+        self.rpc_methods = self._legacy_rpc_methods
         logging.debug("Resolving repository path %r", path)
         path = self._resolve_path(path)
         logging.debug("Resolved repository path to %r", path)
@@ -386,8 +261,6 @@ class RepositoryServer:  # pragma: no cover
             else:
                 raise PathNotAllowed(path)
         kwargs = dict(lock_wait=lock_wait, lock=lock, exclusive=exclusive, send_log_cb=self.send_queued_log)
-        if not v1_legacy:
-            kwargs["permissions"] = self.permissions
         self.repository = self.RepoCls(path, create, **kwargs)
         self.repository.__enter__()  # clean exit handled by serve() method
         return self.repository.id
@@ -420,661 +293,6 @@ class RepositoryServer:  # pragma: no cover
             raise InvalidRPCMethod(s1)
         elif kind == "divide":
             0 // 0
-
-
-class SleepingBandwidthLimiter:
-    def __init__(self, limit):
-        if limit:
-            self.ratelimit = int(limit * RATELIMIT_PERIOD)
-            self.ratelimit_last = time.monotonic()
-            self.ratelimit_quota = self.ratelimit
-        else:
-            self.ratelimit = None
-
-    def write(self, fd, to_send):
-        if self.ratelimit:
-            now = time.monotonic()
-            if self.ratelimit_last + RATELIMIT_PERIOD <= now:
-                self.ratelimit_quota += self.ratelimit
-                if self.ratelimit_quota > 2 * self.ratelimit:
-                    self.ratelimit_quota = 2 * self.ratelimit
-                self.ratelimit_last = now
-            if self.ratelimit_quota == 0:
-                tosleep = self.ratelimit_last + RATELIMIT_PERIOD - now
-                time.sleep(tosleep)
-                self.ratelimit_quota += self.ratelimit
-                self.ratelimit_last = time.monotonic()
-            if len(to_send) > self.ratelimit_quota:
-                to_send = to_send[: self.ratelimit_quota]
-        try:
-            written = os.write(fd, to_send)
-        except BrokenPipeError:
-            raise ConnectionBrokenWithHint("Broken Pipe") from None
-        if self.ratelimit:
-            self.ratelimit_quota -= written
-        return written
-
-
-def api(*, since, **kwargs_decorator):
-    """Check version requirements and use self.call to do the remote method call.
-
-    <since> specifies the version in which borg introduced this method.
-    Calling this method when connected to an older version will fail without transmitting anything to the server.
-
-    Further kwargs can be used to encode version specific restrictions:
-
-    <previously> is the value resulting in the behaviour before introducing the new parameter.
-    If a previous hardcoded behaviour is parameterized in a version, this allows calls that use the previously
-    hardcoded behaviour to pass through and generates an error if another behaviour is requested by the client.
-    E.g. when 'append_only' was introduced in 1.0.7 the previous behaviour was what now is append_only=False.
-    Thus @api(..., append_only={'since': parse_version('1.0.7'), 'previously': False}) allows calls
-    with append_only=False for all version but rejects calls using append_only=True on versions older than 1.0.7.
-
-    <dontcare> is a flag to set the behaviour if an old version is called the new way.
-    If set to True, the method is called without the (not yet supported) parameter (this should be done if that is the
-    more desirable behaviour). If False, an exception is generated.
-    E.g. before 'threshold' was introduced in 1.2.0a8, a hardcoded threshold of 0.1 was used in commit().
-    """
-
-    def decorator(f):
-        @functools.wraps(f)
-        def do_rpc(self, *args, **kwargs):
-            sig = inspect.signature(f)
-            bound_args = sig.bind(self, *args, **kwargs)
-            named = {}  # Arguments for the remote process
-            extra = {}  # Arguments for the local process
-            for name, param in sig.parameters.items():
-                if name == "self":
-                    continue
-                if name in bound_args.arguments:
-                    if name == "wait":
-                        extra[name] = bound_args.arguments[name]
-                    else:
-                        named[name] = bound_args.arguments[name]
-                else:
-                    if param.default is not param.empty:
-                        named[name] = param.default
-
-            if self.server_version < since:
-                raise self.RPCServerOutdated(f.__name__, format_version(since))
-
-            for name, restriction in kwargs_decorator.items():
-                if restriction["since"] <= self.server_version:
-                    continue
-                if "previously" in restriction and named[name] == restriction["previously"]:
-                    continue
-                if restriction.get("dontcare", False):
-                    continue
-
-                raise self.RPCServerOutdated(
-                    f"{f.__name__} {name}={named[name]!s}", format_version(restriction["since"])
-                )
-
-            return self.call(f.__name__, named, **extra)
-
-        return do_rpc
-
-    return decorator
-
-
-class RemoteRepository:
-    extra_test_args = []  # type: ignore
-
-    class RPCError(Exception):
-        def __init__(self, unpacked):
-            # unpacked has keys: 'exception_args', 'exception_full', 'exception_short', 'sysinfo'
-            self.unpacked = unpacked
-
-        def get_message(self):
-            return "\n".join(self.unpacked["exception_short"])
-
-        @property
-        def traceback(self):
-            return self.unpacked.get("exception_trace", True)
-
-        @property
-        def exception_class(self):
-            return self.unpacked["exception_class"]
-
-        @property
-        def exception_full(self):
-            return "\n".join(self.unpacked["exception_full"])
-
-        @property
-        def sysinfo(self):
-            return self.unpacked["sysinfo"]
-
-    class RPCServerOutdated(Error):
-        """Borg server is too old for {}. Required version {}"""
-
-        exit_mcode = 84
-
-        @property
-        def method(self):
-            return self.args[0]
-
-        @property
-        def required_version(self):
-            return self.args[1]
-
-    def __init__(self, location, create=False, exclusive=False, lock_wait=1.0, lock=True, args=None):
-        self.location = self._location = location
-        self.preload_ids = []
-        self.msgid = 0
-        self.rx_bytes = 0
-        self.tx_bytes = 0
-        self.to_send = EfficientCollectionQueue(1024 * 1024, bytes)
-        self.stdin_fd = self.stdout_fd = self.stderr_fd = None
-        self.stderr_received = b""  # incomplete stderr line bytes received (no \n yet)
-        self.chunkid_to_msgids = {}
-        self.ignore_responses = set()
-        self.responses = {}
-        self.async_responses = {}
-        self.shutdown_time = None
-        self.ratelimit = SleepingBandwidthLimiter(args.upload_ratelimit * 1024 if args and args.upload_ratelimit else 0)
-        self.upload_buffer_size_limit = args.upload_buffer * 1024 * 1024 if args and args.upload_buffer else 0
-        self.unpacker = get_limited_unpacker("client")
-        self.server_version = None  # we update this after server sends its version
-        self.p = self.sock = None
-        self._args = args
-        if self.location.proto == "ssh":
-            testing = location.host == "__testsuite__"
-            # when testing, we invoke and talk to a borg process directly (no ssh).
-            # when not testing, we invoke the system-installed ssh binary to talk to a remote borg.
-            env = prepare_subprocess_env(system=not testing)
-            borg_cmd = self.borg_cmd(args, testing)
-            if not testing:
-                borg_cmd = self.ssh_cmd(location) + borg_cmd
-            logger.debug("SSH command line: %s", borg_cmd)
-            # we do not want the ssh getting killed by Ctrl-C/SIGINT because it is needed for clean shutdown of borg.
-            self.p = Popen(
-                borg_cmd,
-                bufsize=0,
-                stdin=PIPE,
-                stdout=PIPE,
-                stderr=PIPE,
-                env=env,
-                preexec_fn=None if is_win32 else ignore_sigint,
-            )  # nosec B603
-            self.stdin_fd = self.p.stdin.fileno()
-            self.stdout_fd = self.p.stdout.fileno()
-            self.stderr_fd = self.p.stderr.fileno()
-            self.r_fds = [self.stdout_fd, self.stderr_fd]
-            self.x_fds = [self.stdin_fd, self.stdout_fd, self.stderr_fd]
-        elif self.location.proto == "socket":
-            if args.use_socket is False or args.use_socket is True:  # nothing or --socket
-                socket_path = get_socket_filename()
-            else:  # --socket=/some/path
-                socket_path = args.use_socket
-            self.sock = socket.socket(family=socket.AF_UNIX, type=socket.SOCK_STREAM)
-            try:
-                self.sock.connect(socket_path)  # note: socket_path length is rather limited.
-            except FileNotFoundError:
-                self.sock = None
-                raise Error(f"The socket file {socket_path} does not exist.")
-            except ConnectionRefusedError:
-                self.sock = None
-                raise Error(f"There is no borg serve running for the socket file {socket_path}.")
-            self.stdin_fd = self.sock.makefile("wb").fileno()
-            self.stdout_fd = self.sock.makefile("rb").fileno()
-            self.stderr_fd = None
-            self.r_fds = [self.stdout_fd]
-            self.x_fds = [self.stdin_fd, self.stdout_fd]
-        else:
-            raise Error(f"Unsupported protocol {location.proto}")
-
-        os.set_blocking(self.stdin_fd, False)
-        assert not os.get_blocking(self.stdin_fd)
-        os.set_blocking(self.stdout_fd, False)
-        assert not os.get_blocking(self.stdout_fd)
-        if self.stderr_fd is not None:
-            os.set_blocking(self.stderr_fd, False)
-            assert not os.get_blocking(self.stderr_fd)
-
-        try:
-            try:
-                version = self.call("negotiate", {"client_data": {"client_version": BORG_VERSION}})
-            except ConnectionClosed:
-                raise ConnectionClosedWithHint("Is borg working on the server?") from None
-            if isinstance(version, dict):
-                self.server_version = version["server_version"]
-            else:
-                raise Exception("Server insisted on using unsupported protocol version %s" % version)
-
-            self.id = self.open(
-                path=self.location.path, create=create, lock_wait=lock_wait, lock=lock, exclusive=exclusive
-            )
-            info = self.info()
-            self.version = info["version"]
-
-        except Exception:
-            self.close()
-            raise
-
-    def __del__(self):
-        if len(self.responses):
-            logging.debug("still %d cached responses left in RemoteRepository" % (len(self.responses),))
-        if self.p or self.sock:
-            self.close()
-            assert False, "cleanup happened in RemoteRepository.__del__"
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__} {self.location.canonical_path()}>"
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if exc_type is not None:
-                self.shutdown_time = time.monotonic() + 30
-        finally:
-            # in any case, we want to close the repo cleanly.
-            logger.debug(
-                "RemoteRepository: %s bytes sent, %s bytes received, %d messages sent",
-                format_file_size(self.tx_bytes),
-                format_file_size(self.rx_bytes),
-                self.msgid,
-            )
-            self.close()
-
-    @property
-    def id_str(self):
-        return bin_to_hex(self.id)
-
-    def borg_cmd(self, args, testing):
-        """return a borg serve command line"""
-        # give some args/options to 'borg serve' process as they were given to us
-        opts = []
-        if args is not None:
-            root_logger = logging.getLogger()
-            if root_logger.isEnabledFor(logging.DEBUG):
-                opts.append("--debug")
-            elif root_logger.isEnabledFor(logging.INFO):
-                opts.append("--info")
-            elif root_logger.isEnabledFor(logging.WARNING):
-                pass  # warning is default
-            elif root_logger.isEnabledFor(logging.ERROR):
-                opts.append("--error")
-            elif root_logger.isEnabledFor(logging.CRITICAL):
-                opts.append("--critical")
-            else:
-                raise ValueError("log level missing, fix this code")
-
-            # Tell the remote server about debug topics it may need to consider.
-            # Note that debug topics are usable for "spew" or "trace" logs which would
-            # be too plentiful to transfer for normal use, so the server doesn't send
-            # them unless explicitly enabled.
-            #
-            # Needless to say, if you do --debug-topic=repository.compaction, for example,
-            # with a 1.0.x server it won't work, because the server does not recognize the
-            # option.
-            #
-            # This is not considered a problem, since this is a debugging feature that
-            # should not be used for regular use.
-            for topic in args.debug_topics:
-                if "." not in topic:
-                    topic = "borg.debug." + topic
-                if "repository" in topic:
-                    opts.append("--debug-topic=%s" % topic)
-        env_vars = []
-        if testing:
-            return env_vars + [sys.executable, "-m", "borg", "serve"] + opts + self.extra_test_args
-        else:  # pragma: no cover
-            remote_path = args.remote_path or os.environ.get("BORG_REMOTE_PATH", "borg")
-            remote_path = replace_placeholders(remote_path)
-            return env_vars + [remote_path, "serve"] + opts
-
-    def ssh_cmd(self, location):
-        """return a ssh command line that can be prefixed to a borg command line"""
-        rsh = self._args.rsh or os.environ.get("BORG_RSH", "ssh")
-        args = shlex.split(rsh)
-        if location.port:
-            args += ["-p", str(location.port)]
-        if location.user:
-            args.append(f"{location.user}@{location.host}")
-        else:
-            args.append("%s" % location.host)
-        return args
-
-    def call(self, cmd, args, **kw):
-        for resp in self.call_many(cmd, [args], **kw):
-            return resp
-
-    def call_many(self, cmd, calls, wait=True, is_preloaded=False, async_wait=True):
-        if not calls and cmd != "async_responses":
-            return
-
-        assert not is_preloaded or cmd == "get", "is_preloaded is only supported for 'get'"
-
-        def send_buffer():
-            if self.to_send:
-                try:
-                    written = self.ratelimit.write(self.stdin_fd, self.to_send.peek_front())
-                    self.tx_bytes += written
-                    self.to_send.pop_front(written)
-                except OSError as e:
-                    # io.write might raise EAGAIN even though select indicates
-                    # that the fd should be writable.
-                    # EWOULDBLOCK is added for defensive programming sake.
-                    if e.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
-                        raise
-
-        def pop_preload_msgid(chunkid):
-            msgid = self.chunkid_to_msgids[chunkid].pop(0)
-            if not self.chunkid_to_msgids[chunkid]:
-                del self.chunkid_to_msgids[chunkid]
-            return msgid
-
-        def handle_error(unpacked):
-            if "exception_class" not in unpacked:
-                return
-
-            error = unpacked["exception_class"]
-            args = unpacked["exception_args"]
-
-            if error == "Error":
-                raise Error(args[0])
-            elif error == "ErrorWithTraceback":
-                raise ErrorWithTraceback(args[0])
-            elif error == "InvalidRepository":
-                raise Repository.InvalidRepository(self.location.processed)
-            elif error == "DoesNotExist":
-                raise Repository.DoesNotExist(self.location.processed)
-            elif error == "AlreadyExists":
-                raise Repository.AlreadyExists(self.location.processed)
-            elif error == "CheckNeeded":
-                raise Repository.CheckNeeded(self.location.processed)
-            elif error == "IntegrityError":
-                raise IntegrityError(args[0])
-            elif error == "PathNotAllowed":
-                raise PathNotAllowed(args[0])
-            elif error == "PathPermissionDenied":
-                raise Repository.PathPermissionDenied(args[0])
-            elif error == "PathAlreadyExists":
-                raise Repository.PathAlreadyExists(args[0])
-            elif error == "ParentPathDoesNotExist":
-                raise Repository.ParentPathDoesNotExist(args[0])
-            elif error == "ObjectNotFound":
-                raise Repository.ObjectNotFound(args[0], self.location.processed)
-            elif error == "StoreObjectNotFound":
-                raise StoreObjectNotFound(args[0])
-            elif error == "InvalidRPCMethod":
-                raise InvalidRPCMethod(args[0])
-            elif error == "LockTimeout":
-                raise LockTimeout(args[0])
-            elif error == "LockFailed":
-                raise LockFailed(args[0], args[1])
-            elif error == "NotLocked":
-                raise NotLocked(args[0])
-            elif error == "NotMyLock":
-                raise NotMyLock(args[0])
-            elif error == "NoManifestError":
-                raise NoManifestError
-            elif error == "InsufficientFreeSpaceError":
-                raise Repository.InsufficientFreeSpaceError(args[0], args[1])
-            elif error == "InvalidRepositoryConfig":
-                raise Repository.InvalidRepositoryConfig(self.location.processed, args[1])
-            else:
-                raise self.RPCError(unpacked)
-
-        calls = list(calls)
-        waiting_for = []
-        maximum_to_send = 0 if wait else self.upload_buffer_size_limit
-        send_buffer()  # Try to send data, as some cases (async_response) will never try to send data otherwise.
-        try:
-            while wait or calls:
-                logger.debug(
-                    f"call_many: calls: {len(calls)} waiting_for: {len(waiting_for)} responses: {len(self.responses)}"
-                )
-                if self.shutdown_time and time.monotonic() > self.shutdown_time:
-                    # we are shutting this RemoteRepository down already, make sure we do not waste
-                    # a lot of time in case a lot of async stuff is coming in or remote is gone or slow.
-                    logger.debug(
-                        "shutdown_time reached, shutting down with %d waiting_for and %d async_responses.",
-                        len(waiting_for),
-                        len(self.async_responses),
-                    )
-                    return
-                while waiting_for:
-                    try:
-                        unpacked = self.responses.pop(waiting_for[0])
-                        waiting_for.pop(0)
-                        handle_error(unpacked)
-                        yield unpacked[RESULT]
-                        if not waiting_for and not calls:
-                            return
-                    except KeyError:
-                        break
-                if cmd == "async_responses":
-                    while True:
-                        try:
-                            msgid, unpacked = self.async_responses.popitem()
-                        except KeyError:
-                            # there is nothing left what we already have received
-                            if async_wait and self.ignore_responses:
-                                # but do not return if we shall wait and there is something left to wait for:
-                                break
-                            else:
-                                return
-                        else:
-                            handle_error(unpacked)
-                            yield unpacked[RESULT]
-                if self.to_send or ((calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT):
-                    w_fds = [self.stdin_fd]
-                else:
-                    w_fds = []
-                r, w, x = select.select(self.r_fds, w_fds, self.x_fds, 1)
-                if x:
-                    raise Exception("FD exception occurred")
-                for fd in r:
-                    if fd is self.stdout_fd:
-                        data = os.read(fd, BUFSIZE)
-                        if not data:
-                            raise ConnectionClosed()
-                        self.rx_bytes += len(data)
-                        self.unpacker.feed(data)
-                        for unpacked in self.unpacker:
-                            if not isinstance(unpacked, dict):
-                                raise UnexpectedRPCDataFormatFromServer(data)
-
-                            lr_dict = unpacked.get(LOG)
-                            if lr_dict is not None:
-                                # Re-emit remote log messages locally.
-                                _logger = logging.getLogger(lr_dict["name"])
-                                if _logger.isEnabledFor(lr_dict["level"]):
-                                    _logger.handle(logging.LogRecord(**lr_dict))
-                                continue
-
-                            msgid = unpacked[MSGID]
-                            if msgid in self.ignore_responses:
-                                self.ignore_responses.remove(msgid)
-                                # async methods never return values, but may raise exceptions.
-                                if "exception_class" in unpacked:
-                                    self.async_responses[msgid] = unpacked
-                                else:
-                                    # we currently do not have async result values except "None",
-                                    # so we do not add them into async_responses.
-                                    if unpacked[RESULT] is not None:
-                                        self.async_responses[msgid] = unpacked
-                            else:
-                                self.responses[msgid] = unpacked
-                    elif fd is self.stderr_fd:
-                        data = os.read(fd, 32768)
-                        if not data:
-                            raise ConnectionClosed()
-                        self.rx_bytes += len(data)
-                        # deal with incomplete lines (may appear due to block buffering)
-                        if self.stderr_received:
-                            data = self.stderr_received + data
-                            self.stderr_received = b""
-                        lines = data.splitlines(keepends=True)
-                        if lines and not lines[-1].endswith((b"\r", b"\n")):
-                            self.stderr_received = lines.pop()
-                        # now we have complete lines in <lines> and any partial line in self.stderr_received.
-                        _logger = logging.getLogger()
-                        for line in lines:
-                            # borg serve (remote/server side) should not emit stuff on stderr,
-                            # but e.g. the ssh process (local/client side) might output errors there.
-                            assert line.endswith((b"\r", b"\n"))
-                            # something came in on stderr, log it to not lose it.
-                            # decode late, avoid partial utf-8 sequences.
-                            _logger.warning("stderr: " + line.decode().strip())
-                if w:
-                    while (
-                        (len(self.to_send) <= maximum_to_send)
-                        and (calls or self.preload_ids)
-                        and len(waiting_for) < MAX_INFLIGHT
-                    ):
-                        if calls:
-                            args = calls[0]
-                            if cmd == "get" and args["id"] in self.chunkid_to_msgids:
-                                # we have a get command and have already sent a request for this chunkid when
-                                # doing preloading, so we know the msgid of the response we are waiting for:
-                                waiting_for.append(pop_preload_msgid(args["id"]))
-                                del calls[0]
-                            elif not is_preloaded:
-                                # make and send a request (already done if we are using preloading)
-                                self.msgid += 1
-                                waiting_for.append(self.msgid)
-                                del calls[0]
-                                self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))
-                        if not self.to_send and self.preload_ids:
-                            chunk_id = self.preload_ids.pop(0)
-                            # for preloading chunks, the raise_missing behaviour is defined HERE,
-                            # not in the get_many / fetch_many call that later fetches the preloaded chunks.
-                            args = {"id": chunk_id, "raise_missing": False}
-                            self.msgid += 1
-                            self.chunkid_to_msgids.setdefault(chunk_id, []).append(self.msgid)
-                            self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: "get", ARGS: args}))
-
-                    send_buffer()
-        finally:
-            self.ignore_responses |= set(waiting_for)  # we lose order here
-            if is_preloaded:
-                for call in calls:
-                    chunkid = call["id"]
-                    if chunkid in self.chunkid_to_msgids:
-                        self.ignore_responses.add(pop_preload_msgid(chunkid))
-
-    @api(since=parse_version("1.0.0"), v1_legacy={"since": parse_version("2.0.0b21"), "previously": True})
-    def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, v1_legacy=False):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0a3"))
-    def info(self):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"), max_duration={"since": parse_version("1.2.0a4"), "previously": 0})
-    def check(self, repair=False, max_duration=0):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(
-        since=parse_version("1.0.0"),
-        compact={"since": parse_version("1.2.0a0"), "previously": True, "dontcare": True},
-        threshold={"since": parse_version("1.2.0a8"), "previously": 0.1, "dontcare": True},
-    )
-    def commit(self, compact=True, threshold=0.1):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"))
-    def rollback(self):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"))
-    def destroy(self):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"))
-    def __len__(self):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"))
-    def list(self, limit=None, marker=None):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    def get(self, id, read_data=True, raise_missing=True):
-        for resp in self.get_many([id], read_data=read_data, raise_missing=raise_missing):
-            return resp
-
-    def get_many(self, ids, read_data=True, is_preloaded=False, raise_missing=True):
-        yield from self.call_many(
-            "get",
-            [{"id": id, "read_data": read_data, "raise_missing": raise_missing} for id in ids],
-            is_preloaded=is_preloaded,
-        )
-
-    @api(since=parse_version("1.0.0"))
-    def put(self, id, data, wait=True):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"))
-    def delete(self, id, wait=True):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"))
-    def save_key(self, keydata):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"))
-    def load_key(self):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("1.0.0"))
-    def break_lock(self):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    def close(self):
-        if self.p or self.sock:
-            self.call("close", {}, wait=True)
-        if self.p:
-            self.p.stdin.close()
-            self.p.stdout.close()
-            self.p.wait()
-            self.p = None
-        if self.sock:
-            try:
-                self.sock.shutdown(socket.SHUT_RDWR)
-            except OSError as e:
-                if e.errno != errno.ENOTCONN:
-                    raise
-            self.sock.close()
-            self.sock = None
-
-    def async_response(self, wait=True):
-        for resp in self.call_many("async_responses", calls=[], wait=True, async_wait=wait):
-            return resp
-
-    def preload(self, ids):
-        self.preload_ids += ids
-
-    @api(since=parse_version("2.0.0b8"))
-    def get_manifest(self):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b8"))
-    def put_manifest(self, data):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b14"), "previously": False})
-    def store_list(self, name, *, deleted=False):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b8"))
-    def store_load(self, name):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b8"))
-    def store_store(self, name, value):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b8"), deleted={"since": parse_version("2.0.0b14"), "previously": False})
-    def store_delete(self, name, *, deleted=False):
-        """actual remoting is done via self.call in the @api decorator"""
-
-    @api(since=parse_version("2.0.0b14"))
-    def store_move(self, name, new_name=None, *, delete=False, undelete=False, deleted=False):
-        """actual remoting is done via self.call in the @api decorator"""
 
 
 class RepositoryNoCache:
@@ -1280,7 +498,7 @@ def cache_if_remote(repository, *, decrypted_cache=False, pack=None, unpack=None
             csize = meta.get("csize", len(data))
             return csize, decrypted
 
-    if isinstance(repository, RemoteRepository) or force_cache:
+    if force_cache:
         return RepositoryCache(repository, pack, unpack, transform)
     else:
         return RepositoryNoCache(repository, transform)

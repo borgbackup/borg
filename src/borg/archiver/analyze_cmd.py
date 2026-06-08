@@ -8,7 +8,6 @@ from ..helpers import bin_to_hex, Error
 from ..helpers import ProgressIndicatorPercent
 from ..helpers.argparsing import ArgumentParser
 from ..manifest import Manifest
-from ..remote import RemoteRepository
 from ..repository import Repository
 
 from ..logger import create_logger
@@ -20,7 +19,7 @@ class ArchiveAnalyzer:
     def __init__(self, args, repository, manifest):
         self.args = args
         self.repository = repository
-        assert isinstance(repository, (Repository, RemoteRepository))
+        assert isinstance(repository, Repository)
         self.manifest = manifest
         self.difference_by_path = defaultdict(int)  # directory path -> count of chunks changed
 

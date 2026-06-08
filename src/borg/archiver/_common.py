@@ -13,7 +13,6 @@ from ..helpers.argparsing import SUPPRESS, PositiveInt
 from ..helpers.nanorst import rst_to_terminal
 from ..manifest import Manifest, AI_HUMAN_SORT_KEYS
 from ..patterns import PatternMatcher
-from ..remote import RemoteRepository
 from ..repository import Repository
 from ..repoobj import RepoObj
 from ..patterns import (
@@ -30,16 +29,19 @@ logger = create_logger(__name__)
 
 
 def get_repository(location, *, create, exclusive, lock_wait, lock, args, v1_legacy):
-    if location.proto in ("ssh", "socket"):
+    if location.proto == "ssh":
         if v1_legacy:
             from ..legacy.remote import LegacyRemoteRepository
 
-            RemoteRepoCls = LegacyRemoteRepository
+            repository = LegacyRemoteRepository(
+                location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, args=args
+            )
         else:
-            RemoteRepoCls = RemoteRepository
-        repository = RemoteRepoCls(
-            location, create=create, exclusive=exclusive, lock_wait=lock_wait, lock=lock, args=args
-        )
+            raise Error(
+                "ssh:// is no longer supported for current repositories; use rest:// instead "
+                "(it can tunnel over ssh). ssh:// remains available only for legacy v1 repositories "
+                "via --from-borg1."
+            )
 
     elif (
         location.proto in ("rest", "sftp", "file", "http", "https", "rclone", "s3", "b2") and not v1_legacy
@@ -583,16 +585,6 @@ def define_common_options(add_common_option):
         dest="rsh",
         action=Highlander,
         help="Use this command to connect to the 'borg serve' process (default: 'ssh')",
-    )
-    add_common_option(
-        "--socket",
-        metavar="PATH",
-        dest="use_socket",
-        default=False,
-        const=True,
-        nargs="?",
-        action=Highlander,
-        help="Use UNIX DOMAIN (IPC) socket at PATH for client/server communication with socket: protocol.",
     )
     add_common_option(
         "-r",

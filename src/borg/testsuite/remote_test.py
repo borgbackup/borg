@@ -1,13 +1,12 @@
 import errno
 import os
 import io
-import time
 from unittest.mock import patch
 
 import pytest
 
 from ..constants import ROBJ_FILE_STREAM
-from ..remote import SleepingBandwidthLimiter, RepositoryCache, cache_if_remote
+from ..remote import RepositoryCache, cache_if_remote
 from ..repository import Repository
 from ..crypto.key import PlaintextKey
 from ..helpers import IntegrityError
@@ -15,60 +14,6 @@ from ..repoobj import RepoObj
 from .hashindex_test import H
 from .repository_test import fchunk, pdchunk
 from .crypto.key_test import TestKey
-
-
-class TestSleepingBandwidthLimiter:
-    def expect_write(self, fd, data):
-        self.expected_fd = fd
-        self.expected_data = data
-
-    def check_write(self, fd, data):
-        assert fd == self.expected_fd
-        assert data == self.expected_data
-        return len(data)
-
-    def test_write_unlimited(self, monkeypatch):
-        monkeypatch.setattr(os, "write", self.check_write)
-
-        it = SleepingBandwidthLimiter(0)
-        self.expect_write(5, b"test")
-        it.write(5, b"test")
-
-    def test_write(self, monkeypatch):
-        monkeypatch.setattr(os, "write", self.check_write)
-        monkeypatch.setattr(time, "monotonic", lambda: now)
-        monkeypatch.setattr(time, "sleep", lambda x: None)
-
-        now = 100
-
-        it = SleepingBandwidthLimiter(100)  # Bandwidth quota.
-
-        # All fits
-        self.expect_write(5, b"test")
-        it.write(5, b"test")
-
-        # Only partial write
-        self.expect_write(5, b"123456")
-        it.write(5, b"1234567890")
-
-        # Sleeps
-        self.expect_write(5, b"123456")
-        it.write(5, b"123456")
-
-        # Long time interval between writes
-        now += 10
-        self.expect_write(5, b"1")
-        it.write(5, b"1")
-
-        # Long time interval between writes, filling up the quota
-        now += 10
-        self.expect_write(5, b"1")
-        it.write(5, b"1")
-
-        # Long time interval between writes, filling up the quota to clip to the maximum
-        now += 10
-        self.expect_write(5, b"1")
-        it.write(5, b"1")
 
 
 class TestRepositoryCache:

@@ -62,7 +62,7 @@ from .crypto.low_level import blake2b_128
 from .archiver._common import build_matcher, build_filter
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
-from .helpers import daemonize, daemonizing, signal_handler, format_file_size, bin_to_hex, Error
+from .helpers import daemonizing, signal_handler, format_file_size, bin_to_hex, Error
 from .helpers import HardLinkManager
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
@@ -70,7 +70,6 @@ from .item import Item
 from .platform import uid2user, gid2group
 from .platformflags import is_darwin
 from .repository import Repository
-from .remote import RemoteRepository
 
 
 def fuse_main():
@@ -596,13 +595,10 @@ class FuseOperations(llfuse.Operations, FuseBackend):
             "that do not reflect the archive content."
         )
         if not foreground:
-            if isinstance(self.repository_uncached, RemoteRepository):
-                daemonize()
-            else:
-                with daemonizing(show_rc=show_rc) as (old_id, new_id):
-                    # local repo: the locking process' PID is changing, migrate it:
-                    logger.debug("fuse: mount local repo, going to background: migrating lock.")
-                    self.repository_uncached.migrate_lock(old_id, new_id)
+            with daemonizing(show_rc=show_rc) as (old_id, new_id):
+                # the locking process' PID is changing, migrate it:
+                logger.debug("fuse: mount repo, going to background: migrating lock.")
+                self.repository_uncached.migrate_lock(old_id, new_id)
 
         # If the file system crashes, we do not want to umount because in that
         # case the mountpoint suddenly appears to become empty. This can have

@@ -47,7 +47,7 @@ try:
     from ..helpers import sig_int
     from ..helpers import get_config_dir
     from ..platformflags import is_msystem
-    from ..remote import RemoteRepository
+    from ..legacy.remote import LegacyRemoteRepository
     from ..selftest import selftest
 except BaseException:
     # an unhandled exception in the try-block would cause the borg cli command to exit with rc 1 due to python's
@@ -538,7 +538,7 @@ def sig_trace_handler(sig_no, stack):  # pragma: no cover
 
 def format_tb(exc):
     qualname = type(exc).__qualname__
-    remote = isinstance(exc, RemoteRepository.RPCError)
+    remote = isinstance(exc, LegacyRemoteRepository.RPCError)
     if remote:
         prefix = "Borg server: "
         trace_back = "\n".join(prefix + line for line in exc.exception_full.splitlines())
@@ -632,7 +632,7 @@ def main():  # pragma: no cover
             tb_log_level = logging.ERROR if e.traceback else logging.DEBUG
             tb = format_tb(e)
             exit_code = e.exit_code
-        except RemoteRepository.RPCError as e:
+        except LegacyRemoteRepository.RPCError as e:
             important = e.traceback
             msg = e.exception_full if important else e.get_message()
             msgid = e.exception_class

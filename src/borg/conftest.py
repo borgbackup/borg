@@ -96,7 +96,7 @@ class ArchiverSetup:
         self.patterns_file_path: str | None = None
 
     def get_kind(self) -> str:
-        if self.repository_location.startswith("ssh://__testsuite__") or self.repository_location.startswith("rest://"):
+        if self.repository_location.startswith("rest://"):
             return "remote"
         elif self.EXE == "borg.exe":
             return "binary"

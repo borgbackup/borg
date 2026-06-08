@@ -24,7 +24,7 @@ logger = create_logger()
 from .archiver._common import build_matcher, build_filter
 from .archive import Archive, get_item_uid_gid
 from .hashindex import FuseVersionsIndex
-from .helpers import daemonize, daemonizing, signal_handler, bin_to_hex, Error
+from .helpers import daemonizing, signal_handler, bin_to_hex, Error
 from .helpers import HardLinkManager
 from .helpers import msgpack
 from .helpers.lrucache import LRUCache
@@ -32,7 +32,6 @@ from .item import Item
 from .platform import uid2user, gid2group
 from .platformflags import is_darwin
 from .repository import Repository
-from .remote import RemoteRepository
 
 BLOCK_SIZE = 512  # Standard filesystem block size for st_blocks and statfs
 DEBUG_LOG: str | None = None  # os.path.join(os.getcwd(), "fuse_debug.log")
@@ -529,12 +528,9 @@ class borgfs(hlfuse.Operations, FuseBackend):
         # hlfuse.FUSE will block if foreground=True, otherwise it returns immediately
         if not foreground:
             # Background mode: daemonize first, then start FUSE (blocking)
-            if isinstance(self.repository, RemoteRepository):
-                daemonize()
-            else:
-                with daemonizing(show_rc=show_rc) as (old_id, new_id):
-                    logger.debug("fuse: mount local repo, going to background: migrating lock.")
-                    self.repository.migrate_lock(old_id, new_id)
+            with daemonizing(show_rc=show_rc) as (old_id, new_id):
+                logger.debug("fuse: mount repo, going to background: migrating lock.")
+                self.repository.migrate_lock(old_id, new_id)
 
         # Run the FUSE main loop in foreground (we might be daemonized already or not)
         with signal_handler("SIGUSR1", self.sig_info_handler), signal_handler("SIGINFO", self.sig_info_handler):

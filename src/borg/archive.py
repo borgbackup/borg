@@ -50,8 +50,7 @@ from .patterns import PathPrefixPattern, FnmatchPattern, IECommand
 from .item import Item, ArchiveItem, ItemDiff
 from . import platform
 from .platform import acl_get, acl_set, set_flags, get_flags, swidth
-from .remote import cache_if_remote
-from .repository import Repository, NoManifestError
+from .repository import Repository, NoManifestError, cache_if_remote
 from .repoobj import RepoObj
 
 has_link = hasattr(os, "link")

@@ -1,5 +1,5 @@
 from ..constants import *  # NOQA
-from ..remote import RepositoryServer
+from ..legacy.remote import RepositoryServer
 
 from ..logger import create_logger
 from ..helpers.argparsing import ArgumentParser

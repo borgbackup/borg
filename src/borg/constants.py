@@ -73,7 +73,7 @@ IDS_PER_CHUNK = MAX_DATA_SIZE // 40
 # we use it in all places where we need to detect or create all-zero buffers
 zeros = bytes(MAX_DATA_SIZE)
 
-# borg.remote read() buffer size
+# borg serve (borg.legacy.remote) read() buffer size
 BUFSIZE = 10 * 1024 * 1024
 
 # To use a safe, limited unpacker, we need to set an upper limit to the archive count in the manifest.

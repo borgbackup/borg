@@ -233,7 +233,6 @@ latex_show_urls = 'footnote'
 # Documents to append as an appendix to all manuals.
 latex_appendices = [
     'support',
-    'resources',
     'changes',
     'authors',
 ]

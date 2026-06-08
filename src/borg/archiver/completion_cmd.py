@@ -627,6 +627,144 @@ _borg_help_topics() {
 """
 
 
+TCSH_PREAMBLE_TMPL = r"""
+# Dynamic completion helpers for tcsh
+
+alias _borg_complete_timestamp 'date +"%Y-%m-%dT%H:%M:%S"'
+
+
+alias _borg_complete_sortby "echo {SORT_KEYS}"
+alias _borg_complete_filescachemode "echo {FCM_KEYS}"
+alias _borg_help_topics "echo {HELP_CHOICES}"
+alias _borg_complete_compression_spec "echo {COMP_SPEC_CHOICES}"
+alias _borg_complete_chunker_params "echo {CHUNKER_PARAMS_CHOICES}"
+alias _borg_complete_relative_time "echo {RELATIVE_TIME_CHOICES}"
+alias _borg_complete_file_size "echo {FILE_SIZE_CHOICES}"
+"""
+
+
+def _monkeypatch_shtab():
+    """
+    Monkeypatches shtab's tcsh completion logic to fix severe parsing issues and add missing features.
+
+    1. Subcommand Positional Completion: shtab lacks native support for auto-completing positional
+       arguments that belong to subcommands in tcsh (e.g., `borg help <topic>`). This builds a
+       conditional evaluation structure (`if ( $#cmd >= X && ... )`) to support them.
+    2. Subshell Array Indexing Fix: `tcsh` aggressively evaluates array indices like `$cmd[2]` even
+       if the array is smaller than the requested index, causing "if: Empty if." errors. Added
+       explicit bounds checking (`$#cmd >= max_idx`).
+    3. Nested Subshell Safety: Standard shtab nests subshells using backticks which causes recursive
+       parsing crashes in tcsh. Replaced with safe `eval` usage.
+    """
+    import shtab
+    from shtab import CHOICE_FUNCTIONS, complete2pattern
+    from collections import defaultdict
+    from argparse import SUPPRESS
+    from string import Template
+
+    def patched_complete_tcsh(parser, root_prefix=None, preamble="", choice_functions=None):
+        optionals_single = set()
+        optionals_double = set()
+        specials = []
+        index_choices = defaultdict(dict)
+
+        choice_type2fn = {k: v["tcsh"] for k, v in CHOICE_FUNCTIONS.items()}
+
+        if choice_functions:
+            choice_type2fn.update(choice_functions)
+
+        def get_specials(arg, arg_type, arg_sel):
+            if arg.choices:
+                choice_strs = " ".join(map(str, arg.choices))
+                yield f"'{arg_type}/{arg_sel}/({choice_strs})/'"
+            elif hasattr(arg, "complete"):
+                complete_fn = complete2pattern(arg.complete, "tcsh", choice_type2fn)
+                if complete_fn:
+                    yield f"'{arg_type}/{arg_sel}/{complete_fn}/'"
+
+        def recurse_parser(cparser, positional_idx, requirements=None):
+            if requirements is None:
+                requirements = []
+
+            for optional in cparser._get_optional_actions():
+                if optional.help != SUPPRESS:
+                    for optional_str in optional.option_strings:
+                        if optional_str.startswith("--"):
+                            optionals_double.add(optional_str[2:])
+                        elif optional_str.startswith("-"):
+                            optionals_single.add(optional_str[1:])
+                        specials.extend(get_specials(optional, "n", optional_str))
+                        if optional.nargs != 0:
+                            specials.extend(get_specials(optional, "c", optional_str + "="))
+
+            for positional in cparser._get_positional_actions():
+                if positional.help != SUPPRESS:
+                    positional_idx += 1
+                    index_choices[positional_idx][tuple(requirements)] = positional
+                    if isinstance(positional.choices, dict):
+                        for subcmd, subparser in positional.choices.items():
+                            recurse_parser(subparser, positional_idx, requirements + [subcmd])
+
+        recurse_parser(parser, 0)
+
+        for idx, ndict in index_choices.items():
+            if len(ndict) == 1:
+                arg = list(ndict.values())[0]
+                specials.extend(get_specials(arg, "p", str(idx)))
+            else:
+                nlist = []
+                for nn, arg in ndict.items():
+                    max_idx = len(nn) + 1
+                    checks = [f'("$cmd[{iidx}]" == "{n}")' for iidx, n in enumerate(nn, start=2)]
+                    condition = f"$#cmd >= {max_idx} && " + " && ".join(checks)
+                    if arg.choices:
+                        choices_str = " ".join(map(str, arg.choices))
+                        nlist.append(f"if ( {condition} ) echo {choices_str}")
+                    elif hasattr(arg, "complete"):
+                        complete_fn = complete2pattern(arg.complete, "tcsh", choice_type2fn)
+                        if complete_fn:
+                            if complete_fn.startswith("`") and complete_fn.endswith("`"):
+                                func_name = complete_fn.strip("`")
+                                nlist.append(f"if ( {condition} ) eval {func_name}")
+                            else:
+                                nlist.append(f"if ( {condition} ) {complete_fn}")
+                if nlist:
+                    nlist_str = "; ".join(nlist)
+                    padding = '"" "" "" "" "" "" "" "" ""'
+                    specials.append(f"'p@{str(idx)}@`set cmd=(\"$COMMAND_LINE\" {padding}); {nlist_str}`@'")
+
+        if optionals_double:
+            if optionals_single:
+                optionals_single.add("-")
+            else:
+                optionals_single = ("-", "-")
+
+        specials = list(dict.fromkeys(specials))
+
+        return Template(
+            """\
+# AUTOMATICALLY GENERATED by `shtab`
+
+${preamble}
+
+complete ${prog} \\
+        'c/--/(${optionals_double_str})/' \\
+        'c/-/(${optionals_single_str})/' \\
+        ${optionals_special_str} \\
+        'p/*/()/'"""
+        ).safe_substitute(
+            preamble=("\n# Custom Preamble\n" + preamble + "\n# End Custom Preamble\n" if preamble else ""),
+            root_prefix=root_prefix,
+            prog=parser.prog,
+            optionals_double_str=" ".join(sorted(optionals_double)),
+            optionals_single_str=" ".join(sorted(optionals_single)),
+            optionals_special_str=" \\\n        ".join(specials),
+        )
+
+    shtab.complete_tcsh = patched_complete_tcsh
+    shtab._SUPPORTED_COMPLETERS["tcsh"] = patched_complete_tcsh
+
+
 def _attach_completion(parser: ArgumentParser, type_class, completion_dict: dict):
     """Tag all arguments with type `type_class` with completion choices from `completion_dict`."""
 
@@ -659,32 +797,72 @@ class CompletionMixIn:
         # adds dynamic completion for archive IDs with the aid: prefix for all ARCHIVE
         # arguments (identified by archivename_validator). It reuses `borg repo-list`
         # to enumerate archives and does not introduce any new commands or caching.
+        _monkeypatch_shtab()
         parser = self.build_parser()
         _attach_completion(
             parser, archivename_validator, {"bash": "_borg_complete_archive", "zsh": "_borg_complete_archive"}
         )
-        _attach_completion(parser, SortBySpec, {"bash": "_borg_complete_sortby", "zsh": "_borg_complete_sortby"})
+
         _attach_completion(
-            parser, FilesCacheMode, {"bash": "_borg_complete_filescachemode", "zsh": "_borg_complete_filescachemode"}
+            parser,
+            SortBySpec,
+            {"bash": "_borg_complete_sortby", "zsh": "_borg_complete_sortby", "tcsh": "`_borg_complete_sortby`"},
+        )
+        _attach_completion(
+            parser,
+            FilesCacheMode,
+            {
+                "bash": "_borg_complete_filescachemode",
+                "zsh": "_borg_complete_filescachemode",
+                "tcsh": "`_borg_complete_filescachemode`",
+            },
         )
         _attach_completion(
             parser,
             CompressionSpec,
-            {"bash": "_borg_complete_compression_spec", "zsh": "_borg_complete_compression_spec"},
+            {
+                "bash": "_borg_complete_compression_spec",
+                "zsh": "_borg_complete_compression_spec",
+                "tcsh": "`_borg_complete_compression_spec`",
+            },
         )
         _attach_completion(parser, PathSpec, shtab.DIRECTORY)
         _attach_completion(
-            parser, ChunkerParams, {"bash": "_borg_complete_chunker_params", "zsh": "_borg_complete_chunker_params"}
+            parser,
+            ChunkerParams,
+            {
+                "bash": "_borg_complete_chunker_params",
+                "zsh": "_borg_complete_chunker_params",
+                "tcsh": "`_borg_complete_chunker_params`",
+            },
         )
         _attach_completion(parser, tag_validator, {"bash": "_borg_complete_tags", "zsh": "_borg_complete_tags"})
         _attach_completion(
             parser,
             relative_time_marker_validator,
-            {"bash": "_borg_complete_relative_time", "zsh": "_borg_complete_relative_time"},
+            {
+                "bash": "_borg_complete_relative_time",
+                "zsh": "_borg_complete_relative_time",
+                "tcsh": "`_borg_complete_relative_time`",
+            },
         )
-        _attach_completion(parser, timestamp, {"bash": "_borg_complete_timestamp", "zsh": "_borg_complete_timestamp"})
         _attach_completion(
-            parser, parse_file_size, {"bash": "_borg_complete_file_size", "zsh": "_borg_complete_file_size"}
+            parser,
+            timestamp,
+            {
+                "bash": "_borg_complete_timestamp",
+                "zsh": "_borg_complete_timestamp",
+                "tcsh": "`_borg_complete_timestamp`",
+            },
+        )
+        _attach_completion(
+            parser,
+            parse_file_size,
+            {
+                "bash": "_borg_complete_file_size",
+                "zsh": "_borg_complete_file_size",
+                "tcsh": "`_borg_complete_file_size`",
+            },
         )
 
         # Collect all commands and help topics for "borg help" completion
@@ -694,7 +872,9 @@ class CompletionMixIn:
                 help_choices.extend(action.choices.keys())
 
         help_completion_fn = "_borg_help_topics"
-        _attach_help_completion(parser, {"bash": help_completion_fn, "zsh": help_completion_fn})
+        _attach_help_completion(
+            parser, {"bash": help_completion_fn, "zsh": help_completion_fn, "tcsh": "`_borg_help_topics`"}
+        )
 
         # Build preambles using partial_format to avoid escaping braces etc.
         sort_keys = " ".join(AI_HUMAN_SORT_KEYS)
@@ -730,11 +910,14 @@ class CompletionMixIn:
         }
         bash_preamble = partial_format(BASH_PREAMBLE_TMPL, mapping)
         zsh_preamble = partial_format(ZSH_PREAMBLE_TMPL, mapping)
+        tcsh_preamble = partial_format(TCSH_PREAMBLE_TMPL, mapping)
 
         if args.shell == "bash":
             preambles = [bash_preamble]
         elif args.shell == "zsh":
             preambles = [zsh_preamble]
+        elif args.shell == "tcsh":
+            preambles = [tcsh_preamble]
         else:
             preambles = []
         script = parser.get_completion_script(f"shtab-{args.shell}", preambles=preambles)

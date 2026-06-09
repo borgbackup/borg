@@ -29,3 +29,4 @@ sphinx:
 
 formats:
     - htmlzip
+    - pdf

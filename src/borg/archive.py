@@ -271,7 +271,6 @@ class DownloadPipeline:
     def __init__(self, repository, repo_objs):
         self.repository = repository
         self.repo_objs = repo_objs
-        self.hlids_preloaded = None
 
     def unpack_many(self, ids, *, filter=None):
         """
@@ -280,7 +279,6 @@ class DownloadPipeline:
         *ids* is a chunk ID list of an item content data stream.
         *filter* is an optional callable to decide whether an item will be yielded, default: yield all items.
         """
-        self.hlids_preloaded = set()
         unpacker = msgpack.Unpacker(use_list=False)
         for data in self.fetch_many(ids, ro_type=ROBJ_ARCHIVE_STREAM, replacement_chunk=False):
             if data is None:
@@ -295,35 +293,7 @@ class DownloadPipeline:
                         item.chunks_healthy = [ChunkListEntry(*e) for e in item.chunks_healthy]
                     yield item
 
-    def preload_item_chunks(self, item, optimize_hardlinks=False):
-        """
-        Preloads the content data chunks of an item (if any).
-        optimize_hardlinks can be set to True if item chunks only need to be preloaded for
-        1st hard link, but not for any further hard link to same inode / with same hlid.
-        Returns True if chunks were preloaded.
-
-        Warning: if data chunks are preloaded then all data chunks have to be retrieved,
-        otherwise preloaded chunks will accumulate in RemoteRepository and create a memory leak.
-        """
-        preload_chunks = False
-        if "chunks" in item:
-            if optimize_hardlinks:
-                hlid = item.get("hlid", None)
-                if hlid is None:
-                    preload_chunks = True
-                elif hlid in self.hlids_preloaded:
-                    preload_chunks = False
-                else:
-                    # not having the hard link's chunks already preloaded for other hard link to same inode
-                    preload_chunks = True
-                    self.hlids_preloaded.add(hlid)
-            else:
-                preload_chunks = True
-            if preload_chunks:
-                self.repository.preload([c.id for c in item.chunks])
-        return preload_chunks
-
-    def fetch_many(self, chunks, is_preloaded=False, ro_type=None, replacement_chunk=True):
+    def fetch_many(self, chunks, ro_type=None, replacement_chunk=True):
         assert ro_type is not None
         ids = []
         sizes = []
@@ -336,9 +306,7 @@ class DownloadPipeline:
             sizes = [None] * len(ids)
         else:
             raise TypeError(f"unsupported or mixed element types: {chunks}")
-        for id, size, cdata in zip(
-            ids, sizes, self.repository.get_many(ids, is_preloaded=is_preloaded, raise_missing=False)
-        ):
+        for id, size, cdata in zip(ids, sizes, self.repository.get_many(ids, raise_missing=False)):
             if cdata is None:
                 if replacement_chunk and size is not None:
                     logger.error(f"repository object {bin_to_hex(id)} missing, returning {size} zero bytes.")
@@ -663,15 +631,6 @@ Duration: {0.duration}
     def iter_items(self, filter=None):
         yield from self.pipeline.unpack_many(self.metadata.items, filter=lambda item: self.item_filter(item, filter))
 
-    def preload_item_chunks(self, item, optimize_hardlinks=False):
-        """
-        Preloads item content data chunks from the repository.
-
-        Warning: if data chunks are preloaded then all data chunks have to be retrieved,
-        otherwise preloaded chunks will accumulate in RemoteRepository and create a memory leak.
-        """
-        return self.pipeline.preload_item_chunks(item, optimize_hardlinks=optimize_hardlinks)
-
     def add_item(self, item, show_progress=True, stats=None):
         if show_progress and self.show_progress:
             if stats is None:
@@ -811,12 +770,10 @@ Duration: {0.duration}
         if dry_run or stdout:
             with self.extract_helper(item, "", hlm, dry_run=dry_run or stdout) as hardlink_set:
                 if not hardlink_set:
-                    # it does not really set hard links due to dry_run, but we need to behave same
-                    # as non-dry_run concerning fetching preloaded chunks from the pipeline or
-                    # it would get stuck.
+                    # it does not really set hard links due to dry_run, but behave the same as non-dry_run.
                     if "chunks" in item:
                         item_chunks_size = 0
-                        for data in self.pipeline.fetch_many(item.chunks, is_preloaded=True, ro_type=ROBJ_FILE_STREAM):
+                        for data in self.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
                             if pi:
                                 pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                             if stdout:
@@ -872,7 +829,7 @@ Duration: {0.duration}
                     fd = open(path, "wb")
                 with fd:
                     trailing_hole = False
-                    for data in self.pipeline.fetch_many(item.chunks, is_preloaded=True, ro_type=ROBJ_FILE_STREAM):
+                    for data in self.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM):
                         if pi:
                             pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                         with backup_io("write"):

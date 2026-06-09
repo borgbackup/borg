@@ -833,7 +833,14 @@ def test_extract_y2261(archivers, request):
     create_regular_file(archiver.input_path, "file_y2261", contents=b"post y2038 test")
     # 2261-01-01 00:00:00 UTC as a Unix timestamp (seconds).
     time_y2261 = 9183110400
-    os.utime("input/file_y2261", (time_y2261, time_y2261))
+    try:
+        os.utime("input/file_y2261", (time_y2261, time_y2261))
+    except OSError as e:
+        if e.errno == errno.EOVERFLOW:
+            # some filesystems/platforms cannot store timestamps beyond y2038
+            # (e.g. ZFS on omniOS rejects this with EOVERFLOW).
+            pytest.skip("filesystem cannot store post-y2038 timestamps")
+        raise
     cmd(archiver, "repo-create", RK_ENCRYPTION)
     cmd(archiver, "create", "test", "input")
     with changedir("output"):

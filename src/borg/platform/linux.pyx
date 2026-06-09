@@ -8,7 +8,7 @@ from ..helpers import workarounds
 from ..helpers import safe_decode, safe_encode
 from .base import SyncFile as BaseSyncFile
 from .base import safe_fadvise
-from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
+from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, _removexattr_inner, split_string0
 try:
     from .syncfilerange import sync_file_range, SYNC_FILE_RANGE_WRITE, SYNC_FILE_RANGE_WAIT_BEFORE, SYNC_FILE_RANGE_WAIT_AFTER
     SYNC_FILE_RANGE_LOADED = True
@@ -31,6 +31,10 @@ cdef extern from "sys/xattr.h":
     int c_setxattr "setxattr" (const char *path, const char *name, const void *value, size_t size, int flags)
     int c_lsetxattr "lsetxattr" (const char *path, const char *name, const void *value, size_t size, int flags)
     int c_fsetxattr "fsetxattr" (int filedes, const char *name, const void *value, size_t size, int flags)
+
+    int c_removexattr "removexattr" (const char *path, const char *name)
+    int c_lremovexattr "lremovexattr" (const char *path, const char *name)
+    int c_fremovexattr "fremovexattr" (int filedes, const char *name)
 
 cdef extern from "sys/types.h":
     int ACL_TYPE_ACCESS
@@ -119,6 +123,19 @@ def setxattr(path, name, value, *, follow_symlinks=False):
                 return c_lsetxattr(path, name, <char *> value, size, flags)
 
     _setxattr_inner(func, path, name, value)
+
+
+def removexattr(path, name, *, follow_symlinks=False):
+    def func(path, name):
+        if isinstance(path, int):
+            return c_fremovexattr(path, name)
+        else:
+            if follow_symlinks:
+                return c_removexattr(path, name)
+            else:
+                return c_lremovexattr(path, name)
+
+    _removexattr_inner(func, path, name)
 
 
 BSD_TO_LINUX_FLAGS = {

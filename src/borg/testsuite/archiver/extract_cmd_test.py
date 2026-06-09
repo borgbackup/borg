@@ -771,6 +771,32 @@ def test_extract_continue(archivers, request):
             assert f.read() == CONTENTS3
 
 
+def test_extract_patches_existing_file_in_place(archivers, request):
+    # when extracting over an existing regular file, borg updates it in place (only fetching
+    # the chunks that differ, see #5638) instead of unlinking and recreating it.
+    archiver = request.getfixturevalue(archivers)
+    # use a reasonably large, chunkable content so multiple chunks exist.
+    contents = os.urandom(4 * 1024 * 1024)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    create_regular_file(archiver.input_path, "file", contents=contents)
+    cmd(archiver, "create", "arch", "input")
+
+    with changedir("output"):
+        cmd(archiver, "extract", "arch")
+        st_before = os.stat("input/file")
+        # locally modify a few bytes near the start, leaving the rest identical.
+        with open("input/file", "rb+") as f:
+            f.seek(5)
+            f.write(b"DIFFERENT")
+        # extract again (no --continue): the existing file should be patched in place.
+        cmd(archiver, "extract", "arch")
+        st_after = os.stat("input/file")
+        if not is_win32:
+            assert st_before.st_ino == st_after.st_ino  # same inode -> updated in place
+        with open("input/file", "rb") as f:
+            assert f.read() == contents  # content fully restored
+
+
 def test_dry_run_extraction_flags(archivers, request):
     archiver = request.getfixturevalue(archivers)
     cmd(archiver, "repo-create", RK_ENCRYPTION)

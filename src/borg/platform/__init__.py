@@ -18,7 +18,7 @@ from . import xattr  # noqa: F401
 platform_ug: ModuleType | None = None  # make mypy happy
 
 if is_linux:  # pragma: linux only
-    from .linux import listxattr, getxattr, setxattr
+    from .linux import listxattr, getxattr, setxattr, removexattr
     from .linux import acl_get, acl_set
     from .linux import set_flags, get_flags
     from .linux import SyncFile
@@ -27,7 +27,7 @@ if is_linux:  # pragma: linux only
     from .posix import getosusername
     from . import posix_ug as platform_ug
 elif is_freebsd:  # pragma: freebsd only
-    from .freebsd import listxattr, getxattr, setxattr
+    from .freebsd import listxattr, getxattr, setxattr, removexattr
     from .freebsd import acl_get, acl_set
     from .freebsd import set_flags
     from .base import get_flags
@@ -37,7 +37,7 @@ elif is_freebsd:  # pragma: freebsd only
     from .posix import getosusername
     from . import posix_ug as platform_ug
 elif is_netbsd:  # pragma: netbsd only
-    from .netbsd import listxattr, getxattr, setxattr
+    from .netbsd import listxattr, getxattr, setxattr, removexattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
     from .base import SyncFile
@@ -46,7 +46,7 @@ elif is_netbsd:  # pragma: netbsd only
     from .posix import getosusername
     from . import posix_ug as platform_ug
 elif is_darwin:  # pragma: darwin only
-    from .darwin import listxattr, getxattr, setxattr
+    from .darwin import listxattr, getxattr, setxattr, removexattr
     from .darwin import acl_get, acl_set
     from .darwin import is_darwin_feature_64_bit_inode, _get_birthtime_ns
     from .darwin import set_flags
@@ -59,7 +59,7 @@ elif is_darwin:  # pragma: darwin only
     from . import posix_ug as platform_ug
 elif not is_win32:  # pragma: posix only
     # Generic code for all other POSIX OSes
-    from .base import listxattr, getxattr, setxattr
+    from .base import listxattr, getxattr, setxattr, removexattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
     from .base import SyncFile
@@ -69,7 +69,7 @@ elif not is_win32:  # pragma: posix only
     from . import posix_ug as platform_ug
 else:  # pragma: win32 only
     # Win32-specific stuff
-    from .base import listxattr, getxattr, setxattr
+    from .base import listxattr, getxattr, setxattr, removexattr
     from .base import acl_get, acl_set
     from .base import set_flags, get_flags
     from .windows import SyncFile

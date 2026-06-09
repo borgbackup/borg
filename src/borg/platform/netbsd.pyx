@@ -1,4 +1,4 @@
-from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_lstring
+from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, _removexattr_inner, split_lstring
 
 
 
@@ -14,6 +14,10 @@ cdef extern from "sys/extattr.h":
     int c_extattr_set_file "extattr_set_file" (const char *path, int attrnamespace, const char *attrname, const void *data, size_t nbytes)
     int c_extattr_set_link "extattr_set_link" (const char *path, int attrnamespace, const char *attrname, const void *data, size_t nbytes)
     int c_extattr_set_fd "extattr_set_fd" (int fd, int attrnamespace, const char *attrname, const void *data, size_t nbytes)
+
+    int c_extattr_delete_file "extattr_delete_file" (const char *path, int attrnamespace, const char *attrname)
+    int c_extattr_delete_link "extattr_delete_link" (const char *path, int attrnamespace, const char *attrname)
+    int c_extattr_delete_fd "extattr_delete_fd" (int fd, int attrnamespace, const char *attrname)
 
     int EXTATTR_NAMESPACE_USER
 
@@ -87,3 +91,22 @@ def setxattr(path, name, value, *, follow_symlinks=False):
         pass
     else:
         _setxattr_inner(func, path, name, value)
+
+
+def removexattr(path, name, *, follow_symlinks=False):
+    def func(path, name):
+        if isinstance(path, int):
+            return c_extattr_delete_fd(path, ns_id, name)
+        else:
+            if follow_symlinks:
+                return c_extattr_delete_file(path, ns_id, name)
+            else:
+                return c_extattr_delete_link(path, ns_id, name)
+
+    ns, name = split_ns(name, b"user")
+    try:
+        ns_id = NS_ID_MAP[ns]  # this will raise a KeyError it the namespace is unsupported
+    except KeyError:
+        pass
+    else:
+        _removexattr_inner(func, path, name)

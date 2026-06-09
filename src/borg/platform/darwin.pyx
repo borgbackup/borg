@@ -6,7 +6,7 @@ from posix.time cimport timespec
 
 from . import posix_ug
 from ..helpers import safe_decode, safe_encode
-from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, split_string0
+from .xattr import _listxattr_inner, _getxattr_inner, _setxattr_inner, _removexattr_inner, split_string0
 
 
 
@@ -31,6 +31,9 @@ cdef extern from "sys/xattr.h":
 
     int c_setxattr "setxattr" (const char *path, const char *name, const void *value, size_t size, uint32_t pos, int flags)
     int c_fsetxattr "fsetxattr" (int filedes, const char *name, const void *value, size_t size, uint32_t pos, int flags)
+
+    int c_removexattr "removexattr" (const char *path, const char *name, int flags)
+    int c_fremovexattr "fremovexattr" (int filedes, const char *name, int flags)
 
     int XATTR_NOFOLLOW
 
@@ -98,6 +101,19 @@ def setxattr(path, name, value, *, follow_symlinks=False):
                 return c_setxattr(path, name, <char *> value, size, 0, XATTR_NOFOLLOW)
 
     _setxattr_inner(func, path, name, value)
+
+
+def removexattr(path, name, *, follow_symlinks=False):
+    def func(path, name):
+        if isinstance(path, int):
+            return c_fremovexattr(path, name, XATTR_NOFLAGS)
+        else:
+            if follow_symlinks:
+                return c_removexattr(path, name, XATTR_NOFLAGS)
+            else:
+                return c_removexattr(path, name, XATTR_NOFOLLOW)
+
+    _removexattr_inner(func, path, name)
 
 
 def _remove_numeric_id_if_possible(acl):

@@ -72,7 +72,14 @@ class ExtractMixIn:
                 logging.getLogger("borg.output.list").info(f"{log_prefix} {remove_surrogates(item.path)}")
 
             if is_matched:
-                archive.preload_item_chunks(item, optimize_hardlinks=True)
+                # Skip preloading when we will update an existing regular file in place:
+                # that path only fetches the chunks that differ, so preloading all of them
+                # would leak the unfetched ones in the RemoteRepository (see preload_item_chunks).
+                preloaded = True
+                if not dry_run and not stdout and archive.will_patch_in_place(item):
+                    preloaded = False
+                else:
+                    archive.preload_item_chunks(item, optimize_hardlinks=True)
 
                 if not dry_run:
                     while dirs and not item.path.startswith(dirs[-1].path):
@@ -97,6 +104,7 @@ class ExtractMixIn:
                                 hlm=hlm,
                                 pi=pi,
                                 continue_extraction=continue_extraction,
+                                preloaded=preloaded,
                             )
                 except BackupError as e:
                     self.print_warning_instance(BackupWarning(remove_surrogates(orig_path), e))

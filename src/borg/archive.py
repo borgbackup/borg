@@ -760,6 +760,125 @@ Duration: {0.duration}
                 # In this case, we *want* to extract twice, because there is no other way.
                 pass
 
+    def _fs_has_extended_acl(self, path, st):
+        """
+        Return True if the filesystem object at *path* (with stat *st*) has a non-trivial
+        (extended) ACL.
+
+        clear_attrs() deliberately does not reset ACLs. So if the existing file has an extended ACL that the archive item does not,
+        an in-place update would leave that stale ACL behind. We detect this here and let such
+        files take the normal extraction path (fresh inode) instead.
+        """
+        if is_win32 or self.noacls:
+            return False
+        probe = Item()
+        try:
+            # acl_get only sets acl_* keys when there is a non-trivial ACL; for plain mode-only
+            # permissions it sets nothing (it checks acl_extended_*() first on all platforms).
+            acl_get(path, probe, st, numeric_ids=self.numeric_ids)
+        except OSError:
+            # if we cannot even read ACLs (e.g. unsupported by the fs), none can survive: safe.
+            return False
+        return any(key.startswith("acl") for key in probe.as_dict())
+
+    def can_patch_in_place(self, item, path, st):
+        """
+        Can the existing filesystem object at *path* (described by *st*) be updated in place
+        from *item* by only fetching the chunks that differ (see compare_and_extract_chunks)?
+
+        We only do this for plain regular files (not hard links): the destination must already
+        exist as a regular file and the item must be a regular file, too. Hard links keep going
+        through the normal extraction path so the preloading bookkeeping stays correct.
+
+        Finally, we skip files that carry an extended ACL, see _fs_has_extended_acl().
+        """
+        if st is None:
+            return False
+        if "hlid" in item:
+            return False
+        if not (stat.S_ISREG(st.st_mode) and stat.S_ISREG(item.mode)):
+            return False
+        if st.st_nlink != 1:
+            return False
+        return not self._fs_has_extended_acl(path, st)
+
+    def will_patch_in_place(self, item):
+        """
+        Like can_patch_in_place(), but stats the destination itself.
+
+        Used by the extract command to decide whether to skip preloading this item's chunks.
+        """
+        if "hlid" in item or not stat.S_ISREG(item.mode):
+            return False
+        path = os.path.join(self.cwd, item.path)
+        try:
+            st = os.stat(path, follow_symlinks=False)
+        except OSError:
+            return False
+        return self.can_patch_in_place(item, path, st)
+
+    def compare_and_extract_chunks(self, item, path, *, st, pi=None):
+        """
+        Update the existing regular file at *path* in place from *item*, fetching only the
+        chunks whose content differs from what is already on disk.
+
+        *st* is the stat result of the existing file as determined by the caller. Returns True
+        if the file was updated in place, or False if the caller should fall back to a full
+        extraction.
+        """
+        if not self.can_patch_in_place(item, path, st):
+            return False
+
+        # First pass (read-only): hash the existing on-disk content using the archived chunk
+        # sizes, so we can compare it chunk-by-chunk with the archived chunk list.
+        with backup_io("open"):
+            fs_file = open(path, "rb+")
+        with fs_file:
+            fs_chunks = []
+            for item_chunk in item.chunks:
+                with backup_io("read"):
+                    data = fs_file.read(item_chunk.size)
+                fs_chunks.append(ChunkListEntry(id=self.key.id_hash(data), size=len(data)))
+
+            # Only the chunks that actually differ need to be fetched from the repository.
+            # These were not preloaded (see will_patch_in_place / the extract command), so we
+            # fetch them as regular, non-preloaded objects.
+            needed_chunks = [
+                item_chunk for fs_chunk, item_chunk in zip(fs_chunks, item.chunks) if fs_chunk != item_chunk
+            ]
+            fetched_chunks = self.pipeline.fetch_many(needed_chunks, ro_type=ROBJ_FILE_STREAM)
+
+            # Second pass: for each archived chunk, seek over the matching on-disk chunk or
+            # overwrite the differing one with the freshly fetched data.
+            with backup_io("seek"):
+                fs_file.seek(0)
+            for fs_chunk, item_chunk in zip(fs_chunks, item.chunks):
+                if fs_chunk == item_chunk:
+                    with backup_io("seek"):
+                        fs_file.seek(item_chunk.size, os.SEEK_CUR)
+                else:
+                    data = next(fetched_chunks)
+                    with backup_io("write"):
+                        fs_file.write(data)
+                if pi:
+                    pi.show(increase=item_chunk.size, info=[remove_surrogates(item.path)])
+
+            with backup_io("truncate_and_attrs"):
+                item_chunks_size = fs_file.tell()
+                fs_file.truncate(item_chunks_size)
+                fs_file.flush()
+                fd = fs_file.fileno()
+                # the file existed before, so it may carry stale metadata that
+                # restore_attrs() would not clear: wipe it first.
+                self.clear_attrs(path, fd=fd)
+                self.restore_attrs(path, item, fd=fd)
+
+        if "size" in item:
+            item_size = item.size
+            if item_size != item_chunks_size:
+                raise BackupError(f"Size inconsistency detected: size {item_size}, chunks size {item_chunks_size}")
+        return True
+
     def extract_item(
         self,
         item,
@@ -771,6 +890,7 @@ Duration: {0.duration}
         hlm=None,
         pi=None,
         continue_extraction=False,
+        preloaded=True,
     ):
         """
         Extract archive item.
@@ -783,6 +903,9 @@ Duration: {0.duration}
         :param hlm: maps hlid to link_target for extracting subtrees with hard links correctly
         :param pi: ProgressIndicatorPercent (or similar) for file extraction progress (in bytes)
         :param continue_extraction: continue a previously interrupted extraction of the same archive
+        :param preloaded: whether this item's chunks were preloaded (see preload_item_chunks).
+            Must be False if the caller skipped preloading (e.g. for in-place updates), so the
+            full-extraction fetch does not wait for preloaded chunks that were never requested.
         """
 
         def same_item(item, st):
@@ -816,7 +939,9 @@ Duration: {0.duration}
                     # it would get stuck.
                     if "chunks" in item:
                         item_chunks_size = 0
-                        for data in self.pipeline.fetch_many(item.chunks, is_preloaded=True, ro_type=ROBJ_FILE_STREAM):
+                        for data in self.pipeline.fetch_many(
+                            item.chunks, is_preloaded=preloaded, ro_type=ROBJ_FILE_STREAM
+                        ):
                             if pi:
                                 pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                             if stdout:
@@ -836,13 +961,20 @@ Duration: {0.duration}
 
         dest = self.cwd
         path = os.path.join(dest, item.path)
+        st = None  # There is no file at path (or we could not stat it).
         # Attempt to remove existing files, ignore errors on failure
         try:
             st = os.stat(path, follow_symlinks=False)
             if continue_extraction and same_item(item, st):
                 return  # done! we already have fully extracted this file in a previous run.
-            if not stat.S_ISDIR(st.st_mode):
+            if self.can_patch_in_place(item, path, st):
+                # keep the existing regular file in place so it can be updated by only
+                # fetching the chunks that differ from what is already there.
+                # compare_and_extract_chunks() will use this st.
+                pass
+            elif not stat.S_ISDIR(st.st_mode):
                 os.unlink(path)
+                st = None
             elif stat.S_ISDIR(item.mode):
                 # if we have an existing directory and we want to extract a directory,
                 # we just use the existing one and do not remove it.
@@ -851,10 +983,11 @@ Duration: {0.duration}
                 pass
             else:
                 os.rmdir(path)  # only works for empty directories
+                st = None
         except UnicodeEncodeError:
             raise self.IncompatibleFilesystemEncodingError(path, sys.getfilesystemencoding()) from None
         except OSError:
-            pass
+            st = None
 
         def make_parent(path):
             parent_dir = os.path.dirname(path)
@@ -868,11 +1001,13 @@ Duration: {0.duration}
             with self.extract_helper(item, path, hlm) as hardlink_set:
                 if hardlink_set:
                     return
+                if self.compare_and_extract_chunks(item, path, st=st, pi=pi):
+                    return
                 with backup_io("open"):
                     fd = open(path, "wb")
                 with fd:
                     trailing_hole = False
-                    for data in self.pipeline.fetch_many(item.chunks, is_preloaded=True, ro_type=ROBJ_FILE_STREAM):
+                    for data in self.pipeline.fetch_many(item.chunks, is_preloaded=preloaded, ro_type=ROBJ_FILE_STREAM):
                         if pi:
                             pi.show(increase=len(data), info=[remove_surrogates(item.path)])
                         with backup_io("write"):
@@ -1029,6 +1164,31 @@ Duration: {0.duration}
             except OSError:
                 # some systems don't support calling utime on a symlink
                 pass
+
+    def clear_attrs(self, path, fd=None):
+        """
+        Remove pre-existing filesystem metadata (extended attributes and BSD-style flags) from
+        *path* (*fd*), bringing it to a "fresh" state for a subsequent restore_attrs().
+
+        restore_attrs() only *adds* the metadata stored in the archive item; it assumes a newly
+        created file. When updating an existing file in place (see compare_and_extract_chunks),
+        the file may carry xattrs or flags that are not present in the archive and that would
+        otherwise survive.
+
+        Note: ACLs are not cleared here. An access ACL present in the archive item is overwritten
+        by restore_attrs(); however, ACLs present only on the pre-existing file are not removed.
+        """
+        if is_win32:
+            return
+        # Clear flags first: a leftover immutable/append flag from the existing file must not
+        # survive, and restore_attrs() only sets flags when the archive item carries them.
+        if not self.noflags:
+            try:
+                set_flags(path, 0, fd=fd)
+            except OSError:
+                pass
+        if not self.noxattrs:
+            xattr.clear_all(fd if fd is not None else path, follow_symlinks=False)
 
     def set_meta(self, key, value):
         metadata = self._load_meta(self.id)

@@ -540,6 +540,12 @@ jobs:
                 sudo python3 -m ensurepip
                 sudo python3 -m pip install virtualenv
 
+                # On omniOS /tmp is swap-backed tmpfs (small, RAM-bound), so the pip/cargo
+                # build temps and the pytest temp tree quickly exhaust it ("no space left on
+                # device"). /var/tmp is disk-backed (ZFS), so redirect TMPDIR there.
+                export TMPDIR=/var/tmp/borg-ci
+                mkdir -p "$TMPDIR"
+
                 python3 -m venv .venv
                 . .venv/bin/activate
                 python -V

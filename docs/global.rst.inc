@@ -14,7 +14,6 @@
 .. _ACL: https://en.wikipedia.org/wiki/Access_control_list
 .. _libacl: https://savannah.nongnu.org/projects/acl/
 .. _libattr: https://savannah.nongnu.org/projects/attr/
-.. _libxxhash: https://github.com/Cyan4973/xxHash
 .. _liblz4: https://github.com/Cyan4973/lz4
 .. _libzstd: https://github.com/facebook/zstd
 .. _OpenSSL: https://www.openssl.org/
@@ -28,4 +27,3 @@
 .. _userspace filesystems: https://en.wikipedia.org/wiki/Filesystem_in_Userspace
 .. _Cython: https://cython.org/
 .. _virtualenv: https://pypi.org/project/virtualenv/
-.. _python-xxhash: https://github.com/ifduyue/python-xxhash/

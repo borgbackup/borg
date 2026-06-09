@@ -39,7 +39,6 @@ dependencies = [
   "argon2-cffi",
   "shtab>=1.8.0",
   "backports-zstd; python_version < '3.14'", # for python < 3.14.
-  "xxhash>=2.0.0",
   "jsonargparse>=4.47.0",
   "PyYAML>=6.0.2",  # we need to register our types with yaml, jsonargparse uses yaml for config files
   "blake3>=1.0.0",

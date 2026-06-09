@@ -1,9 +1,11 @@
 import os
+import sys
 import time
 from pathlib import Path
 from hashlib import sha256
 
 from borgstore.store import Store
+from borgstore.backends.rest import REST, ssh_cmd
 from borgstore.store import ObjectNotFound as StoreObjectNotFound
 from borgstore.backends.errors import BackendError as StoreBackendError
 from borgstore.backends.errors import BackendDoesNotExist as StoreBackendDoesNotExist
@@ -32,6 +34,69 @@ def repo_lister(repository, *, limit=None):
         if not finished:
             marker = result[-1][0]
         yield from result
+
+
+def borg_permissions(permissions):
+    """Map a borg permissions string to a borgstore permissions dict (or None for "all").
+
+    The namespaces match the borg repository layout (see Repository.__init__ ns_config).
+    """
+    if permissions == "all":
+        return None  # permissions system will not be used
+    elif permissions == "no-delete":  # mostly no delete, no overwrite
+        return {
+            "": "lr",
+            "archives": "lrw",
+            "cache": "lrwWD",  # WD for chunks.<HASH>, last-key-checked, ...
+            "config": "lrW",  # W for manifest
+            "keys": "lr",
+            "locks": "lrwD",  # borg needs to create/delete a shared lock here
+            "packs": "lrw",
+        }
+    elif permissions == "write-only":  # mostly no reading
+        return {
+            "": "l",
+            "archives": "lw",
+            "cache": "lrwWD",  # read allowed, e.g. for chunks.<HASH> cache
+            "config": "lrW",  # W for manifest
+            "keys": "lr",
+            "locks": "lrwD",  # borg needs to create/delete a shared lock here
+            "packs": "lw",  # no r!
+        }
+    elif permissions == "read-only":  # mostly r/o
+        return {"": "lr", "locks": "lrwD"}
+    else:
+        raise Error(
+            f"Invalid BORG_REPO_PERMISSIONS value: {permissions}, should be one of: "
+            f"all, no-delete, write-only, read-only."
+        )
+
+
+def rest_serve_command(location):
+    """Build the command line that serves a rest:// *location* via "borg serve --rest".
+
+    For a local rest:// (no host) we run this borg directly (over stdio); if a host is
+    given, we prefix an ssh command (reusing borgstore's ssh_cmd / BORGSTORE_RSH).
+    """
+    backend_arg = f"FILE:{location.path}"
+    if not location.host:
+        # run this borg locally, talking over stdio
+        borg_cmd = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, "-m", "borg"]
+        return borg_cmd + ["serve", "--rest", "--backend", backend_arg]
+    # reach the remote borg via ssh
+    remote_path = os.environ.get("BORG_REMOTE_PATH", "borg")
+    return ssh_cmd(location.user, location.host, location.port) + [
+        remote_path,
+        "serve",
+        "--rest",
+        "--backend",
+        backend_arg,
+    ]
+
+
+def build_rest_backend(location):
+    """Return a borgstore REST backend for a rest:// *location*, served by "borg serve --rest"."""
+    return REST(base_url="http://stdio-backend", command=rest_serve_command(location))
 
 
 class Repository:
@@ -125,39 +190,18 @@ class Repository:
         }
         # Get permissions from parameter or environment variable
         permissions = permissions if permissions is not None else os.environ.get("BORG_REPO_PERMISSIONS", "all")
-
-        if permissions == "all":
-            permissions = None  # permissions system will not be used
-        elif permissions == "no-delete":  # mostly no delete, no overwrite
-            permissions = {
-                "": "lr",
-                "archives": "lrw",
-                "cache": "lrwWD",  # WD for chunks.<HASH>, last-key-checked, ...
-                "config": "lrW",  # W for manifest
-                "keys": "lr",
-                "locks": "lrwD",  # borg needs to create/delete a shared lock here
-                "packs": "lrw",
-            }
-        elif permissions == "write-only":  # mostly no reading
-            permissions = {
-                "": "l",
-                "archives": "lw",
-                "cache": "lrwWD",  # read allowed, e.g. for chunks.<HASH> cache
-                "config": "lrW",  # W for manifest
-                "keys": "lr",
-                "locks": "lrwD",  # borg needs to create/delete a shared lock here
-                "packs": "lw",  # no r!
-            }
-        elif permissions == "read-only":  # mostly r/o
-            permissions = {"": "lr", "locks": "lrwD"}
-        else:
-            raise Error(
-                f"Invalid BORG_REPO_PERMISSIONS value: {permissions}, should be one of: "
-                f"all, no-delete, write-only, read-only."
-            )
+        permissions = borg_permissions(permissions)
 
         try:
-            self.store = Store(url, config=ns_config, permissions=permissions)
+            if location.proto == "rest":
+                # rest:// is served by "borg serve --rest" (reachable via ssh if a host is given),
+                # talking HTTP over stdio - rather than borgstore's own "borgstore-server-rest" command.
+                # permissions are not given to the (remote) backend here; they are enforced on the
+                # server side by "borg serve --rest --permissions ...".
+                backend = build_rest_backend(location)
+                self.store = Store(backend=backend, config=ns_config)
+            else:
+                self.store = Store(url, config=ns_config, permissions=permissions)
         except StoreBackendError as e:
             raise Error(str(e))
         self.store_opened = False

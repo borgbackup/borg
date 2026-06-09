@@ -16,7 +16,7 @@ from subprocess import Popen, PIPE
 import borg.logger
 from .. import __version__
 from ..constants import *  # NOQA
-from ..helpers import Error, ErrorWithTraceback, IntegrityError
+from ..helpers import Error, ErrorWithTraceback, IntegrityError, PathNotAllowed
 from ..helpers import bin_to_hex
 from ..helpers import get_limited_unpacker
 from ..helpers import replace_placeholders
@@ -53,12 +53,6 @@ class ConnectionClosedWithHint(ConnectionClosed):
     """Connection closed by remote host. {}"""
 
     exit_mcode = 81
-
-
-class PathNotAllowed(Error):
-    """Repository path not allowed: {}."""
-
-    exit_mcode = 83
 
 
 class InvalidRPCMethod(Error):
@@ -758,13 +752,15 @@ class RepositoryServer:  # pragma: no cover
         "get_manifest",  # borg2 LegacyRepository has this
     )
 
-    def __init__(self, restrict_to_paths, restrict_to_repositories, permissions=None):
+    def __init__(self, restrict_to_paths, restrict_to_repositories):
         self.repository = None
         self.RepoCls = None
         self.rpc_methods = ("open", "close", "negotiate")
         self.restrict_to_paths = restrict_to_paths
         self.restrict_to_repositories = restrict_to_repositories
-        self.permissions = permissions
+        # note: legacy (borg 1.x / v1) repositories have no permission system, so borg serve
+        # does not accept/forward permissions here (the --permissions option only applies to
+        # the non-legacy "borg serve --rest" path).
         self.client_version = None  # we update this after client sends version information
 
     def filter_args(self, f, kwargs):

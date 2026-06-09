@@ -76,6 +76,12 @@ class CommandError(Error):
     exit_mcode = 4
 
 
+class PathNotAllowed(Error):
+    """Repository path not allowed: {}."""
+
+    exit_mcode = 83
+
+
 class BorgWarning:
     """Warning: {}"""
 

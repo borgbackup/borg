@@ -171,6 +171,10 @@ New features:
 - WIP packs project, major repo format changes, you must create new repos! #8572
 - rest:// repository URLs - connect via ssh to remote borgstore REST server,
   talking http via stdio, #9593
+- ``borg serve --rest`` serves a (non-legacy) repository as the remote-side
+  component of a rest:// repository (HTTP over stdio). A rest:// client then
+  starts ``borg serve --rest`` on the remote.
+  ``borg serve`` (without --rest) serves legacy borg 1.x repositories.
 - removed ssh:// and socket:// support for current repositories; use a rest://
   repository instead (it can tunnel over ssh). ssh:// and ``borg serve`` remain
   available only for legacy (borg 1.x / v1) repositories, e.g. for

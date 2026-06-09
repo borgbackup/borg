@@ -65,7 +65,7 @@ If you only back up your own files, run it as your normal user (i.e. not root).
 For a local repository always use the same user to invoke borg.
 
 For a remote repository: always use e.g., rest://borg@remote_host (Borg connects
-via ssh and runs a borgstore REST server on the remote). You can use this
+via ssh and runs ``borg serve --rest`` on the remote). You can use this
 from different local users; the remote user running borg and accessing the
 repo will always be `borg`.
 
@@ -363,8 +363,8 @@ Remote repositories
 Borg can initialize and access repositories on remote hosts if the
 host is accessible using SSH.  This is fastest and easiest when Borg
 is installed on the remote host, in which case a ``rest://`` repository URL is
-used. Borg connects via SSH and runs a borgstore REST server on the remote host
-(talking HTTP over stdio)::
+used. Borg connects via SSH and runs ``borg serve --rest`` on the remote host,
+which serves the repository talking HTTP over stdio::
 
   $ borg -r rest://user@hostname:port/path/to/repo repo-create ...
 
@@ -533,8 +533,8 @@ Example with **borg extract**:
 Difference when using a **remote borg backup server**:
 
 It is basically all the same as with the local repository, but you need to
-refer to the repo using a ``rest://`` URL (Borg connects via ssh and runs a
-borgstore REST server on the remote host).
+refer to the repo using a ``rest://`` URL (Borg connects via ssh and runs
+``borg serve --rest`` on the remote host).
 
 In the given example, ``borg`` is the user name used to log into the machine
 ``backup.example.org`` which runs ssh on port ``2222`` and has the borg repo

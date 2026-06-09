@@ -339,7 +339,15 @@ class Archiver(
                 # everything else comes from the forced "borg serve" command (or the defaults).
                 # stuff from denylist must never be used from the client.
                 denylist = {"restrict_to_paths", "restrict_to_repositories", "umask", "permissions"}
-                allowlist = {"debug_topics", "lock_wait", "log_level"}
+                # "backend" is given by the client to the REST server to contruct a posixfs backend
+                # that shall be used as a repository (borg serve --rest --backend FILE:<path>).
+                # Like the legacy repository path (transmitted via the RPC protocol),
+                # the client chooses *which* repository it wants to use; the ssh forced command pins the
+                # restrictions, and do_serve_rest validates the client backend against restrict_to_paths
+                # and restrict_to_repositories.
+                # The --rest mode flag itself is intentionally NOT allowlisted, so the forced command
+                # keeps pinning the mode (legacy/rpc vs. non-legacy/rest).
+                allowlist = {"debug_topics", "lock_wait", "log_level", "backend"}
                 not_present = object()
                 for attr_name in allowlist:
                     assert attr_name not in denylist, "allowlist has denylisted attribute name %s" % attr_name

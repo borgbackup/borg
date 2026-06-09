@@ -8,10 +8,11 @@ import pytest
 from ..legacy.hashindex import NSIndex1
 from ..helpers import Location
 from ..helpers import IntegrityError
+from ..helpers import PathNotAllowed
 from ..helpers import msgpack
 from ..fslocking import Lock, LockFailed
 from ..platformflags import is_win32
-from ..legacy.remote import LegacyRemoteRepository, InvalidRPCMethod, PathNotAllowed
+from ..legacy.remote import LegacyRemoteRepository, InvalidRPCMethod
 from ..legacy.repository import LegacyRepository, LoggedIO
 from ..legacy.repository import MAGIC, MAX_DATA_SIZE, TAG_DELETE, TAG_PUT, TAG_COMMIT
 from ..compress import CNONE

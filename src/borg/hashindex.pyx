@@ -5,6 +5,8 @@ import struct
 
 from borghash import HashTableNT
 
+from .constants import UNKNOWN_INT32, UNKNOWN_BYTES32
+
 
 
 cdef _NoDefault = object()
@@ -79,8 +81,9 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
         else:
             flags = v.flags | self.F_USED
             assert v.size == 0 or v.size == size
-        pack_id = key  # N=1: chunk_id == pack_id
-        self[key] = ChunkIndexEntry(flags=flags, size=size, pack_id=pack_id, obj_offset=0, obj_size=0)
+        self[key] = ChunkIndexEntry(
+            flags=flags, size=size, pack_id=UNKNOWN_BYTES32, obj_offset=UNKNOWN_INT32, obj_size=UNKNOWN_INT32
+        )
 
     def __getitem__(self, key):
         """Specialized __getitem__ that hides system flags."""
@@ -104,6 +107,14 @@ class ChunkIndex(HTProxyMixin, MutableMapping):
             system_flags &= ~self.F_NEW
         user_flags = value.flags & self.M_USER
         self.ht[key] = value._replace(flags=system_flags | user_flags)
+
+    def update_pack_info(self, pack_results):
+        """Update the on-disk location fields for a list of (chunk_id, pack_id, obj_offset, obj_size) tuples."""
+        if not pack_results:
+            return
+        for chunk_id, pack_id, obj_offset, obj_size in pack_results:
+            existing = self[chunk_id]
+            self[chunk_id] = existing._replace(pack_id=pack_id, obj_offset=obj_offset, obj_size=obj_size)
 
     def clear_new(self):
         """Clears the F_NEW flag of all items."""

@@ -1,10 +1,11 @@
 import os
 import sys
+from hashlib import sha256
 
 import pytest
 from ..constants import ROBJ_FILE_STREAM
 from ..helpers import IntegrityError, Location
-from ..repository import Repository, MAX_DATA_SIZE, cache_if_remote, rest_serve_command
+from ..repository import Repository, MAX_DATA_SIZE, cache_if_remote, rest_serve_command, PackWriter
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from ..crypto.key import PlaintextKey
 from .hashindex_test import H
@@ -200,3 +201,67 @@ class TestCacheIfRemote:
     def test_decrypted_cache_and_transform_incompatible(self, cache_repository, repo_objs):
         with pytest.raises(ValueError):
             cache_if_remote(cache_repository, decrypted_cache=repo_objs, transform=lambda key, data: data)
+
+
+class MockStore:
+    def __init__(self):
+        self.stored = {}
+
+    def store(self, key, data):
+        self.stored[key] = data
+
+
+def test_pack_writer_returns_none_when_not_full():
+    pw = PackWriter(MockStore(), max_count=2)
+    assert pw.add(b"a" * 32, b"data") is None
+
+
+def test_pack_writer_flush_returns_none_when_empty():
+    pw = PackWriter(MockStore(), max_count=1)
+    assert pw.flush() is None
+
+
+def test_pack_writer_n1_flush():
+    store = MockStore()
+    chunk_id = b"c" * 32
+    cdata = b"payload"
+    pw = PackWriter(store, max_count=1)
+    results = pw.add(chunk_id, cdata)
+    assert results is not None
+    assert len(results) == 1
+    stored_id, pack_id, obj_offset, obj_size = results[0]
+    assert stored_id == chunk_id
+    assert pack_id == chunk_id  # N=1: pack_id == chunk_id
+    assert obj_offset == 0
+    assert obj_size == len(cdata)
+
+
+def test_pack_writer_n2_flush():
+    store = MockStore()
+    id1, id2 = b"a" * 32, b"b" * 32
+    data1, data2 = b"first", b"second"
+    pw = PackWriter(store, max_count=2)
+    assert pw.add(id1, data1) is None
+    results = pw.add(id2, data2)
+    assert results is not None
+    assert len(results) == 2
+    pack_data = data1 + data2
+    expected_pack_id = sha256(pack_data).digest()
+    assert results[0] == (id1, expected_pack_id, 0, len(data1))
+    assert results[1] == (id2, expected_pack_id, len(data1), len(data2))
+
+
+def test_pack_writer_final_partial_pack_uses_sha256():
+    # When max_count > 1, a final flush with only 1 piece must still use SHA256,
+    # not the N=1 pack_id == chunk_id hack.
+    store = MockStore()
+    chunk_id = b"d" * 32
+    cdata = b"solo"
+    pw = PackWriter(store, max_count=3)
+    assert pw.add(chunk_id, cdata) is None
+    results = pw.flush()
+    assert results is not None
+    assert len(results) == 1
+    _, pack_id, _, _ = results[0]
+    assert pack_id == sha256(cdata).digest()
+    assert pack_id != chunk_id

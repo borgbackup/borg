@@ -2012,12 +2012,16 @@ class ArchiveChecker:
             # either we already have this chunk in repo and chunks index or we add it now
             if id_ not in self.chunks:
                 assert cdata is not None
-                pack_id = id_  # only correct for N=1
                 self.chunks[id_] = ChunkIndexEntry(
-                    flags=ChunkIndex.F_USED, size=size, pack_id=pack_id, obj_offset=0, obj_size=0
+                    flags=ChunkIndex.F_USED,
+                    size=size,
+                    pack_id=UNKNOWN_BYTES32,
+                    obj_offset=UNKNOWN_INT32,
+                    obj_size=UNKNOWN_INT32,
                 )
                 if self.repair:
-                    self.repository.put(id_, cdata)
+                    pack_results = self.repository.put(id_, cdata)
+                    self.chunks.update_pack_info(pack_results)
 
         def verify_file_chunks(archive_name, item):
             """Verifies that all file chunks are present. Missing file chunks will be logged."""

@@ -112,7 +112,7 @@ class TarMixIn:
             """
             Return a file-like object that reads from the chunks of *item*.
             """
-            chunk_iterator = archive.pipeline.fetch_many(item.chunks, is_preloaded=True, ro_type=ROBJ_FILE_STREAM)
+            chunk_iterator = archive.pipeline.fetch_many(item.chunks, ro_type=ROBJ_FILE_STREAM)
             if pi:
                 info = [remove_surrogates(item.path)]
                 return ChunkIteratorFileWrapper(
@@ -231,7 +231,6 @@ class TarMixIn:
             return ph
 
         for item in archive.iter_items(filter):
-            archive.preload_item_chunks(item, optimize_hardlinks=True)
             orig_path = item.path
             if strip_components:
                 item.path = os.sep.join(orig_path.split(os.sep)[strip_components:])

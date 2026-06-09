@@ -241,14 +241,12 @@ class LegacyRemoteRepository:
 
     def __init__(self, location, create=False, exclusive=False, lock_wait=None, lock=True, args=None):
         self.location = self._location = location
-        self.preload_ids = []
         self.msgid = 0
         self.rx_bytes = 0
         self.tx_bytes = 0
         self.to_send = EfficientCollectionQueue(1024 * 1024, bytes)
         self.stdin_fd = self.stdout_fd = self.stderr_fd = None
         self.stderr_received = b""  # incomplete stderr line bytes received (no \n yet)
-        self.chunkid_to_msgids = {}
         self.ignore_responses = set()
         self.responses = {}
         self.async_responses = {}
@@ -431,7 +429,7 @@ class LegacyRemoteRepository:
         for resp in self.call_many(cmd, [args], **kw):
             return resp
 
-    def call_many(self, cmd, calls, wait=True, is_preloaded=False, async_wait=True):
+    def call_many(self, cmd, calls, wait=True, async_wait=True):
         if not calls and cmd != "async_responses":
             return
 
@@ -447,12 +445,6 @@ class LegacyRemoteRepository:
                     # EWOULDBLOCK is added for defensive programming sake.
                     if e.errno not in [errno.EAGAIN, errno.EWOULDBLOCK]:
                         raise
-
-        def pop_preload_msgid(chunkid):
-            msgid = self.chunkid_to_msgids[chunkid].pop(0)
-            if not self.chunkid_to_msgids[chunkid]:
-                del self.chunkid_to_msgids[chunkid]
-            return msgid
 
         def handle_error(unpacked):
             if "exception_class" not in unpacked:
@@ -533,7 +525,7 @@ class LegacyRemoteRepository:
                         else:
                             handle_error(unpacked)
                             yield unpacked[RESULT]
-                if self.to_send or ((calls or self.preload_ids) and len(waiting_for) < MAX_INFLIGHT):
+                if self.to_send or (calls and len(waiting_for) < MAX_INFLIGHT):
                     w_fds = [self.stdin_fd]
                 else:
                     w_fds = []
@@ -594,39 +586,15 @@ class LegacyRemoteRepository:
                             # decode late, avoid partial utf-8 sequences.
                             _logger.warning("stderr: " + line.decode().strip())
                 if w:
-                    while (
-                        (len(self.to_send) <= maximum_to_send)
-                        and (calls or self.preload_ids)
-                        and len(waiting_for) < MAX_INFLIGHT
-                    ):
-                        if calls:
-                            if is_preloaded:
-                                assert cmd == "get", "is_preload is only supported for 'get'"
-                                if calls[0]["id"] in self.chunkid_to_msgids:
-                                    waiting_for.append(pop_preload_msgid(calls.pop(0)["id"]))
-                            else:
-                                args = calls.pop(0)
-                                if cmd == "get" and args["id"] in self.chunkid_to_msgids:
-                                    waiting_for.append(pop_preload_msgid(args["id"]))
-                                else:
-                                    self.msgid += 1
-                                    waiting_for.append(self.msgid)
-                                    self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))
-                        if not self.to_send and self.preload_ids:
-                            chunk_id = self.preload_ids.pop(0)
-                            args = {"id": chunk_id}
-                            self.msgid += 1
-                            self.chunkid_to_msgids.setdefault(chunk_id, []).append(self.msgid)
-                            self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: "get", ARGS: args}))
+                    while (len(self.to_send) <= maximum_to_send) and calls and len(waiting_for) < MAX_INFLIGHT:
+                        args = calls.pop(0)
+                        self.msgid += 1
+                        waiting_for.append(self.msgid)
+                        self.to_send.push_back(msgpack.packb({MSGID: self.msgid, MSG: cmd, ARGS: args}))
 
                     send_buffer()
         finally:
             self.ignore_responses |= set(waiting_for)  # we lose order here
-            if is_preloaded:
-                for call in calls:
-                    chunkid = call["id"]
-                    if chunkid in self.chunkid_to_msgids:
-                        self.ignore_responses.add(pop_preload_msgid(chunkid))
 
     @api(since=parse_version("1.0.0"), v1_legacy={"since": parse_version("2.0.0b21"), "previously": True})
     def open(self, path, create=False, lock_wait=None, lock=True, exclusive=False, v1_legacy=False):
@@ -668,9 +636,9 @@ class LegacyRemoteRepository:
         for resp in self.get_many([id], read_data=read_data, raise_missing=raise_missing):
             return resp
 
-    def get_many(self, ids, read_data=True, is_preloaded=False, raise_missing=True):
+    def get_many(self, ids, read_data=True, raise_missing=True):
         # note: legacy remote protocol does not support raise_missing parameter, so we ignore it here
-        yield from self.call_many("get", [{"id": id, "read_data": read_data} for id in ids], is_preloaded=is_preloaded)
+        yield from self.call_many("get", [{"id": id, "read_data": read_data} for id in ids])
 
     @api(since=parse_version("1.0.0"))
     def put(self, id, data, wait=True):
@@ -712,9 +680,6 @@ class LegacyRemoteRepository:
     def async_response(self, wait=True):
         for resp in self.call_many("async_responses", calls=[], wait=True, async_wait=wait):
             return resp
-
-    def preload(self, ids):
-        self.preload_ids += ids
 
     @api(since=parse_version("2.0.0b8"))
     def get_manifest(self):

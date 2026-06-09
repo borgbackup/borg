@@ -72,8 +72,6 @@ class ExtractMixIn:
                 logging.getLogger("borg.output.list").info(f"{log_prefix} {remove_surrogates(item.path)}")
 
             if is_matched:
-                archive.preload_item_chunks(item, optimize_hardlinks=True)
-
                 if not dry_run:
                     while dirs and not item.path.startswith(dirs[-1].path):
                         dir_item = dirs.pop(-1)

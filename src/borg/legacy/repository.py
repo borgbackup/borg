@@ -1148,7 +1148,7 @@ class LegacyRepository:
             else:
                 return None
 
-    def get_many(self, ids, read_data=True, is_preloaded=False, raise_missing=True):
+    def get_many(self, ids, read_data=True, raise_missing=True):
         for id_ in ids:
             yield self.get(id_, read_data=read_data, raise_missing=raise_missing)
 
@@ -1212,9 +1212,6 @@ class LegacyRepository:
         If wait=True is given and there are outstanding responses, it will wait for them
         to arrive. With wait=False, it will only return already received responses.
         """
-
-    def preload(self, ids):
-        """Preload objects (only applies to remote repositories)"""
 
     def get_manifest(self):
         try:

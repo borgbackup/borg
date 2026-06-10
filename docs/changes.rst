@@ -207,6 +207,8 @@ Other changes:
   Note: for these repositories the canonical location string changed slightly, so on the first run
   against an existing such repository borg may warn once that it "was previously located at ..." -
   this is harmless and can be confirmed.
+- remove leftover socket: protocol code (the unix-socket transport and the --socket option were
+  never part of a stable borg 2 release).
 - keyfile: name key files by sha256(keyfile_contents).
   Existing legacy-named keyfiles continue to work.
 - repokey: use same format as with external keyfile

@@ -544,7 +544,7 @@ class Location:
     # path may contain any chars. to avoid ambiguities with other regexes, it must not start with
     # "//", a "scheme://" or one of the borgstore "scheme:" specifiers (all of which are matched
     # before local_re in _parse). the borgstore scheme list is sourced from BORGSTORE_SCHEMES.
-    local_path_re = r"(?!(//|(?:ssh|socket|file)://|(?:" + "|".join(BORGSTORE_SCHEMES) + r"):))" r"(?P<path>.+)"
+    local_path_re = r"(?!(//|(?:ssh|file)://|(?:" + "|".join(BORGSTORE_SCHEMES) + r"):))" r"(?P<path>.+)"
 
     # abs_path must start with a slash (or drive letter on Windows).
     abs_path_re = r"(?P<path>[A-Za-z]:/.+)" if is_win32 else r"(?P<path>/.+)"

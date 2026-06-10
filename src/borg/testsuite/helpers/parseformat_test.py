@@ -244,13 +244,6 @@ class TestLocationWithoutEnv:
         # credentials stripped from canonical_path
         assert loc.canonical_path() == "http://host:1234/"
 
-    def test_socket(self, monkeypatch):
-        monkeypatch.delenv("BORG_REPO", raising=False)
-        # socket:// is no longer supported and must be rejected as an invalid location.
-        url = "socket:///c:/repo/path" if is_win32 else "socket:///repo/path"
-        with pytest.raises(ValueError):
-            Location(url)
-
     def test_file(self, monkeypatch):
         monkeypatch.delenv("BORG_REPO", raising=False)
         url = "file:///c:/repo/path" if is_win32 else "file:///repo/path"

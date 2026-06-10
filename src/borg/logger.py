@@ -44,7 +44,7 @@ Logging setup in Borg needs to work under various conditions:
 - Tests: potentially running in parallel via pytest-xdist, capturing Borg output into a
   given stream.
 - Logging might be short-lived (e.g., when invoking a single Borg command via the CLI)
-  or long-lived (e.g., borg serve --socket or when running the tests).
+  or long-lived (e.g., borg serve or when running the tests).
 - Logging is global and exists only once per process.
 """
 

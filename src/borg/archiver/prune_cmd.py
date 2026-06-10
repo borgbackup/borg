@@ -385,7 +385,8 @@ class PruneMixIn:
         as a pre-filter. When ``--since`` is used together with interval-based
         ``--keep-*`` options (e.g. ``--keep-daily 7d``), the interval is
         measured backwards from the given timestamp rather than from the
-        current time. Count-based retention is unaffected.
+        current time. Count-based retention does not count the unconditionally
+        kept archives.
 
         The ``--keep-13weekly`` and ``--keep-3monthly`` rules are two different
         strategies for keeping archives every quarter year.

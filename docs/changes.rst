@@ -185,6 +185,10 @@ New features:
 
 Fixes:
 
+- compact: invalidate cached chunk indexes before deleting objects, #9748.
+  An interrupted compact no longer leaves a stale cache/chunks.* that claims
+  deleted objects still exist, which could cause a later create to skip
+  re-uploading data and silently produce an archive with dangling references.
 - files cache: fix no-change backup emptying the files cache, #9749
 - fix canonical_path() missing ':' before port number
 - fix: xattr xdg backup exclusion should be on 'false'

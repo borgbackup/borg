@@ -1,11 +1,14 @@
+import os
 from pathlib import Path
 
 import pytest
 
 from ...constants import *  # NOQA
 from ...helpers import get_cache_dir
-from ...cache import files_cache_name, discover_files_cache_names
-from . import cmd, create_src_archive, generate_archiver_tests, RK_ENCRYPTION
+from ...cache import files_cache_name, discover_files_cache_names, list_chunkindex_hashes
+from ...manifest import Manifest
+from . import cmd, create_regular_file, create_src_archive, generate_archiver_tests, open_repository, RK_ENCRYPTION
+from . import changedir
 
 pytest_generate_tests = lambda metafunc: generate_archiver_tests(metafunc, kinds="local,remote,binary")  # NOQA
 
@@ -83,6 +86,61 @@ def test_compact_index_corruption(archivers, request):
 
     output = cmd(archiver, "compact", "-v", "--stats", exit_code=0)
     assert "missing objects" not in output
+
+
+@pytest.mark.parametrize("stats", (True, False))
+def test_compact_interrupted_does_not_poison_chunk_index(archivers, request, monkeypatch, stats):
+    """Regression test for issue #9748.
+
+    If a compact is interrupted after it deleted repository objects but before it wrote the
+    updated chunk index, the still-existing cache/chunks.* must not claim that the deleted
+    objects are still present. Otherwise a later "borg create" trusts the stale index, does
+    not re-upload the affected chunks and silently produces an archive with dangling object
+    references (which extracts to zero bytes).
+
+    The fix invalidates all cached chunk indexes before the first delete, so an interruption
+    is conservative: the next client rebuilds the index from actual repository contents and
+    re-uploads any deleted data. This is tested for both compact paths (default and --stats).
+    """
+    from ...archiver.compact_cmd import ArchiveGarbageCollector
+
+    archiver = request.getfixturevalue(archivers)
+
+    # Unique content, so the chunk(s) become unused once we delete the only archive referencing them.
+    content = os.urandom(1024 * 1024)
+    create_regular_file(archiver.input_path, "file1", contents=content)
+
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+    cmd(archiver, "create", "archive1", "input")
+    cmd(archiver, "delete", "-a", "archive1")
+
+    # Simulate an interruption inside compact: run the real garbage collection (which deletes the
+    # unused objects), but force it to abort right before it writes the fresh, updated chunk index.
+    repository = open_repository(archiver)
+    with repository:
+        manifest = Manifest.load(repository, (Manifest.Operation.DELETE,))
+        gc = ArchiveGarbageCollector(repository, manifest, stats=stats, iec=False)
+
+        def interrupt():
+            raise KeyboardInterrupt("simulated interruption before save_chunk_index")
+
+        monkeypatch.setattr(gc, "save_chunk_index", interrupt)
+        with pytest.raises(KeyboardInterrupt):
+            gc.garbage_collect()
+
+    # The objects were deleted, so no readable cached chunk index may still list them.
+    repository = open_repository(archiver)
+    with repository:
+        assert list_chunkindex_hashes(repository) == []
+
+    # A later backup of identical content must re-upload the deleted chunks, ...
+    cmd(archiver, "create", "archive2", "input")
+    # ... and extracting it must reproduce the original bytes without missing-object warnings.
+    with changedir("output"):
+        output = cmd(archiver, "extract", "archive2")
+        assert "missing" not in output
+        with open(os.path.join("input", "file1"), "rb") as fd:
+            assert fd.read() == content
 
 
 def test_compact_files_cache_cleanup(archivers, request):

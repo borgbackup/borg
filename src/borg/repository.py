@@ -415,9 +415,8 @@ class Repository:
         """Set the ChunkIndex get() uses to resolve pack locations.
 
         The caller retains ownership; Repository holds a borrowed reference.
-        Pass None to reset to an empty index.
         """
-        self._chunks = chunks if chunks is not None else ChunkIndex()
+        self._chunks = chunks
 
     def flush(self):
         """Flush any buffered pack writer chunks."""
@@ -435,7 +434,6 @@ class Repository:
         if self.store_opened:
             self.store.close()
             self.store_opened = False
-        self._chunks = None
         self.opened = False
 
     def info(self):
@@ -612,11 +610,12 @@ class Repository:
 
     def get(self, id, read_data=True, raise_missing=True):
         self._lock_refresh()
-        pack_id = id  # N=1 fallback: pack_id == chunk_id
-        obj_offset, obj_size = 0, None
         entry = self._chunks.get(id)
-        if entry is not None and entry.pack_id != UNKNOWN_BYTES32:  # UNKNOWN: buffered, not yet flushed
-            pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
+        if entry is None or entry.pack_id == UNKNOWN_BYTES32:
+            if raise_missing:
+                raise self.ObjectNotFound(id, str(self._location))
+            return None
+        pack_id, obj_offset, obj_size = entry.pack_id, entry.obj_offset, entry.obj_size
         id_hex = bin_to_hex(id)
         key = "packs/" + bin_to_hex(pack_id)
         try:
@@ -672,7 +671,11 @@ class Repository:
         data_size = len(data)
         if data_size > MAX_DATA_SIZE:
             raise IntegrityError(f"More than allowed put data [{data_size} > {MAX_DATA_SIZE}]")
-        return self._pack_writer.add(id, data)
+        pack_results = self._pack_writer.add(id, data)
+        self._chunks.add(id, 0)  # mark seen; uncompressed size filled in by cache layer
+        if pack_results:
+            self._chunks.update_pack_info(pack_results)
+        return pack_results
 
     def delete(self, id, wait=True):
         """delete a repo object

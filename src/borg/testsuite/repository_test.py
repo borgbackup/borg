@@ -77,15 +77,21 @@ def pdchunk(chunk):
 
 
 def test_basic_operations(repo_fixtures, request):
+    chunks = ChunkIndex()
     with get_repository_from_fixture(repo_fixtures, request) as repository:
         for x in range(100):
-            repository.put(H(x), fchunk(b"SOMEDATA"))
+            pack_results = repository.put(H(x), fchunk(b"SOMEDATA"))
+            if pack_results:
+                for chunk_id, *_ in pack_results:
+                    chunks.add(chunk_id, 0)
+                chunks.update_pack_info(pack_results)
         key50 = H(50)
         assert pdchunk(repository.get(key50)) == b"SOMEDATA"
         repository.delete(key50)
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(key50)
     with reopen(repository) as repository:
+        repository.set_chunk_index(chunks)
         with pytest.raises(Repository.ObjectNotFound):
             repository.get(key50)
         for x in range(100):
@@ -254,6 +260,18 @@ def test_get_uses_chunk_index_location(tmp_path):
         repository.set_chunk_index(chunks)
         assert repository.get(id1) == chunk1
         assert repository.get(id2) == chunk2
+
+
+def test_put_marks_id_in_chunk_index(tmp_path):
+    # put() immediately updates _chunks: add() marks the id as seen, then update_pack_info
+    # fills in the real pack location for the current session.
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        id1 = H(1)
+        repository.put(id1, fchunk(b"ZEROS"))
+        entry = repository._chunks.get(id1)
+        assert entry is not None
+        assert entry.pack_id == id1  # N=1: pack_id == chunk_id, set by update_pack_info in put()
+        assert entry.size == 0  # uncompressed size filled in by cache layer
 
 
 def test_pack_writer_final_partial_pack_uses_sha256():

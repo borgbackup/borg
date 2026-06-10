@@ -1,3 +1,4 @@
+from itertools import product
 import json
 import pytest
 import re
@@ -5,6 +6,7 @@ from operator import attrgetter
 from datetime import datetime, timezone, timedelta
 from ...constants import *  # NOQA
 from ...archiver.prune_cmd import (
+    PRUNING_RULES,
     prune,
     PRUNE_DAILY,
     PRUNE_HOURLY,
@@ -509,16 +511,6 @@ def test_prune_keep_int_or_interval(archivers, request, backup_files, keep_arg):
     assert re.search(r"Would prune:\s+test-3", output)
 
 
-@pytest.mark.parametrize("keep_arg", ["--keep=0", "--keep=0S"])
-def test_prune_keep_int_or_interval_zero(archivers, request, backup_files, keep_arg):
-    archiver = request.getfixturevalue(archivers)
-    cmd(archiver, "repo-create", RK_ENCRYPTION)
-    dt = datetime(2023, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
-    _create_archive_dt(archiver, backup_files, "test", dt)
-    output = cmd(archiver, "prune", "--list", "--dry-run", "--since", dt.isoformat(), keep_arg)
-    assert re.search(r"Would prune:\s+test", output)
-
-
 @pytest.mark.parametrize("keep_arg", ["--keep-daily=-1", "--keep-daily=all"])
 def test_prune_keep_all(archivers, request, backup_files, keep_arg):
     archiver = request.getfixturevalue(archivers)
@@ -714,6 +706,24 @@ def test_prune_no_args(archivers, request):
     flags = ["secondly", "minutely", "hourly", "daily", "weekly", "monthly", "yearly", "13weekly", "3monthly"]
     for flag in flags:
         assert f"keep-{flag}" in output
+
+
+@pytest.mark.parametrize("keep_arg,value", product([rule.key for rule in PRUNING_RULES], ["0", "0S"]))
+def test_prune_all_zero_args_one(archivers, request, keep_arg, value):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    arg_with_prefix = "--keep" if keep_arg == "keep" else f"--keep-{keep_arg.replace('quarterly_', '')}"
+    output = _cmd_prune_error(archiver, f"{arg_with_prefix}={value}")
+    assert re.search(r"None of the .* settings have a positive value. At least one must be non-zero.", output)
+
+
+def test_prune_all_zero_multiple_multiple(archivers, request):
+    archiver = request.getfixturevalue(archivers)
+    cmd(archiver, "repo-create", RK_ENCRYPTION)
+
+    output = _cmd_prune_error(archiver, "--keep-secondly=0S", "--keep-daily=0")
+    assert re.search(r"None of the .* settings have a positive value. At least one must be non-zero.", output)
 
 
 @pytest.mark.parametrize(

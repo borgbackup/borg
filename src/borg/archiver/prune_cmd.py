@@ -296,6 +296,13 @@ class PruneMixIn:
                 "specified."
             )
 
+        if all(not bool(val) for val in keep_args.values()):
+            raise CommandError(
+                'None of the "keep", "keep-secondly", "keep-minutely", "keep-hourly", "keep-daily", "keep-weekly", '
+                '"keep-monthly", "keep-13weekly", "keep-3monthly", or "keep-yearly" settings have a positive value. '
+                "At least one must be non-zero."
+            )
+
         def lo_hi_mismatch_errmsg(lo_arg, lo_val, hi_arg, hi_val):
             return (
                 f"The combination of \"{lo_arg}='{lo_val}'\" and \"{hi_arg}='{hi_val}'\" is invalid. It is effectively "

@@ -56,7 +56,7 @@ class CreateMixIn:
             except OSError:
                 pass
             # Add local repository dir to inode_skip list
-            if not args.location.host:
+            if args.location.proto == "file":
                 try:
                     st = os.stat(args.location.path)
                     skip_inodes.add((st.st_ino, st.st_dev))

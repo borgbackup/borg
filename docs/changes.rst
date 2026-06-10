@@ -201,6 +201,12 @@ Fixes:
 
 Other changes:
 
+- Location: simplify parsing/validation, #9678.
+  For sftp/http(s)/s3/b2/rclone repositories, borg now only detects the scheme and hands the raw
+  URL to borgstore, which parses and validates it (removing the duplicate parsing borg did before).
+  Note: for these repositories the canonical location string changed slightly, so on the first run
+  against an existing such repository borg may warn once that it "was previously located at ..." -
+  this is harmless and can be confirmed.
 - keyfile: name key files by sha256(keyfile_contents).
   Existing legacy-named keyfiles continue to work.
 - repokey: use same format as with external keyfile

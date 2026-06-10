@@ -603,20 +603,23 @@ class Repository:
                     # note: do not collect the marker id
         return result
 
-    def get(self, id, read_data=True, raise_missing=True):
+    def get(self, id, read_data=True, raise_missing=True, obj_offset=0, obj_size=None):
         self._lock_refresh()
         pack_id = id  # N=1: pack_id == chunk_id
         id_hex = bin_to_hex(id)
         key = "packs/" + bin_to_hex(pack_id)
         try:
             if read_data:
-                return self.store.load(key)
+                return self.store.load(key, offset=obj_offset, size=obj_size)
             else:
                 # RepoObj layout supports separately encrypted metadata and data.
                 # We return enough bytes so the client can decrypt the metadata.
                 hdr_size = RepoObj.obj_header.size
                 extra_size = 1024 - hdr_size  # load a bit more, 1024b, reduces round trips
-                obj = self.store.load(key, size=hdr_size + extra_size)
+                load_size = hdr_size + extra_size
+                if obj_size is not None:
+                    load_size = min(load_size, obj_size)
+                obj = self.store.load(key, offset=obj_offset, size=load_size)
                 hdr = obj[0:hdr_size]
                 if len(hdr) != hdr_size:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {hdr_size}, got {len(hdr)} bytes")
@@ -624,7 +627,12 @@ class Repository:
                 if meta_size > extra_size:
                     # we did not get enough, need to load more, but not all.
                     # this should be rare, as chunk metadata is rather small usually.
-                    obj = self.store.load(key, size=hdr_size + meta_size)
+                    retry_size = hdr_size + meta_size
+                    if obj_size is not None:
+                        # normally a no-op (meta_size <= obj_size - hdr_size for a healthy object);
+                        # guards against a corrupted meta_size producing an oversize read.
+                        retry_size = min(retry_size, obj_size)
+                    obj = self.store.load(key, offset=obj_offset, size=retry_size)
                 meta = obj[hdr_size : hdr_size + meta_size]
                 if len(meta) != meta_size:
                     raise IntegrityError(f"Object too small [id {id_hex}]: expected {meta_size}, got {len(meta)} bytes")

@@ -3,7 +3,7 @@ import sys
 from hashlib import sha256
 
 import pytest
-from ..helpers import IntegrityError, Location
+from ..helpers import IntegrityError, Location, bin_to_hex
 from ..repository import Repository, MAX_DATA_SIZE, rest_serve_command, PackWriter
 from ..repoobj import RepoObj, OBJ_MAGIC, OBJ_VERSION
 from .hashindex_test import H
@@ -196,6 +196,18 @@ def test_pack_writer_n2_flush():
     expected_pack_id = sha256(pack_data).digest()
     assert results[0] == (id1, expected_pack_id, 0, len(data1))
     assert results[1] == (id2, expected_pack_id, len(data1), len(data2))
+
+
+def test_get_with_range(tmp_path):
+    # get() passes obj_offset/obj_size through to store.load() for range reads.
+    chunk1 = fchunk(b"FIRST")
+    chunk2 = fchunk(b"SECOND")
+    pack = chunk1 + chunk2
+    pack_id = H(42)
+    with Repository(str(tmp_path / "repo"), exclusive=True, create=True) as repository:
+        repository.store_store("packs/" + bin_to_hex(pack_id), pack)
+        assert repository.get(pack_id, obj_offset=0, obj_size=len(chunk1)) == chunk1
+        assert repository.get(pack_id, obj_offset=len(chunk1), obj_size=len(chunk2)) == chunk2
 
 
 def test_pack_writer_final_partial_pack_uses_sha256():

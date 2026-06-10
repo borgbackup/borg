@@ -846,8 +846,7 @@ and disk space on subsequent runs. Here what Borg does when you run ``borg creat
 - Transmits to repo. If the repo is remote, this usually involves an SSH connection
   (does its own encryption / authentication).
 - Stores the chunk into a key/value store (the key is the chunk id, the value
-  is the data). While doing that, it computes XXH64 of the data (repo low-level
-  checksum, used by borg check --repository).
+  is the data).
 
 Subsequent backups are usually very fast if most files are unchanged and only
 a few are new or modified. The high performance on unchanged files primarily depends

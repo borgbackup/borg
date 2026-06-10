@@ -81,13 +81,8 @@ A repo object has a structure like this:
 
 * 32-bit meta size
 * 32-bit data size
-* 64-bit xxh64(meta)
-* 64-bit xxh64(data)
 * meta
 * data
-
-The size and xxh64 hashes can be used for server-side corruption checks without
-needing to decrypt anything (which would require the borg key).
 
 The overall size of repository objects varies from very small (a small source
 file will be stored as a single repository object) to medium (big source files will
@@ -897,8 +892,7 @@ Data corruption in the files cache could create incorrect archives, e.g. due
 to wrong object IDs or sizes in the files cache.
 
 Therefore, Borg calculates checksums when writing these files and tests checksums
-when reading them. Checksums are generally 64-bit XXH64 hashes.
-The canonical xxHash representation is used, i.e. big-endian.
+when reading them. Checksums are generally 256-bit sha256 hashes.
 Checksums are stored as hexadecimal ASCII strings.
 
 For compatibility, checksums are not required and absent checksums do not trigger errors.
@@ -909,19 +903,7 @@ Checksums are a data safety mechanism. They are not a security mechanism.
 
 .. rubric:: Choice of algorithm
 
-XXH64 has been chosen for its high speed on all platforms, which avoids performance
-degradation in CPU-limited parts (e.g. cache synchronization).
-Unlike CRC32, it neither requires hardware support (crc32c or CLMUL)
-nor vectorized code nor large, cache-unfriendly lookup tables to achieve good performance.
-This simplifies deployment of it considerably (cf. src/borg/algorithms/crc32...).
-
-Further, XXH64 is a non-linear hash function and thus has a "more or less" good
-chance to detect larger burst errors, unlike linear CRCs where the probability
-of detection decreases with error size.
-
-The 64-bit checksum length is considered sufficient for the file sizes typically
-checksummed (individual files up to a few GB, usually less).
-xxHash was expressly designed for data blocks of these sizes.
+sha256 has been chosen for its wide availability on all platforms and hw acceleration on some.
 
 Lower layer — file_integrity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -959,10 +941,10 @@ All checksums are compiled into a simple JSON structure called *integrity data*:
 .. code-block:: json
 
     {
-        "algorithm": "XXH64",
+        "algorithm": "SHA256",
         "digests": {
-            "HashHeader": "eab6802590ba39e3",
-            "final": "e2a7f132fc2e8b24"
+            "HashHeader": "eab6802590ba39e3...",
+            "final": "e2a7f132fc2e8b24..."
         }
     }
 
@@ -996,7 +978,7 @@ The ``[integrity]`` section is used:
 
     [integrity]
     manifest = 10e...21c
-    files = {"algorithm": "XXH64", "digests": {"HashHeader": "eab...39e3", "final": "e2a...b24"}}
+    files = {"algorithm": "SHA256", "digests": {"HashHeader": "eab...39e3", "final": "e2a...b24"}}
 
 The manifest ID is duplicated in the integrity section due to the way all Borg
 versions handle the config file. Instead of creating a "new" config file from
